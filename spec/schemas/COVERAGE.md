@@ -28,8 +28,8 @@ canonical `chio_spec_codegen::GENERATED_HEADER`; it is not exported from
 
 ## Wire schemas: `chio-wire/v1/`
 
-The native Chio message families defined in `spec/WIRE_PROTOCOL.md`. Forty
-schema files across eleven subtrees.
+The native Chio message families defined in `spec/WIRE_PROTOCOL.md`. Ninety-four
+schema files across twelve subtrees.
 
 ### agent (3)
 
@@ -70,17 +70,28 @@ schema files across eleven subtrees.
 | `error/policy_denied.schema.json`     |    27 |
 | `error/tool_server_error.schema.json` |    16 |
 
-### capability (4)
+### capability (15)
 
-Capability tokens, grants, revocation envelopes, and the capability list
-projection. See `capability/README.md`.
+Capability tokens, grants, revocation envelopes, aggregate delegation-family
+budgets, and threshold approval artifacts. See `capability/README.md`.
 
-| File                                  | Lines |
-|---------------------------------------|-------|
-| `capability/capabilities.schema.json` |    28 |
-| `capability/grant.schema.json`        |   140 |
-| `capability/revocation.schema.json`   |    20 |
-| `capability/token.schema.json`        |   427 |
+| File                                                             | Lines |
+|------------------------------------------------------------------|-------|
+| `capability/aggregate-budget-root-binding-body.schema.json`      |    23 |
+| `capability/aggregate-budget-root-binding.schema.json`           |    16 |
+| `capability/aggregate-budget-root-commitment.schema.json`        |    23 |
+| `capability/aggregate-family-preservation-evidence.schema.json`  |    12 |
+| `capability/aggregate-invocation-budget.schema.json`             |    17 |
+| `capability/capabilities.schema.json`                            |    28 |
+| `capability/governed-approval-token-body.schema.json`            |    24 |
+| `capability/governed-approval-token.schema.json`                 |    27 |
+| `capability/governed-transaction-intent.schema.json`             |   327 |
+| `capability/grant.schema.json`                                   |   140 |
+| `capability/revocation.schema.json`                              |    20 |
+| `capability/threshold-approval-proposal-body.schema.json`        |    26 |
+| `capability/threshold-approval-proposal.schema.json`             |    18 |
+| `capability/token.schema.json`                                   |   436 |
+| `capability/verified-approval-set.schema.json`                   |    28 |
 
 ### receipt (3)
 
@@ -103,17 +114,32 @@ JSON-RPC framing used by the hosted MCP HTTP edge. See `jsonrpc/README.md`.
 | `jsonrpc/request.schema.json`     |    46 |
 | `jsonrpc/response.schema.json`    |    67 |
 
-### trust-control (4)
+### trust-control (7)
 
-Trust-control plane messages: lease, heartbeat, terminate, and attestation.
-See `trust-control/README.md`.
+Trust-control plane messages plus supplemental quota, request-binding, and
+authoritative admission-capture projections. See `trust-control/README.md`.
 
-| File                                  | Lines |
-|---------------------------------------|-------|
-| `trust-control/attestation.schema.json` |  88 |
-| `trust-control/heartbeat.schema.json` |    41 |
-| `trust-control/lease.schema.json`     |    64 |
-| `trust-control/terminate.schema.json` |    52 |
+| File                                                         | Lines |
+|--------------------------------------------------------------|-------|
+| `trust-control/admission-capture-metadata.schema.json`       |    36 |
+| `trust-control/admission-request-binding.schema.json`        |    40 |
+| `trust-control/attestation.schema.json`                      |    88 |
+| `trust-control/budget-invocation-admission-evidence.schema.json` | 68 |
+| `trust-control/heartbeat.schema.json`                        |    41 |
+| `trust-control/lease.schema.json`                            |    64 |
+| `trust-control/terminate.schema.json`                        |    52 |
+
+### security (40)
+
+Closed native security contracts for information flow, declassification,
+manifest v2, cage enforcement, broker execution, and witnessed key rotation.
+
+| Subfamily                    | Files | Covers |
+|------------------------------|-------|--------|
+| Information flow            |     3 | Labels, tool-flow declarations, and declassification grants. |
+| Manifest and cage            |    10 | Tool manifests, signed envelopes, launch policy, init plans, and enforcement evidence. |
+| Broker                       |    17 | Capability, request-proof, durable attempt registration, execute success and failure evidence, and receipt bodies and envelopes. |
+| Witnessed key log            |    10 | Events, checkpoints, witness signatures, activation commits, synchronization, and enterprise receipts. |
 
 ### provenance (4)
 
@@ -183,7 +209,7 @@ Loose schema files at the root of `spec/schemas/`.
 | `model-card.v1.json`          |    68 | Signed declaration binding a model's loaded weights to an allowed capability set, banned tools, and training-data class. |
 | `receipt-provenance-v1.json`  |    29 | Receipt-provenance record shape. |
 | `chio-tee-frame-v1.json`      |   151 | Capture frame emitted by the chio-tee shadow runner per kernel evaluation. |
-| `registry.json`               |   963 | Verifier-facing registry of signed artifact schema IDs and their schema files. |
+| `registry.json`               |  1725 | Verifier-facing registry of signed artifact schema IDs and their schema files. |
 
 ## Conformance and vector coverage
 
@@ -205,7 +231,9 @@ The native scenarios cover capability validation, delegation attenuation, DPoP
 verification, governed-transaction enforcement, receipt integrity, and
 revocation propagation.
 
-Cross-language binding vectors under `tests/bindings/vectors/` (one `v1.json`
-per domain): `canonical`, `capability`, `eval`, `hashing`, `manifest`,
-`receipt`, and `signing`. SDKs in other languages round-trip these vectors
-through their generated bindings.
+Cross-language binding vectors under `tests/bindings/vectors/` include the
+legacy per-domain `v1.json` corpora and recursive enterprise security indexes.
+The `security/broker/`, `security/cage/`, `security/key-log/`, and
+`security/protocol-primitives/` corpora bind each positive vector to an exact
+schema and include semantic mutation cases. SDKs in other languages round-trip
+these vectors through their generated bindings.

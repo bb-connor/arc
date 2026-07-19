@@ -47,8 +47,8 @@ auto-bumps.
 The `computer-use` feature alone is not sufficient to enable the
 server-tool surface at runtime. The adapter requires a `chio-manifest`
 `server_tools: [...]` allowlist at lift time through
-`AnthropicAdapter::new_with_manifest`. Default deny applies even with the
-feature on, including when `AnthropicAdapter::new` is used without manifest
+`AnthropicAdapter::new_with_registry`. Default deny applies even with the
+feature on, including when `AnthropicAdapter::new` is used without a verified manifest
 wiring.
 
 ## Components
@@ -91,6 +91,14 @@ Unlisted server tools return a `ProviderError::Malformed` before the
 `ToolInvocation` crosses the Chio trust boundary. Regular custom tools are
 not affected by `server_tools` and continue through the normal capability and
 guard path.
+
+Allowlisting a stable server-tool family does not authorize arbitrary input
+shapes from a future provider revision. Before kernel execution,
+`chio-manifest` validates the invocation against Chio's pinned trusted schema
+catalog for the `computer_use`, `bash`, or `text_editor` family. A date-suffix
+revision remains classified under the same allowlist entry, but incompatible
+new actions or fields fail closed until the trusted catalog is reviewed and
+updated.
 
 This differs from Bedrock Converse. Bedrock tool use is client-defined via
 `toolConfig`; it does not have an Anthropic-managed `bash` server tool, so

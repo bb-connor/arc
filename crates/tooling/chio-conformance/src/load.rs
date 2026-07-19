@@ -31,8 +31,13 @@ pub fn load_scenarios_from_dir(
 }
 
 pub fn load_results_from_dir(path: impl AsRef<Path>) -> Result<Vec<ScenarioResult>, LoadError> {
+    let path = path.as_ref();
+    let artifacts_dir = path.join("artifacts");
     let mut results = Vec::new();
-    for file_path in collect_json_files(path.as_ref())? {
+    for file_path in collect_json_files(path)?
+        .into_iter()
+        .filter(|file_path| !file_path.starts_with(&artifacts_dir))
+    {
         let content = fs::read_to_string(&file_path)?;
         match serde_json::from_str::<Vec<ScenarioResult>>(&content) {
             Ok(mut batch) => results.append(&mut batch),
@@ -196,6 +201,39 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(scenarios[0].id, "initialize");
         assert_eq!(results[0].peer, "js");
+        Ok(())
+    }
+
+    #[test]
+    fn load_results_excludes_diagnostic_artifacts() -> Result<(), LoadError> {
+        let dir = unique_dir("chio-conformance-load-result-artifacts")?;
+        let results_dir = dir.join("results");
+        fs::create_dir_all(results_dir.join("artifacts/security"))?;
+        fs::write(
+            results_dir.join("python.json"),
+            r#"[{
+              "scenarioId": "initialize",
+              "peer": "python",
+              "peerRole": "client_to_chio_server",
+              "deploymentMode": "wrapped_stdio",
+              "transport": "stdio",
+              "specVersion": "2025-11-25",
+              "category": "mcp-core",
+              "status": "pass",
+              "durationMs": 12,
+              "assertions": [{"name": "initialize_succeeds", "status": "pass"}]
+            }]"#,
+        )?;
+        fs::write(
+            results_dir.join("artifacts/security/signed-policy.json"),
+            r#"{"body":{"schema":"chio.test.policy.v1"}}"#,
+        )?;
+
+        let results = load_results_from_dir(&results_dir)?;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].peer, "python");
+
+        let _ = fs::remove_dir_all(dir);
         Ok(())
     }
 

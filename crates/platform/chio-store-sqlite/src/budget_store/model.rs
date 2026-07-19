@@ -42,4 +42,6 @@ pub(super) struct SqliteBudgetHold {
     pub(super) invocation_count_debited: bool,
     pub(super) disposition: HoldDisposition,
     pub(super) authority: Option<BudgetEventAuthority>,
+    pub(super) operation_id: Option<String>,
+    pub(super) request_binding_hash: Option<String>,
 }

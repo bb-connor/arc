@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-enterprise/v1/enterprise-migration-canary-evidence-body.schema.json",
+  "title": "Chio enterprise migration designated-runner canary evidence body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evidence_kind",
+    "generated_at_unix_ms",
+    "binding",
+    "repository_mechanics_only",
+    "production_traffic_attested",
+    "production_cutover_attested",
+    "operator_attestation_required"
+  ],
+  "properties": {
+    "schema": { "const": "chio.enterprise-migration-canary-evidence.v1" },
+    "evidence_kind": { "const": "designated_runner_repository_canary" },
+    "generated_at_unix_ms": { "type": "integer", "minimum": 1 },
+    "binding": { "$ref": "#/$defs/evidenceBinding" },
+    "repository_mechanics_only": { "const": true },
+    "production_traffic_attested": { "const": false },
+    "production_cutover_attested": { "const": false },
+    "operator_attestation_required": { "const": true }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "runnerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_name", "runner_os", "runner_arch", "required_labels_digest"],
+      "properties": {
+        "runner_name": { "$ref": "#/$defs/identifier" },
+        "runner_os": { "$ref": "#/$defs/identifier" },
+        "runner_arch": { "$ref": "#/$defs/identifier" },
+        "required_labels_digest": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "gateResultDigests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner_contract",
+        "key_log_transparency",
+        "broker_boundary",
+        "cage_enforcement",
+        "committed_adversarial_evidence",
+        "linux_adversarial_controls",
+        "migration_state_store"
+      ],
+      "properties": {
+        "runner_contract": { "$ref": "#/$defs/hash" },
+        "key_log_transparency": { "$ref": "#/$defs/hash" },
+        "broker_boundary": { "$ref": "#/$defs/hash" },
+        "cage_enforcement": { "$ref": "#/$defs/hash" },
+        "committed_adversarial_evidence": { "$ref": "#/$defs/hash" },
+        "linux_adversarial_controls": { "$ref": "#/$defs/hash" },
+        "migration_state_store": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "durableMigrationState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deployment_id",
+        "scope_kind",
+        "scope_id",
+        "control",
+        "stage",
+        "generation",
+        "config_digest",
+        "evidence_digest",
+        "updated_at_unix_ms"
+      ],
+      "properties": {
+        "deployment_id": { "$ref": "#/$defs/identifier" },
+        "scope_kind": { "enum": ["deployment", "provider", "tool_server"] },
+        "scope_id": { "$ref": "#/$defs/identifier" },
+        "control": {
+          "enum": [
+            "key_log_verification",
+            "broker_credential_custody",
+            "broker_quota_enforcement",
+            "cage_enforcement",
+            "legacy_configuration"
+          ]
+        },
+        "stage": { "enum": ["disabled", "shadow", "enforced", "legacy_removed"] },
+        "generation": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "config_digest": { "$ref": "#/$defs/hash" },
+        "evidence_digest": { "$ref": "#/$defs/hash" },
+        "updated_at_unix_ms": { "type": "integer", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "stage": { "const": "disabled" } } },
+          "then": { "properties": { "generation": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "stage": { "const": "shadow" } } },
+          "then": { "properties": { "generation": { "const": 1 } } }
+        },
+        {
+          "if": { "properties": { "stage": { "const": "enforced" } } },
+          "then": { "properties": { "generation": { "const": 2 } } }
+        },
+        {
+          "if": { "properties": { "stage": { "const": "legacy_removed" } } },
+          "then": { "properties": { "generation": { "const": 3 } } }
+        }
+      ]
+    },
+    "shadowMigrationState": {
+      "allOf": [
+        { "$ref": "#/$defs/durableMigrationState" },
+        {
+          "type": "object",
+          "properties": {
+            "stage": { "const": "shadow" },
+            "generation": { "const": 1 }
+          }
+        }
+      ]
+    },
+    "evidenceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit",
+        "runner",
+        "configuration_digest",
+        "inventory_digest",
+        "durable_migration_states",
+        "gate_result_digests"
+      ],
+      "properties": {
+        "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "runner": { "$ref": "#/$defs/runnerIdentity" },
+        "configuration_digest": { "$ref": "#/$defs/hash" },
+        "inventory_digest": { "$ref": "#/$defs/hash" },
+        "durable_migration_states": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/shadowMigrationState" }
+        },
+        "gate_result_digests": { "$ref": "#/$defs/gateResultDigests" }
+      }
+    }
+  }
+}

@@ -1,5 +1,82 @@
 use super::*;
 
+pub(crate) async fn create_threshold_approval_proposal_handler(
+    State(state): State<Arc<ProxyState>>,
+    body: Result<
+        Json<CreateThresholdApprovalProposalRequest>,
+        axum::extract::rejection::JsonRejection,
+    >,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold proposal payload: {error}"
+            )));
+        }
+    };
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_create_threshold_approval_proposal(&state.approval_admin, body, now) {
+        Ok(response) => approval_json(StatusCode::CREATED, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn get_threshold_approval_proposal_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+) -> Response {
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_get_threshold_approval_proposal(&state.approval_admin, &proposal_id, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn append_threshold_approval_vote_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+    body: Result<Json<AppendThresholdApprovalVoteRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold vote payload: {error}"
+            )));
+        }
+    };
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_append_threshold_approval_vote(&state.approval_admin, &proposal_id, body, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn deliver_threshold_approval_response_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+    body: Result<
+        Json<DeliverThresholdApprovalResponseRequest>,
+        axum::extract::rejection::JsonRejection,
+    >,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold delivery payload: {error}"
+            )));
+        }
+    };
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_deliver_threshold_approval_response(&state.approval_admin, &proposal_id, body, now)
+    {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
 pub(crate) async fn list_pending_approvals_handler(
     State(state): State<Arc<ProxyState>>,
     Query(query): Query<PendingQuery>,

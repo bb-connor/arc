@@ -179,11 +179,40 @@ pub(crate) struct ProxyState {
 /// The protect proxy.
 pub struct ProtectProxy {
     config: ProtectConfig,
+    threshold_approval_collector: Option<ThresholdApprovalCollectorConfig>,
+    verified_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
 }
 
 impl ProtectProxy {
     pub fn new(config: ProtectConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            threshold_approval_collector: None,
+            verified_manifest_registry: None,
+        }
+    }
+
+    /// Install the verified manifest registry used to admit tool-targeted
+    /// HTTP requests in compatibility mode.
+    #[must_use]
+    pub fn with_verified_manifest_registry(
+        mut self,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Self {
+        self.verified_manifest_registry = Some(registry);
+        self
+    }
+
+    /// Inject the authenticated policy and request authority for threshold collection.
+    ///
+    /// The threshold routes remain unmounted unless this configuration is supplied.
+    #[must_use]
+    pub fn with_threshold_approval_collector(
+        mut self,
+        config: ThresholdApprovalCollectorConfig,
+    ) -> Self {
+        self.threshold_approval_collector = Some(config);
+        self
     }
 
     async fn load_spec_content(&self) -> Result<String, ProtectError> {
@@ -215,7 +244,7 @@ impl ProtectProxy {
                     _ => continue,
                 };
 
-                let extensions = ChioExtensions::from_operation(&operation.raw);
+                let extensions = ChioExtensions::from_operation(&operation.raw)?;
                 let policy = DefaultPolicy::for_method_with_extensions(method, &extensions);
                 routes.push(RouteEntry {
                     pattern: path.clone(),
@@ -265,6 +294,16 @@ impl ProtectProxy {
         } else {
             Arc::new(InMemoryApprovalStore::new())
         };
+        if self.threshold_approval_collector.is_some()
+            && !approval_store
+                .authority_profile()
+                .supports_dispatch_workers(1)
+        {
+            return Err(ProtectError::Config(
+                "threshold approval collection requires a durable approval store; configure receipt_db"
+                    .to_string(),
+            ));
+        }
 
         let mut trusted_capability_issuers = self.config.trusted_capability_issuers.clone();
         let signer_public_key = keypair.public_key();
@@ -280,6 +319,25 @@ impl ProtectProxy {
             Arc::clone(&approval_store),
             self.config.trusted_capability_issuers.clone(),
         );
+        let evaluator = match self.verified_manifest_registry {
+            Some(registry) => evaluator.with_verified_manifest_registry(registry),
+            None => evaluator,
+        };
+
+        let approval_admin = match self.threshold_approval_collector.as_ref() {
+            Some(config) => ApprovalAdmin::new_with_threshold_policy(
+                Arc::clone(&approval_store),
+                config.current_policy_hash.clone(),
+                config.trusted_policy_authorities.clone(),
+                Arc::clone(&config.request_context_resolver),
+            )
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "invalid threshold approval collector configuration: {error}"
+                ))
+            })?,
+            None => ApprovalAdmin::new(Arc::clone(&approval_store)),
+        };
 
         let (receipt_log, tool_receipt_log, receipt_store, revoked_capability_ids) =
             if let Some(path) = &self.config.receipt_db {
@@ -318,7 +376,7 @@ impl ProtectProxy {
             upstream: self.config.upstream.clone(),
             http_client,
             egress_contract,
-            approval_admin: ApprovalAdmin::new(approval_store),
+            approval_admin,
             receipt_log: Mutex::new(receipt_log),
             tool_receipt_log: Mutex::new(tool_receipt_log),
             receipt_store,

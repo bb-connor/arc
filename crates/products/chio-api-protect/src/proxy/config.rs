@@ -1,4 +1,6 @@
 use super::*;
+use chio_http_core::ThresholdApprovalRequestContextResolver;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Default wall-clock ceiling on a single upstream proxy hop, including reading
@@ -6,6 +8,41 @@ use std::time::Duration;
 /// in-flight hop is resolved and receipted before a shutdown force-closes the
 /// connection.
 pub const DEFAULT_UPSTREAM_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Trusted production authority required before threshold collector routes are mounted.
+#[derive(Clone)]
+pub struct ThresholdApprovalCollectorConfig {
+    pub(crate) current_policy_hash: String,
+    pub(crate) trusted_policy_authorities: Vec<PublicKey>,
+    pub(crate) request_context_resolver: Arc<dyn ThresholdApprovalRequestContextResolver>,
+}
+
+impl ThresholdApprovalCollectorConfig {
+    #[must_use]
+    pub fn new(
+        current_policy_hash: String,
+        trusted_policy_authorities: Vec<PublicKey>,
+        request_context_resolver: Arc<dyn ThresholdApprovalRequestContextResolver>,
+    ) -> Self {
+        Self {
+            current_policy_hash,
+            trusted_policy_authorities,
+            request_context_resolver,
+        }
+    }
+}
+
+impl std::fmt::Debug for ThresholdApprovalCollectorConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ThresholdApprovalCollectorConfig")
+            .field("current_policy_hash", &self.current_policy_hash)
+            .field(
+                "trusted_policy_authority_count",
+                &self.trusted_policy_authorities.len(),
+            )
+            .finish_non_exhaustive()
+    }
+}
 
 /// Configuration for the protect proxy.
 pub struct ProtectConfig {

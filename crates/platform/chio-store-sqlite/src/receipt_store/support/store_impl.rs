@@ -231,6 +231,14 @@ impl ReceiptStore for SqliteReceiptStore {
         self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }
 
+    fn durable_storage_identity(&self) -> Result<Option<chio_core::Hash>, ReceiptStoreError> {
+        Ok(Some(self.database_identity))
+    }
+
+    fn supports_native_security_receipts(&self) -> bool {
+        true
+    }
+
     fn load_chio_receipt(
         &self,
         receipt_id: &str,
@@ -386,15 +394,12 @@ impl ReceiptStore for SqliteReceiptStore {
 
     fn enable_background_checkpoints(
         &self,
-        keypair: Keypair,
+        backend: std::sync::Arc<dyn chio_core::crypto::SigningBackend>,
         max_batch: u64,
     ) -> Result<bool, ReceiptStoreError> {
         SqliteReceiptStore::enable_background_checkpoints(
             self,
-            crate::receipt_store::BackgroundCheckpointSigner {
-                keypair: std::sync::Arc::new(keypair),
-                max_batch,
-            },
+            crate::receipt_store::BackgroundCheckpointSigner { backend, max_batch },
         )
         .map(|()| true)
     }
@@ -413,6 +418,48 @@ impl ReceiptStore for SqliteReceiptStore {
                 chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
             },
         )
+    }
+
+    fn record_capability_snapshot_with_issuance_admission(
+        &self,
+        tenant_id: &chio_security_types::ports::TenantId,
+        lineage_root_id: &chio_security_types::ports::LineageId,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_capability_snapshot_with_issuance_admission(
+            self,
+            tenant_id,
+            lineage_root_id,
+            token,
+            parent_capability_id,
+        )
+        .map_err(|error| match error {
+            chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+            chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+            chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+        })
+    }
+
+    fn capability_snapshot_has_issuance_admission(
+        &self,
+        tenant_id: &chio_security_types::ports::TenantId,
+        lineage_root_id: &chio_security_types::ports::LineageId,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::capability_snapshot_has_issuance_admission(
+            self,
+            tenant_id,
+            lineage_root_id,
+            token,
+            parent_capability_id,
+        )
+        .map_err(|error| match error {
+            chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+            chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+            chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+        })
     }
 
     fn get_capability_snapshot(
@@ -547,6 +594,27 @@ impl ReceiptStore for SqliteReceiptStore {
         receipt: &ChildRequestReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         SqliteReceiptStore::append_child_receipt_record(self, receipt).map(Some)
+    }
+}
+
+impl IndexedSecurityEvidenceStore for SqliteReceiptStore {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::ensure_indexed_security_evidence_ready(self)
+    }
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError> {
+        SqliteReceiptStore::append_indexed_security_evidence(self, evidence_id, receipt)
+    }
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        SqliteReceiptStore::load_indexed_security_evidence(self, evidence_id)
     }
 }
 

@@ -10,7 +10,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core::crypto::{
+    Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
 use chio_core::hashing::sha256_hex;
 use chio_core::hashing::Hash;
 use chio_core::merkle::{MerkleProof, MerkleTree};
@@ -763,13 +765,32 @@ pub fn build_checkpoint(
     receipt_canonical_bytes_batch: &[Vec<u8>],
     keypair: &Keypair,
 ) -> Result<KernelCheckpoint, CheckpointError> {
-    build_checkpoint_with_previous(
+    let backend = Ed25519Backend::new(keypair.clone());
+    build_checkpoint_with_backend(
         checkpoint_seq,
         batch_start_seq,
         batch_end_seq,
         receipt_canonical_bytes_batch,
-        keypair,
+        &backend,
         None,
+    )
+}
+
+pub fn build_checkpoint_with_backend(
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    receipt_canonical_bytes_batch: &[Vec<u8>],
+    backend: &dyn SigningBackend,
+    previous_checkpoint: Option<&KernelCheckpoint>,
+) -> Result<KernelCheckpoint, CheckpointError> {
+    build_checkpoint_from_backend(
+        checkpoint_seq,
+        batch_start_seq,
+        batch_end_seq,
+        receipt_canonical_bytes_batch,
+        backend,
+        previous_checkpoint,
     )
 }
 
@@ -782,6 +803,25 @@ pub fn build_checkpoint_with_previous(
     keypair: &Keypair,
     previous_checkpoint: Option<&KernelCheckpoint>,
 ) -> Result<KernelCheckpoint, CheckpointError> {
+    let backend = Ed25519Backend::new(keypair.clone());
+    build_checkpoint_from_backend(
+        checkpoint_seq,
+        batch_start_seq,
+        batch_end_seq,
+        receipt_canonical_bytes_batch,
+        &backend,
+        previous_checkpoint,
+    )
+}
+
+fn build_checkpoint_from_backend(
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    receipt_canonical_bytes_batch: &[Vec<u8>],
+    backend: &dyn SigningBackend,
+    previous_checkpoint: Option<&KernelCheckpoint>,
+) -> Result<KernelCheckpoint, CheckpointError> {
     let tree = MerkleTree::from_leaves(receipt_canonical_bytes_batch)?;
     let merkle_root = tree.root();
     let body = KernelCheckpointBody {
@@ -792,14 +832,23 @@ pub fn build_checkpoint_with_previous(
         tree_size: tree.leaf_count(),
         merkle_root,
         issued_at: unix_now(),
-        kernel_key: keypair.public_key(),
+        kernel_key: backend.public_key(),
         previous_checkpoint_sha256: previous_checkpoint
             .map(|checkpoint| checkpoint_body_sha256(&checkpoint.body))
             .transpose()?,
     };
     let body_bytes =
         canonical_json_bytes(&body).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
-    let signature = keypair.sign(&body_bytes);
+    let outcome = backend
+        .sign_bytes_for_identity(&body.kernel_key, &body_bytes)
+        .map_err(|error| CheckpointError::Signing(error.to_string()))?;
+    let signature = outcome.signature;
+    if body.kernel_key.algorithm() != outcome.algorithm
+        || signature.algorithm() != outcome.algorithm
+        || !body.kernel_key.verify(&body_bytes, &signature)
+    {
+        return Err(CheckpointError::InvalidSignature);
+    }
     Ok(KernelCheckpoint { body, signature })
 }
 

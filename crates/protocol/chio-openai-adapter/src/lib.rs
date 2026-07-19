@@ -17,17 +17,22 @@ use std::collections::BTreeMap;
 use chio_core::capability::{
     governance::{GovernedApprovalToken, GovernedTransactionIntent},
     scope::ModelMetadata,
+    threshold_approval::ThresholdApprovalProposal,
     token::CapabilityToken,
 };
+use chio_core::message::OpaqueSupplementalAuthorization;
 use chio_core::receipt::body::ChioReceipt;
-use chio_core::session::OperationTerminalState;
+use chio_core::session::{
+    OperationContext, OperationTerminalState, RequestId, SessionId, ToolCallOperation,
+};
 use chio_cross_protocol::discovery::{DiscoveryProtocol, TargetProtocolRegistry};
 use chio_cross_protocol::routing::{plan_authoritative_route, route_selection_metadata};
 use chio_kernel::{
-    dpop, ChioKernel, SignedExecutionNonce, ToolCallOutput, ToolCallRequest, ToolCallResponse,
+    dpop, ChioKernel, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    SignedExecutionNonce, ToolCallOutput, ToolCallRequest, ToolCallResponse,
     Verdict as KernelVerdict,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{BridgeSecurityMetadata, ToolDefinition, ToolManifest};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -180,8 +185,43 @@ pub struct OpenAiExecutionContext {
     pub governed_intent: Option<GovernedTransactionIntent>,
     /// Optional governed approval token.
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Complete approval token set for threshold-governed execution.
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+    /// Signed proposal binding a threshold token set to this request.
+    pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional originating model metadata for model-constrained grants.
     pub model_metadata: Option<ModelMetadata>,
+    /// Opaque signed authorization forwarded only to the installed verifier.
+    pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
+    /// Authoritative identity and isolation state resolved by the trusted
+    /// provider host. It is never derived from provider response fields.
+    pub security_context: Option<SecurityInvocationContext>,
+}
+
+fn tool_call_operation_from_request(
+    request: &ToolCallRequest,
+) -> Result<ToolCallOperation, String> {
+    let execution_nonce = request
+        .execution_nonce
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|error| format!("serialize execution nonce for authority resolution: {error}"))?;
+    Ok(ToolCallOperation {
+        capability: request.capability.clone(),
+        server_id: request.server_id.clone(),
+        tool_name: request.tool_name.clone(),
+        arguments: request.arguments.clone(),
+        supplemental_authorization: request.supplemental_authorization.clone(),
+        governed_intent: request.governed_intent.clone(),
+        approval_token: request.approval_token.clone(),
+        approval_tokens: request.approval_tokens.clone(),
+        threshold_approval_proposal: request.threshold_approval_proposal.clone(),
+        execution_nonce,
+        model_metadata: request.model_metadata.clone(),
+        extra_metadata: None,
+        declassification_grant: request.declassification_grant.clone(),
+    })
 }
 
 /// The OpenAI adapter.
@@ -193,16 +233,39 @@ pub struct ChioOpenAiAdapter {
     manifest: ToolManifest,
     /// Maps function name to (server_id, tool_name).
     function_bindings: BTreeMap<String, (String, String)>,
+    function_security: BTreeMap<String, BridgeSecurityMetadata>,
+    manifest_registry: Option<chio_manifest::VerifiedManifestRegistry>,
 }
 
 impl ChioOpenAiAdapter {
-    /// Create a new adapter from Chio tool manifests.
+    /// Create a new adapter from registered-key, policy, and topology admitted manifests.
     pub fn new(
+        config: OpenAiAdapterConfig,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, OpenAiAdapterError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(config, manifests, Some(registry))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_from_unverified_internal(
         config: OpenAiAdapterConfig,
         manifests: Vec<ToolManifest>,
     ) -> Result<Self, OpenAiAdapterError> {
+        Self::new_internal(config, manifests, None)
+    }
+
+    fn new_internal(
+        config: OpenAiAdapterConfig,
+        manifests: Vec<ToolManifest>,
+        registry: Option<&chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, OpenAiAdapterError> {
         let mut all_tools = Vec::new();
         let mut function_bindings = BTreeMap::new();
+        let mut function_security = BTreeMap::new();
 
         for manifest in &manifests {
             for tool in &manifest.tools {
@@ -210,8 +273,22 @@ impl ChioOpenAiAdapter {
                 if function_bindings.contains_key(&func_name) {
                     continue;
                 }
-                function_bindings
-                    .insert(func_name, (manifest.server_id.clone(), tool.name.clone()));
+                function_bindings.insert(
+                    func_name.clone(),
+                    (manifest.server_id.clone(), tool.name.clone()),
+                );
+                let security = match registry {
+                    Some(registry) => registry
+                        .bridge_security(&manifest.server_id, &tool.name)
+                        .ok_or_else(|| {
+                            OpenAiAdapterError::InvalidRequest(format!(
+                                "verified manifest registry has no admitted security for {}/{}",
+                                manifest.server_id, tool.name
+                            ))
+                        })?,
+                    None => BridgeSecurityMetadata::from_tool(tool),
+                };
+                function_security.insert(func_name, security);
                 all_tools.push(tool.clone());
             }
         }
@@ -223,7 +300,7 @@ impl ChioOpenAiAdapter {
         }
 
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: config.server_id.clone(),
             name: config.server_name.clone(),
             description: Some("Chio tools exposed via OpenAI function calling".to_string()),
@@ -239,6 +316,8 @@ impl ChioOpenAiAdapter {
         Ok(Self {
             manifest,
             function_bindings,
+            function_security,
+            manifest_registry: registry.cloned(),
         })
     }
 
@@ -278,39 +357,22 @@ impl ChioOpenAiAdapter {
         self.manifest.tools.iter().find(|t| t.name == name)
     }
 
-    /// Execute an OpenAI tool call through the Chio kernel.
-    ///
-    /// This is the core interception point. Every function call produces
-    /// a signed receipt via the kernel guard pipeline.
-    pub fn execute_tool_call(
+    fn build_tool_call_request(
         &self,
         tool_call: &OpenAiToolCall,
-        kernel: &ChioKernel,
         execution: &OpenAiExecutionContext,
-    ) -> ToolCallResult {
-        let (server_id, tool_name) = {
-            let binding = self.function_bindings.get(&tool_call.function.name);
-            match binding {
-                Some((server_id, name)) => (server_id.clone(), name.clone()),
-                None => {
-                    return denied_tool_call_result(
-                        tool_call,
-                        format!("Error: function '{}' not found", tool_call.function.name),
-                    );
-                }
+    ) -> Result<ToolCallRequest, String> {
+        let (server_id, tool_name) = match self.function_bindings.get(&tool_call.function.name) {
+            Some((server_id, name)) => (server_id.clone(), name.clone()),
+            None => {
+                return Err(format!(
+                    "Error: function '{}' not found",
+                    tool_call.function.name
+                ));
             }
         };
-
-        let arguments = match serde_json::from_str::<Value>(&tool_call.function.arguments) {
-            Ok(args) => args,
-            Err(e) => {
-                return denied_tool_call_result(
-                    tool_call,
-                    format!("Error: failed to parse arguments: {e}"),
-                );
-            }
-        };
-
+        let arguments = serde_json::from_str::<Value>(&tool_call.function.arguments)
+            .map_err(|error| format!("Error: failed to parse arguments: {error}"))?;
         let request = ToolCallRequest {
             request_id: format!("openai-{}", tool_call.id),
             capability: execution.capability.clone(),
@@ -322,10 +384,52 @@ impl ChioOpenAiAdapter {
             execution_nonce: execution.execution_nonces.get(&tool_call.id).cloned(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
+            approval_tokens: execution.approval_tokens.clone(),
+            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
             model_metadata: execution.model_metadata.clone(),
+            supplemental_authorization: execution.supplemental_authorization.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: None,
+        };
+        request
+            .validate()
+            .map_err(|error| format!("Error: invalid authorization context: {error}"))?;
+        Ok(request)
+    }
+
+    /// Execute an OpenAI tool call through the Chio kernel.
+    ///
+    /// This is the core interception point. Every function call produces
+    /// a signed receipt via the kernel guard pipeline.
+    pub fn execute_tool_call(
+        &self,
+        tool_call: &OpenAiToolCall,
+        kernel: &ChioKernel,
+        execution: &OpenAiExecutionContext,
+    ) -> ToolCallResult {
+        self.execute_tool_call_with_security_context_resolver(
+            tool_call,
+            kernel,
+            execution,
+            None,
+            |_| Ok(execution.security_context.clone()),
+        )
+    }
+
+    fn execute_tool_call_with_security_context_resolver<F>(
+        &self,
+        tool_call: &OpenAiToolCall,
+        kernel: &ChioKernel,
+        execution: &OpenAiExecutionContext,
+        authenticated_session_id: Option<&SessionId>,
+        resolve_security_context: F,
+    ) -> ToolCallResult
+    where
+        F: FnOnce(&ToolCallRequest) -> Result<Option<SecurityInvocationContext>, String>,
+    {
+        let request = match self.build_tool_call_request(tool_call, execution) {
+            Ok(request) => request,
+            Err(error) => return denied_tool_call_result(tool_call, error),
         };
 
         let route_plan = match plan_authoritative_route(
@@ -353,8 +457,55 @@ impl ChioOpenAiAdapter {
                 );
             }
         };
+        let Some(security) = self.function_security.get(&tool_call.function.name) else {
+            return denied_tool_call_result(
+                tool_call,
+                "Error: internal bridge security sidecar is missing",
+            );
+        };
+        let security_context = match resolve_security_context(&request) {
+            Ok(security_context) => security_context,
+            Err(error) => {
+                return denied_tool_call_result(
+                    tool_call,
+                    format!("Error: failed to resolve authoritative security context: {error}"),
+                );
+            }
+        };
+        let evaluation = match (
+            self.manifest_registry.as_ref(),
+            security_context.as_ref(),
+            authenticated_session_id,
+        ) {
+            (Some(registry), Some(security_context), Some(authenticated_session_id)) => kernel
+                .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
+                    &request,
+                    registry,
+                    security,
+                    Some(route_metadata),
+                    authenticated_session_id,
+                    security_context,
+                ),
+            (Some(registry), Some(security_context), None) => kernel
+                .evaluate_tool_call_blocking_with_manifest_security_and_security_context(
+                    &request,
+                    registry,
+                    security,
+                    Some(route_metadata),
+                    security_context,
+                ),
+            (Some(registry), None, _) => kernel.evaluate_tool_call_blocking_with_manifest_security(
+                &request,
+                registry,
+                security,
+                Some(route_metadata),
+            ),
+            (None, _, _) => {
+                kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(route_metadata))
+            }
+        };
 
-        match kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(route_metadata)) {
+        match evaluation {
             Ok(response) => {
                 let preflight_reason = execution_nonce_preflight_reason(&response);
                 let preflight = preflight_reason.is_some();
@@ -386,9 +537,73 @@ impl ChioOpenAiAdapter {
         kernel: &ChioKernel,
         execution: &OpenAiExecutionContext,
     ) -> Vec<ToolCallResult> {
+        if tool_calls.len() > 1 && execution.security_context.is_some() {
+            return tool_calls
+                .iter()
+                .map(|tool_call| {
+                    denied_tool_call_result(
+                        tool_call,
+                        "Error: OpenAI batch security state must be resolved separately for each tool call",
+                    )
+                })
+                .collect();
+        }
         tool_calls
             .iter()
             .map(|tc| self.execute_tool_call(tc, kernel, execution))
+            .collect()
+    }
+
+    /// Execute a batch while resolving authoritative security state after
+    /// each request has been finalized and immediately before its kernel
+    /// dispatch.
+    pub fn execute_tool_calls_with_security_context_authority(
+        &self,
+        tool_calls: &[OpenAiToolCall],
+        kernel: &ChioKernel,
+        execution: &OpenAiExecutionContext,
+        authenticated_context: &OperationContext,
+        authority: &dyn SecurityInvocationContextAuthority,
+    ) -> Vec<ToolCallResult> {
+        if authenticated_context.agent_id.as_str() != execution.agent_id.as_str() {
+            return tool_calls
+                .iter()
+                .map(|tool_call| {
+                    denied_tool_call_result(
+                        tool_call,
+                        "Error: OpenAI batch authority context does not match the authenticated agent",
+                    )
+                })
+                .collect();
+        }
+
+        tool_calls
+            .iter()
+            .map(|tool_call| {
+                let mut dispatch_context = authenticated_context.clone();
+                dispatch_context.request_id = RequestId::new(format!("openai-{}", tool_call.id));
+                self.execute_tool_call_with_security_context_resolver(
+                    tool_call,
+                    kernel,
+                    execution,
+                    Some(&dispatch_context.session_id),
+                    |request| {
+                        let operation = tool_call_operation_from_request(request)?;
+                        let security_context = authority
+                            .resolve_security_invocation_context(&dispatch_context, &operation)
+                            .map_err(|error| error.to_string())?;
+                        if security_context.as_v1().session_id().as_str()
+                            != dispatch_context.session_id.as_str()
+                        {
+                            return Err(
+                                "authoritative security context does not match the authenticated session"
+                                    .to_string(),
+                            );
+                        }
+                        Ok(Some(security_context))
+                    },
+                )
+            })
             .collect()
     }
 

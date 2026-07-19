@@ -63,7 +63,9 @@ async fn walking_skeleton_loads_runs_and_writes_fixture_shape(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let runtime = ArenaRuntime::new(Arc::new(kernel));

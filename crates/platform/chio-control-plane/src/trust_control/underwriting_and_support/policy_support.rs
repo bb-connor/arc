@@ -651,7 +651,7 @@ pub(crate) fn load_behavioral_feed_signing_keypair(
                 .to_string(),
         )),
         (Some(path), None) => load_or_create_authority_keypair(path),
-        (None, Some(path)) => Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?),
+        (None, Some(path)) => Ok(SqliteCapabilityAuthority::open_existing(path)?.local_keypair()?),
         (None, None) => Err(CliError::cli_other_error(
             "behavioral feed export requires --authority-seed-file or --authority-db so the export can be signed"
                 .to_string(),
@@ -935,6 +935,16 @@ pub(crate) fn unix_timestamp_now() -> u64 {
         .unwrap_or(0)
 }
 
+pub(crate) fn checked_unix_timestamp_now() -> Result<u64, ()> {
+    checked_unix_timestamp(SystemTime::now())
+}
+
+pub(crate) fn checked_unix_timestamp(time: SystemTime) -> Result<u64, ()> {
+    time.duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|_| ())
+}
+
 pub(crate) fn open_receipt_store(
     config: &TrustServiceConfig,
 ) -> Result<SqliteReceiptStore, Response> {
@@ -1003,4 +1013,16 @@ pub(crate) fn list_limit(requested: Option<usize>) -> usize {
 
 pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
+}
+
+#[cfg(test)]
+mod checked_timestamp_tests {
+    use super::*;
+
+    #[test]
+    fn checked_timestamp_rejects_pre_epoch_clock_values() {
+        let before_epoch = UNIX_EPOCH - Duration::from_secs(1);
+        assert_eq!(checked_unix_timestamp(before_epoch), Err(()));
+        assert_eq!(checked_unix_timestamp(UNIX_EPOCH), Ok(0));
+    }
 }

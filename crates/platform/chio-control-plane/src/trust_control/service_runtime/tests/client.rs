@@ -1,11 +1,169 @@
 use super::super::super::*;
 use super::super::client::{
-    build_client, build_public_client, certification_marketplace_search_path,
-    certification_marketplace_transparency_path, encode_path_segment, path_with_encoded_param,
+    build_client, build_control_http_agent_for_test, build_public_client,
+    certification_marketplace_search_path, certification_marketplace_transparency_path,
+    control_tls_root_ca_file_max_bytes_for_test, encode_path_segment,
+    load_control_tls_root_store_for_test, path_with_encoded_param,
 };
 use super::support::{assert_bearer_request, assert_json_post, StaticResponseServer};
 use chio_test_support::prelude::*;
+use rcgen::{generate_simple_self_signed, CertifiedKey};
 use std::collections::BTreeMap;
+use std::io::{Read as _, Write as _};
+use std::net::TcpListener;
+use std::path::Path;
+use std::thread;
+
+fn custom_control_tls_root_error(path: &Path) -> String {
+    match build_control_http_agent_for_test(Some(path)) {
+        Ok(_) => panic!("invalid custom control TLS root should fail"),
+        Err(error) => error.to_string(),
+    }
+}
+
+#[test]
+fn custom_control_tls_root_uses_only_supplied_certificates() {
+    let directory = tempfile::tempdir().test_expect("create TLS root directory");
+    let path = directory.path().join("control-root.pem");
+    let CertifiedKey { cert, .. } =
+        generate_simple_self_signed(vec!["localhost".to_string()]).test_expect("generate CA");
+    std::fs::write(&path, cert.pem()).test_expect("write TLS root certificate");
+
+    let roots =
+        load_control_tls_root_store_for_test(&path).test_expect("load custom TLS root store");
+    assert_eq!(roots.len(), 1, "public WebPKI roots must not be retained");
+    let _agent = build_control_http_agent_for_test(Some(&path))
+        .test_expect("build client with custom TLS root");
+}
+
+#[test]
+fn custom_control_tls_root_rejects_missing_empty_non_regular_and_oversized_files() {
+    let directory = tempfile::tempdir().test_expect("create TLS root directory");
+
+    let missing = directory.path().join("missing.pem");
+    let missing_error = custom_control_tls_root_error(&missing);
+    assert!(
+        missing_error.contains("existing regular file"),
+        "{missing_error}"
+    );
+
+    let empty_path_error = custom_control_tls_root_error(Path::new(""));
+    assert!(
+        empty_path_error.contains("empty path"),
+        "{empty_path_error}"
+    );
+
+    let empty = directory.path().join("empty.pem");
+    std::fs::write(&empty, b"").test_expect("write empty TLS root file");
+    let empty_error = custom_control_tls_root_error(&empty);
+    assert!(empty_error.contains("must not be empty"), "{empty_error}");
+
+    let directory_error = custom_control_tls_root_error(directory.path());
+    assert!(
+        directory_error.contains("regular file"),
+        "{directory_error}"
+    );
+
+    let oversized = directory.path().join("oversized.pem");
+    std::fs::write(
+        &oversized,
+        vec![b'A'; control_tls_root_ca_file_max_bytes_for_test() + 1],
+    )
+    .test_expect("write oversized TLS root file");
+    let oversized_error = custom_control_tls_root_error(&oversized);
+    assert!(oversized_error.contains("byte limit"), "{oversized_error}");
+}
+
+#[cfg(unix)]
+#[test]
+fn custom_control_tls_root_rejects_symlinks() {
+    use std::os::unix::fs::symlink;
+
+    let directory = tempfile::tempdir().test_expect("create TLS root directory");
+    let target = directory.path().join("target.pem");
+    let link = directory.path().join("control-root.pem");
+    std::fs::write(&target, "not used").test_expect("write symlink target");
+    symlink(&target, &link).test_expect("create TLS root symlink");
+
+    let error = custom_control_tls_root_error(&link);
+    assert!(error.contains("must not be a symlink"), "{error}");
+}
+
+#[test]
+fn custom_control_tls_root_rejects_malformed_and_certificate_free_pem() {
+    let directory = tempfile::tempdir().test_expect("create TLS root directory");
+
+    let certificate_free = directory.path().join("certificate-free.pem");
+    std::fs::write(
+        &certificate_free,
+        "-----BEGIN PRIVATE KEY-----\nAQID\n-----END PRIVATE KEY-----\n",
+    )
+    .test_expect("write certificate-free PEM");
+    let certificate_free_error = custom_control_tls_root_error(&certificate_free);
+    assert!(
+        certificate_free_error.contains("does not contain a PEM certificate"),
+        "{certificate_free_error}"
+    );
+
+    let malformed = directory.path().join("malformed.pem");
+    std::fs::write(
+        &malformed,
+        "-----BEGIN CERTIFICATE-----\n%%%\n-----END CERTIFICATE-----\n",
+    )
+    .test_expect("write malformed PEM");
+    let malformed_error = custom_control_tls_root_error(&malformed);
+    assert!(
+        malformed_error.contains("malformed PEM certificate data"),
+        "{malformed_error}"
+    );
+
+    let invalid_certificate = directory.path().join("invalid-certificate.pem");
+    std::fs::write(
+        &invalid_certificate,
+        "-----BEGIN CERTIFICATE-----\nAQID\n-----END CERTIFICATE-----\n",
+    )
+    .test_expect("write invalid certificate PEM");
+    let invalid_certificate_error = custom_control_tls_root_error(&invalid_certificate);
+    assert!(
+        invalid_certificate_error.contains("invalid CA certificate"),
+        "{invalid_certificate_error}"
+    );
+}
+
+#[test]
+fn control_http_agent_disables_redirects_without_changing_default_tls_configuration() {
+    let destination = StaticResponseServer::spawn(200, "followed", "text/plain", 1);
+    let listener = TcpListener::bind("127.0.0.1:0").test_expect("bind redirect server");
+    let address = listener.local_addr().test_expect("redirect server address");
+    let location = destination.url.clone();
+    let worker = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().test_expect("accept redirect request");
+        let mut request = [0_u8; 4096];
+        let _ = stream
+            .read(&mut request)
+            .test_expect("read redirect request");
+        write!(
+            stream,
+            "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        )
+        .test_expect("write redirect response");
+        stream.flush().test_expect("flush redirect response");
+    });
+
+    let agent = build_control_http_agent_for_test(None).test_expect("build default HTTP agent");
+    let status = match agent.get(&format!("http://{address}/redirect")).call() {
+        Ok(response) => response.status(),
+        Err(ureq::Error::Status(status, _)) => status,
+        Err(error) => panic!("redirect request failed unexpectedly: {error}"),
+    };
+    worker.join().test_expect("join redirect server");
+
+    assert_eq!(status, 302);
+    assert!(
+        destination.requests().is_empty(),
+        "control client followed a redirect"
+    );
+}
 
 #[test]
 fn build_client_rejects_empty_control_url_and_normalizes_endpoints() {
@@ -15,11 +173,11 @@ fn build_client_rejects_empty_control_url_and_normalizes_endpoints() {
     };
     assert!(error.to_string().contains("control URL must not be empty"));
 
-    let client = build_client(" http://one/ , http://two// ,,", "secret")
+    let client = build_client(" https://one/ , https://two// ,,", "secret")
         .test_expect("build client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
-        &vec!["http://one".to_string(), "http://two".to_string()]
+        &vec!["https://one".to_string(), "https://two".to_string()]
     );
     assert_eq!(client.endpoint_order(), vec![0, 1]);
 
@@ -42,12 +200,38 @@ fn build_client_rejects_blank_or_padded_control_token() {
 }
 
 #[test]
+fn control_clients_require_https_except_for_numeric_loopback() {
+    for endpoint in [
+        "http://control.example.test",
+        "http://localhost:8940",
+        "http://10.0.0.4:8940",
+    ] {
+        let error = match build_client(endpoint, "secret") {
+            Ok(_) => panic!("cleartext non-loopback control endpoint should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("requires HTTPS"),
+            "unexpected error for endpoint `{endpoint}`: {error}",
+        );
+    }
+
+    let ipv4 = build_client("http://127.0.0.1:8940", "secret")
+        .test_expect("allow IPv4 loopback control endpoint");
+    assert_eq!(ipv4.endpoints[0], "http://127.0.0.1:8940");
+
+    let ipv6 = build_public_client("http://[::1]:8940")
+        .test_expect("allow IPv6 loopback public control endpoint");
+    assert_eq!(ipv6.endpoints[0], "http://[::1]:8940");
+}
+
+#[test]
 fn build_public_client_allows_empty_token_for_public_endpoints_and_keeps_endpoint_validation() {
-    let client = build_public_client(" http://one/ , http://two// ,,")
+    let client = build_public_client(" https://one/ , https://two// ,,")
         .test_expect("build public client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
-        &vec!["http://one".to_string(), "http://two".to_string()]
+        &vec!["https://one".to_string(), "https://two".to_string()]
     );
     assert_eq!(client.token.as_ref(), "");
 

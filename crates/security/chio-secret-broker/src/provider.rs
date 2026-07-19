@@ -96,6 +96,25 @@ impl GenericCredentialProvider {
             CredentialPlacement::ApiKeyHeader => "x-api-key",
         }
     }
+
+    pub(crate) fn validate_request(
+        &self,
+        request: &BrokerRequest,
+        constraints: &RequestConstraints,
+    ) -> Result<()> {
+        let owned = self.owned_header();
+        if constraints.provider_owned_headers != [owned.to_string()] {
+            return Err(BrokerError::AuthorizationDenied(
+                "signed provider-owned header set does not match the adapter".to_string(),
+            ));
+        }
+        if request.headers.iter().any(|header| header.name == owned) {
+            return Err(BrokerError::AuthorizationDenied(
+                "caller attempted to supply a provider-owned header".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl ProviderAdapter for GenericCredentialProvider {
@@ -113,17 +132,8 @@ impl ProviderAdapter for GenericCredentialProvider {
         constraints: &RequestConstraints,
         credential: &SecretMaterial,
     ) -> Result<PreparedProviderRequest> {
+        self.validate_request(request, constraints)?;
         let owned = self.owned_header();
-        if constraints.provider_owned_headers != [owned.to_string()] {
-            return Err(BrokerError::AuthorizationDenied(
-                "signed provider-owned header set does not match the adapter".to_string(),
-            ));
-        }
-        if request.headers.iter().any(|header| header.name == owned) {
-            return Err(BrokerError::AuthorizationDenied(
-                "caller attempted to supply a provider-owned header".to_string(),
-            ));
-        }
         let mut value = Zeroizing::new(Vec::new());
         if self.placement == CredentialPlacement::BearerAuthorization {
             value.extend_from_slice(b"Bearer ");
@@ -171,6 +181,7 @@ pub(crate) fn rejects_forbidden_caller_header(header: &HeaderField) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
 
     #[test]
     fn prepared_request_debug_redacts_injected_header() {
@@ -179,14 +190,14 @@ mod tests {
             1,
             CredentialPlacement::BearerAuthorization,
         )
-        .expect("provider");
+        .test_expect("provider");
         let request = BrokerRequest {
             destination: crate::protocol::BrokerDestination::parse(
                 "https://example.com/",
                 "GET",
                 false,
             )
-            .expect("destination"),
+            .test_expect("destination"),
             headers: Vec::new(),
             body: Vec::new(),
             approved_preview_sha256: None,
@@ -210,7 +221,7 @@ mod tests {
         let credential = SecretMaterial::new(b"unique-provider-canary".to_vec());
         let prepared = provider
             .prepare(&request, &constraints, &credential)
-            .expect("prepare");
+            .test_expect("prepare");
         assert!(!format!("{prepared:?}").contains("unique-provider-canary"));
     }
 }

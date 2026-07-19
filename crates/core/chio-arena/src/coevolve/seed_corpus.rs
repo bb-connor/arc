@@ -1,6 +1,6 @@
 //! Seed-corpus loader.
 //!
-//! The co-evolution loop seeds its initial population from two sources:
+//! The co-evolution loop seeds its initial population from three source groups:
 //!
 //!   1. Fuzz crash artifacts under `fuzz/artifacts/` (primary). The
 //!      directory does not exist on every checkout (libFuzzer only
@@ -12,6 +12,9 @@
 //!      `tests/replay/fixtures/tampered_signature/` (secondary). These
 //!      are always present on a clean checkout; missing files are
 //!      reported the same way as the primary source.
+//!   3. Curated security cases under
+//!      `crates/core/chio-adversarial-suite/cases/`, recursively grouped
+//!      by attack class.
 //!
 //! Each artifact is recorded as `(path, sha256)` so a rotated corpus
 //! surfaces as a manifest hash mismatch in the driver's run record
@@ -41,6 +44,8 @@ pub const DEFAULT_FUZZ_ARTIFACTS_DIR: &str = "fuzz/artifacts";
 pub const DEFAULT_REPLAY_ATTACK_DIR: &str = "tests/replay/fixtures/replay_attack";
 /// Default tampered-signature family directory.
 pub const DEFAULT_TAMPERED_SIGNATURE_DIR: &str = "tests/replay/fixtures/tampered_signature";
+/// Default curated security adversarial-case directory.
+pub const DEFAULT_SECURITY_ADVERSARIAL_CASES_DIR: &str = "crates/core/chio-adversarial-suite/cases";
 
 /// Sources searched by the seed corpus loader. Callers (typically the
 /// driver) construct the sources with [`SeedCorpusSources::default`] and
@@ -53,6 +58,8 @@ pub struct SeedCorpusSources {
     pub replay_attack: PathBuf,
     /// Tampered-signature family.
     pub tampered_signature: PathBuf,
+    /// Curated security cases grouped under class directories.
+    pub security_adversarial_cases: PathBuf,
 }
 
 impl SeedCorpusSources {
@@ -64,6 +71,7 @@ impl SeedCorpusSources {
             fuzz_artifacts: root.join(DEFAULT_FUZZ_ARTIFACTS_DIR),
             replay_attack: root.join(DEFAULT_REPLAY_ATTACK_DIR),
             tampered_signature: root.join(DEFAULT_TAMPERED_SIGNATURE_DIR),
+            security_adversarial_cases: root.join(DEFAULT_SECURITY_ADVERSARIAL_CASES_DIR),
         }
     }
 
@@ -84,6 +92,12 @@ impl SeedCorpusSources {
         self.tampered_signature = path.as_ref().to_path_buf();
         self
     }
+
+    /// Override the curated security adversarial-case path.
+    pub fn with_security_adversarial_cases(mut self, path: impl AsRef<Path>) -> Self {
+        self.security_adversarial_cases = path.as_ref().to_path_buf();
+        self
+    }
 }
 
 impl Default for SeedCorpusSources {
@@ -101,7 +115,8 @@ pub struct SeedArtifact {
     /// manifest can be rehydrated later.
     pub path: PathBuf,
     /// Stable identifier for the originating family
-    /// (`fuzz_artifacts`, `replay_attack`, `tampered_signature`).
+    /// (`fuzz_artifacts`, `replay_attack`, `tampered_signature`, or
+    /// `security_adversarial_cases`).
     pub family: String,
     /// SHA-256 of the artifact's raw bytes.
     pub sha256: String,
@@ -132,7 +147,6 @@ impl SeedCorpus {
 
     /// Aggregate SHA-256 of every artifact hash and missing-source label,
     /// in order. Used by the driver to record a single corpus-shape
-    /// fingerprint in the run manifest; rotation surfaces as a
     /// fingerprint mismatch (whether the rotation deletes an artifact,
     /// renames one, or marks a previously-present source as missing).
     pub fn fingerprint_hex(&self) -> String {
@@ -183,11 +197,69 @@ pub fn load_seed_corpus(sources: &SeedCorpusSources) -> Result<SeedCorpus, SeedC
         load_directory(family, path, &mut artifacts)?;
     }
 
+    if !sources.security_adversarial_cases.exists() {
+        missing.push("security_adversarial_cases".to_string());
+    } else {
+        load_directory_recursive(
+            "security_adversarial_cases",
+            &sources.security_adversarial_cases,
+            &mut artifacts,
+        )?;
+    }
+
     artifacts.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(SeedCorpus {
         artifacts,
         missing_sources: missing,
     })
+}
+
+fn load_directory_recursive(
+    family: &str,
+    dir: &Path,
+    out: &mut Vec<SeedArtifact>,
+) -> Result<(), SeedCorpusError> {
+    let read = fs::read_dir(dir).map_err(|source| SeedCorpusError::Io {
+        path: dir.to_path_buf(),
+        source,
+    })?;
+    let mut entries = Vec::new();
+    for entry in read {
+        let entry = entry.map_err(|source| SeedCorpusError::Io {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        entries.push(entry.path());
+    }
+    entries.sort();
+
+    for path in entries {
+        let metadata = fs::symlink_metadata(&path).map_err(|source| SeedCorpusError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+        if metadata.is_dir() {
+            load_directory_recursive(family, &path, out)?;
+            continue;
+        }
+        if !metadata.is_file() {
+            continue;
+        }
+        let bytes = fs::read(&path).map_err(|source| SeedCorpusError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        out.push(SeedArtifact {
+            path,
+            family: family.to_string(),
+            sha256: sha256_hex(&bytes),
+            size_bytes: bytes.len() as u64,
+        });
+    }
+    Ok(())
 }
 
 fn load_directory(

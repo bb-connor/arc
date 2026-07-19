@@ -236,7 +236,10 @@ pub use listing::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA, GENERIC_TRUST_ACTIVATION_ARTIFACT_SCHEMA,
     MAX_GENERIC_LISTING_LIMIT,
 };
-pub use manifest::{ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody};
+pub use manifest::{
+    LatencyHint, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    ToolManifestBody,
+};
 pub use market::{
     LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition, LiabilityAutoBindFinding,
     LiabilityAutoBindReasonCode, LiabilityBoundCoverageArtifact,
@@ -280,7 +283,10 @@ pub use market::{
     MAX_LIABILITY_PROVIDER_LIST_LIMIT,
 };
 pub use merkle::{MerkleProof, MerkleTree};
-pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
+pub use message::{
+    AgentMessage, KernelMessage, OpaqueSupplementalAuthorization, ToolCallError, ToolCallResult,
+    MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES, MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES,
+};
 pub use open_market::evaluation::{
     evaluate_open_market_penalty, evaluate_open_market_penalty_with_trusted_signers,
     OpenMarketPenaltyEvaluation, OpenMarketPenaltyEvaluationRequest,

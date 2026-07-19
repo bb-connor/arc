@@ -74,6 +74,13 @@ impl SecurityEventVerifierPort for FakePorts {
 }
 
 impl SecurityEventStore for FakePorts {
+    fn admit_verified_correlation_event(
+        &self,
+        _: &CorrelationEventAdmissionRequest,
+    ) -> PortResult<CorrelationEventAdmission> {
+        unavailable!()
+    }
+
     fn append_verified(&self, _: &VerifiedSecurityEvent) -> PortResult<EventAppend> {
         unavailable!()
     }
@@ -97,10 +104,38 @@ impl SecurityEventStore for FakePorts {
         unavailable!()
     }
 
+    fn load_correlation_max_seen_event_time(
+        &self,
+        _: &CorrelationPartitionKey,
+    ) -> PortResult<Option<u64>> {
+        unavailable!()
+    }
+
     fn compare_and_swap_correlation(
         &self,
         _: &CorrelationCasRequest,
     ) -> PortResult<CorrelationPartial> {
+        unavailable!()
+    }
+
+    fn commit_correlation_outcome(
+        &self,
+        _: &CorrelationOutcomeCommitRequest,
+    ) -> PortResult<CorrelationPartial> {
+        unavailable!()
+    }
+
+    fn commit_correlation_outcome_only(
+        &self,
+        _: &CorrelationOutcomePublication,
+    ) -> PortResult<CreateOutcome> {
+        unavailable!()
+    }
+
+    fn load_correlation_outcome(
+        &self,
+        _: &CorrelationOutcomeKey,
+    ) -> PortResult<Option<CorrelationOutcomePublication>> {
         unavailable!()
     }
 
@@ -176,6 +211,13 @@ impl ResponseSchedulerStore for FakePorts {
         unavailable!()
     }
 
+    fn compare_and_swap_scheduled_mutation(
+        &self,
+        _: &ResponseScheduledMutationCasRequest,
+    ) -> PortResult<ResponsePlanRecord> {
+        unavailable!()
+    }
+
     fn renew_lease(&self, _: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork> {
         unavailable!()
     }
@@ -196,13 +238,49 @@ impl ResponseSchedulerStore for FakePorts {
     }
 }
 
+impl ResponseDispatchStore for FakePorts {
+    fn ensure_dispatch_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn commit_dispatch(
+        &self,
+        _: &ResponseDispatchCommitRequest,
+    ) -> PortResult<ResponseDispatchCommitOutcome> {
+        unavailable!()
+    }
+
+    fn load_dispatch(&self, _: &ResponseDispatchKey) -> PortResult<ResponseDispatchLoadOutcome> {
+        unavailable!()
+    }
+
+    fn recover_dispatch_work(
+        &self,
+        _: &ResponseDispatchRecoveryRequest,
+    ) -> PortResult<ResponseDispatchRecoveryOutcome> {
+        unavailable!()
+    }
+}
+
 impl SchedulerHealthPort for FakePorts {
-    fn page_once(&self, _: &SchedulerHealthPageRequest) -> PortResult<()> {
+    fn ensure_scheduler_health_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn page_once(&self, _: &SchedulerHealthPageRequest) -> PortResult<AlertDeliveryStatus> {
+        unavailable!()
+    }
+
+    fn load_delivery(&self, _: &AlertDeliveryQuery) -> PortResult<Option<AlertDeliveryStatus>> {
         unavailable!()
     }
 }
 
 impl ContainmentOverlayStore for FakePorts {
+    fn ensure_containment_overlays_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
     fn apply_contribution(&self, _: &OverlayApplyRequest) -> PortResult<OverlaySnapshot> {
         unavailable!()
     }
@@ -214,18 +292,167 @@ impl ContainmentOverlayStore for FakePorts {
     fn load_effective(&self, _: &TenantScopedId) -> PortResult<Option<OverlaySnapshot>> {
         unavailable!()
     }
+
+    fn load_containment_overlay_result(
+        &self,
+        _: &EffectResultQuery,
+    ) -> PortResult<EffectExecutionStatus> {
+        unavailable!()
+    }
+}
+
+impl SessionThrottleStore for FakePorts {
+    fn ensure_session_throttles_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn apply_session_throttle(
+        &self,
+        _: &SessionThrottleApplyRequest,
+    ) -> PortResult<SessionThrottleSnapshot> {
+        unavailable!()
+    }
+
+    fn remove_session_throttle(
+        &self,
+        _: &SessionThrottleRemoveRequest,
+    ) -> PortResult<SessionThrottleSnapshot> {
+        unavailable!()
+    }
+
+    fn load_session_throttles(
+        &self,
+        _: &SessionThrottleKey,
+    ) -> PortResult<Option<SessionThrottleSnapshot>> {
+        unavailable!()
+    }
+
+    fn consume_session_invocation(
+        &self,
+        _: &SessionThrottleConsumeRequest,
+    ) -> PortResult<SessionThrottleDecision> {
+        unavailable!()
+    }
+
+    fn load_session_throttle_result(
+        &self,
+        _: &EffectResultQuery,
+    ) -> PortResult<EffectExecutionStatus> {
+        unavailable!()
+    }
+}
+
+impl CapabilitySetSuspensionStore for FakePorts {
+    fn ensure_capability_set_suspensions_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn apply_capability_set_suspension(
+        &self,
+        _: &CapabilitySetSuspensionApplyRequest,
+    ) -> PortResult<CapabilitySetSuspensionSnapshot> {
+        unavailable!()
+    }
+
+    fn remove_capability_set_suspension(
+        &self,
+        _: &CapabilitySetSuspensionRemoveRequest,
+    ) -> PortResult<CapabilitySetSuspensionSnapshot> {
+        unavailable!()
+    }
+
+    fn load_capability_set_suspensions(
+        &self,
+        _: &CapabilitySetSuspensionKey,
+    ) -> PortResult<Option<CapabilitySetSuspensionSnapshot>> {
+        unavailable!()
+    }
+
+    fn evaluate_capability_suspension(
+        &self,
+        _: &CapabilitySuspensionQuery,
+    ) -> PortResult<CapabilitySuspensionDecision> {
+        unavailable!()
+    }
+
+    fn load_capability_set_suspension_result(
+        &self,
+        _: &EffectResultQuery,
+    ) -> PortResult<EffectExecutionStatus> {
+        unavailable!()
+    }
+}
+
+impl IssuanceFreezeStore for FakePorts {
+    fn ensure_issuance_freezes_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn apply_issuance_freeze(
+        &self,
+        _: &IssuanceFreezeApplyRequest,
+    ) -> PortResult<IssuanceFreezeSnapshot> {
+        unavailable!()
+    }
+
+    fn prepare_issuance_freeze_remove(
+        &self,
+        _: &IssuanceFreezeRemoveRequest,
+    ) -> PortResult<IssuanceFreezeContribution> {
+        unavailable!()
+    }
+
+    fn complete_issuance_freeze_remove(
+        &self,
+        _: &IssuanceFreezeRemoveRequest,
+    ) -> PortResult<IssuanceFreezeSnapshot> {
+        unavailable!()
+    }
+
+    fn load_issuance_freezes(
+        &self,
+        _: &IssuanceFreezeKey,
+    ) -> PortResult<Option<IssuanceFreezeSnapshot>> {
+        unavailable!()
+    }
+
+    fn evaluate_issuance_freeze(
+        &self,
+        _: &IssuanceFreezeAdmissionQuery,
+    ) -> PortResult<IssuanceFreezeAdmissionDecision> {
+        unavailable!()
+    }
+
+    fn load_issuance_freeze_operation(
+        &self,
+        _: &EffectResultQuery,
+    ) -> PortResult<IssuanceFreezeOperationStatus> {
+        unavailable!()
+    }
 }
 
 impl BlastRadiusPort for FakePorts {
+    fn ensure_blast_radius_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
     fn resolve(&self, _: &BlastRadiusRequest) -> PortResult<BlastRadiusResult> {
         unavailable!()
     }
 
-    fn acquire_fence(&self, _: &LineageFenceRequest) -> PortResult<LineageFence> {
+    fn acquire_fence(
+        &self,
+        _: &BlastRadiusFenceAcquisition,
+        _: &LineageFenceRequest,
+    ) -> PortResult<LineageFence> {
         unavailable!()
     }
 
-    fn query_fence(&self, _: &TenantScopedId) -> PortResult<Option<LineageFence>> {
+    fn query_fence(&self, _: &LineageFenceRequest) -> PortResult<Option<LineageFence>> {
+        unavailable!()
+    }
+
+    fn renew_fence(&self, _: &LineageFenceRenewal) -> PortResult<LineageFence> {
         unavailable!()
     }
 
@@ -243,47 +470,45 @@ impl LineageFenceStore for FakePorts {
         unavailable!()
     }
 
+    fn renew(&self, _: &LineageFenceRenewal) -> PortResult<LineageFence> {
+        unavailable!()
+    }
+
     fn release(&self, _: &LineageFenceRelease) -> PortResult<()> {
         unavailable!()
     }
 }
 
 impl ApprovalVerifierPort for FakePorts {
-    fn verify_and_reserve(&self, _: &ApprovalRequest) -> PortResult<ApprovalReservation> {
-        unavailable!()
-    }
-
-    fn commit(&self, _: &ApprovalReservationMutation) -> PortResult<()> {
-        unavailable!()
-    }
-
-    fn cancel(&self, _: &ApprovalReservationMutation) -> PortResult<()> {
-        unavailable!()
-    }
-}
-
-impl ApprovalReservationStore for FakePorts {
-    fn reserve(&self, _: &ApprovalReservationCreate) -> PortResult<CreateOutcome> {
-        unavailable!()
-    }
-
-    fn load_reservation(
+    fn verify_and_reserve(
         &self,
-        _: &TenantScopedId,
-    ) -> PortResult<Option<StoredApprovalReservation>> {
+        _: &GovernedApprovalRequest,
+    ) -> PortResult<GovernedApprovalReservation> {
         unavailable!()
     }
 
-    fn commit_reservation(&self, _: &ApprovalReservationMutation) -> PortResult<()> {
+    fn reconstruct(
+        &self,
+        _: &GovernedApprovalRequest,
+        _: &GovernedApprovalReservation,
+    ) -> PortResult<Option<GovernedApprovalReservation>> {
         unavailable!()
     }
 
-    fn cancel_reservation(&self, _: &ApprovalReservationMutation) -> PortResult<()> {
+    fn commit(&self, _: &GovernedApprovalReservationMutation) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn cancel(&self, _: &GovernedApprovalReservationMutation) -> PortResult<()> {
         unavailable!()
     }
 }
 
 impl EffectPort for FakePorts {
+    fn ensure_effects_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
     fn execute(&self, _: &EffectRequest) -> PortResult<EffectResult> {
         unavailable!()
     }
@@ -294,13 +519,25 @@ impl EffectPort for FakePorts {
 }
 
 impl SecurityReceiptSink for FakePorts {
+    fn ensure_receipts_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
     fn sign_and_append(&self, _: &ReceiptAppendRequest) -> PortResult<OpaqueReceiptRef> {
         unavailable!()
     }
 }
 
 impl SecurityAlertPort for FakePorts {
-    fn page(&self, _: &SecurityAlert) -> PortResult<()> {
+    fn ensure_alerts_ready(&self) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn page(&self, _: &SecurityAlert) -> PortResult<AlertDeliveryStatus> {
+        unavailable!()
+    }
+
+    fn load_delivery(&self, _: &AlertDeliveryQuery) -> PortResult<Option<AlertDeliveryStatus>> {
         unavailable!()
     }
 }
@@ -317,12 +554,15 @@ where
         + SealedDecoyRegistryStore
         + ResponseStore
         + ResponseSchedulerStore
+        + ResponseDispatchStore
         + SchedulerHealthPort
         + ContainmentOverlayStore
+        + SessionThrottleStore
+        + CapabilitySetSuspensionStore
+        + IssuanceFreezeStore
         + BlastRadiusPort
         + LineageFenceStore
         + ApprovalVerifierPort
-        + ApprovalReservationStore
         + EffectPort
         + SecurityReceiptSink
         + SecurityAlertPort,
@@ -354,6 +594,8 @@ fn identifiers_reject_noncanonical_decoding() {
     assert!(serde_json::from_str::<TenantId>(r#"" tenant-a""#).is_err());
     assert!(serde_json::from_str::<TenantId>(r#""tenant-a\u0000""#).is_err());
     assert!(serde_json::from_str::<TenantId>("\"\"").is_err());
+    assert!(AdmissionArtifactRef::new("0000").is_err());
+    assert!(serde_json::from_str::<AdmissionArtifactRef>(r#""0000""#).is_err());
 }
 
 #[test]

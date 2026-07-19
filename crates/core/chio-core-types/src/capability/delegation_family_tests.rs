@@ -6,8 +6,8 @@ use core::cell::Cell;
 
 use crate::capability::aggregate_budget::{
     issue_aggregate_family_root, verify_aggregate_invocation_authority,
-    verify_direct_aggregate_family_root, AggregateFamilyRootResolution,
-    AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
+    verify_direct_aggregate_family_root, AggregateFamilyPreservationEvidence,
+    AggregateFamilyRootResolution, AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
     AggregateInvocationAuthorityError, AggregateInvocationBudget, AggregateInvocationScope,
     LegacyUnboundAggregateRoot,
 };
@@ -80,6 +80,26 @@ impl FamilyFixture {
             self.child_subject.public_key(),
             Some(self.root_scope_hash()),
             1_100,
+            Some(self.verified_root.preservation_evidence()),
+        );
+        sign_leaf(
+            id,
+            &self.root_subject,
+            self.child_subject.public_key(),
+            vec![link],
+            Some(self.family_budget()),
+            1_900,
+        )
+    }
+
+    fn one_hop_legacy_descendant(&self, id: &str) -> CapabilityToken {
+        let link = signed_link(
+            &self.root_token.id,
+            &self.root_subject,
+            self.child_subject.public_key(),
+            Some(self.root_scope_hash()),
+            1_100,
+            None,
         );
         sign_leaf(
             id,
@@ -200,6 +220,7 @@ fn signed_link(
     delegatee: PublicKey,
     scope_hash: Option<ScopeHash>,
     timestamp: u64,
+    aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
 ) -> DelegationLink {
     DelegationLink::sign(
         DelegationLinkBody {
@@ -209,7 +230,7 @@ fn signed_link(
             attenuations: Vec::new(),
             timestamp,
             scope_hash,
-            aggregate_family_preservation: None,
+            aggregate_family_preservation,
         },
         signer,
     )
@@ -300,6 +321,26 @@ fn delegation_family_direct_root_and_descendants_share_owner_digest_and_maximum(
 }
 
 #[test]
+fn delegation_family_descendant_requires_evidence_on_every_link() {
+    let fixture = FamilyFixture::new("family-root-missing-link-evidence", 7);
+    let descendant = fixture.one_hop_legacy_descendant("family-child-missing-link-evidence");
+    let resolver = CountingResolver::family(&fixture);
+
+    let error = verify_aggregate_invocation_authority(
+        &descendant,
+        &[],
+        &[fixture.root_subject.public_key()],
+        &resolver,
+    )
+    .unwrap_err();
+
+    assert_authority_reason(
+        error,
+        "delegation-family capability link is missing aggregate family preservation evidence",
+    );
+}
+
+#[test]
 fn delegation_family_direct_root_rejects_descendant_leaf_only_trusted_issuer() {
     let attacker = FamilyFixture::new("leaf-only-self-issued-root", 3);
     let descendant_leaf_issuers = [attacker.root_issuer.public_key()];
@@ -370,6 +411,7 @@ fn delegation_family_multi_hop_descendant_is_accepted() {
         intermediate.public_key(),
         Some(fixture.root_scope_hash()),
         1_100,
+        Some(fixture.verified_root.preservation_evidence()),
     );
     let second = signed_link(
         "intermediate-capability",
@@ -377,6 +419,7 @@ fn delegation_family_multi_hop_descendant_is_accepted() {
         leaf_subject.public_key(),
         Some(fixture.root_scope_hash()),
         1_200,
+        Some(fixture.verified_root.preservation_evidence()),
     );
     let leaf = sign_leaf(
         "family-grandchild",
@@ -531,7 +574,7 @@ fn delegation_family_missing_unavailable_and_corrupt_resolution_fail_closed() {
 #[test]
 fn delegation_family_authenticated_legacy_accepts_none_and_capability_scope() {
     let fixture = FamilyFixture::new("legacy-root", 4);
-    let family_leaf = fixture.one_hop_descendant("legacy-leaf");
+    let family_leaf = fixture.one_hop_legacy_descendant("legacy-leaf");
 
     let no_aggregate = sign_leaf(
         "legacy-no-aggregate",
@@ -576,7 +619,7 @@ fn delegation_family_authenticated_legacy_accepts_none_and_capability_scope() {
 #[test]
 fn delegation_family_authenticated_legacy_rejects_new_family_creation() {
     let fixture = FamilyFixture::new("legacy-no-family-creation", 4);
-    let leaf = fixture.one_hop_descendant("legacy-family-attempt");
+    let leaf = fixture.one_hop_legacy_descendant("legacy-family-attempt");
     let resolver = CountingResolver::legacy(&fixture);
 
     let error = verify_aggregate_invocation_authority(
@@ -744,6 +787,7 @@ fn delegation_family_first_link_id_mismatch_is_corrupt_resolution() {
         fixture.child_subject.public_key(),
         Some(fixture.root_scope_hash()),
         1_100,
+        Some(fixture.verified_root.preservation_evidence()),
     );
     let leaf = sign_leaf(
         "first-link-id-leaf",
@@ -786,6 +830,7 @@ fn delegation_family_first_link_delegator_mismatch_is_rejected() {
         fixture.child_subject.public_key(),
         Some(fixture.root_scope_hash()),
         1_100,
+        Some(fixture.verified_root.preservation_evidence()),
     );
     let leaf = sign_leaf(
         "first-link-delegator-leaf",
@@ -820,6 +865,7 @@ fn delegation_family_first_link_scope_hash_mismatch_is_rejected() {
         fixture.child_subject.public_key(),
         Some("00".repeat(32)),
         1_100,
+        Some(fixture.verified_root.preservation_evidence()),
     );
     let leaf = sign_leaf(
         "first-link-scope-leaf",
@@ -904,7 +950,7 @@ fn delegation_family_resolver_root_record_id_mismatch_is_corrupt() {
 #[test]
 fn delegation_family_legacy_record_still_binds_first_hop_and_expiry() {
     let fixture = FamilyFixture::new("legacy-binding-root", 4);
-    let valid = fixture.one_hop_descendant("legacy-binding-leaf");
+    let valid = fixture.one_hop_legacy_descendant("legacy-binding-leaf");
     let resolver = CountingResolver::legacy(&fixture);
 
     let wrong_delegator = Keypair::generate();
@@ -914,6 +960,7 @@ fn delegation_family_legacy_record_still_binds_first_hop_and_expiry() {
         fixture.child_subject.public_key(),
         Some(fixture.root_scope_hash()),
         1_100,
+        None,
     );
     let wrong_leaf = sign_leaf(
         "legacy-wrong-delegator",

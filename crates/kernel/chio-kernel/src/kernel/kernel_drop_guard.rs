@@ -2,7 +2,10 @@ use chio_core::receipt::metadata::GuardEvidence;
 use chio_log_redact::redacted;
 use tracing::warn;
 
-use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCallRequest};
+use crate::{
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationState, CapabilityToken,
+    ChildRequestReceipt, PaymentAuthorization, SecurityDispatchOutcomeHandle, ToolCallRequest,
+};
 
 use super::{
     current_unix_timestamp, merge_metadata_objects, scope_pre_invocation_guard_evidence,
@@ -77,6 +80,8 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
     /// overlapping evaluation that still holds it keeps its share protected.
     /// Gates the step-4 child-budget release in `handle_pre_dispatch_drop`.
     budget_lease_acquired: bool,
+    threshold_operation: Option<AdmissionOperation>,
+    security_dispatch_outcome: Option<SecurityDispatchOutcomeHandle>,
     armed: bool,
     dispatch_started: bool,
 }
@@ -103,6 +108,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
             receipt_context,
             child_receipts: Vec::new(),
             budget_lease_acquired,
+            threshold_operation: None,
+            security_dispatch_outcome: None,
             armed: true,
             dispatch_started: false,
         }
@@ -129,6 +136,26 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// reservations.
     pub(crate) fn mark_dispatch_started(&mut self) {
         self.dispatch_started = true;
+        if let Some(outcome) = self.security_dispatch_outcome.as_mut() {
+            outcome.mark_dispatch_started();
+        }
+    }
+
+    pub(crate) fn bind_threshold_operation(&mut self, operation: AdmissionOperation) {
+        self.threshold_operation = Some(operation);
+    }
+
+    pub(crate) fn bind_security_dispatch_outcome(
+        &mut self,
+        outcome: Option<SecurityDispatchOutcomeHandle>,
+    ) {
+        self.security_dispatch_outcome = outcome;
+    }
+
+    pub(crate) fn take_security_dispatch_outcome(
+        &mut self,
+    ) -> Option<SecurityDispatchOutcomeHandle> {
+        self.security_dispatch_outcome.take()
     }
 
     pub(crate) fn disarm(&mut self) {
@@ -149,11 +176,12 @@ impl<'a> PostAdmissionDropGuard<'a> {
             self.cap,
             self.budget_mutation.charge_result(),
             self.payment_authorization,
+            self.threshold_operation.is_some(),
         );
         if let Err(failure) = &cleanup {
             warn!(
                 request_id = %self.request.request_id,
-                reason = %failure.reason(),
+                reason = %redacted!(failure.reason()),
                 "failed to release dropped post-admission monetary invocation"
             );
         }
@@ -173,12 +201,36 @@ impl<'a> PostAdmissionDropGuard<'a> {
     fn handle_pre_dispatch_drop(&self) {
         let mut faults: Vec<PreDispatchCleanupFault> = Vec::new();
 
+        // Operation-owned cleanup has one durable winner. Claim compensation
+        // before releasing any participant. If another coordinator already
+        // committed dispatch, this stale drop guard must release nothing.
+        if let Some(admission) = self.budget_mutation.ordinary_admission() {
+            match self.kernel.claim_pre_dispatch_compensation(
+                admission.operation_id(),
+                "tool evaluation future dropped before dispatch",
+            ) {
+                Ok(Some(_)) => {}
+                Ok(None) => return,
+                Err(error) => {
+                    faults.push(PreDispatchCleanupFault {
+                        step: "compensation_claim",
+                        reason: redacted!(&error).to_string(),
+                        hold_ids: vec![admission.operation_id().to_string()],
+                    });
+                    self.record_pre_dispatch_cleanup_fault_receipt(&faults);
+                    return;
+                }
+            }
+        }
+
         // 1. Monetary hold reversal (budget charge + payment release/refund).
-        if self.budget_mutation.charge_result().is_some() {
+        if self.budget_mutation.charge_result().is_some()
+            || self.budget_mutation.ordinary_admission().is_some()
+        {
             if let Err(error) = self.kernel.unwind_aborted_monetary_invocation(
                 self.request,
                 self.cap,
-                self.budget_mutation.charge_result(),
+                self.budget_mutation,
                 self.payment_authorization,
             ) {
                 let reason = redacted!(&error).to_string();
@@ -272,7 +324,16 @@ impl<'a> PostAdmissionDropGuard<'a> {
         //    free another evaluation's live share (a budget bypass), the worse
         //    failure. Mirrors the pre-dispatch denial path.
         if self.budget_lease_acquired {
-            if let Err(error) = self.kernel.release_admitted_capability_budget(self.cap) {
+            let release = match self.threshold_operation.as_ref() {
+                Some(operation) => self
+                    .kernel
+                    .release_threshold_delegated_budget(self.cap, operation),
+                None => self
+                    .kernel
+                    .release_admitted_capability_budget(self.cap)
+                    .map_err(super::KernelError::DelegationInvalid),
+            };
+            if let Err(error) = release {
                 let reason = redacted!(&error).to_string();
                 warn!(
                     request_id = %self.request.request_id,
@@ -375,6 +436,8 @@ impl Drop for PostAdmissionDropGuard<'_> {
             return;
         }
 
+        drop(self.security_dispatch_outcome.take());
+
         if !self.dispatch_started {
             // Pre-dispatch drop (or a panic unwinding before dispatch).
             // Nothing was written to the tool server, so no side effect is
@@ -384,6 +447,49 @@ impl Drop for PostAdmissionDropGuard<'_> {
             self.handle_pre_dispatch_drop();
             return;
         }
+
+        let terminal_operation = self.threshold_operation.clone().or_else(|| {
+            self.budget_mutation
+                .ordinary_admission()
+                .and_then(|admission| {
+                    match self.kernel.load_ordinary_admission(admission.operation_id()) {
+                        Ok(operation) => Some(operation),
+                        Err(error) => {
+                            warn!(
+                                request_id = %self.request.request_id,
+                                reason = %redacted!(&error),
+                                audit_fault = "ordinary_drop_terminal_receipt_load_failed",
+                                "failed to load dropped ordinary admission for signed terminal staging"
+                            );
+                            None
+                        }
+                    }
+                })
+        });
+        let mut terminal_receipt_scope = None;
+        let terminal_metadata = terminal_operation.as_ref().and_then(|operation| {
+            match self.kernel.scope_threshold_terminal_receipt_outbox(
+                self.request,
+                operation,
+                AdmissionOperationState::OutcomeUnknownAfterDispatch,
+                AdmissionDispatchState::OutcomeUnknown,
+                Some(POST_ADMISSION_DROP_REASON.to_string()),
+            ) {
+                Ok((metadata, scope)) => {
+                    terminal_receipt_scope = Some(scope);
+                    Some(metadata)
+                }
+                Err(error) => {
+                    warn!(
+                        request_id = %self.request.request_id,
+                        reason = %redacted!(&error),
+                        audit_fault = "admission_drop_terminal_receipt_staging_failed",
+                        "failed to stage unknown outcome and signed receipt for dropped governed dispatch"
+                    );
+                    None
+                }
+            }
+        });
 
         // Flush the buffered nested child receipts FIRST. The child operations
         // completed and were signed before the parent evaluation was cancelled,
@@ -399,7 +505,10 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // tool-side effect may already have occurred.
         // Best-effort from a Drop context; a non-monetary grant returns the
         // base metadata unchanged.
-        let released_metadata = self.release_charge_from_post_dispatch_drop();
+        let released_metadata = merge_metadata_objects(
+            self.release_charge_from_post_dispatch_drop(),
+            terminal_metadata,
+        );
 
         // Post-dispatch drop. The tool-server invoke was in flight; a side
         // effect MAY have executed. Fail closed: retain the runtime-
@@ -430,5 +539,6 @@ impl Drop for PostAdmissionDropGuard<'_> {
                 "failed to record cancellation receipt for dropped post-admission invocation"
             );
         }
+        drop(terminal_receipt_scope);
     }
 }

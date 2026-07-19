@@ -52,11 +52,14 @@ chio-custody-hw = { workspace = true, features = ["passkey", "sqlite-store"] }
 chio-weights = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 chio-kernel-core = { workspace = true }
+chio-keyring = { workspace = true }
 chio-credit = { workspace = true }
 chio-federation = { workspace = true }
 chio-link = { path = "../../economy/chio-link", default-features = false }
 chio-log-redact = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
+chio-security-types = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 lru = "0.16.3"
 chio-settle = { workspace = true }
@@ -86,6 +89,8 @@ loom = { workspace = true, optional = true }
 libc = "0.2"
 
 [dev-dependencies]
+chio-guards = { workspace = true }
+chio-security-kernel = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 criterion = { workspace = true }
@@ -94,6 +99,7 @@ dhat = { workspace = true }
 # - tests/property_budget_store.rs
 # - tests/replay_proptest.rs (replay-invariance suite)
 proptest = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "cap_verify_ed25519"

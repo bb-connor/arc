@@ -1,18 +1,24 @@
 #![forbid(unsafe_code)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod audit;
 pub mod authority_ipc;
 pub mod budget;
 pub mod capability;
+#[cfg(feature = "conformance")]
+pub mod conformance;
 pub mod daemon;
 pub mod daemon_runtime;
 pub mod generic_https;
+pub mod ipc_client;
+pub mod migration;
+pub mod privileged_audit;
 pub mod proof;
 pub mod protocol;
 pub mod provider;
 pub mod provision;
 pub mod receipt;
 pub mod reconcile;
+pub mod registration;
 pub mod revocation;
 pub mod service;
 pub mod sqlite;

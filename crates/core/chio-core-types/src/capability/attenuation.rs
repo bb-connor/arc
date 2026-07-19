@@ -1134,17 +1134,25 @@ fn validate_parent_family_authority(
                 .to_string(),
         });
     }
-    if let Some(evidence) = parent
-        .attenuation_proof
-        .as_ref()
-        .and_then(|proof| proof.aggregate_family_preservation.as_ref())
-    {
+    if let Some(proof) = parent.attenuation_proof.as_ref() {
+        let evidence = proof
+            .aggregate_family_preservation
+            .as_ref()
+            .ok_or_else(|| Error::AttenuationViolation {
+                reason: "attenuated delegation-family capability must preserve aggregate family evidence"
+                    .to_string(),
+            })?;
         evidence.validate_against_verified_root(verified_root)?;
     }
     for link in &parent.delegation_chain {
-        if let Some(evidence) = link.aggregate_family_preservation.as_ref() {
-            evidence.validate_against_verified_root(verified_root)?;
-        }
+        let evidence = link
+            .aggregate_family_preservation
+            .as_ref()
+            .ok_or_else(|| Error::AttenuationViolation {
+                reason: "delegation-family capability link is missing aggregate family preservation evidence"
+                    .to_string(),
+            })?;
+        evidence.validate_against_verified_root(verified_root)?;
     }
     Ok(())
 }

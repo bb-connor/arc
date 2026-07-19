@@ -43,6 +43,10 @@ metadata into a checked shared invariant:
   capability reference whose `originProtocol` belongs to another, even when its
   id and parent hash are otherwise valid; protocol-edge metadata is not trusted
   when it disagrees with the bridge object the caller selected.
+- When both an authenticated session and an authoritative security context are
+  supplied, their session ids must match exactly before route planning. Native,
+  OpenAI, and MCP target execution pass that authenticated session into the
+  kernel's session-aware manifest-security entrypoint.
 
 Malformed requests fail closed with `BridgeError::InvalidRequest` at the shared
 orchestrator boundary rather than reaching route planning or kernel execution.
@@ -52,20 +56,21 @@ orchestrator boundary rather than reaching route planning or kernel execution.
 The orchestrator fails closed before signing or forwarding misleading lineage.
 Route selection evidence, trace ids, receipt metadata, and capability envelope
 fields stay canonical and byte-stable for valid requests. Public type names,
-trait methods, struct fields, and serialized field names stay source-compatible.
-Native and registered target execution continues to route through the kernel.
+trait methods, and serialized field names stay source-compatible.
+`CrossProtocolExecutionRequest` adds the Rust-only
+`authenticated_session_id` field. Native and registered target execution
+continues to route through the kernel.
 
 ## Affected Dependents
 
-No transitive crate edits are expected. `chio-a2a-edge`, `chio-acp-edge`,
-`chio-acp-proxy`, `chio-mcp-edge`, and other crates using
-`CrossProtocolOrchestrator`, `CapabilityBridge`, `TargetProtocolExecutor`, and
-`CrossProtocolExecutionRequest` keep the same API. Malformed requests change
-from kernel/routing behavior to `BridgeError::InvalidRequest`.
+`chio-a2a-edge` and `chio-acp-edge` populate the authenticated session.
+Sessionless compatibility callers, including `chio-acp-proxy` and existing MCP
+tests, explicitly use `None`. Malformed requests change from kernel/routing
+behavior to `BridgeError::InvalidRequest`.
 
 ## Verification Focus
 
-Tests cover identity-field rejection before route planning, capability id and
+Tests cover identity-field and authenticated-session rejection before route planning, capability id and
 parent-hash mismatch rejection, source-protocol drift rejection, metadata byte
 stability for valid bridge requests, and kernel handoff parity for native and
 registered executors. Edge-crate smoke tests prove that A2A, ACP, MCP, and

@@ -15,9 +15,14 @@ name = "chio_secret_broker"
 name = "chio-secret-brokerd"
 path = "src/bin/chio-secret-brokerd.rs"
 
+[features]
+conformance = ["dep:chio-kernel"]
+
 [dependencies]
-chacha20poly1305 = { workspace = true }
 chio-core-types = { workspace = true }
+chio-kernel = { workspace = true, optional = true }
+chio-security-types = { workspace = true }
+chio-store-sqlite = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }
 rand_core = { workspace = true }
@@ -27,12 +32,20 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+subtle = "2.6"
 thiserror = { workspace = true }
 url = { workspace = true }
 webpki-roots = "1"
 zeroize = { workspace = true }
 
+[target.'cfg(target_vendor = "apple")'.dependencies]
+chio-keyring = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
+chio-test-support = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }
 

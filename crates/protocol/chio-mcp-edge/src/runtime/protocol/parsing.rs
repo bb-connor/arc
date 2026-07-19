@@ -213,6 +213,79 @@ pub(in crate::runtime) fn parse_request_governed_intent(
         })
 }
 
+fn parse_request_chio_extension<T: serde::de::DeserializeOwned>(
+    id: &Value,
+    params: &Value,
+    names: [&str; 2],
+    error_message: &str,
+) -> Result<Option<T>, Value> {
+    let Some(meta) = params.get("_meta") else {
+        return Ok(None);
+    };
+    let Some(meta) = meta.as_object() else {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta must be an object",
+        ));
+    };
+    let Some(value) = meta.get(names[0]).or_else(|| meta.get(names[1])) else {
+        return Ok(None);
+    };
+    serde_json::from_value(value.clone())
+        .map(Some)
+        .map_err(|_| jsonrpc_error(id.clone(), JSONRPC_INVALID_PARAMS, error_message))
+}
+
+pub(in crate::runtime) fn parse_request_supplemental_authorization(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<OpaqueSupplementalAuthorization>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["supplementalAuthorization", "chioSupplementalAuthorization"],
+        "supplementalAuthorization must be a bounded opaque Chio authorization object",
+    )
+}
+
+pub(in crate::runtime) fn parse_request_approval_token(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<GovernedApprovalToken>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["approvalToken", "chioApprovalToken"],
+        "approvalToken must be a signed Chio governed approval token",
+    )
+}
+
+pub(in crate::runtime) fn parse_request_approval_tokens(
+    id: &Value,
+    params: &Value,
+) -> Result<Vec<GovernedApprovalToken>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["approvalTokens", "chioApprovalTokens"],
+        "approvalTokens must be a bounded array of signed Chio governed approval tokens",
+    )
+    .map(|tokens| tokens.unwrap_or_default())
+}
+
+pub(in crate::runtime) fn parse_request_threshold_approval_proposal(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<ThresholdApprovalProposal>, Value> {
+    parse_request_chio_extension(
+        id,
+        params,
+        ["thresholdApprovalProposal", "chioThresholdApprovalProposal"],
+        "thresholdApprovalProposal must be a signed Chio threshold approval proposal",
+    )
+}
+
 pub(in crate::runtime) fn parse_request_extra_metadata(
     id: &Value,
     params: &Value,
@@ -324,4 +397,23 @@ pub(in crate::runtime) fn parse_peer_capabilities(params: &Value) -> PeerCapabil
         elicitation_form,
         elicitation_url,
     }
+}
+
+pub(in crate::runtime) fn parse_peer_protocol_features(
+    params: &Value,
+) -> Result<CapabilityNegotiation, String> {
+    let Some(advertisement) = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("experimental"))
+        .and_then(|experimental| experimental.get(CHIO_PROTOCOL_CAPABILITY_KEY))
+        .and_then(|chio_protocol| chio_protocol.get("capabilityNegotiation"))
+    else {
+        return Ok(CapabilityNegotiation::v1_default());
+    };
+    let features: CapabilityNegotiation = serde_json::from_value(advertisement.clone())
+        .map_err(|error| format!("invalid MCP capability negotiation advertisement: {error}"))?;
+    features
+        .validate()
+        .map_err(|error| format!("invalid MCP capability negotiation advertisement: {error}"))?;
+    Ok(features)
 }

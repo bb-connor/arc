@@ -1,7 +1,30 @@
 use super::*;
 
 pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
+    let threshold_routes = if state.approval_admin.threshold_collector_configured() {
+        Router::new()
+            .route(
+                "/approvals/threshold/proposals",
+                post(create_threshold_approval_proposal_handler),
+            )
+            .route(
+                "/approvals/threshold/proposals/{id}/votes",
+                post(append_threshold_approval_vote_handler),
+            )
+            .route(
+                "/approvals/threshold/proposals/{id}/deliver",
+                post(deliver_threshold_approval_response_handler),
+            )
+            .route(
+                "/approvals/threshold/proposals/{id}",
+                get(get_threshold_approval_proposal_handler),
+            )
+    } else {
+        Router::new()
+    };
+
     let approval_routes = Router::new()
+        .merge(threshold_routes)
         .route("/approvals/pending", get(list_pending_approvals_handler))
         .route("/approvals/submit", post(submit_approval_handler))
         .route(
@@ -131,6 +154,16 @@ pub(crate) async fn proxy_handler(
     };
 
     let path = uri.path().to_string();
+    if path == "/approvals/threshold" || path.starts_with("/approvals/threshold/") {
+        return (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": "not_found",
+                "message": "threshold approval collector route is not available",
+            })),
+        )
+            .into_response();
+    }
     if let Some(key) = duplicate_query_key(uri.query()) {
         return (
             StatusCode::BAD_REQUEST,

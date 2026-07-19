@@ -60,7 +60,7 @@ fn make_request(tool_name: &str) -> GuardRequest {
 #[test]
 fn ts_guard_component_round_trip() {
     let wasm_bytes = load_ts_guard_wasm();
-    let format = detect_wasm_format(&wasm_bytes).unwrap();
+    let format = detect_wasm_format(wasm_bytes).unwrap();
     assert!(
         matches!(format, WasmFormat::Component),
         "expected Component format, got {format:?}"

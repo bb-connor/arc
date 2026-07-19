@@ -8,13 +8,44 @@ use crate::execution::CrossProtocolExecutionRequest;
 
 pub(crate) fn validate_execution_request_boundary(
     request: &CrossProtocolExecutionRequest,
+    registry: &chio_manifest::VerifiedManifestRegistry,
 ) -> Result<(), BridgeError> {
     validate_request_identity_field("origin_request_id", &request.origin_request_id)?;
     validate_request_identity_field("kernel_request_id", &request.kernel_request_id)?;
     validate_request_identity_field("target_server_id", &request.target_server_id)?;
     validate_request_identity_field("target_tool_name", &request.target_tool_name)?;
     validate_request_identity_field("agent_id", &request.agent_id)?;
+    if let (Some(security_context), Some(authenticated_session_id)) = (
+        request.security_context.as_ref(),
+        request.authenticated_session_id.as_ref(),
+    ) {
+        if security_context.as_v1().session_id().as_str() != authenticated_session_id.as_str() {
+            return Err(BridgeError::InvalidRequest(
+                "authoritative security context does not match the authenticated session"
+                    .to_string(),
+            ));
+        }
+    }
+    validate_manifest_invocation_binding(request, registry)?;
+    request
+        .to_tool_call_request()
+        .validate()
+        .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
     Ok(())
+}
+
+fn validate_manifest_invocation_binding(
+    request: &CrossProtocolExecutionRequest,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+) -> Result<(), BridgeError> {
+    registry
+        .validate_invocation_arguments(
+            &request.target_server_id,
+            &request.target_tool_name,
+            &request.bridge_security,
+            &request.arguments,
+        )
+        .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
 }
 
 fn validate_request_identity_field(field_name: &str, value: &str) -> Result<(), BridgeError> {

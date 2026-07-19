@@ -171,7 +171,7 @@ impl Write for DeadlineTcpStream {
     }
 }
 
-fn build_request_head(request: &PinnedHttpsRequest) -> Result<Zeroizing<Vec<u8>>> {
+pub(super) fn build_request_head(request: &PinnedHttpsRequest) -> Result<Zeroizing<Vec<u8>>> {
     let mut head = Zeroizing::new(Vec::new());
     head.extend_from_slice(request.method.as_bytes());
     head.push(b' ');
@@ -560,6 +560,7 @@ fn trim_optional_whitespace(mut value: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
+    use chio_test_support::prelude::*;
     use std::io::Cursor;
     use std::net::{IpAddr, Ipv4Addr, TcpListener};
     use std::sync::mpsc;
@@ -576,20 +577,19 @@ mod tests {
     use crate::protocol::{
         BrokerDestination, BrokerRequest, CallerOptions, RedirectPolicy, RequestConstraints,
     };
-    use crate::provider::{
-        CredentialPlacement, GenericCredentialProvider, PreparedProviderRequest, ProviderAdapter,
-    };
+    use crate::provider::{CredentialPlacement, GenericCredentialProvider};
 
     #[test]
     fn strict_parser_accepts_only_fixed_or_plain_chunked_bodies() {
         let fixed = b"HTTP/1.1 200 OK\r\ncontent-length: 5\r\nx-test: one\r\n\r\nhello";
-        let parsed = parse_http_response(&mut Cursor::new(fixed), "GET", 64).expect("fixed");
+        let parsed = parse_http_response(&mut Cursor::new(fixed), "GET", 64).test_expect("fixed");
         assert_eq!(parsed.status, 200);
         assert_eq!(parsed.body, b"hello");
         assert_eq!(parsed.response_head_bytes, fixed.len() - parsed.body.len());
 
         let chunked = b"HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n2\r\nhe\r\n3\r\nllo\r\n0\r\n\r\n";
-        let parsed = parse_http_response(&mut Cursor::new(chunked), "GET", 64).expect("chunked");
+        let parsed =
+            parse_http_response(&mut Cursor::new(chunked), "GET", 64).test_expect("chunked");
         assert_eq!(parsed.body, b"hello");
         assert_eq!(
             parsed.response_head_bytes,
@@ -672,50 +672,55 @@ mod tests {
 
     fn local_tls_server(behavior: ServerBehavior) -> LocalTlsServer {
         let CertifiedKey { cert, key_pair } =
-            generate_simple_self_signed(vec!["localhost".to_string()]).expect("certificate");
+            generate_simple_self_signed(vec!["localhost".to_string()]).test_expect("certificate");
         let certificate: CertificateDer<'static> = cert.der().clone();
         let private_key = PrivatePkcs8KeyDer::from(key_pair.serialize_der()).into();
         let builder =
             ServerConfig::builder_with_provider(rustls::crypto::ring::default_provider().into())
                 .with_safe_default_protocol_versions()
-                .expect("server protocols");
+                .test_expect("server protocols");
         let mut server_config = builder
             .with_no_client_auth()
             .with_single_cert(vec![certificate.clone()], private_key)
-            .expect("server certificate");
+            .test_expect("server certificate");
         server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
 
         let mut roots = RootCertStore::empty();
-        roots.add(certificate).expect("test root");
+        roots.add(certificate).test_expect("test root");
         let builder =
             ClientConfig::builder_with_provider(rustls::crypto::ring::default_provider().into())
                 .with_safe_default_protocol_versions()
-                .expect("client protocols");
+                .test_expect("client protocols");
         let mut client_config = builder.with_root_certificates(roots).with_no_client_auth();
         client_config.alpn_protocols = vec![b"http/1.1".to_vec()];
 
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("listener");
-        let address = listener.local_addr().expect("listener address");
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).test_expect("listener");
+        let address = listener.local_addr().test_expect("listener address");
         let (sender, receiver) = mpsc::channel();
         let server_config = Arc::new(server_config);
         let thread = thread::spawn(move || {
-            let (socket, _) = listener.accept().expect("accept");
-            let connection = ServerConnection::new(server_config).expect("server TLS connection");
+            let (socket, _) = listener.accept().test_expect("accept");
+            let connection =
+                ServerConnection::new(server_config).test_expect("server TLS connection");
             let mut stream = StreamOwned::new(connection, socket);
-            let mut request = read_request_head(&mut stream).expect("request head");
+            let mut request = read_request_head(&mut stream).test_expect("request head");
             let mut request_body = [0_u8; 4];
-            stream.read_exact(&mut request_body).expect("request body");
+            stream
+                .read_exact(&mut request_body)
+                .test_expect("request body");
             request.extend_from_slice(&request_body);
-            sender.send(request).expect("observed request");
+            sender.send(request).test_expect("observed request");
             match behavior {
                 ServerBehavior::Respond(response) => {
-                    stream.write_all(&response).expect("response");
-                    stream.flush().expect("response flush");
+                    stream.write_all(&response).test_expect("response");
+                    stream.flush().test_expect("response flush");
                 }
                 ServerBehavior::Delay(duration) => thread::sleep(duration),
                 ServerBehavior::Truncate(response) => {
-                    stream.write_all(&response).expect("truncated response");
-                    stream.flush().expect("truncated response flush");
+                    stream
+                        .write_all(&response)
+                        .test_expect("truncated response");
+                    stream.flush().test_expect("truncated response flush");
                 }
             }
         });
@@ -743,18 +748,14 @@ mod tests {
         ))
     }
 
-    fn prepared_request(
-        port: u16,
-        timeout_ms: u64,
-        credential: &SecretMaterial,
-    ) -> (PreparedProviderRequest, RequestConstraints) {
+    fn request_and_constraints(port: u16, timeout_ms: u64) -> (BrokerRequest, RequestConstraints) {
         let request = BrokerRequest {
             destination: BrokerDestination::parse(
                 &format!("https://localhost:{port}/v1"),
                 "POST",
                 false,
             )
-            .expect("destination"),
+            .test_expect("destination"),
             headers: Vec::new(),
             body: b"body".to_vec(),
             approved_preview_sha256: None,
@@ -775,16 +776,16 @@ mod tests {
             streaming_allowed: false,
             maximum_timeout_ms: timeout_ms,
         };
-        let provider = GenericCredentialProvider::new(
+        (request, constraints)
+    }
+
+    fn provider() -> GenericCredentialProvider {
+        GenericCredentialProvider::new(
             "generic-bearer".to_string(),
             1,
             CredentialPlacement::BearerAuthorization,
         )
-        .expect("provider");
-        let prepared = provider
-            .prepare(&request, &constraints, credential)
-            .expect("prepare");
-        (prepared, constraints)
+        .test_expect("provider")
     }
 
     fn local_executor(server: &LocalTlsServer) -> GenericHttpsExecutor {
@@ -807,19 +808,23 @@ mod tests {
         ));
         let canary = b"direct-rustls-auth-canary-9813";
         let credential = SecretMaterial::new(canary.to_vec());
-        let (prepared, constraints) = prepared_request(server.address.port(), 2_000, &credential);
-        let (_, _, body) = local_executor(&server)
+        let (request, constraints) = request_and_constraints(server.address.port(), 2_000);
+        let executor = local_executor(&server);
+        let prepared = executor
+            .prepare(&provider(), &request, &constraints, &credential)
+            .test_expect("prepare");
+        let (_, _, body) = executor
             .dispatch(prepared, &constraints, &credential)
-            .expect("dispatch");
+            .test_expect("dispatch");
         assert_eq!(body, b"ok");
         let observed = server
             .observed_request
             .recv_timeout(Duration::from_secs(1))
-            .expect("observed request");
+            .test_expect("observed request");
         assert!(observed
             .windows(canary.len())
             .any(|candidate| candidate == canary));
-        server.thread.join().expect("server thread");
+        server.thread.join().test_expect("server thread");
     }
 
     #[test]
@@ -834,27 +839,30 @@ mod tests {
         ] {
             let server = local_tls_server(behavior);
             let credential = SecretMaterial::new(canary.to_vec());
-            let (prepared, constraints) =
-                prepared_request(server.address.port(), 250, &credential);
-            let error = local_executor(&server)
+            let (request, constraints) = request_and_constraints(server.address.port(), 250);
+            let executor = local_executor(&server);
+            let prepared = executor
+                .prepare(&provider(), &request, &constraints, &credential)
+                .test_expect("prepare");
+            let error = executor
                 .dispatch(prepared, &constraints, &credential)
-                .expect_err("timeout or cancellation must fail closed");
+                .test_expect_err("timeout or cancellation must fail closed");
             let diagnostic = format!(
                 "{} {:?} {}",
                 error,
                 error,
                 error.diagnostic_code()
             );
-            assert!(!diagnostic.contains(std::str::from_utf8(canary).expect("canary UTF-8")));
+            assert!(!diagnostic.contains(std::str::from_utf8(canary).test_expect("canary UTF-8")));
             assert_eq!(error.diagnostic_code(), "upstream");
             let observed = server
                 .observed_request
                 .recv_timeout(Duration::from_secs(1))
-                .expect("observed request");
+                .test_expect("observed request");
             assert!(observed
                 .windows(canary.len())
                 .any(|candidate| candidate == canary));
-            server.thread.join().expect("server thread");
+            server.thread.join().test_expect("server thread");
         }
     }
 }

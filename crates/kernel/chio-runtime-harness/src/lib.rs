@@ -385,9 +385,11 @@ mod tests {
         let scenario = root.join("scenario.json");
         write_executable_scenario(&fixture_scenario, &scenario)?;
 
-        let error =
+        let Err(error) =
             run_runtime_loopback_scenario(&scenario, &store_dir, 1_800_000_001_000, &out_dir)
-                .expect_err("runtime package drift from static fixture must fail closed");
+        else {
+            panic!("runtime package drift from static fixture must fail closed");
+        };
         assert!(error
             .to_string()
             .contains("runtime_proof_semantic_parity_mismatch"));
@@ -449,9 +451,11 @@ mod tests {
         let scenario = root.join("scenario.json");
         write_executable_scenario(&fixture_scenario, &scenario)?;
 
-        let error =
+        let Err(error) =
             run_runtime_loopback_scenario(&scenario, &store_dir, 1_800_000_001_000, &out_dir)
-                .expect_err("runtime package drift from static fixture must fail closed");
+        else {
+            panic!("runtime package drift from static fixture must fail closed");
+        };
         assert!(error
             .to_string()
             .contains("runtime_proof_semantic_parity_mismatch"));

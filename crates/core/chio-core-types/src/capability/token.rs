@@ -1,12 +1,14 @@
 use alloc::format;
 use alloc::string::{String, ToString};
+use alloc::vec;
 use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::{canonical_json_bytes, canonical_json_bytes_from_str};
 use crate::crypto::{
-    is_default_optional_algorithm, sign_canonical_with_backend, Keypair, PublicKey, Signature,
-    SigningAlgorithm, SigningBackend,
+    is_default_optional_algorithm, sign_canonical_with_backend_for_identity, Keypair, PublicKey,
+    Signature, SigningAlgorithm, SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::schema_binding::ensure_schema_matches;
@@ -17,7 +19,7 @@ use super::attenuation::{
     scope_hash, validate_attenuation_proof, verify_attenuation_witness, Attenuation,
     AttenuationProof, DelegationLink, ScopeHash,
 };
-use super::caveat::Caveat;
+use super::caveat::{CapabilitySecurityBinding, Caveat, CaveatKind};
 use super::crypto_floor::{CapabilityCryptoFloor, CapabilityFloorVerifyError};
 use super::features::{self, CapabilityNegotiation};
 use super::scope::ChioScope;
@@ -165,6 +167,40 @@ pub struct CapabilityTokenAttenuationBody {
     pub budget_share_bps: Option<u16>,
 }
 
+/// Return whether `bytes` are exactly one of the canonical preimages accepted
+/// by capability-token verification.
+///
+/// This recognizes both the current schema-aware signing body and the legacy
+/// plain body accepted for otherwise unattenuated v1 tokens. Callers that
+/// expose a constrained authority-signing surface use this as a mandatory
+/// deny rule so generic artifact signing cannot bypass governed capability
+/// issuance.
+pub fn is_capability_token_signing_preimage(bytes: &[u8]) -> Result<bool> {
+    let raw = match core::str::from_utf8(bytes) {
+        Ok(raw) => raw,
+        Err(_) => return Ok(false),
+    };
+    let strict_canonical = match canonical_json_bytes_from_str(raw) {
+        Ok(canonical) => canonical,
+        Err(_) => return Ok(false),
+    };
+    if strict_canonical.as_slice() != bytes {
+        return Ok(false);
+    }
+
+    if let Ok(body) = serde_json::from_slice::<CapabilityTokenSigningBody>(bytes) {
+        if canonical_json_bytes(&body)? == bytes {
+            return Ok(true);
+        }
+    }
+    if let Ok(body) = serde_json::from_slice::<CapabilityTokenBody>(bytes) {
+        if canonical_json_bytes(&body)? == bytes {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 impl CapabilityToken {
     /// Extract the body (everything except the signature) for re-verification.
     #[must_use]
@@ -207,12 +243,24 @@ impl CapabilityToken {
     /// Reject unknown schema IDs and budget amplification.
     pub fn validate_schema(&self) -> Result<()> {
         ensure_schema_matches(&self.schema, CHIO_CAPABILITY_SCHEMA, "capability token")?;
-        if !self.caveats.is_empty() {
+        let security_binding_count = self
+            .caveats
+            .iter()
+            .filter(|caveat| caveat.kind == CaveatKind::BindSecurityContext)
+            .count();
+        if self
+            .caveats
+            .iter()
+            .any(|caveat| caveat.kind != CaveatKind::BindSecurityContext)
+            || security_binding_count > 1
+        {
             return Err(Error::AttenuationViolation {
-                reason:
-                    "capability caveats are not enforced by admission and are rejected fail-closed"
-                        .to_string(),
+                reason: "only one enforced security-context capability caveat is accepted"
+                    .to_string(),
             });
+        }
+        for caveat in &self.caveats {
+            caveat.security_binding()?;
         }
         let needs_attenuation_proof = self.requires_chain_binding();
         if needs_attenuation_proof && self.attenuation_proof.is_none() {
@@ -405,6 +453,111 @@ impl CapabilityToken {
         })
     }
 
+    /// Sign a directly issued capability with one enforced workload/session
+    /// security binding.
+    pub fn sign_with_security_binding(
+        body: CapabilityTokenBody,
+        binding: CapabilitySecurityBinding,
+        keypair: &Keypair,
+    ) -> Result<Self> {
+        ensure_keypair_matches_embedded_key(&body.issuer, keypair, "capability token", "issuer")?;
+        if let Some(budget) = body.aggregate_invocation_budget.as_ref() {
+            budget.validate_for_scope(&body.scope)?;
+        }
+        let caveats = vec![Caveat::bind_security_context(&binding)?];
+        let signing_body = CapabilityTokenSigningBody {
+            schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+            body: body.clone(),
+            caveats: caveats.clone(),
+            scope_attenuations: None,
+            attenuation_proof: None,
+            budget_share_bps: None,
+        };
+        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
+        Ok(Self {
+            schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+            id: body.id,
+            issuer: body.issuer,
+            subject: body.subject,
+            scope: body.scope,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            delegation_chain: body.delegation_chain,
+            algorithm: None,
+            caveats,
+            scope_attenuations: None,
+            attenuation_proof: None,
+            budget_share_bps: None,
+            aggregate_invocation_budget: body.aggregate_invocation_budget,
+            signature,
+        })
+    }
+
+    /// Sign a directly issued, security-bound capability through a governed
+    /// signing backend. The backend identity is captured atomically and must
+    /// equal the issuer embedded in the persisted issuance intent.
+    pub fn sign_with_security_binding_backend(
+        body: CapabilityTokenBody,
+        binding: CapabilitySecurityBinding,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        let expected_issuer = body.issuer.clone();
+        let expected_algorithm = expected_issuer.algorithm();
+        if let Some(budget) = body.aggregate_invocation_budget.as_ref() {
+            budget.validate_for_scope(&body.scope)?;
+        }
+        let caveats = vec![Caveat::bind_security_context(&binding)?];
+        let signing_body = CapabilityTokenSigningBody {
+            schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+            body: body.clone(),
+            caveats: caveats.clone(),
+            scope_attenuations: None,
+            attenuation_proof: None,
+            budget_share_bps: None,
+        };
+        let (outcome, canonical_bytes) =
+            sign_canonical_with_backend_for_identity(backend, &expected_issuer, &signing_body)?;
+        if outcome.algorithm != expected_algorithm
+            || outcome.signature.algorithm() != expected_algorithm
+            || !expected_issuer.verify(&canonical_bytes, &outcome.signature)
+        {
+            return Err(Error::InvalidSignature(
+                "security-bound capability backend returned a mismatched signature".to_string(),
+            ));
+        }
+        Ok(Self {
+            schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+            id: body.id,
+            issuer: body.issuer,
+            subject: body.subject,
+            scope: body.scope,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            delegation_chain: body.delegation_chain,
+            algorithm: Some(expected_algorithm),
+            caveats,
+            scope_attenuations: None,
+            attenuation_proof: None,
+            budget_share_bps: None,
+            aggregate_invocation_budget: body.aggregate_invocation_budget,
+            signature: outcome.signature,
+        })
+    }
+
+    pub fn security_binding(&self) -> Result<Option<CapabilitySecurityBinding>> {
+        let mut binding = None;
+        for caveat in &self.caveats {
+            if let Some(candidate) = caveat.security_binding()? {
+                if binding.replace(candidate).is_some() {
+                    return Err(Error::AttenuationViolation {
+                        reason: "capability carries multiple security-context bindings".to_string(),
+                    });
+                }
+            }
+        }
+        Ok(binding)
+    }
+
     /// Sign an attenuated capability token with caveats and an attenuation proof.
     pub fn sign_attenuated(
         body: CapabilityTokenAttenuationBody,
@@ -487,13 +640,8 @@ impl CapabilityToken {
         body: CapabilityTokenBody,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
-        let expected_issuer = backend.public_key();
-        let expected_algorithm = backend.algorithm();
-        if body.issuer != expected_issuer {
-            return Err(Error::InvalidPublicKey(
-                "capability token issuer does not match signing key".to_string(),
-            ));
-        }
+        let expected_issuer = body.issuer.clone();
+        let expected_algorithm = expected_issuer.algorithm();
         if expected_issuer.algorithm() != expected_algorithm {
             return Err(Error::InvalidSignature(
                 "capability token backend algorithm does not match public key".to_string(),
@@ -510,8 +658,10 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let (signature, canonical_bytes) = sign_canonical_with_backend(backend, &signing_body)?;
-        if signature.algorithm() != expected_algorithm {
+        let (outcome, canonical_bytes) =
+            sign_canonical_with_backend_for_identity(backend, &expected_issuer, &signing_body)?;
+        let signature = outcome.signature;
+        if outcome.algorithm != expected_algorithm || signature.algorithm() != expected_algorithm {
             return Err(Error::InvalidSignature(
                 "capability token backend algorithm does not match returned signature".to_string(),
             ));
@@ -734,5 +884,61 @@ impl CapabilityToken {
             });
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod signing_preimage_tests {
+    use super::*;
+    use crate::canonical::canonical_json_bytes;
+    use chio_test_support::prelude::*;
+
+    fn capability_body() -> CapabilityTokenBody {
+        let issuer = Keypair::generate().public_key();
+        CapabilityTokenBody {
+            id: "cap-preimage-test".to_string(),
+            issuer: issuer.clone(),
+            subject: issuer,
+            scope: ChioScope::default(),
+            issued_at: 10,
+            expires_at: 20,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        }
+    }
+
+    #[test]
+    fn classifier_rejects_schema_aware_capability_signing_preimage() {
+        let signing_body = CapabilityTokenSigningBody {
+            schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+            body: capability_body(),
+            caveats: Vec::new(),
+            scope_attenuations: None,
+            attenuation_proof: None,
+            budget_share_bps: None,
+        };
+        let bytes = canonical_json_bytes(&signing_body).test_expect("canonical signing body");
+        assert!(is_capability_token_signing_preimage(&bytes)
+            .test_expect("classify schema-aware signing preimage"));
+    }
+
+    #[test]
+    fn classifier_rejects_legacy_plain_capability_signing_preimage() {
+        let bytes =
+            canonical_json_bytes(&capability_body()).test_expect("canonical legacy signing body");
+        assert!(is_capability_token_signing_preimage(&bytes)
+            .test_expect("classify legacy signing preimage"));
+    }
+
+    #[test]
+    fn classifier_does_not_accept_noncanonical_or_unrelated_json() {
+        assert!(
+            !is_capability_token_signing_preimage(br#"{ "id": "not-canonical" }"#)
+                .test_expect("classify noncanonical JSON")
+        );
+        assert!(
+            !is_capability_token_signing_preimage(br#"{"kind":"receipt"}"#)
+                .test_expect("classify unrelated JSON")
+        );
     }
 }

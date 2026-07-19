@@ -1,3 +1,6 @@
+use super::super::super::report_validation::{
+    cluster_empty_body_digest, cluster_request_body_digest,
+};
 use super::super::*;
 use super::should_retry_status;
 
@@ -7,7 +10,7 @@ impl TrustControlClient {
         path: &str,
         term: Option<u64>,
     ) -> Result<T, CliError> {
-        self.request_internal_get_json(path, path, term)
+        self.request_internal_get_json(path, path, term, &cluster_empty_body_digest())
     }
 
     pub(super) fn get_internal_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
@@ -24,7 +27,8 @@ impl TrustControlClient {
         } else {
             format!("{path}?{encoded_query}")
         };
-        self.request_internal_get_json(&url, path, term)
+        let query_digest = cluster_request_body_digest(query)?;
+        self.request_internal_get_json(&url, path, term, &query_digest)
     }
 
     pub(super) fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, CliError> {
@@ -196,6 +200,7 @@ impl TrustControlClient {
         request_path: &str,
         auth_endpoint: &str,
         term: Option<u64>,
+        body_digest: &str,
     ) -> Result<T, CliError>
     where
         T: for<'de> Deserialize<'de>,
@@ -204,13 +209,14 @@ impl TrustControlClient {
         let mut last_error = None;
         for index in endpoint_order {
             let url = format!("{}{}", self.endpoints[index], request_path);
-            let request = if self.cluster_peer_auth.is_some() {
-                self.build_internal_get_request(&self.http, &url, auth_endpoint, term)?
-            } else {
-                self.http
-                    .get(&url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token))
-            };
+            let request = self.build_internal_get_request(
+                &self.http,
+                &url,
+                &self.endpoints[index],
+                auth_endpoint,
+                term,
+                body_digest,
+            )?;
             match request.call() {
                 Ok(response) => {
                     self.mark_preferred(index);
@@ -238,40 +244,19 @@ impl TrustControlClient {
     where
         T: for<'de> Deserialize<'de>,
     {
-        let body_digest = matches!(
-            path,
-            INTERNAL_ADMISSION_REQUEST_VOTE_PATH
-                | INTERNAL_ADMISSION_APPEND_ENTRIES_PATH
-                | INTERNAL_ADMISSION_SNAPSHOT_PATH
-                | INTERNAL_ADMISSION_PROPOSAL_PATH
-        )
-        .then(|| {
-            canonical_json_bytes(&body)
-                .map(|body_bytes| sha256_hex(&body_bytes))
-                .map_err(|error| {
-                    CliError::cli_other_error(format!(
-                        "failed to canonicalize internal request body: {error}"
-                    ))
-                })
-        })
-        .transpose()?;
+        let body_digest = cluster_request_body_digest(&body)?;
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
             let url = format!("{}{}", self.endpoints[index], path);
-            let request = if self.cluster_peer_auth.is_some() {
-                self.build_internal_post_request(
-                    &self.http,
-                    &url,
-                    path,
-                    term,
-                    body_digest.as_deref(),
-                )?
-            } else {
-                self.http
-                    .post(&url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token))
-            };
+            let request = self.build_internal_post_request(
+                &self.http,
+                &url,
+                &self.endpoints[index],
+                path,
+                term,
+                &body_digest,
+            )?;
             match request.send_json(body.clone()) {
                 Ok(response) => {
                     self.mark_preferred(index);

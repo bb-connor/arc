@@ -206,6 +206,8 @@ fn validate_nonce(nonce: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use chio_core_types::Ed25519Backend;
+    use chio_test_support::prelude::*;
     use sha2::{Digest, Sha256};
 
     use super::*;
@@ -220,11 +222,11 @@ mod tests {
         let issuer = Keypair::from_seed(&[1; 32]);
         let caller = Keypair::from_seed(&[2; 32]);
         let destination = BrokerDestination::parse("https://example.com/v1?x=1", "post", false)
-            .expect("destination");
+            .test_expect("destination");
         let request = BrokerRequest {
             destination: destination.clone(),
             headers: vec![
-                HeaderField::normalized("content-type", b"application/json").expect("header")
+                HeaderField::normalized("content-type", b"application/json").test_expect("header")
             ],
             body: b"body".to_vec(),
             approved_preview_sha256: None,
@@ -273,7 +275,8 @@ mod tests {
                 nonce_ttl_seconds: 30,
             },
         };
-        let capability = issue_capability(body, &issuer, true).expect("capability");
+        let issuer_backend = Ed25519Backend::new(issuer.clone());
+        let capability = issue_capability(body, &issuer_backend, true).test_expect("capability");
         (caller, capability, request)
     }
 
@@ -287,8 +290,8 @@ mod tests {
             20,
             &caller,
         )
-        .expect("proof");
-        verify_request_proof(&proof, &capability, &request, 21, 2).expect("verify");
+        .test_expect("proof");
+        verify_request_proof(&proof, &capability, &request, 21, 2).test_expect("verify");
 
         let mut changed = request.clone();
         changed.options.streaming = true;

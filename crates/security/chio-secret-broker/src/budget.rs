@@ -325,6 +325,7 @@ fn validate_execution_ids(
 mod tests {
     use super::*;
     use crate::revocation::CanonicalBrokerRevocationSet;
+    use chio_test_support::prelude::*;
 
     #[test]
     fn quota_deduplication_preserves_distinct_parent_and_broker_ceilings() {
@@ -342,7 +343,7 @@ mod tests {
                 maximum_executions: 10,
             },
         ])
-        .expect("canonical quotas");
+        .test_expect("canonical quotas");
         assert_eq!(quotas.len(), 2);
         assert_eq!(quotas[0].key_id, "broker");
         assert_eq!(quotas[1].key_id, "parent");
@@ -392,7 +393,7 @@ mod tests {
             "broker",
             "broker-revocation",
         )
-        .expect("canonical revocations");
+        .test_expect("canonical revocations");
         let valid = CaptureExecutionHoldRequest {
             operation_id: "operation".to_string(),
             invocation_id: "invocation".to_string(),
@@ -405,7 +406,7 @@ mod tests {
             authorization_artifact_digest: "a".repeat(64),
             authority_metadata_digest: "b".repeat(64),
         };
-        valid.validate().expect("valid capture");
+        valid.validate().test_expect("valid capture");
 
         let mut changed = valid.clone();
         changed.revocation_ids.retain(|id| id != "broker");

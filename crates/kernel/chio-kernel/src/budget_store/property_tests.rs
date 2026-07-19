@@ -7,6 +7,14 @@ use super::*;
 const CAPABILITY_ID: &str = "cap-property";
 const GRANT_INDEX: usize = 0;
 
+fn property_operation_binding(hold_index: u8) -> BudgetAdmissionOperationBinding {
+    BudgetAdmissionOperationBinding::new(
+        format!("property-operation-{hold_index}"),
+        "44".repeat(32),
+    )
+    .expect("valid property admission operation")
+}
+
 fn composite_property_request(hold_index: u8, maxima: [u32; 3]) -> BudgetAuthorizeHoldRequest {
     let quotas = vec![
         BudgetInvocationQuota {
@@ -44,10 +52,12 @@ fn composite_property_request(hold_index: u8, maxima: [u32; 3]) -> BudgetAuthori
         hold_id: Some(format!("property-hold-{hold_index}")),
         event_id: Some(format!("property-event-{hold_index}-authorize")),
         authority: None,
+        admission_operation: Some(property_operation_binding(hold_index)),
         invocation_admission: Some(VerifiedInvocationAdmission {
             quotas,
             revocation_set: CanonicalRevocationSet::new(CAPABILITY_ID, &[], &[])
                 .expect("canonical revocation set"),
+            aggregate_root_capability_id: None,
             aggregate_binding_digest: None,
             supplemental_binding: Some(SupplementalQuotaBinding {
                 artifact_digest: "11".repeat(32),
@@ -104,6 +114,7 @@ proptest! {
                 hold_id: Some("property-hold-1".to_string()),
                 event_id: Some("property-event-1-reverse".to_string()),
                 authority: None,
+                admission_operation: Some(property_operation_binding(1)),
             })
             .expect("reverse composite hold");
         prop_assert!(reversed

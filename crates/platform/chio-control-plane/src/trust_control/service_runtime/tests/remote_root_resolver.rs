@@ -325,7 +325,7 @@ fn remote_aggregate_family_root_resolver_separates_unavailable_and_transport_pol
         Err(AggregateFamilyRootResolutionError::Unavailable(_))
     ));
 
-    let error = match RemoteAggregateFamilyRootResolver::new(
+    let error = match RemoteAggregateFamilyRootResolver::new_with_pinned_authority(
         "http://control.example.test",
         "secret",
         pinned_authority(&issuer, Vec::new()),
@@ -335,7 +335,7 @@ fn remote_aggregate_family_root_resolver_separates_unavailable_and_transport_pol
     };
     assert!(error.to_string().contains("requires HTTPS"));
 
-    let loopback_error = match RemoteAggregateFamilyRootResolver::new(
+    let loopback_error = match RemoteAggregateFamilyRootResolver::new_with_pinned_authority(
         "http://127.0.0.1:9",
         "secret",
         pinned_authority(&issuer, Vec::new()),

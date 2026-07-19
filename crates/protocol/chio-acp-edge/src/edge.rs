@@ -1,10 +1,19 @@
 // The ACP edge server, its deferred-task state, and the explicit
 // compatibility-only passthrough wrapper.
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+struct DeferredSecurityContextAuthority {
+    session_id: SessionId,
+    authority: Arc<dyn SecurityInvocationContextAuthority>,
+}
+
+#[derive(Clone)]
 struct DeferredAcpTask {
     owner_agent_id: String,
+    owner_session_id: SessionId,
     request: CrossProtocolExecutionRequest,
+    security_context_authority: Option<DeferredSecurityContextAuthority>,
+    trusted_peer_negotiation: TrustedPeerNegotiation,
     task: AcpInvocationTask,
     result: Option<AcpInvocationResult>,
     expires_at_ms: u64,
@@ -15,12 +24,14 @@ struct DeferredAcpTask {
 /// Maps Chio tools to ACP capabilities and routes invocations through
 /// the kernel guard pipeline.
 pub struct ChioAcpEdge {
+    manifest_registry: chio_manifest::VerifiedManifestRegistry,
     capabilities: Vec<AcpCapability>,
     capability_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps capability ID to authoritative target binding metadata.
     capability_bindings: BTreeMap<String, CapabilityBinding>,
-    task_counter: Cell<u64>,
     tasks: RefCell<BTreeMap<String, DeferredAcpTask>>,
+    deferred_security_context_authorities: BTreeMap<String, DeferredSecurityContextAuthority>,
+    trusted_peer_negotiation: TrustedPeerNegotiation,
 }
 
 /// Explicit compatibility-only surface for config-preview and direct ACP passthrough flows.
@@ -32,7 +43,70 @@ pub struct ChioAcpEdgeCompatibility<'a> {
 }
 
 fn validate_execution_context(execution: &AcpKernelExecutionContext) -> Result<(), AcpEdgeError> {
-    validate_execution_agent_id(&execution.agent_id)
+    validate_execution_agent_id(&execution.agent_id)?;
+    if let Some(security_context) = execution.security_context.as_ref() {
+        validate_security_context_session(security_context, &execution.session_id)?;
+    }
+    if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
+        return Err(AcpEdgeError::InvalidRequest(
+            "approval_token and approval_tokens must not both be supplied".to_string(),
+        ));
+    }
+    if execution.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+        return Err(AcpEdgeError::InvalidRequest(format!(
+            "approval token set exceeds the protocol ceiling of {MAX_THRESHOLD_APPROVAL_TOKENS}"
+        )));
+    }
+    if let Some(authorization) = &execution.supplemental_authorization {
+        authorization
+            .validate()
+            .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn refresh_deferred_acp_security_context(
+    request: &mut CrossProtocolExecutionRequest,
+    execution: &AcpKernelExecutionContext,
+    owner_session_id: &SessionId,
+) -> Result<(), AcpEdgeError> {
+    if &execution.session_id != owner_session_id {
+        return Err(AcpEdgeError::AccessDenied(
+            "deferred task is not owned by the authenticated session".to_string(),
+        ));
+    }
+    if request.authenticated_session_id.as_ref() != Some(owner_session_id) {
+        return Err(AcpEdgeError::AccessDenied(
+            "deferred task authenticated session binding changed before dispatch".to_string(),
+        ));
+    }
+    if request.agent_id != execution.agent_id {
+        return Err(AcpEdgeError::AccessDenied(
+            "deferred task agent binding changed before dispatch".to_string(),
+        ));
+    }
+    let retained_capability = chio_core::canonical_json_bytes(&request.capability)
+        .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
+    let presented_capability = chio_core::canonical_json_bytes(&execution.capability)
+        .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
+    if retained_capability != presented_capability {
+        return Err(AcpEdgeError::AccessDenied(
+            "deferred task capability binding changed before dispatch".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_security_context_session(
+    security_context: &SecurityInvocationContext,
+    authenticated_session_id: &SessionId,
+) -> Result<(), AcpEdgeError> {
+    if security_context.as_v1().session_id().as_str() != authenticated_session_id.as_str() {
+        return Err(AcpEdgeError::AccessDenied(
+            "authoritative security context does not match the authenticated session".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
@@ -54,9 +128,50 @@ fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
     Ok(())
 }
 
+fn validate_deferred_acp_task_owner(
+    owner_agent_id: &str,
+    owner_session_id: &SessionId,
+    execution: &AcpKernelExecutionContext,
+) -> Result<(), AcpEdgeError> {
+    if owner_agent_id != execution.agent_id {
+        return Err(AcpEdgeError::AccessDenied(
+            "task is not owned by the current agent".to_string(),
+        ));
+    }
+    if owner_session_id != &execution.session_id {
+        return Err(AcpEdgeError::AccessDenied(
+            "task is not owned by the authenticated session".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 impl ChioAcpEdge {
-    /// Create a new ACP edge from Chio tool manifests.
-    pub fn new(config: AcpEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, AcpEdgeError> {
+    /// Create a new ACP edge from registered-key, policy, and topology admitted manifests.
+    pub fn new(
+        config: AcpEdgeConfig,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AcpEdgeError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(config, manifests, Some(registry))
+    }
+
+    #[cfg(any(test, feature = "fuzz"))]
+    pub(crate) fn new_from_unverified_internal(
+        config: AcpEdgeConfig,
+        manifests: Vec<ToolManifest>,
+    ) -> Result<Self, AcpEdgeError> {
+        Self::new_internal(config, manifests, None)
+    }
+
+    fn new_internal(
+        config: AcpEdgeConfig,
+        manifests: Vec<ToolManifest>,
+        registry: Option<&chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, AcpEdgeError> {
         let mut capabilities = BTreeMap::new();
         let mut capability_fidelity = BTreeMap::new();
         let mut capability_bindings = BTreeMap::new();
@@ -97,6 +212,17 @@ impl ChioAcpEdge {
                 capability_fidelity.insert(cap_id.clone(), fidelity.clone());
 
                 if fidelity.published_by_default() {
+                    let security = match registry {
+                        Some(registry) => registry
+                            .bridge_security(&manifest.server_id, &tool.name)
+                            .ok_or_else(|| {
+                                AcpEdgeError::InvalidRequest(format!(
+                                    "verified manifest registry has no admitted security for {}/{}",
+                                    manifest.server_id, tool.name
+                                ))
+                            })?,
+                        None => BridgeSecurityMetadata::from_tool(tool),
+                    };
                     capabilities.insert(
                         cap_id.clone(),
                         AcpCapability {
@@ -104,7 +230,8 @@ impl ChioAcpEdge {
                             name: cap_id.clone(),
                             description: tool.description.clone(),
                             category,
-                            requires_permission: config.require_permission || tool.has_side_effects,
+                            requires_permission: config.require_permission
+                                || !tool.annotations.read_only,
                             bridge_fidelity: fidelity,
                         },
                     );
@@ -115,6 +242,7 @@ impl ChioAcpEdge {
                             target_protocol,
                             server_id: manifest.server_id.clone(),
                             tool_name: tool.name.clone(),
+                            security,
                         },
                     );
                 }
@@ -122,18 +250,61 @@ impl ChioAcpEdge {
         }
 
         Ok(Self {
+            manifest_registry: registry.cloned().unwrap_or_default(),
             capabilities: capabilities.into_values().collect(),
             capability_fidelity,
             capability_bindings,
-            task_counter: Cell::new(0),
             tasks: RefCell::new(BTreeMap::new()),
+            deferred_security_context_authorities: BTreeMap::new(),
+            trusted_peer_negotiation: TrustedPeerNegotiation::default(),
         })
     }
 
+    /// Install the authenticated local/peer feature intersection used for
+    /// extension-bearing ACP admission. ACP request parameters cannot modify it.
+    pub fn set_peer_protocol_negotiation(
+        &mut self,
+        local_advertised: &CapabilityNegotiation,
+        peer_advertised: &CapabilityNegotiation,
+    ) -> Result<(), AcpEdgeError> {
+        self.trusted_peer_negotiation =
+            TrustedPeerNegotiation::from_advertised_intersection(local_advertised, peer_advertised)
+                .map_err(AcpEdgeError::InvalidRequest)?;
+        Ok(())
+    }
+
     fn next_task_id(&self) -> String {
-        let next = self.task_counter.get() + 1;
-        self.task_counter.set(next);
-        format!("acp-task-{next}")
+        format!(
+            "acp-task-{}",
+            chio_core::crypto::Keypair::generate().public_key().to_hex()
+        )
+    }
+
+    /// Install the trusted authority used to resolve fresh security state for
+    /// each deferred task dispatch.
+    pub fn set_deferred_security_context_authority(
+        &mut self,
+        session_id: SessionId,
+        authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) -> Result<(), AcpEdgeError> {
+        let session_key = session_id.as_str().to_string();
+        if self
+            .deferred_security_context_authorities
+            .contains_key(&session_key)
+        {
+            return Err(AcpEdgeError::InvalidRequest(
+                "deferred security context authority may only be configured once per session"
+                    .to_string(),
+            ));
+        }
+        self.deferred_security_context_authorities.insert(
+            session_key,
+            DeferredSecurityContextAuthority {
+                session_id,
+                authority,
+            },
+        );
+        Ok(())
     }
 
     fn prune_deferred_tasks(&self) {
@@ -189,7 +360,13 @@ impl ChioAcpEdge {
             execution_nonce: execution.execution_nonce.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            approval_tokens: execution.approval_tokens.clone(),
+            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
             model_metadata: execution.model_metadata.clone(),
+            supplemental_authorization: execution.supplemental_authorization.clone(),
+            authenticated_session_id: Some(execution.session_id.clone()),
+            security_context: execution.security_context.clone(),
+            bridge_security: binding.security.clone(),
         })
     }
 
@@ -377,7 +554,12 @@ impl ChioAcpEdge {
                 kernel_request_id: format!("acp-{capability_id}-{request_suffix}"),
             },
         )?;
-        let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
+        let orchestrated = execute_orchestrated_acp_request(
+            kernel,
+            &self.manifest_registry,
+            request,
+            &self.trusted_peer_negotiation,
+        )?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
     }
 
@@ -409,7 +591,12 @@ impl ChioAcpEdge {
                 kernel_request_id: format!("acp-{capability_id}-pending-{request_suffix}"),
             },
         )?;
-        let mut orchestrated = execute_orchestrated_acp_request(kernel, request)?;
+        let mut orchestrated = execute_orchestrated_acp_request(
+            kernel,
+            &self.manifest_registry,
+            request,
+            &self.trusted_peer_negotiation,
+        )?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
         orchestrated.response.output = None;
@@ -444,7 +631,12 @@ impl ChioAcpEdge {
                 kernel_request_id: format!("acp-mcp-{capability_id}-{request_suffix}"),
             },
         )?;
-        let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
+        let orchestrated = execute_orchestrated_acp_request(
+            kernel,
+            &self.manifest_registry,
+            request,
+            &self.trusted_peer_negotiation,
+        )?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
     }
 
@@ -509,11 +701,11 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> AcpJsonRpcResponse {
-        let AcpJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return AcpJsonRpcResponse::from_optional(response),
-            };
+        let AcpJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return AcpJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
@@ -619,11 +811,11 @@ impl ChioAcpEdge {
         message: Value,
         server: &dyn ToolServerConnection,
     ) -> AcpJsonRpcResponse {
-        let AcpJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return AcpJsonRpcResponse::from_optional(response),
-            };
+        let AcpJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return AcpJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
@@ -830,11 +1022,21 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
         validate_execution_context(execution)?;
+        let security_context_authority = self
+            .deferred_security_context_authorities
+            .get(execution.session_id.as_str())
+            .cloned();
+        if execution.security_context.is_some() && security_context_authority.is_none() {
+            return Err(AcpEdgeError::InvalidRequest(
+                "deferred security state requires a context authority for the authenticated session"
+                    .to_string(),
+            ));
+        }
         let binding = self.capability_binding(capability_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
         let expires_at_ms = current_unix_millis().saturating_add(DEFERRED_ACP_TASK_TTL_MILLIS);
-        let request = self.build_execution_request(
+        let mut request = self.build_execution_request(
             capability_id,
             arguments,
             execution,
@@ -845,6 +1047,10 @@ impl ChioAcpEdge {
                 kernel_request_id: format!("acp-stream-{task_id}"),
             },
         )?;
+        // Context generations are dispatch snapshots, not durable task
+        // identity. Retain the authority handle and resolve fresh state on
+        // resume immediately before dispatch.
+        request.security_context = None;
         let task = AcpInvocationTask {
             id: task_id.clone(),
             status: AcpTaskStatus::Working,
@@ -855,7 +1061,10 @@ impl ChioAcpEdge {
             task_id,
             DeferredAcpTask {
                 owner_agent_id: execution.agent_id.clone(),
+                owner_session_id: execution.session_id.clone(),
                 request,
+                security_context_authority,
+                trusted_peer_negotiation: self.trusted_peer_negotiation.clone(),
                 task: task.clone(),
                 result: None,
                 expires_at_ms,
@@ -875,11 +1084,7 @@ impl ChioAcpEdge {
         let task = tasks
             .get_mut(task_id)
             .ok_or_else(|| AcpEdgeError::ToolNotFound(task_id.to_string()))?;
-        if task.owner_agent_id != execution.agent_id {
-            return Err(AcpEdgeError::AccessDenied(
-                "task is not owned by the current agent".to_string(),
-            ));
-        }
+        validate_deferred_acp_task_owner(&task.owner_agent_id, &task.owner_session_id, execution)?;
         match task.task.status {
             AcpTaskStatus::Working => {
                 task.task.status = AcpTaskStatus::Cancelled;
@@ -909,16 +1114,86 @@ impl ChioAcpEdge {
             let task = tasks
                 .get(task_id)
                 .ok_or_else(|| AcpEdgeError::ToolNotFound(task_id.to_string()))?;
-            if task.owner_agent_id != execution.agent_id {
-                return Err(AcpEdgeError::AccessDenied(
-                    "task is not owned by the current agent".to_string(),
-                ));
-            }
+            validate_deferred_acp_task_owner(
+                &task.owner_agent_id,
+                &task.owner_session_id,
+                execution,
+            )?;
             task.clone()
         };
 
         if task_snapshot.task.status == AcpTaskStatus::Working {
-            let orchestrated = execute_orchestrated_acp_request(kernel, task_snapshot.request)?;
+            let security_context_authority = task_snapshot.security_context_authority.clone();
+            let mut request = task_snapshot.request;
+            refresh_deferred_acp_security_context(
+                &mut request,
+                execution,
+                &task_snapshot.owner_session_id,
+            )?;
+            if security_context_authority.is_none() && execution.security_context.is_some() {
+                return Err(AcpEdgeError::AccessDenied(
+                    "deferred security state requires a per-dispatch context authority".to_string(),
+                ));
+            }
+            if let Some(security_context_authority) = security_context_authority {
+                if security_context_authority.session_id != task_snapshot.owner_session_id {
+                    return Err(AcpEdgeError::AccessDenied(
+                        "deferred authority is not bound to the task session".to_string(),
+                    ));
+                }
+                let context = OperationContext::new(
+                    task_snapshot.owner_session_id.clone(),
+                    RequestId::new(request.kernel_request_id.clone()),
+                    request.agent_id.clone(),
+                );
+                let operation = request.to_tool_call_operation().map_err(|error| {
+                    AcpEdgeError::InvalidRequest(format!(
+                        "deferred authority request projection failed: {error}"
+                    ))
+                })?;
+                let security_context = security_context_authority
+                    .authority
+                    .resolve_security_invocation_context(&context, &operation)
+                    .map_err(|error| {
+                        AcpEdgeError::AccessDenied(format!(
+                            "deferred security context resolution failed: {error}"
+                        ))
+                    })?;
+                validate_security_context_session(
+                    &security_context,
+                    &task_snapshot.owner_session_id,
+                )?;
+                request.security_context = Some(security_context);
+            }
+            let orchestrated = match execute_orchestrated_acp_request(
+                kernel,
+                &self.manifest_registry,
+                request,
+                &task_snapshot.trusted_peer_negotiation,
+            ) {
+                Ok(orchestrated) => orchestrated,
+                Err(error) => {
+                    let reason = error.to_string();
+                    let result = AcpInvocationResult {
+                        success: false,
+                        data: Value::Null,
+                        error: Some(format!("Deferred dispatch outcome is unknown: {reason}")),
+                        metadata: Some(outcome_unknown_stream_task_metadata(
+                            "cross_protocol_orchestrator",
+                            &reason,
+                        )),
+                    };
+                    if let Some(retained_task) = self.tasks.borrow_mut().get_mut(task_id) {
+                        if retained_task.task.status == AcpTaskStatus::Working {
+                            retained_task.task.status = AcpTaskStatus::Failed;
+                            retained_task.task.status_message = result.error.clone();
+                            retained_task.task.metadata = result.metadata.clone();
+                            retained_task.result = Some(result);
+                        }
+                    }
+                    return Err(error);
+                }
+            };
             let result = acp_invocation_result_from_orchestrated(orchestrated);
             let status = if result.success {
                 AcpTaskStatus::Completed

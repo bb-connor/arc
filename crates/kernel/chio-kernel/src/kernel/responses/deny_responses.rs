@@ -1,6 +1,106 @@
 use super::*;
 
 impl ChioKernel {
+    /// Capture the receipt-log boundary immediately before a transport invokes
+    /// a kernel entrypoint that may need an error fallback.
+    pub fn begin_transport_receipt_observation(
+        &self,
+        request_id: &str,
+    ) -> TransportReceiptObservation {
+        let observed_receipt_ids = match self.receipt_log.lock() {
+            Ok(log) => log
+                .iter()
+                .filter(|receipt| receipt_request_id(receipt) == Some(request_id))
+                .map(|receipt| receipt.id.clone())
+                .collect(),
+            Err(poisoned) => poisoned
+                .into_inner()
+                .iter()
+                .filter(|receipt| receipt_request_id(receipt) == Some(request_id))
+                .map(|receipt| receipt.id.clone())
+                .collect(),
+        };
+        TransportReceiptObservation {
+            request_id: request_id.to_string(),
+            observed_receipt_ids,
+        }
+    }
+
+    /// Sign and persist a local deny receipt after a transport-facing kernel
+    /// entrypoint returns an internal error.
+    ///
+    /// Transport adapters must not mint their own signing keys when preserving
+    /// receipt totality on an error path. This method deliberately uses the
+    /// installed kernel authority and the normal receipt-store write path. It
+    /// also remains local-only because the failed entrypoint may not have
+    /// completed federation admission. If the entrypoint already persisted a
+    /// matching deny after `observation`, that receipt is returned instead of
+    /// appending a duplicate. Receipts at or before the boundary are never
+    /// reused, even when a caller repeats a request identifier.
+    pub fn record_transport_internal_error_deny_receipt(
+        &self,
+        request: &ToolCallRequest,
+        observation: &TransportReceiptObservation,
+    ) -> Result<ChioReceipt, KernelError> {
+        if observation.request_id != request.request_id {
+            return Err(KernelError::Internal(
+                "transport receipt observation does not match the failed request".to_string(),
+            ));
+        }
+        self.ensure_receipt_persistence_ready()?;
+        if let Some(receipt) = self.fresh_request_deny_receipt(request, observation)? {
+            return Ok(receipt);
+        }
+        self.build_local_v1_failclosed_deny_response_with_metadata(
+            request,
+            "internal kernel error",
+            current_unix_timestamp(),
+            None,
+            None,
+            "kernel",
+        )
+        .map(|response| response.receipt)
+    }
+
+    fn fresh_request_deny_receipt(
+        &self,
+        request: &ToolCallRequest,
+        observation: &TransportReceiptObservation,
+    ) -> Result<Option<ChioReceipt>, KernelError> {
+        let expected_action =
+            ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to hash transport fallback parameters: {error}"
+                ))
+            })?;
+        let log = match self.receipt_log.lock() {
+            Ok(log) => log,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let mut matched = None;
+        for receipt in log.iter() {
+            if observation.observed_receipt_ids.contains(&receipt.id) {
+                continue;
+            }
+            if receipt_request_id(receipt) == Some(request.request_id.as_str())
+                && receipt.is_denied()
+                && receipt.capability_id == request.capability.id
+                && receipt.tool_server == request.server_id
+                && receipt.tool_name == request.tool_name
+                && receipt.action.parameter_hash == expected_action.parameter_hash
+                && receipt.action.parameters == request.arguments
+                && receipt.kernel_key == self.authority_signing_backend.public_key()
+            {
+                matched = Some(receipt.clone());
+            }
+        }
+        drop(log);
+        match matched {
+            Some(receipt) if self.verify_trusted_receipt(&receipt)? => Ok(Some(receipt)),
+            Some(_) | None => Ok(None),
+        }
+    }
+
     pub(crate) fn build_monetary_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -189,7 +289,6 @@ impl ChioKernel {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::too_many_arguments)]
     fn build_pre_execution_monetary_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,
@@ -338,7 +437,7 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_chio_receipt(&receipt)?;
+        self.record_chio_receipt_for_admitted_request_local_only(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -530,4 +629,13 @@ impl ChioKernel {
             execution_nonce: None,
         })
     }
+}
+
+fn receipt_request_id(receipt: &ChioReceipt) -> Option<&str> {
+    receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("receipt_context"))
+        .and_then(|context| context.get("request_id"))
+        .and_then(serde_json::Value::as_str)
 }

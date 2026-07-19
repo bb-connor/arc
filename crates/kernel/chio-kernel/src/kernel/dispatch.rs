@@ -4,10 +4,93 @@
 //! hook invocation, the tool-dispatch entrypoints, and child-receipt
 //! recording.
 
-use crate::budget_store::{BudgetReleaseHoldDecision, BudgetReverseHoldDecision};
+use crate::budget_store::{
+    BudgetAdmissionOperationBinding, BudgetReleaseHoldDecision, BudgetReverseHoldDecision,
+};
 use chio_log_redact::redacted;
 
 use super::*;
+
+const SECURITY_PRE_DISPATCH_GUARD_NAME: &str = "chio-security-pre-dispatch";
+const SECURITY_PRE_DISPATCH_MISSING_CONTEXT_REASON: &str =
+    "authoritative security context is missing at dispatch";
+const SECURITY_PRE_DISPATCH_MISSING_HOOK_REASON: &str =
+    "security pre-dispatch hook is not installed";
+const SECURITY_PRE_DISPATCH_BINDING_REASON: &str =
+    "security pre-dispatch commitment could not be derived";
+const SECURITY_PRE_DISPATCH_REJECTION_REASON: &str = "security pre-dispatch hook rejected dispatch";
+const SECURITY_DISPATCH_COMMITMENT_DOMAIN: &[u8] =
+    b"chio.kernel.security-pre-dispatch.commitment.v2\0";
+
+#[derive(serde::Serialize)]
+struct SecurityDispatchContextBinding<'a> {
+    schema: &'static str,
+    context_version: u16,
+    tenant_id: &'a str,
+    session_id: &'a str,
+    principal_id: &'a str,
+    isolation_epoch_id: &'a str,
+    lineage_root_id: &'a str,
+    /// Immutable capability-bound isolation-incarnation generation.
+    context_generation: u64,
+    /// Mutable durable flow generation observed for this dispatch.
+    flow_state_generation: Option<u64>,
+}
+
+fn security_pre_dispatch_denial(reason: &'static str) -> SecurityPreDispatchDenial {
+    SecurityPreDispatchDenial {
+        reason,
+        evidence: GuardEvidence {
+            guard_name: SECURITY_PRE_DISPATCH_GUARD_NAME.to_string(),
+            verdict: false,
+            details: Some(reason.to_string()),
+        },
+    }
+}
+
+pub(crate) fn derive_security_dispatch_commitment_id(
+    canonical_request: &[u8],
+    security_context: &SecurityInvocationContext,
+) -> Result<chio_security_types::ports::RecordId, KernelError> {
+    let context = security_context.as_v1();
+    let binding = SecurityDispatchContextBinding {
+        schema: "chio.kernel.security-dispatch-context.v2",
+        context_version: security_context.version(),
+        tenant_id: context.tenant_id().as_str(),
+        session_id: context.session_id().as_str(),
+        principal_id: context.principal_id().as_str(),
+        isolation_epoch_id: context.isolation_epoch_id().as_str(),
+        lineage_root_id: context.lineage_root_id().as_str(),
+        context_generation: context.context_generation(),
+        flow_state_generation: context.flow_state_generation(),
+    };
+    let canonical_context = canonical_json_bytes(&binding).map_err(|error| {
+        KernelError::Internal(format!(
+            "failed to canonicalize security dispatch context: {error}"
+        ))
+    })?;
+    let request_len = u64::try_from(canonical_request.len()).map_err(|_| {
+        KernelError::Internal("canonical security dispatch request is too large".to_string())
+    })?;
+    let context_len = u64::try_from(canonical_context.len()).map_err(|_| {
+        KernelError::Internal("canonical security dispatch context is too large".to_string())
+    })?;
+    let mut preimage = Vec::new();
+    preimage.extend_from_slice(SECURITY_DISPATCH_COMMITMENT_DOMAIN);
+    preimage.extend_from_slice(&request_len.to_be_bytes());
+    preimage.extend_from_slice(canonical_request);
+    preimage.extend_from_slice(&context_len.to_be_bytes());
+    preimage.extend_from_slice(&canonical_context);
+    chio_security_types::ports::RecordId::new(format!(
+        "dispatch-commitment:{}",
+        sha256_hex(&preimage)
+    ))
+    .map_err(|error| {
+        KernelError::Internal(format!(
+            "failed to construct security dispatch commitment identifier: {error}"
+        ))
+    })
+}
 
 pub(crate) struct GuardRunError {
     pub(crate) error: KernelError,
@@ -21,6 +104,182 @@ impl GuardRunError {
 }
 
 impl ChioKernel {
+    /// Bind trusted-host security state to the request that will cross the
+    /// connector boundary. This validation must run before receipt scoping,
+    /// guard mutation, session inflight tracking, or any connector side effect.
+    pub(crate) fn validate_security_invocation_context_binding(
+        &self,
+        request: &ToolCallRequest,
+        security_context: Option<&SecurityInvocationContext>,
+        authenticated_session_id: Option<&SessionId>,
+    ) -> Result<(), KernelError> {
+        let capability_binding = request.capability.security_binding().map_err(|error| {
+            KernelError::GuardDenied(format!("capability security binding is invalid: {error}"))
+        })?;
+        let expected_workload = self.capability_authority.workload_binding();
+        let Some(security_context) = security_context else {
+            if capability_binding.is_some() || expected_workload.is_some() {
+                return Err(KernelError::GuardDenied(
+                    "security-bound capability requires an authoritative invocation context"
+                        .to_string(),
+                ));
+            }
+            return Ok(());
+        };
+        let context = security_context.as_v1();
+        if context.principal_id().as_str() != request.agent_id.as_str() {
+            return Err(KernelError::GuardDenied(
+                "authoritative security context principal does not match the request agent"
+                    .to_string(),
+            ));
+        }
+
+        let expected_lineage_root = capability_binding
+            .as_ref()
+            .map(|binding| binding.lineage_id.as_str())
+            .or_else(|| {
+                self.capability_issuance_admission_authority
+                    .is_none()
+                    .then(|| {
+                        request
+                            .capability
+                            .delegation_chain
+                            .first()
+                            .map_or(request.capability.id.as_str(), |link| {
+                                link.capability_id.as_str()
+                            })
+                    })
+            });
+        if expected_lineage_root
+            .is_some_and(|lineage_root| context.lineage_root_id().as_str() != lineage_root)
+        {
+            return Err(KernelError::GuardDenied(
+                "authoritative security context lineage root does not match the request capability"
+                    .to_string(),
+            ));
+        }
+
+        if authenticated_session_id
+            .is_some_and(|session_id| context.session_id().as_str() != session_id.as_str())
+        {
+            return Err(KernelError::GuardDenied(
+                "authoritative security context does not match the authenticated session"
+                    .to_string(),
+            ));
+        }
+        match (capability_binding.as_ref(), expected_workload.as_ref()) {
+            (Some(binding), Some(workload)) => {
+                if binding.tenant_id != context.tenant_id().as_str()
+                    || binding.lineage_id != context.lineage_root_id().as_str()
+                    || binding.session_id != context.session_id().as_str()
+                    || binding.principal_id != context.principal_id().as_str()
+                    || binding.isolation_epoch_id != context.isolation_epoch_id().as_str()
+                    || binding.context_generation != context.context_generation()
+                    || binding.tenant_id != workload.tenant_id
+                    || binding.workload_id != workload.workload_id
+                    || binding.server_id != workload.server_id
+                    || binding.workload_signer_public_key != workload.signer_public_key.to_hex()
+                {
+                    return Err(KernelError::GuardDenied(
+                        "capability security binding does not match the live invocation and pinned workload identity"
+                            .to_string(),
+                    ));
+                }
+                if !request.capability.delegation_chain.is_empty() {
+                    return Err(KernelError::GuardDenied(
+                        "security-bound remote capabilities cannot be delegated".to_string(),
+                    ));
+                }
+            }
+            (Some(_), None) => {
+                return Err(KernelError::GuardDenied(
+                    "capability carries a workload binding but no workload authority is pinned"
+                        .to_string(),
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(KernelError::GuardDenied(
+                    "pinned workload authority returned an unbound capability".to_string(),
+                ));
+            }
+            (None, None) => {}
+        }
+        Ok(())
+    }
+
+    pub(crate) fn run_security_pre_dispatch_hook(
+        &self,
+        request: &ToolCallRequest,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<SecurityPreDispatchCommit, SecurityPreDispatchDenial> {
+        let Some(security_context) = security_context else {
+            return if self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce {
+                Err(security_pre_dispatch_denial(
+                    SECURITY_PRE_DISPATCH_MISSING_CONTEXT_REASON,
+                ))
+            } else {
+                Ok(SecurityPreDispatchCommit {
+                    dispatch_outcome: None,
+                    request_lifecycle: None,
+                })
+            };
+        };
+        let Some(hook) = self.security_pre_dispatch_hook.as_ref() else {
+            return if self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce {
+                Err(security_pre_dispatch_denial(
+                    SECURITY_PRE_DISPATCH_MISSING_HOOK_REASON,
+                ))
+            } else {
+                Ok(SecurityPreDispatchCommit {
+                    dispatch_outcome: None,
+                    request_lifecycle: None,
+                })
+            };
+        };
+        let canonical_request = canonical_json_bytes(request).map_err(|error| {
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&error.to_string()),
+                "security pre-dispatch request canonicalization failed"
+            );
+            security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_BINDING_REASON)
+        })?;
+        let dispatch_commitment_id =
+            derive_security_dispatch_commitment_id(&canonical_request, security_context).map_err(
+                |error| {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&error.to_string()),
+                        "security pre-dispatch commitment derivation failed"
+                    );
+                    security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_BINDING_REASON)
+                },
+            )?;
+        let context = SecurityPreDispatchContext {
+            request,
+            canonical_request: &canonical_request,
+            security_context,
+            dispatch_commitment_id: &dispatch_commitment_id,
+        };
+        let map_rejection = |error: KernelError| {
+            warn!(
+                request_id = %request.request_id,
+                hook = hook.name(),
+                reason = %redacted!(&error.to_string()),
+                "security pre-dispatch hook rejected dispatch"
+            );
+            security_pre_dispatch_denial(SECURITY_PRE_DISPATCH_REJECTION_REASON)
+        };
+        let request_lifecycle = hook
+            .acquire_request_lifecycle(&context)
+            .map_err(&map_rejection)?;
+        let dispatch_outcome = hook.commit(&context).map_err(map_rejection)?;
+        Ok(SecurityPreDispatchCommit {
+            dispatch_outcome,
+            request_lifecycle,
+        })
+    }
+
     pub(crate) fn validate_parent_request_continuation(
         &self,
         request: &ToolCallRequest,
@@ -146,53 +405,90 @@ impl ChioKernel {
         })
     }
 
-    pub(crate) fn is_trusted_governed_continuation_signer(
+    pub(crate) fn verify_trusted_governed_continuation_signer(
         &self,
-        signer: &chio_core::PublicKey,
-    ) -> bool {
-        if *signer == self.config.keypair.public_key() {
-            return true;
-        }
+        token: &chio_core::capability::governance::CallChainContinuationToken,
+    ) -> Result<bool, KernelError> {
+        let signer = &token.signer;
         if self
             .config
             .ca_public_keys
             .iter()
             .any(|candidate| candidate == signer)
         {
-            return true;
+            return Ok(true);
         }
-        self.capability_authority
+        if self.authority_artifact_trust_resolver.is_some() {
+            let artifact = canonical_json_bytes(&token.body())
+                .map_err(|error| KernelError::Internal(error.to_string()))?;
+            return self.verify_trusted_authority_artifact_signature(
+                &artifact,
+                signer,
+                &token.signature,
+            );
+        }
+        if *signer == self.public_key() {
+            return Ok(true);
+        }
+        Ok(self
+            .capability_authority
             .trusted_public_keys()
             .into_iter()
-            .any(|candidate| candidate == *signer)
+            .any(|candidate| candidate == *signer))
     }
 
     pub(crate) fn unwind_aborted_monetary_invocation(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
-        charge_result: Option<&BudgetChargeResult>,
+        budget_mutation: &PreExecutionBudgetMutation,
         payment_authorization: Option<&PaymentAuthorization>,
     ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
-        let Some(charge) = charge_result else {
-            return Ok(None);
-        };
+        let charge = budget_mutation.charge_result();
 
-        if let Some(authorization) = payment_authorization {
+        // For operation-owned admission this reversal first wins the shared
+        // compensation-versus-dispatch CAS. Payment is a participant in that
+        // operation and must not be released while dispatch can still win.
+        let reversed = self.reverse_pre_execution_budget_mutation(cap, budget_mutation)?;
+
+        if let (Some(charge), Some(authorization)) = (charge, payment_authorization) {
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                 KernelError::Internal(
                     "payment authorization present without configured adapter".to_string(),
                 )
             })?;
-            let unwind_result = if authorization.settled {
-                adapter.refund(
+            let unwind = || match (authorization.settled, charge.admission_operation.as_ref()) {
+                (true, Some(binding)) => {
+                    adapter.refund_for_operation(OperationPaymentRefundRequest {
+                        operation_id: binding.operation_id(),
+                        request_binding_hash: binding.request_binding_hash(),
+                        transaction_id: &authorization.authorization_id,
+                        amount_units: charge.cost_charged,
+                        currency: &charge.currency,
+                        reference: &request.request_id,
+                    })
+                }
+                (true, None) => adapter.refund(
                     &authorization.authorization_id,
                     charge.cost_charged,
                     &charge.currency,
                     &request.request_id,
-                )
+                ),
+                (false, Some(binding)) => adapter.release_for_operation(
+                    binding.operation_id(),
+                    binding.request_binding_hash(),
+                    &authorization.authorization_id,
+                    &request.request_id,
+                ),
+                (false, None) => {
+                    adapter.release(&authorization.authorization_id, &request.request_id)
+                }
+            };
+            let unwind_result = unwind();
+            let unwind_result = if charge.admission_operation.is_some() {
+                unwind_result.or_else(|_| unwind())
             } else {
-                adapter.release(&authorization.authorization_id, &request.request_id)
+                unwind_result
             };
             if let Err(error) = unwind_result {
                 return Err(KernelError::Internal(format!(
@@ -201,7 +497,7 @@ impl ChioKernel {
             }
         }
 
-        Ok(Some(self.reverse_budget_charge(&cap.id, charge)?))
+        Ok(reversed)
     }
 
     pub(crate) fn release_post_dispatch_monetary_invocation(
@@ -210,7 +506,11 @@ impl ChioKernel {
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
+        retain_operation_owned_budget: bool,
     ) -> Result<Option<BudgetReleaseHoldDecision>, PostDispatchCleanupFailure> {
+        if retain_operation_owned_budget {
+            return Ok(None);
+        }
         let Some(charge) = charge_result else {
             return Ok(None);
         };
@@ -240,15 +540,39 @@ impl ChioKernel {
             } else {
                 "payment_release"
             };
-            let release_result = if authorization.settled {
-                adapter.refund(
-                    &authorization.authorization_id,
-                    charge.cost_charged,
-                    &charge.currency,
-                    &request.request_id,
-                )
+            let release_payment =
+                || match (authorization.settled, charge.admission_operation.as_ref()) {
+                    (true, Some(binding)) => {
+                        adapter.refund_for_operation(OperationPaymentRefundRequest {
+                            operation_id: binding.operation_id(),
+                            request_binding_hash: binding.request_binding_hash(),
+                            transaction_id: &authorization.authorization_id,
+                            amount_units: charge.cost_charged,
+                            currency: &charge.currency,
+                            reference: &request.request_id,
+                        })
+                    }
+                    (true, None) => adapter.refund(
+                        &authorization.authorization_id,
+                        charge.cost_charged,
+                        &charge.currency,
+                        &request.request_id,
+                    ),
+                    (false, Some(binding)) => adapter.release_for_operation(
+                        binding.operation_id(),
+                        binding.request_binding_hash(),
+                        &authorization.authorization_id,
+                        &request.request_id,
+                    ),
+                    (false, None) => {
+                        adapter.release(&authorization.authorization_id, &request.request_id)
+                    }
+                };
+            let release_result = release_payment();
+            let release_result = if charge.admission_operation.is_some() {
+                release_result.or_else(|_| release_payment())
             } else {
-                adapter.release(&authorization.authorization_id, &request.request_id)
+                release_result
             };
             if let Err(error) = release_result {
                 return Err(failure(payment_step, redacted!(&error).to_string()));
@@ -270,6 +594,10 @@ impl ChioKernel {
             (Some(charge), Ok(Some(released))) => self.merge_budget_receipt_metadata(
                 base,
                 self.budget_execution_receipt_metadata(charge, Some(("released", released))),
+            ),
+            (Some(charge), Ok(None)) => self.merge_budget_receipt_metadata(
+                base,
+                self.budget_execution_receipt_metadata(charge, None),
             ),
             (Some(charge), Err(failure)) => {
                 let authorized = self.merge_budget_receipt_metadata(
@@ -299,6 +627,12 @@ impl ChioKernel {
         &self,
         capability: &CapabilityToken,
     ) -> Result<(), KernelError> {
+        if self.capability_issuance_admission_authority.is_some() {
+            return Err(KernelError::CapabilityIssuanceDenied(
+                "authoritative tenant and lineage context is required for capability issuance"
+                    .to_string(),
+            ));
+        }
         let parent_capability_id = capability
             .delegation_chain
             .last()
@@ -307,6 +641,94 @@ impl ChioKernel {
             Ok(store.record_capability_snapshot(capability, parent_capability_id)?)
         })?;
         Ok(())
+    }
+
+    pub(crate) fn record_observed_capability_snapshot_for_dispatch(
+        &self,
+        capability: &CapabilityToken,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<(), KernelError> {
+        let Some(authority) = self.capability_issuance_admission_authority.as_ref() else {
+            return self.record_observed_capability_snapshot(capability);
+        };
+        let context = security_context.ok_or_else(|| {
+            KernelError::CapabilityIssuanceDenied(
+                "authoritative tenant and lineage context is required for capability issuance"
+                    .to_string(),
+            )
+        })?;
+        let context = context.as_v1();
+        let parent_capability_id = capability
+            .delegation_chain
+            .last()
+            .map(|link| link.capability_id.as_str());
+        let already_admitted = self
+            .with_receipt_store(|store| {
+                store
+                    .capability_snapshot_has_issuance_admission(
+                        context.tenant_id(),
+                        context.lineage_root_id(),
+                        capability,
+                        parent_capability_id,
+                    )
+                    .map_err(KernelError::from)
+            })?
+            .ok_or_else(|| {
+                KernelError::CapabilityIssuanceDenied(
+                    "durable receipt store is required for capability issuance admission"
+                        .to_string(),
+                )
+            })?;
+        if already_admitted {
+            return Ok(());
+        }
+        let parent_capability_id = parent_capability_id
+            .map(chio_security_types::ports::RecordId::new)
+            .transpose()
+            .map_err(|error| KernelError::CapabilityIssuanceDenied(error.to_string()))?;
+        let query = chio_security_types::ports::IssuanceFreezeAdmissionQuery {
+            tenant_id: context.tenant_id().clone(),
+            lineage_id: context.lineage_root_id().clone(),
+            operation: if parent_capability_id.is_some() {
+                chio_security_types::ports::CapabilityIssuanceOperation::Delegate
+            } else {
+                chio_security_types::ports::CapabilityIssuanceOperation::Issue
+            },
+            parent_capability_id,
+        };
+        authority.authorize(&query).map_err(|error| {
+            KernelError::CapabilityIssuanceDenied(format!(
+                "active issuance freeze rejected capability admission: {error}"
+            ))
+        })?;
+        let _ = self.with_receipt_store(|store| {
+            Ok(store.record_capability_snapshot_with_issuance_admission(
+                context.tenant_id(),
+                context.lineage_root_id(),
+                capability,
+                query
+                    .parent_capability_id
+                    .as_ref()
+                    .map(|parent| parent.as_str()),
+            )?)
+        })?;
+        Ok(())
+    }
+
+    pub(crate) fn authorize_capability_issuance(
+        &self,
+        query: &chio_security_types::ports::IssuanceFreezeAdmissionQuery,
+    ) -> Result<(), KernelError> {
+        let Some(authority) = self.capability_issuance_admission_authority.as_ref() else {
+            return Err(KernelError::CapabilityIssuanceDenied(
+                "capability issuance admission authority is unavailable".to_string(),
+            ));
+        };
+        authority.authorize(query).map_err(|error| {
+            KernelError::CapabilityIssuanceDenied(format!(
+                "active issuance freeze rejected capability admission: {error}"
+            ))
+        })
     }
 
     /// Verify a DPoP proof carried on the request against the capability.
@@ -400,6 +822,7 @@ impl ChioKernel {
         scope: &ChioScope,
         session_filesystem_roots: Option<&[String]>,
         matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let ctx = GuardContext {
             request,
@@ -408,6 +831,7 @@ impl ChioKernel {
             server_id: &request.server_id,
             session_filesystem_roots,
             matched_grant_index,
+            security_context,
         };
 
         let mut evidence = Vec::new();
@@ -466,6 +890,25 @@ impl ChioKernel {
         now_unix_ms: u64,
         matched_grant_index: Option<usize>,
     ) -> RuntimeAdmissionDecision {
+        self.run_runtime_admission_hook_for_operation(
+            request,
+            extra_metadata,
+            now,
+            now_unix_ms,
+            matched_grant_index,
+            None,
+        )
+    }
+
+    pub(crate) fn run_runtime_admission_hook_for_operation(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<&serde_json::Value>,
+        now: u64,
+        now_unix_ms: u64,
+        matched_grant_index: Option<usize>,
+        admission_operation: Option<&AdmissionOperation>,
+    ) -> RuntimeAdmissionDecision {
         let Some(hook) = self.runtime_admission_hook.as_ref() else {
             let has_runtime_context = request
                 .governed_intent
@@ -508,8 +951,16 @@ impl ChioKernel {
             now_unix_ms,
             matched_grant_index,
             local_kernel_id: self.federation_local_kernel_id(),
+            admission_operation_id: admission_operation.map(AdmissionOperation::operation_id),
+            admission_request_binding_hash: admission_operation
+                .map(AdmissionOperation::request_binding_hash),
         };
-        match hook.evaluate(&context) {
+        let evaluation = if admission_operation.is_some() {
+            hook.evaluate_before_operation_persist(&context)
+        } else {
+            hook.evaluate(&context)
+        };
+        let mut decision = match evaluation {
             Ok(decision) => decision,
             Err(error) => RuntimeAdmissionDecision::deny(
                 format!(
@@ -524,7 +975,20 @@ impl ChioKernel {
                     }
                 })),
             ),
+        };
+        if let Some(operation) = admission_operation {
+            decision.metadata = merge_metadata_objects(
+                decision.metadata,
+                Some(serde_json::json!({
+                    "admission_operation": {
+                        "operation_id": operation.operation_id(),
+                        "request_binding_hash": operation.request_binding_hash(),
+                        "runtime_evaluation": "pure_pre_persist"
+                    }
+                })),
+            );
         }
+        decision
     }
 
     pub(crate) fn release_runtime_admission_reservations(
@@ -537,7 +1001,7 @@ impl ChioKernel {
         let Some(hook) = self.runtime_admission_hook.as_ref() else {
             return Ok(());
         };
-        hook.release_reserved(metadata)
+        self.release_runtime_admission_metadata(hook.as_ref(), metadata)
     }
 
     /// Record, in receipt metadata, that runtime-admission reservations
@@ -615,7 +1079,7 @@ impl ChioKernel {
             return Some(metadata_value);
         };
 
-        match hook.release_reserved(&metadata_value) {
+        match self.release_runtime_admission_metadata(hook.as_ref(), &metadata_value) {
             Ok(()) => Some(metadata_value),
             Err(error) => {
                 let reason = error.to_string();
@@ -637,6 +1101,52 @@ impl ChioKernel {
         }
     }
 
+    fn release_runtime_admission_metadata(
+        &self,
+        hook: &dyn RuntimeAdmissionHook,
+        metadata: &serde_json::Value,
+    ) -> Result<(), KernelError> {
+        let Some(operation) = metadata
+            .get("admission_operation")
+            .and_then(serde_json::Value::as_object)
+        else {
+            return hook.release_reserved(metadata);
+        };
+        if operation
+            .get("runtime_evaluation")
+            .and_then(serde_json::Value::as_str)
+            == Some("pure_pre_persist")
+        {
+            return Ok(());
+        }
+        let operation_id = operation
+            .get("operation_id")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "runtime reservation metadata omitted admission operation_id".to_string(),
+                )
+            })?;
+        let request_binding_hash = operation
+            .get("request_binding_hash")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "runtime reservation metadata omitted admission request_binding_hash"
+                        .to_string(),
+                )
+            })?;
+        let binding = BudgetAdmissionOperationBinding::new(
+            operation_id.to_string(),
+            request_binding_hash.to_string(),
+        )?;
+        hook.release_reserved_for_operation(
+            binding.operation_id(),
+            binding.request_binding_hash(),
+            metadata,
+        )
+    }
+
     /// Forward the validated request and optionally report actual invocation cost.
     pub(crate) async fn dispatch_tool_call_with_cost(
         &self,
@@ -644,6 +1154,15 @@ impl ChioKernel {
         has_monetary_grant: bool,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         self.require_presented_execution_nonce(request, &request.capability)?;
+        if !self.tool_servers.contains_key(&request.server_id) {
+            return Err(KernelError::ToolNotRegistered(format!(
+                "server \"{}\" / tool \"{}\"",
+                request.server_id, request.tool_name
+            )));
+        }
+        let _security_dispatch_outcome = self
+            .run_security_pre_dispatch_hook(request, None)
+            .map_err(|denial| KernelError::GuardDenied(denial.reason.to_string()))?;
         self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant)
             .await
     }
@@ -737,9 +1256,14 @@ impl ChioKernel {
     }
 
     pub(crate) fn append_chio_receipt_to_local_log(&self, receipt: ChioReceipt) {
+        let append_once = |log: &mut ReceiptLog| {
+            if !log.iter().any(|existing| existing.id == receipt.id) {
+                log.append(receipt);
+            }
+        };
         match self.receipt_log.lock() {
-            Ok(mut log) => log.append(receipt),
-            Err(poisoned) => poisoned.into_inner().append(receipt),
+            Ok(mut log) => append_once(&mut log),
+            Err(poisoned) => append_once(&mut poisoned.into_inner()),
         }
     }
 

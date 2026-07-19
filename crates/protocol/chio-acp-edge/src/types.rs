@@ -148,6 +148,8 @@ pub struct AcpKernelExecutionContext {
     pub capability: CapabilityToken,
     /// The authenticated calling agent identifier.
     pub agent_id: String,
+    /// The exact authenticated runtime session for this invocation.
+    pub session_id: SessionId,
     /// Optional DPoP proof when the matched grant requires sender binding.
     pub dpop_proof: Option<dpop::DpopProof>,
     /// Optional execution nonce for strict kernel dispatch.
@@ -156,6 +158,15 @@ pub struct AcpKernelExecutionContext {
     pub governed_intent: Option<GovernedTransactionIntent>,
     /// Optional approval token for governed transaction execution.
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Complete approval token set for threshold-governed execution.
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+    /// Signed proposal binding the threshold approval set to this invocation.
+    pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional metadata about the model that originated this invocation.
     pub model_metadata: Option<ModelMetadata>,
+    /// Opaque signed authorization forwarded only to the installed verifier.
+    pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
+    /// Authoritative identity and isolation state resolved by the trusted ACP
+    /// host. It is never derived from ACP request parameters.
+    pub security_context: Option<SecurityInvocationContext>,
 }

@@ -120,6 +120,31 @@ fn cancelled_stream_task_metadata(authority_path: &str) -> Value {
     })
 }
 
+fn outcome_unknown_stream_task_metadata(authority_path: &str, reason: &str) -> Value {
+    json!({
+        "chio": {
+            "receiptId": Value::Null,
+            "receipt": Value::Null,
+            "decision": "outcome_unknown",
+            "capabilityId": Value::Null,
+            "authorityPath": authority_path,
+            "authoritative": true,
+            "compatibilityOnly": false,
+            "claimEligible": false,
+            "receiptBearing": false,
+            "receiptPending": false,
+            "reason": reason,
+            "runtimeLifecycle": runtime_lifecycle_metadata(RuntimeLifecycleSurface::AcpAuthoritative),
+            "lifecycle": {
+                "toolInvoke": "blocking_terminal_result",
+                "toolStream": "deferred_task_resume",
+                "toolCancel": "supported",
+                "toolResume": "supported"
+            }
+        }
+    })
+}
+
 fn acp_invocation_result_from_orchestrated(
     orchestrated: OrchestratedToolCall,
 ) -> AcpInvocationResult {

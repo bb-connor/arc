@@ -42,6 +42,51 @@ pub(super) fn mutation_record_from_row(
         )
     })?;
     let authority = sqlite_budget_event_authority(row.get(17)?, row.get(18)?, row.get(19)?)?;
+    let operation_id = row.get::<_, Option<String>>(20)?;
+    let request_binding_hash = row.get::<_, Option<String>>(21)?;
+    let admission_operation = match (operation_id, request_binding_hash) {
+        (None, None) => None,
+        (Some(operation_id), Some(request_binding_hash)) => Some(
+            BudgetAdmissionOperationBinding::new(operation_id, request_binding_hash).map_err(
+                |error| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        20,
+                        rusqlite::types::Type::Text,
+                        Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            error.to_string(),
+                        )),
+                    )
+                },
+            )?,
+        ),
+        _ => {
+            return Err(rusqlite::Error::FromSqlConversionFailure(
+                20,
+                rusqlite::types::Type::Text,
+                Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "budget mutation admission ownership is incomplete",
+                )),
+            ));
+        }
+    };
+    if matches!(
+        kind,
+        BudgetMutationKind::ReserveInvocations
+            | BudgetMutationKind::CaptureInvocations
+            | BudgetMutationKind::ReverseInvocations
+    ) && admission_operation.is_none()
+    {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            20,
+            rusqlite::types::Type::Null,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "composite budget mutation omits admission ownership",
+            )),
+        ));
+    }
     let allowed = row.get::<_, Option<i64>>(5)?.map(|value| value > 0);
     let exposure_units = budget_u64_from_row(row, 9, "exposure_units")?;
     let invocation_state = match kind {
@@ -85,6 +130,7 @@ pub(super) fn mutation_record_from_row(
     Ok(BudgetMutationRecord {
         event_id: row.get(0)?,
         hold_id: row.get(1)?,
+        admission_operation,
         capability_id: row.get(2)?,
         grant_index: budget_u32_from_row(row, 3, "grant_index")?,
         kind,

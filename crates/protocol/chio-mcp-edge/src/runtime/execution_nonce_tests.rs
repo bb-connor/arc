@@ -62,10 +62,12 @@ fn make_nonce_kernel() -> ChioKernel {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .unwrap();
     kernel
 }
 
@@ -106,7 +108,11 @@ fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpT
         agent_id: agent.public_key().to_hex(),
         execution_nonce: None,
         governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         route_selection_metadata: None,
         peer_supports_chio_tool_streaming: false,
     }
@@ -114,7 +120,7 @@ fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpT
 
 fn nonce_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".into(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.into(),
         server_id: "srv".into(),
         name: "Nonce Test Server".into(),
         description: Some("nonce test".into()),
@@ -125,8 +131,14 @@ fn nonce_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: Some(LatencyHint::Fast),
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -179,7 +191,7 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
     let kernel = make_nonce_kernel();
     let agent = Keypair::generate();
     let capabilities = issue_nonce_capability(&kernel, &agent);
-    let mut edge = ChioMcpEdge::new(
+    let mut edge = ChioMcpEdge::new_from_unverified_internal(
         McpEdgeConfig {
             server_name: "Chio MCP Edge".to_string(),
             server_version: "0.1.0".to_string(),

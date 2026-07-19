@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json",
   "title": "Chio AgentMessage tool_call_request",
   "type": "object",
   "additionalProperties": false,
@@ -344,6 +345,9 @@
           "minimum": 0,
           "maximum": 10000
         },
+        "aggregate_invocation_budget": {
+          "$ref": "../capability/aggregate-invocation-budget.schema.json"
+        },
         "signature": {
           "type": "string",
           "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
@@ -358,6 +362,61 @@
       "type": "string",
       "minLength": 1
     },
-    "params": true
+    "params": true,
+    "supplemental_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "artifact"
+      ],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+        },
+        "artifact": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 65536,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      }
+    },
+    "governed_intent": {
+      "$ref": "../capability/governed-transaction-intent.schema.json"
+    },
+    "approval_token": {
+      "$ref": "../capability/governed-approval-token.schema.json"
+    },
+    "approval_tokens": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "../capability/governed-approval-token.schema.json"
+      }
+    },
+    "threshold_approval_proposal": {
+      "$ref": "../capability/threshold-approval-proposal.schema.json"
+    },
+    "declassification_grant": {
+      "$ref": "../security/declassification-grant.schema.json"
+    }
+  },
+  "not": {
+    "required": [
+      "approval_token",
+      "approval_tokens"
+    ],
+    "properties": {
+      "approval_token": true,
+      "approval_tokens": true
+    }
   }
 }

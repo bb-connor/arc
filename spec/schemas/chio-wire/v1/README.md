@@ -33,12 +33,17 @@ Directory layout:
   - `policy_denied.schema.json`
   - `tool_server_error.schema.json`
   - `internal_error.schema.json`
-- `capability/` - capability tokens, grants, and revocation envelopes.
+- `capability/` - capability tokens, grants, revocation envelopes, aggregate
+  delegation-family budget roots, and threshold approval artifacts.
 - `jsonrpc/` - JSON-RPC framing used by the hosted MCP HTTP edge.
 - `provenance/` - provenance and attestation records emitted by the kernel.
 - `receipt/` - signed receipts produced after tool calls complete.
-- `security/` - portable information-flow and active-defense records.
-- `trust-control/` - trust-control plane messages (policy, allowlist, audit).
+- `security/` - portable information-flow records, strict `chio.manifest.v2`
+  envelopes, native cage evidence, broker authorization and execution receipts,
+  witnessed key-log rotation receipts, and a closed exported-signed-artifact
+  schema map.
+- `trust-control/` - trust-control plane messages plus supplemental quota,
+  request-binding, and authoritative admission-capture projections.
 
 Source-of-truth pointers:
 
@@ -49,3 +54,8 @@ Source-of-truth pointers:
   (canonical JSON, capability, hashing, manifest, receipt, signing). SDKs in
   other languages must round-trip those vectors through their generated
   bindings.
+- Enterprise security vectors are indexed recursively under
+  `tests/bindings/vectors/security/`. The `broker/`, `cage/`, `key-log/`,
+  `protocol-primitives/`, and `signed-wire/` corpora pair each canonical
+  positive with its exact schema and include schema-valid semantic mutations
+  for native verification.

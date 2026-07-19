@@ -9,3 +9,13 @@ This product includes third-party software components, each of which is governed
 by its own license. The licenses for those components apply to their respective
 portions of the software and are available with their corresponding source or
 package distributions.
+
+nono 0.53.0
+Copyright Luke Hinds
+Upstream repository: https://github.com/always-further/nono
+Reviewed upstream commit: c4b25b827330640cb95f85809d88d977191b42e7
+Licensed under the Apache License, Version 2.0.
+
+Chio consumes the upstream nono crate unchanged and includes the local
+`nono-chio` integration adapter under `third_party/nono-chio`. The adapter's
+source, license, and exact patch inventory are distributed with this product.

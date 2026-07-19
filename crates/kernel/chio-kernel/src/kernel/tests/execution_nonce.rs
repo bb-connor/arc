@@ -18,6 +18,37 @@ use crate::execution_nonce::{
     InMemoryExecutionNonceStore, NonceBinding,
 };
 
+struct SelectiveAuthorityArtifactTrustResolver {
+    key: PublicKey,
+    denied_artifact: std::sync::Arc<std::sync::Mutex<Option<Vec<u8>>>>,
+}
+
+impl AuthorityArtifactTrustResolver for SelectiveAuthorityArtifactTrustResolver {
+    fn trusted_issuer_for_artifact(
+        &self,
+        artifact: &[u8],
+        claimed_issuer: &PublicKey,
+        signature: &chio_core::Signature,
+    ) -> Result<Option<PublicKey>, String> {
+        if claimed_issuer != &self.key {
+            return Ok(None);
+        }
+        if !claimed_issuer.verify(artifact, signature) {
+            return Ok(None);
+        }
+        if self
+            .denied_artifact
+            .lock()
+            .map_err(|_| "selective authority resolver lock poisoned".to_string())?
+            .as_deref()
+            == Some(artifact)
+        {
+            return Err("authority artifact denied by runtime migration binding".to_string());
+        }
+        Ok(Some(self.key.clone()))
+    }
+}
+
 fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig) {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -27,7 +58,9 @@ fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig)
         require_nonce: false,
     };
     let store = Box::new(InMemoryExecutionNonceStore::from_config(&cfg));
-    kernel.set_execution_nonce_store(cfg.clone(), store);
+    kernel
+        .set_execution_nonce_store(cfg.clone(), store)
+        .expect("nonce store installation");
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     (kernel, agent_kp, scope, cfg)
@@ -82,6 +115,38 @@ fn allow_verdict_carries_signed_execution_nonce_and_verifies() {
         tool_name: request.tool_name.clone(),
         parameter_hash: response.receipt.action.parameter_hash.clone(),
     };
+    kernel
+        .verify_presented_execution_nonce(&signed, &expected)
+        .unwrap();
+}
+
+#[test]
+fn resolver_denial_does_not_consume_a_presented_execution_nonce() {
+    let (mut kernel, agent_kp, scope, _cfg) = kernel_with_nonce();
+    let denied_artifact = std::sync::Arc::new(std::sync::Mutex::new(None));
+    kernel
+        .set_authority_artifact_trust_resolver(std::sync::Arc::new(
+            SelectiveAuthorityArtifactTrustResolver {
+                key: kernel.public_key(),
+                denied_artifact: std::sync::Arc::clone(&denied_artifact),
+            },
+        ))
+        .unwrap();
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-nonce-resolver", &cap, "read_file", "srv-a");
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    let signed = response.execution_nonce.unwrap();
+    let expected = binding_for_request(&cap, &request);
+    *denied_artifact.lock().unwrap() = Some(
+        crate::execution_nonce::execution_nonce_signed_artifact(&signed).unwrap(),
+    );
+
+    let error = kernel
+        .verify_presented_execution_nonce(&signed, &expected)
+        .unwrap_err();
+    assert!(matches!(error, ExecutionNonceError::AuthorityTrust(_)));
+
+    *denied_artifact.lock().unwrap() = None;
     kernel
         .verify_presented_execution_nonce(&signed, &expected)
         .unwrap();
@@ -236,10 +301,12 @@ fn disabled_mode_allows_tool_calls_without_nonce() {
 fn strict_nonce_mode_denies_dispatch_without_presented_nonce() {
     let (mut kernel, agent_kp, scope, mut cfg) = kernel_with_nonce();
     cfg.require_nonce = true;
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-nonce-required", &cap, "read_file", "srv-a");
@@ -257,10 +324,12 @@ fn strict_nonce_mode_denies_dispatch_without_presented_nonce() {
 fn strict_nonce_mode_denies_missing_nonce_before_server_lookup() {
     let (mut kernel, agent_kp, scope, mut cfg) = kernel_with_nonce();
     cfg.require_nonce = true;
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let mut request = make_request("req-nonce-before-lookup", &cap, "read_file", "missing-srv");
@@ -279,10 +348,12 @@ fn strict_nonce_mode_denies_missing_nonce_before_server_lookup() {
 fn strict_nonce_mode_dispatches_once_with_presented_nonce() {
     let (mut kernel, agent_kp, scope, mut cfg) = kernel_with_nonce();
     cfg.require_nonce = true;
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let mut request = make_request("req-nonce-dispatch-once", &cap, "read_file", "srv-a");
@@ -309,10 +380,12 @@ fn strict_nonce_mode_nested_flow_operation_forwards_presented_nonce(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (mut kernel, agent_kp, scope, mut cfg) = kernel_with_nonce();
     cfg.require_nonce = true;
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request_id = "req-nonce-nested-operation";
@@ -327,9 +400,14 @@ fn strict_nonce_mode_nested_flow_operation_forwards_presented_nonce(
         tool_name: request.tool_name.clone(),
         arguments: request.arguments.clone(),
         governed_intent: None,
+        supplemental_authorization: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         execution_nonce: Some(serde_json::to_value(&nonce)?),
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     };
     let mut client = NoopNestedFlowClient;
 
@@ -361,10 +439,12 @@ fn strict_nonce_mode_preflights_nonce_then_executes_once() {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
@@ -425,6 +505,95 @@ fn strict_nonce_mode_preflights_nonce_then_executes_once() {
 }
 
 #[test]
+fn strict_nonce_mode_ordinary_aggregate_admission_owns_replay_reservation() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        invocations.clone(),
+    )));
+    let config = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
+    let budget = std::sync::Arc::new(DurableThresholdBudgetStore::new());
+    let nonce_store = DurableRecoveryNonceStore::new();
+    kernel
+        .set_admission_operation_store_handle(operations.clone())
+        .unwrap();
+    kernel.set_budget_store_handle(budget).unwrap();
+    kernel
+        .set_execution_nonce_store(config.clone(), Box::new(nonce_store.clone()))
+        .unwrap();
+    kernel.enable_aggregate_invocation_admission().unwrap();
+
+    let agent_kp = make_keypair();
+    let mut grant = make_grant("srv-a", "read_file");
+    grant.max_invocations = Some(2);
+    let capability = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
+    let capability = aggregate_limited_capability(&kernel, &capability, 2);
+    let mut request = make_request(
+        "req-ordinary-operation-owned-nonce",
+        &capability,
+        "read_file",
+        "srv-a",
+    );
+    request.execution_nonce = Some(mint_nonce_for_request(
+        &kernel,
+        &capability,
+        &request,
+        &config,
+    ));
+    let expected_nonce = request.execution_nonce.clone().unwrap();
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    let operation_id = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| {
+            metadata.pointer("/protocol_admission/admission_operation/operation_id")
+        })
+        .and_then(serde_json::Value::as_str)
+        .unwrap();
+    let operation = operations.load(operation_id).unwrap().unwrap();
+    assert_eq!(
+        operation.execution_nonce_id(),
+        Some(expected_nonce.nonce_id())
+    );
+    let reservation = nonce_store
+        .get_nonce_reservation(operation_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(reservation.operation_id(), operation_id);
+    assert_eq!(reservation.nonce_id(), expected_nonce.nonce_id());
+    assert_eq!(reservation.signed_expires_at(), expected_nonce.expires_at());
+    assert_eq!(reservation.state(), ReplayReservationState::Committed);
+    let nonce_action = operations
+        .load_cleanup_actions(operation_id)
+        .unwrap()
+        .into_iter()
+        .find(|action| action.kind() == AdmissionCleanupActionKind::ExecutionNonce)
+        .unwrap();
+    assert_eq!(nonce_action.state(), AdmissionCleanupActionState::Completed);
+
+    let mut replay = request;
+    replay.request_id = "req-ordinary-operation-owned-nonce-replay".to_string();
+    let replay = kernel.evaluate_tool_call_blocking(&replay).unwrap();
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert!(replay
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("execution nonce reservation")));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
@@ -438,10 +607,12 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
 
     let agent_kp = Keypair::generate();
     let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
@@ -462,7 +633,9 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let preflight = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -496,10 +669,12 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
 fn strict_nonce_mode_denies_dispatch_with_stale_nonce() {
     let (mut kernel, agent_kp, scope, mut cfg) = kernel_with_nonce();
     cfg.require_nonce = true;
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let mut request = make_request("req-nonce-stale-dispatch", &cap, "read_file", "srv-a");
@@ -527,10 +702,12 @@ fn strict_nonce_mode_denies_dispatch_with_stale_nonce() {
 fn strict_nonce_mode_denies_dispatch_with_mismatched_binding() {
     let (mut kernel, agent_kp, scope, mut cfg) = kernel_with_nonce();
     cfg.require_nonce = true;
-    kernel.set_execution_nonce_store(
-        cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("nonce store installation");
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let mut request = make_request("req-nonce-binding-dispatch", &cap, "read_file", "srv-a");
@@ -560,7 +737,9 @@ fn require_presented_nonce_denies_when_missing_in_strict_mode() {
         require_nonce: true,
     };
     let store = Box::new(InMemoryExecutionNonceStore::from_config(&cfg));
-    kernel.set_execution_nonce_store(cfg, store);
+    kernel
+        .set_execution_nonce_store(cfg, store)
+        .expect("nonce store installation");
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
@@ -586,7 +765,9 @@ fn require_presented_nonce_passes_when_valid() {
     let strict_store = Box::new(InMemoryExecutionNonceStore::from_config(&strict_cfg));
     // Rebuild kernel with strict mode set.
     let mut kernel = kernel;
-    kernel.set_execution_nonce_store(strict_cfg.clone(), strict_store);
+    kernel
+        .set_execution_nonce_store(strict_cfg.clone(), strict_store)
+        .expect("nonce store installation");
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let mut request = make_request("req-strict-ok", &cap, "read_file", "srv-a");

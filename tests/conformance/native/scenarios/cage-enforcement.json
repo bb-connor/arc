@@ -1,0 +1,30 @@
+{
+  "id": "cage-enforcement",
+  "title": "Cage plans and enforcement evidence reject identity mutation",
+  "category": "cage_enforcement",
+  "driver": "artifact",
+  "fixture": "security-vector-cage",
+  "specVersion": "chio-wire-v1",
+  "assertions": [
+    {
+      "name": "cage_plan_target_fd_identity_bound",
+      "kind": "cage_plan_target_fd_identity_bound",
+      "expectedBool": true
+    },
+    {
+      "name": "cage_prepared_mutation_rejected",
+      "kind": "cage_prepared_mutation_rejected",
+      "expectedBool": true
+    },
+    {
+      "name": "cage_exec_transition_mutation_rejected",
+      "kind": "cage_exec_transition_mutation_rejected",
+      "expectedBool": true
+    },
+    {
+      "name": "cage_enforcement_evidence_mutation_rejected",
+      "kind": "cage_enforcement_evidence_mutation_rejected",
+      "expectedBool": true
+    }
+  ]
+}

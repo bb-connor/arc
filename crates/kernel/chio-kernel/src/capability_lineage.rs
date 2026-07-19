@@ -12,7 +12,7 @@ use crate::receipt_store::ReceiptStoreError;
 ///
 /// Stored in the `capability_lineage` table alongside `chio_tool_receipts`
 /// for efficient JOINs during audit queries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CapabilitySnapshot {
     /// The unique token ID (matches CapabilityToken.id).
     pub capability_id: String,

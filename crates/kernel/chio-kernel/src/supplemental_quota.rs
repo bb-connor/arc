@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::capability::features::CapabilityNegotiation;
+use chio_core::capability::features::{CapabilityNegotiation, SUPPLEMENTAL_BROKER_EXECUTION_QUOTA};
 use chio_core::crypto::{sha256_hex, PublicKey};
 use serde::Serialize;
 
 use crate::budget_store::{
-    BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile, BudgetStoreError,
+    BudgetAuthorizeHoldRequest, BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetStoreError,
 };
 
 pub const MAX_SUPPLEMENTAL_QUOTA_ARTIFACT_BYTES: usize = 64 * 1024;
@@ -29,6 +30,8 @@ pub enum SupplementalQuotaError {
     Expired,
     #[error("supplemental quota profile is unsupported")]
     UnsupportedProfile,
+    #[error("supplemental broker execution quota is not negotiated")]
+    FeatureNotNegotiated,
     #[error("supplemental quota canonicalization failed: {0}")]
     Canonicalization(String),
     #[error("supplemental revocation set is invalid: {0}")]
@@ -123,21 +126,6 @@ pub struct VerifiedSupplementalQuotaClaimBody {
     pub profile: BudgetQuotaProfile,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifiedSupplementalQuotaClaim {
-    body: VerifiedSupplementalQuotaClaimBody,
-}
-
-impl VerifiedSupplementalQuotaClaim {
-    pub fn from_verified_body(body: VerifiedSupplementalQuotaClaimBody) -> Self {
-        Self { body }
-    }
-
-    pub fn body(&self) -> &VerifiedSupplementalQuotaClaimBody {
-        &self.body
-    }
-}
-
 pub trait SupplementalQuotaVerifier: Send + Sync {
     fn verifier_id(&self) -> &str;
 
@@ -145,7 +133,151 @@ pub trait SupplementalQuotaVerifier: Send + Sync {
         &self,
         artifact: &OpaqueSignedSupplementalQuota,
         context: &SupplementalQuotaVerificationContext,
-    ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaError>;
+    ) -> Result<VerifiedSupplementalQuotaClaimBody, SupplementalQuotaError>;
+}
+
+/// Trusted, non-secret request material supplied to an installed supplemental
+/// admission registrar before any budget authority mutation.
+#[derive(Debug, Clone, Copy)]
+pub struct SupplementalAdmissionPrepareRequest<'a> {
+    pub request_id: &'a str,
+    pub capability_id: &'a str,
+    pub arguments: &'a serde_json::Value,
+    pub authorization_reference: &'a str,
+    pub authorization_artifact: &'a OpaqueSignedSupplementalQuota,
+}
+
+/// Deterministic broker participant identifiers derived by the installed
+/// registrar from the authenticated request envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupplementalAdmissionPlan {
+    attempt_id: String,
+    hold_id: String,
+    authorize_event_id: String,
+    reverse_event_id: String,
+    capture_event_id: String,
+    registration_payload: Vec<u8>,
+}
+
+impl SupplementalAdmissionPlan {
+    pub fn new(
+        attempt_id: String,
+        hold_id: String,
+        authorize_event_id: String,
+        reverse_event_id: String,
+        capture_event_id: String,
+        registration_payload: Vec<u8>,
+    ) -> Result<Self, SupplementalQuotaError> {
+        for (value, label) in [
+            (&attempt_id, "supplemental attempt id"),
+            (&hold_id, "supplemental hold id"),
+            (&authorize_event_id, "supplemental authorize event id"),
+            (&reverse_event_id, "supplemental reverse event id"),
+            (&capture_event_id, "supplemental capture event id"),
+        ] {
+            validate_identifier(value, label)?;
+        }
+        if registration_payload.is_empty()
+            || registration_payload.len() > MAX_SUPPLEMENTAL_QUOTA_ARTIFACT_BYTES
+        {
+            return Err(SupplementalQuotaError::Verification(
+                "supplemental registration payload is empty or oversized".to_string(),
+            ));
+        }
+        Ok(Self {
+            attempt_id,
+            hold_id,
+            authorize_event_id,
+            reverse_event_id,
+            capture_event_id,
+            registration_payload,
+        })
+    }
+
+    pub fn attempt_id(&self) -> &str {
+        &self.attempt_id
+    }
+
+    pub fn hold_id(&self) -> &str {
+        &self.hold_id
+    }
+
+    pub fn authorize_event_id(&self) -> &str {
+        &self.authorize_event_id
+    }
+
+    pub fn reverse_event_id(&self) -> &str {
+        &self.reverse_event_id
+    }
+
+    pub fn capture_event_id(&self) -> &str {
+        &self.capture_event_id
+    }
+
+    pub fn registration_payload(&self) -> &[u8] {
+        &self.registration_payload
+    }
+}
+
+/// Read-only kernel-derived composite authorization passed to the installed
+/// registrar. Its private constructor prevents callers from manufacturing the
+/// verified quota authority installed in the underlying budget request.
+pub struct SupplementalAdmissionAuthorization<'a> {
+    admission_operation_id: &'a str,
+    budget_request: &'a BudgetAuthorizeHoldRequest,
+}
+
+impl<'a> SupplementalAdmissionAuthorization<'a> {
+    pub(crate) fn new(
+        admission_operation_id: &'a str,
+        budget_request: &'a BudgetAuthorizeHoldRequest,
+    ) -> Self {
+        Self {
+            admission_operation_id,
+            budget_request,
+        }
+    }
+
+    pub fn admission_operation_id(&self) -> &str {
+        self.admission_operation_id
+    }
+
+    pub fn budget_request(&self) -> &BudgetAuthorizeHoldRequest {
+        self.budget_request
+    }
+}
+
+/// Trusted runtime-composition port for broker attempt registration.
+///
+/// Registration must durably consume the proof nonce and persist the pending
+/// attempt before `register_admission` returns. The kernel invokes this port
+/// after `AdmissionOperation::Prepared` and before budget authorization.
+pub trait SupplementalAdmissionRegistrar: Send + Sync {
+    fn prepare_admission(
+        &self,
+        request: SupplementalAdmissionPrepareRequest<'_>,
+    ) -> Result<SupplementalAdmissionPlan, SupplementalQuotaError>;
+
+    fn register_admission(
+        &self,
+        plan: &SupplementalAdmissionPlan,
+        authorization: SupplementalAdmissionAuthorization<'_>,
+    ) -> Result<(), SupplementalQuotaError>;
+
+    /// Materialize and retain the exact broker dispatch only after the
+    /// admission operation is durably ReadyToDispatch and before capture.
+    fn prepare_dispatch(&self, admission_operation_id: &str) -> Result<(), SupplementalQuotaError>;
+
+    fn release_admission(&self, admission_operation_id: &str)
+        -> Result<(), SupplementalQuotaError>;
+
+    /// Remove the live broker registration linkage after the kernel has
+    /// durably persisted completed dispatch. Outcome-unknown operations retain
+    /// their linkage because they still require the original authority.
+    fn finalize_admission(
+        &self,
+        admission_operation_id: &str,
+    ) -> Result<(), SupplementalQuotaError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -190,8 +322,13 @@ pub(crate) fn verify_supplemental_quota(
     context: &SupplementalQuotaVerificationContext,
 ) -> Result<VerifiedSupplementalQuota, SupplementalQuotaError> {
     validate_context(context)?;
-    let claim = verifier.verify(artifact, context)?;
-    let body = claim.body();
+    if !context
+        .negotiated_features
+        .supports(SUPPLEMENTAL_BROKER_EXECUTION_QUOTA)
+    {
+        return Err(SupplementalQuotaError::FeatureNotNegotiated);
+    }
+    let body = verifier.verify(artifact, context)?;
 
     if body.profile != BudgetQuotaProfile::SupplementalBrokerExecution
         || context.negotiated_profile != BudgetQuotaProfile::SupplementalBrokerExecution
@@ -252,7 +389,7 @@ pub(crate) fn verify_supplemental_quota(
     validate_identifier(&body.broker_capability_id, "broker capability id")?;
     validate_identifier(verifier.verifier_id(), "verifier id")?;
 
-    let owner_id = derive_broker_quota_owner(body)?;
+    let owner_id = derive_broker_quota_owner(&body)?;
     Ok(VerifiedSupplementalQuota {
         quota: BudgetInvocationQuota::from_verified_parts(
             BudgetQuotaKey::from_verified_parts(
@@ -326,7 +463,14 @@ pub struct CanonicalRevocationSet {
 }
 
 impl CanonicalRevocationSet {
-    pub(crate) fn new(
+    /// Build the canonical revocation set for one verified admission.
+    ///
+    /// The leaf capability, every verified delegation ancestor, and every
+    /// supplemental capability identifier must be supplied exactly once. The
+    /// constructor validates identifier bounds and uniqueness, sorts by UTF-8
+    /// bytes, and derives the domain-separated digest consumed by admission
+    /// capture.
+    pub fn new(
         leaf_capability_id: &str,
         delegation_ancestor_ids: &[String],
         supplemental_ids: &[String],
@@ -487,7 +631,7 @@ mod tests {
 
     #[derive(Clone)]
     struct FixedVerifier {
-        claim: VerifiedSupplementalQuotaClaim,
+        claim: VerifiedSupplementalQuotaClaimBody,
     }
 
     impl SupplementalQuotaVerifier for FixedVerifier {
@@ -499,7 +643,7 @@ mod tests {
             &self,
             _artifact: &OpaqueSignedSupplementalQuota,
             _context: &SupplementalQuotaVerificationContext,
-        ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaError> {
+        ) -> Result<VerifiedSupplementalQuotaClaimBody, SupplementalQuotaError> {
             Ok(self.claim.clone())
         }
     }
@@ -513,7 +657,10 @@ mod tests {
         let issuer = Keypair::generate();
         let artifact = OpaqueSignedSupplementalQuota::new(b"signed-extension".to_vec()).unwrap();
         let destination = SupplementalQuotaDestination::new("broker", "execute").unwrap();
-        let negotiated_features = CapabilityNegotiation::t1_default();
+        let mut negotiated_features = CapabilityNegotiation::t1_default();
+        negotiated_features
+            .features
+            .insert(SUPPLEMENTAL_BROKER_EXECUTION_QUOTA.to_string(), true);
         let context = SupplementalQuotaVerificationContext {
             capability_id: "leaf-capability-1".to_string(),
             capability_digest: "11".repeat(32),
@@ -550,9 +697,7 @@ mod tests {
     #[test]
     fn trusted_verifier_result_derives_broker_quota_from_bound_claim() {
         let (artifact, context, body) = fixture();
-        let verifier = FixedVerifier {
-            claim: VerifiedSupplementalQuotaClaim::from_verified_body(body),
-        };
+        let verifier = FixedVerifier { claim: body };
 
         let verified = verify_supplemental_quota(&verifier, &artifact, &context).unwrap();
 
@@ -572,9 +717,7 @@ mod tests {
     fn verifier_result_mismatch_and_expiry_fail_closed() {
         let (artifact, context, mut body) = fixture();
         body.arguments_digest = "44".repeat(32);
-        let verifier = FixedVerifier {
-            claim: VerifiedSupplementalQuotaClaim::from_verified_body(body),
-        };
+        let verifier = FixedVerifier { claim: body };
         assert!(matches!(
             verify_supplemental_quota(&verifier, &artifact, &context),
             Err(SupplementalQuotaError::ContextMismatch(_))
@@ -582,12 +725,24 @@ mod tests {
 
         let (artifact, context, mut body) = fixture();
         body.expires_at = context.now;
-        let verifier = FixedVerifier {
-            claim: VerifiedSupplementalQuotaClaim::from_verified_body(body),
-        };
+        let verifier = FixedVerifier { claim: body };
         assert!(matches!(
             verify_supplemental_quota(&verifier, &artifact, &context),
             Err(SupplementalQuotaError::Expired)
+        ));
+    }
+
+    #[test]
+    fn supplemental_quota_requires_explicit_feature_negotiation() {
+        let (artifact, mut context, body) = fixture();
+        context
+            .negotiated_features
+            .features
+            .remove(SUPPLEMENTAL_BROKER_EXECUTION_QUOTA);
+        let verifier = FixedVerifier { claim: body };
+        assert!(matches!(
+            verify_supplemental_quota(&verifier, &artifact, &context),
+            Err(SupplementalQuotaError::FeatureNotNegotiated)
         ));
     }
 

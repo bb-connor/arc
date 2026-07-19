@@ -15,6 +15,7 @@ use chio_cross_protocol::orchestrator::CrossProtocolOrchestrator;
 use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolServerConnection, Verdict as KernelVerdict,
 };
+use chio_manifest::{BridgeSecurityMetadata, VerifiedManifestRegistry};
 use serde_json::json;
 
 const ACP_GUARD_READ_TOOL: &str = "fs/read_text_file";
@@ -22,6 +23,13 @@ const ACP_GUARD_WRITE_TOOL: &str = "fs/write_text_file";
 const ACP_GUARD_TERMINAL_TOOL: &str = "terminal/create";
 const ACP_GUARD_TERMINAL_KILL_TOOL: &str = "terminal/kill";
 const ACP_GUARD_TERMINAL_RELEASE_TOOL: &str = "terminal/release";
+const ACP_GUARD_TOOLS: [&str; 5] = [
+    ACP_GUARD_READ_TOOL,
+    ACP_GUARD_WRITE_TOOL,
+    ACP_GUARD_TERMINAL_TOOL,
+    ACP_GUARD_TERMINAL_KILL_TOOL,
+    ACP_GUARD_TERMINAL_RELEASE_TOOL,
+];
 
 struct AcpGuardCapabilityBridge;
 
@@ -104,13 +112,7 @@ impl ToolServerConnection for AcpAuthorityToolServer {
     }
 
     fn tool_names(&self) -> Vec<String> {
-        vec![
-            ACP_GUARD_READ_TOOL.to_string(),
-            ACP_GUARD_WRITE_TOOL.to_string(),
-            ACP_GUARD_TERMINAL_TOOL.to_string(),
-            ACP_GUARD_TERMINAL_KILL_TOOL.to_string(),
-            ACP_GUARD_TERMINAL_RELEASE_TOOL.to_string(),
-        ]
+        ACP_GUARD_TOOLS.into_iter().map(str::to_string).collect()
     }
 
     async fn invoke(
@@ -134,23 +136,59 @@ impl ToolServerConnection for AcpAuthorityToolServer {
 /// operations. Every successful check emits a signed Chio receipt.
 pub struct KernelCapabilityChecker {
     kernel: Arc<ChioKernel>,
+    manifest_registry: Arc<VerifiedManifestRegistry>,
     server_id: String,
+    bridge_security_by_tool: std::collections::BTreeMap<&'static str, BridgeSecurityMetadata>,
 }
 
 impl KernelCapabilityChecker {
-    /// Create a new kernel-backed checker.
-    pub fn new(mut kernel: ChioKernel, server_id: impl Into<String>) -> Self {
+    /// Create a new kernel-backed checker from an already verified manifest registry.
+    ///
+    /// Production callers must populate `manifest_registry` from an existing signed
+    /// manifest. The registered in-process authority tools must use local topology
+    /// and omit manifest flow declarations because they perform no ACP side effect.
+    pub fn new(
+        mut kernel: ChioKernel,
+        server_id: impl Into<String>,
+        manifest_registry: Arc<VerifiedManifestRegistry>,
+    ) -> Result<Self, CapabilityCheckError> {
         let server_id = server_id.into();
-        kernel.register_tool_server(Box::new(AcpAuthorityToolServer::new(server_id.clone())));
-        Self {
-            kernel: Arc::new(kernel),
-            server_id,
+        let mut bridge_security_by_tool = std::collections::BTreeMap::new();
+        for tool_name in ACP_GUARD_TOOLS {
+            let bridge_security = manifest_registry
+                .bridge_security(&server_id, tool_name)
+                .ok_or_else(|| {
+                    CapabilityCheckError::Internal(format!(
+                        "verified manifest registry has no ACP authority tool `{server_id}/{tool_name}`"
+                    ))
+                })?;
+            manifest_registry
+                .validate_bridge_security(&server_id, tool_name, &bridge_security)
+                .map_err(|error| {
+                    CapabilityCheckError::Internal(format!(
+                        "ACP authority tool `{server_id}/{tool_name}` has invalid bridge security: {error}"
+                    ))
+                })?;
+            if bridge_security.flow().is_some() || bridge_security.effective_egress() {
+                return Err(CapabilityCheckError::Internal(format!(
+                    "ACP authority tool `{server_id}/{tool_name}` must use local topology with no flow declaration"
+                )));
+            }
+            bridge_security_by_tool.insert(tool_name, bridge_security);
         }
+        kernel.register_tool_server(Box::new(AcpAuthorityToolServer::new(server_id.clone())));
+        Ok(Self {
+            kernel: Arc::new(kernel),
+            manifest_registry,
+            server_id,
+            bridge_security_by_tool,
+        })
     }
 
     fn parse_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
-        serde_json::from_str(token_json)
-            .map_err(|error| CapabilityCheckError::InvalidToken(format!("failed to parse token: {error}")))
+        serde_json::from_str(token_json).map_err(|error| {
+            CapabilityCheckError::InvalidToken(format!("failed to parse token: {error}"))
+        })
     }
 
     fn map_request(
@@ -269,8 +307,10 @@ impl CapabilityChecker for KernelCapabilityChecker {
         // require the binding at the live authorization step; for the file
         // and terminal-create operations the matching toolCallId arrives on
         // the later session/update notification.
-        let tool_call_id_required =
-            matches!(request.operation.as_str(), "terminal_kill" | "terminal_release");
+        let tool_call_id_required = matches!(
+            request.operation.as_str(),
+            "terminal_kill" | "terminal_release"
+        );
         let tool_call_id = match request
             .tool_call_id
             .as_deref()
@@ -314,32 +354,52 @@ impl CapabilityChecker for KernelCapabilityChecker {
             .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?,
         );
         let kernel_request_id = format!("acp-live-guard-{request_hash}");
-        let orchestrated = CrossProtocolOrchestrator::new(self.kernel.as_ref())
-            .execute(
-                &AcpGuardCapabilityBridge,
-                CrossProtocolExecutionRequest {
-                    origin_request_id: format!("acp-guard-{}-{request_hash}", request.session_id),
-                    kernel_request_id: kernel_request_id.clone(),
-                    target_protocol: DiscoveryProtocol::Native,
-                    target_server_id: self.server_id.clone(),
-                    target_tool_name: tool_name.to_string(),
-                    agent_id: capability.subject.to_hex(),
-                    arguments: arguments.clone(),
-                    capability: capability.clone(),
-                    source_envelope: self.build_source_envelope(
-                        request,
-                        &arguments,
-                        tool_call_id,
-                        &kernel_request_id,
-                    ),
-                    dpop_proof: None,
-                    execution_nonce: request.execution_nonce.clone(),
-                    governed_intent: None,
-                    approval_token: None,
-                    model_metadata: None,
-                },
-            )
-            .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?;
+        let bridge_security = self
+            .bridge_security_by_tool
+            .get(tool_name)
+            .cloned()
+            .ok_or_else(|| {
+                CapabilityCheckError::Internal(format!(
+                    "ACP authority tool `{}/{tool_name}` was not bound at construction",
+                    self.server_id
+                ))
+            })?;
+        let orchestrated =
+            CrossProtocolOrchestrator::new(self.kernel.as_ref(), self.manifest_registry.as_ref())
+                .execute(
+                    &AcpGuardCapabilityBridge,
+                    CrossProtocolExecutionRequest {
+                        origin_request_id: format!(
+                            "acp-guard-{}-{request_hash}",
+                            request.session_id
+                        ),
+                        kernel_request_id: kernel_request_id.clone(),
+                        target_protocol: DiscoveryProtocol::Native,
+                        target_server_id: self.server_id.clone(),
+                        target_tool_name: tool_name.to_string(),
+                        agent_id: capability.subject.to_hex(),
+                        arguments: arguments.clone(),
+                        capability: capability.clone(),
+                        source_envelope: self.build_source_envelope(
+                            request,
+                            &arguments,
+                            tool_call_id,
+                            &kernel_request_id,
+                        ),
+                        dpop_proof: None,
+                        execution_nonce: request.execution_nonce.clone(),
+                        governed_intent: None,
+                        approval_token: None,
+                        approval_tokens: Vec::new(),
+                        threshold_approval_proposal: None,
+                        model_metadata: None,
+                        supplemental_authorization: None,
+                        authenticated_session_id: None,
+                        security_context: None,
+                        bridge_security,
+                    },
+                )
+                .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?;
 
         let response = orchestrated.response;
         let capability_id = Some(response.receipt.capability_id.clone());

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-receipt-body-v1.schema.json",
+  "title": "Chio broker execution receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "receiptId", "issuedAtUnixSeconds", "evidence", "operationId", "authorizeEventId", "captureEventId", "parentCapabilityId", "brokerCapabilityId", "subject", "credentialReferenceHash", "credentialVersion", "normalizedDestination", "requestBodySha256", "callerHeadersSha256", "callerOptionsSha256", "quotas", "brokerQuotaKeyId", "providerAdapterId", "providerAdapterVersion", "requestBodyBytes", "responseBodyBytes", "sourceReceiptIds", "outcome"],
+  "properties": {
+    "schema": { "const": "chio.broker-execution-receipt.v1" },
+    "receiptId": { "$ref": "#/$defs/identifier" },
+    "issuedAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "evidence": { "$ref": "broker-execution-evidence-v1.schema.json" },
+    "operationId": { "$ref": "#/$defs/identifier" },
+    "authorizeEventId": { "$ref": "#/$defs/identifier" },
+    "captureEventId": { "$ref": "#/$defs/identifier" },
+    "parentCapabilityId": { "$ref": "#/$defs/identifier" },
+    "brokerCapabilityId": { "$ref": "#/$defs/identifier" },
+    "subject": { "$ref": "#/$defs/publicKey" },
+    "credentialReferenceHash": { "$ref": "#/$defs/digest" },
+    "credentialVersion": { "type": "integer", "minimum": 1 },
+    "normalizedDestination": { "$ref": "broker-capability-body-v1.schema.json#/$defs/destination" },
+    "requestBodySha256": { "$ref": "#/$defs/digest" },
+    "callerHeadersSha256": { "$ref": "#/$defs/digest" },
+    "callerOptionsSha256": { "$ref": "#/$defs/digest" },
+    "quotas": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "$ref": "#/$defs/quota" } },
+    "brokerQuotaKeyId": { "$ref": "#/$defs/identifier" },
+    "providerAdapterId": { "$ref": "#/$defs/identifier" },
+    "providerAdapterVersion": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "requestBodyBytes": { "type": "integer", "minimum": 0, "maximum": 524288 },
+    "responseBodyBytes": { "type": "integer", "minimum": 0, "maximum": 2097152 },
+    "sourceReceiptIds": { "type": "array", "minItems": 0, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } },
+    "outcome": { "const": "completed" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "maximumExecutions"],
+      "properties": {
+        "keyId": { "$ref": "#/$defs/identifier" },
+        "maximumExecutions": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    }
+  }
+}

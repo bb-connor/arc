@@ -206,8 +206,9 @@ fn test_shared_evidence_reporting_surfaces() {
 
     {
         let budgets = SqliteBudgetStore::open(&budget_db_path).expect("open budget store");
-        budgets
-            .upsert_usage(&BudgetUsageRecord {
+        import_budget_usage_with_quota(
+            &budgets,
+            BudgetUsageRecord {
                 capability_id: "cap-local-child".to_string(),
                 grant_index: 0,
                 invocation_count: 2,
@@ -215,8 +216,9 @@ fn test_shared_evidence_reporting_surfaces() {
                 seq: 1,
                 total_cost_exposed: 450,
                 total_cost_realized_spend: 0,
-            })
-            .expect("upsert budget usage");
+            },
+            5,
+        );
     }
 
     let listen = reserve_listen_addr();
@@ -448,8 +450,9 @@ fn test_behavioral_feed_export_surfaces() {
 
     {
         let budgets = SqliteBudgetStore::open(&budget_db_path).expect("open budget store");
-        budgets
-            .upsert_usage(&BudgetUsageRecord {
+        import_budget_usage_with_quota(
+            &budgets,
+            BudgetUsageRecord {
                 capability_id: "cap-risk-child".to_string(),
                 grant_index: 0,
                 invocation_count: 2,
@@ -457,8 +460,9 @@ fn test_behavioral_feed_export_surfaces() {
                 seq: 1,
                 total_cost_exposed: 950,
                 total_cost_realized_spend: 0,
-            })
-            .expect("upsert budget usage");
+            },
+            5,
+        );
     }
 
     let listen = reserve_listen_addr();

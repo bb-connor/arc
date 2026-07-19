@@ -33,6 +33,9 @@ tracing = { workspace = true }
 # via `chio-mcp-edge = { features = ["fuzz"] }`.
 arbitrary = { version = "1", features = ["derive"], optional = true }
 
+[dev-dependencies]
+chio-security-types = { workspace = true }
+
 [features]
 otel = ["chio-kernel/otel"]
 # Enables `chio_mcp_edge::fuzz`, the libFuzzer entry-point module driving

@@ -124,11 +124,33 @@ impl ChioMcpEdge {
             Ok(version) => version,
             Err(error) => return error,
         };
+        let peer_protocol_features = match parse_peer_protocol_features(&params) {
+            Ok(features) => features,
+            Err(error) => {
+                return jsonrpc_error(id, JSONRPC_INVALID_PARAMS, &error);
+            }
+        };
+        let trusted_peer_negotiation = match TrustedPeerNegotiation::from_advertised_intersection(
+            &self.local_protocol_features,
+            &peer_protocol_features,
+        ) {
+            Ok(negotiation) => negotiation,
+            Err(error) => {
+                return jsonrpc_error(id, JSONRPC_INVALID_PARAMS, &error);
+            }
+        };
 
-        let session_id = match self
-            .kernel
-            .open_session(self.agent_id.clone(), self.capabilities.clone())
-        {
+        let opened_session = match self.initial_session_id.as_ref() {
+            Some(session_id) => self.kernel.open_session_with_id(
+                session_id.clone(),
+                self.agent_id.clone(),
+                self.capabilities.clone(),
+            ),
+            None => self
+                .kernel
+                .open_session(self.agent_id.clone(), self.capabilities.clone()),
+        };
+        let session_id = match opened_session {
             Ok(session_id) => session_id,
             Err(error) => {
                 return jsonrpc_error(
@@ -160,6 +182,7 @@ impl ChioMcpEdge {
             );
         }
         self.state = EdgeState::WaitingForInitialized { session_id };
+        self.trusted_peer_negotiation = trusted_peer_negotiation;
 
         let mut capabilities = serde_json::Map::new();
         capabilities.insert(
@@ -208,7 +231,8 @@ impl ChioMcpEdge {
                 "errorRegistry": {
                     "schema": CHIO_ERROR_REGISTRY_SCHEMA,
                     "path": "spec/errors/chio-error-registry.v1.json",
-                }
+                },
+                "capabilityNegotiation": self.local_protocol_features,
             }),
         );
         capabilities.insert("experimental".to_string(), Value::Object(experimental));

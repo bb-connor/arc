@@ -33,8 +33,16 @@
 //! about the failure. Mapping never panics.
 
 use chio_core::receipt::body::chio_receipt_id;
+use chio_core::receipt::security::{
+    ActiveDefensePolicyBinding, ActiveDefenseReceiptBody, ActiveDefenseResponseBinding,
+};
 use chio_core::receipt::{
-    body::ChioReceipt, decision::Decision, kinds::TrustLevel, metadata::GuardEvidence,
+    body::ChioReceipt,
+    decision::Decision,
+    kinds::{
+        BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
+    },
+    metadata::GuardEvidence,
     metadata::ReceiptSemanticFields,
 };
 use serde_json::{json, Map, Value};
@@ -69,7 +77,10 @@ pub const OCSF_PRODUCT_VENDOR: &str = "Backbay Labs";
 /// component of the mapping fails (for example, `serde_json` cannot serialize
 /// the receipt into `raw_data`) the function still returns a best-effort event
 /// with `status_id = 0` (Unknown) and an `unmapped` block describing the
-/// failure. It never panics.
+/// failure. It never panics. Because this API has no trusted-signer input, an
+/// active-defense extension is reported as untrusted even when its embedded
+/// self-signature verifies. Use [`siem_event_to_ocsf`] with a SIEM event built
+/// from an explicit trusted-kernel key set to validate that extension.
 #[must_use]
 pub fn receipt_to_ocsf(receipt: &ChioReceipt) -> Value {
     let semantics = receipt.semantic_fields();
@@ -94,6 +105,7 @@ fn receipt_to_ocsf_with_authority(
     semantics: &ReceiptSemanticFields,
     authority: OcsfAuthority,
 ) -> Value {
+    let active_defense = ActiveDefenseProjection::from_receipt(receipt, authority);
     let authorized = authority.authorized;
     let (activity_id, activity_name) = activity_for(receipt, semantics, authorized);
     let (status_id, status_name) = status_for(receipt, semantics, authorized);
@@ -182,9 +194,25 @@ fn receipt_to_ocsf_with_authority(
         }),
     );
 
-    event.insert("observables".into(), build_observables(receipt));
-    event.insert("enrichments".into(), build_enrichments(receipt, authorized));
-    event.insert("unmapped".into(), build_unmapped(receipt, authority));
+    event.insert(
+        "observables".into(),
+        build_observables(receipt, &active_defense),
+    );
+    event.insert(
+        "enrichments".into(),
+        build_enrichments(receipt, authorized, &active_defense),
+    );
+    event.insert(
+        "unmapped".into(),
+        build_unmapped(receipt, authority, &active_defense),
+    );
+
+    if matches!(active_defense, ActiveDefenseProjection::Invalid(_)) {
+        event.insert("status_id".into(), json!(0));
+        event.insert("status".into(), json!("Unknown"));
+        event.insert("severity_id".into(), json!(3));
+        event.insert("severity".into(), json!("Medium"));
+    }
 
     match serde_json::to_string(receipt) {
         Ok(raw) => {
@@ -242,13 +270,31 @@ impl OcsfAuthority {
     }
 
     fn from_event(event: &SiemEvent) -> Self {
+        let receipt = &event.receipt;
+        let receipt_id_valid = event.receipt_id_valid
+            && chio_receipt_id(&receipt.body())
+                .map(|expected| expected == receipt.id)
+                .unwrap_or(false);
+        let signature_valid =
+            event.signature_valid && matches!(receipt.verify_signature(), Ok(true));
+        let parameter_hash_valid =
+            event.parameter_hash_valid && matches!(receipt.action.verify_hash(), Ok(true));
+        let authoritative =
+            event.authoritative && receipt_id_valid && signature_valid && parameter_hash_valid;
+        let signer_trusted = event.has_proven_signer_trust();
+        let authorized = event.authorized
+            && authoritative
+            && signer_trusted
+            && receipt
+                .semantic_fields()
+                .is_authorized(receipt.decision.as_ref());
         Self {
-            authoritative: event.authoritative,
-            signature_valid: event.signature_valid,
-            receipt_id_valid: event.receipt_id_valid,
-            parameter_hash_valid: event.parameter_hash_valid,
-            signer_trusted: event.signer_trusted,
-            authorized: event.authorized,
+            authoritative,
+            signature_valid,
+            receipt_id_valid,
+            parameter_hash_valid,
+            signer_trusted,
+            authorized,
         }
     }
 }
@@ -330,7 +376,7 @@ fn severity_for(
     }
 }
 
-fn build_observables(receipt: &ChioReceipt) -> Value {
+fn build_observables(receipt: &ChioReceipt, active_defense: &ActiveDefenseProjection) -> Value {
     // OCSF observable type_id enum (selected values): 1 Hostname, 6 Endpoint,
     // 10 Resource UID, 20 Endpoint Name, 99 Other. We use:
     //   10 Resource UID  -- for receipt/capability identifiers
@@ -384,10 +430,50 @@ fn build_observables(receipt: &ChioReceipt) -> Value {
         }));
     }
 
+    if let ActiveDefenseProjection::Valid(projection) = active_defense {
+        observables.push(resource_observable(
+            "chio.active_defense.evidence_id",
+            &projection.evidence_id,
+        ));
+        observables.push(resource_observable(
+            "chio.active_defense.transition_id",
+            projection.body.header().transition_id.as_str(),
+        ));
+        for prior in projection.body.header().prior_receipt_ids.as_slice() {
+            observables.push(resource_observable(
+                "chio.active_defense.prior_receipt_id",
+                prior.as_str(),
+            ));
+        }
+        if let Some(response) = response_binding(&projection.body) {
+            observables.push(resource_observable(
+                "chio.active_defense.action_id",
+                response.action_id.as_str(),
+            ));
+            observables.push(resource_observable(
+                "chio.active_defense.trigger_finding_receipt_id",
+                response.trigger_finding_receipt_id.as_str(),
+            ));
+        }
+    }
+
     Value::Array(observables)
 }
 
-fn build_enrichments(receipt: &ChioReceipt, authorized: bool) -> Value {
+fn resource_observable(name: &str, value: &str) -> Value {
+    json!({
+        "name": name,
+        "type": "Resource UID",
+        "type_id": 10,
+        "value": value,
+    })
+}
+
+fn build_enrichments(
+    receipt: &ChioReceipt,
+    authorized: bool,
+    active_defense: &ActiveDefenseProjection,
+) -> Value {
     let mut enrichments = Vec::new();
     let semantics = receipt.semantic_fields();
 
@@ -424,6 +510,15 @@ fn build_enrichments(receipt: &ChioReceipt, authorized: bool) -> Value {
         }));
     }
 
+    if let Some(data) = active_defense.structured_value() {
+        enrichments.push(json!({
+            "name": "chio.active_defense",
+            "type": "dict",
+            "value": active_defense.kind_label(),
+            "data": data,
+        }));
+    }
+
     Value::Array(enrichments)
 }
 
@@ -442,7 +537,11 @@ fn guard_evidence_enrichment(index: usize, evidence: &GuardEvidence) -> Value {
     })
 }
 
-fn build_unmapped(receipt: &ChioReceipt, authority: OcsfAuthority) -> Value {
+fn build_unmapped(
+    receipt: &ChioReceipt,
+    authority: OcsfAuthority,
+    active_defense: &ActiveDefenseProjection,
+) -> Value {
     // The OCSF `unmapped` attribute holds a key/value object for fields that
     // are meaningful to the producer but are not represented in the class.
     let semantics = receipt.semantic_fields();
@@ -522,9 +621,362 @@ fn build_unmapped(receipt: &ChioReceipt, authority: OcsfAuthority) -> Value {
         chio_map.insert("tenant_id".into(), json!(tenant));
     }
 
+    if let Some(active_defense) = active_defense.structured_value() {
+        chio_map.insert("active_defense".into(), active_defense);
+    }
+
     let mut root = Map::new();
     root.insert("chio".into(), Value::Object(chio_map));
     Value::Object(root)
+}
+
+enum ActiveDefenseProjection {
+    Absent,
+    Valid(Box<VerifiedActiveDefenseProjection>),
+    Invalid(InvalidActiveDefenseProjection),
+}
+
+struct VerifiedActiveDefenseProjection {
+    body: ActiveDefenseReceiptBody,
+    evidence_id: String,
+    verification: ActiveDefenseVerification,
+}
+
+struct InvalidActiveDefenseProjection {
+    error: &'static str,
+    verification: ActiveDefenseVerification,
+}
+
+#[derive(Clone, Copy)]
+struct ActiveDefenseVerification {
+    signature_valid: bool,
+    receipt_id_valid: bool,
+    parameter_hash_valid: bool,
+    signer_trusted: bool,
+    envelope_valid: bool,
+    semantics_valid: bool,
+    binding_valid: bool,
+}
+
+impl ActiveDefenseVerification {
+    fn from_receipt(
+        receipt: &ChioReceipt,
+        authority: OcsfAuthority,
+        semantics_valid: bool,
+        binding_valid: bool,
+    ) -> Self {
+        let signature_valid =
+            authority.signature_valid && matches!(receipt.verify_signature(), Ok(true));
+        let receipt_id_valid = authority.receipt_id_valid
+            && chio_receipt_id(&receipt.body())
+                .map(|expected| expected == receipt.id)
+                .unwrap_or(false);
+        let parameter_hash_valid =
+            authority.parameter_hash_valid && matches!(receipt.action.verify_hash(), Ok(true));
+        let envelope_valid =
+            authority.authoritative && signature_valid && receipt_id_valid && parameter_hash_valid;
+        Self {
+            signature_valid,
+            receipt_id_valid,
+            parameter_hash_valid,
+            signer_trusted: authority.signer_trusted,
+            envelope_valid,
+            semantics_valid,
+            binding_valid,
+        }
+    }
+
+    fn structured_value(self) -> Value {
+        json!({
+            "signature_valid": self.signature_valid,
+            "receipt_id_valid": self.receipt_id_valid,
+            "parameter_hash_valid": self.parameter_hash_valid,
+            "signer_trusted": self.signer_trusted,
+            "envelope_valid": self.envelope_valid,
+            "semantics_valid": self.semantics_valid,
+            "binding_valid": self.binding_valid,
+        })
+    }
+}
+
+impl ActiveDefenseProjection {
+    fn from_receipt(receipt: &ChioReceipt, authority: OcsfAuthority) -> Self {
+        let Some(metadata) = receipt.metadata.as_ref() else {
+            return Self::Absent;
+        };
+        let Some(raw_body) = metadata.get("active_defense_body") else {
+            return if metadata
+                .as_object()
+                .is_some_and(|entries| entries.contains_key("active_defense_evidence_id"))
+            {
+                Self::invalid(
+                    "invalid_active_defense_binding",
+                    receipt,
+                    authority,
+                    false,
+                    false,
+                )
+            } else {
+                Self::Absent
+            };
+        };
+        let Ok(body) = serde_json::from_value::<ActiveDefenseReceiptBody>(raw_body.clone()) else {
+            return Self::invalid(
+                "invalid_active_defense_binding",
+                receipt,
+                authority,
+                false,
+                false,
+            );
+        };
+        let semantics_valid = active_defense_semantics_match(receipt, &body);
+        let Ok(evidence_id) = body.evidence_id() else {
+            return Self::invalid(
+                "invalid_active_defense_binding",
+                receipt,
+                authority,
+                semantics_valid,
+                false,
+            );
+        };
+        let Ok(body_digest) = body.body_digest() else {
+            return Self::invalid(
+                "invalid_active_defense_binding",
+                receipt,
+                authority,
+                semantics_valid,
+                false,
+            );
+        };
+        let Ok(expected_action) =
+            chio_core::receipt::decision::ToolCallAction::from_parameters(json!({
+                "evidence_id": evidence_id.as_str(),
+                "kind": body.kind().as_str(),
+                "transition_id": body.header().transition_id.as_str(),
+            }))
+        else {
+            return Self::invalid(
+                "invalid_active_defense_binding",
+                receipt,
+                authority,
+                semantics_valid,
+                false,
+            );
+        };
+        let expected_metadata = json!({
+            "active_defense_body": &body,
+            "active_defense_evidence_id": evidence_id.as_str(),
+            "occurred_at_unix_ms": body.header().occurred_at_unix_ms,
+        });
+        let binding_valid = metadata
+            .get("active_defense_evidence_id")
+            .and_then(Value::as_str)
+            == Some(evidence_id.as_str())
+            && metadata.get("occurred_at_unix_ms").and_then(Value::as_u64)
+                == Some(body.header().occurred_at_unix_ms)
+            && receipt.capability_id == "chio.active-defense.system"
+            && receipt.tool_server == "chio.kernel"
+            && receipt.tool_name == body.kind().as_str()
+            && receipt.timestamp == body.header().occurred_at_unix_ms / 1_000
+            && receipt.tenant_id.as_deref() == Some(body.header().tenant_id.as_str())
+            && receipt.content_hash == encode_hex(body_digest.as_bytes())
+            && receipt.policy_hash == encode_hex(policy_binding(&body).policy_hash.as_bytes())
+            && receipt.action.parameters == expected_action.parameters
+            && receipt.action.parameter_hash == expected_action.parameter_hash
+            && metadata == &expected_metadata;
+        let verification = ActiveDefenseVerification::from_receipt(
+            receipt,
+            authority,
+            semantics_valid,
+            binding_valid,
+        );
+        if !verification.envelope_valid {
+            return Self::Invalid(InvalidActiveDefenseProjection {
+                error: "invalid_active_defense_envelope",
+                verification,
+            });
+        }
+        if !verification.signer_trusted {
+            return Self::Invalid(InvalidActiveDefenseProjection {
+                error: "untrusted_active_defense_signer",
+                verification,
+            });
+        }
+        if !verification.semantics_valid {
+            return Self::Invalid(InvalidActiveDefenseProjection {
+                error: "invalid_active_defense_semantics",
+                verification,
+            });
+        }
+        if !verification.binding_valid {
+            return Self::Invalid(InvalidActiveDefenseProjection {
+                error: "invalid_active_defense_binding",
+                verification,
+            });
+        }
+        Self::Valid(Box::new(VerifiedActiveDefenseProjection {
+            body,
+            evidence_id: evidence_id.as_str().to_string(),
+            verification,
+        }))
+    }
+
+    fn invalid(
+        error: &'static str,
+        receipt: &ChioReceipt,
+        authority: OcsfAuthority,
+        semantics_valid: bool,
+        binding_valid: bool,
+    ) -> Self {
+        Self::Invalid(InvalidActiveDefenseProjection {
+            error,
+            verification: ActiveDefenseVerification::from_receipt(
+                receipt,
+                authority,
+                semantics_valid,
+                binding_valid,
+            ),
+        })
+    }
+
+    fn kind_label(&self) -> &'static str {
+        match self {
+            Self::Absent => "absent",
+            Self::Valid(projection) => projection.body.kind().as_str(),
+            Self::Invalid(_) => "invalid",
+        }
+    }
+
+    fn structured_value(&self) -> Option<Value> {
+        match self {
+            Self::Absent => None,
+            Self::Invalid(projection) => Some(json!({
+                "valid": false,
+                "error": projection.error,
+                "verification": projection.verification.structured_value(),
+            })),
+            Self::Valid(projection) => {
+                let header = projection.body.header();
+                let policy = policy_binding(&projection.body);
+                let response = response_binding(&projection.body);
+                Some(json!({
+                    "valid": true,
+                    "kind": projection.body.kind().as_str(),
+                    "evidence_id": projection.evidence_id,
+                    "transition_id": header.transition_id.as_str(),
+                    "occurred_at_unix_ms": header.occurred_at_unix_ms,
+                    "tenant_id": header.tenant_id.as_str(),
+                    "prior_receipt_ids": header
+                        .prior_receipt_ids
+                        .as_slice()
+                        .iter()
+                        .map(|prior| prior.as_str())
+                        .collect::<Vec<_>>(),
+                    "policy": policy,
+                    "response": response,
+                    "body": projection.body,
+                    "verification": projection.verification.structured_value(),
+                }))
+            }
+        }
+    }
+}
+
+fn active_defense_semantics_match(receipt: &ChioReceipt, body: &ActiveDefenseReceiptBody) -> bool {
+    let (receipt_kind, boundary_class, observation_outcome, decision, trust_level) =
+        expected_active_defense_semantics(body);
+    receipt.receipt_kind == receipt_kind
+        && receipt.boundary_class == boundary_class
+        && receipt.observation_outcome == observation_outcome
+        && receipt.decision == decision
+        && receipt.tool_origin == ToolOrigin::ChioInternal
+        && receipt.redaction_mode == RedactionMode::Redacted
+        && receipt.trust_level == trust_level
+        && receipt.actor_chain.is_empty()
+        && receipt.evidence.is_empty()
+        && receipt.bbs_projection_version.is_none()
+        && receipt.bbs_signature.is_none()
+}
+
+fn expected_active_defense_semantics(
+    body: &ActiveDefenseReceiptBody,
+) -> (
+    ReceiptKind,
+    BoundaryClass,
+    Option<ObservationOutcome>,
+    Option<Decision>,
+    TrustLevel,
+) {
+    match body {
+        ActiveDefenseReceiptBody::FlowDenial(_) => (
+            ReceiptKind::MediatedDecision,
+            BoundaryClass::Prevent,
+            None,
+            Some(Decision::Deny {
+                reason: "active-defense flow policy denied the request".to_string(),
+                guard: "chio.flow".to_string(),
+            }),
+            TrustLevel::Mediated,
+        ),
+        ActiveDefenseReceiptBody::ResponsePlan(_) => (
+            ReceiptKind::AdvisoryEvaluation,
+            BoundaryClass::AdvisoryOnly,
+            Some(ObservationOutcome::Evaluated),
+            None,
+            TrustLevel::Advisory,
+        ),
+        _ => (
+            ReceiptKind::TraceObservation,
+            BoundaryClass::DetectOnly,
+            Some(ObservationOutcome::Observed),
+            None,
+            TrustLevel::Verified,
+        ),
+    }
+}
+
+fn policy_binding(body: &ActiveDefenseReceiptBody) -> &ActiveDefensePolicyBinding {
+    match body {
+        ActiveDefenseReceiptBody::FlowDenial(body) => &body.policy,
+        ActiveDefenseReceiptBody::DeclassificationConsumption(body) => &body.policy,
+        ActiveDefenseReceiptBody::DeclassificationOutcome(body) => &body.policy,
+        ActiveDefenseReceiptBody::TripwireObservation(body) => &body.policy,
+        ActiveDefenseReceiptBody::CorrelatedFinding(body) => &body.policy,
+        ActiveDefenseReceiptBody::ResponsePlan(body) => &body.response.policy,
+        ActiveDefenseReceiptBody::ResponseStateTransition(body) => &body.response.policy,
+        ActiveDefenseReceiptBody::EffectTransition(body) => &body.response.policy,
+        ActiveDefenseReceiptBody::ResponseCompletion(body) => &body.response.policy,
+        ActiveDefenseReceiptBody::LiftRollbackCompletion(body) => &body.response.policy,
+        ActiveDefenseReceiptBody::DetectorHealth(body) => &body.policy,
+        ActiveDefenseReceiptBody::SchedulerHealth(body) => &body.response.policy,
+    }
+}
+
+fn response_binding(body: &ActiveDefenseReceiptBody) -> Option<&ActiveDefenseResponseBinding> {
+    match body {
+        ActiveDefenseReceiptBody::ResponsePlan(body) => Some(&body.response),
+        ActiveDefenseReceiptBody::ResponseStateTransition(body) => Some(&body.response),
+        ActiveDefenseReceiptBody::EffectTransition(body) => Some(&body.response),
+        ActiveDefenseReceiptBody::ResponseCompletion(body) => Some(&body.response),
+        ActiveDefenseReceiptBody::LiftRollbackCompletion(body) => Some(&body.response),
+        ActiveDefenseReceiptBody::SchedulerHealth(body) => Some(&body.response),
+        ActiveDefenseReceiptBody::FlowDenial(_)
+        | ActiveDefenseReceiptBody::DeclassificationConsumption(_)
+        | ActiveDefenseReceiptBody::DeclassificationOutcome(_)
+        | ActiveDefenseReceiptBody::TripwireObservation(_)
+        | ActiveDefenseReceiptBody::CorrelatedFinding(_)
+        | ActiveDefenseReceiptBody::DetectorHealth(_) => None,
+    }
+}
+
+fn encode_hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        encoded.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        encoded.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 fn trust_level_str(level: TrustLevel) -> &'static str {

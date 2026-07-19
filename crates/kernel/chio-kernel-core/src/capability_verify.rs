@@ -222,12 +222,7 @@ fn verify_negotiated_capability_semantics(
             "aggregate invocation budget is not negotiated".to_string(),
         ));
     }
-
-    // The signed semantic is negotiated but remains latched off until the
-    // durable composite quota and admission authorities are installed.
-    Err(CapabilityError::AttenuationViolation(
-        "aggregate invocation budget enforcement is disabled".to_string(),
-    ))
+    Ok(())
 }
 
 pub(crate) fn admit_delegated_budget(
@@ -545,7 +540,7 @@ mod tests {
     }
 
     #[test]
-    fn aggregate_invocation_enforcement_disabled_rejects_portable_and_full_verification() {
+    fn aggregate_invocation_requires_negotiation_and_full_verification_accepts_rollout_profile() {
         let issuer = Keypair::generate();
         let clock = crate::FixedClock::new(150);
         let peer = CapabilityNegotiation::t1_default();
@@ -580,7 +575,7 @@ mod tests {
                 true,
             );
             let mut budgets = NoopBudgetRegistry;
-            let rollout_error = verify_capability_full(
+            let verified = verify_capability_full(
                 &token,
                 &[issuer.public_key()],
                 &clock,
@@ -589,13 +584,8 @@ mod tests {
                 &trust_roots,
                 &mut budgets,
             )
-            .expect_err("feature negotiation alone must not enable aggregate enforcement");
-            assert_eq!(
-                rollout_error,
-                CapabilityError::AttenuationViolation(
-                    "aggregate invocation budget enforcement is disabled".to_string()
-                )
-            );
+            .expect("negotiated full verification must accept the aggregate semantic");
+            assert_eq!(verified.id, token.id);
         }
 
         let mut tampered = aggregate_budget_token(&issuer, 0);

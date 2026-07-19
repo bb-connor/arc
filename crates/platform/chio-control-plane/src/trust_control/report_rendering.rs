@@ -1,6 +1,6 @@
 use super::cluster::{
     cluster_authority_lease_view, cluster_consensus_view, cluster_self_url, current_leader_url,
-    update_peer_failure, update_peer_reachable,
+    update_peer_failure,
 };
 use super::*;
 
@@ -66,6 +66,7 @@ pub(crate) fn json_response_with_leader_visibility_and_budget_commit<T: Serializ
 
 pub(crate) fn authority_snapshot_view(snapshot: AuthoritySnapshot) -> AuthoritySnapshotView {
     AuthoritySnapshotView {
+        observational_only: true,
         public_key_hex: snapshot.public_key_hex,
         generation: snapshot.generation,
         rotated_at: snapshot.rotated_at,
@@ -94,23 +95,6 @@ pub(crate) fn budget_cursor_view(cursor: BudgetCursor) -> BudgetCursorView {
         updated_at: cursor.updated_at,
         capability_id: cursor.capability_id,
         grant_index: cursor.grant_index,
-    }
-}
-
-pub(crate) fn authority_snapshot_from_view(view: AuthoritySnapshotView) -> AuthoritySnapshot {
-    AuthoritySnapshot {
-        public_key_hex: view.public_key_hex,
-        generation: view.generation,
-        rotated_at: view.rotated_at,
-        trusted_keys: view
-            .trusted_keys
-            .into_iter()
-            .map(|trusted_key| chio_kernel::AuthorityTrustedKeySnapshot {
-                public_key_hex: trusted_key.public_key_hex,
-                generation: trusted_key.generation,
-                activated_at: trusted_key.activated_at,
-            })
-            .collect(),
     }
 }
 
@@ -345,115 +329,6 @@ pub(crate) async fn forward_post_to_leader<B: Serialize>(
     Err(plain_http_error(
         StatusCode::SERVICE_UNAVAILABLE,
         "failed to forward control-plane write to cluster leader",
-    ))
-}
-
-pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
-    state: &TrustServiceState,
-    path: &str,
-    body: &B,
-) -> Result<Option<Response>, Response> {
-    let Some(self_url) = cluster_self_url(state) else {
-        return Ok(None);
-    };
-    let Some(consensus) = cluster_consensus_view(state) else {
-        return Ok(None);
-    };
-    if !consensus.has_quorum {
-        return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "cluster quorum is unavailable for authority writes",
-        ));
-    }
-    let Some(authority_lease) = cluster_authority_lease_view(state) else {
-        return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "cluster authority lease is unavailable for authority writes",
-        ));
-    };
-    if !authority_lease.lease_valid {
-        return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "cluster authority lease expired before authority write forwarding",
-        ));
-    }
-    let Some(mut leader_url) = consensus.leader_url else {
-        return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "cluster leader is unavailable for authority writes",
-        ));
-    };
-    let mut authority_term = authority_lease.term;
-    if leader_url == self_url {
-        return Ok(None);
-    }
-
-    for _ in 0..2 {
-        let client = service_runtime::client::build_cluster_peer_client(
-            &leader_url,
-            &state.config.service_token,
-            &self_url,
-        )
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
-        if let Ok(status) = client.cluster_status() {
-            update_peer_reachable(state, &leader_url);
-            if status.has_quorum && status.leader_url.as_deref() == Some(leader_url.as_str()) {
-                if let Some(lease) = status.authority_lease.as_ref() {
-                    if lease.lease_valid && lease.leader_url == leader_url {
-                        authority_term = lease.term;
-                    }
-                }
-            }
-        }
-        match client.post_internal_json::<_, Value>(path, body, Some(authority_term)) {
-            Ok(value) => return Ok(Some(Json(value).into_response())),
-            Err(error) => {
-                update_peer_failure(state, &leader_url, error.to_string());
-                let Some(next_consensus) = cluster_consensus_view(state) else {
-                    return Ok(None);
-                };
-                if !next_consensus.has_quorum {
-                    return Err(plain_http_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "cluster quorum is unavailable for authority writes",
-                    ));
-                }
-                let Some(next_leader) = next_consensus.leader_url else {
-                    return Err(plain_http_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "cluster leader is unavailable for authority writes",
-                    ));
-                };
-                if next_leader == self_url {
-                    return Ok(None);
-                }
-                let Some(next_authority_lease) = cluster_authority_lease_view(state) else {
-                    return Err(plain_http_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "cluster authority lease is unavailable for authority writes",
-                    ));
-                };
-                if !next_authority_lease.lease_valid {
-                    return Err(plain_http_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "cluster authority lease expired before authority write forwarding",
-                    ));
-                }
-                if next_leader == leader_url && next_authority_lease.term == authority_term {
-                    return Err(plain_http_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        &format!("failed to forward authority write to leader: {error}"),
-                    ));
-                }
-                leader_url = next_leader;
-                authority_term = next_authority_lease.term;
-            }
-        }
-    }
-
-    Err(plain_http_error(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "failed to forward authority write to cluster leader",
     ))
 }
 

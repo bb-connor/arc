@@ -1,5 +1,9 @@
 use super::super::cluster::{build_cluster_state, run_cluster_sync_loop};
+use super::super::cluster_replay::initialize_cluster_peer_replay_ledger;
 use super::super::*;
+use super::active_defense::{
+    TrustControlActiveDefenseRuntime, TrustControlActiveDefenseRuntimeConfig,
+};
 use super::router;
 use chio_http_serve::{
     apply_server_hygiene, run_until_drained, MaxConnListener, ServeHygieneConfig,
@@ -8,9 +12,36 @@ use chio_http_serve::{
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
+pub(crate) async fn serve_async(
+    config: TrustServiceConfig,
+    active_defense_config: TrustControlActiveDefenseRuntimeConfig,
+) -> Result<(), CliError> {
     config.validate()?;
     initialize_trust_service_storage(&config)?;
+    let authority_keyring = match (
+        config.authority_keyring_config_path.as_deref(),
+        config.authority_seed_path.as_deref(),
+    ) {
+        (Some(config_path), Some(seed_path)) => {
+            let (_, composition) =
+                crate::load_keyring_runtime_from_authority_seed(config_path, seed_path)?;
+            let receipt_path = config.receipt_db_path.as_deref().ok_or_else(|| {
+                CliError::cli_other_error(
+                    "keyring capability authority requires a durable receipt database".to_string(),
+                )
+            })?;
+            let receipt_store: Arc<dyn chio_kernel::ReceiptStore> =
+                Arc::new(SqliteReceiptStore::open(receipt_path)?);
+            composition.attach_receipt_store(receipt_store)?;
+            Some(composition)
+        }
+        (None, _) => None,
+        (Some(_), None) => {
+            return Err(CliError::cli_other_error(
+                "authority keyring configuration requires an authority seed".to_string(),
+            ));
+        }
+    };
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let enterprise_provider_registry = load_enterprise_provider_registry(
@@ -27,15 +58,32 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
         FederationAdmissionRateLimiter::from_memory_budget(&config.memory_budget),
     ));
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
-    let state = TrustServiceState {
+    let dashboard_report_bridge =
+        super::super::dashboard_reports::DashboardReportBridge::from_config(&config)?;
+    let mut state = TrustServiceState {
         config,
+        dashboard_sessions: super::super::dashboard_auth::DashboardSessionStore::production(),
+        dashboard_report_bridge,
+        authority_keyring,
+        #[cfg(test)]
+        authority_test_backend: None,
+        active_defense: super::TrustControlActiveDefenseService::disabled(),
         enterprise_provider_registry,
         verifier_policy_registry,
         federation_admission_rate_limiter,
+        authority_issuance_rotation_lock: Arc::new(Mutex::new(())),
         cluster,
         cluster_progress,
     };
     super::super::cluster::initialize_admission_consensus(&state)?;
+    let mut active_defense = TrustControlActiveDefenseRuntime::start(active_defense_config)
+        .await
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "trust control active-defense startup failed: {error}"
+            ))
+        })?;
+    state.active_defense = active_defense.service();
     let controller = ShutdownController::install();
     let cluster_sync_task = state
         .cluster
@@ -76,7 +124,11 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     };
     let router = apply_server_hygiene(router::build_router(state), &hygiene);
 
-    info!(listen_addr = %local_addr, "serving Chio trust control service");
+    info!(
+        listen_addr = %local_addr,
+        active_defense = active_defense.is_enabled(),
+        "serving Chio trust control service"
+    );
     eprintln!("Chio trust control service listening on http://{local_addr}");
 
     let listener = MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
@@ -108,12 +160,25 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
         let _ = tokio::time::timeout(join_budget, task).await;
     }
 
-    serve_result.map(|_outcome| ()).map_err(|error| {
-        CliError::cli_other_error(format!("trust control service failed: {error}"))
-    })
+    let active_defense_shutdown = active_defense.shutdown().await;
+    match (serve_result, active_defense_shutdown) {
+        (Ok(_), Ok(())) => Ok(()),
+        (Err(error), Ok(())) => Err(CliError::cli_other_error(format!(
+            "trust control service failed: {error}"
+        ))),
+        (Ok(_), Err(error)) => Err(CliError::cli_other_error(format!(
+            "trust control active-defense shutdown refused: {error}"
+        ))),
+        (Err(serve_error), Err(shutdown_error)) => Err(CliError::cli_other_error(format!(
+            "trust control service failed: {serve_error}; active-defense shutdown refused: {shutdown_error}"
+        ))),
+    }
 }
 
 fn initialize_trust_service_storage(config: &TrustServiceConfig) -> Result<(), CliError> {
+    if let Some(path) = config.cluster_replay_db_path.as_deref() {
+        initialize_cluster_peer_replay_ledger(path)?;
+    }
     match (
         config.authority_seed_path.as_deref(),
         config.authority_db_path.as_deref(),
@@ -132,7 +197,33 @@ fn initialize_trust_service_storage(config: &TrustServiceConfig) -> Result<(), C
         (None, None) => {}
     }
     if let Some(path) = config.receipt_db_path.as_deref() {
-        drop(SqliteReceiptStore::open(path)?);
+        let receipt_store = SqliteReceiptStore::open(path)?;
+        receipt_store
+            .ensure_causal_lineage_ready()
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "trust control causal-lineage authority is unavailable: {error}"
+                ))
+            })?;
+        receipt_store
+            .ensure_causal_lineage_fences_ready()
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "trust control causal-fence authority is unavailable: {error}"
+                ))
+            })?;
+        let security_store = SqliteSecurityStateStore::open(path).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "trust control issuance-freeze authority is unavailable: {error}"
+            ))
+        })?;
+        security_store
+            .ensure_issuance_freezes_ready()
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "trust control issuance-freeze authority is unavailable: {error}"
+                ))
+            })?;
     }
     Ok(())
 }

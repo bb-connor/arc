@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-failure-v1.schema.json",
+  "title": "Chio broker execute failure v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["diagnosticCode", "receiptReference", "receipt"],
+  "properties": {
+    "diagnosticCode": {
+      "type": "string",
+      "minLength": 6,
+      "maxLength": 128,
+      "pattern": "^chio\\.[a-z0-9._-]+$"
+    },
+    "receiptReference": {
+      "type": "string",
+      "minLength": 94,
+      "maxLength": 94,
+      "pattern": "^broker-failure-receipt-sha256-[0-9a-f]{64}$"
+    },
+    "receipt": { "$ref": "broker-execution-failure-receipt-envelope-v1.schema.json" }
+  }
+}

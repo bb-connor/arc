@@ -394,7 +394,7 @@ fn make_monetary_config() -> KernelConfig {
         keypair: make_keypair(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "monetary-policy-hash".to_string(),
+        policy_hash: "11".repeat(32),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -436,10 +436,26 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
     seed_store
         .record_capability_snapshot(&parent, None)
         .unwrap();
+    let aggregate_root =
+        chio_core::capability::aggregate_budget::verify_direct_aggregate_root_record(
+            &parent,
+            &[kernel.config.keypair.public_key()],
+        )
+        .unwrap();
+    let aggregate_root_id = parent.id.clone();
     drop(seed_store);
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
+    kernel.set_aggregate_family_root_resolver(std::sync::Arc::new(move |requested_id: &str| {
+        if requested_id == aggregate_root_id {
+            Ok(aggregate_root.clone())
+        } else {
+            Err(
+                chio_core::capability::aggregate_budget::AggregateFamilyRootResolutionError::Missing,
+            )
+        }
+    }));
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
@@ -1186,6 +1202,20 @@ fn make_governed_approval_token(
     .unwrap()
 }
 
+fn install_durable_legacy_governed_admission_authorities(kernel: &mut ChioKernel) {
+    kernel
+        .set_admission_operation_store_handle(std::sync::Arc::new(ProfiledTestStore::new(
+            AdmissionOperationStoreProfile::SingleNodeDurable,
+        )))
+        .expect("legacy governed operation store");
+    kernel
+        .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
+        .expect("legacy governed approval store");
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .expect("legacy governed budget store");
+}
+
 // --- Monetary enforcement tests ---
 
 #[derive(Clone)]
@@ -1310,7 +1340,9 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let kernel = std::sync::Arc::new(kernel);
@@ -1376,7 +1408,9 @@ async fn assert_post_dispatch_drop_cleanup_fault(
             kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
         }
         DropCleanupFailureSource::BudgetStore => {
-            kernel.set_budget_store_handle(std::sync::Arc::new(FailingReleaseBudgetStore::new()));
+            kernel
+                .set_budget_store_handle(std::sync::Arc::new(FailingReleaseBudgetStore::new()))
+                .expect("budget store");
         }
     }
     kernel.register_tool_server(Box::new(PendingMonetaryServer {

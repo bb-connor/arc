@@ -68,6 +68,7 @@ impl ChioScope {
 /// Uses minor-unit integers to avoid floating-point precision issues.
 /// For USD, 1 dollar = 100 units (cents). For JPY, 1 yen = 1 unit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MonetaryAmount {
     /// Amount in the currency's smallest unit (e.g. cents for USD).
     pub units: u64,

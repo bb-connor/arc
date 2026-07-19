@@ -4,6 +4,11 @@ use std::time::{Duration, Instant};
 use chio_bedrock_converse_adapter::{
     transport, BedrockAdapter, BedrockAdapterConfig, BEDROCK_CONVERSE_API_VERSION,
 };
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{ProviderError, ReceiptId, VerdictResult};
 use serde_json::json;
 use std::hint::black_box;
@@ -44,20 +49,58 @@ fn stream_bytes() -> Result<Vec<u8>, ProviderError> {
 }
 
 fn cold_adapter() -> Result<BedrockAdapter, ProviderError> {
+    let signer = Keypair::from_seed(&[70; 32]);
     let config = BedrockAdapterConfig::new(
         "bedrock-latency",
         "Bedrock Converse Latency",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "arn:aws:iam::123456789012:role/ChioLatencyBenchRole",
         "123456789012",
     )
     .with_assumed_role_session_arn(
         "arn:aws:sts::123456789012:assumed-role/ChioLatencyBenchRole/session-latency",
     );
-    BedrockAdapter::new(config, Arc::new(transport::MockTransport::new())).map_err(|error| {
-        ProviderError::Malformed(format!("Bedrock cold adapter init failed: {error}"))
-    })
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "lookup_policy".to_string(),
+            description: "Latency fixture tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).map_err(|error| {
+        ProviderError::Malformed(format!("Bedrock latency manifest signing failed: {error}"))
+    })?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| {
+            ProviderError::Malformed(format!(
+                "Bedrock latency manifest admission failed: {error}"
+            ))
+        })?;
+    BedrockAdapter::new_with_registry(config, Arc::new(transport::MockTransport::new()), &registry)
+        .map_err(|error| {
+            ProviderError::Malformed(format!("Bedrock cold adapter init failed: {error}"))
+        })
 }
 
 fn allow_verdict() -> VerdictResult {

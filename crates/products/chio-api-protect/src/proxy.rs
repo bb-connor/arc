@@ -32,11 +32,15 @@ use chio_core_types::receipt::{
     kinds::ToolOrigin, kinds::TrustLevel,
 };
 use chio_http_core::{
-    client_builder_with_contract, handle_batch_respond, handle_get_approval, handle_list_pending,
+    client_builder_with_contract, handle_append_threshold_approval_vote, handle_batch_respond,
+    handle_create_threshold_approval_proposal, handle_deliver_threshold_approval_response,
+    handle_get_approval, handle_get_threshold_approval_proposal, handle_list_pending,
     handle_respond, http_status_metadata_decision, http_status_metadata_final, send_with_contract,
-    ApprovalAdmin, ApprovalHandlerError, BatchRespondRequest, CallerIdentity, ChioHttpRequest,
-    EvaluateResponse, HealthResponse, HttpEgressContract, HttpMethod, HttpReceipt, HttpReceiptBody,
-    PendingQuery, RespondRequest, SidecarStatus, Verdict, VerifyReceiptResponse,
+    AppendThresholdApprovalVoteRequest, ApprovalAdmin, ApprovalHandlerError, BatchRespondRequest,
+    CallerIdentity, ChioHttpRequest, CreateThresholdApprovalProposalRequest,
+    DeliverThresholdApprovalResponseRequest, EvaluateResponse, HealthResponse, HttpEgressContract,
+    HttpMethod, HttpReceipt, HttpReceiptBody, PendingQuery, RespondRequest, SidecarStatus, Verdict,
+    VerifyReceiptResponse,
 };
 use chio_kernel::{ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore};
 use chio_openapi::{ChioExtensions, DefaultPolicy};
@@ -80,7 +84,9 @@ pub(crate) use self::scope_subset::*;
 pub(crate) use self::sidecar::*;
 pub(crate) use self::state::*;
 
-pub use self::config::{ProtectConfig, DEFAULT_UPSTREAM_REQUEST_TIMEOUT};
+pub use self::config::{
+    ProtectConfig, ThresholdApprovalCollectorConfig, DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
+};
 pub use self::state::ProtectProxy;
 
 #[cfg(test)]

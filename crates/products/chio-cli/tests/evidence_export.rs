@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chio_control_plane::persist_authority_keypair;
 use chio_core::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
@@ -573,7 +574,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
     // receipts without rewriting the importer's (empty) local history. The
     // share's federation-policy signer is a different key and is deliberately
     // NOT auto-trusted (that would be fail-open).
-    std::fs::write(&authority_seed_path, issuer.seed_hex()).expect("write authority seed");
+    persist_authority_keypair(&authority_seed_path, &issuer).expect("write authority seed");
 
     {
         let store =

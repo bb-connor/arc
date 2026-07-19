@@ -13,19 +13,19 @@
         "owners": {
           "type": "object",
           "maxProperties": 64,
-          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "propertyNames": { "$ref": "#/$defs/flowIdentifier" },
           "additionalProperties": {
             "type": "array",
             "maxItems": 256,
             "uniqueItems": true,
-            "items": { "$ref": "#/$defs/identifier" }
+            "items": { "$ref": "#/$defs/flowIdentifier" }
           }
         },
         "compartments": {
           "type": "array",
           "maxItems": 64,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/identifier" }
+          "items": { "$ref": "#/$defs/flowIdentifier" }
         }
       }
     },
@@ -39,7 +39,7 @@
     }
   ],
   "$defs": {
-    "identifier": {
+    "flowIdentifier": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,

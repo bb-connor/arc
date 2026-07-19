@@ -162,6 +162,35 @@ fn cancelled_task_metadata(authority_path: &str, message_stream: &str) -> Value 
     })
 }
 
+fn outcome_unknown_task_metadata(
+    authority_path: &str,
+    message_stream: &str,
+    reason: &str,
+) -> Value {
+    json!({
+        "chio": {
+            "receiptId": Value::Null,
+            "receipt": Value::Null,
+            "decision": "outcome_unknown",
+            "capabilityId": Value::Null,
+            "authorityPath": authority_path,
+            "authoritative": true,
+            "compatibilityOnly": false,
+            "claimEligible": false,
+            "receiptBearing": false,
+            "receiptPending": false,
+            "reason": reason,
+            "runtimeLifecycle": runtime_lifecycle_metadata(RuntimeLifecycleSurface::A2aAuthoritative),
+            "lifecycle": {
+                "messageSend": "blocking_terminal_task",
+                "messageStream": message_stream,
+                "taskGet": "supported",
+                "taskCancel": "supported"
+            }
+        }
+    })
+}
+
 fn kernel_output_to_parts(output: Option<&ToolCallOutput>) -> Vec<A2aPart> {
     match output {
         Some(ToolCallOutput::Value(value)) => result_to_parts(value),

@@ -1,0 +1,25 @@
+{
+  "id": "protocol-primitives",
+  "title": "Protocol budgets and threshold approvals fail closed",
+  "category": "protocol_primitives",
+  "driver": "artifact",
+  "fixture": "security-vector-protocol-primitives",
+  "specVersion": "chio-wire-v1",
+  "assertions": [
+    {
+      "name": "protocol_aggregate_multi_key_atomic_exhaustion",
+      "kind": "protocol_aggregate_multi_key_atomic_exhaustion",
+      "expectedBool": true
+    },
+    {
+      "name": "protocol_threshold_distinct_signers_required",
+      "kind": "protocol_threshold_distinct_signers_required",
+      "expectedBool": true
+    },
+    {
+      "name": "protocol_threshold_approval_replay_refused",
+      "kind": "protocol_threshold_approval_replay_refused",
+      "expectedBool": true
+    }
+  ]
+}

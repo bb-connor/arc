@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9d7b17b15b33f7dcc9d52da37c9fb906c57911cdfd78424c344f5ce58b160468
+# Schema sha256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,19 +12,19 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
 
 
-class ReceiptKind(Enum):
+class Algorithm(Enum):
     """
-    Signed semantic class for this v1 receipt.
+    Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.
     """
 
-    mediated_decision = "mediated_decision"
-    trace_observation = "trace_observation"
-    advisory_evaluation = "advisory_evaluation"
+    ed25519 = "ed25519"
+    p256 = "p256"
+    p384 = "p384"
 
 
 class BoundaryClass(Enum):
@@ -47,14 +47,14 @@ class ObservationOutcome(Enum):
     dropped = "dropped"
 
 
-class ToolOrigin(Enum):
+class ReceiptKind(Enum):
     """
-    Signed classification of where the tool effect executed relative to Chio.
+    Signed semantic class for this v1 receipt.
     """
 
-    caller_executed = "caller_executed"
-    host_executed_provider_reported = "host_executed_provider_reported"
-    host_executed_unmediated = "host_executed_unmediated"
+    mediated_decision = "mediated_decision"
+    trace_observation = "trace_observation"
+    advisory_evaluation = "advisory_evaluation"
 
 
 class RedactionMode(Enum):
@@ -67,6 +67,16 @@ class RedactionMode(Enum):
     redacted = "redacted"
 
 
+class ToolOrigin(Enum):
+    """
+    Signed classification of where the tool effect executed relative to Chio.
+    """
+
+    caller_executed = "caller_executed"
+    host_executed_provider_reported = "host_executed_provider_reported"
+    host_executed_unmediated = "host_executed_unmediated"
+
+
 class TrustLevel(Enum):
     """
     Strength of kernel mediation that produced this receipt. Must cohere with receipt_kind: mediated_decision uses mediated, trace_observation uses verified, and advisory_evaluation uses advisory.
@@ -77,56 +87,26 @@ class TrustLevel(Enum):
     advisory = "advisory"
 
 
-class Algorithm(Enum):
-    """
-    Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.
-    """
-
-    ed25519 = "ed25519"
-    p256 = "p256"
-    p384 = "p384"
+class ActorRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    actor_id: Annotated[str, Field(min_length=1)]
+    actor_kind: Annotated[str | None, Field(min_length=1)] = None
 
 
 class BbsReceiptSignature(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.receipt.bbs_signature.v1"] = Field(..., alias="schema")
-    projection_version: Literal["chio.bbs-projection.receipt.v1"]
     algorithm: Literal["bbs"]
     ciphersuite: Literal["BBS_BLS12381G1_XMD:SHA-256_SSWU_RO_"]
-    issuer_fingerprint: constr(pattern=r"^[A-Za-z0-9._:-]{1,128}$")
-    issuer_public_key_hex: constr(pattern=r"^[0-9a-f]{192}$")
+    issuer_fingerprint: Annotated[str, Field(pattern="^[A-Za-z0-9._:-]{1,128}$")]
+    issuer_public_key_hex: Annotated[str, Field(pattern="^[0-9a-f]{192}$")]
     message_count: Literal[14]
-    signature_hex: constr(pattern=r"^([0-9a-f]{2})+$")
-
-
-class ToolCallAction(BaseModel):
-    """
-    Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    parameters: Any = Field(
-        ...,
-        description="The parameters that were passed to the tool (or attempted). Free-form JSON value (mirrors `serde_json::Value`).",
-    )
-    parameter_hash: constr(pattern=r"^[0-9a-f]{64}$") = Field(
-        ..., description="SHA-256 hex hash of the canonical JSON of `parameters`."
-    )
-
-
-class Decision1(BaseModel):
-    """
-    The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    verdict: Literal["allow"]
+    projection_version: Literal["chio.bbs-projection.receipt.v1"]
+    schema_: Annotated[Literal["chio.receipt.bbs_signature.v1"], Field(alias="schema")]
+    signature_hex: Annotated[str, Field(pattern="^([0-9a-f]{2})+$")]
 
 
 class Decision2(BaseModel):
@@ -137,11 +117,7 @@ class Decision2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    verdict: Literal["deny"]
-    reason: str = Field(..., description="Human-readable reason for the denial.")
-    guard: str = Field(
-        ..., description="The guard or validation step that triggered the denial."
-    )
+    verdict: Literal["allow"]
 
 
 class Decision3(BaseModel):
@@ -152,8 +128,12 @@ class Decision3(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    verdict: Literal["cancelled"]
-    reason: str = Field(..., description="Human-readable reason for the cancellation.")
+    guard: Annotated[
+        str,
+        Field(description="The guard or validation step that triggered the denial."),
+    ]
+    reason: Annotated[str, Field(description="Human-readable reason for the denial.")]
+    verdict: Literal["deny"]
 
 
 class Decision4(BaseModel):
@@ -164,17 +144,34 @@ class Decision4(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    reason: Annotated[
+        str, Field(description="Human-readable reason for the cancellation.")
+    ]
+    verdict: Literal["cancelled"]
+
+
+class Decision5(BaseModel):
+    """
+    The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    reason: Annotated[
+        str,
+        Field(description="Human-readable reason for the incomplete terminal state."),
+    ]
     verdict: Literal["incomplete"]
-    reason: str = Field(
-        ..., description="Human-readable reason for the incomplete terminal state."
-    )
 
 
-class Decision(RootModel[Decision1 | Decision2 | Decision3 | Decision4]):
-    root: Decision1 | Decision2 | Decision3 | Decision4 = Field(
-        ...,
-        description='The Kernel\'s verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).',
-    )
+class Decision(RootModel[Decision2 | Decision3 | Decision4 | Decision5]):
+    root: Annotated[
+        Decision2 | Decision3 | Decision4 | Decision5,
+        Field(
+            description='The Kernel\'s verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).'
+        ),
+    ]
 
 
 class GuardEvidence(BaseModel):
@@ -185,23 +182,41 @@ class GuardEvidence(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    guard_name: constr(min_length=1) = Field(
-        ..., description="Name of the guard (e.g. `ForbiddenPathGuard`)."
-    )
-    verdict: bool = Field(
-        ..., description="Whether the guard passed (true) or denied (false)."
-    )
-    details: str | None = Field(
-        None, description="Optional details about the guard's decision."
-    )
+    details: Annotated[
+        str | None, Field(description="Optional details about the guard's decision.")
+    ] = None
+    guard_name: Annotated[
+        str,
+        Field(
+            description="Name of the guard (e.g. `ForbiddenPathGuard`).", min_length=1
+        ),
+    ]
+    verdict: Annotated[
+        bool, Field(description="Whether the guard passed (true) or denied (false).")
+    ]
 
 
-class ActorRef(BaseModel):
+class ToolCallAction(BaseModel):
+    """
+    Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
+    """
+
     model_config = ConfigDict(
         extra="forbid",
     )
-    actor_id: constr(min_length=1)
-    actor_kind: constr(min_length=1) | None = None
+    parameter_hash: Annotated[
+        str,
+        Field(
+            description="SHA-256 hex hash of the canonical JSON of `parameters`.",
+            pattern="^[0-9a-f]{64}$",
+        ),
+    ]
+    parameters: Annotated[
+        Any,
+        Field(
+            description="The parameters that were passed to the tool (or attempted). Free-form JSON value (mirrors `serde_json::Value`)."
+        ),
+    ]
 
 
 class ChioReceiptRecord(BaseModel):
@@ -212,82 +227,137 @@ class ChioReceiptRecord(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    id: constr(pattern=r"^[0-9a-f]{64}$", min_length=1) = Field(
-        ..., description="Authoritative content-addressed receipt id."
-    )
-    timestamp: conint(ge=0) = Field(
-        ..., description="Unix timestamp (seconds) when the receipt was created."
-    )
-    capability_id: constr(min_length=1) = Field(
-        ..., description="ID of the capability token that was exercised (or presented)."
-    )
-    tool_server: constr(min_length=1) = Field(
-        ..., description="Tool server that handled the invocation."
-    )
-    tool_name: constr(min_length=1) = Field(
-        ..., description="Tool that was invoked (or attempted)."
-    )
     action: ToolCallAction
+    actor_chain: Annotated[
+        list[ActorRef] | None,
+        Field(
+            description="Signed actor attribution chain. Omitted from the wire when empty."
+        ),
+    ] = None
+    algorithm: Annotated[
+        Algorithm | None,
+        Field(
+            description="Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field."
+        ),
+    ] = None
+    bbs_projection_version: Annotated[
+        Literal["chio.bbs-projection.receipt.v1"] | None,
+        Field(
+            description="Receipt-body BBS projection version bound into the receipt id when bbs_signature is present."
+        ),
+    ] = None
+    bbs_signature: Annotated[
+        BbsReceiptSignature | None,
+        Field(
+            description="Optional BBS signature material for selective disclosure. When present, the Ed25519 receipt signature covers this material through ChioReceiptSigningBody."
+        ),
+    ] = None
+    boundary_class: Annotated[
+        BoundaryClass,
+        Field(
+            description="Signed runtime boundary class. `cannot_see` is planning metadata only and is not valid on signed runtime receipts."
+        ),
+    ]
+    capability_id: Annotated[
+        str,
+        Field(
+            description="ID of the capability token that was exercised (or presented).",
+            min_length=1,
+        ),
+    ]
+    content_hash: Annotated[
+        str,
+        Field(
+            description="SHA-256 hex hash of the evaluated content for this receipt.",
+            pattern="^[0-9a-f]{64}$",
+        ),
+    ]
     decision: Decision | None = None
-    receipt_kind: ReceiptKind = Field(
-        ..., description="Signed semantic class for this v1 receipt."
-    )
-    boundary_class: BoundaryClass = Field(
-        ...,
-        description="Signed runtime boundary class. `cannot_see` is planning metadata only and is not valid on signed runtime receipts.",
-    )
-    observation_outcome: ObservationOutcome | None = Field(
-        None,
-        description="Signed outcome for trace and advisory records. Omitted for mediated decisions.",
-    )
-    tool_origin: ToolOrigin = Field(
-        ...,
-        description="Signed classification of where the tool effect executed relative to Chio.",
-    )
-    redaction_mode: RedactionMode = Field(
-        ..., description="Signed redaction mode applied to receipt details."
-    )
-    actor_chain: list[ActorRef] | None = Field(
-        None,
-        description="Signed actor attribution chain. Omitted from the wire when empty.",
-    )
-    content_hash: constr(pattern=r"^[0-9a-f]{64}$") = Field(
-        ..., description="SHA-256 hex hash of the evaluated content for this receipt."
-    )
-    policy_hash: constr(min_length=1) = Field(
-        ...,
-        description="SHA-256 hash (or symbolic identifier) of the policy that was applied. Mirrors the `String` shape on `ChioReceipt::policy_hash` rather than enforcing a hex pattern, since some deployments embed a symbolic version id (e.g. `policy-bindings-v1`) rather than a raw digest.",
-    )
-    evidence: list[GuardEvidence] | None = Field(
-        None,
-        description='Per-guard evidence collected during evaluation. Omitted from the wire when empty (matches `#[serde(skip_serializing_if = "Vec::is_empty")]`).',
-    )
-    metadata: Any | None = Field(
-        None,
-        description="Optional receipt metadata for stream/accounting/financial details. Schema-less by design (mirrors `Option<serde_json::Value>`).",
-    )
-    trust_level: TrustLevel = Field(
-        ...,
-        description="Strength of kernel mediation that produced this receipt. Must cohere with receipt_kind: mediated_decision uses mediated, trace_observation uses verified, and advisory_evaluation uses advisory.",
-    )
-    tenant_id: constr(min_length=1) | None = Field(
-        None,
-        description="Tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields.",
-    )
-    bbs_projection_version: Literal["chio.bbs-projection.receipt.v1"] | None = Field(
-        None,
-        description="Receipt-body BBS projection version bound into the receipt id when bbs_signature is present.",
-    )
-    kernel_key: constr(
-        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
-    ) = Field(
-        ...,
-        description="Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/core/chio-core-types/src/crypto.rs`.",
-    )
-    bbs_signature: BbsReceiptSignature | None = Field(
-        None,
-        description="Optional BBS signature material for selective disclosure. When present, the Ed25519 receipt signature covers this material through ChioReceiptSigningBody.",
-    )
+    evidence: Annotated[
+        list[GuardEvidence] | None,
+        Field(
+            description='Per-guard evidence collected during evaluation. Omitted from the wire when empty (matches `#[serde(skip_serializing_if = "Vec::is_empty")]`).'
+        ),
+    ] = None
+    id: Annotated[
+        str,
+        Field(
+            description="Authoritative content-addressed receipt id.",
+            min_length=1,
+            pattern="^[0-9a-f]{64}$",
+        ),
+    ]
+    kernel_key: Annotated[
+        str,
+        Field(
+            description="Kernel public key (for verification without out-of-band lookup). Bare 64-char lowercase hex string for Ed25519, `p256:<130-char hex>` for uncompressed SEC1 P-256 (65 bytes; leading byte `0x04`), or `p384:<194-char hex>` for uncompressed SEC1 P-384 (97 bytes; leading byte `0x04`). Anything outside these length classes is rejected at decode time by `PublicKey::from_hex` in `crates/core/chio-core-types/src/crypto.rs`.",
+            pattern="^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+        ),
+    ]
+    metadata: Annotated[
+        Any | None,
+        Field(
+            description="Optional receipt metadata for stream/accounting/financial details. Schema-less by design (mirrors `Option<serde_json::Value>`)."
+        ),
+    ] = None
+    observation_outcome: Annotated[
+        ObservationOutcome | None,
+        Field(
+            description="Signed outcome for trace and advisory records. Omitted for mediated decisions."
+        ),
+    ] = None
+    policy_hash: Annotated[
+        str,
+        Field(
+            description="SHA-256 hash (or symbolic identifier) of the policy that was applied. Mirrors the `String` shape on `ChioReceipt::policy_hash` rather than enforcing a hex pattern, since some deployments embed a symbolic version id (e.g. `policy-bindings-v1`) rather than a raw digest.",
+            min_length=1,
+        ),
+    ]
+    receipt_kind: Annotated[
+        ReceiptKind, Field(description="Signed semantic class for this v1 receipt.")
+    ]
+    redaction_mode: Annotated[
+        RedactionMode,
+        Field(description="Signed redaction mode applied to receipt details."),
+    ]
+    signature: Annotated[
+        str,
+        Field(
+            description="Hex-encoded signature over canonical JSON of ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/core/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
+            pattern="^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$",
+        ),
+    ]
+    tenant_id: Annotated[
+        str | None,
+        Field(
+            description="Tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields.",
+            min_length=1,
+        ),
+    ] = None
+    timestamp: Annotated[
+        int,
+        Field(
+            description="Unix timestamp (seconds) when the receipt was created.", ge=0
+        ),
+    ]
+    tool_name: Annotated[
+        str, Field(description="Tool that was invoked (or attempted).", min_length=1)
+    ]
+    tool_origin: Annotated[
+        ToolOrigin,
+        Field(
+            description="Signed classification of where the tool effect executed relative to Chio."
+        ),
+    ]
+    tool_server: Annotated[
+        str, Field(description="Tool server that handled the invocation.", min_length=1)
+    ]
+    trust_level: Annotated[
+        TrustLevel,
+        Field(
+            description="Strength of kernel mediation that produced this receipt. Must cohere with receipt_kind: mediated_decision uses mediated, trace_observation uses verified, and advisory_evaluation uses advisory."
+        ),
+    ]
 
     @model_validator(mode="after")
     def _validate_bbs_pairing(self) -> "ChioReceiptRecord":
@@ -298,14 +368,3 @@ class ChioReceiptRecord(BaseModel):
                 "bbs_projection_version and bbs_signature must be present together"
             )
         return self
-
-    algorithm: Algorithm | None = Field(
-        None,
-        description="Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.",
-    )
-    signature: constr(pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$") = (
-        Field(
-            ...,
-            description="Hex-encoded signature over canonical JSON of ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/core/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.",
-        )
-    )

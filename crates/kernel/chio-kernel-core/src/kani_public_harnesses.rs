@@ -18,10 +18,11 @@ use crate::capability_verify::CapabilityError;
 use crate::clock::FixedClock;
 use crate::evaluate::EvaluateInput;
 use crate::formal_core::{
-    admit_quota_maximum, authorize_composite_quotas, family_binding_is_preserved,
-    guard_pipeline_allows, monetary_cap_is_subset_by_parts, optional_u32_cap_is_subset,
-    receipt_fields_coupled, required_true_is_preserved, revocation_snapshot_denies,
-    time_window_valid, validate_threshold_signers, FamilyBindingPreservation, GuardStep,
+    admit_quota_maximum, authorize_composite_quotas, capture_invocation_count,
+    family_binding_is_preserved, guard_pipeline_allows, monetary_cap_is_subset_by_parts,
+    optional_u32_cap_is_subset, receipt_fields_coupled, required_true_is_preserved,
+    reserve_replay_fingerprint, revocation_snapshot_denies, time_window_valid,
+    validate_threshold_signers, FamilyBindingPreservation, GuardStep,
 };
 use crate::guard::PortableToolCallRequest;
 use crate::normalized::{NormalizedOperation, NormalizedScope, NormalizedToolGrant};
@@ -1324,6 +1325,48 @@ pub fn verify_quota_maximum_immutable() {
     } else {
         assert!(result.accepted);
         assert_eq!(result.maximum, presented_maximum);
+    }
+}
+
+#[kani::proof]
+pub fn verify_captured_invocation_count_monotonic() {
+    let count = kani::any::<u32>();
+    let maximum = kani::any::<u32>();
+
+    let result = capture_invocation_count(count, maximum);
+    if result.accepted {
+        assert!(result.count > count);
+        assert_eq!(result.count, count + 1);
+        assert!(result.count <= maximum);
+    } else {
+        assert_eq!(result.count, count);
+    }
+}
+
+#[kani::proof]
+pub fn verify_replay_fingerprint_uniqueness() {
+    let fingerprints = kani::any::<[u8; 4]>();
+    let count = kani::any::<u8>();
+    let candidate = kani::any::<u8>();
+
+    let result = reserve_replay_fingerprint(fingerprints, count, candidate);
+    if result.accepted {
+        assert!(count < 4);
+        assert_eq!(result.count, count + 1);
+        assert_eq!(result.fingerprints[usize::from(count)], candidate);
+
+        let mut left = 0_usize;
+        while left < usize::from(result.count) {
+            let mut right = left + 1;
+            while right < usize::from(result.count) {
+                assert_ne!(result.fingerprints[left], result.fingerprints[right]);
+                right += 1;
+            }
+            left += 1;
+        }
+    } else {
+        assert_eq!(result.fingerprints, fingerprints);
+        assert_eq!(result.count, count);
     }
 }
 

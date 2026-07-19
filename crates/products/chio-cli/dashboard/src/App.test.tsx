@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { act } from 'react'
-import { createRoot } from 'react-dom/client'
-import { describe, expect, it, vi } from 'vitest'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   fetchProofRoomFixtureBundle,
@@ -11,16 +11,27 @@ import {
 import App from './App'
 import { sha256Hex } from './proofRoomArtifactEvidence'
 
+const mountedRoots = new Set<Root>()
+
 async function renderIntoDocument(node: ReactNode): Promise<HTMLDivElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
+  mountedRoots.add(root)
   await act(async () => {
     root.render(node)
     await Promise.resolve()
   })
   return container
 }
+
+afterEach(() => {
+  act(() => {
+    for (const root of mountedRoots) root.unmount()
+    mountedRoots.clear()
+  })
+  vi.useRealTimers()
+})
 
 function bytesToHex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes))
@@ -118,6 +129,35 @@ function jsonResponse(
     [mockJsonBody]: body,
     json: async () => body,
   }
+}
+
+function dashboardSessionResponse(
+  observability = false,
+  expiresAt = Math.floor(Date.now() / 1000) + 900,
+): MockJsonResponse {
+  return jsonResponse({
+    authenticated: true,
+    expiresAt,
+    relayReports: {
+      observability,
+      alerts: false,
+      trends: false,
+      alertHandoff: false,
+      alertDelivery: false,
+      alertAssurance: false,
+      alertAssuranceExport: false,
+      alertAssuranceReplay: false,
+      alertAssuranceRetention: false,
+      alertAssuranceArchive: false,
+      alertAssuranceCloseout: false,
+      alertAssuranceArchivePackage: false,
+      alertAssuranceArchiveExtraction: false,
+      alertAssurancePhysicalArchive: false,
+      alertAssuranceRetentionHandoff: false,
+      alertAssuranceArchiveRestoreDrill: false,
+      alertAssuranceExternalRetentionReview: false,
+    },
+  })
 }
 
 function textResponse(body: string, init: { ok?: boolean; status?: number; statusText?: string } = {}) {
@@ -437,9 +477,8 @@ function servedProofRoomRoutesWithVerifierRoots(): Record<string, MockFetchRoute
 }
 
 describe('App operator paths', () => {
-  it('keeps Proof Room mode when token cleanup strips the URL secret', async () => {
-    sessionStorage.clear()
-    window.history.replaceState({}, '', '/?view=proof-room&token=proof-room-token')
+  it('keeps Proof Room independent from dashboard sessions', async () => {
+    window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch(servedProofRoomRoutes('served-proof-room', 'single-call-authority'))
 
     const container = await renderIntoDocument(<App />)
@@ -447,7 +486,10 @@ describe('App operator paths', () => {
 
     expect(container.textContent).toContain('Chio Proof Room')
     expect(container.textContent).not.toContain('Chio Receipt Dashboard')
-    expect(window.location.search).toBe('?view=proof-room')
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      '/v1/dashboard/session',
+      expect.anything(),
+    )
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringMatching(/^\/v1\/receipts\/query/),
       expect.anything(),
@@ -455,7 +497,6 @@ describe('App operator paths', () => {
   })
 
   it('renders static Proof Room data without bearer token prompts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch({
       '/manifest.json': jsonResponse({
@@ -701,7 +742,6 @@ describe('App operator paths', () => {
   })
 
   it('renders first-run Proof Room fixture bundles from the catalog', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch({
       ...servedProofRoomRoutes('served-proof-room', 'served'),
@@ -803,7 +843,6 @@ describe('App operator paths', () => {
   })
 
   it('renders selected failed fixture verifier reports from the Proof Room catalog', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch({
       ...servedProofRoomRoutes(),
@@ -866,7 +905,6 @@ describe('App operator paths', () => {
   })
 
   it('renders selected domain fixture verifier reports from the Proof Room catalog', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes(),
@@ -1101,7 +1139,6 @@ describe('App operator paths', () => {
   })
 
   it('renders selected catalog transaction fixture in the main Proof Room evidence view', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch({
       ...servedProofRoomRoutes(),
@@ -1283,7 +1320,6 @@ describe('App operator paths', () => {
   })
 
   it('renders rejected workflow preflight checks from the Proof Room catalog', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes(),
@@ -1340,7 +1376,6 @@ describe('App operator paths', () => {
   })
 
   it('renders minimal transaction Proof Room data backed by the transaction verifier report', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch({
       '/manifest.json': jsonResponse({
@@ -1407,7 +1442,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a served Proof Room fixture catalog with an unsupported schema', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes(),
@@ -1425,7 +1459,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound runtime enforcement evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const executionLeaseJson = JSON.stringify({
       schema: 'chio.runtime.execution-lease.v1',
@@ -1625,7 +1658,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound risk comptroller details from the Proof Room artifact', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const riskReportJson = JSON.stringify({
       schema: 'chio.risk.comptroller-report.v1',
@@ -1770,7 +1802,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects served risk comptroller reports with unsupported schema', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const riskReportJson = JSON.stringify({
       schema: 'chio.risk.unregistered-comptroller-report.v1',
@@ -1851,7 +1882,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound enterprise export evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const exportBundleJson = JSON.stringify({
       schema: 'chio.enterprise.evidence-export-bundle.v1',
@@ -2119,7 +2149,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound Trust Market context from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const discoveryJson = JSON.stringify({
       schema: 'chio.commerce.provider-discovery-snapshot.v1',
@@ -2464,7 +2493,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound commerce order evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const orderContextJson = JSON.stringify({
       schema: 'chio.commerce.order-context.v1',
@@ -2634,7 +2662,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound public settlement proof evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const settlementProofJson = JSON.stringify({
       schema: 'chio.web3-settlement-proof-bundle.v1',
@@ -2852,7 +2879,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound disclosure lineage evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const disclosureCapsuleJson = JSON.stringify({
       schema: 'chio.disclosure.capsule.v1',
@@ -3051,7 +3077,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound crypto context evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const verificationContextJson = JSON.stringify({
       schema: 'chio.crypto.verification-context.v1',
@@ -3296,7 +3321,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound swarm authority evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const taskGraphJson = JSON.stringify({
       schema: 'chio.swarm.task-graph.v1',
@@ -3609,7 +3633,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound workflow preflight planning evidence from Proof Room artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const preflightPlanJson = JSON.stringify({
       schema: 'chio.workflow.preflight-plan.v1',
@@ -3760,7 +3783,6 @@ describe('App operator paths', () => {
   })
 
   it('renders manifest-bound Agent Web projection evidence without treating external authority as Chio authority', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const agentWebEnvelopeJson = JSON.stringify({
       schema: 'chio.agent-web-proof-envelope.v1',
@@ -3904,7 +3926,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects served Agent Web projection manifests with unsupported schema', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const agentWebEnvelopeJson = JSON.stringify({
       schema: 'chio.agent-web-proof-envelope.v1',
@@ -4006,7 +4027,6 @@ describe('App operator paths', () => {
   })
 
   it('renders served Proof Room data from the manifest report reference', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch({
       '/manifest.json': jsonResponse({
@@ -4161,7 +4181,6 @@ describe('App operator paths', () => {
   })
 
   it('renders failed Proof Room claim paths from the verifier report', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       '/manifest.json': jsonResponse({
@@ -4227,7 +4246,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects served Proof Room data when the verifier report digest does not match the manifest', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const verifierReportJson = JSON.stringify({
       schema: 'chio.transaction.verifier-report.v1',
@@ -4288,7 +4306,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects served Proof Room data when the load report digest does not match the manifest', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const verifierReportJson = JSON.stringify({
       schema: 'chio.transaction.verifier-report.v1',
@@ -4360,7 +4377,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects served Proof Room data when the load report verifies a claim absent from the verifier report', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       '/manifest.json': jsonResponse({
@@ -4425,7 +4441,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room report set without verifier root artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutes('served-proof-room', 'single-call-authority', 'served-report-digest', {
       passport_id: 'served-passport',
@@ -4537,7 +4552,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle when server upload verification fails', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const fetchMock = mockFetch({
       ...servedProofRoomRoutesWithVerifierRoots(),
@@ -4577,7 +4591,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle when a manifest-bound verifier root digest does not match', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       '/manifest.json': jsonResponse({
@@ -4740,7 +4753,6 @@ describe('App operator paths', () => {
   })
 
   it('loads a selected Proof Room bundle from the manifest report reference', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes('served-proof-room', 'single-call-authority'),
@@ -4874,7 +4886,6 @@ describe('App operator paths', () => {
   })
 
   it('allows selected Proof Room bundle upload when the served bundle fails to load', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       '/manifest.json': jsonResponse(null, {
@@ -4991,7 +5002,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects selected Proof Room bundle manifest paths that escape the bundle root', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes('served-proof-room', 'single-call-authority'),
@@ -5114,7 +5124,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects selected Proof Room claims backed only by unmanifested artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes('served-proof-room', 'single-call-authority'),
@@ -5227,7 +5236,6 @@ describe('App operator paths', () => {
   })
 
   it('renders selected bundle risk comptroller details from an uploaded manifest artifact', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes('served-proof-room', 'single-call-authority'),
@@ -5388,7 +5396,6 @@ describe('App operator paths', () => {
   })
 
   it('renders selected bundle Agent Web projection evidence from uploaded manifest artifacts', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes('served-proof-room', 'single-call-authority'),
@@ -5549,7 +5556,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room load report whose bytes do not match the manifest digest', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch({
       ...servedProofRoomRoutes('served-proof-room', 'single-call-authority'),
@@ -5650,7 +5656,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle when its detached signature is missing from the manifest', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -5756,7 +5761,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle with an unsafe excluded artifact path', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -5869,7 +5873,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle when its detached signature file is missing', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -5979,7 +5982,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle when its detached signature payload digest is wrong', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6103,7 +6105,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle when its detached signature is forged', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6228,7 +6229,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle signed outside its trust roots', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6392,7 +6392,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle trusted only by uploaded trust roots', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6535,7 +6534,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room bundle with mismatched negative-case evidence', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6648,7 +6646,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room load report that is not bound to the manifest', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6729,7 +6726,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room verifier report whose bytes do not match the manifest digest', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6823,7 +6819,6 @@ describe('App operator paths', () => {
   })
 
   it('rejects a selected Proof Room load report that renders an unbacked claim', async () => {
-    sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     mockFetch(servedProofRoomRoutesWithVerifierRoots())
 
@@ -6915,25 +6910,340 @@ describe('App operator paths', () => {
     expect(container.textContent).not.toContain('claim.proof_room.invented_ui_claim')
   })
 
-  it('shows token guidance before issuing unauthenticated queries', async () => {
-    sessionStorage.clear()
+  it('shows the transient credential form before issuing dashboard queries', async () => {
     window.history.replaceState({}, '', '/')
-    const fetchMock = vi.fn()
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+    })
     vi.stubGlobal('fetch', fetchMock)
 
     const container = await renderIntoDocument(<App />)
-    await waitForText(container, 'Bearer token required')
+    await waitForText(container, 'Dashboard credential required')
 
-    expect(container.textContent).toContain('Bearer token required')
-    expect(container.textContent).toContain('Provide a trust-control bearer token via')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Dashboard credential required')
+    expect(container.querySelector('input[type="password"]')).not.toBeNull()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/dashboard/session',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^\/v1\/receipts\/query/),
+      expect.anything(),
+    )
+  })
+
+  it('unmounts dashboard data when the server session deadline passes', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2027-01-15T12:00:00Z'))
+    window.history.replaceState({}, '', '/')
+    const expiresAt = Math.floor(Date.now() / 1000) + 1
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      if (url === '/v1/dashboard/session') {
+        return Promise.resolve(dashboardSessionResponse(false, expiresAt))
+      }
+      if (url.startsWith('/v1/receipts/query')) {
+        return Promise.resolve(jsonResponse({
+          totalCount: 0,
+          nextCursor: null,
+          receipts: [],
+        }))
+      }
+      if (url.startsWith('/v1/reports/operator')) {
+        return Promise.resolve({ ok: false, status: 503, statusText: 'Unavailable' })
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`))
+    }))
+
+    const container = await renderIntoDocument(<App />)
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(container.querySelector('.app-body')).not.toBeNull()
+
+    act(() => {
+      vi.advanceTimersByTime(1_000)
+    })
+
+    expect(container.querySelector('.app-body')).toBeNull()
+    expect(container.textContent).toContain('Dashboard credential required')
+    expect(container.textContent).toContain('Dashboard session expired. Sign in again.')
+    expect(container.textContent).not.toContain('Sign out')
+  })
+
+  it('does not let a stale session recheck restore data after the deadline', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2027-01-15T12:00:00Z'))
+    window.history.replaceState({}, '', '/')
+    const expiresAt = Math.floor(Date.now() / 1000) + 1
+    let sessionChecks = 0
+    let resolveRecheck: ((response: MockJsonResponse) => void) | undefined
+    const pendingRecheck = new Promise<MockJsonResponse>((resolve) => {
+      resolveRecheck = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      if (url === '/v1/dashboard/session') {
+        sessionChecks += 1
+        return sessionChecks === 1
+          ? Promise.resolve(dashboardSessionResponse(false, expiresAt))
+          : pendingRecheck
+      }
+      if (url.startsWith('/v1/receipts/query')) {
+        return Promise.resolve(jsonResponse({
+          totalCount: 0,
+          nextCursor: null,
+          receipts: [],
+        }))
+      }
+      if (url.startsWith('/v1/reports/operator')) {
+        return Promise.resolve({ ok: false, status: 503, statusText: 'Unavailable' })
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`))
+    }))
+
+    const container = await renderIntoDocument(<App />)
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(container.querySelector('.app-body')).not.toBeNull()
+
+    act(() => {
+      window.dispatchEvent(new Event('pageshow'))
+    })
+    expect(container.textContent).toContain('Checking dashboard access...')
+
+    act(() => {
+      vi.advanceTimersByTime(1_000)
+    })
+    await act(async () => {
+      resolveRecheck?.(dashboardSessionResponse(false, expiresAt + 900))
+      await Promise.resolve()
+    })
+
+    expect(sessionChecks).toBe(2)
+    expect(container.querySelector('.app-body')).toBeNull()
+    expect(container.textContent).toContain('Dashboard session expired. Sign in again.')
+  })
+
+  it('rechecks an authenticated session when a visible page is restored', async () => {
+    window.history.replaceState({}, '', '/')
+    const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+    let sessionChecks = 0
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      if (url === '/v1/dashboard/session') {
+        sessionChecks += 1
+        return Promise.resolve(sessionChecks < 3
+          ? dashboardSessionResponse()
+          : { ok: false, status: 401, statusText: 'Unauthorized' })
+      }
+      if (url.startsWith('/v1/receipts/query')) {
+        return Promise.resolve(jsonResponse({
+          totalCount: 0,
+          nextCursor: null,
+          receipts: [],
+        }))
+      }
+      if (url.startsWith('/v1/reports/operator')) {
+        return Promise.resolve({ ok: false, status: 503, statusText: 'Unavailable' })
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      const container = await renderIntoDocument(<App />)
+      await waitForText(container, 'No receipts found')
+
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(sessionChecks).toBe(2)
+      expect(container.querySelector('.app-body')).not.toBeNull()
+
+      await act(async () => {
+        window.dispatchEvent(new Event('pageshow'))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(sessionChecks).toBe(3)
+      expect(container.querySelector('.app-body')).toBeNull()
+      expect(container.textContent).toContain('Dashboard session expired. Sign in again.')
+    } finally {
+      if (visibilityDescriptor) {
+        Object.defineProperty(document, 'visibilityState', visibilityDescriptor)
+      } else {
+        Reflect.deleteProperty(document, 'visibilityState')
+      }
+    }
+  })
+
+  it('rejects a session response that does not assert authentication', async () => {
+    window.history.replaceState({}, '', '/')
+    const validSession = dashboardSessionResponse()[mockJsonBody] as {
+      relayReports: unknown
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      authenticated: false,
+      expiresAt: Math.floor(Date.now() / 1000) + 900,
+      relayReports: validSession.relayReports,
+    })))
+
+    const container = await renderIntoDocument(<App />)
+    await waitForText(container, 'Dashboard credential required')
+
+    expect(container.querySelector('.app-body')).toBeNull()
+    expect(container.textContent).toContain('Dashboard session expired. Sign in again.')
+  })
+
+  it('clears the submitted credential and signs out through the session endpoint', async () => {
+    window.history.replaceState({}, '', '/')
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/v1/dashboard/session' && init?.method === 'POST') {
+        return Promise.resolve(dashboardSessionResponse())
+      }
+      if (url === '/v1/dashboard/session' && init?.method === 'DELETE') {
+        return Promise.resolve({ ok: true, status: 204 })
+      }
+      if (url === '/v1/dashboard/session') {
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+        })
+      }
+      if (url.startsWith('/v1/receipts/query')) {
+        return Promise.resolve(jsonResponse({
+          totalCount: 0,
+          nextCursor: null,
+          receipts: [],
+        }))
+      }
+      if (url.startsWith('/v1/reports/operator')) {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          statusText: 'Unavailable',
+        })
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const container = await renderIntoDocument(<App />)
+    await waitForText(container, 'Dashboard credential required')
+    const input = container.querySelector('input[type="password"]')
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error('missing dashboard credential input')
+    }
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set
+    if (!valueSetter) {
+      throw new Error('missing native input value setter')
+    }
+    await act(async () => {
+      valueSetter.call(input, 'transient-dashboard-secret')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const form = input.closest('form')
+    if (!(form instanceof HTMLFormElement)) {
+      throw new Error('missing dashboard credential form')
+    }
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })
+    await waitForText(container, 'No receipts found')
+
+    expect(container.textContent).not.toContain('transient-dashboard-secret')
+    expect(container.querySelector('input[type="password"]')).toBeNull()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/dashboard/session',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ token: 'transient-dashboard-secret' }),
+        credentials: 'same-origin',
+      }),
+    )
+
+    await act(async () => {
+      buttonWithText(container, 'Sign out').click()
+    })
+    await waitForText(container, 'Dashboard credential required')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/dashboard/session',
+      expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }),
+    )
+  })
+
+  it('keeps the authenticated state when sign-out is not confirmed', async () => {
+    window.history.replaceState({}, '', '/')
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/v1/dashboard/session' && init?.method === 'DELETE') {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          statusText: 'Unavailable',
+        })
+      }
+      if (url === '/v1/dashboard/session') {
+        return Promise.resolve(dashboardSessionResponse())
+      }
+      if (url.startsWith('/v1/receipts/query')) {
+        return Promise.resolve(jsonResponse({
+          totalCount: 0,
+          nextCursor: null,
+          receipts: [],
+        }))
+      }
+      if (url.startsWith('/v1/reports/operator')) {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          statusText: 'Unavailable',
+        })
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const container = await renderIntoDocument(<App />)
+    await waitForText(container, 'No receipts found')
+
+    await act(async () => {
+      buttonWithText(container, 'Sign out').click()
+    })
+    await waitForText(container, 'Dashboard sign-out failed. The session remains active.')
+
+    expect(container.textContent).toContain('Sign out')
+    expect(container.textContent).not.toContain('Dashboard credential required')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/dashboard/session',
+      expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }),
+    )
   })
 
   it('renders the empty receipt state when the corpus has no matches', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     window.history.replaceState({}, '', '/')
-    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+    const fetchMock = vi.fn((input: string | URL | Request) => {
       const url = String(input)
+      if (url === '/v1/dashboard/session') {
+        return Promise.resolve(dashboardSessionResponse(true))
+      }
       if (url.startsWith('/v1/receipts/query')) {
         return Promise.resolve({
           ok: true,
@@ -7027,19 +7337,35 @@ describe('App operator paths', () => {
         })
       }
       return Promise.reject(new Error(`unexpected fetch: ${url}`))
-    }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
 
     const container = await renderIntoDocument(<App />)
     await waitForText(container, 'No receipts found')
 
     expect(container.textContent).toContain('No receipts found')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/chio/pheromone/observability',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+    for (const unavailable of [
+      '/v1/chio/pheromone/alerts',
+      '/v1/chio/pheromone/trends',
+      '/v1/chio/pheromone/alert-handoff',
+      '/v1/chio/pheromone/alert-delivery',
+      '/v1/chio/pheromone/alert-assurance',
+    ]) {
+      expect(fetchMock).not.toHaveBeenCalledWith(unavailable, expect.anything())
+    }
   })
 
   it('renders the operator report summary for authenticated users', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     window.history.replaceState({}, '', '/')
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
       const url = String(input)
+      if (url === '/v1/dashboard/session') {
+        return Promise.resolve(dashboardSessionResponse())
+      }
       if (url.startsWith('/v1/receipts/query')) {
         return Promise.resolve({
           ok: true,

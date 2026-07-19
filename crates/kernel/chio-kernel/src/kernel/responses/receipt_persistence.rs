@@ -6,6 +6,14 @@ impl ChioKernel {
         &self,
         params: ReceiptParams<'_>,
     ) -> Result<ChioReceipt, KernelError> {
+        self.build_and_sign_receipt_with_backend(params, self.authority_signing_backend.as_ref())
+    }
+
+    pub(crate) fn build_and_sign_receipt_with_backend(
+        &self,
+        params: ReceiptParams<'_>,
+        backend: &dyn chio_core::crypto::SigningBackend,
+    ) -> Result<ChioReceipt, KernelError> {
         // Multi-tenant receipt isolation: resolve tenant_id for this receipt.
         // Precedence:
         //   1. An explicit override on `ReceiptParams` (currently unused).
@@ -54,7 +62,7 @@ impl ChioKernel {
             metadata,
             trust_level: params.trust_level,
             tenant_id,
-            kernel_key: self.config.keypair.public_key(),
+            kernel_key: backend.public_key(),
             bbs_projection_version: None,
         };
 
@@ -77,24 +85,42 @@ impl ChioKernel {
         // direct call into `chio_kernel_core::sign_receipt_with_handle`. Receipt
         // body assembly, metadata shaping, and persistence remain
         // operational-shell behavior outside the current bounded proof claim.
-        let backend = chio_core::crypto::Ed25519Backend::new(self.config.keypair.clone());
-        chio_kernel_core::sign_receipt_with_handle(body, &backend, handle).map_err(|error| {
-            use chio_kernel_core::ReceiptSigningError;
-            let message = match error {
-                ReceiptSigningError::KernelKeyMismatch => {
-                    "kernel signing key does not match receipt body kernel_key".to_string()
-                }
-                ReceiptSigningError::ContentHashMismatch {
-                    recomputed,
-                    claimed,
-                } => format!(
-                    "receipt content_hash mismatch: body claimed {claimed} but signer \
+        let receipt =
+            chio_kernel_core::sign_receipt_with_handle(body, backend, handle).map_err(|error| {
+                use chio_kernel_core::ReceiptSigningError;
+                let message = match error {
+                    ReceiptSigningError::KernelKeyMismatch => {
+                        "kernel signing key does not match receipt body kernel_key".to_string()
+                    }
+                    ReceiptSigningError::ContentHashMismatch {
+                        recomputed,
+                        claimed,
+                    } => format!(
+                        "receipt content_hash mismatch: body claimed {claimed} but signer \
                      recomputed {recomputed} over the canonical content (WYSIWYS refused)"
-                ),
-                ReceiptSigningError::SigningFailed(reason) => reason,
-            };
-            KernelError::ReceiptSigningFailed(message)
-        })
+                    ),
+                    ReceiptSigningError::SigningFailed(reason) => reason,
+                };
+                KernelError::ReceiptSigningFailed(message)
+            })?;
+        if receipt.algorithm != Some(receipt.signature.algorithm())
+            || receipt.kernel_key.algorithm() != receipt.signature.algorithm()
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "freshly signed receipt algorithm does not match its embedded kernel key"
+                    .to_string(),
+            ));
+        }
+        if !receipt.verify_signature().map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to verify freshly signed receipt: {error}"
+            ))
+        })? {
+            return Err(KernelError::ReceiptSigningFailed(
+                "freshly signed receipt does not verify under its embedded kernel key".to_string(),
+            ));
+        }
+        Ok(receipt)
     }
 
     /// Record the receipt and drive the bilateral co-signing hook when the
@@ -123,7 +149,9 @@ impl ChioKernel {
             admission.remote_kernel_id.as_deref() == request.federated_origin_kernel_id.as_deref()
         });
         let scoped_admission = request_admission.as_ref().or(thread_admission);
-        self.record_chio_receipt(receipt)?;
+        if !self.record_scoped_threshold_terminal_receipt(request, receipt)? {
+            self.record_chio_receipt(receipt)?;
+        }
         self.apply_federation_cosign(
             request,
             receipt,
@@ -148,9 +176,9 @@ impl ChioKernel {
         }
     }
 
-    fn record_chio_receipt_for_admitted_request_local_only(
+    pub(crate) fn record_chio_receipt_for_admitted_request_local_only(
         &self,
-        _request: &crate::runtime::ToolCallRequest,
+        request: &crate::runtime::ToolCallRequest,
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
         // Persist the v1 deny receipt locally and
@@ -158,7 +186,11 @@ impl ChioKernel {
         // runtime-admission deny path does not co-sign because the deny
         // decision is locally authoritative and may have been triggered
         // before any federation peer was contacted.
-        self.record_chio_receipt(receipt)
+        if self.record_scoped_threshold_terminal_receipt(request, receipt)? {
+            Ok(())
+        } else {
+            self.record_chio_receipt(receipt)
+        }
     }
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {

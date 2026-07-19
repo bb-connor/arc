@@ -6,7 +6,10 @@ use chio_core::capability::{
 };
 use chio_core::crypto::PublicKey;
 use chio_core::SigningAlgorithm;
-use chio_kernel::{CapabilityAuthority, KernelError};
+use chio_kernel::{
+    CapabilityAuthority, CapabilityIssuanceContext, CapabilityLineageError, KernelError,
+    ReceiptStoreError,
+};
 use chio_store_sqlite::SqliteReceiptStore;
 
 use crate::policy::{ReputationIssuancePolicy, RuntimeAssuranceIssuancePolicy};
@@ -46,6 +49,138 @@ struct PolicyBackedCapabilityAuthority {
     budget_db_path: Option<PathBuf>,
 }
 
+impl PolicyBackedCapabilityAuthority {
+    fn issue_validated_capability(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        runtime_attestation: Option<RuntimeAttestationEvidence>,
+        security_context: Option<&CapabilityIssuanceContext>,
+    ) -> Result<CapabilityToken, KernelError> {
+        let now = unix_now();
+        // Reputation integrity validation requires a trust set of kernel
+        // signing keys. The inner authority (the local kernel) is the
+        // canonical signer of issuance-context receipts, and its trusted
+        // peers (federation/cross-kernel) extend that set. Without these, an
+        // empty trust set silently filters every receipt as unsigned.
+        let mut trusted_keys: Vec<String> = self
+            .inner
+            .trusted_public_keys()
+            .into_iter()
+            .map(|key| key.to_hex())
+            .collect();
+        trusted_keys.push(self.inner.authority_public_key().to_hex());
+        let scope = apply_authoritative_issuance_policy(
+            subject,
+            scope,
+            ttl_seconds,
+            runtime_attestation.as_ref(),
+            self.issuance_policy.as_ref(),
+            self.runtime_assurance_policy.as_ref(),
+            self.receipt_db_path.as_deref(),
+            self.budget_db_path.as_deref(),
+            &trusted_keys,
+            now,
+        )?;
+
+        let expected_scope_hash = scope_hash(&scope).map_err(|error| {
+            issuance_failure(format!("issued capability scope cannot be bound: {error}"))
+        })?;
+        let trusted_issuers = trusted_issuer_snapshot(self.inner.as_ref());
+        let capability = match security_context {
+            Some(context) => self.inner.issue_capability_with_security_context(
+                subject,
+                scope.clone(),
+                ttl_seconds,
+                runtime_attestation,
+                context,
+            )?,
+            None => self
+                .inner
+                .issue_capability(subject, scope.clone(), ttl_seconds)?,
+        };
+        let issuance_validation_time = unix_now();
+        validate_issued_capability(
+            &capability,
+            subject,
+            &expected_scope_hash,
+            ttl_seconds,
+            &trusted_issuers,
+            issuance_validation_time,
+        )?;
+
+        if let Some(path) = self.receipt_db_path.as_deref() {
+            let store = SqliteReceiptStore::open_existing_strict(path)
+                .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
+            if let Some(context) = security_context {
+                store
+                    .record_capability_snapshot_with_issuance_admission(
+                        &context.tenant_id,
+                        &context.lineage_id,
+                        &capability,
+                        None,
+                    )
+                    .map_err(contextual_persistence_error)?;
+            } else if is_explicit_root_candidate(&capability) {
+                store
+                    .record_issued_aggregate_family_root(&capability, &trusted_issuers, unix_now())
+                    .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
+            } else {
+                store
+                    .record_capability_snapshot(&capability, None)
+                    .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
+            }
+        }
+
+        Ok(capability)
+    }
+}
+
+/// Apply every authoritative issuance policy before any signing backend is
+/// selected. Remote keyring issuance and local issuance call this same
+/// transformation so neither path can bypass reputation, attestation trust,
+/// runtime-assurance attenuation, or scope ceilings.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn apply_authoritative_issuance_policy(
+    subject: &PublicKey,
+    scope: ChioScope,
+    ttl_seconds: u64,
+    runtime_attestation: Option<&RuntimeAttestationEvidence>,
+    issuance_policy: Option<&ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<&RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    trusted_kernel_keys: &[String],
+    now: u64,
+) -> Result<ChioScope, KernelError> {
+    let verified_runtime_attestation = verify_runtime_attestation_for_issuance(
+        runtime_attestation,
+        runtime_assurance_policy,
+        now,
+    )?;
+    if let Some(policy) = issuance_policy {
+        enforce_reputation_policy(
+            subject,
+            &scope,
+            ttl_seconds,
+            policy,
+            receipt_db_path,
+            budget_db_path,
+            trusted_kernel_keys,
+        )?;
+    }
+    match runtime_assurance_policy {
+        Some(policy) => enforce_runtime_assurance_policy(
+            &scope,
+            ttl_seconds,
+            policy,
+            verified_runtime_attestation.as_ref(),
+        ),
+        None => Ok(scope),
+    }
+}
+
 impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
     fn authority_public_key(&self) -> PublicKey {
         self.inner.authority_public_key()
@@ -61,7 +196,7 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
         scope: ChioScope,
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError> {
-        self.issue_capability_with_attestation(subject, scope, ttl_seconds, None)
+        self.issue_validated_capability(subject, scope, ttl_seconds, None, None)
     }
 
     fn issue_capability_with_attestation(
@@ -71,80 +206,33 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
         ttl_seconds: u64,
         runtime_attestation: Option<RuntimeAttestationEvidence>,
     ) -> Result<CapabilityToken, KernelError> {
-        let mut scope = scope;
-        let now = unix_now();
-        let verified_runtime_attestation = verify_runtime_attestation_for_issuance(
-            runtime_attestation.as_ref(),
-            self.runtime_assurance_policy.as_ref(),
-            now,
-        )?;
+        self.issue_validated_capability(subject, scope, ttl_seconds, runtime_attestation, None)
+    }
 
-        if let Some(policy) = &self.issuance_policy {
-            // Reputation integrity validation requires a trust set of kernel
-            // signing keys. The inner authority (the local kernel) is the
-            // canonical signer of issuance-context receipts, and its trusted
-            // peers (federation/cross-kernel) extend that set. Without these,
-            // an empty trust set would silently filter every receipt as
-            // unsigned (see chio-reputation::receipt_integrity_valid).
-            let mut trusted_keys: Vec<String> = self
-                .inner
-                .trusted_public_keys()
-                .into_iter()
-                .map(|key| key.to_hex())
-                .collect();
-            trusted_keys.push(self.inner.authority_public_key().to_hex());
-            enforce_reputation_policy(
-                subject,
-                &scope,
-                ttl_seconds,
-                policy,
-                self.receipt_db_path.as_deref(),
-                self.budget_db_path.as_deref(),
-                &trusted_keys,
-            )?;
-        }
-
-        if let Some(policy) = &self.runtime_assurance_policy {
-            scope = enforce_runtime_assurance_policy(
-                &scope,
-                ttl_seconds,
-                policy,
-                verified_runtime_attestation.as_ref(),
-            )?;
-        }
-
-        let expected_scope_hash = scope_hash(&scope).map_err(|error| {
-            issuance_failure(format!("issued capability scope cannot be bound: {error}"))
-        })?;
-        let trusted_issuers = trusted_issuer_snapshot(self.inner.as_ref());
-        let capability = self
-            .inner
-            .issue_capability(subject, scope.clone(), ttl_seconds)?;
-        let issuance_validation_time = unix_now();
-        validate_issued_capability(
-            &capability,
+    fn issue_capability_with_security_context(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        runtime_attestation: Option<RuntimeAttestationEvidence>,
+        security_context: &CapabilityIssuanceContext,
+    ) -> Result<CapabilityToken, KernelError> {
+        self.issue_validated_capability(
             subject,
-            &expected_scope_hash,
+            scope,
             ttl_seconds,
-            &trusted_issuers,
-            issuance_validation_time,
-        )?;
+            runtime_attestation,
+            Some(security_context),
+        )
+    }
+}
 
-        if let Some(path) = self.receipt_db_path.as_deref() {
-            let store = SqliteReceiptStore::open_existing_strict(path)
-                .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
-            if is_explicit_root_candidate(&capability) {
-                store
-                    .record_issued_aggregate_family_root(&capability, &trusted_issuers, unix_now())
-                    .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
-            } else {
-                store
-                    .record_capability_snapshot(&capability, None)
-                    .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
-            }
+fn contextual_persistence_error(error: CapabilityLineageError) -> KernelError {
+    match error {
+        CapabilityLineageError::ReceiptStore(ReceiptStoreError::Conflict(reason)) => {
+            KernelError::CapabilityIssuanceDenied(reason)
         }
-
-        Ok(capability)
+        other => KernelError::CapabilityIssuanceFailed(other.to_string()),
     }
 }
 

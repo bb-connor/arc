@@ -32,7 +32,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(&target_dir)?;
 
     let chio_bin = env::var("CHIO_BIN").unwrap_or_else(|_| "chio".to_string());
-    let mut edge = spawn_chio_edge(&chio_bin, &project_root, &receipt_db, &target_dir)?;
+    let server_bin = env::var_os("CHIO_DEMO_SERVER")
+        .map(PathBuf::from)
+        .ok_or("CHIO_DEMO_SERVER must name the exact prebuilt MCP server executable")?;
+    let signed_manifest = env::var_os("CHIO_SIGNED_MANIFEST")
+        .map(PathBuf::from)
+        .ok_or("CHIO_SIGNED_MANIFEST must name the publisher-signed manifest")?;
+    let manifest_public_key = env::var("CHIO_MANIFEST_PUBLIC_KEY")?;
+    let cage_policy = env::var_os("CHIO_CAGE_POLICY")
+        .map(PathBuf::from)
+        .ok_or("CHIO_CAGE_POLICY must name the signed native-launch policy")?;
+    let cage_policy_signer = env::var("CHIO_CAGE_POLICY_SIGNER")?;
+    let mut edge = spawn_chio_edge(
+        &chio_bin,
+        &project_root,
+        &receipt_db,
+        &target_dir,
+        &server_bin,
+        &signed_manifest,
+        &manifest_public_key,
+        &cage_policy,
+        &cage_policy_signer,
+    )?;
 
     send_json(
         &mut edge.stdin,
@@ -135,6 +156,11 @@ fn spawn_chio_edge(
     project_root: &Path,
     receipt_db: &Path,
     target_dir: &Path,
+    server_bin: &Path,
+    signed_manifest: &Path,
+    manifest_public_key: &str,
+    cage_policy: &Path,
+    cage_policy_signer: &str,
 ) -> Result<ChioEdge, Box<dyn std::error::Error>> {
     let mut child = Command::new(chio_bin)
         .arg("--receipt-db")
@@ -145,11 +171,20 @@ fn spawn_chio_edge(
         .arg("policy.yaml")
         .arg("--server-id")
         .arg("hello")
-        .arg("cargo")
-        .arg("run")
-        .arg("--quiet")
-        .arg("--bin")
-        .arg("hello_server")
+        .arg("--server-name")
+        .arg("hello")
+        .arg("--server-version")
+        .arg("0.1.0")
+        .arg("--signed-manifest")
+        .arg(signed_manifest)
+        .arg("--manifest-public-key")
+        .arg(manifest_public_key)
+        .arg("--cage-policy")
+        .arg(cage_policy)
+        .arg("--cage-policy-signer")
+        .arg(cage_policy_signer)
+        .arg("--")
+        .arg(server_bin)
         .current_dir(project_root)
         .env("CARGO_TARGET_DIR", target_dir)
         .stdin(Stdio::piped())

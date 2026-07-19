@@ -6,7 +6,10 @@
 
 use chio_log_redact::redacted;
 
-use self::responses::FinalizeToolOutputCostContext;
+use self::responses::{
+    FinalizeToolOutputCostContext, FinalizeToolOutputRequest, PostInvocationHandling,
+};
+use super::kernel_struct::OperationOwnedDelegatedBudgetLease;
 use super::*;
 use crate::budget_store::{
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetEventAuthority,
@@ -14,6 +17,15 @@ use crate::budget_store::{
     BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
     BudgetReverseHoldRequest,
 };
+
+struct IssuedCapabilityPostconditions<'a> {
+    expected_subject: &'a chio_core::PublicKey,
+    expected_scope: &'a ChioScope,
+    ttl_seconds: u64,
+    authority_key: &'a chio_core::PublicKey,
+    security_context: Option<&'a crate::CapabilityIssuanceContext>,
+    now: u64,
+}
 
 impl ChioKernel {
     /// Issue a new capability for an agent.
@@ -25,9 +37,96 @@ impl ChioKernel {
         scope: ChioScope,
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError> {
-        let capability = self
-            .capability_authority
-            .issue_capability(subject, scope, ttl_seconds)?;
+        if self.capability_issuance_admission_authority.is_some() {
+            return Err(KernelError::CapabilityIssuanceDenied(
+                "authoritative tenant and lineage context is required for capability issuance"
+                    .to_string(),
+            ));
+        }
+        let capability = self.issue_capability_unrecorded(subject, &scope, ttl_seconds, None)?;
+        self.record_observed_capability_snapshot(&capability)?;
+        Ok(capability)
+    }
+
+    /// Issue a capability through the governed active-defense admission path.
+    ///
+    /// The trusted context is checked before signing and checked again when the
+    /// resulting capability snapshot is transactionally made visible. The
+    /// second boundary closes a concurrent fence-acquisition race.
+    pub fn issue_capability_with_security_context(
+        &self,
+        subject: &chio_core::PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<CapabilityToken, KernelError> {
+        let context = security_context.as_v1();
+        let query = chio_security_types::ports::IssuanceFreezeAdmissionQuery {
+            tenant_id: context.tenant_id().clone(),
+            lineage_id: context.lineage_root_id().clone(),
+            operation: chio_security_types::ports::CapabilityIssuanceOperation::Issue,
+            parent_capability_id: None,
+        };
+        self.authorize_capability_issuance(&query)?;
+        let issuance_context = crate::CapabilityIssuanceContext::authoritative_session(
+            query.tenant_id.clone(),
+            query.lineage_id.clone(),
+            context.session_id().clone(),
+            context.principal_id().clone(),
+            context.isolation_epoch_id().clone(),
+            context.context_generation(),
+        );
+        let capability = self.issue_capability_unrecorded(
+            subject,
+            &scope,
+            ttl_seconds,
+            Some(&issuance_context),
+        )?;
+        self.record_observed_capability_snapshot_for_dispatch(&capability, Some(security_context))?;
+        Ok(capability)
+    }
+
+    fn issue_capability_unrecorded(
+        &self,
+        subject: &chio_core::PublicKey,
+        scope: &ChioScope,
+        ttl_seconds: u64,
+        security_context: Option<&crate::CapabilityIssuanceContext>,
+    ) -> Result<CapabilityToken, KernelError> {
+        // Minting and its postcondition share one fallible snapshot. The scoped
+        // value also reaches wrapped governed authorities without widening the
+        // public CapabilityAuthority API.
+        let now = crate::authority::capability_authority_now_unix_secs(
+            self.capability_authority_clock.as_ref(),
+        )?;
+        let _clock_scope = scope_fixed_runtime_unix_secs_for_current_thread(now);
+        let authority_key = self.capability_authority.authority_public_key();
+        let capability = match security_context {
+            Some(context) => self
+                .capability_authority
+                .issue_capability_with_security_context(
+                    subject,
+                    scope.clone(),
+                    ttl_seconds,
+                    None,
+                    context,
+                )?,
+            None => {
+                self.capability_authority
+                    .issue_capability(subject, scope.clone(), ttl_seconds)?
+            }
+        };
+        let capability = self.finalize_issued_capability(
+            capability,
+            IssuedCapabilityPostconditions {
+                expected_subject: subject,
+                expected_scope: scope,
+                ttl_seconds,
+                authority_key: &authority_key,
+                security_context,
+                now,
+            },
+        )?;
 
         info!(
             capability_id = %capability.id,
@@ -37,8 +136,117 @@ impl ChioKernel {
             "issuing capability"
         );
 
-        self.record_observed_capability_snapshot(&capability)?;
+        Ok(capability)
+    }
 
+    fn finalize_issued_capability(
+        &self,
+        capability: CapabilityToken,
+        postconditions: IssuedCapabilityPostconditions<'_>,
+    ) -> Result<CapabilityToken, KernelError> {
+        let IssuedCapabilityPostconditions {
+            expected_subject,
+            expected_scope,
+            ttl_seconds,
+            authority_key,
+            security_context,
+            now,
+        } = postconditions;
+        let issuance_error =
+            |reason: &str| KernelError::CapabilityIssuanceFailed(reason.to_string());
+        let expected_scope_bytes = canonical_json_bytes(expected_scope).map_err(|error| {
+            issuance_error(&format!("requested capability scope is invalid: {error}"))
+        })?;
+        let returned_scope_bytes = canonical_json_bytes(&capability.scope).map_err(|error| {
+            issuance_error(&format!("issued capability scope is invalid: {error}"))
+        })?;
+        if &capability.issuer != authority_key
+            || &capability.subject != expected_subject
+            || returned_scope_bytes != expected_scope_bytes
+        {
+            return Err(issuance_error(
+                "issued capability does not match the requested authority, subject, or scope",
+            ));
+        }
+        capability.validate_schema().map_err(|error| {
+            issuance_error(&format!("issued capability schema is invalid: {error}"))
+        })?;
+        let security_binding = capability.security_binding().map_err(|error| {
+            issuance_error(&format!(
+                "issued capability security binding is invalid: {error}"
+            ))
+        })?;
+        let external_authority = authority_key != &self.authority_signing_backend.public_key();
+        if external_authority && security_binding.is_none() {
+            return Err(issuance_error(
+                "external capability authority omitted the required signed security binding",
+            ));
+        }
+        if let Some(binding) = security_binding.as_ref() {
+            let context = security_context.ok_or_else(|| {
+                issuance_error(
+                    "security-bound capability was issued without an authoritative session context",
+                )
+            })?;
+            let session_id = context.session_id.as_ref().ok_or_else(|| {
+                issuance_error("security-bound capability context omitted its session")
+            })?;
+            let principal_id = context.principal_id.as_ref().ok_or_else(|| {
+                issuance_error("security-bound capability context omitted its principal")
+            })?;
+            let isolation_epoch_id = context.isolation_epoch_id.as_ref().ok_or_else(|| {
+                issuance_error("security-bound capability context omitted its isolation epoch")
+            })?;
+            let context_generation = context.context_generation.ok_or_else(|| {
+                issuance_error("security-bound capability context omitted its generation")
+            })?;
+            if binding.tenant_id != context.tenant_id.as_str()
+                || binding.lineage_id != context.lineage_id.as_str()
+                || binding.session_id != session_id.as_str()
+                || binding.principal_id != principal_id.as_str()
+                || binding.isolation_epoch_id != isolation_epoch_id.as_str()
+                || binding.context_generation != context_generation
+            {
+                return Err(issuance_error(
+                    "issued capability security binding does not match the authoritative session context",
+                ));
+            }
+        }
+        if !capability.delegation_chain.is_empty()
+            || capability
+                .scope_attenuations
+                .as_ref()
+                .is_some_and(|attenuations| !attenuations.is_empty())
+            || capability.attenuation_proof.is_some()
+            || capability.budget_share_bps.is_some()
+            || capability.aggregate_invocation_budget.is_some()
+        {
+            return Err(issuance_error(
+                "direct issuance returned delegated or attenuated authority",
+            ));
+        }
+        if !matches!(
+            capability.expires_at.checked_sub(capability.issued_at),
+            Some(lifetime) if lifetime > 0 && lifetime <= ttl_seconds
+        ) {
+            return Err(issuance_error(
+                "issued capability lifetime is outside the requested bound",
+            ));
+        }
+        if !capability.verify_signature_at(now).map_err(|error| {
+            issuance_error(&format!("issued capability verification failed: {error}"))
+        })? {
+            return Err(issuance_error(
+                "issued capability signature verification failed",
+            ));
+        }
+
+        // The capability authority has already returned a complete signed
+        // token and every authority, subject, exact-scope, direct-issuance,
+        // lifetime, schema, validity, and signature postcondition above has
+        // been checked. Re-signing here is cryptographically redundant and
+        // would turn an external artifact signer into a capability-minting
+        // oracle that bypasses contextual issuance policy and freeze checks.
         Ok(capability)
     }
 
@@ -74,8 +282,18 @@ impl ChioKernel {
     }
 
     #[must_use]
+    pub fn guard_names(&self) -> Vec<&str> {
+        self.guards.iter().map(|guard| guard.name()).collect()
+    }
+
+    #[must_use]
     pub fn post_invocation_hook_count(&self) -> usize {
         self.post_invocation_pipeline.len()
+    }
+
+    #[must_use]
+    pub fn post_invocation_hook_names(&self) -> Vec<&str> {
+        self.post_invocation_pipeline.names()
     }
 
     pub async fn drain_tool_server_events_async(
@@ -218,7 +436,7 @@ impl ChioKernel {
     }
 
     pub fn public_key(&self) -> chio_core::PublicKey {
-        self.config.keypair.public_key()
+        self.authority_signing_backend.public_key()
     }
 
     /// Set the configured capability-token crypto floor.
@@ -229,7 +447,14 @@ impl ChioKernel {
         self.capability_crypto_floor = floor;
     }
 
+    /// Check only statically configured issuer membership.
+    ///
+    /// Resolver-governed runtime keys require the complete signed artifact and
+    /// therefore fail this issuer-only query closed.
     pub fn capability_issuer_is_trusted(&self, issuer: &chio_core::PublicKey) -> bool {
+        if self.authority_artifact_trust_resolver.is_some() {
+            return self.config.ca_public_keys.contains(issuer);
+        }
         self.trusted_issuer_keys().contains(issuer)
     }
 
@@ -244,16 +469,197 @@ impl ChioKernel {
     /// inline check.
     pub(crate) fn trusted_issuer_keys(&self) -> Vec<chio_core::PublicKey> {
         let mut trusted = self.config.ca_public_keys.clone();
-        for authority_pk in self.capability_authority.trusted_public_keys() {
-            if !trusted.contains(&authority_pk) {
-                trusted.push(authority_pk);
-            }
-        }
-        let kernel_pk = self.config.keypair.public_key();
+        let kernel_pk = self.public_key();
         if !trusted.contains(&kernel_pk) {
             trusted.push(kernel_pk);
         }
         trusted
+    }
+
+    /// Verify an authority artifact under either the live runtime key or a
+    /// keyring-backed current- or historical-key decision with trusted time.
+    pub fn verify_trusted_authority_artifact_signature(
+        &self,
+        artifact: &[u8],
+        claimed_issuer: &chio_core::PublicKey,
+        signature: &chio_core::Signature,
+    ) -> Result<bool, KernelError> {
+        if !claimed_issuer.verify(artifact, signature) {
+            return Ok(false);
+        }
+        match self.authority_artifact_trust_resolver.as_ref() {
+            Some(resolver) => {
+                let trusted = resolver
+                    .trusted_issuer_for_artifact(artifact, claimed_issuer, signature)
+                    .map_err(|error| {
+                        KernelError::Internal(format!(
+                            "authority artifact trust resolution failed: {error}"
+                        ))
+                    })?;
+                Ok(trusted.as_ref() == Some(claimed_issuer))
+            }
+            None => Ok(claimed_issuer == &self.public_key()),
+        }
+    }
+
+    pub fn verify_trusted_receipt(
+        &self,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<bool, KernelError> {
+        if !receipt
+            .verify_signature()
+            .map_err(|error| KernelError::Internal(error.to_string()))?
+        {
+            return Ok(false);
+        }
+        let signing_body = chio_core::receipt::signing::ChioReceiptSigningBody::from_body_and_bbs(
+            &receipt.body(),
+            receipt.bbs_signature.as_ref(),
+        );
+        let artifact = canonical_json_bytes(&signing_body)
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        self.verify_trusted_authority_artifact_signature(
+            &artifact,
+            &receipt.kernel_key,
+            &receipt.signature,
+        )
+    }
+
+    pub fn verify_trusted_child_receipt(
+        &self,
+        receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<bool, KernelError> {
+        if !receipt
+            .verify_signature()
+            .map_err(|error| KernelError::Internal(error.to_string()))?
+        {
+            return Ok(false);
+        }
+        let artifact = canonical_json_bytes(&receipt.body())
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        self.verify_trusted_authority_artifact_signature(
+            &artifact,
+            &receipt.kernel_key,
+            &receipt.signature,
+        )
+    }
+
+    pub fn verify_trusted_session_anchor(
+        &self,
+        anchor: &chio_core::session::SessionAnchor,
+    ) -> Result<bool, KernelError> {
+        if !anchor
+            .verify_signature()
+            .map_err(|error| KernelError::Internal(error.to_string()))?
+        {
+            return Ok(false);
+        }
+        let artifact = canonical_json_bytes(&anchor.body())
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        self.verify_trusted_authority_artifact_signature(
+            &artifact,
+            &anchor.kernel_key,
+            &anchor.signature,
+        )
+    }
+
+    pub fn verify_trusted_kernel_checkpoint(
+        &self,
+        checkpoint: &crate::checkpoint::KernelCheckpoint,
+    ) -> Result<bool, KernelError> {
+        crate::checkpoint::validate_checkpoint(checkpoint)
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        let artifact = canonical_json_bytes(&checkpoint.body)
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        self.verify_trusted_authority_artifact_signature(
+            &artifact,
+            &checkpoint.body.kernel_key,
+            &checkpoint.signature,
+        )
+    }
+
+    pub fn verify_trusted_bilateral_signature(
+        &self,
+        body: &chio_federation::bilateral::CoSigningBody,
+        claimed_issuer: &chio_core::PublicKey,
+        signature: &chio_core::Signature,
+    ) -> Result<bool, KernelError> {
+        let artifact = body
+            .canonical_bytes()
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        self.verify_trusted_authority_artifact_signature(&artifact, claimed_issuer, signature)
+    }
+
+    pub fn verify_trusted_dsse_signature(
+        &self,
+        envelope: &chio_federation::bilateral_dsse::DsseEnvelope,
+        claimed_issuer: &chio_core::PublicKey,
+        signature: &chio_core::Signature,
+    ) -> Result<bool, KernelError> {
+        let artifact = envelope
+            .pae_bytes()
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        self.verify_trusted_authority_artifact_signature(&artifact, claimed_issuer, signature)
+    }
+
+    pub(crate) fn trusted_issuer_keys_for(
+        &self,
+        capability: &CapabilityToken,
+        _now: u64,
+    ) -> Result<Vec<chio_core::PublicKey>, String> {
+        let mut trusted = self.config.ca_public_keys.clone();
+        if trusted.contains(&capability.issuer) {
+            return Ok(trusted);
+        }
+        let Some(resolver) = self.authority_artifact_trust_resolver.as_ref() else {
+            let runtime_issuer = self.public_key();
+            if !trusted.contains(&runtime_issuer) {
+                trusted.push(runtime_issuer);
+            }
+            return Ok(trusted);
+        };
+        capability
+            .validate_schema()
+            .map_err(|error| error.to_string())?;
+        let schema_aware_artifact =
+            canonical_json_bytes(&capability.signing_body()).map_err(|error| error.to_string())?;
+        let artifact = if capability
+            .issuer
+            .verify(&schema_aware_artifact, &capability.signature)
+        {
+            schema_aware_artifact
+        } else if capability
+            .verify_signature()
+            .map_err(|error| error.to_string())?
+        {
+            canonical_json_bytes(&capability.body()).map_err(|error| error.to_string())?
+        } else {
+            return Err(
+                "capability signature does not verify over a supported preimage".to_string(),
+            );
+        };
+        let resolved = resolver.trusted_issuer_for_artifact(
+            &artifact,
+            &capability.issuer,
+            &capability.signature,
+        )?;
+        match resolved {
+            Some(issuer) => {
+                if issuer != capability.issuer {
+                    return Err(
+                        "artifact trust resolver returned a key that does not match the capability issuer"
+                            .to_string(),
+                    );
+                }
+                trusted.push(issuer);
+            }
+            None => {
+                return Err(
+                    "artifact trust resolver rejected the runtime capability issuer".to_string(),
+                );
+            }
+        }
+        Ok(trusted)
     }
 
     /// Spec: PROTOCOL.md requires production kernels to route every
@@ -265,7 +671,7 @@ impl ChioKernel {
         remote_kernel_id: Option<&str>,
         now: u64,
     ) -> Result<(), String> {
-        let trusted = self.trusted_issuer_keys();
+        let trusted = self.trusted_issuer_keys_for(cap, now)?;
         let clock = chio_kernel_core::FixedClock::new(now);
         let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
@@ -372,6 +778,147 @@ impl ChioKernel {
         Ok(())
     }
 
+    /// Verify a persisted capability before a runtime reuses it after restart.
+    ///
+    /// This routes current and historical runtime issuers through the installed
+    /// artifact resolver and applies the same signature, time, crypto-floor,
+    /// and delegation checks as ordinary pre-admission verification.
+    pub fn verify_stored_capability_for_reuse(
+        &self,
+        capability: &CapabilityToken,
+        now: u64,
+    ) -> Result<(), String> {
+        self.verify_capability_full_pre_admit(capability, None, now)
+    }
+
+    pub(super) fn reserve_threshold_delegated_budget(
+        &self,
+        cap: &CapabilityToken,
+        operation: &AdmissionOperation,
+    ) -> Result<bool, KernelError> {
+        if operation.capability_id() != cap.id {
+            return Err(KernelError::DelegationInvalid(
+                "threshold delegated budget operation does not match the capability".to_string(),
+            ));
+        }
+        let Some(parent_link) = cap.delegation_chain.last() else {
+            return Ok(false);
+        };
+        let proposed_share = cap
+            .budget_share_bps
+            .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
+        let expected = OperationOwnedDelegatedBudgetLease {
+            request_binding_hash: operation.request_binding_hash().to_string(),
+            parent_capability_id: parent_link.capability_id.clone(),
+            child_capability_id: cap.id.clone(),
+            budget_share_bps: proposed_share,
+        };
+        let mut leases = match self.threshold_delegated_budget_leases.lock() {
+            Ok(leases) => leases,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(existing) = leases.get(operation.operation_id()) {
+            if existing == &expected {
+                return Ok(true);
+            }
+            return Err(KernelError::DelegationInvalid(
+                "threshold delegated budget operation is bound to a different lease".to_string(),
+            ));
+        }
+
+        use chio_kernel_core::BudgetRegistry;
+        let mut budgets = match self.budget_registry.lock() {
+            Ok(budgets) => budgets,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        budgets
+            .try_admit_child(
+                parent_link.capability_id.as_str(),
+                cap.id.clone(),
+                proposed_share,
+            )
+            .map_err(|error| {
+                KernelError::DelegationInvalid(format!(
+                    "sibling-sum budget admission failed: {error}"
+                ))
+            })?;
+        leases.insert(operation.operation_id().to_string(), expected);
+        Ok(true)
+    }
+
+    pub(super) fn release_threshold_delegated_budget(
+        &self,
+        cap: &CapabilityToken,
+        operation: &AdmissionOperation,
+    ) -> Result<(), KernelError> {
+        let mut leases = match self.threshold_delegated_budget_leases.lock() {
+            Ok(leases) => leases,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let Some(existing) = leases.get(operation.operation_id()).cloned() else {
+            return Ok(());
+        };
+        if existing.request_binding_hash != operation.request_binding_hash()
+            || existing.child_capability_id != cap.id
+        {
+            return Err(KernelError::DelegationInvalid(
+                "threshold delegated budget release does not match operation ownership".to_string(),
+            ));
+        }
+        use chio_kernel_core::BudgetRegistry;
+        let mut budgets = match self.budget_registry.lock() {
+            Ok(budgets) => budgets,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        budgets
+            .release_child(
+                existing.parent_capability_id.as_str(),
+                existing.child_capability_id.as_str(),
+                existing.budget_share_bps,
+            )
+            .map_err(|error| KernelError::DelegationInvalid(error.to_string()))?;
+        leases.remove(operation.operation_id());
+        Ok(())
+    }
+
+    pub(super) fn release_pre_dispatch_delegated_budget(
+        &self,
+        cap: &CapabilityToken,
+        budget_mutation: &PreExecutionBudgetMutation,
+    ) -> Result<(), KernelError> {
+        if let Some(operation) = self.threshold_operation_for_budget_mutation(budget_mutation)? {
+            return self.release_threshold_delegated_budget(cap, &operation);
+        }
+        self.release_admitted_capability_budget(cap)
+            .map_err(KernelError::DelegationInvalid)
+    }
+
+    pub(super) fn threshold_operation_for_budget_mutation(
+        &self,
+        budget_mutation: &PreExecutionBudgetMutation,
+    ) -> Result<Option<AdmissionOperation>, KernelError> {
+        let Some(admission) = budget_mutation.ordinary_admission() else {
+            return Ok(None);
+        };
+        let operation = self
+            .admission_operation_store
+            .as_ref()
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "operation-owned delegated budget release requires an admission store"
+                        .to_string(),
+                )
+            })?
+            .load(admission.operation_id())?
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "operation-owned delegated budget release lost its admission operation"
+                        .to_string(),
+                )
+            })?;
+        Ok(operation.approval_set_hash().is_some().then_some(operation))
+    }
+
     /// Run the portable pure-compute verdict path provided by
     /// `chio-kernel-core`.
     ///
@@ -401,7 +948,19 @@ impl ChioKernel {
         clock: &'a dyn chio_kernel_core::Clock,
         session_filesystem_roots: Option<&'a [String]>,
     ) -> chio_kernel_core::EvaluationVerdict {
-        let trusted = self.trusted_issuer_keys();
+        let trusted = match self.trusted_issuer_keys_for(capability, clock.now_unix_secs()) {
+            Ok(trusted) => trusted,
+            Err(reason) => {
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some(format!(
+                        "capability artifact trust resolution failed; denying fail-closed: {reason}"
+                    )),
+                    matched_grant_index: None,
+                    verified: None,
+                };
+            }
+        };
         let peer_profile = match self.capability_negotiation_for_remote(None, clock.now_unix_secs())
         {
             Ok(profile) => profile,
@@ -647,9 +1206,9 @@ impl ChioKernel {
         Ok(())
     }
 
-    fn local_budget_event_authority(&self) -> BudgetEventAuthority {
+    pub(crate) fn local_budget_event_authority(&self) -> BudgetEventAuthority {
         BudgetEventAuthority {
-            authority_id: format!("kernel:{}", self.config.keypair.public_key().to_hex()),
+            authority_id: format!("kernel:{}", self.public_key().to_hex()),
             lease_id: "single-node".to_string(),
             lease_epoch: 0,
         }
@@ -793,7 +1352,7 @@ impl ChioKernel {
     /// Returns the matched grant index and the exact pre-execution budget mutation.
     pub(crate) fn check_and_increment_budget(
         &self,
-        request_id: &str,
+        request: &ToolCallRequest,
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
     ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
@@ -801,6 +1360,18 @@ impl ChioKernel {
 
         for matching in matching_grants {
             let grant = matching.grant;
+            if cap.aggregate_invocation_budget.is_some()
+                || request.supplemental_authorization.is_some()
+            {
+                let mutation = self.coordinate_ordinary_protocol_admission(
+                    request,
+                    cap,
+                    matching.index,
+                    grant,
+                    current_unix_timestamp(),
+                )?;
+                return Ok((matching.index, mutation));
+            }
             let has_monetary =
                 grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
 
@@ -820,8 +1391,10 @@ impl ChioKernel {
                 let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
                 let budget_total = max_total.unwrap_or(u64::MAX);
-                let budget_hold_id =
-                    format!("budget-hold:{}:{}:{}", request_id, cap.id, matching.index);
+                let budget_hold_id = format!(
+                    "budget-hold:{}:{}:{}",
+                    request.request_id, cap.id, matching.index
+                );
                 let authorize_event_id = format!("{budget_hold_id}:authorize");
                 let authority = self.local_budget_event_authority();
 
@@ -852,8 +1425,12 @@ impl ChioKernel {
                                 .hold_id
                                 .unwrap_or_else(|| budget_hold_id.clone()),
                             authorize_metadata: authorized.metadata,
+                            admission_operation: None,
                         };
-                        return Ok((matching.index, PreExecutionBudgetMutation::Charge(charge)));
+                        return Ok((
+                            matching.index,
+                            PreExecutionBudgetMutation::Charge(Box::new(charge)),
+                        ));
                     }
                     BudgetAuthorizeHoldDecision::Denied(_) => {
                         saw_exhausted_budget = true;
@@ -901,6 +1478,7 @@ impl ChioKernel {
                 hold_id: Some(charge.budget_hold_id.clone()),
                 event_id: Some(charge.reverse_event_id()),
                 authority,
+                admission_operation: charge.admission_operation.clone(),
             })?)
         })
     }
@@ -919,6 +1497,7 @@ impl ChioKernel {
                 hold_id: Some(charge.budget_hold_id.clone()),
                 event_id: Some(charge.release_event_id()),
                 authority,
+                admission_operation: charge.admission_operation.clone(),
             })?)
         })
     }
@@ -938,425 +1517,12 @@ impl ChioKernel {
                 })?;
                 Ok(None)
             }
+            PreExecutionBudgetMutation::Admission(admission) => self
+                .reverse_ordinary_protocol_admission(cap, admission.as_ref())
+                .map(Some),
             PreExecutionBudgetMutation::None => Ok(None),
         }
     }
-
-    fn reconcile_budget_charge(
-        &self,
-        capability_id: &str,
-        charge: &BudgetChargeResult,
-        realized_cost_units: u64,
-    ) -> Result<BudgetReconcileHoldDecision, KernelError> {
-        let authority = charge.authorize_metadata.authority.clone();
-        self.with_budget_store(|store| {
-            Ok(store.reconcile_budget_hold(BudgetReconcileHoldRequest {
-                capability_id: capability_id.to_string(),
-                grant_index: charge.grant_index,
-                exposed_cost_units: charge.cost_charged,
-                realized_spend_units: realized_cost_units.min(charge.cost_charged),
-                hold_id: Some(charge.budget_hold_id.clone()),
-                event_id: Some(charge.reconcile_event_id()),
-                authority,
-            })?)
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn finalize_budgeted_tool_output_with_cost_and_metadata(
-        &self,
-        request: &ToolCallRequest,
-        output: ToolServerOutput,
-        elapsed: Duration,
-        timestamp: u64,
-        matched_grant_index: usize,
-        cost_context: FinalizeToolOutputCostContext<'_>,
-        extra_metadata: Option<serde_json::Value>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let FinalizeToolOutputCostContext {
-            charge_result,
-            reported_cost,
-            payment_authorization,
-            cap,
-        } = cost_context;
-        let Some(charge) = charge_result else {
-            return self.finalize_tool_output_with_metadata(
-                request,
-                output,
-                elapsed,
-                timestamp,
-                matched_grant_index,
-                extra_metadata,
-            );
-        };
-
-        let reported_cost_ref = reported_cost.as_ref();
-        let mut oracle_evidence = None;
-        let mut cross_currency_note = None;
-        let (actual_cost, cross_currency_failed) = if let Some(cost) =
-            reported_cost_ref.filter(|cost| cost.currency != charge.currency)
-        {
-            match self.resolve_cross_currency_cost(cost, &charge.currency, timestamp) {
-                Ok((converted_units, evidence)) => {
-                    oracle_evidence = Some(evidence);
-                    cross_currency_note = Some(serde_json::json!({
-                        "oracle_conversion": {
-                            "status": "applied",
-                            "reported_currency": cost.currency,
-                            "grant_currency": charge.currency,
-                            "reported_units": cost.units,
-                            "converted_units": converted_units
-                        }
-                    }));
-                    (converted_units, false)
-                }
-                Err(error) => {
-                    warn!(
-                        request_id = %request.request_id,
-                        reported_currency = %cost.currency,
-                        charged_currency = %charge.currency,
-                        reason = %redacted!(&error),
-                        "cross-currency reconciliation failed; closing hold at authorized exposure"
-                    );
-                    cross_currency_note = Some(serde_json::json!({
-                        "oracle_conversion": {
-                            "status": "failed",
-                            "reported_currency": cost.currency,
-                            "grant_currency": charge.currency,
-                            "reported_units": cost.units,
-                            "provisional_units": charge.cost_charged,
-                            "reason": error.to_string()
-                        }
-                    }));
-                    (charge.cost_charged, true)
-                }
-            }
-        } else {
-            (
-                reported_cost_ref
-                    .map(|cost| cost.units)
-                    .unwrap_or(charge.cost_charged),
-                false,
-            )
-        };
-
-        let payment_already_settled = payment_authorization
-            .as_ref()
-            .is_some_and(|authorization| authorization.settled);
-        let cost_overrun =
-            !cross_currency_failed && actual_cost > charge.cost_charged && charge.cost_charged > 0;
-
-        if cost_overrun {
-            warn!(
-                request_id = %request.request_id,
-                reported = actual_cost,
-                charged = charge.cost_charged,
-                "tool server reported cost exceeds max_cost_per_invocation; settlement_status=failed"
-            );
-        }
-
-        let realized_budget_units =
-            if cross_currency_failed || payment_already_settled || cost_overrun {
-                charge.cost_charged
-            } else {
-                actual_cost.min(charge.cost_charged)
-            };
-        let reconcile = self.reconcile_budget_charge(&cap.id, &charge, realized_budget_units)?;
-        let running_committed_cost_units = reconcile.committed_cost_units_after;
-
-        let payment_result = if let Some(authorization) = payment_authorization.as_ref() {
-            if authorization.settled || cross_currency_failed || cost_overrun {
-                None
-            } else {
-                let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                    KernelError::Internal(
-                        "payment authorization present without configured adapter".to_string(),
-                    )
-                })?;
-                Some(if actual_cost == 0 {
-                    adapter.release(&authorization.authorization_id, &request.request_id)
-                } else {
-                    adapter.capture(
-                        &authorization.authorization_id,
-                        actual_cost,
-                        &charge.currency,
-                        &request.request_id,
-                    )
-                })
-            }
-        } else {
-            None
-        };
-
-        let settlement = if cross_currency_failed || cost_overrun {
-            ReceiptSettlement {
-                payment_reference: payment_authorization
-                    .as_ref()
-                    .map(|authorization| authorization.authorization_id.clone()),
-                settlement_status: SettlementStatus::Failed,
-            }
-        } else if let Some(authorization) = payment_authorization.as_ref() {
-            if authorization.settled {
-                ReceiptSettlement::from_authorization(authorization)
-            } else if let Some(payment_result) = payment_result.as_ref() {
-                match payment_result {
-                    Ok(result) => ReceiptSettlement::from_payment_result(result),
-                    Err(error) => {
-                        warn!(
-                            request_id = %request.request_id,
-                            reason = %redacted!(&error),
-                            "post-execution payment settlement failed"
-                        );
-                        ReceiptSettlement {
-                            payment_reference: Some(authorization.authorization_id.clone()),
-                            settlement_status: SettlementStatus::Failed,
-                        }
-                    }
-                }
-            } else {
-                warn!(
-                    request_id = %request.request_id,
-                    authorization_id = %authorization.authorization_id,
-                    "unsettled authorization completed without a payment result"
-                );
-                ReceiptSettlement {
-                    payment_reference: Some(authorization.authorization_id.clone()),
-                    settlement_status: SettlementStatus::Failed,
-                }
-            }
-        } else {
-            ReceiptSettlement::settled()
-        };
-        let recorded_cost = if payment_already_settled && !cross_currency_failed && !cost_overrun {
-            charge.cost_charged
-        } else {
-            actual_cost
-        };
-
-        let budget_remaining = charge
-            .budget_total
-            .saturating_sub(running_committed_cost_units);
-        let delegation_depth = cap.delegation_chain.len() as u32;
-        let root_budget_holder = cap.issuer.to_hex();
-        let (payment_reference, settlement_status) = settlement.into_receipt_parts();
-        let payment_breakdown = payment_authorization.as_ref().map(|authorization| {
-            serde_json::json!({
-                "payment": {
-                    "authorization_id": authorization.authorization_id,
-                    "adapter_metadata": authorization.metadata,
-                    "preauthorized_units": charge.cost_charged,
-                    "recorded_units": recorded_cost
-                }
-            })
-        });
-
-        let financial_meta = FinancialReceiptMetadata {
-            grant_index: charge.grant_index as u32,
-            cost_charged: recorded_cost,
-            currency: charge.currency.clone(),
-            budget_remaining,
-            budget_total: charge.budget_total,
-            delegation_depth,
-            root_budget_holder,
-            payment_reference,
-            settlement_status,
-            cost_breakdown: merge_metadata_objects(
-                merge_metadata_objects(
-                    reported_cost_ref.and_then(|cost| cost.breakdown.clone()),
-                    payment_breakdown,
-                ),
-                cross_currency_note,
-            ),
-            oracle_evidence,
-            attempted_cost: None,
-        };
-
-        let limited_output = self.apply_stream_limits(output, elapsed)?;
-        let tool_call_output = match &limited_output {
-            ToolServerOutput::Value(value) => ToolCallOutput::Value(value.clone()),
-            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
-                ToolCallOutput::Stream(stream.clone())
-            }
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, .. }) => {
-                ToolCallOutput::Stream(stream.clone())
-            }
-        };
-
-        let budget_metadata =
-            self.budget_execution_receipt_metadata(&charge, Some(("reconciled", &reconcile)));
-        let merged_extra_metadata =
-            self.merge_budget_receipt_metadata(extra_metadata, budget_metadata);
-        let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
-        let merged_extra_metadata = merge_metadata_objects(financial_json, merged_extra_metadata);
-
-        match limited_output {
-            ToolServerOutput::Value(_)
-            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
-                .build_allow_response_with_metadata(
-                    request,
-                    tool_call_output,
-                    timestamp,
-                    Some(charge.grant_index),
-                    merged_extra_metadata.clone(),
-                ),
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
-                .build_incomplete_response_with_output_and_metadata(
-                    request,
-                    Some(tool_call_output),
-                    &reason,
-                    timestamp,
-                    Some(charge.grant_index),
-                    // The tool ran (a side effect may have committed) but the
-                    // stream ended incomplete, so any runtime-admission lease
-                    // consumed at admission is retained, not released. Mark it
-                    // so the burned lease is recoverable from the receipt,
-                    // matching the RequestIncomplete error arm.
-                    self.mark_runtime_admission_reservations_retained_fail_closed(
-                        merged_extra_metadata,
-                    ),
-                ),
-        }
-    }
-
-    fn block_on_price_oracle<T>(
-        &self,
-        future: impl Future<Output = Result<T, PriceOracleError>>,
-    ) -> Result<T, KernelError> {
-        match tokio::runtime::Handle::try_current() {
-            Ok(handle) => match handle.runtime_flavor() {
-                tokio::runtime::RuntimeFlavor::MultiThread => tokio::task::block_in_place(|| {
-                    handle
-                        .block_on(future)
-                        .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))
-                }),
-                tokio::runtime::RuntimeFlavor::CurrentThread => {
-                    Err(KernelError::CrossCurrencyOracle(
-                        "current-thread tokio runtime cannot synchronously resolve price oracles"
-                            .to_string(),
-                    ))
-                }
-                flavor => Err(KernelError::CrossCurrencyOracle(format!(
-                    "unsupported tokio runtime flavor for synchronous oracle resolution: {flavor:?}"
-                ))),
-            },
-            Err(_) => tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|error| {
-                    KernelError::CrossCurrencyOracle(format!(
-                        "failed to build synchronous oracle runtime: {error}"
-                    ))
-                })?
-                .block_on(future)
-                .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string())),
-        }
-    }
-
-    pub(crate) fn resolve_cross_currency_cost(
-        &self,
-        reported_cost: &ToolInvocationCost,
-        grant_currency: &str,
-        timestamp: u64,
-    ) -> Result<(u64, chio_core::web3::anchors::OracleConversionEvidence), KernelError> {
-        let oracle =
-            self.price_oracle
-                .as_ref()
-                .ok_or_else(|| KernelError::NoCrossCurrencyOracle {
-                    base: reported_cost.currency.clone(),
-                    quote: grant_currency.to_string(),
-                })?;
-        let rate =
-            self.block_on_price_oracle(oracle.get_rate(&reported_cost.currency, grant_currency))?;
-        let converted_units =
-            convert_supported_units(reported_cost.units, &rate, rate.conversion_margin_bps)
-                .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))?;
-        let evidence = rate
-            .to_conversion_evidence(
-                reported_cost.units,
-                reported_cost.currency.clone(),
-                grant_currency.to_string(),
-                converted_units,
-                timestamp,
-            )
-            .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))?;
-        Ok((converted_units, evidence))
-    }
-
-    pub(crate) fn ensure_registered_tool_target(
-        &self,
-        request: &ToolCallRequest,
-    ) -> Result<(), KernelError> {
-        self.tool_servers.get(&request.server_id).ok_or_else(|| {
-            KernelError::ToolNotRegistered(format!(
-                "server \"{}\" / tool \"{}\"",
-                request.server_id, request.tool_name
-            ))
-        })?;
-        Ok(())
-    }
-
-    pub(crate) fn authorize_payment_if_needed(
-        &self,
-        request: &ToolCallRequest,
-        charge_result: Option<&BudgetChargeResult>,
-    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
-        let Some(charge) = charge_result else {
-            return Ok(None);
-        };
-        let Some(adapter) = self.payment_adapter.as_ref() else {
-            return Ok(None);
-        };
-
-        let governed = request
-            .governed_intent
-            .as_ref()
-            .and_then(|intent| intent.as_tool_invocation().map(|body| (intent, body)))
-            .map(|(governed_intent, intent)| {
-                governed_intent
-                    .binding_hash()
-                    .map(|intent_hash| GovernedPaymentContext {
-                        intent_id: intent.id.clone(),
-                        intent_hash,
-                        purpose: intent.purpose.clone(),
-                        server_id: intent.server_id.clone(),
-                        tool_name: intent.tool_name.clone(),
-                        approval_token_id: request
-                            .approval_token
-                            .as_ref()
-                            .map(|token| token.id.clone()),
-                    })
-                    .map_err(|error| {
-                        PaymentError::RailError(format!(
-                            "failed to hash governed intent for payment authorization: {error}"
-                        ))
-                    })
-            })
-            .transpose()?;
-        let commerce = request
-            .governed_intent
-            .as_ref()
-            .and_then(|intent| intent.as_tool_invocation())
-            .and_then(|intent| {
-                intent
-                    .commerce
-                    .as_ref()
-                    .map(|commerce| CommercePaymentContext {
-                        seller: commerce.seller.clone(),
-                        shared_payment_token_id: commerce.shared_payment_token_id.clone(),
-                        max_amount: intent.max_amount.clone(),
-                    })
-            });
-
-        adapter
-            .authorize(&PaymentAuthorizeRequest {
-                amount_units: charge.cost_charged,
-                currency: charge.currency.clone(),
-                payer: request.agent_id.clone(),
-                payee: request.server_id.clone(),
-                reference: request.request_id.clone(),
-                governed,
-                commerce,
-            })
-            .map(Some)
-    }
 }
+
+include!("validation_finalize_and_payment.inc");

@@ -291,6 +291,99 @@ pub fn admit_quota_maximum(
     }
 }
 
+/// Result of one invocation-reservation capture in the bounded model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvocationCapture {
+    pub accepted: bool,
+    pub count: u32,
+}
+
+/// Capture one invocation without decreasing or exceeding the signed maximum.
+#[must_use]
+pub fn capture_invocation_count(count: u32, maximum: u32) -> InvocationCapture {
+    let Some(next) = count.checked_add(1) else {
+        return InvocationCapture {
+            accepted: false,
+            count,
+        };
+    };
+    if count > maximum || next > maximum {
+        InvocationCapture {
+            accepted: false,
+            count,
+        }
+    } else {
+        InvocationCapture {
+            accepted: true,
+            count: next,
+        }
+    }
+}
+
+/// Result of reserving one replay fingerprint in a bounded set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReplayFingerprintReservation {
+    pub accepted: bool,
+    pub fingerprints: [u8; 4],
+    pub count: u8,
+}
+
+/// Insert a fingerprint exactly once into a bounded replay set.
+#[must_use]
+pub fn reserve_replay_fingerprint(
+    fingerprints: [u8; 4],
+    count: u8,
+    candidate: u8,
+) -> ReplayFingerprintReservation {
+    if count > 4 {
+        return ReplayFingerprintReservation {
+            accepted: false,
+            fingerprints,
+            count,
+        };
+    }
+
+    let mut index = 0_usize;
+    while index < usize::from(count) {
+        if fingerprints[index] == candidate {
+            return ReplayFingerprintReservation {
+                accepted: false,
+                fingerprints,
+                count,
+            };
+        }
+
+        let mut prior = 0_usize;
+        while prior < index {
+            if fingerprints[prior] == fingerprints[index] {
+                return ReplayFingerprintReservation {
+                    accepted: false,
+                    fingerprints,
+                    count,
+                };
+            }
+            prior += 1;
+        }
+        index += 1;
+    }
+
+    if count == 4 {
+        return ReplayFingerprintReservation {
+            accepted: false,
+            fingerprints,
+            count,
+        };
+    }
+
+    let mut next = fingerprints;
+    next[usize::from(count)] = candidate;
+    ReplayFingerprintReservation {
+        accepted: true,
+        fingerprints: next,
+        count: count + 1,
+    }
+}
+
 /// Authenticated fields required to preserve a delegation-family quota.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FamilyBindingPreservation {
@@ -387,8 +480,9 @@ pub fn validate_threshold_signers(
 #[cfg(test)]
 mod protocol_primitive_tests {
     use super::{
-        admit_quota_maximum, authorize_composite_quotas, family_binding_is_preserved,
-        validate_threshold_signers, FamilyBindingPreservation,
+        admit_quota_maximum, authorize_composite_quotas, capture_invocation_count,
+        family_binding_is_preserved, reserve_replay_fingerprint, validate_threshold_signers,
+        FamilyBindingPreservation,
     };
 
     #[test]
@@ -421,5 +515,38 @@ mod protocol_primitive_tests {
         let threshold = validate_threshold_signers([7, 7, 0, 0], 2, [7, 8, 0, 0], 2, 2);
         assert!(!threshold.valid);
         assert!(!threshold.accepted);
+    }
+
+    #[test]
+    fn captured_invocation_count_is_monotonic_and_bounded() {
+        let captured = capture_invocation_count(2, 3);
+        assert!(captured.accepted);
+        assert_eq!(captured.count, 3);
+
+        let exhausted = capture_invocation_count(3, 3);
+        assert!(!exhausted.accepted);
+        assert_eq!(exhausted.count, 3);
+
+        let corrupt = capture_invocation_count(4, 3);
+        assert!(!corrupt.accepted);
+        assert_eq!(corrupt.count, 4);
+    }
+
+    #[test]
+    fn replay_fingerprint_reservation_is_unique() {
+        let reserved = reserve_replay_fingerprint([7, 9, 0, 0], 2, 11);
+        assert!(reserved.accepted);
+        assert_eq!(reserved.count, 3);
+        assert_eq!(reserved.fingerprints, [7, 9, 11, 0]);
+
+        let duplicate = reserve_replay_fingerprint([7, 9, 0, 0], 2, 9);
+        assert!(!duplicate.accepted);
+        assert_eq!(duplicate.count, 2);
+        assert_eq!(duplicate.fingerprints, [7, 9, 0, 0]);
+
+        let full = reserve_replay_fingerprint([1, 2, 3, 4], 4, 5);
+        assert!(!full.accepted);
+        assert_eq!(full.count, 4);
+        assert_eq!(full.fingerprints, [1, 2, 3, 4]);
     }
 }

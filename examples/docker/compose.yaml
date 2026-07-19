@@ -1,18 +1,135 @@
 name: chio-docker-quickstart
 
+x-runtime-hardening: &runtime-hardening
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 128
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=16777216,mode=1777
+
 services:
+  chio-security-init:
+    image: chio-mcp-demo:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: chio-mcp-demo
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    network_mode: none
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16777216,mode=1777
+      - /run/chio-provision:rw,noexec,nosuid,nodev,size=67108864,mode=0700
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        umask 077
+        for directory in /run/chio-public /var/lib/chio/security /run/chio-trust; do
+          mkdir -p "$${directory}"
+          if [ ! -d "$${directory}" ] || [ -L "$${directory}" ]; then
+            echo "security state is not a real directory: $${directory}" >&2
+            exit 1
+          fi
+          chown 0:0 "$${directory}"
+          chmod 0700 "$${directory}"
+          first_entry="$$(find "$${directory}" -mindepth 1 -maxdepth 1 -print -quit)" || {
+            echo "failed to inspect security state: $${directory}" >&2
+            exit 1
+          }
+          if [ -n "$${first_entry}" ]; then
+            echo "refusing to overwrite nonempty security state: $${directory}" >&2
+            exit 1
+          fi
+        done
+        /usr/local/bin/chio security provision-native-mcp-demo \
+          --output-dir /run/chio-provision/security \
+          --runtime-security-dir /var/lib/chio/security \
+          --tools-fixture /opt/chio/examples/tools.json \
+          --target /usr/local/bin/chio-demo-mcp-launcher \
+          --working-directory /opt/chio \
+          --execution-uid 10002 \
+          --execution-gid 10002 \
+          --server-id docker-demo \
+          --server-name "Docker demo MCP" \
+          --server-version 1
+        for artifact in \
+          signed-manifest.json \
+          manifest-public-key \
+          cage-launch-policy.json \
+          cage-policy-signer \
+          cage-migration-public-key \
+          cage-receipt-public-key \
+          control-authority-public-key \
+          target-command; do
+          cp "/run/chio-provision/security/$${artifact}" "/run/chio-public/$${artifact}"
+          chmod 0444 "/run/chio-public/$${artifact}"
+        done
+        for artifact in \
+          enterprise-migration.sqlite3 \
+          cage-receipt-signer.seed \
+          control-authority.seed; do
+          cp "/run/chio-provision/security/$${artifact}" "/var/lib/chio/security/$${artifact}"
+          chmod 0600 "/var/lib/chio/security/$${artifact}"
+        done
+        for suffix in -wal -shm; do
+          source="/run/chio-provision/security/enterprise-migration.sqlite3$${suffix}"
+          if [ -f "$${source}" ] && [ ! -L "$${source}" ]; then
+            cp "$${source}" "/var/lib/chio/security/enterprise-migration.sqlite3$${suffix}"
+            chmod 0600 "/var/lib/chio/security/enterprise-migration.sqlite3$${suffix}"
+          fi
+        done
+        cp /run/chio-provision/security/control-authority.seed /run/chio-trust/control-authority.seed
+        chown -R 0:0 /run/chio-public /var/lib/chio/security
+        chmod 0555 /run/chio-public
+        chmod 0700 /var/lib/chio/security
+        for forbidden in manifest-signer.seed cage-policy-signer.seed cage-migration-signer.seed; do
+          escaped_path="$$(find /run/chio-public /var/lib/chio /run/chio-trust -name "$${forbidden}" -print -quit)" || {
+            echo "failed to inspect runtime state for escaped signer: $${forbidden}" >&2
+            exit 1
+          }
+          if [ -n "$${escaped_path}" ]; then
+            echo "provisioning-only signer escaped into runtime state: $${forbidden}" >&2
+            exit 1
+          fi
+        done
+        chmod 0700 /run/chio-trust
+        chmod 0400 /run/chio-trust/control-authority.seed
+        chown 10001:10001 /run/chio-trust/control-authority.seed /run/chio-trust
+    volumes:
+      - chio_public_security:/run/chio-public
+      - chio_edge_state:/var/lib/chio
+      - chio_trust_secret:/run/chio-trust
+
   chio-trust-demo:
+    <<: *runtime-hardening
     image: chio-trust-demo:local
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       target: chio-trust-demo
     environment:
-      CHIO_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-token}
-    ports:
-      - "${CHIO_TRUST_PORT:-8940}:8940"
+      CHIO_TRUST_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:?set a dedicated CHIO_SERVICE_TOKEN}
+      CHIO_TRUST_DASHBOARD_READ_TOKEN: ${CHIO_DASHBOARD_READ_TOKEN:?set a dedicated CHIO_DASHBOARD_READ_TOKEN}
+      CHIO_AUTHORITY_SEED_FILE: /run/chio-trust/control-authority.seed
     volumes:
       - chio_demo_state:/var/lib/chio
+      - chio_trust_secret:/run/chio-trust:ro
+    networks:
+      - trust-backend
+    depends_on:
+      chio-security-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8940/health >/dev/null 2>&1"]
       interval: 5s
@@ -20,30 +137,141 @@ services:
       retries: 20
       start_period: 5s
 
+  chio-tls-init:
+    image: chio-trust-tls-demo:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: chio-trust-tls-demo
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 32
+    network_mode: none
+    environment:
+      CHIO_TLS_MODE: provision
+    tmpfs:
+      - /run:rw,noexec,nosuid,nodev,size=33554432,mode=0755
+    volumes:
+      - chio_tls_ca_private:/var/lib/chio-tls-ca
+      - chio_tls_private:/var/lib/chio-tls-private
+      - chio_tls_public:/var/lib/chio-tls-public
+
+  chio-trust-tls:
+    <<: *runtime-hardening
+    image: chio-trust-tls-demo:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: chio-trust-tls-demo
+    environment:
+      CHIO_TLS_MODE: serve
+      CHIO_TLS_UPSTREAM_HOST: chio-trust-demo
+      CHIO_TLS_UPSTREAM_PORT: "8940"
+    ports:
+      - "127.0.0.1:${CHIO_TRUST_PORT:-8940}:8940"
+    volumes:
+      - chio_tls_private:/var/lib/chio-tls-private:ro
+      - chio_tls_public:/var/lib/chio-tls-public:ro
+    networks:
+      - trust-backend
+      - edge-control
+    depends_on:
+      chio-tls-init:
+        condition: service_completed_successfully
+      chio-trust-demo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "/opt/chio/tls_healthcheck.py"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 5s
+
   chio-mcp-demo:
+    <<: *runtime-hardening
     image: chio-mcp-demo:local
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       target: chio-mcp-demo
+    user: "0:0"
+    cap_add:
+      - SETUID
+      - SETGID
     environment:
-      CHIO_AUTH_TOKEN: ${CHIO_AUTH_TOKEN:-demo-token}
-      CHIO_CONTROL_URL: http://chio-trust-demo:8940
-      CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-token}
+      CHIO_AUTH_TOKEN: ${CHIO_AUTH_TOKEN:?set a dedicated CHIO_AUTH_TOKEN}
+      CHIO_ADMIN_TOKEN: ${CHIO_ADMIN_TOKEN:?set a dedicated CHIO_ADMIN_TOKEN}
+      CHIO_CONTROL_URL: https://chio-trust-tls:8940
+      CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:?set a dedicated CHIO_SERVICE_TOKEN}
+      CHIO_CONTROL_TLS_ROOT_CA_FILE: /var/lib/chio-tls-public/demo-ca.pem
+      CHIO_PUBLIC_SECURITY_DIR: /run/chio-public
+      CHIO_PRIVATE_SECURITY_DIR: /var/lib/chio/security
     ports:
-      - "${CHIO_EDGE_PORT:-8931}:8931"
+      - "127.0.0.1:${CHIO_EDGE_PORT:-8931}:8931"
+    healthcheck:
+      test: ["CMD", "python3", "/opt/chio/examples/mcp_edge_healthcheck.py"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 5s
     depends_on:
-      chio-trust-demo:
+      chio-security-init:
+        condition: service_completed_successfully
+      chio-trust-tls:
         condition: service_healthy
+    volumes:
+      - chio_public_security:/run/chio-public:ro
+      - chio_edge_state:/var/lib/chio
+      - chio_tls_public:/var/lib/chio-tls-public:ro
+    networks:
+      - edge-control
 
   chio-proof-room:
+    <<: *runtime-hardening
     image: chio-proof-room:local
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       target: chio-proof-room-quickstart
+    command:
+      - /sbin/tini
+      - --
+      - /usr/local/bin/chio-proof-room
+      - --bundle
+      - /opt/chio/fixtures/proof-room/first-run/single-call-authority/proof-room-bundle
+      - --ui-dir
+      - /opt/chio/dashboard/dist
+      - --fixture-root
+      - /opt/chio/fixtures/proof-room
+      - --listen
+      - 0.0.0.0:7391
+      - --doctor-report
+      - /tmp/chio-proof-doctor-report.json
     ports:
-      - "${CHIO_PROOF_ROOM_PORT:-7391}:7391"
+      - "127.0.0.1:${CHIO_PROOF_ROOM_PORT:-7391}:7391"
+    networks:
+      - proof-room
 
 volumes:
   chio_demo_state:
+  chio_public_security:
+  chio_edge_state:
+  chio_trust_secret:
+  chio_tls_ca_private:
+  chio_tls_private:
+  chio_tls_public:
+
+networks:
+  trust-backend:
+    internal: true
+  edge-control:
+    internal: true
+  proof-room:
+    internal: true

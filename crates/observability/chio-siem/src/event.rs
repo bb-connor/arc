@@ -32,6 +32,12 @@ pub struct SiemEvent {
     pub parameter_hash_valid: bool,
     /// True when the receipt signer is pinned as a trusted kernel signer.
     pub signer_trusted: bool,
+    /// In-memory proof that `signer_trusted` was derived by this crate from an
+    /// explicit trusted-kernel key set. This marker is private and is never
+    /// serialized, so deserialization or mutation of the public reporting
+    /// field cannot manufacture signer trust.
+    #[serde(skip)]
+    proven_trusted_signer: Option<String>,
     /// True only for authoritative Chio-mediated allow receipts at a prevent boundary.
     pub authorized: bool,
     /// Financial metadata extracted from `receipt.metadata["financial"]`, if present.
@@ -63,9 +69,11 @@ impl SiemEvent {
         let signature_valid = receipt.verify_signature().unwrap_or(false);
         let parameter_hash_valid = receipt.action.verify_hash().unwrap_or(false);
         let authoritative = receipt_id_valid && signature_valid && parameter_hash_valid;
+        let signer_fingerprint = receipt.kernel_key.to_hex();
         let signer_trusted = trusted_kernel_keys
-            .map(|trusted| trusted.contains(&receipt.kernel_key.to_hex()))
+            .map(|trusted| trusted.contains(&signer_fingerprint))
             .unwrap_or(false);
+        let proven_trusted_signer = signer_trusted.then_some(signer_fingerprint);
         let authorized =
             authoritative && signer_trusted && semantics.is_authorized(receipt.decision.as_ref());
         let result = if authorized {
@@ -96,6 +104,7 @@ impl SiemEvent {
             receipt_id_valid,
             parameter_hash_valid,
             signer_trusted,
+            proven_trusted_signer,
             authorized,
             financial,
         }
@@ -105,6 +114,16 @@ impl SiemEvent {
     #[must_use]
     pub fn is_authorized(&self) -> bool {
         self.authorized
+    }
+
+    /// True only when this in-memory event derived signer trust from an
+    /// explicit trusted-kernel key set. Serialized events must be reverified
+    /// against a current key set before this becomes true again.
+    #[must_use]
+    pub(crate) fn has_proven_signer_trust(&self) -> bool {
+        self.signer_trusted
+            && self.proven_trusted_signer.as_deref()
+                == Some(self.receipt.kernel_key.to_hex().as_str())
     }
 }
 

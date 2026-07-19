@@ -191,6 +191,48 @@ fn evaluate_allows_matching_capability() {
 }
 
 #[test]
+fn evaluate_rejects_supplemental_authorization_without_a_trusted_authority() {
+    let mut envelope: serde_json::Value = serde_json::from_str(&evaluate_envelope("echo")).unwrap();
+    envelope["request"]["supplemental_authorization"] = json!({
+        "reference": "broker:cpp-attempt",
+        "artifact": [1, 2, 3]
+    });
+
+    let error = evaluate_json_str(&envelope.to_string()).unwrap_err();
+    match error {
+        KernelFfiError::InvalidCapability(message) => {
+            assert!(message.contains("cannot verify or reserve supplemental authorization"));
+        }
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+}
+
+#[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let extensions = [
+        ("approval_tokens", json!([{}])),
+        ("threshold_approval_proposal", json!({})),
+        ("governed_intent", json!({})),
+    ];
+
+    for (field, value) in extensions {
+        let mut envelope: serde_json::Value =
+            serde_json::from_str(&evaluate_envelope("echo")).unwrap();
+        envelope["request"][field] = value;
+
+        let error = evaluate_json_str(&envelope.to_string())
+            .expect_err("unnegotiated authorization extension must fail closed");
+        match error {
+            KernelFfiError::InvalidJson(message) => {
+                assert!(message.contains("unknown field"), "message: {message}");
+                assert!(message.contains(field), "message: {message}");
+            }
+            other => panic!("expected InvalidJson, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -293,7 +335,7 @@ fn verify_capability_honors_epoch_zero_clock() {
 }
 
 #[test]
-fn verify_capability_context_denies_mixed_version_aggregate_budget_and_preserves_latch() {
+fn verify_capability_context_denies_unnegotiated_and_accepts_negotiated_aggregate_budget() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = make_aggregate_capability(&subject, &issuer);
@@ -330,15 +372,10 @@ fn verify_capability_context_denies_mixed_version_aggregate_budget_and_preserves
         "now_secs": ISSUED_AT as i64 + 1,
         "peer_capabilities": rollout_peer,
     });
-    let rollout_error = verify_capability_with_context_json_str(&rollout_envelope.to_string())
-        .expect_err("feature negotiation alone must not enable aggregate enforcement");
-    match rollout_error {
-        KernelFfiError::InvalidCapability(message) => assert!(
-            message.contains("aggregate invocation budget enforcement is disabled"),
-            "message: {message}"
-        ),
-        other => panic!("expected InvalidCapability, got {other:?}"),
-    }
+    let verified = verify_capability_with_context_json_str(&rollout_envelope.to_string())
+        .expect("negotiated C++ verification must preserve the aggregate semantic");
+    let verified: serde_json::Value = serde_json::from_str(&verified).unwrap();
+    assert_eq!(verified["id"], "cap-aggregate-ffi");
 }
 
 #[test]

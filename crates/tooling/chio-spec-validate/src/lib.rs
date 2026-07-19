@@ -110,8 +110,19 @@ pub fn validate_value(
     if let Some(base_uri) = schema_base_uri(schema_path) {
         options = options.with_base_uri(base_uri);
     }
-    if let Some(schema_root) = schema_registry_root(schema_path) {
+    let schema_root = schema_registry_root(schema_path);
+    let registry = schema_root
+        .as_ref()
+        .map(|root| local_schema_registry(root))
+        .transpose()
+        .map_err(|error| {
+            ValidateError::SchemaCompile(schema_path.to_path_buf(), error.to_string())
+        })?;
+    if let Some(schema_root) = schema_root {
         options = options.with_retriever(LocalSchemaRetriever { schema_root });
+    }
+    if let Some(registry) = registry.as_ref() {
+        options = options.with_registry(registry);
     }
     let validator = options
         .build(schema)
@@ -128,6 +139,67 @@ pub fn validate_value(
         doc_path.to_path_buf(),
         errors,
     ))
+}
+
+fn local_schema_registry(
+    schema_root: &Path,
+) -> Result<jsonschema::Registry<'static>, Box<dyn std::error::Error + Send + Sync>> {
+    let retriever = LocalSchemaRetriever {
+        schema_root: schema_root.to_path_buf(),
+    };
+    let mut builder = jsonschema::Registry::new().retriever(retriever);
+    for path in local_schema_files(schema_root)? {
+        let value = read_local_schema_file(schema_root, &path)?;
+        let file_uri = canonical_file_uri(&path)?;
+        let schema_id = value.get("$id").and_then(Value::as_str).map(str::to_owned);
+        if let Some(schema_id) = schema_id.filter(|id| id != &file_uri) {
+            builder = builder.add(&file_uri, value.clone())?;
+            builder = builder.add(&schema_id, value)?;
+        } else {
+            builder = builder.add(&file_uri, value)?;
+        }
+    }
+    Ok(builder.prepare()?)
+}
+
+fn local_schema_files(
+    schema_root: &Path,
+) -> Result<Vec<PathBuf>, Box<dyn std::error::Error + Send + Sync>> {
+    let mut pending = vec![schema_root.to_path_buf()];
+    let mut files = Vec::new();
+    while let Some(directory) = pending.pop() {
+        let mut entries = fs::read_dir(&directory)?.collect::<Result<Vec<_>, _>>()?;
+        entries.sort_by_key(std::fs::DirEntry::path);
+        for entry in entries {
+            let path = entry.path();
+            let file_type = entry.file_type()?;
+            if file_type.is_dir() {
+                pending.push(path);
+            } else if file_type.is_file() && is_schema_file(&path)? {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+fn is_schema_file(path: &Path) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    if !is_json_file(path) {
+        return Ok(false);
+    }
+    let file = fs::File::open(path)?;
+    let value: Value = serde_json::from_reader(file)?;
+    Ok(value.get("$schema").and_then(Value::as_str).is_some())
+}
+
+fn canonical_file_uri(path: &Path) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let canonical = fs::canonicalize(path)?;
+    let mut value = canonical.to_string_lossy().replace('\\', "/");
+    if !value.starts_with('/') {
+        value.insert(0, '/');
+    }
+    Ok(format!("file://{value}"))
 }
 
 /// Build a `file://` base URI from a schema's parent directory so that the

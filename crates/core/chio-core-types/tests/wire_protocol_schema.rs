@@ -4,11 +4,14 @@ use std::{fs, path::PathBuf};
 
 use chio_core_types::{
     capability::{
+        aggregate_budget::verify_direct_aggregate_family_root,
         scope::{ChioScope, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     },
     crypto::Keypair,
-    message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult},
+    message::{
+        AgentMessage, KernelMessage, OpaqueSupplementalAuthorization, ToolCallError, ToolCallResult,
+    },
     receipt::{
         body::{ChioReceipt, ChioReceiptBody},
         decision::{Decision, ToolCallAction},
@@ -19,6 +22,7 @@ use chio_core_types::{
             CHIO_RECEIPT_BBS_SIGNATURE_ALGORITHM, CHIO_RECEIPT_BBS_SIGNATURE_SCHEMA,
         },
     },
+    SignedDeclassificationGrant,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -40,6 +44,11 @@ fn load_schema(relative_path: &str) -> Value {
     serde_json::from_str(&contents).expect("schema parses as json")
 }
 
+fn load_json(path: &std::path::Path) -> Value {
+    let contents = fs::read_to_string(path).expect("JSON file exists");
+    serde_json::from_str(&contents).expect("file parses as JSON")
+}
+
 fn to_json<T: Serialize>(value: &T) -> Value {
     serde_json::to_value(value).expect("value serializes")
 }
@@ -47,19 +56,16 @@ fn to_json<T: Serialize>(value: &T) -> Value {
 fn assert_schema_accepts(relative_path: &str, instance: &Value) {
     let schema_path = schema_root().join(relative_path);
     let schema = load_schema(relative_path);
-    let validator = validator_for_schema(&schema_path, &schema);
-    if let Err(error) = validator.validate(instance) {
-        let mut details = vec![error.to_string()];
-        details.extend(
-            validator
-                .iter_errors(instance)
-                .skip(1)
-                .map(|entry| entry.to_string()),
-        );
+    if let Err(error) = chio_spec_validate::validate_value(
+        &schema_path,
+        &schema,
+        std::path::Path::new("<wire-protocol-instance>"),
+        instance,
+    ) {
         panic!(
             "schema `{relative_path}` rejected instance:\ninstance={}\nerrors={}",
             serde_json::to_string_pretty(instance).expect("instance pretty prints"),
-            details.join(" | ")
+            error
         );
     }
 }
@@ -67,33 +73,195 @@ fn assert_schema_accepts(relative_path: &str, instance: &Value) {
 fn assert_schema_rejects(relative_path: &str, instance: &Value) {
     let schema_path = schema_root().join(relative_path);
     let schema = load_schema(relative_path);
-    let validator = validator_for_schema(&schema_path, &schema);
     assert!(
-        !validator.is_valid(instance),
+        chio_spec_validate::validate_value(
+            &schema_path,
+            &schema,
+            std::path::Path::new("<wire-protocol-instance>"),
+            instance,
+        )
+        .is_err(),
         "schema `{relative_path}` unexpectedly accepted instance:\n{}",
         serde_json::to_string_pretty(instance).expect("instance pretty prints")
     );
 }
 
-fn validator_for_schema(schema_path: &std::path::Path, schema: &Value) -> jsonschema::Validator {
-    let base_uri = schema_path
-        .parent()
-        .and_then(|parent| parent.canonicalize().ok())
-        .map(|parent| {
-            let mut path = parent.to_string_lossy().replace('\\', "/");
-            if !path.starts_with('/') {
-                path.insert(0, '/');
+fn assert_authenticated_tool_call_request(instance: &Value, expected_approval_count: usize) {
+    let message: AgentMessage =
+        serde_json::from_value(instance.clone()).expect("tool-call request fixture decodes");
+    message
+        .validate()
+        .expect("tool-call request fixture passes message validation");
+    let AgentMessage::ToolCallRequest {
+        capability_token,
+        approval_token,
+        approval_tokens,
+        ..
+    } = message
+    else {
+        panic!("fixture must decode as a tool-call request");
+    };
+
+    assert!(
+        capability_token
+            .verify_signature()
+            .expect("capability signature verification completes"),
+        "embedded capability token must have a valid production signature"
+    );
+    assert_eq!(
+        usize::from(approval_token.is_some()) + approval_tokens.len(),
+        expected_approval_count
+    );
+    if let Some(approval) = approval_token.as_deref() {
+        assert!(
+            approval
+                .verify_signature()
+                .expect("singular approval signature verification completes"),
+            "embedded singular approval token must have a valid production signature"
+        );
+    }
+    for approval in &approval_tokens {
+        assert!(
+            approval
+                .verify_signature()
+                .expect("approval-list signature verification completes"),
+            "every embedded approval-list token must have a valid production signature"
+        );
+    }
+}
+
+fn exact_object_merge(sources: &[&Value]) -> Value {
+    let mut merged = serde_json::Map::new();
+    for source in sources {
+        let object = source
+            .as_object()
+            .expect("exact merge sources must be JSON objects");
+        for (key, value) in object {
+            if let Some(existing) = merged.get(key) {
+                assert_eq!(
+                    existing, value,
+                    "exact merge sources must agree on shared member {key}"
+                );
+            } else {
+                merged.insert(key.clone(), value.clone());
             }
-            if !path.ends_with('/') {
-                path.push('/');
+        }
+    }
+    Value::Object(merged)
+}
+
+fn schema_files_below(root: &std::path::Path) -> Vec<PathBuf> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut schemas = Vec::new();
+    while let Some(directory) = pending.pop() {
+        let mut entries = fs::read_dir(&directory)
+            .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+            .map(|entry| entry.expect("schema directory entry"))
+            .collect::<Vec<_>>();
+        entries.sort_by_key(std::fs::DirEntry::path);
+        for entry in entries {
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().and_then(|value| value.to_str()) == Some("json") {
+                schemas.push(path);
             }
-            format!("file://{path}")
-        })
-        .expect("schema parent canonicalizes");
-    jsonschema::options()
-        .with_base_uri(base_uri)
-        .build(schema)
-        .expect("schema compiles")
+        }
+    }
+    schemas.sort();
+    schemas
+}
+
+#[test]
+fn security_schema_reference_graph_resolves_fully_offline() {
+    let security_root = schema_root().join("security");
+    for schema_path in schema_files_below(&security_root) {
+        let schema = load_json(&schema_path);
+        let result = chio_spec_validate::validate_value(
+            &schema_path,
+            &schema,
+            std::path::Path::new("<offline-reference-probe>"),
+            &json!({}),
+        );
+        if let Err(chio_spec_validate::ValidateError::SchemaCompile(_, error)) = result {
+            panic!(
+                "security schema `{}` has an unresolved offline reference: {error}",
+                schema_path.display()
+            );
+        }
+    }
+}
+
+#[test]
+fn live_agent_request_resolves_nested_security_schema_refs_offline() {
+    let keypair = Keypair::from_seed(&[17; 32]);
+    let vectors = load_json(&repo_root().join("tests/bindings/vectors/declassification/v1.json"));
+    let grant: SignedDeclassificationGrant =
+        serde_json::from_value(vectors["positive"]["grant"].clone())
+            .expect("declassification grant vector decodes");
+    let request = AgentMessage::ToolCallRequest {
+        id: "req-wire-offline-security-ref".to_string(),
+        capability_token: Box::new(make_token(&keypair)),
+        server_id: "srv".to_string(),
+        tool: "echo".to_string(),
+        params: Box::new(json!({"message": "hello"})),
+        supplemental_authorization: Some(Box::new(
+            OpaqueSupplementalAuthorization::new("broker:wire-offline", vec![1, 2, 3])
+                .expect("valid supplemental authorization"),
+        )),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: Some(Box::new(grant)),
+    };
+    assert_schema_accepts("agent/tool_call_request.schema.json", &to_json(&request));
+}
+
+#[test]
+fn tool_call_request_approval_forms_are_individually_valid_and_mutually_exclusive() {
+    let vector_root = repo_root().join("tests/bindings/vectors/security/protocol-primitives");
+    let singular =
+        load_json(&vector_root.join("positive/tool-call-request-singular-approval-v1.json"));
+    assert_schema_accepts("agent/tool_call_request.schema.json", &singular);
+    assert_authenticated_tool_call_request(&singular, 1);
+    let list = load_json(&vector_root.join("positive/tool-call-request-list-approval-v1.json"));
+    assert_schema_accepts("agent/tool_call_request.schema.json", &list);
+    assert_authenticated_tool_call_request(&list, 2);
+
+    let alice = load_json(&vector_root.join("positive/governed-approval-token-alice-v1.json"));
+    let bob = load_json(&vector_root.join("positive/governed-approval-token-bob-v1.json"));
+    assert_eq!(singular["approval_token"], alice);
+    assert_eq!(list["approval_tokens"], json!([alice, bob]));
+
+    let ambiguous =
+        load_json(&vector_root.join("negative/tool-call-request-both-approval-forms-v1.json"));
+    assert_eq!(ambiguous, exact_object_merge(&[&singular, &list]));
+    assert_schema_rejects("agent/tool_call_request.schema.json", &ambiguous);
+}
+
+#[test]
+fn capability_list_fixture_preserves_authenticated_delegation_family_budget() {
+    let fixture = load_json(&repo_root().join(
+        "tests/bindings/vectors/security/protocol-primitives/positive/capability-list-delegation-family-v1.json",
+    ));
+    assert_schema_accepts("kernel/capability_list.schema.json", &fixture);
+
+    let message: KernelMessage =
+        serde_json::from_value(fixture).expect("capability-list fixture decodes");
+    let KernelMessage::CapabilityList { capabilities } = message else {
+        panic!("fixture must decode as a capability list");
+    };
+    assert_eq!(capabilities.len(), 1);
+    let capability = &capabilities[0];
+    let verified =
+        verify_direct_aggregate_family_root(capability, std::slice::from_ref(&capability.issuer))
+            .expect("fixture carries a valid signed delegation-family root");
+    assert_eq!(verified.max_invocations(), 7);
+    assert_eq!(
+        verified.root_capability_id(),
+        "aggregate-list-root-vector-1"
+    );
 }
 
 fn make_token(kp: &Keypair) -> CapabilityToken {
@@ -239,13 +407,40 @@ fn make_receipt_body(kp: &Keypair, decision: Decision) -> ChioReceiptBody {
 fn wire_protocol_schema_cases_validate_live_serialization() {
     let kp = Keypair::from_seed(&[7; 32]);
     let token = make_token(&kp);
+    let declassification_vectors =
+        load_json(&repo_root().join("tests/bindings/vectors/declassification/v1.json"));
+    let declassification_grant: SignedDeclassificationGrant =
+        serde_json::from_value(declassification_vectors["positive"]["grant"].clone())
+            .expect("declassification grant vector decodes");
 
     let tool_call_request = AgentMessage::ToolCallRequest {
         id: "req-wire-001".to_string(),
         capability_token: Box::new(token.clone()),
         server_id: "srv".to_string(),
         tool: "echo".to_string(),
-        params: json!({"message": "hello"}),
+        params: Box::new(json!({"message": "hello"})),
+        supplemental_authorization: Some(Box::new(
+            OpaqueSupplementalAuthorization::new("broker:wire", vec![4, 5, 6])
+                .expect("valid supplemental authorization"),
+        )),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
+    };
+    let tool_call_request_with_declassification = AgentMessage::ToolCallRequest {
+        id: "req-wire-declassification-001".to_string(),
+        capability_token: Box::new(token.clone()),
+        server_id: "srv".to_string(),
+        tool: "echo".to_string(),
+        params: Box::new(json!({"message": "hello"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: Some(Box::new(declassification_grant)),
     };
 
     let result_ok = ToolCallResult::Ok {
@@ -286,6 +481,10 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
         (
             "agent/tool_call_request.schema.json",
             to_json(&tool_call_request),
+        ),
+        (
+            "agent/tool_call_request.schema.json",
+            to_json(&tool_call_request_with_declassification),
         ),
         (
             "agent/list_capabilities.schema.json",

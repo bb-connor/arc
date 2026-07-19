@@ -1,15 +1,66 @@
 package invariants_test
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/backbay-labs/chio/sdks/go/chio-go/invariants"
 )
 
 const vectorRoot = "../../../../tests/bindings/vectors"
+const watermarkVectorRoot = "../../../../crates/tooling/chio-conformance/vectors/security/watermark"
+const maxWatermarkSafeInteger int64 = (1 << 53) - 1
+
+var watermarkPayloadFields = []string{
+	"application_id",
+	"encoding",
+	"expires_at_unix_ms",
+	"issued_at_unix_ms",
+	"key_id",
+	"marker_ref",
+	"sequence",
+	"session_id",
+	"source_receipt_id",
+	"tenant_id",
+	"tool_id",
+}
+
+var watermarkNumericFields = []string{
+	"expires_at_unix_ms",
+	"issued_at_unix_ms",
+	"sequence",
+}
+
+var declassificationEnvelopeFields = []string{
+	"algorithm",
+	"authority_key",
+	"body",
+	"signature",
+}
+
+var declassificationBodyFields = []string{
+	"agent_id",
+	"authority_key_id",
+	"capability_id",
+	"destination_id",
+	"domain_version",
+	"expires_at_unix_seconds",
+	"grant_id",
+	"issued_at_unix_seconds",
+	"purpose",
+	"request_hash",
+	"session_id",
+	"source_label_hash",
+	"subject_id",
+	"target_label",
+	"tenant_id",
+	"tool_name",
+}
 
 type canonicalVectors struct {
 	Cases []struct {
@@ -46,6 +97,49 @@ type signingVectors struct {
 	} `json:"utf8_cases"`
 }
 
+type declassificationVectors struct {
+	Positive struct {
+		CanonicalBodyJSON string `json:"canonical_body_json"`
+		Grant             struct {
+			Algorithm    string         `json:"algorithm"`
+			AuthorityKey string         `json:"authority_key"`
+			Body         map[string]any `json:"body"`
+			Signature    string         `json:"signature"`
+		} `json:"grant"`
+		ID             string `json:"id"`
+		SigningSeedHex string `json:"signing_seed_hex"`
+	} `json:"positive"`
+}
+
+type watermarkVectors struct {
+	Cases []struct {
+		CanonicalEnvelopeJSON string         `json:"canonical_envelope_json"`
+		CanonicalPayloadJSON  string         `json:"canonical_payload_json"`
+		EncodedPayload        string         `json:"encoded_payload"`
+		Envelope              map[string]any `json:"envelope"`
+		ID                    string         `json:"id"`
+		Payload               map[string]any `json:"payload"`
+		PublicKeyHex          string         `json:"public_key_hex"`
+		SignatureHex          string         `json:"signature_hex"`
+		SigningMessageHex     string         `json:"signing_message_hex"`
+		Token                 string         `json:"token"`
+	} `json:"cases"`
+	Schema            string `json:"schema"`
+	SigningDomain     string `json:"signing_domain"`
+	SigningKeySeedHex string `json:"signing_key_seed_hex"`
+}
+
+type watermarkRejectionVectors struct {
+	Cases []struct {
+		CanonicalPayloadJSON string `json:"canonical_payload_json"`
+		ExpectedError        string `json:"expected_error"`
+		Field                string `json:"field"`
+		ID                   string `json:"id"`
+		InputPayloadJSON     string `json:"input_payload_json"`
+		ValueDecimal         string `json:"value_decimal"`
+	} `json:"cases"`
+}
+
 type receiptVectors struct {
 	Cases []struct {
 		Expected                 invariants.ReceiptVerification `json:"expected"`
@@ -74,6 +168,14 @@ type manifestVectors struct {
 		ID                        string                          `json:"id"`
 		ManifestBodyCanonicalJSON string                          `json:"manifest_body_canonical_json"`
 		SignedManifest            map[string]any                  `json:"signed_manifest"`
+	} `json:"cases"`
+}
+
+type manifestCanonicalRejectionVectors struct {
+	Cases []struct {
+		Field       string `json:"field"`
+		ID          string `json:"id"`
+		Replacement any    `json:"replacement"`
 	} `json:"cases"`
 }
 
@@ -159,6 +261,228 @@ func TestSigningVectors(t *testing.T) {
 	}
 	if signedJSON.CanonicalJSON != vectors.JSONCases[0].CanonicalJSON || signedJSON.PublicKeyHex != vectors.JSONCases[0].PublicKeyHex || signedJSON.SignatureHex != vectors.JSONCases[0].SignatureHex {
 		t.Fatalf("unexpected json signing output: %#v", signedJSON)
+	}
+}
+
+func TestDeclassificationVector(t *testing.T) {
+	var vectors declassificationVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "declassification", "v1.json"), &vectors)
+	testCase := vectors.Positive
+	grant := map[string]any{
+		"algorithm":     testCase.Grant.Algorithm,
+		"authority_key": testCase.Grant.AuthorityKey,
+		"body":          testCase.Grant.Body,
+		"signature":     testCase.Grant.Signature,
+	}
+	assertExactObjectKeys(t, grant, declassificationEnvelopeFields)
+	assertExactObjectKeys(t, testCase.Grant.Body, declassificationBodyFields)
+	if testCase.Grant.Algorithm != "ed25519" {
+		t.Fatalf("unexpected declassification algorithm: %s", testCase.Grant.Algorithm)
+	}
+	bodyJSON, err := json.Marshal(testCase.Grant.Body)
+	if err != nil {
+		t.Fatalf("marshal declassification body: %v", err)
+	}
+	canonicalBody, err := invariants.CanonicalizeJSONString(string(bodyJSON))
+	if err != nil {
+		t.Fatalf("canonicalize declassification body: %v", err)
+	}
+	if canonicalBody != testCase.CanonicalBodyJSON {
+		t.Fatalf("unexpected declassification canonical body: %s", canonicalBody)
+	}
+	signingMessage := "chio:declassification-grant:v1\x00" + canonicalBody
+	signed, err := invariants.SignUTF8MessageEd25519(signingMessage, testCase.SigningSeedHex)
+	if err != nil {
+		t.Fatalf("sign declassification body: %v", err)
+	}
+	if signed.PublicKeyHex != testCase.Grant.AuthorityKey || signed.SignatureHex != testCase.Grant.Signature {
+		t.Fatalf("unexpected declassification signature: %#v", signed)
+	}
+	verified, err := invariants.VerifyUTF8MessageEd25519(
+		signingMessage,
+		testCase.Grant.AuthorityKey,
+		testCase.Grant.Signature,
+	)
+	if err != nil || !verified {
+		t.Fatalf("verify declassification signature: verified=%v error=%v", verified, err)
+	}
+	withoutDomain, err := invariants.VerifyUTF8MessageEd25519(
+		canonicalBody,
+		testCase.Grant.AuthorityKey,
+		testCase.Grant.Signature,
+	)
+	if err != nil {
+		t.Fatalf("verify declassification domain separation: %v", err)
+	}
+	if withoutDomain {
+		t.Fatal("declassification signature verified without its domain")
+	}
+}
+
+func TestWatermarkVectors(t *testing.T) {
+	var vectors watermarkVectors
+	loadVectorFile(t, filepath.Join(watermarkVectorRoot, "v1.json"), &vectors)
+	if vectors.Schema != "chio.signed-watermark-vectors.v1" {
+		t.Fatalf("unexpected watermark vector schema: %s", vectors.Schema)
+	}
+	if vectors.SigningDomain != "chio.signed-watermark.v1\x00" {
+		t.Fatalf("unexpected watermark signing domain: %q", vectors.SigningDomain)
+	}
+
+	for _, testCase := range vectors.Cases {
+		t.Run(testCase.ID, func(t *testing.T) {
+			assertExactObjectKeys(t, testCase.Payload, watermarkPayloadFields)
+			if requireString(t, testCase.Payload, "encoding") != "base64_url_canonical_json" {
+				t.Fatal("unexpected watermark encoding")
+			}
+			for _, field := range watermarkNumericFields {
+				number, ok := testCase.Payload[field].(json.Number)
+				if !ok {
+					t.Fatalf("watermark field %s is not a JSON number", field)
+				}
+				value, err := number.Int64()
+				if err != nil || value < 0 || value > maxWatermarkSafeInteger {
+					t.Fatalf("watermark field %s is not an interoperable integer: %v", field, number)
+				}
+			}
+			if testCase.Payload["sequence"].(json.Number).String() != "9007199254740991" {
+				t.Fatal("positive watermark vector must pin the maximum safe integer")
+			}
+
+			canonicalPayload, err := invariants.CanonicalizeJSON(testCase.Payload)
+			if err != nil {
+				t.Fatalf("CanonicalizeJSON payload returned error: %v", err)
+			}
+			if canonicalPayload != testCase.CanonicalPayloadJSON {
+				t.Fatalf("unexpected canonical watermark payload: %s", canonicalPayload)
+			}
+			signingMessage := vectors.SigningDomain + canonicalPayload
+			if hex.EncodeToString([]byte(signingMessage)) != testCase.SigningMessageHex {
+				t.Fatal("unexpected watermark signing-message bytes")
+			}
+			signed, err := invariants.SignUTF8MessageEd25519(signingMessage, vectors.SigningKeySeedHex)
+			if err != nil {
+				t.Fatalf("SignUTF8MessageEd25519 returned error: %v", err)
+			}
+			if signed.PublicKeyHex != testCase.PublicKeyHex || signed.SignatureHex != testCase.SignatureHex {
+				t.Fatalf("unexpected watermark signing output: %#v", signed)
+			}
+			verified, err := invariants.VerifyUTF8MessageEd25519(
+				signingMessage,
+				testCase.PublicKeyHex,
+				testCase.SignatureHex,
+			)
+			if err != nil || !verified {
+				t.Fatalf("watermark signature verification failed: verified=%v err=%v", verified, err)
+			}
+			verifiedWithoutDomain, err := invariants.VerifyUTF8MessageEd25519(
+				canonicalPayload,
+				testCase.PublicKeyHex,
+				testCase.SignatureHex,
+			)
+			if err != nil || verifiedWithoutDomain {
+				t.Fatalf("watermark signature was not domain separated: verified=%v err=%v", verifiedWithoutDomain, err)
+			}
+
+			if strings.Contains(testCase.EncodedPayload, "=") {
+				t.Fatal("watermark payload base64url contains padding")
+			}
+			if base64.RawURLEncoding.EncodeToString([]byte(canonicalPayload)) != testCase.EncodedPayload {
+				t.Fatal("unexpected base64url-encoded watermark payload")
+			}
+			decodedPayload, err := base64.RawURLEncoding.DecodeString(testCase.EncodedPayload)
+			if err != nil {
+				t.Fatalf("failed to decode watermark payload: %v", err)
+			}
+			if string(decodedPayload) != canonicalPayload {
+				t.Fatal("decoded watermark payload is not canonical payload JSON")
+			}
+			if base64.RawURLEncoding.EncodeToString(decodedPayload) != testCase.EncodedPayload {
+				t.Fatal("watermark payload base64url is not canonical")
+			}
+
+			assertExactObjectKeys(t, testCase.Envelope, []string{"encoded_payload", "payload", "schema", "signature"})
+			if requireString(t, testCase.Envelope, "schema") != "chio.signed-watermark-envelope.v1" {
+				t.Fatal("unexpected signed watermark envelope schema")
+			}
+			if requireString(t, testCase.Envelope, "encoded_payload") != testCase.EncodedPayload {
+				t.Fatal("envelope encoded payload does not match pinned payload")
+			}
+			if requireString(t, testCase.Envelope, "signature") != testCase.SignatureHex {
+				t.Fatal("envelope signature does not match pinned signature")
+			}
+			envelopePayload, ok := testCase.Envelope["payload"].(map[string]any)
+			if !ok {
+				t.Fatal("envelope payload is not an object")
+			}
+			canonicalEnvelopePayload, err := invariants.CanonicalizeJSON(envelopePayload)
+			if err != nil || canonicalEnvelopePayload != canonicalPayload {
+				t.Fatalf("envelope payload does not match pinned payload: %v", err)
+			}
+			canonicalEnvelope, err := invariants.CanonicalizeJSON(testCase.Envelope)
+			if err != nil {
+				t.Fatalf("CanonicalizeJSON envelope returned error: %v", err)
+			}
+			if canonicalEnvelope != testCase.CanonicalEnvelopeJSON {
+				t.Fatalf("unexpected canonical watermark envelope: %s", canonicalEnvelope)
+			}
+
+			if !strings.HasPrefix(testCase.Token, "[[chio-wm1:") || !strings.HasSuffix(testCase.Token, "]]") {
+				t.Fatal("watermark token wrapper is malformed")
+			}
+			encodedEnvelope := strings.TrimSuffix(strings.TrimPrefix(testCase.Token, "[[chio-wm1:"), "]]")
+			if strings.Contains(encodedEnvelope, "=") {
+				t.Fatal("watermark envelope base64url contains padding")
+			}
+			decodedEnvelope, err := base64.RawURLEncoding.DecodeString(encodedEnvelope)
+			if err != nil {
+				t.Fatalf("failed to decode watermark envelope: %v", err)
+			}
+			if string(decodedEnvelope) != canonicalEnvelope {
+				t.Fatal("decoded watermark envelope is not canonical envelope JSON")
+			}
+			if base64.RawURLEncoding.EncodeToString(decodedEnvelope) != encodedEnvelope {
+				t.Fatal("watermark envelope base64url is not canonical")
+			}
+			canonicalDecodedEnvelope, err := invariants.CanonicalizeJSONString(string(decodedEnvelope))
+			if err != nil || canonicalDecodedEnvelope != string(decodedEnvelope) {
+				t.Fatalf("decoded watermark envelope failed canonical validation: %v", err)
+			}
+		})
+	}
+}
+
+func TestWatermarkVectorsRejectUnsafeInteger(t *testing.T) {
+	var vectors watermarkRejectionVectors
+	loadVectorFile(t, filepath.Join(watermarkVectorRoot, "v1-rejections.json"), &vectors)
+	for _, testCase := range vectors.Cases {
+		t.Run(testCase.ID, func(t *testing.T) {
+			canonicalPayload, err := invariants.CanonicalizeJSONString(testCase.InputPayloadJSON)
+			if err != nil {
+				t.Fatalf("CanonicalizeJSONString returned error: %v", err)
+			}
+			if canonicalPayload != testCase.CanonicalPayloadJSON {
+				t.Fatalf("unexpected canonical rejection payload: %s", canonicalPayload)
+			}
+			decoder := json.NewDecoder(strings.NewReader(testCase.InputPayloadJSON))
+			decoder.UseNumber()
+			var payload map[string]any
+			if err := decoder.Decode(&payload); err != nil {
+				t.Fatalf("failed to decode rejection payload: %v", err)
+			}
+			assertExactObjectKeys(t, payload, watermarkPayloadFields)
+			number, ok := payload[testCase.Field].(json.Number)
+			if !ok || number.String() != testCase.ValueDecimal {
+				t.Fatalf("unexpected rejection integer: %v", payload[testCase.Field])
+			}
+			value, err := number.Int64()
+			if err != nil || value <= maxWatermarkSafeInteger || value != 1<<53 {
+				t.Fatalf("rejection vector is not the first unsafe integer: %v", number)
+			}
+			if testCase.ExpectedError != "unsafe_integer" {
+				t.Fatalf("unexpected rejection reason: %s", testCase.ExpectedError)
+			}
+		})
 	}
 }
 
@@ -322,23 +646,65 @@ func TestCapabilityVectors(t *testing.T) {
 }
 
 func TestManifestVectors(t *testing.T) {
-	var vectors manifestVectors
-	loadVectorFile(t, filepath.Join(vectorRoot, "manifest", "v1.json"), &vectors)
+	for _, version := range []string{"v1", "v2"} {
+		var vectors manifestVectors
+		loadVectorFile(t, filepath.Join(vectorRoot, "manifest", version+".json"), &vectors)
+		for _, testCase := range vectors.Cases {
+			t.Run(version+"/"+testCase.ID, func(t *testing.T) {
+				renderedBody, err := invariants.SignedManifestBodyCanonicalJSON(testCase.SignedManifest)
+				if err != nil {
+					t.Fatalf("SignedManifestBodyCanonicalJSON returned error: %v", err)
+				}
+				if renderedBody != testCase.ManifestBodyCanonicalJSON {
+					t.Fatalf("unexpected manifest body: %s", renderedBody)
+				}
+				verification, err := invariants.VerifySignedManifest(testCase.SignedManifest)
+				if err != nil {
+					t.Fatalf("VerifySignedManifest returned error: %v", err)
+				}
+				if verification != testCase.Expected {
+					t.Fatalf("unexpected manifest verification: %#v", verification)
+				}
+			})
+		}
+	}
+}
+
+func TestManifestV2CanonicalRejectionVectors(t *testing.T) {
+	var manifests manifestVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "manifest", "v2.json"), &manifests)
+	var vectors manifestCanonicalRejectionVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "manifest", "v2-canonical-rejections.json"), &vectors)
+	var baseline map[string]any
+	for _, testCase := range manifests.Cases {
+		if testCase.ID == "valid_signed_manifest" {
+			baseline = testCase.SignedManifest
+			break
+		}
+	}
+	if baseline == nil {
+		t.Fatal("valid v2 manifest vector not found")
+	}
 	for _, testCase := range vectors.Cases {
 		t.Run(testCase.ID, func(t *testing.T) {
-			renderedBody, err := invariants.SignedManifestBodyCanonicalJSON(testCase.SignedManifest)
-			if err != nil {
-				t.Fatalf("SignedManifestBodyCanonicalJSON returned error: %v", err)
+			envelope := cloneMap(t, baseline)
+			manifest := envelope["manifest"].(map[string]any)
+			permissions := manifest["required_permissions"].(map[string]any)
+			switch testCase.Field {
+			case "network_destinations.0.host":
+				destinations := permissions["network_destinations"].([]any)
+				destinations[0].(map[string]any)["host"] = testCase.Replacement
+			case "read_paths.0":
+				permissions["read_paths"].([]any)[0] = testCase.Replacement
+			default:
+				permissions[testCase.Field] = testCase.Replacement
 			}
-			if renderedBody != testCase.ManifestBodyCanonicalJSON {
-				t.Fatalf("unexpected manifest body: %s", renderedBody)
-			}
-			verification, err := invariants.VerifySignedManifest(testCase.SignedManifest)
+			verification, err := invariants.VerifySignedManifest(envelope)
 			if err != nil {
 				t.Fatalf("VerifySignedManifest returned error: %v", err)
 			}
-			if verification != testCase.Expected {
-				t.Fatalf("unexpected manifest verification: %#v", verification)
+			if verification.StructureValid {
+				t.Fatal("canonical alias was accepted")
 			}
 		})
 	}
@@ -355,6 +721,27 @@ func cloneMap(t *testing.T, input map[string]any) map[string]any {
 		t.Fatalf("failed to unmarshal clone output: %v", err)
 	}
 	return output
+}
+
+func assertExactObjectKeys(t *testing.T, object map[string]any, expected []string) {
+	t.Helper()
+	if len(object) != len(expected) {
+		t.Fatalf("unexpected object keys: %#v", object)
+	}
+	for _, key := range expected {
+		if _, ok := object[key]; !ok {
+			t.Fatalf("object is missing key %q", key)
+		}
+	}
+}
+
+func requireString(t *testing.T, object map[string]any, key string) string {
+	t.Helper()
+	value, ok := object[key].(string)
+	if !ok {
+		t.Fatalf("object field %q is not a string", key)
+	}
+	return value
 }
 
 func loadVectorFile(t *testing.T, path string, target any) {

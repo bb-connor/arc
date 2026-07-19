@@ -2,6 +2,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_core::crypto::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use chio_openai::adapter::{OpenAiAdapter, OpenAiAdapterConfig};
 use chio_tool_call_fabric::{
     DenyReason, ProviderError, ProviderId, ReceiptId, VerdictResult,
@@ -50,6 +55,41 @@ fn config_with_api_version(api_version: &str) -> OpenAiAdapterConfig {
     config
 }
 
+fn admitted_adapter() -> OpenAiAdapter {
+    let signer = Keypair::from_seed(&[55; 32]);
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "openai-stream".to_string(),
+        name: "OpenAI stream".to_string(),
+        description: None,
+        version: "1".to_string(),
+        tools: vec![ToolDefinition {
+            name: "create_calendar_event".to_string(),
+            description: "Create a calendar event".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: false,
+                destructive: true,
+                idempotent: false,
+                requires_approval: true,
+            },
+            latency_hint: None,
+            flow: Some(ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    OpenAiAdapter::new_with_registry("org_chio_demo", "openai-stream", &registry).unwrap()
+}
+
 fn assert_api_version_drift(error: ProviderError) {
     match error {
         ProviderError::Malformed(message) => {
@@ -79,8 +119,26 @@ fn gate_sse_stream_rejects_api_version_drift_before_evaluator() {
 }
 
 #[test]
-fn buffers_function_call_argument_deltas_until_done_verdict_allows() {
+fn raw_projection_cannot_enter_stream_authorization_without_sidecar() {
     let adapter = OpenAiAdapter::new("org_chio_demo");
+    let mut evaluated = false;
+
+    let error = adapter
+        .gate_sse_stream(tool_call_stream().as_bytes(), |_| {
+            evaluated = true;
+            Ok(allow_verdict())
+        })
+        .expect_err("raw projection must not be treated as execution-ready");
+
+    assert!(error
+        .to_string()
+        .contains("requires a registry-admitted security sidecar"));
+    assert!(!evaluated);
+}
+
+#[test]
+fn buffers_function_call_argument_deltas_until_done_verdict_allows() {
+    let adapter = admitted_adapter();
     let mut evaluated = Vec::new();
     let gated = adapter
         .gate_sse_stream(tool_call_stream().as_bytes(), |invocation| {
@@ -120,7 +178,7 @@ fn buffers_function_call_argument_deltas_until_done_verdict_allows() {
 
 #[test]
 fn done_sentinel_after_completed_is_idempotent() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = format!("{}data: [DONE]\n\n", tool_call_stream());
 
     let gated = adapter
@@ -134,7 +192,7 @@ fn done_sentinel_after_completed_is_idempotent() {
 
 #[test]
 fn deny_verdict_fails_closed_before_tool_frames_are_released() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let mut calls = 0;
     let err = adapter
         .gate_sse_stream(tool_call_stream().as_bytes(), |_| {
@@ -151,7 +209,7 @@ fn deny_verdict_fails_closed_before_tool_frames_are_released() {
 
 #[test]
 fn mismatched_done_arguments_fail_closed_before_verdict() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -178,7 +236,7 @@ fn mismatched_done_arguments_fail_closed_before_verdict() {
 
 #[test]
 fn missing_function_arguments_done_fails_closed_before_verdict() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -205,7 +263,7 @@ fn missing_function_arguments_done_fails_closed_before_verdict() {
 
 #[test]
 fn mismatched_function_arguments_done_fails_closed_before_verdict() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -232,7 +290,7 @@ fn mismatched_function_arguments_done_fails_closed_before_verdict() {
 
 #[test]
 fn function_arguments_done_must_match_output_item_done_before_verdict() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_calendar_1\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -257,7 +315,7 @@ fn function_arguments_done_must_match_output_item_done_before_verdict() {
 
 #[test]
 fn non_empty_start_arguments_with_delta_fail_closed_before_verdict() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_calendar_1\",\"name\":\"create_calendar_event\",\"arguments\":\"{\\\"secret\\\":\\\"forbidden\\\"}\"}}\n\n",
@@ -284,7 +342,7 @@ fn non_empty_start_arguments_with_delta_fail_closed_before_verdict() {
 
 #[test]
 fn id_only_function_call_fails_closed_before_verdict() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"item_fc_1\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -311,7 +369,7 @@ fn id_only_function_call_fails_closed_before_verdict() {
 
 #[test]
 fn verdict_timeout_terminates_before_tool_frames_are_released() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let err = adapter
         .gate_sse_stream(tool_call_stream().as_bytes(), |_| {
             Err(ProviderError::VerdictBudgetExceeded {
@@ -327,7 +385,7 @@ fn verdict_timeout_terminates_before_tool_frames_are_released() {
 
 #[test]
 fn malformed_delta_without_active_tool_call_fails_closed() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.function_call_arguments.delta\n",
         "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"call_id\":\"call_orphan\",\"delta\":\"{}\"}\n\n",
@@ -343,7 +401,7 @@ fn malformed_delta_without_active_tool_call_fails_closed() {
 
 #[test]
 fn malformed_done_tool_call_arguments_fail_closed() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let raw = concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_bad_args\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -361,7 +419,7 @@ fn malformed_done_tool_call_arguments_fail_closed() {
 
 #[test]
 fn zero_length_argument_deltas_count_toward_buffered_frame_limit() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let mut raw = String::from(concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_many_empty\",\"call_id\":\"call_many_empty\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -389,7 +447,7 @@ fn zero_length_argument_deltas_count_toward_buffered_frame_limit() {
 
 #[test]
 fn output_item_done_is_forwarded_when_pre_verdict_frames_reach_limit() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let mut raw = String::from(concat!(
         "event: response.output_item.added\n",
         "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_limit\",\"call_id\":\"call_limit\",\"name\":\"create_calendar_event\",\"arguments\":\"\"}}\n\n",
@@ -428,7 +486,7 @@ fn output_item_done_is_forwarded_when_pre_verdict_frames_reach_limit() {
 
 #[test]
 fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
-    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let adapter = admitted_adapter();
     let padding = "x".repeat(2 * 1024 * 1024 + 2048);
     let raw = format!(
         concat!(

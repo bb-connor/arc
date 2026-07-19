@@ -234,52 +234,62 @@ pub(crate) fn build_runtime_loopback_buyer_closure(
         RuntimeLoopbackError::message(format!("Chio runtime buyer closure vendor key: {error}"))
     })?;
     let bilateral_dsse = chio_federation::bilateral_dsse::sign_chio_bilateral_dsse_envelope(
-        receipt,
-        &buyer_key,
-        &vendor_key,
-        &treaty_context.continuation.source_kernel_id,
-        &treaty_context.continuation.target_kernel_id,
-        &step.request.tool_name,
-        now_unix_ms,
-        chio_federation::bilateral_dsse::BilateralPredicateExtensions {
-            capability_lease_ref: Some(chio_federation::bilateral_dsse::CapabilityLeaseRef {
-                lease_id: lease.body.lease_id.clone(),
-                issuer: lease.body.issuer.clone(),
-                expires_at_unix_ms: lease.body.expires_at_unix_ms,
-                scope_digest: Some(chio_federation::bilateral_dsse::HashRecord {
-                    alg: "sha256".to_string(),
-                    value: lease.body.scope_digest.clone(),
-                }),
-            }),
-            policy_evaluation_summary: Some(runtime_loopback_policy_summary(step)),
-            governance_receipt_ref: Some(chio_federation::bilateral_dsse::GovernanceReceiptRef {
-                receipt_id: governance_receipt.body.receipt_id.clone(),
-                kernel_id: governance_receipt.body.authorizing_kernel.clone(),
-                digest: chio_federation::bilateral_dsse::HashRecord {
-                    alg: "sha256".to_string(),
-                    value: governance_digest,
+        chio_federation::bilateral_dsse::BilateralDsseLocalSigningInput {
+            invocation: chio_federation::bilateral_dsse::BilateralDsseInvocationInput {
+                receipt,
+                org_a_kernel_id: &treaty_context.continuation.source_kernel_id,
+                org_b_kernel_id: &treaty_context.continuation.target_kernel_id,
+                tool_name: &step.request.tool_name,
+                timestamp_unix_ms: now_unix_ms,
+                extensions: chio_federation::bilateral_dsse::BilateralPredicateExtensions {
+                    capability_lease_ref: Some(
+                        chio_federation::bilateral_dsse::CapabilityLeaseRef {
+                            lease_id: lease.body.lease_id.clone(),
+                            issuer: lease.body.issuer.clone(),
+                            expires_at_unix_ms: lease.body.expires_at_unix_ms,
+                            scope_digest: Some(chio_federation::bilateral_dsse::HashRecord {
+                                alg: "sha256".to_string(),
+                                value: lease.body.scope_digest.clone(),
+                            }),
+                        },
+                    ),
+                    policy_evaluation_summary: Some(runtime_loopback_policy_summary(step)),
+                    governance_receipt_ref: Some(
+                        chio_federation::bilateral_dsse::GovernanceReceiptRef {
+                            receipt_id: governance_receipt.body.receipt_id.clone(),
+                            kernel_id: governance_receipt.body.authorizing_kernel.clone(),
+                            digest: chio_federation::bilateral_dsse::HashRecord {
+                                alg: "sha256".to_string(),
+                                value: governance_digest,
+                            },
+                        },
+                    ),
+                    consistency_anchor: workflow_step.consistency_anchor.clone(),
+                    consistency_model: Some(admission_report.consistency_model.clone()),
+                    cross_org_visibility: None,
+                    treaty_binding_ref: Some(chio_federation::bilateral_dsse::TreatyBindingRef {
+                        treaty_id: admission_report.treaty_id.clone(),
+                        treaty_scope_sha256: treaty_context.treaty_scope_sha256.clone(),
+                        ladder_intersection_sha256: treaty_context
+                            .ladder_intersection_sha256
+                            .clone(),
+                        admission_report_sha256: admission_report_sha256.clone(),
+                        continuation_sha256: treaty_context.continuation_sha256.clone(),
+                        lineage_bundle_sha256,
+                        action_class_id: admission_report.action_class_id.clone(),
+                        consistency_model: admission_report.consistency_model.clone(),
+                        request_sha256: bilateral_invocation.request_sha256.clone(),
+                        outcome_sha256: bilateral_invocation.outcome_sha256.clone(),
+                        local_receipt_sha256: bilateral_invocation.local_receipt_sha256.clone(),
+                        remote_receipt_sha256: bilateral_invocation.remote_receipt_sha256.clone(),
+                        lease_refs: vec![lease.body.lease_id.clone()],
+                        governance_refs: vec![governance_receipt.body.receipt_id.clone()],
+                        signer_kernel_ids: bilateral_invocation.signer_kernel_ids.clone(),
+                    }),
                 },
-            }),
-            consistency_anchor: workflow_step.consistency_anchor.clone(),
-            consistency_model: Some(admission_report.consistency_model.clone()),
-            cross_org_visibility: None,
-            treaty_binding_ref: Some(chio_federation::bilateral_dsse::TreatyBindingRef {
-                treaty_id: admission_report.treaty_id.clone(),
-                treaty_scope_sha256: treaty_context.treaty_scope_sha256.clone(),
-                ladder_intersection_sha256: treaty_context.ladder_intersection_sha256.clone(),
-                admission_report_sha256: admission_report_sha256.clone(),
-                continuation_sha256: treaty_context.continuation_sha256.clone(),
-                lineage_bundle_sha256,
-                action_class_id: admission_report.action_class_id.clone(),
-                consistency_model: admission_report.consistency_model.clone(),
-                request_sha256: bilateral_invocation.request_sha256.clone(),
-                outcome_sha256: bilateral_invocation.outcome_sha256.clone(),
-                local_receipt_sha256: bilateral_invocation.local_receipt_sha256.clone(),
-                remote_receipt_sha256: bilateral_invocation.remote_receipt_sha256.clone(),
-                lease_refs: vec![lease.body.lease_id.clone()],
-                governance_refs: vec![governance_receipt.body.receipt_id.clone()],
-                signer_kernel_ids: bilateral_invocation.signer_kernel_ids.clone(),
-            }),
+            },
+            org_a_signer: &buyer_key,
+            org_b_signer: &vendor_key,
         },
     )
     .map_err(|error| {

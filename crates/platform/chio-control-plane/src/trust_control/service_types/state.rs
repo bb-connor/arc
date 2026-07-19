@@ -3,9 +3,17 @@ use super::*;
 #[derive(Clone)]
 pub(crate) struct TrustServiceState {
     pub(crate) config: TrustServiceConfig,
+    pub(crate) dashboard_sessions: super::super::dashboard_auth::DashboardSessionStore,
+    pub(crate) dashboard_report_bridge:
+        Option<super::super::dashboard_reports::DashboardReportBridge>,
+    pub(crate) authority_keyring: Option<crate::KeyringRuntimeComposition>,
+    #[cfg(test)]
+    pub(crate) authority_test_backend: Option<Arc<dyn chio_core::crypto::SigningBackend>>,
+    pub(crate) active_defense: super::super::service_runtime::TrustControlActiveDefenseService,
     pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     pub(crate) verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
+    pub(crate) authority_issuance_rotation_lock: Arc<Mutex<()>>,
     pub(crate) cluster: Option<Arc<Mutex<ClusterRuntimeState>>>,
     /// Progress signal for the single background cluster-sync loop. `Some`
     /// exactly when `cluster` is `Some`. A budget-write handler parks on this
@@ -62,11 +70,32 @@ pub struct TrustControlClient {
 #[derive(Clone)]
 pub(crate) struct ClusterPeerClientAuth {
     pub(crate) node_id: Arc<str>,
+    pub(crate) signing_key: Arc<Keypair>,
 }
 
 pub(crate) struct RemoteCapabilityAuthority {
     pub(crate) client: TrustControlClient,
-    pub(crate) pinned_current: PublicKey,
+    pub(crate) verified_trust:
+        Option<Arc<super::super::service_runtime::remote_authority::RemoteControlAuthorityTrust>>,
+    pub(crate) active_epoch: Mutex<RemoteAuthorityEpoch>,
+    pub(crate) tenant_id: String,
+    pub(crate) workload_id: String,
+    pub(crate) server_id: String,
+    pub(crate) workload_signer: Keypair,
+    pub(crate) session_admission_signer: Keypair,
+    pub(crate) pending_requests: Arc<
+        dyn super::super::service_runtime::remote_capability_request_store::RemoteCapabilityRequestStore,
+    >,
+    pub(crate) issuance_clock: Arc<
+        dyn super::super::service_runtime::remote_capability_request_store::RemoteCapabilityIssuanceClock,
+    >,
+}
+
+#[derive(Clone)]
+pub(crate) struct RemoteAuthorityEpoch {
+    pub(crate) public_key: PublicKey,
+    pub(crate) generation: u64,
+    pub(crate) trusted_public_keys: Vec<PublicKey>,
 }
 
 pub(crate) struct RemoteRevocationStore {
@@ -89,10 +118,13 @@ pub(crate) struct RemoteAdmissionCaptureAuthority {
 
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteCompositeHoldEvidence {
+    pub(crate) admission_operation: BudgetAdmissionOperationBinding,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) invocation_quotas: Vec<BudgetInvocationQuota>,
+    pub(crate) invocation_counts_after: Vec<BudgetInvocationQuotaUsage>,
     pub(crate) revocation_set: CanonicalRevocationSet,
+    pub(crate) authorized_exposure_units: u64,
     pub(crate) monetary_state: BudgetMonetaryHoldState,
     pub(crate) authority: BudgetEventAuthority,
 }

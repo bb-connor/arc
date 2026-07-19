@@ -258,7 +258,9 @@ fn kernel_hook_accepts_governed_context_reference_and_returns_receipt_metadata(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
         GovernedToolInvocationIntentBody {
@@ -289,6 +291,8 @@ fn kernel_hook_accepts_governed_context_reference_and_returns_receipt_metadata(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(decision.allowed);
@@ -325,7 +329,9 @@ fn kernel_hook_preserves_millisecond_admission_time() -> Result<(), Box<dyn std:
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
         GovernedToolInvocationIntentBody {
@@ -363,6 +369,8 @@ fn kernel_hook_preserves_millisecond_admission_time() -> Result<(), Box<dyn std:
         now_unix_ms: 1_800_000_001_600,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -405,7 +413,9 @@ fn kernel_hook_bypasses_non_chio_request() -> Result<(), Box<dyn std::error::Err
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = ChioRuntimeAdmissionHook::new(profile(), store);
 
@@ -416,6 +426,8 @@ fn kernel_hook_bypasses_non_chio_request() -> Result<(), Box<dyn std::error::Err
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(decision.allowed, "{decision:#?}");
@@ -442,7 +454,9 @@ fn kernel_hook_denies_federated_origin_without_any_runtime_context(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
 
     let hook = allowing_policy_hook(store)?;
@@ -453,6 +467,8 @@ fn kernel_hook_denies_federated_origin_without_any_runtime_context(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed, "{decision:#?}");
@@ -492,7 +508,9 @@ fn kernel_hook_denies_federated_runtime_request_without_treaty_context(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
         GovernedToolInvocationIntentBody {
@@ -523,6 +541,8 @@ fn kernel_hook_denies_federated_runtime_request_without_treaty_context(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -564,7 +584,9 @@ fn kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
         GovernedToolInvocationIntentBody {
@@ -602,6 +624,8 @@ fn kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);

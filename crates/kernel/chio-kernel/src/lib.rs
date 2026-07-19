@@ -120,42 +120,53 @@ pub use request_matching::{
 };
 
 pub use admission_capture_authority::{
-    AdmissionCaptureAuthority, AdmissionCaptureDecision, AdmissionCaptureDenial,
-    AdmissionCaptureDenialReason, AdmissionCaptureError, AdmissionCaptureMetadata,
-    AdmissionCaptureRequest, MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION,
+    AdmissionCaptureAuthority, AdmissionCaptureAuthorityProjection, AdmissionCaptureDecision,
+    AdmissionCaptureDenial, AdmissionCaptureDenialReason, AdmissionCaptureError,
+    AdmissionCaptureInvocationQuotaProjection, AdmissionCaptureMetadata,
+    AdmissionCaptureMetadataInput, AdmissionCaptureQuotaKeyProjection, AdmissionCaptureRequest,
+    AdmissionCaptureRequestInput, CombinedAdmissionCaptureReceiptProjection,
+    MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION,
 };
 pub use admission_operation::{
-    derive_operation_id, AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
-    AdmissionOperationCreateOutcome, AdmissionOperationError, AdmissionOperationKind,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreProfile,
-    AdmissionRequestBindingInput, InMemoryAdmissionOperationStore, PreparedAdmissionOperation,
-    ReplayReservationState, ADMISSION_OPERATION_SCHEMA, MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION,
+    derive_cleanup_action_id, derive_operation_id, AdmissionCleanupAction,
+    AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
+    AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
+    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationError,
+    AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
+    AdmissionOperationStoreProfile, AdmissionRequestBindingInput, AdmissionRequestBindingParts,
+    InMemoryAdmissionOperationStore, PersistedAdmissionCleanupAction, PersistedAdmissionOperation,
+    PreparedAdmissionOperation, ReplayReservationState, ADMISSION_OPERATION_SCHEMA,
+    MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION,
 };
 pub use approval::{
     compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
     ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
     ApprovalReservation, ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStore,
-    ApprovalStoreError, ApprovalToken, BatchApproval, BatchApprovalStore, ChannelError,
-    ChannelHandle, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
-    ResolvedApproval, MAX_APPROVAL_TTL_SECS,
+    ApprovalStoreError, ApprovalStoreProfile, ApprovalToken, BatchApproval, BatchApprovalStore,
+    ChannelError, ChannelHandle, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
+    ResolvedApproval, ThresholdApprovalCollectorStatus, ThresholdApprovalProposalCreationContext,
+    ThresholdApprovalProposalCreationParameters, ThresholdApprovalProposalRegistration,
+    MAX_APPROVAL_TTL_SECS,
 };
 pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 pub use authority::{
-    AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
-    CapabilityAuthority, LocalCapabilityAuthority,
+    AuthorityArtifactTrustResolver, AuthoritySnapshot, AuthorityStatus, AuthorityStoreError,
+    AuthorityTrustedKeySnapshot, CapabilityAuthority, CapabilityAuthorityWorkloadBinding,
+    CapabilityIssuanceContext, LocalCapabilityAuthority,
 };
 pub use budget_store::{
-    BudgetInvocationAdmissionEvidence, BudgetStore, BudgetStoreError, BudgetUsageRecord,
-    InMemoryBudgetStore,
+    BudgetInvocationAdmissionEvidence, BudgetStore, BudgetStoreError, BudgetStoreProfile,
+    BudgetUsageRecord, InMemoryBudgetStore,
 };
 pub use capability_lineage::{
     CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
 };
 pub use checkpoint::{
-    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
-    checkpoint_body_sha256, is_supported_checkpoint_schema, verify_checkpoint_continuity,
-    verify_checkpoint_signature, CheckpointError, KernelCheckpoint, KernelCheckpointBody,
-    ReceiptInclusionProof, CHECKPOINT_SCHEMA,
+    build_checkpoint, build_checkpoint_with_backend, build_checkpoint_with_previous,
+    build_inclusion_proof, checkpoint_body_sha256, is_supported_checkpoint_schema,
+    verify_checkpoint_continuity, verify_checkpoint_signature, CheckpointError, KernelCheckpoint,
+    KernelCheckpointBody, ReceiptInclusionProof, CHECKPOINT_SCHEMA,
 };
 pub use chio_core::credit::{
     ensure_capital_execution_custodian_authority, ensure_capital_execution_owner_authority,
@@ -355,8 +366,9 @@ pub use evidence_export::{
 pub use execution_nonce::{
     is_supported_execution_nonce_schema, mint_execution_nonce, verify_execution_nonce,
     ExecutionNonce, ExecutionNonceConfig, ExecutionNonceError, ExecutionNonceReservation,
-    ExecutionNonceReservationError, ExecutionNonceStore, InMemoryExecutionNonceStore, NonceBinding,
-    SignedExecutionNonce, DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, DEFAULT_EXECUTION_NONCE_TTL_SECS,
+    ExecutionNonceReservationError, ExecutionNonceStore, ExecutionNonceStoreProfile,
+    InMemoryExecutionNonceStore, NonceBinding, SignedExecutionNonce,
+    DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, DEFAULT_EXECUTION_NONCE_TTL_SECS,
     EXECUTION_NONCE_SCHEMA,
 };
 pub use memory_provenance::{
@@ -412,17 +424,18 @@ pub use operator_report::{
     MAX_OPERATOR_BUDGET_LIMIT, MAX_SETTLEMENT_BACKLOG_LIMIT, MAX_SHARED_EVIDENCE_LIMIT,
 };
 pub use payment::{
-    AcpPaymentAdapter, CommercePaymentContext, GovernedPaymentContext, PaymentAdapter,
+    AcpPaymentAdapter, CommercePaymentContext, GovernedPaymentContext,
+    OperationPaymentCaptureRequest, OperationPaymentRefundRequest, PaymentAdapter,
     PaymentAuthorization, PaymentAuthorizeRequest, PaymentError, PaymentResult,
     RailSettlementStatus, ReceiptSettlement, X402PaymentAdapter,
 };
 pub use post_invocation::{
-    PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationPipeline,
-    PostInvocationVerdict,
+    PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationInspection,
+    PostInvocationPipeline, PostInvocationVerdict,
 };
 pub use provider_verdict::{
-    build_tool_call_request, canonical_invocation_bytes, verdict_result_from_response,
-    ProviderVerdictError, FABRIC_SHIM_PROVIDER_LANES,
+    canonical_invocation_bytes, verdict_result_from_response, ProviderVerdictError,
+    FABRIC_SHIM_PROVIDER_LANES,
 };
 pub use receipt_analytics::{
     AgentAnalyticsRow, AnalyticsTimeBucket, ReceiptAnalyticsMetrics, ReceiptAnalyticsQuery,
@@ -434,22 +447,29 @@ pub use receipt_query::{
 };
 pub use receipt_store::{
     AuthorizationReceiptConsumption, FederatedEvidenceShareImport, FederatedEvidenceShareSummary,
-    ReceiptCheckpointCreateReport, ReceiptCheckpointRange, ReceiptCheckpointStatusReport,
-    ReceiptFlushReport, ReceiptStore, ReceiptStoreError, ReceiptStoreHealthReport,
-    ReceiptWalCheckpointReport, ReceiptWriterCounters, RetentionConfig, StoredChildReceipt,
-    StoredToolReceipt,
+    IndexedSecurityEvidenceStore, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
+    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
+    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters, RetentionConfig,
+    StoredChildReceipt, StoredToolReceipt,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};
 pub use runtime::{
-    NestedFlowBridge, NestedFlowClient, ToolCallChunk, ToolCallOutput, ToolCallRequest,
-    ToolCallResponse, ToolCallStream, ToolInvocationCost, ToolServerConnection, ToolServerEvent,
-    ToolServerOutput, ToolServerStreamResult, Verdict,
+    BlockingToolServerAdapter, BlockingToolServerConnection, NestedFlowBridge, NestedFlowClient,
+    ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream,
+    ToolInvocationCost, ToolServerConnection, ToolServerEvent, ToolServerOutput,
+    ToolServerStreamResult, Verdict,
 };
 pub use session::{
     InflightRegistry, InflightRequest, LateSessionEvent, PeerCapabilities, Session, SessionError,
     SessionOperationResponse, SessionPersistError, SessionState, SubscriptionRegistry,
     TerminalRegistry,
+};
+pub use supplemental_quota::{
+    OpaqueSignedSupplementalQuota, SupplementalAdmissionAuthorization, SupplementalAdmissionPlan,
+    SupplementalAdmissionPrepareRequest, SupplementalAdmissionRegistrar,
+    SupplementalQuotaDestination, SupplementalQuotaError, SupplementalQuotaVerificationContext,
+    SupplementalQuotaVerifier, VerifiedSupplementalQuotaClaimBody,
 };
 pub use weights_binding::{evaluate_weights_binding, WeightsBindingError, WeightsBindingRequest};
 
@@ -460,10 +480,37 @@ mod kernel;
 pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 pub use kernel::{
-    AgentId, CapabilityId, ChildReceiptLog, ChioKernel, Guard, GuardContext, GuardDecision,
-    HybridSigningConfig, KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource,
-    PromptProvider, ReceiptLog, ResourceProvider, RuntimeAdmissionContext,
-    RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId, StructuredErrorReport,
+    active_response_admission_artifact_payload_digest,
+    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    derive_active_response_dispatch_id, ActiveResponseAdmissionRequest,
+    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+    ActiveResponseArtifactAuthorityAttestationError, ActiveResponseAuthorizationRequest,
+    ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,
+    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
+    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOutcome,
+    ActiveResponseExecutionRequest, ActiveResponseExecutorAuthority,
+    ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
+    ActiveResponseExecutorIdentityError, ActiveResponseFailedEffectEvidence,
+    ActiveResponseFailureEvidence, ActiveResponseFindingAuthority,
+    ActiveResponseFindingAuthorityError, ActiveResponsePolicyRequest,
+    ActiveResponsePolicyResolutionError, ActiveResponseReceiptProofSource,
+    ActiveResponseRequirement, ActiveResponseRequirementResolver, ActiveResponseSubmissionProof,
+    ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError, AgentId,
+    AuthoritativeCorrelatedFindingEvidence, AutomaticActiveResponseDispatchFenceOutcome,
+    AutomaticActiveResponsePermit, CapabilityId, CapabilityIssuanceAdmissionAuthority,
+    ChildReceiptLog, ChioKernel, DispatchCommittedActiveResponseResume,
+    GovernedActiveResponseReservation, GovernedSecurityRuntimePublication,
+    GovernedSecurityRuntimeStatus, Guard, GuardContext, GuardDecision, HybridSigningConfig,
+    KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource,
+    PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission, PromptProvider,
+    ReceiptLog, ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision,
+    RuntimeAdmissionHook, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
+    SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
+    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId, StructuredErrorReport,
+    TransportReceiptObservation, VerifiedActiveResponseBindings,
+    ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
+    ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA, ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
 };

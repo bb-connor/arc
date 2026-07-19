@@ -33,6 +33,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+chio-security-types = { workspace = true }
 chio-test-support = { workspace = true }
 
 [lints]

@@ -485,7 +485,9 @@ pub(crate) fn execute_runtime_loopback_step(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: step.request.origin_kernel_id.clone(),
+        declassification_grant: None,
     };
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

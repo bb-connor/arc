@@ -21,24 +21,26 @@
 
 `conversion.rs` rejects non-object `data` parts before kernel dispatch, receipt construction, deferred task creation, or compatibility passthrough; the one-data-part maximum and text-plus-data precedence are preserved.
 
-`A2aKernelExecutionContext.agent_id` is validated for non-empty, unpadded, control-free shape before skill resolution, kernel dispatch, deferred task allocation, owner checks, or lifecycle mutation. The authenticated identifier is not trimmed or normalized.
+`A2aKernelExecutionContext.agent_id` is validated for non-empty, unpadded, control-free shape before skill resolution, kernel dispatch, deferred task allocation, owner checks, or lifecycle mutation. The authenticated identifier is not trimmed or normalized. The execution context also carries the exact authenticated `session_id`; any supplied security context must name that same session before dispatch.
 
 ## Deferred Task Lifecycle
 
-`task/get` executes a working deferred task once and then persists the terminal result. Terminal deferred-task responses (completed, failed, cancelled) are retained in the internal task map until the TTL expires, so a follow-up `task/get` or idempotent `task/cancel` returns the same owner-bound terminal response rather than `tool not found`. The kernel-backed deferred request is never re-executed after the first successful `task/get`. The deferred-task cap counts every retained task record after TTL pruning, not only working tasks, so terminal retention cannot grow without bound. Signed receipt metadata is preserved on completed or failed terminal responses and cancellation metadata on cancelled responses.
+`task/get` executes a working deferred task once and then persists the terminal result. Terminal deferred-task responses (completed, failed, cancelled) are retained in the internal task map until the TTL expires, so a follow-up `task/get` or idempotent `task/cancel` returns the same owner-bound terminal response rather than `tool not found`. Once orchestration begins, every error terminalizes the retained task as failed with `outcome_unknown` metadata, so a post-dispatch persistence failure cannot replay the tool side effect. The deferred-task cap counts every retained task record after TTL pruning, not only working tasks, so terminal retention cannot grow without bound. Signed receipt metadata is preserved on completed or failed terminal responses and cancellation metadata on cancelled responses.
 
 ## Security And API Constraints
 
-- Public request and response structs do not change.
+- Public A2A wire request and response structs do not change. The Rust-only `A2aKernelExecutionContext` requires an authenticated `session_id`.
 - Authoritative calls route through `CrossProtocolOrchestrator` and the Chio kernel.
 - Compatibility-surface helpers stay visibly non-authoritative and feature-gated.
-- Deferred task ownership stays bound to the authenticated `agent_id` across all task states.
+- Deferred task ownership stays bound to the exact authenticated `agent_id` and `session_id` across all task states.
+- Deferred security-context authorities are registered per session, and every resolved context is compared with the retained session before dispatch.
+- Deferred task ids use cryptographic key material rather than a process-local counter.
 - Receipt metadata, capability ids, bridge route metadata, and lifecycle metadata stay byte-stable for valid requests.
 - No generated code is in scope.
 
 ## Affected Dependents
 
-- `chio-kernel` is reached through kernel-mediated tool execution; the kernel API is unchanged.
-- `chio-cross-protocol` provides bridge and lifecycle metadata contracts, preserved here.
+- `chio-kernel` is reached through a session-aware manifest-security entrypoint that validates the authenticated session against the security context.
+- `chio-cross-protocol` carries the authenticated session through bridge and lifecycle execution.
 - `chio-mcp-edge` remains a target executor dependency for multi-hop routes.
 - Downstream A2A clients may see construction-time manifest errors earlier; successful Agent Card, JSON-RPC, task lifecycle, and response shapes stay compatible.

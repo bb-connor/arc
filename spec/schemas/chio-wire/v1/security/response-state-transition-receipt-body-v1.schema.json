@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-state-transition-receipt-body-v1.schema.json",
+  "title": "Chio response state transition receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "response",
+    "generation",
+    "from_state",
+    "to_state",
+    "cause",
+    "applying_lease_expires_at_unix_ms",
+    "error_code"
+  ],
+  "properties": {
+    "header": {
+      "allOf": [
+        { "$ref": "#/$defs/header" },
+        { "type": "object", "properties": { "prior_receipt_ids": { "type": "array", "maxItems": 1 } } }
+      ]
+    },
+    "response": { "$ref": "#/$defs/response" },
+    "generation": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "from_state": { "$ref": "#/$defs/state" },
+    "to_state": { "$ref": "#/$defs/state" },
+    "cause": {
+      "enum": [
+        "approval_requested",
+        "approval_satisfied",
+        "apply_started",
+        "apply_completed",
+        "applying_lease_renewed",
+        "applying_lease_expired",
+        "plan_expired",
+        "operator_cancelled",
+        "rollback_completed",
+        "rollback_failed",
+        "rollback_requested",
+        "rollback_retry",
+        "validation_failed"
+      ]
+    },
+    "applying_lease_expires_at_unix_ms": {
+      "oneOf": [{ "$ref": "#/$defs/time" }, { "type": "null" }]
+    },
+    "scheduler_lease_owner_id": {
+      "oneOf": [{ "$ref": "#/$defs/identifier" }, { "type": "null" }]
+    },
+    "scheduler_fencing_token": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        { "type": "null" }
+      ]
+    },
+    "error_code": {
+      "oneOf": [{ "$ref": "#/$defs/identifier" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "digest": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "contains": { "type": "integer", "minimum": 1 },
+      "minContains": 1
+    },
+    "time": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "state": {
+      "enum": [
+        "planned",
+        "awaiting_approval",
+        "applying",
+        "active",
+        "apply_partial",
+        "expiring",
+        "rolling_back",
+        "rollback_partial",
+        "cancelled",
+        "expired",
+        "failed",
+        "lifted"
+      ]
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "occurred_at_unix_ms", "tenant_id", "transition_id", "prior_receipt_ids"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "occurred_at_unix_ms": { "$ref": "#/$defs/time" },
+        "tenant_id": { "$ref": "#/$defs/identifier" },
+        "transition_id": { "$ref": "#/$defs/identifier" },
+        "prior_receipt_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_version", "policy_hash"],
+      "properties": {
+        "policy_version": { "$ref": "#/$defs/identifier" },
+        "policy_hash": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "plan_hash", "action_id", "trigger_finding_id", "trigger_finding_hash", "trigger_finding_receipt_id", "affected_set_hash", "plan_expires_at_unix_ms"],
+      "properties": {
+        "policy": { "$ref": "#/$defs/policy" },
+        "plan_hash": { "$ref": "#/$defs/digest" },
+        "action_id": { "$ref": "#/$defs/identifier" },
+        "trigger_finding_id": { "$ref": "#/$defs/identifier" },
+        "trigger_finding_hash": { "$ref": "#/$defs/digest" },
+        "trigger_finding_receipt_id": { "$ref": "#/$defs/identifier" },
+        "affected_set_hash": { "$ref": "#/$defs/digest" },
+        "plan_expires_at_unix_ms": { "$ref": "#/$defs/time" }
+      }
+    }
+  }
+}

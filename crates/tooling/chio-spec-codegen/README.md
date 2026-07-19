@@ -7,12 +7,17 @@ the other three).
 ## What it does
 
 `chio_spec_codegen::codegen_rust(schemas_dir, out_dir)` walks
-`spec/schemas/chio-wire/v1/**/*.schema.json`, registers every schema with a
-single `typify::TypeSpace`, renders the resulting token stream through
-`prettyplease`, prepends the `// DO NOT EDIT` header, and writes the result to
-`out_dir/chio_wire_v1.rs`. It also writes a header-only `out_dir/mod.rs` so the
-`_generated_check` integration test always finds a generated Rust file to
-validate even on a fresh clone.
+`spec/schemas/chio-wire/v1/**/*.schema.json` in lexicographic order. Each
+schema gets an independent `typify::TypeSpace` and a deterministic module
+derived from its relative path. For example,
+`security/response-plan-v1.schema.json` becomes
+`security__response_plan_v1`. The modules are rendered as one consolidated
+syntax tree through `prettyplease`, prepended with the `// DO NOT EDIT` header,
+and written to `out_dir/chio_wire_v1.rs`. Per-schema scopes prevent unrelated
+local `$defs` names from colliding. A normalized module-name collision fails
+closed instead of emitting ambiguous Rust. The pass also writes a header-only
+`out_dir/mod.rs` so the `_generated_check` integration test always finds a
+generated Rust file to validate even on a fresh clone.
 
 ## Toolchain
 
@@ -59,7 +64,7 @@ cargo test  -p chio-core-types --test _generated_check
 
 ```text
 crates/core/chio-core-types/src/_generated/
-  chio_wire_v1.rs   # all types, header-stamped, prettyplease-formatted
+  chio_wire_v1.rs   # one path-named module per schema, header-stamped
   mod.rs            # header-only marker; not yet wired into lib.rs
 ```
 

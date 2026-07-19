@@ -462,12 +462,31 @@ pub fn co_sign_with_origin(
     receipt: ChioReceipt,
     cosigner: &dyn BilateralCoSigningProtocol,
 ) -> Result<DualSignedReceipt, BilateralCoSigningError> {
+    let backend = Ed25519Backend::new(tool_host_keypair.clone());
+    co_sign_with_origin_backend(
+        origin_kernel_id,
+        origin_public_key,
+        tool_host_kernel_id,
+        &backend,
+        receipt,
+        cosigner,
+    )
+}
+
+pub fn co_sign_with_origin_backend(
+    origin_kernel_id: &str,
+    origin_public_key: &PublicKey,
+    tool_host_kernel_id: &str,
+    tool_host_backend: &dyn SigningBackend,
+    receipt: ChioReceipt,
+    cosigner: &dyn BilateralCoSigningProtocol,
+) -> Result<DualSignedReceipt, BilateralCoSigningError> {
     let started = std::time::Instant::now();
     let outcome = co_sign_with_origin_inner(
         origin_kernel_id,
         origin_public_key,
         tool_host_kernel_id,
-        tool_host_keypair,
+        tool_host_backend,
         receipt,
         cosigner,
     );
@@ -485,15 +504,15 @@ fn co_sign_with_origin_inner(
     origin_kernel_id: &str,
     origin_public_key: &PublicKey,
     tool_host_kernel_id: &str,
-    tool_host_keypair: &Keypair,
+    tool_host_backend: &dyn SigningBackend,
     receipt: ChioReceipt,
     cosigner: &dyn BilateralCoSigningProtocol,
 ) -> Result<DualSignedReceipt, BilateralCoSigningError> {
     let body = CoSigningBody::from_receipt(&receipt, origin_kernel_id, tool_host_kernel_id)?;
     let bytes = body.canonical_bytes()?;
 
-    let backend = Ed25519Backend::new(tool_host_keypair.clone());
-    let org_b_signature = backend
+    let tool_host_public_key = tool_host_backend.public_key();
+    let org_b_signature = tool_host_backend
         .sign_bytes(&bytes)
         .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
 
@@ -520,7 +539,7 @@ fn co_sign_with_origin_inner(
     // Double-check the assembled artifact verifies end-to-end. The kernel
     // relies on this invariant to persist only dual-signed artifacts that
     // would themselves pass third-party verification.
-    dual.verify(origin_public_key, &tool_host_keypair.public_key())?;
+    dual.verify(origin_public_key, &tool_host_public_key)?;
     Ok(dual)
 }
 
@@ -681,14 +700,18 @@ pub fn execute_local_bilateral_invocation_fixture(
     )?;
 
     let dsse_envelope = crate::bilateral_dsse::sign_dsse_envelope_full(
-        &request.receipt,
-        request.origin_keypair,
-        request.tool_host_keypair,
-        request.origin_kernel_id,
-        request.tool_host_kernel_id,
-        request.tool_name,
-        request.timestamp_unix_ms,
-        request.predicate_extensions,
+        crate::bilateral_dsse::BilateralDsseLocalSigningInput {
+            invocation: crate::bilateral_dsse::BilateralDsseInvocationInput {
+                receipt: &request.receipt,
+                org_a_kernel_id: request.origin_kernel_id,
+                org_b_kernel_id: request.tool_host_kernel_id,
+                tool_name: request.tool_name,
+                timestamp_unix_ms: request.timestamp_unix_ms,
+                extensions: request.predicate_extensions,
+            },
+            org_a_signer: request.origin_keypair,
+            org_b_signer: request.tool_host_keypair,
+        },
     )?;
 
     let artifacts = BilateralCoSignArtifacts {

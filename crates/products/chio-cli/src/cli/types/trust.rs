@@ -15,6 +15,76 @@ pub(crate) enum TrustCommands {
         #[arg(long, env = "CHIO_TRUST_SERVICE_TOKEN", hide_env_values = true)]
         service_token: String,
 
+        /// Dedicated credential exchanged once for a read-only dashboard session.
+        #[arg(
+            long,
+            env = "CHIO_TRUST_DASHBOARD_READ_TOKEN",
+            hide_env_values = true
+        )]
+        dashboard_read_token: Option<String>,
+
+        /// HTTPS origin of the pheromone relay observability endpoint.
+        #[arg(long, env = "CHIO_TRUST_DASHBOARD_REPORT_ORIGIN")]
+        dashboard_report_origin: Option<String>,
+
+        /// Server-side bearer used only for relay observability reads.
+        #[arg(
+            long,
+            env = "CHIO_TRUST_DASHBOARD_REPORT_TOKEN",
+            hide_env_values = true
+        )]
+        dashboard_report_token: Option<String>,
+
+        /// Permit an HTTP loopback relay origin for local integration tests.
+        #[arg(long, default_value_t = false)]
+        dashboard_allow_insecure_report_origin: bool,
+
+        /// Dedicated bearer token for capability-authority rotation. This
+        /// credential must never be installed on a workload edge.
+        #[arg(
+            long,
+            env = "CHIO_TRUST_AUTHORITY_ADMIN_TOKEN",
+            hide_env_values = true
+        )]
+        authority_admin_token: Option<String>,
+
+        /// Dedicated bearer token for the pinned capability-issuance workload.
+        #[arg(
+            long,
+            env = "CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        authority_workload_token: Option<String>,
+
+        /// Fixed tenant claim for the authority workload credential.
+        #[arg(long, env = "CHIO_TRUST_AUTHORITY_WORKLOAD_TENANT_ID")]
+        authority_workload_tenant_id: Option<String>,
+
+        /// Fixed workload claim for the authority workload credential.
+        #[arg(long, env = "CHIO_TRUST_AUTHORITY_WORKLOAD_ID")]
+        authority_workload_id: Option<String>,
+
+        /// Fixed server claim for the authority workload credential.
+        #[arg(long, env = "CHIO_TRUST_AUTHORITY_WORKLOAD_SERVER_ID")]
+        authority_workload_server_id: Option<String>,
+
+        /// Public key of the persisted workload request signer authorized to
+        /// prove capability issuance requests.
+        #[arg(long, env = "CHIO_TRUST_AUTHORITY_WORKLOAD_PUBLIC_KEY_FILE")]
+        authority_workload_public_key_file: Option<PathBuf>,
+
+        /// Public key of the distinct edge session-admission signer trusted to
+        /// attest centrally bound session and principal claims.
+        #[arg(
+            long,
+            env = "CHIO_TRUST_AUTHORITY_SESSION_ADMISSION_PUBLIC_KEY_FILE"
+        )]
+        authority_session_admission_public_key_file: Option<PathBuf>,
+
+        /// Enterprise keyring runtime configuration for capability-authority signing.
+        #[arg(long, env = "CHIO_TRUST_AUTHORITY_KEYRING_CONFIG")]
+        authority_keyring_config: Option<PathBuf>,
+
         /// Tenant-scoped read token mapping in `tenant_id=token` form. Repeat
         /// for multiple tenants. Requests presenting one of these tokens are
         /// confined to reading the matching tenant's receipts; the
@@ -29,6 +99,18 @@ pub(crate) enum TrustCommands {
         /// Peer trust-control base URL. Repeat for multiple peers.
         #[arg(long = "peer-url")]
         peer_urls: Vec<String>,
+
+        /// Strict 0600 Ed25519 seed file for this cluster node's membership identity.
+        #[arg(long, env = "CHIO_TRUST_CLUSTER_NODE_SEED_FILE")]
+        cluster_node_seed_file: Option<PathBuf>,
+
+        /// Dedicated SQLite database for durable cluster request replay rejection.
+        #[arg(long, env = "CHIO_TRUST_CLUSTER_REPLAY_DB")]
+        cluster_replay_db: Option<PathBuf>,
+
+        /// Pinned cluster member in URL=ED25519_PUBLIC_KEY form. Repeat for every node.
+        #[arg(long = "cluster-member", value_name = "URL=ED25519_PUBLIC_KEY")]
+        cluster_members: Vec<String>,
 
         /// Allow loopback/private cluster peer URLs for local development only.
         #[arg(long, default_value_t = false)]

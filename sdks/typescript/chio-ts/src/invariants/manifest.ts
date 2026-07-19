@@ -28,7 +28,14 @@ export interface ToolManifest {
     input_schema: unknown;
     output_schema?: unknown;
     pricing?: ToolPricing;
-    has_side_effects: boolean;
+    has_side_effects?: boolean;
+    annotations?: {
+      read_only: boolean;
+      destructive: boolean;
+      idempotent: boolean;
+      requires_approval: boolean;
+    };
+    flow?: unknown;
     latency_hint?: "instant" | "fast" | "moderate" | "slow";
   }>;
   server_tools?: Array<"computer_use" | "bash" | "text_editor">;
@@ -36,7 +43,9 @@ export interface ToolManifest {
     read_paths?: string[];
     write_paths?: string[];
     network_hosts?: string[];
+    network_destinations?: Array<{ host: string; port: number }>;
     environment_variables?: string[];
+    native_syscall_profile?: "native_minimal_v1" | "native_standard_v1" | "brokered_native_v1";
   };
   public_key: string;
 }
@@ -88,6 +97,89 @@ const TOOL_FIELD_SET = new Set<string>([
   "has_side_effects",
   "latency_hint",
 ]);
+const V2_TOOL_FIELD_SET = new Set<string>([
+  "name",
+  "description",
+  "input_schema",
+  "output_schema",
+  "pricing",
+  "annotations",
+  "latency_hint",
+  "flow",
+]);
+const V2_ANNOTATION_FIELD_SET = new Set<string>([
+  "read_only",
+  "destructive",
+  "idempotent",
+  "requires_approval",
+]);
+const V2_PERMISSION_FIELD_SET = new Set<string>([
+  "read_paths",
+  "write_paths",
+  "network_destinations",
+  "environment_variables",
+  "native_syscall_profile",
+]);
+const FLOW_FIELD_SET = new Set<string>([
+  "output_label",
+  "input_clearance",
+  "egress",
+  "declassification_purposes",
+]);
+const NATIVE_PROFILE_SET = new Set<string>([
+  "native_minimal_v1",
+  "native_standard_v1",
+  "brokered_native_v1",
+]);
+const FORBIDDEN_ENVIRONMENT_PREFIXES = ["LD_", "DYLD_", "BASH_FUNC_", "MALLOC_"] as const;
+const FORBIDDEN_ENVIRONMENT_NAMES = new Set<string>([
+  "BASH_ENV",
+  "DOCKER_CONFIG",
+  "ENV",
+  "GCONV_PATH",
+  "GEM_HOME",
+  "GEM_PATH",
+  "GIT_ASKPASS",
+  "GLIBC_TUNABLES",
+  "GPG_AGENT_INFO",
+  "IFS",
+  "JAVA_TOOL_OPTIONS",
+  "JDK_JAVA_OPTIONS",
+  "KRB5CCNAME",
+  "LOCPATH",
+  "NETRC",
+  "NLSPATH",
+  "NODE_OPTIONS",
+  "NODE_PATH",
+  "NPM_CONFIG_USERCONFIG",
+  "PERL5OPT",
+  "PERL5LIB",
+  "PYTHONHOME",
+  "PYTHONINSPECT",
+  "PYTHONPATH",
+  "PYTHONSTARTUP",
+  "RUBYLIB",
+  "RUBYOPT",
+  "RUSTC_WRAPPER",
+  "SSLKEYLOGFILE",
+  "SSL_CERT_DIR",
+  "SSL_CERT_FILE",
+  "SSH_AUTH_SOCK",
+  "SUDO_ASKPASS",
+  "ZDOTDIR",
+  "_JAVA_OPTIONS",
+]);
+const CREDENTIAL_ENVIRONMENT_MARKERS = [
+  "TOKEN",
+  "SECRET",
+  "PASSWORD",
+  "PASSWD",
+  "CREDENTIAL",
+  "API_KEY",
+  "PRIVATE_KEY",
+  "ACCESS_KEY",
+  "AUTHORIZATION",
+] as const;
 const PRICING_FIELD_SET = new Set<string>([
   "pricing_model",
   "base_price",
@@ -99,6 +191,13 @@ const LATENCY_HINT_SET = new Set<string>(["instant", "fast", "moderate", "slow"]
 const U64_MAX_EXCLUSIVE = 2 ** 64;
 
 function validateManifestStructure(manifest: ToolManifest): boolean {
+  if (manifest.schema === "chio.manifest.v2") {
+    return validateManifestV2(manifest as unknown as Record<string, unknown>);
+  }
+  return validateManifestV1(manifest);
+}
+
+function validateManifestV1(manifest: ToolManifest): boolean {
   if (!hasOnlyKnownKeys(manifest as unknown as Record<string, unknown>, MANIFEST_FIELD_SET)) {
     return false;
   }
@@ -165,6 +264,163 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
   return validateRequiredPermissions(manifest.required_permissions);
 }
 
+function validateManifestV2(manifest: Record<string, unknown>): boolean {
+  if (!hasOnlyKnownKeys(manifest, MANIFEST_FIELD_SET)) return false;
+  if (
+    manifest.schema !== "chio.manifest.v2" ||
+    !isValidManifestTextField(manifest.server_id) ||
+    !isValidManifestTextField(manifest.name) ||
+    !isValidManifestTextField(manifest.version) ||
+    typeof manifest.public_key !== "string"
+  ) return false;
+  if (hasOwn(manifest, "description") && typeof manifest.description !== "string") {
+    return false;
+  }
+  if (hasOwn(manifest, "server_tools")) {
+    if (!Array.isArray(manifest.server_tools) || manifest.server_tools.length === 0 ||
+      !validateServerTools(manifest.server_tools)) return false;
+  }
+  if (hasOwn(manifest, "required_permissions") &&
+    !validateRequiredPermissionsV2(manifest.required_permissions)) return false;
+  if (!Array.isArray(manifest.tools) || manifest.tools.length === 0) return false;
+  const seen = new Set<string>();
+  for (const candidate of manifest.tools) {
+    if (!isJsonObject(candidate) || !hasOnlyKnownKeys(candidate, V2_TOOL_FIELD_SET)) return false;
+    if (!isValidToolName(candidate.name) || seen.has(candidate.name)) return false;
+    seen.add(candidate.name);
+    if (typeof candidate.description !== "string" || !isJsonObject(candidate.input_schema)) {
+      return false;
+    }
+    if (hasOwn(candidate, "output_schema") && !isJsonObject(candidate.output_schema)) {
+      return false;
+    }
+    if (hasOwn(candidate, "pricing") &&
+      (candidate.pricing === null || !validateToolPricing(candidate.pricing))) return false;
+    if (!validateAnnotationsV2(candidate.annotations)) return false;
+    if (hasOwn(candidate, "latency_hint") &&
+      (typeof candidate.latency_hint !== "string" || !LATENCY_HINT_SET.has(candidate.latency_hint))) {
+      return false;
+    }
+    if (hasOwn(candidate, "flow") && !validateFlowV2(candidate.flow)) return false;
+  }
+  return true;
+}
+
+function validateAnnotationsV2(value: unknown): boolean {
+  return isJsonObject(value) &&
+    Object.keys(value).length === V2_ANNOTATION_FIELD_SET.size &&
+    hasOnlyKnownKeys(value, V2_ANNOTATION_FIELD_SET) &&
+    Array.from(V2_ANNOTATION_FIELD_SET).every((field) => typeof value[field] === "boolean");
+}
+
+function validateFlowV2(value: unknown): boolean {
+  if (!isJsonObject(value) || !hasOnlyKnownKeys(value, FLOW_FIELD_SET) ||
+    typeof value.egress !== "boolean") return false;
+  for (const field of ["output_label", "input_clearance"]) {
+    if (hasOwn(value, field) && !validateKnownLabel(value[field])) return false;
+  }
+  if (hasOwn(value, "declassification_purposes")) {
+    const purposes = value.declassification_purposes;
+    if (!Array.isArray(purposes) || purposes.length === 0) return false;
+    const seen = new Set<string>();
+    for (const purpose of purposes) {
+      if (!isValidIdentifier(purpose) || seen.has(purpose)) return false;
+      seen.add(purpose);
+    }
+  }
+  return true;
+}
+
+function validateKnownLabel(value: unknown): boolean {
+  if (!isJsonObject(value) || !hasOnlyKnownKeys(value, new Set(["kind", "owners", "compartments"])) ||
+    value.kind !== "known" || !isJsonObject(value.owners) || !Array.isArray(value.compartments) ||
+    value.compartments.length > 64) return false;
+  const compartments = new Set<string>();
+  for (const compartment of value.compartments) {
+    if (!isValidIdentifier(compartment) || compartments.has(compartment)) return false;
+    compartments.add(compartment);
+  }
+  if (Object.keys(value.owners).length > 64) return false;
+  for (const [owner, readers] of Object.entries(value.owners)) {
+    if (!isValidIdentifier(owner) || !Array.isArray(readers) || readers.length > 256) return false;
+    const readerSet = new Set<string>();
+    for (const reader of readers) {
+      if (!isValidIdentifier(reader) || readerSet.has(reader)) return false;
+      readerSet.add(reader);
+    }
+    if (!readerSet.has(owner)) return false;
+  }
+  return true;
+}
+
+function isValidIdentifier(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 256 &&
+    value.trim() === value && !hasControlCharacter(value);
+}
+
+function validateRequiredPermissionsV2(value: unknown): boolean {
+  if (!isJsonObject(value) || !hasOnlyKnownKeys(value, V2_PERMISSION_FIELD_SET) ||
+    typeof value.native_syscall_profile !== "string" ||
+    !NATIVE_PROFILE_SET.has(value.native_syscall_profile)) return false;
+  for (const field of ["read_paths", "write_paths"]) {
+    if (hasOwn(value, field) && !validatePathList(value[field])) return false;
+  }
+  if (hasOwn(value, "environment_variables") &&
+    !validateEnvironmentList(value.environment_variables)) return false;
+  if (hasOwn(value, "network_destinations") &&
+    !validateNetworkDestinations(value.network_destinations)) return false;
+  return true;
+}
+
+function validatePathList(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const seen = new Set<string>();
+  for (const path of value) {
+    if (typeof path !== "string" || !path.startsWith("/") || path === "/" ||
+      path.split("/").slice(1).some((component) => component === "" || component === "." || component === "..") ||
+      path.trim() !== path || hasControlCharacter(path) ||
+      seen.has(path)) return false;
+    seen.add(path);
+  }
+  return true;
+}
+
+function validateEnvironmentList(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const seen = new Set<string>();
+  for (const name of value) {
+    if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ||
+      isForbiddenEnvironmentName(name) || seen.has(name)) {
+      return false;
+    }
+    seen.add(name);
+  }
+  return true;
+}
+
+function isForbiddenEnvironmentName(name: string): boolean {
+  return FORBIDDEN_ENVIRONMENT_PREFIXES.some((prefix) => name.startsWith(prefix)) ||
+    FORBIDDEN_ENVIRONMENT_NAMES.has(name) ||
+    CREDENTIAL_ENVIRONMENT_MARKERS.some((marker) => name.includes(marker));
+}
+
+function validateNetworkDestinations(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const seen = new Set<string>();
+  for (const destination of value) {
+    if (!isJsonObject(destination) || Object.keys(destination).length !== 2 ||
+      !hasOnlyKnownKeys(destination, new Set(["host", "port"])) ||
+      typeof destination.host !== "string" || destination.host !== destination.host.toLowerCase() ||
+      destination.host.length === 0 || destination.host.length > 253 || /[\s*/]/.test(destination.host) ||
+      typeof destination.port !== "number" || !Number.isInteger(destination.port) ||
+      destination.port < 1 || destination.port > 65535) return false;
+    const key = `${destination.host}:${destination.port}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+
 function isValidManifestTextField(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -172,6 +428,10 @@ function isValidManifestTextField(value: unknown): value is string {
     value.trim() === value &&
     !hasControlCharacter(value)
   );
+}
+
+function hasOwn(value: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, field);
 }
 
 function isValidToolName(name: unknown): name is string {

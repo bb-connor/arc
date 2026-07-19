@@ -300,7 +300,8 @@ fn generate_proof_fixture(fixture_id: &str, out: &Path, json_output: bool) -> Re
     } else {
         copy_embedded_fixture(installed_fixture_path(&descriptor), out)?;
     }
-    if descriptor.kind == "transaction-passport" || descriptor.kind == "negative-transaction-passport"
+    if descriptor.kind == "transaction-passport"
+        || descriptor.kind == "negative-transaction-passport"
     {
         remove_generated_negative_catalog(out)?;
     }
@@ -383,11 +384,7 @@ fn normalize_declared_evidence_graph_node_ids(
         write_json_line_file(&evidence_graph_path, &evidence_graph)?;
         let passport_path = evidence_graph_path.with_file_name("transaction-passport.json");
         if passport_path.is_file()
-            && !preserves_evidence_graph_digest_mismatch(
-                descriptor,
-                out,
-                &evidence_graph_path,
-            )
+            && !preserves_evidence_graph_digest_mismatch(descriptor, out, &evidence_graph_path)
         {
             let mut passport = read_json_value(&passport_path)?;
             passport["evidence_graph_sha256"] =
@@ -479,9 +476,9 @@ fn preserves_evidence_graph_digest_mismatch(
         .strip_prefix(out)
         .ok()
         .is_some_and(|relative_path| {
-            relative_path.components().any(|component| {
-                component.as_os_str() == "evidence-graph-digest-mismatch"
-            })
+            relative_path
+                .components()
+                .any(|component| component.as_os_str() == "evidence-graph-digest-mismatch")
         })
 }
 
@@ -711,9 +708,7 @@ fn runtime_join_receipt_signature(
     Ok(keypair
         .sign_canonical(&body)
         .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "runtime join receipt signing failed: {error}"
-            ))
+            CliError::cli_other_error(format!("runtime join receipt signing failed: {error}"))
         })?
         .0
         .to_hex())
@@ -729,15 +724,13 @@ fn normalize_runtime_reused_nonce_bundle(
     let mut replay_ack = read_json_value(&source_ack_path)?;
     replay_ack["ack_id"] = serde_json::Value::String("ack-runtime-replay".to_string());
     replay_ack["issued_at"] = serde_json::Value::String("2026-06-10T00:00:03Z".to_string());
-    replay_ack["signature"] =
-        serde_json::Value::String(sign_runtime_tool_server_ack(&replay_ack)?);
+    replay_ack["signature"] = serde_json::Value::String(sign_runtime_tool_server_ack(&replay_ack)?);
     write_json_line_file(&replay_ack_path, &replay_ack)?;
 
     let replay_sha256 = sha256_file(&replay_ack_path)?;
     let nodes = json_array_mut(&mut evidence_graph, "nodes", evidence_graph_path)?;
     let replay_node = if let Some(index) = nodes.iter().position(|node| {
-        node.get("path").and_then(serde_json::Value::as_str)
-            == Some("tool-server-ack-replay.json")
+        node.get("path").and_then(serde_json::Value::as_str) == Some("tool-server-ack-replay.json")
             || node.get("id").and_then(serde_json::Value::as_str) == Some("ack-runtime-replay")
     }) {
         &mut nodes[index]
@@ -749,9 +742,9 @@ fn normalize_runtime_reused_nonce_bundle(
             "schema": "chio.runtime.tool-server-ack.v1",
             "sha256": replay_sha256
         }));
-        nodes
-            .last_mut()
-            .ok_or_else(|| CliError::cli_other_error("runtime replay ack node missing".to_string()))?
+        nodes.last_mut().ok_or_else(|| {
+            CliError::cli_other_error("runtime replay ack node missing".to_string())
+        })?
     };
     let old_id = replay_node
         .get("id")
@@ -880,10 +873,7 @@ pub(super) fn proof_fixture_negative_verifier_context(
 ) -> Result<Option<serde_json::Value>, CliError> {
     let negative_case = proof_fixture_negative_case(descriptor)?;
     let value = serde_json::to_value(negative_case.verifier_context).map_err(CliError::from)?;
-    if value
-        .as_object()
-        .is_some_and(|object| !object.is_empty())
-    {
+    if value.as_object().is_some_and(|object| !object.is_empty()) {
         Ok(Some(value))
     } else {
         Ok(None)
@@ -1093,8 +1083,8 @@ fn write_generated_verifier_report(
     verifier_report_path: &Path,
 ) -> Result<(), CliError> {
     if descriptor.id == SINGLE_CALL_AUTHORITY_FIXTURE_ID {
-        let valid_passport = proof_fixture_source_root()
-            .join("minimal-passport/valid/transaction-passport.json");
+        let valid_passport =
+            proof_fixture_source_root().join("minimal-passport/valid/transaction-passport.json");
         let report = verify_transaction_passport_file(&valid_passport)?;
         write_json_line_file(verifier_report_path, &report)?;
         return Ok(());
@@ -1341,7 +1331,9 @@ fn normalize_disclosure_lineage_bbs_material_for_bundle(bundle: &Path) -> Result
     Ok(())
 }
 
-fn add_disclosure_bbs_material_to_bundle_with_fixture_signer(bundle: &Path) -> Result<(), CliError> {
+fn add_disclosure_bbs_material_to_bundle_with_fixture_signer(
+    bundle: &Path,
+) -> Result<(), CliError> {
     let evidence_graph_path = bundle.join("evidence-graph.json");
     let mut evidence_graph = read_json_value(&evidence_graph_path)?;
     add_disclosure_agent_web_crypto_context_material(bundle, &mut evidence_graph)?;
@@ -1484,7 +1476,10 @@ fn generate_commerce_transaction_passport_fixture(out: &Path) -> Result<(), CliE
     add_commerce_terminal_receipts(&bundle)?;
     normalize_commerce_mandate_projection_edges(&bundle)?;
     refresh_commerce_order_passport_bundle(&bundle)?;
-    normalize_declared_evidence_graph_node_ids(&commerce_transaction_passport_fixture_descriptor(), &bundle)?;
+    normalize_declared_evidence_graph_node_ids(
+        &commerce_transaction_passport_fixture_descriptor(),
+        &bundle,
+    )?;
     collect::seal_collected_public_fixture_bundle(
         ProofCollectKind::IoaWeb3,
         &bundle,
@@ -1528,7 +1523,10 @@ fn merge_commerce_trust_market_fixture(
     let trust_market_replacements = [
         ("passport-trust-market-valid", passport_id.as_str()),
         ("order-commerce-001", order_id.as_str()),
-        ("did:chio:provider-alpha", selected_provider_subject.as_str()),
+        (
+            "did:chio:provider-alpha",
+            selected_provider_subject.as_str(),
+        ),
     ];
     let evidence_graph_path = bundle.join("evidence-graph.json");
     let mut evidence_graph = read_json_value(&evidence_graph_path)?;
@@ -1588,12 +1586,16 @@ fn add_public_stage_settlement_trust_market_refs(
     let sla = read_json_value(&sla_path)?;
 
     let mut settlement_proof = read_json_value(&settlement_proof_path)?;
-    settlement_proof["collateral_position_ref"] = serde_json::Value::String(
-        required_json_string(&collateral, "collateral_id", &collateral_path)?,
-    );
-    settlement_proof["guarantee_decision_ref"] = serde_json::Value::String(
-        required_json_string(&guarantee, "guarantee_id", &guarantee_path)?,
-    );
+    settlement_proof["collateral_position_ref"] = serde_json::Value::String(required_json_string(
+        &collateral,
+        "collateral_id",
+        &collateral_path,
+    )?);
+    settlement_proof["guarantee_decision_ref"] = serde_json::Value::String(required_json_string(
+        &guarantee,
+        "guarantee_id",
+        &guarantee_path,
+    )?);
     settlement_proof["sla_remedy_ref"] =
         serde_json::Value::String(required_json_string(&sla, "remedy_policy_ref", &sla_path)?);
     settlement_proof["slash_authority_ref"] = serde_json::Value::String(required_json_string(
@@ -1642,9 +1644,8 @@ fn refresh_commerce_order_passport_bundle(bundle: &Path) -> Result<(), CliError>
 fn refresh_commerce_negative_order_passport_binding(bundle: &Path) -> Result<(), CliError> {
     let order_passport_path = bundle.join("order-passport.json");
     if !order_passport_path.is_file() {
-        let source = proof_fixture_source_root().join(
-            "commerce-payments/offline-psp-valid/order-passport.json",
-        );
+        let source = proof_fixture_source_root()
+            .join("commerce-payments/offline-psp-valid/order-passport.json");
         if source.is_file() {
             fs::copy(source, &order_passport_path)?;
         } else {
@@ -1776,12 +1777,14 @@ fn refresh_commerce_order_passport_graph_binding(
             )?,
             trusted_event_authority_receipt_kernel_keys: vec![commerce_authority_key.clone()],
             trusted_payment_signer_keys: vec![commerce_authority_key],
-            trusted_provider_trust_signer_keys: vec![
-                Keypair::from_seed(&COMMERCE_PROVIDER_TRUST_SIGNATURE_SEED).public_key(),
-            ],
-            trusted_risk_comptroller_signer_keys: vec![
-                Keypair::from_seed(&ENTERPRISE_RISK_COMPTROLLER_SIGNATURE_SEED).public_key(),
-            ],
+            trusted_provider_trust_signer_keys: vec![Keypair::from_seed(
+                &COMMERCE_PROVIDER_TRUST_SIGNATURE_SEED,
+            )
+            .public_key()],
+            trusted_risk_comptroller_signer_keys: vec![Keypair::from_seed(
+                &ENTERPRISE_RISK_COMPTROLLER_SIGNATURE_SEED,
+            )
+            .public_key()],
         },
     )
     .map_err(|error| {
@@ -1817,9 +1820,11 @@ fn fixture_commerce_trust_market_context(
     let risk_comptroller_report_ref =
         optional_json_string(&bundle.join("risk-comptroller-report.json"), "id")?
             .unwrap_or_else(|| "risk-comptroller-market-valid".to_string());
-    let selected_provider_subject =
-        optional_json_string(&bundle.join("provider-selection-report.json"), "selected_provider_subject")?
-            .unwrap_or_else(|| order_context.merchant_subject.clone());
+    let selected_provider_subject = optional_json_string(
+        &bundle.join("provider-selection-report.json"),
+        "selected_provider_subject",
+    )?
+    .unwrap_or_else(|| order_context.merchant_subject.clone());
     Ok(Some(
         chio_commerce_order::CommerceVerifiedTrustMarketContext {
             provider_discovery_snapshot_ref: requirement.provider_discovery_snapshot_ref.clone(),
@@ -3570,8 +3575,12 @@ fn add_disclosure_agent_web_crypto_context_material(
     write_json_line_file(&report_path, &report)?;
 
     let graph_path = bundle.join("evidence-graph.json");
-    let mut capsule_ids =
-        graph_node_aliases(evidence_graph, &graph_path, "capsule.json", "disclosure-capsule")?;
+    let mut capsule_ids = graph_node_aliases(
+        evidence_graph,
+        &graph_path,
+        "capsule.json",
+        "disclosure-capsule",
+    )?;
     let mut privacy_profile_ids = graph_node_aliases(
         evidence_graph,
         &graph_path,
@@ -4238,8 +4247,7 @@ fn upsert_claim_set_graph_binding(
         .iter()
         .filter(|node| {
             node.get("path").and_then(serde_json::Value::as_str) == Some("verifier-policy.json")
-                || node.get("role").and_then(serde_json::Value::as_str)
-                    == Some("verifier-policy")
+                || node.get("role").and_then(serde_json::Value::as_str) == Some("verifier-policy")
         })
         .flat_map(|node| {
             [
@@ -4259,10 +4267,7 @@ fn upsert_claim_set_graph_binding(
         .cloned()
         .unwrap_or_else(|| "verifier-policy".to_string());
 
-    let mut claim_set_ids = BTreeSet::from([
-        "claim-set".to_string(),
-        claim_set_sha256.to_string(),
-    ]);
+    let mut claim_set_ids = BTreeSet::from(["claim-set".to_string(), claim_set_sha256.to_string()]);
     for node in nodes.iter() {
         if node.get("path").and_then(serde_json::Value::as_str) == Some("claim-set.json")
             || node.get("role").and_then(serde_json::Value::as_str) == Some("claim-set")
@@ -4661,14 +4666,19 @@ fn ensure_enterprise_risk_financial_invariants(risk_report: &mut serde_json::Val
         "status": if is_market_context { "bound" } else { "collected" }
     });
     if !is_market_context {
-        premium["observed_payment_ref"] = serde_json::Value::String("evidence-export-bundle".into());
+        premium["observed_payment_ref"] =
+            serde_json::Value::String("evidence-export-bundle".into());
     }
 
     let committed_units = risk_report_u64(risk_report, &["facility", "capital_units"]);
     let held_units = risk_report_u64(risk_report, &["facility", "reserve_units"]);
     let settlement_units = risk_report_u64(risk_report, &["reconciliation", "settlement_units"]);
     let payout_units = risk_report_u64(risk_report, &["reconciliation", "payout_units"]);
-    let drawn_units = if settlement_units == 0 { payout_units } else { 0 };
+    let drawn_units = if settlement_units == 0 {
+        payout_units
+    } else {
+        0
+    };
     let disbursed_units = settlement_units;
     let deductions = held_units
         .saturating_add(drawn_units)
@@ -5894,10 +5904,8 @@ fn refresh_graph_node_hashes(
                 resolve_graph_artifact_path(bundle, "verifier-policy.json")
             {
                 if sha256_file(&artifact_path)? == sha256_file(&verifier_policy_path)? {
-                    node["path"] =
-                        serde_json::Value::String("verifier-policy.json".to_string());
-                    node["role"] =
-                        serde_json::Value::String("verifier-policy".to_string());
+                    node["path"] = serde_json::Value::String("verifier-policy.json".to_string());
+                    node["role"] = serde_json::Value::String("verifier-policy".to_string());
                     artifact_path = verifier_policy_path;
                 }
             }

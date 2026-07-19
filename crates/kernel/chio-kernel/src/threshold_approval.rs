@@ -15,7 +15,14 @@ pub use chio_core::capability::threshold_approval::{
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{sha256_hex, PublicKey, SigningAlgorithm};
 
+use crate::admission_operation::{
+    AdmissionOperation, AdmissionOperationKind, AdmissionRequestBindingInput,
+    AdmissionRequestBindingParts, PreparedAdmissionOperation,
+};
+use crate::approval::{ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStoreError};
 use crate::canonical_json_bytes;
+
+const CHIO_LEGACY_GOVERNED_APPROVAL_SET_DOMAIN: &[u8] = b"chio.legacy-governed-approval-set.v1\0";
 
 /// Kernel-installed deterministic resolver for the currently loaded policy.
 pub trait ThresholdApprovalRequirementResolver:
@@ -57,6 +64,343 @@ pub enum ThresholdApprovalVerificationError {
     Denied(String),
 }
 
+/// Pure verifier output carrying both the canonical set body and its exact replay members.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedThresholdApprovalSet {
+    body: VerifiedApprovalSetBody,
+    members: Vec<ApprovalReservationMember>,
+}
+
+impl VerifiedThresholdApprovalSet {
+    #[must_use]
+    pub fn body(&self) -> &VerifiedApprovalSetBody {
+        &self.body
+    }
+
+    #[must_use]
+    pub fn members(&self) -> &[ApprovalReservationMember] {
+        &self.members
+    }
+
+    pub fn approval_set_hash(&self) -> Result<String, ThresholdApprovalVerificationError> {
+        self.body
+            .approval_set_hash()
+            .map_err(|error| denied(&format!("verified approval set hash failed: {error}")))
+    }
+
+    pub fn reservation_input(&self) -> Result<ApprovalSetReservationInput, ApprovalStoreError> {
+        ApprovalSetReservationInput::new(
+            self.body
+                .approval_set_hash()
+                .map_err(|error| ApprovalStoreError::Invalid(error.to_string()))?,
+            self.members.clone(),
+            self.body.proposal_deadline(),
+        )
+    }
+}
+
+impl core::ops::Deref for VerifiedThresholdApprovalSet {
+    type Target = VerifiedApprovalSetBody;
+
+    fn deref(&self) -> &Self::Target {
+        &self.body
+    }
+}
+
+/// Canonical approval material used by the durable governed-admission saga.
+///
+/// Threshold approval sets and permitted legacy one-of-one approvals are
+/// normalized into this representation before any replay or budget mutation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct VerifiedGovernedApprovalAdmission {
+    request_id: String,
+    authorization_capability_hash: String,
+    governed_intent_hash: String,
+    policy_hash: String,
+    threshold_proposal_hash: Option<String>,
+    approval_token_digests: Vec<String>,
+    approval_set: ApprovalSetReservationInput,
+}
+
+impl VerifiedGovernedApprovalAdmission {
+    pub(crate) fn from_threshold(
+        verified: &VerifiedThresholdApprovalSet,
+    ) -> Result<Self, ThresholdApprovalVerificationError> {
+        let body = verified.body();
+        body.validate()
+            .map_err(|error| denied(&format!("verified approval set is invalid: {error}")))?;
+        let approval_set = verified.reservation_input().map_err(|error| {
+            denied(&format!(
+                "threshold approval reservation is invalid: {error}"
+            ))
+        })?;
+        Ok(Self {
+            request_id: body.request_id().to_string(),
+            authorization_capability_hash: body.authorization_capability_hash().to_string(),
+            governed_intent_hash: body.governed_intent_hash().to_string(),
+            policy_hash: body.policy_hash().to_string(),
+            threshold_proposal_hash: Some(body.threshold_proposal_hash().to_string()),
+            approval_token_digests: body.token_digests().to_vec(),
+            approval_set,
+        })
+    }
+
+    pub(crate) fn from_legacy_token(
+        token: &GovernedApprovalToken,
+        authorization_capability_hash: &str,
+        governed_intent_hash: &str,
+        policy_hash: &str,
+    ) -> Result<Self, ThresholdApprovalVerificationError> {
+        if token.threshold_proposal_hash.is_some() {
+            return Err(denied(
+                "legacy approval normalization requires a token without a threshold proposal",
+            ));
+        }
+        if token.governed_intent_hash != governed_intent_hash {
+            return Err(denied(
+                "legacy approval intent binding does not match admission",
+            ));
+        }
+        if token.decision != GovernedApprovalDecision::Approved {
+            return Err(denied("legacy approval token does not approve admission"));
+        }
+        let token_digest = token
+            .token_digest()
+            .map_err(|error| denied(&format!("legacy approval token digest failed: {error}")))?;
+        let member = ApprovalReservationMember::new(token.id.clone(), token_digest.clone())
+            .map_err(|error| denied(&format!("legacy approval member is invalid: {error}")))?;
+        let canonical = canonical_json_bytes(&serde_json::json!({
+            "request_id": &token.request_id,
+            "governed_intent_hash": governed_intent_hash,
+            "authorization_capability_hash": authorization_capability_hash,
+            "policy_hash": policy_hash,
+            "member": {
+                "token_id": &token.id,
+                "token_digest": &token_digest,
+            },
+            "expires_at": token.expires_at,
+        }))
+        .map_err(|error| {
+            denied(&format!(
+                "legacy approval set canonicalization failed: {error}"
+            ))
+        })?;
+        let mut preimage =
+            Vec::with_capacity(CHIO_LEGACY_GOVERNED_APPROVAL_SET_DOMAIN.len() + canonical.len());
+        preimage.extend_from_slice(CHIO_LEGACY_GOVERNED_APPROVAL_SET_DOMAIN);
+        preimage.extend_from_slice(&canonical);
+        let approval_set =
+            ApprovalSetReservationInput::new(sha256_hex(&preimage), vec![member], token.expires_at)
+                .map_err(|error| {
+                    denied(&format!("legacy approval reservation is invalid: {error}"))
+                })?;
+        Ok(Self {
+            request_id: token.request_id.clone(),
+            authorization_capability_hash: authorization_capability_hash.to_string(),
+            governed_intent_hash: governed_intent_hash.to_string(),
+            policy_hash: policy_hash.to_string(),
+            threshold_proposal_hash: None,
+            approval_token_digests: vec![token_digest],
+            approval_set,
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn authorization_capability_hash(&self) -> &str {
+        &self.authorization_capability_hash
+    }
+
+    #[must_use]
+    pub(crate) fn governed_intent_hash(&self) -> &str {
+        &self.governed_intent_hash
+    }
+
+    #[must_use]
+    pub(crate) fn approval_set_hash(&self) -> &str {
+        self.approval_set.approval_set_hash()
+    }
+}
+
+/// Explicit inputs for deriving one governed tool admission identity.
+pub(crate) struct GovernedToolAdmissionOperationInput<'a> {
+    pub(crate) coordinator_authority_id: &'a str,
+    pub(crate) request_id: &'a str,
+    pub(crate) capability_id: &'a str,
+    pub(crate) authorization_capability_hash: &'a str,
+    pub(crate) arguments: &'a serde_json::Value,
+    pub(crate) governed_intent_hash: &'a str,
+    pub(crate) policy_hash: &'a str,
+    pub(crate) verified_approval: &'a VerifiedGovernedApprovalAdmission,
+    pub(crate) broker_attempt_id: Option<&'a str>,
+    pub(crate) budget_hold_id: Option<&'a str>,
+    pub(crate) supplemental_authorization_reference: Option<&'a str>,
+    pub(crate) supplemental_authorization_digest: Option<&'a str>,
+    pub(crate) execution_nonce_id: Option<&'a str>,
+    pub(crate) coordinator_lease_epoch: u64,
+}
+
+/// Explicit inputs for deriving one threshold-governed tool admission identity.
+pub struct ThresholdToolAdmissionOperationInput<'a> {
+    pub coordinator_authority_id: &'a str,
+    pub request_id: &'a str,
+    pub capability_id: &'a str,
+    pub authorization_capability_hash: &'a str,
+    pub arguments: &'a serde_json::Value,
+    pub governed_intent_hash: &'a str,
+    pub policy_hash: &'a str,
+    pub verified_approval_set: &'a VerifiedThresholdApprovalSet,
+    pub broker_attempt_id: Option<&'a str>,
+    pub budget_hold_id: Option<&'a str>,
+    pub supplemental_authorization_reference: Option<&'a str>,
+    pub supplemental_authorization_digest: Option<&'a str>,
+    pub execution_nonce_id: Option<&'a str>,
+    pub coordinator_lease_epoch: u64,
+}
+
+/// Deterministic operation plus the exact verified replay members it owns.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedGovernedToolAdmission {
+    operation: AdmissionOperation,
+    approval_set: ApprovalSetReservationInput,
+}
+
+impl PreparedGovernedToolAdmission {
+    pub(crate) fn from_parts(
+        operation: AdmissionOperation,
+        approval_set: ApprovalSetReservationInput,
+    ) -> Result<Self, ThresholdApprovalVerificationError> {
+        if operation.kind() != AdmissionOperationKind::ToolDispatch
+            || operation.state() != crate::admission_operation::AdmissionOperationState::Prepared
+            || operation.approval_set_hash() != Some(approval_set.approval_set_hash())
+        {
+            return Err(denied(
+                "prepared governed operation does not match its approval reservation",
+            ));
+        }
+        Ok(Self {
+            operation,
+            approval_set,
+        })
+    }
+
+    #[must_use]
+    pub fn operation(&self) -> &AdmissionOperation {
+        &self.operation
+    }
+
+    #[must_use]
+    pub fn approval_set(&self) -> &ApprovalSetReservationInput {
+        &self.approval_set
+    }
+
+    #[must_use]
+    pub fn into_parts(self) -> (AdmissionOperation, ApprovalSetReservationInput) {
+        (self.operation, self.approval_set)
+    }
+}
+
+/// Compatibility name for callers that prepare a threshold approval set.
+pub type PreparedThresholdToolAdmission = PreparedGovernedToolAdmission;
+
+/// Derive the stable operation identity before any replay or budget mutation.
+pub fn prepare_threshold_tool_admission_operation(
+    input: ThresholdToolAdmissionOperationInput<'_>,
+) -> Result<PreparedThresholdToolAdmission, ThresholdApprovalVerificationError> {
+    let verified_approval =
+        VerifiedGovernedApprovalAdmission::from_threshold(input.verified_approval_set)?;
+    prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
+        coordinator_authority_id: input.coordinator_authority_id,
+        request_id: input.request_id,
+        capability_id: input.capability_id,
+        authorization_capability_hash: input.authorization_capability_hash,
+        arguments: input.arguments,
+        governed_intent_hash: input.governed_intent_hash,
+        policy_hash: input.policy_hash,
+        verified_approval: &verified_approval,
+        broker_attempt_id: input.broker_attempt_id,
+        budget_hold_id: input.budget_hold_id,
+        supplemental_authorization_reference: input.supplemental_authorization_reference,
+        supplemental_authorization_digest: input.supplemental_authorization_digest,
+        execution_nonce_id: input.execution_nonce_id,
+        coordinator_lease_epoch: input.coordinator_lease_epoch,
+    })
+}
+
+/// Derive the stable governed operation identity before any replay or budget mutation.
+pub(crate) fn prepare_governed_tool_admission_operation(
+    input: GovernedToolAdmissionOperationInput<'_>,
+) -> Result<PreparedGovernedToolAdmission, ThresholdApprovalVerificationError> {
+    let budget_hold_id = input
+        .budget_hold_id
+        .ok_or_else(|| denied("governed admission requires an operation-owned budget hold"))?;
+    let verified = input.verified_approval;
+    if verified.request_id != input.request_id {
+        return Err(denied(
+            "verified approval set request binding does not match admission",
+        ));
+    }
+    if verified.authorization_capability_hash != input.authorization_capability_hash {
+        return Err(denied(
+            "verified approval set capability binding does not match admission",
+        ));
+    }
+    if verified.governed_intent_hash != input.governed_intent_hash {
+        return Err(denied(
+            "verified approval set intent binding does not match admission",
+        ));
+    }
+    if verified.policy_hash != input.policy_hash {
+        return Err(denied(
+            "verified approval set policy binding does not match admission",
+        ));
+    }
+
+    let action_hash = sha256_hex(&canonical_json_bytes(input.arguments).map_err(|error| {
+        denied(&format!(
+            "tool arguments failed canonical admission binding: {error}"
+        ))
+    })?);
+    let approval_set_hash = verified.approval_set.approval_set_hash().to_string();
+    let request_binding_hash = AdmissionRequestBindingInput::new(AdmissionRequestBindingParts {
+        action_hash,
+        policy_hash: input.policy_hash.to_string(),
+        governed_intent_hash: Some(input.governed_intent_hash.to_string()),
+        threshold_proposal_hash: verified.threshold_proposal_hash.clone(),
+        verified_approval_set_hash: Some(approval_set_hash.clone()),
+        approval_token_digests: verified.approval_token_digests.clone(),
+        budget_hold_reference: Some(budget_hold_id.to_string()),
+        supplemental_authorization_reference: input
+            .supplemental_authorization_reference
+            .map(str::to_string),
+        supplemental_authorization_digest: input
+            .supplemental_authorization_digest
+            .map(str::to_string),
+        execution_nonce_reference: input.execution_nonce_id.map(str::to_string),
+    })
+    .and_then(|binding| binding.derive_hash())
+    .map_err(|error| {
+        denied(&format!(
+            "governed admission request binding failed: {error}"
+        ))
+    })?;
+    let operation = AdmissionOperation::prepared(PreparedAdmissionOperation {
+        kind: AdmissionOperationKind::ToolDispatch,
+        coordinator_authority_id: input.coordinator_authority_id.to_string(),
+        request_id: input.request_id.to_string(),
+        capability_id: input.capability_id.to_string(),
+        authorization_capability_hash: input.authorization_capability_hash.to_string(),
+        request_binding_hash,
+        policy_hash: input.policy_hash.to_string(),
+        broker_attempt_id: input.broker_attempt_id.map(str::to_string),
+        budget_hold_id: Some(budget_hold_id.to_string()),
+        approval_set_hash: Some(approval_set_hash),
+        execution_nonce_id: input.execution_nonce_id.map(str::to_string),
+        coordinator_lease_epoch: input.coordinator_lease_epoch,
+    })
+    .map_err(|error| denied(&format!("governed admission operation is invalid: {error}")))?;
+    PreparedGovernedToolAdmission::from_parts(operation, verified.approval_set.clone())
+}
+
 /// Canonical digest of the complete already-verified authorizing capability.
 pub fn authorization_capability_hash(
     capability: &CapabilityToken,
@@ -73,7 +417,7 @@ pub fn authorization_capability_hash(
 pub fn verify_threshold_approval_set(
     input: &ThresholdApprovalVerificationInput<'_>,
     resolver: &dyn ThresholdApprovalRequirementResolver,
-) -> Result<VerifiedApprovalSetBody, ThresholdApprovalVerificationError> {
+) -> Result<VerifiedThresholdApprovalSet, ThresholdApprovalVerificationError> {
     let token_count = input.approval_tokens.len();
     if token_count > MAX_THRESHOLD_APPROVAL_TOKENS {
         return Err(denied("approval token set exceeds the protocol ceiling"));
@@ -179,6 +523,7 @@ pub fn verify_threshold_approval_set(
     let mut token_ids = BTreeSet::new();
     let mut token_digests = BTreeSet::new();
     let mut signer_fingerprints = BTreeSet::new();
+    let mut members = Vec::with_capacity(input.approval_tokens.len());
 
     for token in input.approval_tokens {
         if token.threshold_proposal_hash.as_deref() != Some(proposal_hash.as_str()) {
@@ -241,19 +586,30 @@ pub fn verify_threshold_approval_set(
         if !token_ids.insert(token.id.clone()) {
             return Err(denied("approval token ID is duplicated"));
         }
-        if !token_digests.insert(digest) {
+        if !token_digests.insert(digest.clone()) {
             return Err(denied("approval token digest is duplicated"));
         }
+        members.push(
+            ApprovalReservationMember::new(token.id.clone(), digest)
+                .map_err(|error| denied(&format!("approval replay member is invalid: {error}")))?,
+        );
         if !signer_fingerprints.insert(token.approver.to_hex()) {
             return Err(denied("approval token signer is duplicated"));
         }
     }
 
-    VerifiedApprovalSetBody::new(token_digests.into_iter().collect(), proposal).map_err(|error| {
-        denied(&format!(
-            "verified approval set construction failed: {error}"
-        ))
-    })
+    members.sort_unstable_by(|left, right| {
+        left.token_digest()
+            .cmp(right.token_digest())
+            .then_with(|| left.token_id().cmp(right.token_id()))
+    });
+    let body = VerifiedApprovalSetBody::new(token_digests.into_iter().collect(), proposal)
+        .map_err(|error| {
+            denied(&format!(
+                "verified approval set construction failed: {error}"
+            ))
+        })?;
+    Ok(VerifiedThresholdApprovalSet { body, members })
 }
 
 fn denied(reason: &str) -> ThresholdApprovalVerificationError {
@@ -349,7 +705,7 @@ mod tests {
         fn verify(
             &self,
             tokens: &[GovernedApprovalToken],
-        ) -> Result<VerifiedApprovalSetBody, ThresholdApprovalVerificationError> {
+        ) -> Result<VerifiedThresholdApprovalSet, ThresholdApprovalVerificationError> {
             let trusted_authorities = [self.authority.public_key()];
             verify_threshold_approval_set(
                 &ThresholdApprovalVerificationInput {
@@ -387,6 +743,202 @@ mod tests {
             left.approval_set_hash().expect("left hash"),
             right.approval_set_hash().expect("right hash")
         );
+        assert_eq!(
+            left.members()
+                .iter()
+                .map(|member| member.token_id())
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["approval-a", "approval-b"])
+        );
+        assert_eq!(
+            left.members()
+                .iter()
+                .map(|member| member.token_digest())
+                .collect::<Vec<_>>(),
+            left.body().token_digests()
+        );
+
+        let arguments = serde_json::json!({"amount": 100, "currency": "USD"});
+        let supplemental_digest = "66".repeat(32);
+        let left_operation =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &fixture.capability_hash,
+                arguments: &arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &left,
+                broker_attempt_id: None,
+                budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
+                supplemental_authorization_reference: Some("supplemental-1"),
+                supplemental_authorization_digest: Some(&supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect("left operation");
+        let right_operation =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &fixture.capability_hash,
+                arguments: &arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &right,
+                broker_attempt_id: None,
+                budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
+                supplemental_authorization_reference: Some("supplemental-1"),
+                supplemental_authorization_digest: Some(&supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect("right operation");
+        assert_eq!(
+            left_operation.operation().operation_id(),
+            right_operation.operation().operation_id()
+        );
+        assert_eq!(
+            left_operation.operation().request_binding_hash(),
+            right_operation.operation().request_binding_hash()
+        );
+        assert_eq!(left_operation.approval_set().members(), left.members());
+
+        let changed_supplemental_reference =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &fixture.capability_hash,
+                arguments: &arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &left,
+                broker_attempt_id: None,
+                budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
+                supplemental_authorization_reference: Some("supplemental-2"),
+                supplemental_authorization_digest: Some(&supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect("changed supplemental reference");
+        let changed_supplemental_digest = "77".repeat(32);
+        let changed_supplemental_digest =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &fixture.capability_hash,
+                arguments: &arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &left,
+                broker_attempt_id: None,
+                budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
+                supplemental_authorization_reference: Some("supplemental-1"),
+                supplemental_authorization_digest: Some(&changed_supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect("changed supplemental digest");
+        assert_ne!(
+            left_operation.operation().operation_id(),
+            changed_supplemental_reference.operation().operation_id()
+        );
+        assert_ne!(
+            left_operation.operation().operation_id(),
+            changed_supplemental_digest.operation().operation_id()
+        );
+
+        let changed_arguments = serde_json::json!({"amount": 101, "currency": "USD"});
+        let changed_operation =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &fixture.capability_hash,
+                arguments: &changed_arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &left,
+                broker_attempt_id: None,
+                budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
+                supplemental_authorization_reference: Some("supplemental-1"),
+                supplemental_authorization_digest: Some(&supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect("changed operation");
+        assert_ne!(
+            left_operation.operation().operation_id(),
+            changed_operation.operation().operation_id()
+        );
+
+        let changed_budget_operation =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &fixture.capability_hash,
+                arguments: &arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &left,
+                broker_attempt_id: None,
+                budget_hold_id: Some("budget-hold:request-1:capability-1:1"),
+                supplemental_authorization_reference: Some("supplemental-1"),
+                supplemental_authorization_digest: Some(&supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect("changed budget operation");
+        assert_ne!(
+            left_operation.operation().operation_id(),
+            changed_budget_operation.operation().operation_id()
+        );
+
+        let missing_budget =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &fixture.capability_hash,
+                arguments: &arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &left,
+                broker_attempt_id: None,
+                budget_hold_id: None,
+                supplemental_authorization_reference: Some("supplemental-1"),
+                supplemental_authorization_digest: Some(&supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect_err("missing operation-owned budget must deny");
+        assert!(missing_budget.to_string().contains("budget hold"));
+
+        let mismatched_capability = "44".repeat(32);
+        let mismatch =
+            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+                coordinator_authority_id: "kernel-authority-1",
+                request_id: "request-1",
+                capability_id: "capability-1",
+                authorization_capability_hash: &mismatched_capability,
+                arguments: &arguments,
+                governed_intent_hash: &fixture.intent_hash,
+                policy_hash: fixture.requirement.policy_hash(),
+                verified_approval_set: &left,
+                broker_attempt_id: None,
+                budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
+                supplemental_authorization_reference: Some("supplemental-1"),
+                supplemental_authorization_digest: Some(&supplemental_digest),
+                execution_nonce_id: Some("nonce-1"),
+                coordinator_lease_epoch: 1,
+            })
+            .expect_err("mismatched capability binding must deny");
+        assert!(mismatch.to_string().contains("capability binding"));
     }
 
     #[test]

@@ -58,9 +58,15 @@ pub(crate) fn push_writer_counters_human(
     writer: &chio_kernel::ReceiptWriterCounters,
 ) {
     lines.push(format!("writer_accepted_total: {}", writer.accepted_total));
-    lines.push(format!("writer_committed_total: {}", writer.committed_total));
+    lines.push(format!(
+        "writer_committed_total: {}",
+        writer.committed_total
+    ));
     lines.push(format!("writer_failed_total: {}", writer.failed_total));
-    lines.push(format!("writer_saturated_total: {}", writer.saturated_total));
+    lines.push(format!(
+        "writer_saturated_total: {}",
+        writer.saturated_total
+    ));
     lines.push(format!("writer_inflight: {}", writer.inflight));
     lines.push(format!(
         "writer_last_commit_unix_ms: {}",
@@ -72,7 +78,9 @@ pub(crate) fn push_writer_counters_human(
     ));
 }
 
-pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHealthReport) -> String {
+pub(crate) fn render_receipt_health_human(
+    report: &chio_kernel::ReceiptStoreHealthReport,
+) -> String {
     let mut lines = vec![
         format!(
             "status: {}",
@@ -83,7 +91,10 @@ pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHeal
             }
         ),
         format!("committed_entry_seq: {}", report.latest_committed_entry_seq),
-        format!("checkpoint_seq: {}", optional_u64(report.latest_checkpoint_seq)),
+        format!(
+            "checkpoint_seq: {}",
+            optional_u64(report.latest_checkpoint_seq)
+        ),
         format!(
             "checkpointed_entry_seq: {}",
             report.latest_checkpointed_entry_seq
@@ -110,7 +121,10 @@ pub(crate) fn render_receipt_flush_human(report: &chio_kernel::ReceiptFlushRepor
     let mut lines = vec![
         "flushed: true".to_string(),
         format!("committed_entry_seq: {}", report.latest_committed_entry_seq),
-        format!("checkpoint_seq: {}", optional_u64(report.latest_checkpoint_seq)),
+        format!(
+            "checkpoint_seq: {}",
+            optional_u64(report.latest_checkpoint_seq)
+        ),
         format!(
             "checkpointed_entry_seq: {}",
             report.latest_checkpointed_entry_seq
@@ -155,14 +169,20 @@ pub(crate) fn render_receipt_checkpoint_status_human(
             }
         ),
         format!("committed_entry_seq: {}", report.latest_committed_entry_seq),
-        format!("checkpoint_seq: {}", optional_u64(report.latest_checkpoint_seq)),
+        format!(
+            "checkpoint_seq: {}",
+            optional_u64(report.latest_checkpoint_seq)
+        ),
         format!(
             "checkpointed_entry_seq: {}",
             report.latest_checkpointed_entry_seq
         ),
     ];
     if let Some(range) = &report.next_range {
-        lines.push(format!("next_range: {}..={}", range.start_seq, range.end_seq));
+        lines.push(format!(
+            "next_range: {}..={}",
+            range.start_seq, range.end_seq
+        ));
     } else {
         lines.push("next_range: none".to_string());
     }

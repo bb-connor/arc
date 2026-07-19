@@ -10,7 +10,7 @@
 //   one tool per bucket plus one annotation-driven case so the test
 //   exercises the annotation precedence rule.
 // - Ships every capability with `allow = false` (default-deny floor).
-// - Carries the `# TODO: review and promote` marker per capability so
+// - Carries the `# REVIEW REQUIRED:` marker per capability so
 //   the user knows the scaffold is unscoped.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -87,9 +87,14 @@ fn print_scopes_renders_default_deny_scaffold() {
         "all four tools should ship default-deny: {stdout}"
     );
 
-    // TODO marker per capability.
-    let todo_count = stdout.matches("# TODO: review and promote").count();
-    assert_eq!(todo_count, 4, "expected one TODO per capability: {stdout}");
+    // Explicit review marker per capability.
+    let review_required_count = stdout
+        .matches("# REVIEW REQUIRED: keep denied or explicitly promote")
+        .count();
+    assert_eq!(
+        review_required_count, 4,
+        "expected one review marker per capability: {stdout}"
+    );
 }
 
 fn section_for_tool<'a>(scaffold: &'a str, tool: &str) -> &'a str {

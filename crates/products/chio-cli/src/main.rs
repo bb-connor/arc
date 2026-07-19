@@ -14,6 +14,7 @@
 //   Wrap an MCP server subprocess with the Chio kernel and expose an
 //   MCP-compatible edge over stdio for stock MCP clients.
 
+mod active_defense_migration;
 mod admin;
 mod archive;
 mod cert;
@@ -39,12 +40,14 @@ mod settle;
 // control-plane modules reachable from the standalone `src/*.rs` command
 // modules.
 pub use chio_control_plane::{
-    authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
-    configure_capability_authority, configure_receipt_store, configure_revocation_store,
-    enterprise_federation, evidence_export, federation_policy, issuance,
-    issue_default_capabilities, load_or_create_authority_keypair, passport_verifier, policy,
-    reputation, require_control_token, rotate_authority_keypair, scim_lifecycle, trust_control,
-    CliError,
+    authority_public_key_from_seed_file, build_kernel, build_kernel_with_keyring_composition,
+    build_kernel_with_keyring_composition_and_security_runtime, build_kernel_with_security_runtime,
+    certify, configure_budget_store, configure_capability_authority, configure_receipt_store,
+    configure_revocation_store, enterprise_federation, evidence_export, federation_policy,
+    issuance, issue_default_capabilities, load_existing_authority_keypair,
+    load_keyring_runtime_from_authority_seed, load_or_create_authority_keypair, passport_verifier,
+    policy, reputation, require_control_token, rotate_authority_keypair, scim_lifecycle,
+    trust_control, CliError,
 };
 pub use chio_mcp_remote as remote_mcp;
 
@@ -99,15 +102,15 @@ pub(crate) use types_cli::{
     PassportStatusCommands, ProofCollectKind, ProofCommands, ProofDoctorScenario,
     ProofExportRedactProfile, ProofFixtureCommands, ProofVerifyRequirement,
     ReceiptCheckpointCommands, ReceiptCommands, ReplayArgs, ReplaySubcommand, ReputationCommands,
-    SettleCommands, TrafficArgs, TrustAuthorizationContextCommands, TrustBehavioralFeedCommands,
-    TrustCapitalAllocationCommands, TrustCapitalBookCommands, TrustCapitalInstructionCommands,
-    TrustCommands, TrustCreditBacktestCommands, TrustCreditBondCommands,
-    TrustCreditFacilityCommands, TrustCreditLossLifecycleCommands, TrustCreditScorecardCommands,
-    TrustEvidenceShareCommands, TrustExposureLedgerCommands, TrustFederationPolicyCommands,
-    TrustLiabilityMarketCommands, TrustLiabilityProviderCommands, TrustProviderCommands,
-    TrustProviderRiskPackageCommands, TrustRuntimeAttestationAppraisalCommands,
-    TrustUnderwritingAppealCommands, TrustUnderwritingDecisionCommands,
-    TrustUnderwritingInputCommands, WorkflowCommands,
+    SecurityCommands, SettleCommands, TrafficArgs, TrustAuthorizationContextCommands,
+    TrustBehavioralFeedCommands, TrustCapitalAllocationCommands, TrustCapitalBookCommands,
+    TrustCapitalInstructionCommands, TrustCommands, TrustCreditBacktestCommands,
+    TrustCreditBondCommands, TrustCreditFacilityCommands, TrustCreditLossLifecycleCommands,
+    TrustCreditScorecardCommands, TrustEvidenceShareCommands, TrustExposureLedgerCommands,
+    TrustFederationPolicyCommands, TrustLiabilityMarketCommands, TrustLiabilityProviderCommands,
+    TrustProviderCommands, TrustProviderRiskPackageCommands,
+    TrustRuntimeAttestationAppraisalCommands, TrustUnderwritingAppealCommands,
+    TrustUnderwritingDecisionCommands, TrustUnderwritingInputCommands, WorkflowCommands,
 };
 #[path = "cli/chio/types.rs"]
 mod chio_types;
@@ -165,12 +168,11 @@ pub(crate) use trust_commands_cli::{
     bilateral_field, build_underwriting_policy_input_query, cmd_receipt_audit,
     cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status, cmd_receipt_checkpoint_verify,
     cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,
-    cmd_trust_credit_backtest_export,
-    cmd_trust_credit_loss_lifecycle_evaluate, cmd_trust_credit_loss_lifecycle_issue,
-    cmd_trust_credit_loss_lifecycle_list, cmd_trust_liability_auto_bind_issue,
-    cmd_trust_liability_bound_coverage_issue, cmd_trust_liability_claim_adjudication_issue,
-    cmd_trust_liability_claim_dispute_issue, cmd_trust_liability_claim_issue,
-    cmd_trust_liability_claim_payout_instruction_issue,
+    cmd_trust_credit_backtest_export, cmd_trust_credit_loss_lifecycle_evaluate,
+    cmd_trust_credit_loss_lifecycle_issue, cmd_trust_credit_loss_lifecycle_list,
+    cmd_trust_liability_auto_bind_issue, cmd_trust_liability_bound_coverage_issue,
+    cmd_trust_liability_claim_adjudication_issue, cmd_trust_liability_claim_dispute_issue,
+    cmd_trust_liability_claim_issue, cmd_trust_liability_claim_payout_instruction_issue,
     cmd_trust_liability_claim_payout_receipt_issue, cmd_trust_liability_claim_response_issue,
     cmd_trust_liability_claim_settlement_instruction_issue,
     cmd_trust_liability_claim_settlement_receipt_issue, cmd_trust_liability_claims_list,
@@ -215,17 +217,17 @@ pub(crate) use trust_commands_cli::{
     LiabilityClaimsListArgs, LiabilityMarketListArgs, ProviderRiskPackageExportArgs, QueryBackend,
     ReceiptExplainArgs, ReceiptListArgs, ReceiptOperatorJsonEnvelope, SignedQueryBackend,
     UnderwritingAppealResolveArgs, UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs,
-    UnderwritingDecisionSimulateArgs, UnderwritingPolicyInputArgs,
-    CHIO_CLI_RECEIPT_AUDIT_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA,
-    CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA,
-    CHIO_CLI_RECEIPT_FLUSH_SCHEMA, CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
+    UnderwritingDecisionSimulateArgs, UnderwritingPolicyInputArgs, CHIO_CLI_RECEIPT_AUDIT_SCHEMA,
+    CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA,
+    CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
+    CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
 };
 #[path = "cli/session/mod.rs"]
 mod session_cli;
 #[allow(unused_imports)]
 pub(crate) use session_cli::{
-    control_request_id, handle_agent_message, make_error_receipt, normalize_agent_message,
-    print_summary, select_capability_for_request, tool_response_messages, SessionStats,
+    control_request_id, handle_agent_message, normalize_agent_message, print_summary,
+    select_capability_for_request, tool_response_messages, SessionStats,
 };
 #[cfg(test)]
 #[allow(unused_imports)]

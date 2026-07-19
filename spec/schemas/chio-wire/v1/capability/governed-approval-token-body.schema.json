@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/capability/governed-approval-token-body.schema.json",
+  "title": "Chio governed approval token body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "approver", "subject", "governed_intent_hash", "request_id", "issued_at", "expires_at", "decision"],
+  "properties": {
+    "id": { "$ref": "#/$defs/governanceIdentifier" },
+    "approver": { "$ref": "#/$defs/publicKey" },
+    "subject": { "$ref": "#/$defs/publicKey" },
+    "governed_intent_hash": { "$ref": "#/$defs/digest" },
+    "threshold_proposal_hash": { "$ref": "#/$defs/digest" },
+    "request_id": { "$ref": "#/$defs/governanceIdentifier" },
+    "issued_at": { "type": "integer", "minimum": 0 },
+    "expires_at": { "type": "integer", "minimum": 1 },
+    "decision": { "enum": ["approved", "denied"] }
+  },
+  "$defs": {
+    "governanceIdentifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

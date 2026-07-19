@@ -3,7 +3,7 @@ use super::support::*;
 
 fn signer(keypair: &Keypair, max_batch: u64) -> BackgroundCheckpointSigner {
     BackgroundCheckpointSigner {
-        keypair: Arc::new(keypair.clone()),
+        backend: Arc::new(chio_core::crypto::Ed25519Backend::new(keypair.clone())),
         max_batch,
     }
 }

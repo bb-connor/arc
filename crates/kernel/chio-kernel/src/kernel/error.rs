@@ -99,6 +99,9 @@ pub enum KernelError {
     #[error("governed transaction denied: {0}")]
     GovernedTransactionDenied(String),
 
+    #[error("active-response dispatch was never committed: {0}")]
+    ActiveResponseNeverCommitted(String),
+
     #[error("guard denied the request: {0}")]
     GuardDenied(String),
 
@@ -107,6 +110,14 @@ pub enum KernelError {
 
     #[error("request stream incomplete: {0}")]
     RequestIncomplete(String),
+
+    #[error("invalid receipt metadata: {0}")]
+    InvalidReceiptMetadata(String),
+
+    #[error(
+        "admitted manifest flow policy or topology requires an installed active defense runtime"
+    )]
+    FlowRuntimeUnavailable,
 
     #[error("tool not registered: {0}")]
     ToolNotRegistered(String),
@@ -176,6 +187,18 @@ pub enum KernelError {
 
     #[error("budget store error: {0}")]
     BudgetStore(#[from] BudgetStoreError),
+
+    /// The budget authority reported a capture as committed, but its returned
+    /// fencing evidence did not match the configured hard-limit authority.
+    /// The captured quota is intentionally retained for exact recovery.
+    #[error("budget capture requires exact authority recovery: {0}")]
+    BudgetCaptureRecoveryRequired(String),
+
+    /// An authoritative security mutation terminal outcome could not be
+    /// durably persisted. Reconciliation of the dispatch phase and mutation
+    /// state is required before any retry or redispatch.
+    #[error("security dispatch outcome requires reconciliation: {0}")]
+    SecurityDispatchOutcomeRecoveryRequired(String),
 
     #[error(
         "cross-currency budget enforcement failed: no price oracle configured for {base}/{quote}"
@@ -336,6 +359,15 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Adjust the governed transaction intent so it satisfies the configured approval and policy requirements.",
             ),
+            Self::ActiveResponseNeverCommitted(reason) => self.report_with_context(
+                "active_response.never_committed",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                }),
+                "Close the expired prepared response without dispatch. The exact executor probe proved that no commit occurred.",
+            ),
             Self::GuardDenied(reason) => self.report_with_context(
                 "CHIO-KERNEL-GUARD-DENIED",
                 serde_json::json!({ "reason": reason }),
@@ -350,6 +382,16 @@ impl KernelError {
                 "CHIO-KERNEL-REQUEST-INCOMPLETE",
                 serde_json::json!({ "reason": reason }),
                 "Resubmit the request with all required fields and protocol state transitions present.",
+            ),
+            Self::InvalidReceiptMetadata(reason) => self.report_with_context(
+                "CHIO-KERNEL-INVALID-RECEIPT-METADATA",
+                serde_json::json!({ "reason": reason }),
+                "Remove reserved kernel metadata fields; kernel entrypoints derive them from verified registry or admission state.",
+            ),
+            Self::FlowRuntimeUnavailable => self.report_with_context(
+                "CHIO-KERNEL-FLOW-RUNTIME-UNAVAILABLE",
+                serde_json::json!({}),
+                "Install the governed active-defense runtime before dispatching a flow-required manifest.",
             ),
             Self::ToolNotRegistered(tool) => self.report_with_context(
                 "CHIO-KERNEL-TOOL-NOT-REGISTERED",
@@ -461,6 +503,21 @@ impl KernelError {
                 "CHIO-KERNEL-BUDGET-STORE",
                 serde_json::json!({ "source": error.to_string() }),
                 "Check the configured budget store connectivity, permissions, and schema health before retrying.",
+            ),
+            Self::BudgetCaptureRecoveryRequired(reason) => self.report_with_context(
+                "CHIO-KERNEL-BUDGET-CAPTURE-RECOVERY-REQUIRED",
+                serde_json::json!({ "reason": reason }),
+                "Keep the admission capture pending and reconcile the exact authority commit before retrying dispatch.",
+            ),
+            Self::SecurityDispatchOutcomeRecoveryRequired(reason) => self.report_with_context(
+                "CHIO-KERNEL-SECURITY-DISPATCH-OUTCOME-RECOVERY-REQUIRED",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                    "required_action": "reconcile",
+                }),
+                "Do not retry or redispatch this request. Reconcile the authoritative security outcome, dispatch phase, and admission operation before deciding any next action.",
             ),
             Self::NoCrossCurrencyOracle { base, quote } => self.report_with_context(
                 "CHIO-KERNEL-NO-CROSS-CURRENCY-ORACLE",

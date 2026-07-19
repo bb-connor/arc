@@ -1,0 +1,26 @@
+{
+  "tools": [
+    {
+      "name": "echo_text",
+      "title": "Echo Text",
+      "description": "Return the provided message",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}

@@ -57,7 +57,7 @@ fn make_kernel() -> ChioKernel {
 
 fn make_edge() -> Option<ChioAcpEdge> {
     // Empty manifest: every tool/invoke hits ToolNotFound, exercising the error paths.
-    ChioAcpEdge::new(AcpEdgeConfig::default(), vec![]).ok()
+    ChioAcpEdge::new_from_unverified_internal(AcpEdgeConfig::default(), vec![]).ok()
 }
 
 fn make_execution() -> Option<AcpKernelExecutionContext> {
@@ -93,11 +93,16 @@ fn make_execution() -> Option<AcpKernelExecutionContext> {
     Some(AcpKernelExecutionContext {
         capability,
         agent_id: agent_id().to_string(),
+        session_id: chio_core::session::SessionId::new("acp-authenticated-session"),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     })
 }
 

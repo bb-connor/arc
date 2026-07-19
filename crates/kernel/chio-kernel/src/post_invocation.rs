@@ -5,6 +5,7 @@ use chio_core::{capability::scope::ChioScope, AgentId, ServerId};
 use serde_json::Value;
 
 use crate::runtime::ToolCallRequest;
+use crate::SecurityInvocationContext;
 
 /// Verdict from a post-invocation hook.
 #[derive(Debug, Clone)]
@@ -24,6 +25,7 @@ pub struct PostInvocationContext<'a> {
     pub agent_id: Option<&'a AgentId>,
     pub server_id: Option<&'a ServerId>,
     pub matched_grant_index: Option<usize>,
+    security_context: Option<&'a SecurityInvocationContext>,
 }
 
 impl<'a> PostInvocationContext<'a> {
@@ -36,11 +38,21 @@ impl<'a> PostInvocationContext<'a> {
             agent_id: None,
             server_id: None,
             matched_grant_index: None,
+            security_context: None,
         }
     }
 
     #[must_use]
     pub fn from_request(request: &'a ToolCallRequest, matched_grant_index: Option<usize>) -> Self {
+        Self::from_request_with_security_context(request, matched_grant_index, None)
+    }
+
+    #[must_use]
+    pub fn from_request_with_security_context(
+        request: &'a ToolCallRequest,
+        matched_grant_index: Option<usize>,
+        security_context: Option<&'a SecurityInvocationContext>,
+    ) -> Self {
         Self {
             tool_name: request.tool_name.as_str(),
             request: Some(request),
@@ -48,6 +60,39 @@ impl<'a> PostInvocationContext<'a> {
             agent_id: Some(&request.agent_id),
             server_id: Some(&request.server_id),
             matched_grant_index,
+            security_context,
+        }
+    }
+
+    #[must_use]
+    pub const fn security_context(&self) -> Option<&'a SecurityInvocationContext> {
+        self.security_context
+    }
+}
+
+/// One request-local post-invocation decision and its evidence.
+///
+/// Hooks that produce evidence should override
+/// [`PostInvocationHook::inspect_with_evidence`] so the verdict and evidence
+/// are returned by the same call. The legacy `take_evidence` path remains for
+/// existing hooks during migration.
+#[derive(Debug, Clone)]
+pub struct PostInvocationInspection {
+    pub verdict: PostInvocationVerdict,
+    pub evidence: Vec<GuardEvidence>,
+}
+
+impl PostInvocationInspection {
+    #[must_use]
+    pub const fn new(verdict: PostInvocationVerdict, evidence: Vec<GuardEvidence>) -> Self {
+        Self { verdict, evidence }
+    }
+
+    #[must_use]
+    pub const fn without_evidence(verdict: PostInvocationVerdict) -> Self {
+        Self {
+            verdict,
+            evidence: Vec::new(),
         }
     }
 }
@@ -57,6 +102,16 @@ pub trait PostInvocationHook: Send + Sync {
     fn name(&self) -> &str;
 
     fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
+
+    fn inspect_with_evidence(
+        &self,
+        ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
+        let verdict = self.inspect(ctx, response);
+        let evidence = self.take_evidence().into_iter().collect();
+        PostInvocationInspection::new(verdict, evidence)
+    }
 
     fn take_evidence(&self) -> Option<GuardEvidence> {
         None
@@ -101,6 +156,11 @@ impl PostInvocationPipeline {
     }
 
     #[must_use]
+    pub fn names(&self) -> Vec<&str> {
+        self.hooks.iter().map(|hook| hook.name()).collect()
+    }
+
+    #[must_use]
     pub fn evaluate_with_evidence(&self, tool_name: &str, response: &Value) -> PipelineOutcome {
         let context = PostInvocationContext::synthetic(tool_name);
         self.evaluate_with_context_and_evidence(&context, response)
@@ -117,10 +177,9 @@ impl PostInvocationPipeline {
         let mut evidence = Vec::new();
 
         for hook in &self.hooks {
-            let verdict = hook.inspect(context, &current_response);
-            if let Some(ev) = hook.take_evidence() {
-                evidence.push(ev);
-            }
+            let inspection = hook.inspect_with_evidence(context, &current_response);
+            evidence.extend(inspection.evidence);
+            let verdict = inspection.verdict;
             match verdict {
                 PostInvocationVerdict::Allow => continue,
                 PostInvocationVerdict::Block(reason) => {

@@ -1,6 +1,7 @@
 #[test]
 fn governed_monetary_allow_receipt_contains_approval_metadata() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -40,7 +41,9 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -76,10 +79,9 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
 }
 
 #[test]
-fn governed_request_denies_when_approval_replay_store_is_unavailable() {
+fn governed_request_denies_when_durable_admission_authorities_are_unavailable() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.approval_replay_store = None;
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "cost-srv".to_string(),
         invocations: std::sync::Arc::clone(&invocations),
@@ -110,23 +112,26 @@ fn governed_request_denies_when_approval_replay_store_is_unavailable() {
     request.governed_intent = Some(intent);
     request.approval_token = Some(approval_token);
 
-    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("legacy approval must require the durable admission saga");
 
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("approval replay store not configured")));
+    assert!(error
+        .to_string()
+        .contains("durable admission operation store"));
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
 
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+    assert!(kernel
+        .budget_store
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .is_none());
 }
 
 #[test]
 fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -175,7 +180,9 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -255,7 +262,9 @@ fn governed_request_rejects_empty_metered_billing_provider() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -271,6 +280,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
 #[test]
 fn governed_monetary_allow_receipt_preserves_call_chain_context() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -317,7 +327,9 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -403,7 +415,9 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -502,7 +516,9 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -606,7 +622,9 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -686,7 +704,9 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     let asserted_governed = asserted_response
@@ -752,7 +772,9 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     let observed_governed = observed_response
@@ -851,7 +873,9 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     let verified_governed = verified_response
@@ -963,7 +987,9 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1056,7 +1082,9 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1149,7 +1177,9 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             },
             &mut client,
             None,
@@ -1174,7 +1204,15 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
     let parent_kernel = make_kernel(make_config());
     let mut child_config = make_config();
     child_config.ca_public_keys.push(parent_kernel.public_key());
+    child_config
+        .ca_public_keys
+        .push(child_config.keypair.public_key());
     let mut child_kernel = make_kernel(child_config);
+    child_kernel
+        .set_authority_artifact_trust_resolver(Arc::new(FixedArtifactTrustResolver {
+            key: parent_kernel.public_key(),
+        }))
+        .unwrap();
     let child_kp = make_keypair();
     child_kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
 
@@ -1297,7 +1335,9 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1374,7 +1414,9 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1432,7 +1474,9 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1502,7 +1546,9 @@ fn governed_call_chain_evidence_store_error_precedes_budget_mutation() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         // The evidence-lookup store error must fail closed as a clean deny here,
         // not propagate out of evaluate.
@@ -1604,7 +1650,9 @@ fn nested_governed_call_chain_evidence_store_error_precedes_budget_mutation() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             },
             &mut client,
             None,
@@ -1687,7 +1735,9 @@ fn nested_missing_session_roots_lookup_precedes_budget_mutation() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             },
             &mut client,
             None,

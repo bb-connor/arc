@@ -3,16 +3,16 @@
 //! Exercises the `ExecutionNonceStore` trait contract plus the durable
 //! replay-prevention guarantees specific to the SQLite backend:
 //!
-//! * `reserve(id)` returns `Ok(true)` on first call, `Ok(false)` on
-//!   replay within the retention window.
+//! * `reserve(id)` returns `Ok(true)` on first call and `Ok(false)` on
+//!   every replay.
 //! * Consumed nonces persist across store reopen so a kernel restart
 //!   does not open a replay window.
-//! * Expiry + retention grace period allows a slot to be recycled only
-//!   after `expires_at` is in the past.
+//! * Signed expiry is audit metadata. Clock movement never deletes or
+//!   recycles a consumed identifier.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_kernel::ExecutionNonceStore;
+use chio_kernel::{ExecutionNonceStore, ExecutionNonceStoreProfile};
 use chio_store_sqlite::SqliteExecutionNonceStore;
 
 use chio_test_support::prelude::*;
@@ -32,10 +32,26 @@ fn fresh_nonce_is_reserved() {
 }
 
 #[test]
-fn replayed_nonce_is_rejected_within_retention() {
+fn nonce_store_profile_reflects_instance_durability() {
+    let memory = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
+    assert_eq!(
+        memory.authority_profile(),
+        ExecutionNonceStoreProfile::EphemeralLocal
+    );
+    let path = unique_db_path("chio-exec-nonce-profile");
+    let disk = SqliteExecutionNonceStore::open(&path).test_unwrap();
+    assert_eq!(
+        disk.authority_profile(),
+        ExecutionNonceStoreProfile::SingleNodeDurable
+    );
+    assert!(SqliteExecutionNonceStore::open(":memory:").is_err());
+    assert!(SqliteExecutionNonceStore::open("file::memory:?cache=shared").is_err());
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn replayed_nonce_is_rejected_permanently() {
     let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
-    // Use try_reserve directly to lock the clock so retention is
-    // guaranteed to still apply on the second call.
     let now = 1_000_000;
     let expires_at = now + 60;
     assert!(store.try_reserve("nonce-b", now, expires_at).test_unwrap());
@@ -45,12 +61,11 @@ fn replayed_nonce_is_rejected_within_retention() {
 }
 
 #[test]
-fn expired_row_is_pruned_and_slot_becomes_free() {
+fn forward_clock_jump_then_rollback_keeps_nonce_consumed() {
     let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
     assert!(store.try_reserve("nonce-c", 1_000, 1_010).test_unwrap());
-    // The signed `expires_at` is the primary replay defence; the store
-    // row GC here just bounds the table size.
-    assert!(store.try_reserve("nonce-c", 2_000, 2_060).test_unwrap());
+    assert!(!store.try_reserve("nonce-c", 2_000, 2_060).test_unwrap());
+    assert!(!store.try_reserve("nonce-c", 1_001, 1_010).test_unwrap());
 }
 
 #[test]

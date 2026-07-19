@@ -1,5 +1,5 @@
 schema = "chio.linux-enforcement-stack.v1"
-reviewed_at = "2026-07-12"
+reviewed_at = "2026-07-17"
 reviewer = "Chio security review"
 minimum_linux = "6.7"
 minimum_landlock_abi = 4
@@ -22,8 +22,22 @@ patch_required = true
 
 [nono.patch]
 directory = "third_party/nono-chio"
+kind = "wrapper"
+package_name = "nono-chio"
+version = "0.53.0-chio.2"
 status = "required"
-changes = ["return observed Landlock ABI and RulesetStatus", "reject partially enforced filesystem and network rules", "construct PathBeneath rules from caller-owned descriptors", "retain caller ownership through ruleset application"]
+source_sha256 = "82e9bbb67df62ee123353e92a7d91102837aea8bd3c5f32a508b8a4577594d95"
+changes = ["return observed Landlock ABI and RulesetStatus", "reject partially enforced filesystem and network rules", "construct PathBeneath rules from caller-owned descriptors", "retain caller ownership through ruleset application", "grant directory listing without granting descendant file reads", "handle every filesystem and network right known to the detected ABI"]
+
+[landlock]
+name = "landlock"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+repository = "https://github.com/landlock-lsm/rust-landlock"
+tag = "v0.4.4"
+commit = "89c56e2db04cf0a4d63e192e7b4371af516a1ccc"
+checksum = "49fefd6652c57d68aaa32544a4c0e642929725bdc1fd929367cdeb673ab81088"
+license = "MIT OR Apache-2.0"
 
 [seccompiler]
 name = "seccompiler"

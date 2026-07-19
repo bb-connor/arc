@@ -5,7 +5,7 @@ use std::io::Read;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -20,19 +20,44 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use url::Url;
 
-fn unique_test_dir() -> PathBuf {
+#[path = "support/mcp_security.rs"]
+mod mcp_security;
+
+struct TestDir(PathBuf);
+
+impl std::ops::Deref for TestDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_path()
+    }
+}
+
+impl AsRef<Path> for TestDir {
+    fn as_ref(&self) -> &Path {
+        self.0.as_path()
+    }
+}
+
+impl Drop for TestDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn unique_test_dir() -> TestDir {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("chio-cli-auth-server-{nonce}"))
+    TestDir(std::env::temp_dir().join(format!("chio-cli-auth-server-{nonce}")))
 }
 
 fn auth_server_test_guard() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
         .lock()
-        .expect("lock auth server integration tests")
+        .unwrap_or_else(PoisonError::into_inner)
 }
 
 struct ServerGuard {
@@ -121,14 +146,32 @@ fn spawn_http_server_with_local_auth(
 ) -> ServerGuard {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
-    let receipt_db_path = dir.join("remote-receipts.sqlite3");
-    let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
-    let auth_server_seed_path = dir.join("auth-server.seed");
+    let canonical_dir = fs::canonicalize(dir).expect("canonicalize auth server test directory");
+    let target_command = mcp_security::resolve_executable("python3");
+    let script_path = fs::canonicalize(script_path).expect("canonicalize mock auth server script");
+    let target_args = vec![script_path
+        .to_str()
+        .expect("mock auth server path is UTF-8")
+        .to_string()];
+    let security = mcp_security::materialize_mcp_security(
+        &canonical_dir.join("security"),
+        Path::new(env!("CARGO_BIN_EXE_chio")),
+        &target_command,
+        &target_args,
+        &canonical_dir,
+        "wrapped-http-mock",
+        "Wrapped HTTP Mock",
+        "0.1.0",
+    );
+    let receipt_db_path = canonical_dir.join("remote-receipts.sqlite3");
+    let revocation_db_path = canonical_dir.join("remote-revocations.sqlite3");
+    let authority_seed_path = canonical_dir.join("remote-authority.seed");
+    let auth_server_seed_path = canonical_dir.join("auth-server.seed");
     let public_base_url = format!("http://{listen}");
     let audience = format!("{public_base_url}/mcp");
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
+        .current_dir(&canonical_dir)
         .args([
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
@@ -144,6 +187,8 @@ fn spawn_http_server_with_local_auth(
             "wrapped-http-mock",
             "--server-name",
             "Wrapped HTTP Mock",
+            "--server-version",
+            "0.1.0",
             "--listen",
             &listen.to_string(),
             "--public-base-url",
@@ -158,10 +203,27 @@ fn spawn_http_server_with_local_auth(
             "mcp:invoke",
             "--admin-token",
             admin_token,
+            "--signed-manifest",
+            security
+                .signed_manifest_path
+                .to_str()
+                .expect("signed manifest path"),
+            "--manifest-public-key",
+            &security.manifest_public_key,
+            "--cage-policy",
+            security
+                .cage_policy_path
+                .to_str()
+                .expect("cage policy path"),
+            "--cage-policy-signer",
+            &security.cage_policy_signer,
             "--",
-            "python3",
-            script_path.to_str().expect("script path"),
+            security
+                .target_command
+                .to_str()
+                .expect("MCP target command path"),
         ])
+        .args(&security.target_args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())

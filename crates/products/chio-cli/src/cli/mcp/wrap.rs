@@ -21,6 +21,7 @@
 use super::*;
 
 use super::attestation::attach_chio_verified_header;
+use super::cage_policy::load_native_mcp_launch;
 use super::ide::IdeTarget;
 use super::manifest::load_manifest_allowlist;
 
@@ -80,13 +81,32 @@ pub(crate) struct McpWrapArgs {
     #[arg(long)]
     pub(crate) manifest: Option<std::path::PathBuf>,
 
+    /// Canonical, deny-unknown cage launch policy. Its presence permanently
+    /// selects cage-required execution for this invocation.
+    #[arg(
+        long,
+        value_name = "PATH",
+        requires = "cage_policy_signer",
+        conflicts_with_all = [
+            "tools_fixture",
+            "e2e_fixture",
+            "self_test_attestation"
+        ]
+    )]
+    pub(crate) cage_policy: Option<std::path::PathBuf>,
+
+    /// Externally configured public key that must sign the complete cage
+    /// launch policy. A key declared only inside the policy is not trusted.
+    #[arg(long, value_name = "PUBLIC_KEY", requires = "cage_policy")]
+    pub(crate) cage_policy_signer: Option<String>,
+
     /// Print the inferred capability-scope manifest scaffold and exit.
     #[arg(long, default_value_t = false)]
     pub(crate) print_scopes: bool,
 
-    /// IDE target for `--emit-config`. When set, the command prints the
-    /// paste-ready config for the requested IDE and exits without spawning
-    /// the wrapped child.
+    /// IDE target for `--emit-config`. Requires `--manifest`, `--cage-policy`,
+    /// and `--cage-policy-signer`. The command prints the paste-ready config
+    /// for the requested IDE and exits without spawning the wrapped child.
     #[arg(long, value_enum)]
     pub(crate) emit_config: Option<IdeTarget>,
 
@@ -131,49 +151,97 @@ pub(crate) struct McpWrapArgs {
 /// supplied, every tool denies.
 pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
     let allowed = match args.manifest.as_ref() {
-        Some(path) => load_manifest_allowlist(path)?,
+        Some(path) => load_manifest_allowlist(path, &args.server_id)?,
         None => std::collections::BTreeSet::new(),
     };
     let gate = ManifestVerdictGate {
         allowed: allowed.clone(),
     };
-
     let (program, child_args) = split_wrapped_command(&args.command)?;
     let child_args_refs: Vec<&str> = child_args.iter().map(String::as_str).collect();
-    let transport =
-        chio_mcp_adapter::transport::StdioMcpTransport::spawn(&program, &child_args_refs).map_err(
-            |e| {
-                CliError::cli_other_error(format!(
-                    "failed to spawn wrapped MCP server '{program}': {e}"
-                ))
-            },
-        )?;
-
-    let summary = if args.strict_execution_nonce {
-        let mediated = KernelMediatedMcpTransport::new(
+    let policy_path = args.cage_policy.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "native MCP launch requires a signed, migration-bound cage policy".to_string(),
+        )
+    })?;
+    let trusted_policy_signer = args.cage_policy_signer.as_deref().ok_or_else(|| {
+        CliError::cli_other_error("native MCP launch has no configured policy trust root".to_string())
+    })?;
+    let launch = load_native_mcp_launch(
+        policy_path,
+        trusted_policy_signer,
+        &program,
+        &child_args_refs,
+        None,
+    )?;
+    if launch.server_id() != args.server_id {
+        return Err(CliError::cli_other_error(
+            "native MCP launch policy belongs to a different server".to_string(),
+        ));
+    }
+    require_unprotected_wrap_compatible(&launch)?;
+    let cage_required = matches!(
+        &launch,
+        chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(_)
+    );
+    let transport = std::sync::Arc::new(
+        chio_mcp_adapter::transport::StdioMcpTransport::spawn(
+            &program,
+            &child_args_refs,
+            launch,
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to launch wrapped MCP server '{program}': {error}"
+            ))
+        })?,
+    );
+    let operation = if cage_required && transport.enforcement_evidence().is_none() {
+        Err(CliError::cli_other_error(
+            "cage-required MCP launch returned no fully enforced evidence".to_string(),
+        ))
+    } else if args.strict_execution_nonce {
+        match KernelMediatedMcpTransport::new(
             &args.server_id,
             args.display_name.as_deref().unwrap_or(&args.server_id),
             env!("CARGO_PKG_VERSION"),
-            Box::new(transport),
+            Box::new(chio_mcp_adapter::adapter::SerializedMcpTransport::from_arc(
+                transport.clone(),
+            )),
             &allowed,
-        )?;
+        ) {
+            Ok(mediated) => run_wrap_with_gate(
+                &mediated,
+                &gate,
+                std::io::stdin().lock(),
+                std::io::stdout().lock(),
+            )
+            .map_err(|error| CliError::cli_other_error(format!("chio mcp wrap loop: {error}"))),
+            Err(error) => Err(error),
+        }
+    } else {
         run_wrap_with_gate(
-            &mediated,
+            transport.as_ref(),
             &gate,
             std::io::stdin().lock(),
             std::io::stdout().lock(),
         )
-    } else {
-        let summary = run_wrap_with_gate(
-            &transport,
-            &gate,
-            std::io::stdin().lock(),
-            std::io::stdout().lock(),
-        );
-        let _ = transport.shutdown();
-        summary
-    }
-    .map_err(|e| CliError::cli_other_error(format!("chio mcp wrap loop: {e}")))?;
+        .map_err(|error| CliError::cli_other_error(format!("chio mcp wrap loop: {error}")))
+    };
+    let shutdown = transport.shutdown().map_err(|error| {
+        CliError::cli_other_error(format!(
+            "wrapped MCP terminal receipt persistence failed: {error}"
+        ))
+    });
+    let summary = match (operation, shutdown) {
+        (Ok(summary), Ok(())) => summary,
+        (Err(error), Ok(())) | (Ok(_), Err(error)) => return Err(error),
+        (Err(operation_error), Err(shutdown_error)) => {
+            return Err(CliError::cli_other_error(format!(
+                "{operation_error}; shutdown also failed: {shutdown_error}"
+            )))
+        }
+    };
 
     if summary.denied > 0 {
         tracing::warn!(
@@ -182,6 +250,18 @@ pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
             allowed = summary.allowed,
             "chio mcp wrap loop exited with denied tool calls",
         );
+    }
+    Ok(())
+}
+
+pub(super) fn require_unprotected_wrap_compatible(
+    launch: &chio_mcp_adapter::transport::NativeMcpLaunch,
+) -> Result<(), CliError> {
+    if launch.requires_flow_runtime() {
+        return Err(CliError::cli_other_error(
+            "MCP wrapping without the active defense runtime rejects flow-required manifests"
+                .to_string(),
+        ));
     }
     Ok(())
 }
@@ -290,6 +370,10 @@ impl chio_mcp_adapter::edge::McpTransport for CachedToolListTransport {
     fn drain_notifications(&self) -> Vec<serde_json::Value> {
         self.inner.drain_notifications()
     }
+
+    fn shutdown(&self) -> Result<(), chio_mcp_adapter::edge::AdapterError> {
+        self.inner.shutdown()
+    }
 }
 
 impl KernelMediatedMcpTransport {
@@ -330,7 +414,7 @@ impl KernelMediatedMcpTransport {
             Box::new(chio_kernel::InMemoryExecutionNonceStore::from_config(
                 &nonce_config,
             )),
-        );
+        )?;
 
         let adapter = chio_mcp_adapter::adapter::McpAdapter::new(
             chio_mcp_adapter::adapter::McpAdapterConfig {
@@ -461,7 +545,9 @@ impl chio_mcp_adapter::edge::McpTransport for KernelMediatedMcpTransport {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let preflight = self
@@ -874,6 +960,53 @@ mod wrap_tests {
 
     struct KernelRuntimeErrorTransport;
 
+    fn assert_security_manifest_rejected_before_launch(strict_execution_nonce: bool) {
+        let directory = tempfile::tempdir()
+            .unwrap_or_else(|error| panic!("create wrapper test directory: {error}"));
+        let manifest = directory.path().join("security-bearing-allowlist.toml");
+        std::fs::write(
+            &manifest,
+            r#"
+server_id = "test"
+
+[[capability]]
+tool = "echo"
+allow = true
+flow = { output_classification = "secret" }
+"#,
+        )
+        .unwrap_or_else(|error| panic!("write wrapper manifest: {error}"));
+        let args = McpWrapArgs {
+            server_id: "test".to_string(),
+            manifest: Some(manifest),
+            cage_policy: None,
+            cage_policy_signer: None,
+            print_scopes: false,
+            emit_config: None,
+            display_name: None,
+            tools_fixture: None,
+            e2e_fixture: None,
+            self_test_attestation: None,
+            strict_execution_nonce,
+            command: vec!["/definitely/not/a/real/mcp-server".to_string()],
+        };
+
+        let error = match cmd_mcp_wrap_run(&args) {
+            Ok(()) => panic!("security-bearing wrapper manifest must fail closed"),
+            Err(error) => error,
+        };
+        let message = error.to_string();
+        assert!(
+            message.contains("failed to parse manifest TOML"),
+            "{message}"
+        );
+        assert!(message.contains("unknown field"), "{message}");
+        assert!(
+            !message.contains("failed to launch wrapped MCP server"),
+            "{message}"
+        );
+    }
+
     impl chio_mcp_adapter::edge::McpTransport for KernelRuntimeErrorTransport {
         fn list_tools(
             &self,
@@ -892,6 +1025,16 @@ mod wrap_tests {
                 "kernel denied strict mediated execution".to_string(),
             ))
         }
+    }
+
+    #[test]
+    fn default_wrapper_rejects_security_manifest_before_child_launch() {
+        assert_security_manifest_rejected_before_launch(false);
+    }
+
+    #[test]
+    fn strict_nonce_wrapper_rejects_security_manifest_before_child_launch() {
+        assert_security_manifest_rejected_before_launch(true);
     }
 
     #[test]

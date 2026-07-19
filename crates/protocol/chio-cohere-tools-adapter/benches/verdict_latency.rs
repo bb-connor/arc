@@ -5,7 +5,13 @@ use std::time::{Duration, Instant};
 use chio_cohere_tools_adapter::{
     transport, CohereAdapter, CohereAdapterConfig, COHERE_API_VERSION,
 };
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{ProviderError, ReceiptId, VerdictResult};
+use serde_json::json;
 
 const COLD_INIT_P99_BUDGET: Duration = Duration::from_millis(500);
 const P99_SAMPLE_COUNT: usize = 128;
@@ -15,15 +21,53 @@ fn stream_bytes() -> Result<Vec<u8>, ProviderError> {
     Ok(frame.to_vec())
 }
 
-fn cold_adapter() -> CohereAdapter {
+fn cold_adapter() -> Result<CohereAdapter, ProviderError> {
+    let signer = Keypair::from_seed(&[73; 32]);
     let config = CohereAdapterConfig::new(
         "cohere-latency",
         "Cohere Latency",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "org_chio_latency",
     );
-    CohereAdapter::new(config, Arc::new(transport::MockTransport::new()))
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "lookup_policy".to_string(),
+            description: "Lookup policy".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: config.public_key.clone(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).map_err(|error| {
+        ProviderError::Malformed(format!("Cohere latency manifest signing failed: {error}"))
+    })?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| {
+            ProviderError::Malformed(format!("Cohere latency manifest admission failed: {error}"))
+        })?;
+    CohereAdapter::new_with_registry(config, Arc::new(transport::MockTransport::new()), &registry)
+        .map_err(|error| {
+            ProviderError::Malformed(format!("Cohere latency adapter binding failed: {error}"))
+        })
 }
 
 fn allow_verdict() -> VerdictResult {
@@ -34,7 +78,7 @@ fn allow_verdict() -> VerdictResult {
 }
 
 fn run_cold_verdict_path() -> Result<(), ProviderError> {
-    let adapter = cold_adapter();
+    let adapter = cold_adapter()?;
     let stream = stream_bytes()?;
     let gated = adapter.gate_sse_stream(&stream, |invocation| {
         black_box(invocation);

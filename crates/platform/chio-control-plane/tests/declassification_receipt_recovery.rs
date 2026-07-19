@@ -1,0 +1,12 @@
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/declassification_receipt_recovery_parts/part_01.inc"
+));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/declassification_receipt_recovery_parts/part_02.inc"
+));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/declassification_receipt_recovery_parts/part_03.inc"
+));

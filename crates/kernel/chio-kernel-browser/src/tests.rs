@@ -158,6 +158,7 @@ fn make_request_json(subject: &Keypair) -> ToolCallRequestJson {
         server_id: "srv-a".to_string(),
         agent_id: subject.public_key().to_hex(),
         arguments: serde_json::json!({"msg": "hello"}),
+        supplemental_authorization: None,
     }
 }
 
@@ -195,6 +196,64 @@ fn evaluate_pure_allow_path() {
     assert!(verdict.subject_hex.is_some());
     assert!(verdict.issuer_hex.is_some());
     assert_eq!(verdict.capability_id.as_deref(), Some("cap-1"));
+}
+
+#[test]
+fn browser_rejects_supplemental_authorization_without_a_trusted_authority() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let mut request = make_request_json(&subject);
+    request.supplemental_authorization = Some(
+        chio_core_types::OpaqueSupplementalAuthorization::new(
+            "broker:browser-attempt",
+            std::vec![1, 2, 3],
+        )
+        .unwrap(),
+    );
+
+    let error = evaluate_pure(
+        EvaluateRequestJson {
+            request,
+            capability,
+            trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+            clock_override_unix_secs: Some(ISSUED_AT + 1),
+            session_filesystem_roots: None,
+            peer_capabilities: None,
+            capability_trust_roots: BTreeMap::new(),
+            parent_budget_snapshots: std::vec![],
+        },
+        &BrowserClock::new(),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "supplemental_authority_unavailable");
+}
+
+#[test]
+fn browser_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let subject = Keypair::generate();
+    let base_request = serde_json::json!({
+        "request_id": "req-unnegotiated-authorization",
+        "tool_name": "echo",
+        "server_id": "srv-a",
+        "agent_id": subject.public_key().to_hex(),
+        "arguments": {"msg": "hello"}
+    });
+    let extensions = [
+        ("approval_tokens", serde_json::json!([{}])),
+        ("threshold_approval_proposal", serde_json::json!({})),
+        ("governed_intent", serde_json::json!({})),
+    ];
+
+    for (field, value) in extensions {
+        let mut request = base_request.clone();
+        request[field] = value;
+        let error = serde_json::from_value::<ToolCallRequestJson>(request)
+            .expect_err("unnegotiated authorization extension must fail closed");
+        let message = error.to_string();
+        assert!(message.contains("unknown field"), "message: {message}");
+        assert!(message.contains(field), "message: {message}");
+    }
 }
 
 #[test]
@@ -334,7 +393,7 @@ fn verify_capability_pure_untrusted() {
 }
 
 #[test]
-fn verify_capability_pure_denies_mixed_version_aggregate_budget_and_preserves_latch() {
+fn verify_capability_pure_denies_unnegotiated_and_accepts_negotiated_aggregate_budget() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = make_aggregate_capability(&subject, &issuer);
@@ -367,7 +426,7 @@ fn verify_capability_pure_denies_mixed_version_aggregate_budget_and_preserves_la
         .contains("aggregate invocation budget is not negotiated"));
 
     assert!(rollout_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
-    let rollout_error = verify_capability_pure(
+    let verified = verify_capability_pure(
         VerifyCapabilityRequestJson {
             token: capability,
             trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
@@ -378,11 +437,8 @@ fn verify_capability_pure_denies_mixed_version_aggregate_budget_and_preserves_la
         },
         &clock,
     )
-    .expect_err("feature negotiation alone must not enable aggregate enforcement");
-    assert_eq!(rollout_error.code, "capability_verification_failed");
-    assert!(rollout_error
-        .message
-        .contains("aggregate invocation budget enforcement is disabled"));
+    .expect("negotiated portable verification must preserve the aggregate semantic");
+    assert_eq!(verified.id, "cap-aggregate");
 }
 
 #[test]

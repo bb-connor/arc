@@ -6,7 +6,7 @@ use chio_quarantine::{
 };
 use chio_security_types::ports::{
     CanonicalBody, Digest32, EventId, LineageId, OpaqueReceiptRef, ProducerId, ProducerTrustClass,
-    RecordId, SecurityEventStore, SessionId, TenantId, VerifiedSecurityEvent,
+    RecordId, SessionId, TenantId, VerifiedSecurityEvent,
 };
 use chio_security_types::{
     DetectorHealthKind, SecurityEventBody, SecurityEventBodyInput, SecurityEventKind,
@@ -60,11 +60,45 @@ fn event(
     time: u64,
     trust_class: ProducerTrustClass,
 ) -> VerifiedSecurityEvent {
+    event_with_ingest(TestEventInput {
+        tenant_id,
+        event_id,
+        session_id,
+        lineage_id,
+        kind,
+        event_time_unix_ms: time,
+        ingest_time_unix_ms: time.saturating_add(100),
+        trust_class,
+    })
+}
+
+struct TestEventInput<'a> {
+    tenant_id: &'a str,
+    event_id: &'a str,
+    session_id: &'a str,
+    lineage_id: &'a str,
+    kind: SecurityEventKind,
+    event_time_unix_ms: u64,
+    ingest_time_unix_ms: u64,
+    trust_class: ProducerTrustClass,
+}
+
+fn event_with_ingest(input: TestEventInput<'_>) -> VerifiedSecurityEvent {
+    let TestEventInput {
+        tenant_id,
+        event_id,
+        session_id,
+        lineage_id,
+        kind,
+        event_time_unix_ms,
+        ingest_time_unix_ms,
+        trust_class,
+    } = input;
     let body = SecurityEventBody::new(SecurityEventBodyInput {
         event_id: EventId::new(event_id)
             .unwrap_or_else(|error| panic!("invalid event id: {error}")),
-        event_time_unix_ms: time,
-        ingest_time_unix_ms: time.saturating_add(100),
+        event_time_unix_ms,
+        ingest_time_unix_ms,
         tenant_id: tenant(tenant_id),
         subject: SecuritySubject {
             subject_id: record("subject-1"),
@@ -101,6 +135,82 @@ fn event(
         body_hash: Digest32::new(*sha256(&canonical).as_bytes()),
         evidence_hash: Digest32::new(*evidence.as_bytes()),
     }
+}
+
+#[test]
+fn correlation_windows_use_event_time_independently_of_ingest_time() {
+    let rule = rule_with(
+        "event-time-only",
+        8,
+        8,
+        false,
+        SecurityEventKind::CredentialAccess,
+        SecurityEventKind::EgressAttempt,
+        20,
+    );
+    let within = TemporalCorrelator::new(Arc::new(TestStore::default()), policy(0));
+    let first = event_with_ingest(TestEventInput {
+        tenant_id: "tenant-a",
+        event_id: "event-time-first",
+        session_id: "event-time-session",
+        lineage_id: "event-time-lineage",
+        kind: SecurityEventKind::CredentialAccess,
+        event_time_unix_ms: 100,
+        ingest_time_unix_ms: 1_000,
+        trust_class: ProducerTrustClass::InternalDetector,
+    });
+    let second = event_with_ingest(TestEventInput {
+        tenant_id: "tenant-a",
+        event_id: "event-time-second",
+        session_id: "event-time-session",
+        lineage_id: "event-time-lineage",
+        kind: SecurityEventKind::EgressAttempt,
+        event_time_unix_ms: 120,
+        ingest_time_unix_ms: 9_000,
+        trust_class: ProducerTrustClass::InternalDetector,
+    });
+    assert!(within.ingest(&rule, &first).findings.is_empty());
+    assert_eq!(within.ingest(&rule, &second).findings.len(), 1);
+
+    let outside = TemporalCorrelator::new(Arc::new(TestStore::default()), policy(0));
+    let first = event_with_ingest(TestEventInput {
+        tenant_id: "tenant-a",
+        event_id: "ingest-time-first",
+        session_id: "ingest-time-session",
+        lineage_id: "ingest-time-lineage",
+        kind: SecurityEventKind::CredentialAccess,
+        event_time_unix_ms: 100,
+        ingest_time_unix_ms: 5_000,
+        trust_class: ProducerTrustClass::InternalDetector,
+    });
+    let second = event_with_ingest(TestEventInput {
+        tenant_id: "tenant-a",
+        event_id: "ingest-time-second",
+        session_id: "ingest-time-session",
+        lineage_id: "ingest-time-lineage",
+        kind: SecurityEventKind::EgressAttempt,
+        event_time_unix_ms: 121,
+        ingest_time_unix_ms: 5_001,
+        trust_class: ProducerTrustClass::InternalDetector,
+    });
+    assert!(outside.ingest(&rule, &first).findings.is_empty());
+    assert!(outside.ingest(&rule, &second).findings.is_empty());
+}
+
+fn rebind_source_receipt(
+    mut event: VerifiedSecurityEvent,
+    source_receipt_id: &str,
+) -> VerifiedSecurityEvent {
+    let mut body: SecurityEventBody = serde_json::from_slice(event.canonical_body.as_bytes())
+        .unwrap_or_else(|error| panic!("decode event body: {error}"));
+    body.source_receipt_id = OpaqueReceiptRef::new(source_receipt_id)
+        .unwrap_or_else(|error| panic!("source receipt id: {error}"));
+    let canonical = canonical_json_bytes(&body)
+        .unwrap_or_else(|error| panic!("canonical event serialization failed: {error}"));
+    event.canonical_body = CanonicalBody::new(canonical.clone())
+        .unwrap_or_else(|error| panic!("canonical body rejected: {error}"));
+    event.body_hash = Digest32::new(*sha256(&canonical).as_bytes());
+    event
 }
 
 fn policy(lateness_ms: u64) -> CorrelationPolicy {
@@ -161,6 +271,13 @@ fn in_order_exact_window_duplicate_unrelated_group_and_expiry_are_deterministic(
         .map(EventId::as_str)
         .collect();
     assert_eq!(ids, vec!["event-a", "event-b"]);
+    let source_receipts: Vec<&str> = matched.findings[0]
+        .ordered_source_receipt_ids
+        .as_slice()
+        .iter()
+        .map(OpaqueReceiptRef::as_str)
+        .collect();
+    assert_eq!(source_receipts, vec!["receipt-event-a", "receipt-event-b"]);
     assert_eq!(
         engine.ingest(&rule, &boundary).status,
         CorrelationStatus::Duplicate
@@ -207,6 +324,64 @@ fn in_order_exact_window_duplicate_unrelated_group_and_expiry_are_deterministic(
     assert!(engine.ingest(&rule, &expired_first).findings.is_empty());
     assert!(engine.ingest(&rule, &advance).findings.is_empty());
     assert!(engine.ingest(&rule, &late_second).findings.is_empty());
+}
+
+#[test]
+fn source_receipt_rebinding_changes_finding_identity_even_with_same_evidence_digest() {
+    let rule = rule_with(
+        "source-receipt-binding",
+        8,
+        8,
+        false,
+        SecurityEventKind::CredentialAccess,
+        SecurityEventKind::EgressAttempt,
+        50,
+    );
+    let first = event(
+        "tenant-a",
+        "source-first",
+        "source-session",
+        "source-lineage",
+        SecurityEventKind::CredentialAccess,
+        100,
+        ProducerTrustClass::InternalDetector,
+    );
+    let second = event(
+        "tenant-a",
+        "source-second",
+        "source-session",
+        "source-lineage",
+        SecurityEventKind::EgressAttempt,
+        110,
+        ProducerTrustClass::InternalDetector,
+    );
+
+    let first_engine = TemporalCorrelator::new(Arc::new(TestStore::default()), policy(0));
+    assert!(first_engine.ingest(&rule, &first).findings.is_empty());
+    let original = first_engine.ingest(&rule, &second);
+    let original_finding = original
+        .findings
+        .first()
+        .unwrap_or_else(|| panic!("original finding missing"));
+
+    let rebound_engine = TemporalCorrelator::new(Arc::new(TestStore::default()), policy(0));
+    assert!(rebound_engine.ingest(&rule, &first).findings.is_empty());
+    let rebound_event = rebind_source_receipt(second, "receipt-rebound-source-second");
+    let rebound = rebound_engine.ingest(&rule, &rebound_event);
+    let rebound_finding = rebound
+        .findings
+        .first()
+        .unwrap_or_else(|| panic!("rebound finding missing"));
+
+    assert_ne!(original_finding.finding_id, rebound_finding.finding_id);
+    assert_eq!(
+        original_finding.ordered_evidence_digests,
+        rebound_finding.ordered_evidence_digests
+    );
+    assert_ne!(
+        original_finding.ordered_source_receipt_ids,
+        rebound_finding.ordered_source_receipt_ids
+    );
 }
 
 fn run_permutation(
@@ -302,6 +477,149 @@ fn bounded_out_of_order_permutations_and_restart_replay_produce_one_identical_fi
 }
 
 #[test]
+fn idle_watermark_finalizes_a_deferred_tail_without_a_third_event() {
+    let bounded_lateness_ms = 10;
+    let store = Arc::new(TestStore::default());
+    let engine = TemporalCorrelator::new(Arc::clone(&store), policy(bounded_lateness_ms));
+    let rule = rule_with(
+        "idle-watermark-finalization",
+        8,
+        8,
+        false,
+        SecurityEventKind::CredentialAccess,
+        SecurityEventKind::EgressAttempt,
+        20,
+    );
+    let first = event(
+        "tenant-a",
+        "idle-first",
+        "session-idle",
+        "lineage-idle",
+        SecurityEventKind::CredentialAccess,
+        100,
+        ProducerTrustClass::InternalDetector,
+    );
+    let tail = event(
+        "tenant-a",
+        "idle-tail",
+        "session-idle",
+        "lineage-idle",
+        SecurityEventKind::EgressAttempt,
+        110,
+        ProducerTrustClass::InternalDetector,
+    );
+
+    let first_deferred = engine.ingest_observed_at(&rule, &first, first.event_time_unix_ms);
+    assert_eq!(first_deferred.status, CorrelationStatus::Deferred);
+    assert!(first_deferred.findings.is_empty());
+
+    let tail_deferred = engine.ingest_observed_at(&rule, &tail, tail.event_time_unix_ms);
+    assert_eq!(tail_deferred.status, CorrelationStatus::Deferred);
+    assert!(tail_deferred.findings.is_empty());
+    assert_eq!(
+        store
+            .durable_outcome_count()
+            .unwrap_or_else(|error| panic!("outcome count: {error:?}")),
+        0,
+        "deferred admissions must not publish durable outcomes"
+    );
+
+    let matched =
+        engine.ingest_observed_at(&rule, &tail, tail.event_time_unix_ms + bounded_lateness_ms);
+    assert_eq!(matched.status, CorrelationStatus::Matched);
+    assert_eq!(matched.watermark_unix_ms, tail.event_time_unix_ms);
+    assert_eq!(matched.findings.len(), 1);
+    assert_eq!(
+        matched.findings[0].ordered_event_ids.as_slice(),
+        [first.event_id.clone(), tail.event_id.clone()]
+    );
+    assert_eq!(
+        store
+            .durable_outcome_count()
+            .unwrap_or_else(|error| panic!("outcome count: {error:?}")),
+        1,
+        "the due tail retry must publish its matched outcome"
+    );
+    let durable = engine
+        .load_durable_outcome(&rule, &tail)
+        .unwrap_or_else(|error| panic!("load durable outcome: {error:?}"))
+        .unwrap_or_else(|| panic!("durable outcome missing"));
+    assert_eq!(durable, matched);
+
+    let finalized_first =
+        engine.ingest_observed_at(&rule, &first, tail.event_time_unix_ms + bounded_lateness_ms);
+    assert_eq!(finalized_first.status, CorrelationStatus::Duplicate);
+    assert_eq!(
+        store
+            .durable_outcome_count()
+            .unwrap_or_else(|error| panic!("outcome count: {error:?}")),
+        2,
+        "every deferred ingress record must receive its own durable outcome"
+    );
+    assert_eq!(
+        engine
+            .load_durable_outcome(&rule, &first)
+            .unwrap_or_else(|error| panic!("load first durable outcome: {error:?}")),
+        Some(finalized_first)
+    );
+}
+
+#[test]
+fn deferred_index_remains_the_authoritative_max_seen_watermark() {
+    let bounded_lateness_ms = 50;
+    let store = Arc::new(TestStore::default());
+    let engine = TemporalCorrelator::new(Arc::clone(&store), policy(bounded_lateness_ms));
+    let rule = rule_with(
+        "deferred-index-max-seen",
+        8,
+        8,
+        false,
+        SecurityEventKind::CredentialAccess,
+        SecurityEventKind::EgressAttempt,
+        100,
+    );
+    let future = event(
+        "tenant-a",
+        "max-seen-future",
+        "session-max-seen",
+        "lineage-max-seen",
+        SecurityEventKind::EgressAttempt,
+        200,
+        ProducerTrustClass::InternalDetector,
+    );
+    let older = event(
+        "tenant-a",
+        "max-seen-older",
+        "session-max-seen",
+        "lineage-max-seen",
+        SecurityEventKind::CredentialAccess,
+        100,
+        ProducerTrustClass::InternalDetector,
+    );
+
+    assert_eq!(
+        engine.ingest_observed_at(&rule, &future, 200).status,
+        CorrelationStatus::Deferred
+    );
+
+    let older_outcome = engine.ingest_observed_at(&rule, &older, 200);
+    assert_eq!(older_outcome.status, CorrelationStatus::Accepted);
+    assert_eq!(
+        older_outcome.watermark_unix_ms, 150,
+        "the deferred high event must still advance the set-derived watermark"
+    );
+
+    let future_outcome = engine.ingest_observed_at(&rule, &future, 250);
+    assert_eq!(future_outcome.status, CorrelationStatus::Matched);
+    assert_eq!(future_outcome.watermark_unix_ms, 200);
+    assert_eq!(future_outcome.findings.len(), 1);
+    assert_eq!(
+        future_outcome.findings[0].ordered_event_ids.as_slice(),
+        [older.event_id.clone(), future.event_id.clone()]
+    );
+}
+
+#[test]
 fn lateness_boundary_rejects_events_at_or_behind_the_watermark() {
     let store = Arc::new(TestStore::default());
     let engine = TemporalCorrelator::new(store, policy(10));
@@ -333,18 +651,31 @@ fn lateness_boundary_rejects_events_at_or_behind_the_watermark() {
         190,
         ProducerTrustClass::InternalDetector,
     );
+    let outcome = engine.ingest(&rule, &too_late);
+    assert_eq!(outcome.status, CorrelationStatus::TooLate);
     assert_eq!(
-        engine.ingest(&rule, &too_late).status,
-        CorrelationStatus::TooLate
+        engine
+            .load_durable_outcome(&rule, &too_late)
+            .unwrap_or_else(|error| panic!("load durable too-late outcome: {error}")),
+        Some(outcome)
     );
 }
 
 #[test]
-fn append_without_partition_index_recovers_fail_closed_after_watermark_advance() {
+fn append_and_per_rule_index_recover_atomically_after_injected_crash() {
     let store = Arc::new(TestStore::default());
     let engine = TemporalCorrelator::new(Arc::clone(&store), policy(0));
-    let rule = rule_with(
-        "append-gap",
+    let first_rule = rule_with(
+        "append-gap-first-rule",
+        8,
+        8,
+        false,
+        SecurityEventKind::CredentialAccess,
+        SecurityEventKind::EgressAttempt,
+        50,
+    );
+    let second_rule = rule_with(
+        "append-gap-second-rule",
         8,
         8,
         false,
@@ -361,25 +692,140 @@ fn append_without_partition_index_recovers_fail_closed_after_watermark_advance()
         100,
         ProducerTrustClass::InternalDetector,
     );
-    store
-        .append_verified(&stranded)
-        .unwrap_or_else(|error| panic!("seed append failed: {error}"));
-    let advance = event(
+    store.fail_next_partition_index();
+    let interrupted = engine.ingest(&first_rule, &stranded);
+    assert_eq!(interrupted.status, CorrelationStatus::Suppressed);
+    assert!(interrupted.automatic_response_suppressed);
+    assert_eq!(interrupted.detector_health.len(), 1);
+    assert_eq!(
+        interrupted.detector_health[0].kind,
+        DetectorHealthKind::StoreUnavailable
+    );
+    assert_eq!(
+        store
+            .durable_correlation_counts()
+            .unwrap_or_else(|error| panic!("correlation counts: {error:?}")),
+        (0, 0, 0),
+        "an interrupted admission must not strand the event, capacity row, or rule index"
+    );
+
+    let restarted = TemporalCorrelator::new(Arc::clone(&store), policy(0));
+    let independently_indexed = restarted.ingest(&second_rule, &stranded);
+    assert_ne!(independently_indexed.status, CorrelationStatus::Suppressed);
+    let recovered = restarted.ingest(&first_rule, &stranded);
+    assert_ne!(recovered.status, CorrelationStatus::Suppressed);
+    assert!(!recovered.automatic_response_suppressed);
+    assert!(recovered.detector_health.is_empty());
+
+    let completing = event(
         "tenant-a",
-        "gap-advance",
+        "gap-completing-event",
         "session-gap",
         "lineage-gap",
-        SecurityEventKind::ToolInvocation,
-        200,
+        SecurityEventKind::EgressAttempt,
+        130,
         ProducerTrustClass::InternalDetector,
     );
-    assert_eq!(engine.ingest(&rule, &advance).watermark_unix_ms, 200);
-    let recovered = engine.ingest(&rule, &stranded);
-    assert_eq!(recovered.status, CorrelationStatus::Suppressed);
-    assert!(recovered.automatic_response_suppressed);
+    let first_completed = restarted.ingest(&first_rule, &completing);
+    let second_completed = restarted.ingest(&second_rule, &completing);
+    assert_eq!(first_completed.findings.len(), 1);
+    assert_eq!(second_completed.findings.len(), 1);
     assert_eq!(
-        recovered.detector_health[0].kind,
-        DetectorHealthKind::StoreConflict
+        first_completed.findings[0].ordered_event_ids.as_slice(),
+        [stranded.event_id.clone(), completing.event_id.clone()]
+    );
+    assert_eq!(
+        second_completed.findings[0].ordered_event_ids.as_slice(),
+        [stranded.event_id.clone(), completing.event_id.clone()]
+    );
+    assert_ne!(
+        first_completed.findings[0].finding_id,
+        second_completed.findings[0].finding_id
+    );
+
+    assert!(restarted
+        .ingest(&first_rule, &completing)
+        .findings
+        .is_empty());
+    assert!(restarted
+        .ingest(&second_rule, &completing)
+        .findings
+        .is_empty());
+}
+
+#[test]
+fn correlation_outcome_journal_recovers_a_lost_commit_ack_with_the_exact_finding() {
+    let store = Arc::new(TestStore::default());
+    let engine = TemporalCorrelator::new(Arc::clone(&store), policy(0));
+    let rule = rule_with(
+        "outcome-journal",
+        8,
+        8,
+        false,
+        SecurityEventKind::CredentialAccess,
+        SecurityEventKind::EgressAttempt,
+        50,
+    );
+    let first = event(
+        "tenant-a",
+        "journal-first",
+        "session-journal",
+        "lineage-journal",
+        SecurityEventKind::CredentialAccess,
+        100,
+        ProducerTrustClass::InternalDetector,
+    );
+    let completing = event(
+        "tenant-a",
+        "journal-completing",
+        "session-journal",
+        "lineage-journal",
+        SecurityEventKind::EgressAttempt,
+        120,
+        ProducerTrustClass::InternalDetector,
+    );
+
+    assert_eq!(
+        engine.ingest(&rule, &first).status,
+        CorrelationStatus::Accepted
+    );
+    store.lose_next_outcome_commit_ack();
+    let recovered = engine.ingest(&rule, &completing);
+    assert_eq!(recovered.status, CorrelationStatus::Matched);
+    assert_eq!(recovered.findings.len(), 1);
+    assert_eq!(
+        recovered.findings[0].ordered_event_ids.as_slice(),
+        [first.event_id.clone(), completing.event_id.clone()]
+    );
+    assert_eq!(
+        store
+            .durable_outcome_count()
+            .unwrap_or_else(|error| panic!("outcome count: {error:?}")),
+        2,
+        "both correlation transitions must have immutable outcome records"
+    );
+
+    let restarted = TemporalCorrelator::new(Arc::clone(&store), policy(0));
+    let replayed = restarted
+        .load_durable_outcome(&rule, &completing)
+        .unwrap_or_else(|error| panic!("load durable outcome: {error:?}"))
+        .unwrap_or_else(|| panic!("durable outcome missing"));
+    assert_eq!(replayed, recovered);
+    assert_eq!(
+        restarted.ingest(&rule, &completing).status,
+        CorrelationStatus::Duplicate
+    );
+    let replayed_after_duplicate = restarted
+        .load_durable_outcome(&rule, &completing)
+        .unwrap_or_else(|error| panic!("load durable outcome: {error:?}"))
+        .unwrap_or_else(|| panic!("durable outcome missing"));
+    assert_eq!(replayed_after_duplicate, recovered);
+    assert_eq!(
+        store
+            .durable_outcome_count()
+            .unwrap_or_else(|error| panic!("outcome count: {error:?}")),
+        2,
+        "recovery must not append a second journal record"
     );
 }
 

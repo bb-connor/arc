@@ -53,6 +53,9 @@ builds.
 - Server tools remain gated by both the `computer-use` feature and manifest
   `server_tools`; custom client-hosted tools must not be forced through the
   server-tool allowlist.
+- Registry-bound execution validates server-tool arguments against the pinned
+  trusted schema catalog in `chio-manifest`. A provider date-suffix change does
+  not authorize an incompatible argument shape without a catalog update.
 - The feature gate and manifest gate must use the same server-tool taxonomy.
   A version bump in Anthropic's server-tool wire suffix cannot turn the tool
   into a regular customer tool in default builds.

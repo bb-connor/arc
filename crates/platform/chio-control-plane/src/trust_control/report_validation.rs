@@ -1,4 +1,4 @@
-use super::cluster::cluster_authority_lease_view;
+use super::cluster_replay::consume_cluster_peer_nonce_durably;
 use super::*;
 
 pub(crate) fn budget_visibility_matches(
@@ -18,13 +18,47 @@ pub(crate) fn budget_visibility_matches(
 }
 
 pub(crate) fn normalize_cluster_url(value: &str) -> Result<String, CliError> {
-    let normalized = value.trim().trim_end_matches('/');
-    if normalized.is_empty() {
+    if value.is_empty() {
         return Err(CliError::cli_other_error(
             "cluster URL must not be empty".to_string(),
         ));
     }
-    Ok(normalized.to_string())
+    if value.trim() != value || value.chars().any(char::is_control) {
+        return Err(CliError::cli_other_error(
+            "cluster URL must not contain whitespace or control characters".to_string(),
+        ));
+    }
+    let mut parsed = Url::parse(value).map_err(|error| {
+        CliError::cli_other_error(format!("cluster URL must be valid: {error}"))
+    })?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(CliError::cli_other_error(format!(
+            "cluster URL scheme `{}` is not allowed",
+            parsed.scheme()
+        )));
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(CliError::cli_other_error(
+            "cluster URL must not contain username or password material".to_string(),
+        ));
+    }
+    if parsed.query().is_some() || parsed.fragment().is_some() {
+        return Err(CliError::cli_other_error(
+            "cluster URL must not contain a query string or fragment".to_string(),
+        ));
+    }
+    if !matches!(parsed.path(), "" | "/") {
+        return Err(CliError::cli_other_error(
+            "cluster URL must not contain a path".to_string(),
+        ));
+    }
+    if parsed.host().is_none() {
+        return Err(CliError::cli_other_error(
+            "cluster URL must include a host".to_string(),
+        ));
+    }
+    parsed.set_path("");
+    Ok(parsed.as_str().trim_end_matches('/').to_string())
 }
 
 pub(crate) fn normalize_cluster_config_url(
@@ -35,32 +69,9 @@ pub(crate) fn normalize_cluster_config_url(
     let parsed = Url::parse(&normalized).map_err(|error| {
         CliError::cli_other_error(format!("cluster URL must be valid: {error}"))
     })?;
-    match parsed.scheme() {
-        "http" | "https" => {}
-        scheme => {
-            return Err(CliError::cli_other_error(format!(
-                "cluster URL scheme `{scheme}` is not allowed"
-            )));
-        }
-    }
     if parsed.scheme() != "https" && !allow_local {
         return Err(CliError::cli_other_error(
             "cluster URL must use HTTPS unless --allow-local-peer-urls is enabled".to_string(),
-        ));
-    }
-    if !parsed.username().is_empty() || parsed.password().is_some() {
-        return Err(CliError::cli_other_error(
-            "cluster URL must not contain username or password material".to_string(),
-        ));
-    }
-    if parsed.query().is_some() {
-        return Err(CliError::cli_other_error(
-            "cluster URL must not contain a query string".to_string(),
-        ));
-    }
-    if parsed.fragment().is_some() {
-        return Err(CliError::cli_other_error(
-            "cluster URL must not contain a fragment".to_string(),
         ));
     }
     if allow_local {
@@ -191,123 +202,167 @@ pub(crate) fn cluster_peer_auth_unverified_failure_key(node_id: &str, endpoint: 
     format!("unverified:{}", sha256_hex(payload.as_bytes()))
 }
 
-pub(crate) fn cluster_peer_auth_signature(
-    service_token: &str,
-    node_id: &str,
-    endpoint: &str,
-    issued_at: i64,
-    term: Option<u64>,
-) -> Result<String, CliError> {
-    let payload = canonical_json_bytes(&json!({
-        "scheme": CLUSTER_AUTH_SCHEME,
-        "serviceToken": service_token,
-        "nodeId": node_id,
-        "endpoint": endpoint,
-        "issuedAt": issued_at,
-        "term": term,
-    }))
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to encode cluster peer auth payload: {error}"
-        ))
-    })?;
-    Ok(sha256_hex(&payload))
+pub(crate) fn cluster_request_body_digest<T: Serialize>(body: &T) -> Result<String, CliError> {
+    canonical_json_bytes(body)
+        .map(|canonical| sha256_hex(&canonical))
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to canonicalize cluster request body: {error}"
+            ))
+        })
 }
 
-pub(crate) fn cluster_peer_auth_signature_with_body(
-    service_token: &str,
+pub(crate) fn cluster_empty_body_digest() -> String {
+    sha256_hex(&[])
+}
+
+fn cluster_peer_auth_payload(
     node_id: &str,
+    receiver_id: &str,
+    method: &str,
     endpoint: &str,
     issued_at: i64,
+    nonce: &str,
     term: Option<u64>,
-    body_digest: Option<&str>,
-) -> Result<String, CliError> {
-    let Some(body_digest) = body_digest else {
-        return cluster_peer_auth_signature(service_token, node_id, endpoint, issued_at, term);
-    };
-    let payload = canonical_json_bytes(&json!({
-        "scheme": CLUSTER_AUTH_SCHEME,
-        "serviceToken": service_token,
-        "nodeId": node_id,
-        "endpoint": endpoint,
-        "issuedAt": issued_at,
-        "term": term,
+    body_digest: &str,
+) -> Result<Vec<u8>, CliError> {
+    let node_id = normalize_cluster_url(node_id)?;
+    let receiver_id = normalize_cluster_url(receiver_id)?;
+    canonical_json_bytes(&json!({
         "bodyDigest": body_digest,
+        "domain": CLUSTER_AUTH_SCHEME,
+        "endpoint": endpoint,
+        "issuedAt": issued_at,
+        "method": method,
+        "nonce": nonce,
+        "peerId": node_id,
+        "receiverId": receiver_id,
+        "term": term,
     }))
     .map_err(|error| {
         CliError::cli_other_error(format!(
-            "failed to encode cluster peer auth payload: {error}"
+            "failed to encode cluster membership request: {error}"
         ))
-    })?;
-    Ok(sha256_hex(&payload))
+    })
 }
 
-pub(crate) fn validate_cluster_peer_auth(
+pub(crate) fn cluster_peer_auth_signature(
+    signing_key: &Keypair,
+    node_id: &str,
+    receiver_id: &str,
+    method: &str,
+    endpoint: &str,
+    issued_at: i64,
+    nonce: &str,
+    term: Option<u64>,
+    body_digest: &str,
+) -> Result<String, CliError> {
+    let payload = cluster_peer_auth_payload(
+        node_id,
+        receiver_id,
+        method,
+        endpoint,
+        issued_at,
+        nonce,
+        term,
+        body_digest,
+    )?;
+    Ok(signing_key.sign(&payload).to_hex())
+}
+
+pub(crate) fn validate_cluster_peer_request(
     headers: &HeaderMap,
     config: &TrustServiceConfig,
+    expected_method: &str,
     endpoint: &str,
+    expected_body_digest: &str,
 ) -> Result<ClusterPeerAuthContext, Response> {
-    let node_id = headers
-        .get(CLUSTER_NODE_ID_HEADER)
-        .and_then(|value| value.to_str().ok())
+    let node_id = unique_cluster_auth_header(headers, CLUSTER_NODE_ID_HEADER)?
         .and_then(|value| normalize_cluster_url(value).ok())
         .ok_or_else(cluster_peer_auth_error)?;
-    let issued_at = headers
-        .get(CLUSTER_AUTH_ISSUED_AT_HEADER)
-        .and_then(|value| value.to_str().ok())
+    let issued_at = unique_cluster_auth_header(headers, CLUSTER_AUTH_ISSUED_AT_HEADER)?
         .and_then(|value| value.parse::<i64>().ok())
         .ok_or_else(cluster_peer_auth_error)?;
-    let signature = headers
-        .get(CLUSTER_AUTH_SIGNATURE_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| !value.trim().is_empty())
+    let signature = unique_cluster_auth_header(headers, CLUSTER_AUTH_SIGNATURE_HEADER)?
+        .and_then(|value| Signature::from_hex(value).ok())
         .ok_or_else(cluster_peer_auth_error)?;
-    let term = headers
-        .get(CLUSTER_AUTH_TERM_HEADER)
-        .and_then(|value| value.to_str().ok())
+    let method = unique_cluster_auth_header(headers, CLUSTER_AUTH_METHOD_HEADER)?
+        .filter(|value| *value == expected_method)
+        .ok_or_else(cluster_peer_auth_error)?;
+    let nonce = unique_cluster_auth_header(headers, CLUSTER_AUTH_NONCE_HEADER)?
+        .filter(|value| {
+            uuid::Uuid::parse_str(value).is_ok_and(|parsed| parsed.get_version_num() == 4)
+        })
+        .ok_or_else(cluster_peer_auth_error)?;
+    let term = unique_cluster_auth_header(headers, CLUSTER_AUTH_TERM_HEADER)?
         .map(|value| {
             value.parse::<u64>().map_err(|_| {
                 plain_http_error(StatusCode::UNAUTHORIZED, "invalid cluster peer term header")
             })
         })
         .transpose()?;
-    let body_digest = headers
-        .get(CLUSTER_AUTH_BODY_DIGEST_HEADER)
-        .and_then(|value| value.to_str().ok());
-    if body_digest.is_some_and(|digest| {
-        digest.len() != 64
-            || !digest
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
-    }) {
+    let body_digest = unique_cluster_auth_header(headers, CLUSTER_AUTH_BODY_DIGEST_HEADER)?
+        .ok_or_else(cluster_peer_auth_error)?;
+    if body_digest.len() != 64
+        || !body_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
         return Err(plain_http_error(
             StatusCode::UNAUTHORIZED,
             "invalid cluster peer body digest",
         ));
     }
-    let unverified_failure_key = cluster_peer_auth_unverified_failure_key(&node_id, endpoint);
-    let allowlisted = config
-        .peer_urls
-        .iter()
-        .filter_map(|peer_url| normalize_cluster_url(peer_url).ok())
-        .any(|peer_url| peer_url == node_id);
-    if !allowlisted {
+    if !bool::from(
+        body_digest
+            .as_bytes()
+            .ct_eq(expected_body_digest.as_bytes()),
+    ) {
         return Err(plain_http_error(
-            StatusCode::FORBIDDEN,
-            "cluster peer is not in the configured allowlist",
+            StatusCode::UNAUTHORIZED,
+            "cluster peer body digest does not match the request",
         ));
     }
-    let now = unix_timestamp_now() as i64;
-    let expected = cluster_peer_auth_signature_with_body(
-        &config.service_token,
+    let unverified_failure_key = cluster_peer_auth_unverified_failure_key(&node_id, endpoint);
+    let pinned_key = config
+        .cluster_members
+        .iter()
+        .filter_map(|member| {
+            normalize_cluster_url(&member.node_url)
+                .ok()
+                .filter(|member_url| member_url == &node_id)
+                .map(|_| member.public_key.clone())
+        })
+        .next()
+        .ok_or_else(|| {
+            plain_http_error(
+                StatusCode::FORBIDDEN,
+                "cluster peer is not in the pinned membership",
+            )
+        })?;
+    let receiver_id = config
+        .advertise_url
+        .as_deref()
+        .and_then(|value| normalize_cluster_url(value).ok())
+        .ok_or_else(|| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "cluster receiver identity is not configured",
+            )
+        })?;
+    let payload = cluster_peer_auth_payload(
         &node_id,
+        &receiver_id,
+        method,
         endpoint,
         issued_at,
+        nonce,
         term,
         body_digest,
     )
     .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
-    if !bool::from(signature.as_bytes().ct_eq(expected.as_bytes())) {
+    let now = unix_timestamp_now() as i64;
+    if !pinned_key.verify(&payload, &signature) {
         if cluster_peer_auth_is_rate_limited(&unverified_failure_key, now as u64) {
             let mut response = plain_http_error(
                 StatusCode::TOO_MANY_REQUESTS,
@@ -347,12 +402,64 @@ pub(crate) fn validate_cluster_peer_auth(
             "cluster peer auth timestamp expired outside the allowed skew window",
         ));
     }
+    let replay_db_path = config.cluster_replay_db_path.as_deref().ok_or_else(|| {
+        plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster peer replay database is not configured",
+        )
+    })?;
+    consume_cluster_peer_nonce_durably(replay_db_path, &node_id, nonce, issued_at, now)?;
     clear_cluster_peer_auth_failures(&node_id);
     Ok(ClusterPeerAuthContext {
         node_id,
         issued_at,
         term,
     })
+}
+
+fn unique_cluster_auth_header<'a>(
+    headers: &'a HeaderMap,
+    name: &str,
+) -> Result<Option<&'a str>, Response> {
+    let mut values = headers.get_all(name).iter();
+    let first = values.next();
+    if values.next().is_some() {
+        return Err(cluster_peer_auth_error());
+    }
+    first
+        .map(|value| value.to_str().map_err(|_| cluster_peer_auth_error()))
+        .transpose()
+}
+
+pub(crate) fn validate_cluster_peer_json_request<T: Serialize>(
+    headers: &HeaderMap,
+    config: &TrustServiceConfig,
+    method: &str,
+    endpoint: &str,
+    body: &T,
+) -> Result<ClusterPeerAuthContext, Response> {
+    let body_digest = cluster_request_body_digest(body).map_err(|error| {
+        plain_http_error(
+            StatusCode::BAD_REQUEST,
+            &format!("cluster request body cannot be canonicalized: {error}"),
+        )
+    })?;
+    validate_cluster_peer_request(headers, config, method, endpoint, &body_digest)
+}
+
+pub(crate) fn validate_cluster_peer_empty_request(
+    headers: &HeaderMap,
+    config: &TrustServiceConfig,
+    method: &str,
+    endpoint: &str,
+) -> Result<ClusterPeerAuthContext, Response> {
+    validate_cluster_peer_request(
+        headers,
+        config,
+        method,
+        endpoint,
+        &cluster_empty_body_digest(),
+    )
 }
 
 fn cluster_peer_auth_error() -> Response {
@@ -367,97 +474,25 @@ fn cluster_peer_auth_error() -> Response {
     response
 }
 
-pub(crate) fn validate_authority_mutation_auth(
-    headers: &HeaderMap,
-    state: &TrustServiceState,
-    endpoint: &str,
-) -> Result<Option<ClusterPeerAuthContext>, Response> {
-    let has_cluster_peer_headers = headers.contains_key(CLUSTER_NODE_ID_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_ISSUED_AT_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_SIGNATURE_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
-    if has_cluster_peer_headers {
-        let peer = validate_cluster_peer_auth(headers, &state.config, endpoint)?;
-        let Some(term) = peer.term else {
-            return Err(plain_http_error(
-                StatusCode::UNAUTHORIZED,
-                "cluster authority mutation is missing the forwarded term",
-            ));
-        };
-        let Some(authority_lease) = cluster_authority_lease_view(state) else {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "cluster authority lease is unavailable for authority mutation",
-            ));
-        };
-        if !authority_lease.lease_valid {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "cluster authority lease expired before authority mutation",
-            ));
-        }
-        if term != authority_lease.term {
-            return Err(plain_http_error(
-                StatusCode::CONFLICT,
-                "cluster authority mutation term does not match the current lease",
-            ));
-        }
-        return Ok(Some(peer));
-    }
-    validate_service_auth(headers, &state.config.service_token)?;
-    Ok(None)
-}
-
 pub(crate) fn enforce_authority_mutation_fence(
     state: &TrustServiceState,
 ) -> Result<Option<ClusterAuthorityLeaseView>, Response> {
-    let Some(authority_lease) = cluster_authority_lease_view(state) else {
-        return Ok(None);
-    };
-    if !authority_lease.lease_valid {
+    if state.cluster.is_some() {
         return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "cluster authority lease expired before authority mutation",
+            StatusCode::CONFLICT,
+            "clustered capability-authority mutation is unsupported without a linearizable shared signing selector",
         ));
     }
-    if let Some(path) = state.config.authority_db_path.as_deref() {
-        SqliteCapabilityAuthority::open_existing(path)
-            .and_then(|authority| {
-                authority.enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
-            })
-            .map_err(|_| {
-                plain_http_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "cluster authority fence is unavailable",
-                )
-            })?;
-    }
-    Ok(Some(authority_lease))
+    Ok(None)
 }
 
 pub(crate) fn refresh_authority_mutation_fence(state: &TrustServiceState) -> Result<(), Response> {
-    let Some(authority_lease) = cluster_authority_lease_view(state) else {
-        return Ok(());
-    };
-    if !authority_lease.lease_valid {
+    if state.cluster.is_some() {
         return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "cluster authority lease expired before authority fence refresh",
+            StatusCode::CONFLICT,
+            "clustered capability-authority mutation is unsupported without a linearizable shared signing selector",
         ));
     }
-    let Some(path) = state.config.authority_db_path.as_deref() else {
-        return Ok(());
-    };
-    SqliteCapabilityAuthority::open_existing(path)
-        .and_then(|authority| {
-            authority.seed_cluster_fence(Some(&authority_lease.leader_url), authority_lease.term)
-        })
-        .map_err(|_| {
-            plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "cluster authority fence is unavailable",
-            )
-        })?;
     Ok(())
 }
 
@@ -481,9 +516,11 @@ pub(crate) fn validate_service_auth(
 }
 
 fn control_bearer_token(headers: &HeaderMap) -> Option<&str> {
-    let header = headers
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())?;
+    let mut authorization_headers = headers.get_all(AUTHORIZATION).iter();
+    let header = authorization_headers.next()?.to_str().ok()?;
+    if authorization_headers.next().is_some() {
+        return None;
+    }
     let provided = header.strip_prefix("Bearer ")?;
     (!provided.is_empty()).then_some(provided)
 }
@@ -502,13 +539,22 @@ fn missing_or_invalid_control_token() -> Response {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ResolvedControlReadPrincipal {
     AdminService,
+    DashboardRead,
     TenantRead { tenant_id: String },
 }
 
 impl ResolvedControlReadPrincipal {
+    pub(crate) fn protect_response(&self, response: Response) -> Response {
+        if matches!(self, Self::DashboardRead) {
+            super::dashboard_auth::with_dashboard_no_store(response)
+        } else {
+            response
+        }
+    }
+
     pub(crate) fn receipt_read_context(&self) -> ReceiptReadContext {
         match self {
-            Self::AdminService => ReceiptReadContext::admin_service(),
+            Self::AdminService | Self::DashboardRead => ReceiptReadContext::admin_service(),
             Self::TenantRead { tenant_id } => {
                 ReceiptReadContext::authenticated_tenant(tenant_id.clone())
             }
@@ -520,7 +566,7 @@ impl ResolvedControlReadPrincipal {
         mut query: EvidenceExportQuery,
     ) -> Result<EvidenceExportQuery, Response> {
         match self {
-            Self::AdminService => Ok(query),
+            Self::AdminService | Self::DashboardRead => Ok(query),
             Self::TenantRead { tenant_id } => {
                 match &query.read_boundary {
                     Some(ReceiptReadBoundary::AdminAll) => {
@@ -580,6 +626,31 @@ pub(crate) fn resolve_control_read_principal(
         }
     }
     Err(missing_or_invalid_control_token())
+}
+
+pub(crate) fn resolve_dashboard_or_control_read_principal(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+) -> Result<ResolvedControlReadPrincipal, Response> {
+    if headers.contains_key(AUTHORIZATION) {
+        return resolve_control_read_principal(headers, &state.config)
+            .map_err(super::dashboard_auth::with_dashboard_no_store);
+    }
+    super::dashboard_auth::validate_dashboard_session(headers, state)?;
+    Ok(ResolvedControlReadPrincipal::DashboardRead)
+}
+
+pub(crate) fn validate_dashboard_or_service_auth(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+) -> Result<ResolvedControlReadPrincipal, Response> {
+    if headers.contains_key(AUTHORIZATION) {
+        validate_service_auth(headers, &state.config.service_token)
+            .map_err(super::dashboard_auth::with_dashboard_no_store)?;
+        return Ok(ResolvedControlReadPrincipal::AdminService);
+    }
+    super::dashboard_auth::validate_dashboard_session(headers, state)?;
+    Ok(ResolvedControlReadPrincipal::DashboardRead)
 }
 
 pub(crate) fn validate_metered_billing_reconciliation_request(

@@ -1,23 +1,41 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/core/chio-adversarial-suite",
+    "crates/core/chio-core",
     "crates/core/chio-core-types",
     "crates/economy/chio-appraisal",
+    "crates/economy/chio-autonomy",
     "crates/economy/chio-credit",
+    "crates/economy/chio-listing",
+    "crates/economy/chio-market",
+    "crates/economy/chio-open-market",
     "crates/economy/chio-underwriting",
     "crates/economy/chio-web3",
+    "crates/kernel/chio-kernel-core",
     "crates/kernel/chio-runtime-proof-parity",
     "crates/kernel/chio-swarm-authority",
+    "crates/observability/chio-metrics-spec",
     "crates/platform/chio-agent-web-interop",
     "crates/platform/chio-commerce-order",
     "crates/platform/chio-enterprise-export",
     "crates/platform/chio-risk-comptroller",
     "crates/platform/chio-transaction-passport",
     "crates/platform/chio-trust-market-context",
+    "crates/platform/chio-workflow",
     "crates/platform/chio-workflow-preflight",
     "crates/products/chio-proof-room",
+    "crates/protocol/chio-egress-contract",
+    "crates/protocol/chio-http-serve",
+    "crates/security/chio-security-types",
     "crates/trust/chio-disclosure-lineage",
+    "crates/trust/chio-federation",
+    "crates/trust/chio-governance",
+    "crates/trust/chio-pheromone",
+    "crates/trust/chio-revocation-oracle",
+    "crates/trust/chio-selective-disclosure",
     "crates/tooling/chio-spec-codegen",
+    "crates/tooling/chio-spec-validate",
     "crates/tooling/chio-test-support",
 ]
 
@@ -39,16 +57,33 @@ strip = "symbols"
 panic = "abort"
 
 [workspace.dependencies]
+chio-adversarial-suite = { path = "crates/core/chio-adversarial-suite" }
 chio-appraisal = { path = "crates/economy/chio-appraisal" }
 chio-agent-web-interop = { path = "crates/platform/chio-agent-web-interop" }
+chio-autonomy = { path = "crates/economy/chio-autonomy" }
 chio-commerce-order = { path = "crates/platform/chio-commerce-order" }
+chio-core = { path = "crates/core/chio-core" }
 chio-core-types = { path = "crates/core/chio-core-types" }
 chio-credit = { path = "crates/economy/chio-credit" }
 chio-disclosure-lineage = { path = "crates/trust/chio-disclosure-lineage" }
+chio-egress-contract = { path = "crates/protocol/chio-egress-contract" }
 chio-enterprise-export = { path = "crates/platform/chio-enterprise-export" }
+chio-federation = { path = "crates/trust/chio-federation" }
+chio-governance = { path = "crates/trust/chio-governance" }
+chio-http-serve = { path = "crates/protocol/chio-http-serve" }
+chio-kernel-core = { path = "crates/kernel/chio-kernel-core" }
+chio-listing = { path = "crates/economy/chio-listing" }
+chio-market = { path = "crates/economy/chio-market" }
+chio-metrics-spec = { path = "crates/observability/chio-metrics-spec" }
+chio-open-market = { path = "crates/economy/chio-open-market" }
+chio-pheromone = { path = "crates/trust/chio-pheromone" }
+chio-revocation-oracle = { path = "crates/trust/chio-revocation-oracle" }
 chio-risk-comptroller = { path = "crates/platform/chio-risk-comptroller" }
 chio-runtime-proof-parity = { path = "crates/kernel/chio-runtime-proof-parity" }
+chio-security-types = { path = "crates/security/chio-security-types" }
+chio-selective-disclosure = { path = "crates/trust/chio-selective-disclosure" }
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }
+chio-spec-validate = { path = "crates/tooling/chio-spec-validate" }
 chio-swarm-authority = { path = "crates/kernel/chio-swarm-authority" }
 chio-transaction-passport = { path = "crates/platform/chio-transaction-passport" }
 chio-trust-market-context = { path = "crates/platform/chio-trust-market-context" }
@@ -56,16 +91,25 @@ chio-workflow-preflight = { path = "crates/platform/chio-workflow-preflight" }
 chio-test-support = { path = "crates/tooling/chio-test-support" }
 chio-underwriting = { path = "crates/economy/chio-underwriting" }
 chio-web3 = { path = "crates/economy/chio-web3" }
+chio-workflow = { path = "crates/platform/chio-workflow" }
+arc-swap = "1"
 base64 = "0.22"
 chrono = "0.4"
+criterion = "0.5"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 fips204 = { version = "0.4.6", default-features = false, features = ["ml-dsa-65"] }
 hex = "0.4"
 hmac = "0.12"
 jsonschema = { version = "0.46", default-features = false, features = ["resolve-file"] }
 proptest = "1.10"
+reqwest = { version = "0.13.2", default-features = false }
+rs_merkle = "1.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 sha2 = "0.10"
 thiserror = "1"
 tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", features = ["util", "make", "buffer", "timeout", "load-shed", "limit", "retry"] }
+tracing = "0.1"
+url = "2"
 axum = "0.8"

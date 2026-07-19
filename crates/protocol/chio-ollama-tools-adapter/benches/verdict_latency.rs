@@ -2,6 +2,11 @@ use std::hint::black_box;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_ollama_tools_adapter::{
     transport, OllamaAdapter, OllamaAdapterConfig, OLLAMA_API_VERSION,
 };
@@ -31,18 +36,55 @@ fn stream_bytes() -> Result<Vec<u8>, ProviderError> {
     Ok(ndjson)
 }
 
-fn cold_adapter() -> OllamaAdapter {
+fn cold_adapter() -> Result<OllamaAdapter, ProviderError> {
+    let signer = Keypair::from_seed(&[68; 32]);
     let config = OllamaAdapterConfig::new(
         "ollama-latency",
         "Ollama Latency",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "local_chio_latency",
     );
-    OllamaAdapter::new(
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "lookup_policy".to_string(),
+            description: "Latency fixture tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).map_err(|error| {
+        ProviderError::Malformed(format!("Ollama latency manifest signing failed: {error}"))
+    })?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| {
+            ProviderError::Malformed(format!("Ollama latency manifest admission failed: {error}"))
+        })?;
+    OllamaAdapter::new_with_registry(
         config,
         Arc::new(transport::MockTransport::new("mock://ollama")),
+        &registry,
     )
+    .map_err(|error| ProviderError::Malformed(format!("Ollama cold adapter init failed: {error}")))
 }
 
 fn allow_verdict() -> VerdictResult {
@@ -53,7 +95,7 @@ fn allow_verdict() -> VerdictResult {
 }
 
 fn run_cold_verdict_path() -> Result<(), ProviderError> {
-    let adapter = cold_adapter();
+    let adapter = cold_adapter()?;
     let stream = stream_bytes()?;
     let gated = adapter.gate_sse_stream(&stream, |invocation| {
         black_box(invocation);

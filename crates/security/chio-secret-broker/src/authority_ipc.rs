@@ -8,7 +8,11 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
-use chio_core_types::{canonical_json_bytes, Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core_types::{
+    canonical_json_bytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
+#[cfg(test)]
+use chio_core_types::{Ed25519Backend, Keypair};
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -37,7 +41,7 @@ const MAX_AUTHORITY_CLOCK_SKEW_SECONDS: u64 = 30;
 #[serde(rename_all = "snake_case", tag = "kind", content = "request")]
 pub enum AuthorityOperation {
     Capabilities,
-    PrepareExecution(BrokerExecuteRequest),
+    PrepareExecution(Box<BrokerExecuteRequest>),
     VerifyLiveParent(CapabilityLivenessRequest),
     CheckBrokerRevocation(BrokerRevocationRequest),
     QueryExecutionHold(QueryExecutionHoldRequest),
@@ -130,6 +134,92 @@ pub struct SignedAuthorityResponse {
     pub signature: Signature,
 }
 
+/// Exact signed authority request and response retained for broker audit
+/// evidence. Construction verifies both signatures, the response-to-request
+/// binding, the independently trusted authority key, and the configured
+/// freshness interval.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedAuthorityExchange {
+    request: SignedAuthorityRequest,
+    response: SignedAuthorityResponse,
+    trusted_authority: PublicKey,
+    verified_at_unix_seconds: u64,
+    maximum_clock_skew_seconds: u64,
+}
+
+impl VerifiedAuthorityExchange {
+    #[must_use]
+    pub fn request(&self) -> &SignedAuthorityRequest {
+        &self.request
+    }
+
+    #[must_use]
+    pub fn response(&self) -> &SignedAuthorityResponse {
+        &self.response
+    }
+
+    #[must_use]
+    pub fn trusted_authority(&self) -> &PublicKey {
+        &self.trusted_authority
+    }
+
+    #[must_use]
+    pub const fn verified_at_unix_seconds(&self) -> u64 {
+        self.verified_at_unix_seconds
+    }
+
+    #[must_use]
+    pub const fn maximum_clock_skew_seconds(&self) -> u64 {
+        self.maximum_clock_skew_seconds
+    }
+
+    pub fn request_sha256(&self) -> Result<String> {
+        signed_request_digest(&self.request)
+    }
+
+    pub fn response_sha256(&self) -> Result<String> {
+        let canonical = canonical_json_bytes(&self.response).map_err(|error| {
+            BrokerError::Invariant(format!(
+                "authority response evidence digest failed: {error}"
+            ))
+        })?;
+        Ok(hex::encode(Sha256::digest(canonical)))
+    }
+}
+
+/// Verify and retain one exact signed authority exchange for later audit
+/// evidence verification.
+pub fn verify_authority_exchange(
+    request: SignedAuthorityRequest,
+    response: SignedAuthorityResponse,
+    trusted_authority: &PublicKey,
+    verified_at_unix_seconds: u64,
+    maximum_clock_skew_seconds: u64,
+) -> Result<VerifiedAuthorityExchange> {
+    verify_authority_request(
+        &request,
+        &request.body.broker,
+        verified_at_unix_seconds,
+        maximum_clock_skew_seconds,
+    )?;
+    let request_digest = signed_request_digest(&request)?;
+    verify_authority_response(
+        &response,
+        trusted_authority,
+        &request.body.request_id,
+        &request_digest,
+        verified_at_unix_seconds,
+        maximum_clock_skew_seconds,
+    )?;
+    Ok(VerifiedAuthorityExchange {
+        request,
+        response,
+        trusted_authority: trusted_authority.clone(),
+        verified_at_unix_seconds,
+        maximum_clock_skew_seconds,
+    })
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AuthoritySigningInput<'a, T> {
@@ -169,13 +259,16 @@ impl AuthorityRpcClientConfig {
 
 pub struct AuthorityRpcClient {
     config: AuthorityRpcClientConfig,
-    broker_signer: Keypair,
+    broker_signer: Arc<dyn SigningBackend>,
     capabilities: ExecutionAuthorityCapabilities,
 }
 
 impl AuthorityRpcClient {
     #[cfg(unix)]
-    pub fn connect(config: AuthorityRpcClientConfig, broker_signer: Keypair) -> Result<Self> {
+    pub fn connect(
+        config: AuthorityRpcClientConfig,
+        broker_signer: Arc<dyn SigningBackend>,
+    ) -> Result<Self> {
         config.validate()?;
         let mut client = Self {
             config,
@@ -195,7 +288,10 @@ impl AuthorityRpcClient {
     }
 
     #[cfg(not(unix))]
-    pub fn connect(_config: AuthorityRpcClientConfig, _broker_signer: Keypair) -> Result<Self> {
+    pub fn connect(
+        _config: AuthorityRpcClientConfig,
+        _broker_signer: Arc<dyn SigningBackend>,
+    ) -> Result<Self> {
         Err(BrokerError::AuthorityUnavailable(
             "broker authority IPC requires Unix domain sockets".to_string(),
         ))
@@ -203,10 +299,17 @@ impl AuthorityRpcClient {
 
     #[cfg(unix)]
     fn call(&self, operation: AuthorityOperation) -> Result<AuthorityResult> {
+        self.call_with_exchange(operation).map(|(result, _)| result)
+    }
+
+    #[cfg(unix)]
+    fn call_with_exchange(
+        &self,
+        operation: AuthorityOperation,
+    ) -> Result<(AuthorityResult, VerifiedAuthorityExchange)> {
         validate_authority_operation(&operation)?;
         let now = now_unix_seconds()?;
-        let request = sign_authority_request(operation, now, &self.broker_signer)?;
-        let request_digest = signed_request_digest(&request)?;
+        let request = sign_authority_request(operation, now, self.broker_signer.as_ref())?;
         let encoded = canonical_json_bytes(&request).map_err(|error| {
             BrokerError::Invariant(format!("authority request encoding failed: {error}"))
         })?;
@@ -242,24 +345,34 @@ impl AuthorityRpcClient {
                 "authority response is not canonical JSON".to_string(),
             ));
         }
-        verify_authority_response(
-            &response,
+        let result = response.body.result.clone();
+        let exchange = verify_authority_exchange(
+            request,
+            response,
             &self.config.trusted_authority,
-            &request.body.request_id,
-            &request_digest,
             now_unix_seconds()?,
             self.config.maximum_clock_skew_seconds,
         )?;
-        match response.body.result {
+        match result {
             AuthorityResult::Rejected { .. } => Err(BrokerError::AuthorizationDenied(
                 "authority rejected broker operation".to_string(),
             )),
-            result => Ok(result),
+            result => Ok((result, exchange)),
         }
     }
 
     #[cfg(not(unix))]
     fn call(&self, _operation: AuthorityOperation) -> Result<AuthorityResult> {
+        Err(BrokerError::AuthorityUnavailable(
+            "broker authority IPC requires Unix domain sockets".to_string(),
+        ))
+    }
+
+    #[cfg(not(unix))]
+    fn call_with_exchange(
+        &self,
+        _operation: AuthorityOperation,
+    ) -> Result<(AuthorityResult, VerifiedAuthorityExchange)> {
         Err(BrokerError::AuthorityUnavailable(
             "broker authority IPC requires Unix domain sockets".to_string(),
         ))
@@ -277,7 +390,9 @@ impl AuthorityRpcClient {
 
 impl BrokerAdmissionAuthority for AuthorityRpcClient {
     fn prepare_execution(&self, request: &BrokerExecuteRequest) -> Result<TrustedExecutionContext> {
-        match self.call(AuthorityOperation::PrepareExecution(request.clone()))? {
+        match self.call(AuthorityOperation::PrepareExecution(Box::new(
+            request.clone(),
+        )))? {
             AuthorityResult::Prepared(context) => Ok(context),
             _ => Err(BrokerError::AuthorityUnavailable(
                 "authority returned the wrong admission response".to_string(),
@@ -311,6 +426,18 @@ impl CapabilityLiveness for AuthorityRpcClient {
             )),
         }
     }
+
+    fn verify_live_parent_with_audit_evidence(
+        &self,
+        request: &CapabilityLivenessRequest,
+    ) -> Result<VerifiedAuthorityExchange> {
+        match self.call_with_exchange(AuthorityOperation::VerifyLiveParent(request.clone()))? {
+            (AuthorityResult::LiveParent(_), exchange) => Ok(exchange),
+            _ => Err(BrokerError::AuthorityUnavailable(
+                "authority returned the wrong liveness audit response".to_string(),
+            )),
+        }
+    }
 }
 
 impl BrokerRevocations for AuthorityRpcClient {
@@ -322,6 +449,18 @@ impl BrokerRevocations for AuthorityRpcClient {
             AuthorityResult::Revocation(snapshot) => Ok(snapshot),
             _ => Err(BrokerError::AuthorityUnavailable(
                 "authority returned the wrong revocation response".to_string(),
+            )),
+        }
+    }
+
+    fn check_broker_revocation_with_audit_evidence(
+        &self,
+        request: &BrokerRevocationRequest,
+    ) -> Result<VerifiedAuthorityExchange> {
+        match self.call_with_exchange(AuthorityOperation::CheckBrokerRevocation(request.clone()))? {
+            (AuthorityResult::Revocation(_), exchange) => Ok(exchange),
+            _ => Err(BrokerError::AuthorityUnavailable(
+                "authority returned the wrong revocation audit response".to_string(),
             )),
         }
     }
@@ -373,7 +512,7 @@ pub trait BrokerAuthorityHandler: Send + Sync {
 pub struct AuthorityRpcServer {
     listener: UnixListener,
     trusted_broker: PublicKey,
-    authority_signer: Keypair,
+    authority_signer: Arc<dyn SigningBackend>,
     handler: Arc<dyn BrokerAuthorityHandler>,
     maximum_clock_skew_seconds: u64,
 }
@@ -383,7 +522,7 @@ impl AuthorityRpcServer {
     pub fn bind(
         path: impl AsRef<Path>,
         trusted_broker: PublicKey,
-        authority_signer: Keypair,
+        authority_signer: Arc<dyn SigningBackend>,
         handler: Arc<dyn BrokerAuthorityHandler>,
         maximum_clock_skew_seconds: u64,
     ) -> Result<Self> {
@@ -416,9 +555,37 @@ impl AuthorityRpcServer {
     }
 
     pub fn serve_one(&self) -> Result<()> {
-        let (mut stream, _) = self.listener.accept().map_err(|error| {
+        let (stream, _) = self.listener.accept().map_err(|error| {
             BrokerError::Storage(format!("authority RPC accept failed: {error}"))
         })?;
+        self.serve_stream(stream)
+    }
+
+    pub fn set_nonblocking(&self, nonblocking: bool) -> Result<()> {
+        self.listener.set_nonblocking(nonblocking).map_err(|error| {
+            BrokerError::Storage(format!("authority RPC listener mode failed: {error}"))
+        })
+    }
+
+    /// Serve one pending connection from a nonblocking listener.
+    ///
+    /// `Ok(false)` is an idle poll. Every accepted connection is handled to
+    /// completion or returns its protocol/storage failure.
+    pub fn try_serve_one(&self) -> Result<bool> {
+        let stream = match self.listener.accept() {
+            Ok((stream, _)) => stream,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(false),
+            Err(error) => {
+                return Err(BrokerError::Storage(format!(
+                    "authority RPC accept failed: {error}"
+                )))
+            }
+        };
+        self.serve_stream(stream)?;
+        Ok(true)
+    }
+
+    fn serve_stream(&self, mut stream: UnixStream) -> Result<()> {
         let request_bytes = read_bounded_frame(&mut stream)?;
         let request: SignedAuthorityRequest =
             serde_json::from_slice(&request_bytes).map_err(|error| {
@@ -450,7 +617,7 @@ impl AuthorityRpcServer {
             &request_digest,
             result,
             now_unix_seconds()?,
-            &self.authority_signer,
+            self.authority_signer.as_ref(),
         )?;
         let encoded = canonical_json_bytes(&response).map_err(|error| {
             BrokerError::Invariant(format!("authority response encoding failed: {error}"))
@@ -462,7 +629,7 @@ impl AuthorityRpcServer {
 fn validate_authority_operation(operation: &AuthorityOperation) -> Result<()> {
     match operation {
         AuthorityOperation::Capabilities => Ok(()),
-        AuthorityOperation::PrepareExecution(request) => request.validate_bounds(),
+        AuthorityOperation::PrepareExecution(request) => request.as_ref().validate_bounds(),
         AuthorityOperation::VerifyLiveParent(request) => {
             validate_identifier(&request.parent_capability_id, "parent capability id", 512)?;
             validate_identifier(&request.expected_audience, "parent audience", 512)
@@ -482,7 +649,7 @@ fn validate_authority_operation(operation: &AuthorityOperation) -> Result<()> {
 fn sign_authority_request(
     operation: AuthorityOperation,
     issued_at_unix_seconds: u64,
-    signer: &Keypair,
+    signer: &dyn SigningBackend,
 ) -> Result<SignedAuthorityRequest> {
     if issued_at_unix_seconds == 0 {
         return Err(BrokerError::Invariant(
@@ -491,24 +658,41 @@ fn sign_authority_request(
     }
     let mut random = [0_u8; 32];
     OsRng.fill_bytes(&mut random);
+    let expected_broker = signer.public_key();
     let body = AuthorityRequestBody {
         schema: AUTHORITY_RPC_SCHEMA.to_string(),
         request_id: hex::encode(random),
         issued_at_unix_seconds,
-        broker: signer.public_key(),
+        broker: expected_broker.clone(),
         operation,
     };
     let input = AuthoritySigningInput {
         domain: AUTHORITY_REQUEST_DOMAIN,
         body: &body,
     };
-    let (signature, _) = signer.sign_canonical(&input).map_err(|error| {
-        BrokerError::Invariant(format!("authority request signing failed: {error}"))
+    let canonical = canonical_json_bytes(&input).map_err(|error| {
+        BrokerError::Invariant(format!(
+            "authority request signing input encoding failed: {error}"
+        ))
     })?;
+    let signed = signer
+        .sign_bytes_for_identity(&expected_broker, &canonical)
+        .map_err(|error| {
+            BrokerError::Invariant(format!("authority request signing failed: {error}"))
+        })?;
+    if signed.public_key != expected_broker
+        || signed.algorithm != expected_broker.algorithm()
+        || signed.signature.algorithm() != signed.algorithm
+        || !signed.public_key.verify(&canonical, &signed.signature)
+    {
+        return Err(BrokerError::Invariant(
+            "authority request signer returned a mismatched identity or signature".to_string(),
+        ));
+    }
     Ok(SignedAuthorityRequest {
         body,
-        algorithm: signer.public_key().algorithm(),
-        signature,
+        algorithm: signed.algorithm,
+        signature: signed.signature,
     })
 }
 
@@ -554,30 +738,74 @@ fn sign_authority_response(
     request_digest: &str,
     result: AuthorityResult,
     issued_at_unix_seconds: u64,
-    signer: &Keypair,
+    signer: &dyn SigningBackend,
 ) -> Result<SignedAuthorityResponse> {
     validate_identifier(request_id, "authority request id", 512)?;
     validate_digest(request_digest, "authority request digest")?;
+    let expected_authority = signer.public_key();
     let body = AuthorityResponseBody {
         schema: AUTHORITY_RPC_SCHEMA.to_string(),
         request_id: request_id.to_string(),
         request_digest: request_digest.to_string(),
         issued_at_unix_seconds,
-        authority: signer.public_key(),
+        authority: expected_authority.clone(),
         result,
     };
     let input = AuthoritySigningInput {
         domain: AUTHORITY_RESPONSE_DOMAIN,
         body: &body,
     };
-    let (signature, _) = signer.sign_canonical(&input).map_err(|error| {
-        BrokerError::Invariant(format!("authority response signing failed: {error}"))
+    let canonical = canonical_json_bytes(&input).map_err(|error| {
+        BrokerError::Invariant(format!(
+            "authority response signing input encoding failed: {error}"
+        ))
     })?;
+    let signed = signer
+        .sign_bytes_for_identity(&expected_authority, &canonical)
+        .map_err(|error| {
+            BrokerError::Invariant(format!("authority response signing failed: {error}"))
+        })?;
+    if signed.public_key != expected_authority
+        || signed.algorithm != expected_authority.algorithm()
+        || signed.signature.algorithm() != signed.algorithm
+        || !signed.public_key.verify(&canonical, &signed.signature)
+    {
+        return Err(BrokerError::Invariant(
+            "authority response signer returned a mismatched identity or signature".to_string(),
+        ));
+    }
     Ok(SignedAuthorityResponse {
         body,
-        algorithm: signer.public_key().algorithm(),
-        signature,
+        algorithm: signed.algorithm,
+        signature: signed.signature,
     })
+}
+
+#[cfg(test)]
+pub(crate) fn sign_test_authority_exchange(
+    operation: AuthorityOperation,
+    result: AuthorityResult,
+    issued_at_unix_seconds: u64,
+    broker_signer: &dyn SigningBackend,
+    authority_signer: &dyn SigningBackend,
+    maximum_clock_skew_seconds: u64,
+) -> Result<VerifiedAuthorityExchange> {
+    let request = sign_authority_request(operation, issued_at_unix_seconds, broker_signer)?;
+    let request_digest = signed_request_digest(&request)?;
+    let response = sign_authority_response(
+        &request.body.request_id,
+        &request_digest,
+        result,
+        issued_at_unix_seconds,
+        authority_signer,
+    )?;
+    verify_authority_exchange(
+        request,
+        response,
+        &authority_signer.public_key(),
+        issued_at_unix_seconds,
+        maximum_clock_skew_seconds,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -698,6 +926,7 @@ fn unavailable_capabilities() -> ExecutionAuthorityCapabilities {
 
 #[cfg(test)]
 mod tests {
+    use chio_test_support::prelude::*;
     use std::thread;
 
     use super::*;
@@ -729,21 +958,21 @@ mod tests {
 
     #[test]
     fn authority_rpc_requires_signed_exact_responses_and_full_capabilities() {
-        let directory = tempfile::tempdir().expect("tempdir");
+        let directory = tempfile::tempdir().test_expect("tempdir");
         let socket = directory.path().join("authority.sock");
         let broker = Keypair::from_seed(&[71; 32]);
         let authority = Keypair::from_seed(&[72; 32]);
         let server = AuthorityRpcServer::bind(
             &socket,
             broker.public_key(),
-            authority.clone(),
+            Arc::new(Ed25519Backend::new(authority.clone())),
             Arc::new(Handler),
             30,
         )
-        .expect("server");
+        .test_expect("server");
         let server_thread = thread::spawn(move || {
-            server.serve_one().expect("capabilities");
-            server.serve_one().expect("control");
+            server.serve_one().test_expect("capabilities");
+            server.serve_one().test_expect("control");
         });
         let client = AuthorityRpcClient::connect(
             AuthorityRpcClientConfig {
@@ -752,9 +981,9 @@ mod tests {
                 timeout_ms: 1_000,
                 maximum_clock_skew_seconds: 30,
             },
-            broker,
+            Arc::new(Ed25519Backend::new(broker)),
         )
-        .expect("client");
+        .test_expect("client");
         let response = client
             .control(AuthorityControlRequest {
                 operation: IpcOperation::Status,
@@ -762,21 +991,21 @@ mod tests {
                 authorization: vec![1],
                 payload: br#"{"status":true}"#.to_vec(),
             })
-            .expect("control");
+            .test_expect("control");
         assert_eq!(response, br#"{"accepted":true}"#);
-        server_thread.join().expect("server thread");
+        server_thread.join().test_expect("server thread");
 
         let bad_socket = directory.path().join("bad-authority.sock");
         let broker = Keypair::from_seed(&[73; 32]);
         let server = AuthorityRpcServer::bind(
             &bad_socket,
             broker.public_key(),
-            Keypair::from_seed(&[74; 32]),
+            Arc::new(Ed25519Backend::new(Keypair::from_seed(&[74; 32]))),
             Arc::new(Handler),
             30,
         )
-        .expect("bad server");
-        let server_thread = thread::spawn(move || server.serve_one().expect("bad handshake"));
+        .test_expect("bad server");
+        let server_thread = thread::spawn(move || server.serve_one().test_expect("bad handshake"));
         assert!(AuthorityRpcClient::connect(
             AuthorityRpcClientConfig {
                 socket_path: bad_socket,
@@ -784,9 +1013,29 @@ mod tests {
                 timeout_ms: 1_000,
                 maximum_clock_skew_seconds: 30,
             },
-            broker,
+            Arc::new(Ed25519Backend::new(broker)),
         )
         .is_err());
-        server_thread.join().expect("bad server thread");
+        server_thread.join().test_expect("bad server thread");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn nonblocking_authority_server_distinguishes_idle_from_failure() {
+        let directory = tempfile::tempdir().test_expect("tempdir");
+        let socket = directory.path().join("nonblocking-authority.sock");
+        let broker = Keypair::from_seed(&[76; 32]);
+        let authority = Keypair::from_seed(&[77; 32]);
+        let server = AuthorityRpcServer::bind(
+            &socket,
+            broker.public_key(),
+            Arc::new(Ed25519Backend::new(authority)),
+            Arc::new(Handler),
+            30,
+        )
+        .test_expect("server");
+
+        server.set_nonblocking(true).test_expect("nonblocking mode");
+        assert!(!server.try_serve_one().test_expect("idle poll"));
     }
 }

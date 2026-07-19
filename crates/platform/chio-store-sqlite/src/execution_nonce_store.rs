@@ -2,10 +2,9 @@
 //!
 //! Durable replay-prevention for execution nonces so a kernel that
 //! crashes and restarts cannot be tricked into accepting a nonce that was
-//! already consumed by the previous process. Expiry is enforced by
-//! storing the nonce's `expires_at` alongside the consumed marker;
-//! `reserve` refuses to recycle a slot until the nonce is past its
-//! expiry.
+//! already consumed by the previous process. Consumed identifiers are
+//! permanent tombstones. The signed `expires_at` is retained as audit
+//! metadata, but wall-clock movement never authorizes deletion or reuse.
 //!
 //! The schema is:
 //!
@@ -15,8 +14,6 @@
 //!     consumed_at INTEGER NOT NULL,
 //!     expires_at  INTEGER NOT NULL
 //! );
-//! CREATE INDEX idx_chio_execution_nonces_expires_at
-//!     ON chio_execution_nonces(expires_at);
 //! ```
 
 use std::fs;
@@ -24,18 +21,13 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::{
-    ExecutionNonceReservation, ExecutionNonceReservationError, ExecutionNonceStore, KernelError,
-    ReplayReservationState,
+    ExecutionNonceReservation, ExecutionNonceReservationError, ExecutionNonceStore,
+    ExecutionNonceStoreProfile, KernelError, ReplayReservationState,
 };
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
-/// Default number of seconds a consumed-marker persists after its
-/// `expires_at` before the garbage collector reclaims the row. Keeps the
-/// table bounded without letting a replay slip through immediately after
-/// the nonce would have expired anyway.
-const RETENTION_GRACE_SECS: i64 = 60;
 const MAX_OPERATION_NONCE_ID_BYTES: usize = 512;
 
 /// Opaque error type returned by the SQLite nonce store.
@@ -71,6 +63,7 @@ impl From<r2d2::Error> for SqliteExecutionNonceStoreError {
 /// SQLite-backed replay-prevention store for execution nonces.
 pub struct SqliteExecutionNonceStore {
     pool: Pool<SqliteConnectionManager>,
+    authority_profile: ExecutionNonceStoreProfile,
 }
 
 impl SqliteExecutionNonceStore {
@@ -78,6 +71,7 @@ impl SqliteExecutionNonceStore {
     /// if needed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SqliteExecutionNonceStoreError> {
         let path = path.as_ref();
+        reject_volatile_database_path(path)?;
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
                 fs::create_dir_all(parent)?;
@@ -85,7 +79,10 @@ impl SqliteExecutionNonceStore {
         }
         let manager = SqliteConnectionManager::file(path);
         let pool = Pool::builder().max_size(8).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            authority_profile: ExecutionNonceStoreProfile::SingleNodeDurable,
+        };
         store.run_migrations()?;
         Ok(store)
     }
@@ -94,13 +91,16 @@ impl SqliteExecutionNonceStore {
     pub fn open_in_memory() -> Result<Self, SqliteExecutionNonceStoreError> {
         let manager = SqliteConnectionManager::memory();
         let pool = Pool::builder().max_size(1).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            authority_profile: ExecutionNonceStoreProfile::EphemeralLocal,
+        };
         store.run_migrations()?;
         Ok(store)
     }
 
     fn run_migrations(&self) -> Result<(), SqliteExecutionNonceStoreError> {
-        let conn = self
+        let mut conn = self
             .pool
             .get()
             .map_err(|e| SqliteExecutionNonceStoreError(format!("pool acquire: {e}")))?;
@@ -118,6 +118,12 @@ impl SqliteExecutionNonceStore {
 
             CREATE INDEX IF NOT EXISTS idx_chio_execution_nonces_expires_at
                 ON chio_execution_nonces(expires_at);
+
+            CREATE TRIGGER IF NOT EXISTS chio_execution_nonce_delete_forbidden
+            BEFORE DELETE ON chio_execution_nonces
+            BEGIN
+                SELECT RAISE(ABORT, 'execution nonce tombstones cannot be deleted');
+            END;
 
             CREATE TABLE IF NOT EXISTS chio_execution_nonce_reservations (
                 operation_id TEXT PRIMARY KEY
@@ -175,6 +181,7 @@ impl SqliteExecutionNonceStore {
             END;
             "#,
         )?;
+        audit_permanent_nonce_tombstone_trigger(&mut conn)?;
         let dual_owner = conn
             .query_row(
                 r#"
@@ -196,9 +203,9 @@ impl SqliteExecutionNonceStore {
         Ok(())
     }
 
-    /// Reserve a nonce id. Shared code path for the trait impl and
-    /// tests -- takes an explicit `expires_at` for caller-controlled
-    /// retention (the trait method uses `now + RETENTION_GRACE_SECS`).
+    /// Reserve a nonce id. Shared code path for the trait impl and tests.
+    /// `now` and `expires_at` are persisted only as audit metadata and never
+    /// control tombstone deletion.
     pub fn try_reserve(
         &self,
         nonce_id: &str,
@@ -222,15 +229,6 @@ impl SqliteExecutionNonceStore {
         configure_nonce_connection(&conn)?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
-        // First, prune any rows that are past their `expires_at` so a
-        // long-lived kernel doesn't accumulate garbage. Keeping the
-        // prune here (rather than a background job) is safe because the
-        // query is indexed on expires_at.
-        tx.execute(
-            "DELETE FROM chio_execution_nonces WHERE expires_at <= ?1",
-            params![now],
-        )?;
-
         let operation_owned = tx
             .query_row(
                 "SELECT 1 FROM chio_execution_nonce_reservations WHERE nonce_id = ?1",
@@ -244,9 +242,7 @@ impl SqliteExecutionNonceStore {
             return Ok(false);
         }
 
-        // Then attempt the reservation. A conflicting row means the
-        // nonce was already consumed and is still within the retention
-        // window; return `false`.
+        // A conflicting row is a permanent replay tombstone.
         let rows = tx.execute(
             r#"
             INSERT INTO chio_execution_nonces (nonce_id, consumed_at, expires_at)
@@ -326,6 +322,65 @@ impl SqliteExecutionNonceStore {
     }
 }
 
+fn audit_permanent_nonce_tombstone_trigger(
+    connection: &mut Connection,
+) -> Result<(), SqliteExecutionNonceStoreError> {
+    const AUDIT_NONCE_ID: &str = "chio-execution-nonce-permanent-tombstone-audit";
+    const EXPECTED_TRIGGER_SQL: &str = r#"
+        CREATE TRIGGER chio_execution_nonce_delete_forbidden
+        BEFORE DELETE ON chio_execution_nonces
+        BEGIN
+            SELECT RAISE(ABORT, 'execution nonce tombstones cannot be deleted');
+        END
+    "#;
+    let stored_trigger_sql = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'chio_execution_nonce_delete_forbidden'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    let normalize = |sql: &str| sql.split_ascii_whitespace().collect::<Vec<_>>().join(" ");
+    if stored_trigger_sql
+        .as_deref()
+        .is_none_or(|sql| normalize(sql) != normalize(EXPECTED_TRIGGER_SQL))
+    {
+        return Err(SqliteExecutionNonceStoreError(
+            "permanent execution nonce tombstone trigger has an unexpected definition".to_string(),
+        ));
+    }
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    transaction.execute(
+        r#"
+        INSERT INTO chio_execution_nonces (nonce_id, consumed_at, expires_at)
+        VALUES (?1, 1, 1)
+        ON CONFLICT(nonce_id) DO NOTHING
+        "#,
+        params![AUDIT_NONCE_ID],
+    )?;
+    let deletion_blocked = transaction
+        .execute(
+            "DELETE FROM chio_execution_nonces WHERE nonce_id = ?1",
+            params![AUDIT_NONCE_ID],
+        )
+        .is_err();
+    let tombstone_retained = transaction
+        .query_row(
+            "SELECT 1 FROM chio_execution_nonces WHERE nonce_id = ?1",
+            params![AUDIT_NONCE_ID],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+        .is_some();
+    transaction.rollback()?;
+    if !deletion_blocked || !tombstone_retained {
+        return Err(SqliteExecutionNonceStoreError(
+            "permanent execution nonce tombstone deletion guard is unavailable".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn configure_nonce_connection(
     connection: &Connection,
 ) -> Result<(), SqliteExecutionNonceStoreError> {
@@ -394,6 +449,10 @@ fn now_secs() -> i64 {
 }
 
 impl ExecutionNonceStore for SqliteExecutionNonceStore {
+    fn authority_profile(&self) -> ExecutionNonceStoreProfile {
+        self.authority_profile
+    }
+
     fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
         // Back-compat path: callers that do not know the nonce's signed
         // expiry estimate the kernel default TTL and delegate to
@@ -407,17 +466,8 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
     }
 
     fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError> {
-        // Retain the consumed marker for the full signed validity window
-        // plus a small grace, so a pruner cannot reclaim the row while
-        // the nonce is still cryptographically valid. Take the max of
-        // `nonce_expires_at + RETENTION_GRACE_SECS` and
-        // `now + RETENTION_GRACE_SECS`, preserving the original grace
-        // for clock-skew safety.
         let now = now_secs();
-        let retention = nonce_expires_at.saturating_add(RETENTION_GRACE_SECS);
-        let baseline = now.saturating_add(RETENTION_GRACE_SECS);
-        let expires_at = retention.max(baseline);
-        self.try_reserve(nonce_id, now, expires_at)
+        self.try_reserve(nonce_id, now, nonce_expires_at)
             .map_err(|e| KernelError::Internal(format!("sqlite execution nonce store: {e}")))
     }
 
@@ -477,13 +527,6 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
             )));
         }
 
-        tx.execute(
-            "DELETE FROM chio_execution_nonces WHERE expires_at <= ?1",
-            params![now_secs()],
-        )
-        .map_err(|e| {
-            ExecutionNonceReservationError::Store(format!("prune legacy nonce markers: {e}"))
-        })?;
         let legacy_consumed = tx
             .query_row(
                 "SELECT 1 FROM chio_execution_nonces WHERE nonce_id = ?1",
@@ -548,6 +591,20 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
     }
 }
 
+fn reject_volatile_database_path(path: &Path) -> Result<(), SqliteExecutionNonceStoreError> {
+    let path = path.to_string_lossy();
+    let lower = path.to_ascii_lowercase();
+    let memory_uri = lower.starts_with("file:")
+        && (lower.contains("?mode=memory") || lower.contains("&mode=memory"));
+    if path.is_empty() || path == ":memory:" || memory_uri || lower.starts_with("file::memory:") {
+        return Err(SqliteExecutionNonceStoreError(
+            "volatile SQLite execution-nonce paths are not durable; use open_in_memory for an explicitly ephemeral store"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
@@ -590,13 +647,81 @@ mod tests {
     }
 
     #[test]
-    fn expired_row_is_pruned_and_slot_reusable() {
+    fn forward_clock_jump_then_rollback_cannot_reuse_nonce_tombstone() {
         let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
         assert!(store.try_reserve("a", 1_000, 1_030).unwrap());
-        // "Now" after expiry + retention: prune removes the row and the
-        // same id can be re-reserved (this is benign because verify_
-        // execution_nonce also checks the signed expires_at).
-        assert!(store.try_reserve("a", 2_000, 2_030).unwrap());
+        assert!(!store.try_reserve("a", 2_000, 2_030).unwrap());
+        assert!(!store.try_reserve("a", 1_001, 1_030).unwrap());
+        assert!(matches!(
+            store.reserve_nonce_for_operation(operation_id("09").as_str(), "a", 2_030),
+            Err(ExecutionNonceReservationError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn existing_database_migration_installs_idempotent_permanent_tombstone_guard() {
+        let path = unique_db_path("chio-exec-nonce-tombstone-migration");
+        let legacy = Connection::open(&path).unwrap();
+        legacy
+            .execute_batch(
+                r#"
+                CREATE TABLE chio_execution_nonces (
+                    nonce_id TEXT PRIMARY KEY,
+                    consumed_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL
+                );
+                INSERT INTO chio_execution_nonces (nonce_id, consumed_at, expires_at)
+                VALUES ('legacy-consumed', 1000, 1030);
+                "#,
+            )
+            .unwrap();
+        drop(legacy);
+
+        let store = SqliteExecutionNonceStore::open(&path).unwrap();
+        assert!(!store.try_reserve("legacy-consumed", 2_000, 2_030).unwrap());
+        assert!(!store.try_reserve("legacy-consumed", 1_001, 1_030).unwrap());
+        let connection = store.pool.get().unwrap();
+        assert!(connection
+            .execute(
+                "DELETE FROM chio_execution_nonces WHERE nonce_id = ?1",
+                params!["legacy-consumed"],
+            )
+            .is_err());
+        drop(connection);
+        drop(store);
+
+        let reopened = SqliteExecutionNonceStore::open(&path).unwrap();
+        assert!(!reopened
+            .try_reserve("legacy-consumed", 1_002, 1_030)
+            .unwrap());
+        drop(reopened);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn migration_rejects_conflicting_nonce_delete_trigger_contract() {
+        let path = unique_db_path("chio-exec-nonce-conflicting-trigger");
+        let legacy = Connection::open(&path).unwrap();
+        legacy
+            .execute_batch(
+                r#"
+                CREATE TABLE chio_execution_nonces (
+                    nonce_id TEXT PRIMARY KEY,
+                    consumed_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL
+                );
+                CREATE TRIGGER chio_execution_nonce_delete_forbidden
+                BEFORE UPDATE ON chio_execution_nonces
+                BEGIN
+                    SELECT 1;
+                END;
+                "#,
+            )
+            .unwrap();
+        drop(legacy);
+
+        assert!(SqliteExecutionNonceStore::open(&path).is_err());
+        let _ = fs::remove_file(path);
     }
 
     #[test]

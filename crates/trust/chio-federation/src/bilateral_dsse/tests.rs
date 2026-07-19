@@ -129,66 +129,68 @@ fn strict_chio_signer_binds_treaty_runtime_refs() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
-    let envelope = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        BilateralPredicateExtensions {
-            capability_lease_ref: Some(CapabilityLeaseRef {
-                lease_id: "lease-bilateral".to_string(),
-                issuer: "kernel.org-a".to_string(),
-                expires_at_unix_ms: 1_734_000_060_000,
-                scope_digest: None,
-            }),
-            policy_evaluation_summary: Some(PolicyEvaluationSummary {
-                server_a_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-a".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                server_b_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-b".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                joint_disposition: Some("allow".to_string()),
-            }),
-            governance_receipt_ref: Some(GovernanceReceiptRef {
-                receipt_id: "gov-receipt-1".to_string(),
-                kernel_id: "kernel.org-b".to_string(),
-                digest: HashRecord {
-                    alg: "sha256".to_string(),
-                    value: "d".repeat(64),
-                },
-            }),
-            consistency_anchor: Some("anchor-live".to_string()),
-            consistency_model: Some("totally_ordered".to_string()),
-            cross_org_visibility: Some("treaty_only".to_string()),
-            treaty_binding_ref: Some(TreatyBindingRef {
-                treaty_id: "treaty-buyer-vendor".to_string(),
-                treaty_scope_sha256: "1".repeat(64),
-                ladder_intersection_sha256: "2".repeat(64),
-                admission_report_sha256: "3".repeat(64),
-                continuation_sha256: "4".repeat(64),
-                lineage_bundle_sha256: "5".repeat(64),
-                action_class_id: "workflow.destructive.vendor_call".to_string(),
-                consistency_model: "totally_ordered".to_string(),
-                request_sha256: receipt.action.parameter_hash.clone(),
-                outcome_sha256: receipt.content_hash.clone(),
-                local_receipt_sha256: "8".repeat(64),
-                remote_receipt_sha256: receipt_canonical_digest_hex(&receipt).unwrap(),
-                lease_refs: vec!["lease-bilateral".to_string()],
-                governance_refs: vec!["gov-receipt-1".to_string()],
-                signer_kernel_ids: vec!["kernel.org-a".to_string(), "kernel.org-b".to_string()],
-            }),
+    let envelope = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions: BilateralPredicateExtensions {
+                capability_lease_ref: Some(CapabilityLeaseRef {
+                    lease_id: "lease-bilateral".to_string(),
+                    issuer: "kernel.org-a".to_string(),
+                    expires_at_unix_ms: 1_734_000_060_000,
+                    scope_digest: None,
+                }),
+                policy_evaluation_summary: Some(PolicyEvaluationSummary {
+                    server_a_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-a".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    server_b_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-b".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    joint_disposition: Some("allow".to_string()),
+                }),
+                governance_receipt_ref: Some(GovernanceReceiptRef {
+                    receipt_id: "gov-receipt-1".to_string(),
+                    kernel_id: "kernel.org-b".to_string(),
+                    digest: HashRecord {
+                        alg: "sha256".to_string(),
+                        value: "d".repeat(64),
+                    },
+                }),
+                consistency_anchor: Some("anchor-live".to_string()),
+                consistency_model: Some("totally_ordered".to_string()),
+                cross_org_visibility: Some("treaty_only".to_string()),
+                treaty_binding_ref: Some(TreatyBindingRef {
+                    treaty_id: "treaty-buyer-vendor".to_string(),
+                    treaty_scope_sha256: "1".repeat(64),
+                    ladder_intersection_sha256: "2".repeat(64),
+                    admission_report_sha256: "3".repeat(64),
+                    continuation_sha256: "4".repeat(64),
+                    lineage_bundle_sha256: "5".repeat(64),
+                    action_class_id: "workflow.destructive.vendor_call".to_string(),
+                    consistency_model: "totally_ordered".to_string(),
+                    request_sha256: receipt.action.parameter_hash.clone(),
+                    outcome_sha256: receipt.content_hash.clone(),
+                    local_receipt_sha256: "8".repeat(64),
+                    remote_receipt_sha256: receipt_canonical_digest_hex(&receipt).unwrap(),
+                    lease_refs: vec!["lease-bilateral".to_string()],
+                    governance_refs: vec!["gov-receipt-1".to_string()],
+                    signer_kernel_ids: vec!["kernel.org-a".to_string(), "kernel.org-b".to_string()],
+                }),
+            },
         },
-    )
+        org_a_signer: &kp_a,
+        org_b_signer: &kp_b,
+    })
     .expect("strict Chio treaty DSSE signs");
     let statement =
         verify_chio_bilateral_dsse_envelope(&envelope, &kp_a.public_key(), &kp_b.public_key())
@@ -217,16 +219,18 @@ fn strict_chio_signer_accepts_treaty_binding_without_governance_ref() {
         .expect("strict treaty extension carries binding")
         .governance_refs = Vec::new();
 
-    let envelope = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        extensions,
-    )
+    let envelope = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions,
+        },
+        org_a_signer: &kp_a,
+        org_b_signer: &kp_b,
+    })
     .expect("lease-bound treaty DSSE signs without governance receipt material");
     let statement =
         verify_chio_bilateral_dsse_envelope(&envelope, &kp_a.public_key(), &kp_b.public_key())
@@ -245,66 +249,68 @@ fn strict_chio_signer_rejects_treaty_request_hash_mismatch() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
-    let err = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        BilateralPredicateExtensions {
-            capability_lease_ref: Some(CapabilityLeaseRef {
-                lease_id: "lease-bilateral".to_string(),
-                issuer: "kernel.org-a".to_string(),
-                expires_at_unix_ms: 1_734_000_060_000,
-                scope_digest: None,
-            }),
-            policy_evaluation_summary: Some(PolicyEvaluationSummary {
-                server_a_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-a".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                server_b_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-b".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                joint_disposition: Some("allow".to_string()),
-            }),
-            governance_receipt_ref: Some(GovernanceReceiptRef {
-                receipt_id: "gov-receipt-1".to_string(),
-                kernel_id: "kernel.org-b".to_string(),
-                digest: HashRecord {
-                    alg: "sha256".to_string(),
-                    value: "d".repeat(64),
-                },
-            }),
-            consistency_anchor: Some("anchor-live".to_string()),
-            consistency_model: Some("totally_ordered".to_string()),
-            cross_org_visibility: Some("treaty_only".to_string()),
-            treaty_binding_ref: Some(TreatyBindingRef {
-                treaty_id: "treaty-buyer-vendor".to_string(),
-                treaty_scope_sha256: "1".repeat(64),
-                ladder_intersection_sha256: "2".repeat(64),
-                admission_report_sha256: "3".repeat(64),
-                continuation_sha256: "4".repeat(64),
-                lineage_bundle_sha256: "5".repeat(64),
-                action_class_id: "workflow.destructive.vendor_call".to_string(),
-                consistency_model: "totally_ordered".to_string(),
-                request_sha256: "6".repeat(64),
-                outcome_sha256: receipt.content_hash.clone(),
-                local_receipt_sha256: "8".repeat(64),
-                remote_receipt_sha256: receipt_canonical_digest_hex(&receipt).unwrap(),
-                lease_refs: vec!["lease-bilateral".to_string()],
-                governance_refs: vec!["gov-receipt-1".to_string()],
-                signer_kernel_ids: vec!["kernel.org-a".to_string(), "kernel.org-b".to_string()],
-            }),
+    let err = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions: BilateralPredicateExtensions {
+                capability_lease_ref: Some(CapabilityLeaseRef {
+                    lease_id: "lease-bilateral".to_string(),
+                    issuer: "kernel.org-a".to_string(),
+                    expires_at_unix_ms: 1_734_000_060_000,
+                    scope_digest: None,
+                }),
+                policy_evaluation_summary: Some(PolicyEvaluationSummary {
+                    server_a_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-a".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    server_b_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-b".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    joint_disposition: Some("allow".to_string()),
+                }),
+                governance_receipt_ref: Some(GovernanceReceiptRef {
+                    receipt_id: "gov-receipt-1".to_string(),
+                    kernel_id: "kernel.org-b".to_string(),
+                    digest: HashRecord {
+                        alg: "sha256".to_string(),
+                        value: "d".repeat(64),
+                    },
+                }),
+                consistency_anchor: Some("anchor-live".to_string()),
+                consistency_model: Some("totally_ordered".to_string()),
+                cross_org_visibility: Some("treaty_only".to_string()),
+                treaty_binding_ref: Some(TreatyBindingRef {
+                    treaty_id: "treaty-buyer-vendor".to_string(),
+                    treaty_scope_sha256: "1".repeat(64),
+                    ladder_intersection_sha256: "2".repeat(64),
+                    admission_report_sha256: "3".repeat(64),
+                    continuation_sha256: "4".repeat(64),
+                    lineage_bundle_sha256: "5".repeat(64),
+                    action_class_id: "workflow.destructive.vendor_call".to_string(),
+                    consistency_model: "totally_ordered".to_string(),
+                    request_sha256: "6".repeat(64),
+                    outcome_sha256: receipt.content_hash.clone(),
+                    local_receipt_sha256: "8".repeat(64),
+                    remote_receipt_sha256: receipt_canonical_digest_hex(&receipt).unwrap(),
+                    lease_refs: vec!["lease-bilateral".to_string()],
+                    governance_refs: vec!["gov-receipt-1".to_string()],
+                    signer_kernel_ids: vec!["kernel.org-a".to_string(), "kernel.org-b".to_string()],
+                }),
+            },
         },
-    )
+        org_a_signer: &kp_a,
+        org_b_signer: &kp_b,
+    })
     .expect_err("strict Chio signer must reject mismatched treaty request hash");
     assert!(err.to_string().contains("request_sha256"));
 }
@@ -321,16 +327,18 @@ fn strict_chio_signer_rejects_treaty_outcome_hash_mismatch() {
         .unwrap()
         .outcome_sha256 = "7".repeat(64);
 
-    let err = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        extensions,
-    )
+    let err = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions,
+        },
+        org_a_signer: &kp_a,
+        org_b_signer: &kp_b,
+    })
     .expect_err("strict Chio signer must reject mismatched treaty outcome hash");
     assert!(err.to_string().contains("outcome_sha256"));
 }
@@ -347,16 +355,18 @@ fn strict_chio_signer_rejects_treaty_remote_receipt_hash_mismatch() {
         .unwrap()
         .remote_receipt_sha256 = "9".repeat(64);
 
-    let err = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        extensions,
-    )
+    let err = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions,
+        },
+        org_a_signer: &kp_a,
+        org_b_signer: &kp_b,
+    })
     .expect_err("strict Chio signer must reject mismatched treaty receipt hash");
     assert!(err.to_string().contains("remote_receipt_sha256"));
 }
@@ -366,66 +376,68 @@ fn strict_chio_signer_rejects_treaty_runtime_ref_mismatch() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
-    let err = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        BilateralPredicateExtensions {
-            capability_lease_ref: Some(CapabilityLeaseRef {
-                lease_id: "lease-bilateral".to_string(),
-                issuer: "kernel.org-a".to_string(),
-                expires_at_unix_ms: 1_734_000_060_000,
-                scope_digest: None,
-            }),
-            policy_evaluation_summary: Some(PolicyEvaluationSummary {
-                server_a_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-a".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                server_b_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-b".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                joint_disposition: Some("allow".to_string()),
-            }),
-            governance_receipt_ref: Some(GovernanceReceiptRef {
-                receipt_id: "gov-receipt-1".to_string(),
-                kernel_id: "kernel.org-b".to_string(),
-                digest: HashRecord {
-                    alg: "sha256".to_string(),
-                    value: "d".repeat(64),
-                },
-            }),
-            consistency_anchor: Some("anchor-live".to_string()),
-            consistency_model: Some("totally_ordered".to_string()),
-            cross_org_visibility: Some("treaty_only".to_string()),
-            treaty_binding_ref: Some(TreatyBindingRef {
-                treaty_id: "treaty-buyer-vendor".to_string(),
-                treaty_scope_sha256: "1".repeat(64),
-                ladder_intersection_sha256: "2".repeat(64),
-                admission_report_sha256: "3".repeat(64),
-                continuation_sha256: "4".repeat(64),
-                lineage_bundle_sha256: "5".repeat(64),
-                action_class_id: "workflow.destructive.vendor_call".to_string(),
-                consistency_model: "totally_ordered".to_string(),
-                request_sha256: receipt.action.parameter_hash.clone(),
-                outcome_sha256: receipt.content_hash.clone(),
-                local_receipt_sha256: "8".repeat(64),
-                remote_receipt_sha256: receipt_canonical_digest_hex(&receipt).unwrap(),
-                lease_refs: vec!["other-lease".to_string()],
-                governance_refs: vec!["gov-receipt-1".to_string()],
-                signer_kernel_ids: vec!["kernel.org-a".to_string(), "kernel.org-b".to_string()],
-            }),
+    let err = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions: BilateralPredicateExtensions {
+                capability_lease_ref: Some(CapabilityLeaseRef {
+                    lease_id: "lease-bilateral".to_string(),
+                    issuer: "kernel.org-a".to_string(),
+                    expires_at_unix_ms: 1_734_000_060_000,
+                    scope_digest: None,
+                }),
+                policy_evaluation_summary: Some(PolicyEvaluationSummary {
+                    server_a_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-a".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    server_b_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-b".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    joint_disposition: Some("allow".to_string()),
+                }),
+                governance_receipt_ref: Some(GovernanceReceiptRef {
+                    receipt_id: "gov-receipt-1".to_string(),
+                    kernel_id: "kernel.org-b".to_string(),
+                    digest: HashRecord {
+                        alg: "sha256".to_string(),
+                        value: "d".repeat(64),
+                    },
+                }),
+                consistency_anchor: Some("anchor-live".to_string()),
+                consistency_model: Some("totally_ordered".to_string()),
+                cross_org_visibility: Some("treaty_only".to_string()),
+                treaty_binding_ref: Some(TreatyBindingRef {
+                    treaty_id: "treaty-buyer-vendor".to_string(),
+                    treaty_scope_sha256: "1".repeat(64),
+                    ladder_intersection_sha256: "2".repeat(64),
+                    admission_report_sha256: "3".repeat(64),
+                    continuation_sha256: "4".repeat(64),
+                    lineage_bundle_sha256: "5".repeat(64),
+                    action_class_id: "workflow.destructive.vendor_call".to_string(),
+                    consistency_model: "totally_ordered".to_string(),
+                    request_sha256: receipt.action.parameter_hash.clone(),
+                    outcome_sha256: receipt.content_hash.clone(),
+                    local_receipt_sha256: "8".repeat(64),
+                    remote_receipt_sha256: receipt_canonical_digest_hex(&receipt).unwrap(),
+                    lease_refs: vec!["other-lease".to_string()],
+                    governance_refs: vec!["gov-receipt-1".to_string()],
+                    signer_kernel_ids: vec!["kernel.org-a".to_string(), "kernel.org-b".to_string()],
+                }),
+            },
         },
-    )
+        org_a_signer: &kp_a,
+        org_b_signer: &kp_b,
+    })
     .expect_err("strict Chio signer must reject mismatched treaty refs");
     assert!(err.to_string().contains("lease_refs"));
 }
@@ -434,43 +446,45 @@ fn strict_chio_signer_rejects_treaty_runtime_ref_mismatch() {
 fn strict_chio_signer_rejects_identical_signer_keys() {
     let kp = Keypair::generate();
     let receipt = sample_receipt(&kp);
-    let err = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp,
-        &kp,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        BilateralPredicateExtensions {
-            capability_lease_ref: Some(CapabilityLeaseRef {
-                lease_id: "lease-bilateral".to_string(),
-                issuer: "kernel.org-a".to_string(),
-                expires_at_unix_ms: 1_734_000_060_000,
-                scope_digest: None,
-            }),
-            policy_evaluation_summary: Some(PolicyEvaluationSummary {
-                server_a_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-a".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                server_b_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-b".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                joint_disposition: Some("allow".to_string()),
-            }),
-            governance_receipt_ref: None,
-            consistency_anchor: None,
-            consistency_model: None,
-            cross_org_visibility: None,
-            treaty_binding_ref: None,
+    let err = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions: BilateralPredicateExtensions {
+                capability_lease_ref: Some(CapabilityLeaseRef {
+                    lease_id: "lease-bilateral".to_string(),
+                    issuer: "kernel.org-a".to_string(),
+                    expires_at_unix_ms: 1_734_000_060_000,
+                    scope_digest: None,
+                }),
+                policy_evaluation_summary: Some(PolicyEvaluationSummary {
+                    server_a_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-a".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    server_b_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-b".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    joint_disposition: Some("allow".to_string()),
+                }),
+                governance_receipt_ref: None,
+                consistency_anchor: None,
+                consistency_model: None,
+                cross_org_visibility: None,
+                treaty_binding_ref: None,
+            },
         },
-    )
+        org_a_signer: &kp,
+        org_b_signer: &kp,
+    })
     .expect_err("strict Chio DSSE needs two independent signer keys");
     assert!(err.to_string().contains("independent"));
 }
@@ -480,43 +494,45 @@ fn strict_chio_verifier_rejects_duplicate_signature_keyids() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
-    let mut envelope = sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        BilateralPredicateExtensions {
-            capability_lease_ref: Some(CapabilityLeaseRef {
-                lease_id: "lease-bilateral".to_string(),
-                issuer: "kernel.org-a".to_string(),
-                expires_at_unix_ms: 1_734_000_060_000,
-                scope_digest: None,
-            }),
-            policy_evaluation_summary: Some(PolicyEvaluationSummary {
-                server_a_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-a".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                server_b_verdict: PolicyVerdict {
-                    verdict: "allow".to_string(),
-                    policy_id: "policy-b".to_string(),
-                    policy_version: "v1".to_string(),
-                    rationale_code: None,
-                },
-                joint_disposition: Some("allow".to_string()),
-            }),
-            governance_receipt_ref: None,
-            consistency_anchor: None,
-            consistency_model: None,
-            cross_org_visibility: None,
-            treaty_binding_ref: None,
+    let mut envelope = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions: BilateralPredicateExtensions {
+                capability_lease_ref: Some(CapabilityLeaseRef {
+                    lease_id: "lease-bilateral".to_string(),
+                    issuer: "kernel.org-a".to_string(),
+                    expires_at_unix_ms: 1_734_000_060_000,
+                    scope_digest: None,
+                }),
+                policy_evaluation_summary: Some(PolicyEvaluationSummary {
+                    server_a_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-a".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    server_b_verdict: PolicyVerdict {
+                        verdict: "allow".to_string(),
+                        policy_id: "policy-b".to_string(),
+                        policy_version: "v1".to_string(),
+                        rationale_code: None,
+                    },
+                    joint_disposition: Some("allow".to_string()),
+                }),
+                governance_receipt_ref: None,
+                consistency_anchor: None,
+                consistency_model: None,
+                cross_org_visibility: None,
+                treaty_binding_ref: None,
+            },
         },
-    )
+        org_a_signer: &kp_a,
+        org_b_signer: &kp_b,
+    })
     .unwrap();
     envelope.signatures[1].keyid = envelope.signatures[0].keyid.clone();
 

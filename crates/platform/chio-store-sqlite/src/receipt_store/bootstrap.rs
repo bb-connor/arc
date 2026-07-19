@@ -5,7 +5,7 @@ mod federated;
 #[path = "bootstrap/listing.rs"]
 mod listing;
 #[path = "bootstrap/open.rs"]
-mod open;
+pub(super) mod open;
 
 fn require_admin_list_context(
     read_context: &ReceiptReadContext,

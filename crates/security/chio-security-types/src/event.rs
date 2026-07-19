@@ -2,6 +2,7 @@ use crate::ports::{
     BoundedVec, Digest32, EventId, LineageId, OpaqueReceiptRef, ProducerId, ProducerTrustClass,
     RecordId, RuleId, SessionId, TenantId,
 };
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,7 @@ pub const MAX_FINDING_EVENTS: usize = 64;
 pub type EventEvidenceReferences = BoundedVec<OpaqueReceiptRef, MAX_EVENT_EVIDENCE_REFERENCES>;
 pub type FindingEventIds = BoundedVec<EventId, MAX_FINDING_EVENTS>;
 pub type FindingEvidenceDigests = BoundedVec<Digest32, MAX_FINDING_EVENTS>;
+pub type FindingSourceReceiptIds = BoundedVec<OpaqueReceiptRef, MAX_FINDING_EVENTS>;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -149,6 +151,7 @@ pub struct CorrelatedFinding {
     pub group_key_hash: Digest32,
     pub ordered_event_ids: FindingEventIds,
     pub ordered_evidence_digests: FindingEvidenceDigests,
+    pub ordered_source_receipt_ids: FindingSourceReceiptIds,
     pub first_event_time_unix_ms: u64,
     pub last_event_time_unix_ms: u64,
     pub lineage_seed: LineageId,
@@ -164,6 +167,7 @@ pub struct CorrelatedFindingInput {
     pub group_key_hash: Digest32,
     pub ordered_event_ids: Vec<EventId>,
     pub ordered_evidence_digests: Vec<Digest32>,
+    pub ordered_source_receipt_ids: Vec<OpaqueReceiptRef>,
     pub first_event_time_unix_ms: u64,
     pub last_event_time_unix_ms: u64,
     pub lineage_seed: LineageId,
@@ -182,7 +186,7 @@ impl fmt::Display for CorrelatedFindingValidationError {
         let message = match self {
             Self::EmptySequence => "correlated finding has no contributing events",
             Self::MismatchedEvidence => {
-                "correlated finding event and evidence cardinalities differ"
+                "correlated finding event, evidence, and source receipt cardinalities differ"
             }
             Self::NonMonotonicTime => "correlated finding time range is not monotonic",
             Self::TooManyEvents => "correlated finding exceeds the event limit",
@@ -198,7 +202,9 @@ impl CorrelatedFinding {
         if input.ordered_event_ids.is_empty() {
             return Err(CorrelatedFindingValidationError::EmptySequence);
         }
-        if input.ordered_event_ids.len() != input.ordered_evidence_digests.len() {
+        if input.ordered_event_ids.len() != input.ordered_evidence_digests.len()
+            || input.ordered_event_ids.len() != input.ordered_source_receipt_ids.len()
+        {
             return Err(CorrelatedFindingValidationError::MismatchedEvidence);
         }
         if input.first_event_time_unix_ms > input.last_event_time_unix_ms {
@@ -208,6 +214,9 @@ impl CorrelatedFinding {
             .map_err(|_| CorrelatedFindingValidationError::TooManyEvents)?;
         let ordered_evidence_digests = FindingEvidenceDigests::new(input.ordered_evidence_digests)
             .map_err(|_| CorrelatedFindingValidationError::TooManyEvents)?;
+        let ordered_source_receipt_ids =
+            FindingSourceReceiptIds::new(input.ordered_source_receipt_ids)
+                .map_err(|_| CorrelatedFindingValidationError::TooManyEvents)?;
         Ok(Self {
             finding_id: input.finding_id,
             tenant_id: input.tenant_id,
@@ -217,6 +226,7 @@ impl CorrelatedFinding {
             group_key_hash: input.group_key_hash,
             ordered_event_ids,
             ordered_evidence_digests,
+            ordered_source_receipt_ids,
             first_event_time_unix_ms: input.first_event_time_unix_ms,
             last_event_time_unix_ms: input.last_event_time_unix_ms,
             lineage_seed: input.lineage_seed,
@@ -227,7 +237,9 @@ impl CorrelatedFinding {
         if self.ordered_event_ids.is_empty() {
             return Err(CorrelatedFindingValidationError::EmptySequence);
         }
-        if self.ordered_event_ids.len() != self.ordered_evidence_digests.len() {
+        if self.ordered_event_ids.len() != self.ordered_evidence_digests.len()
+            || self.ordered_event_ids.len() != self.ordered_source_receipt_ids.len()
+        {
             return Err(CorrelatedFindingValidationError::MismatchedEvidence);
         }
         if self.first_event_time_unix_ms > self.last_event_time_unix_ms {
@@ -248,14 +260,31 @@ pub enum DetectorHealthKind {
     TruncatedScan,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum DetectorWatermarkEvidence {
+    Unknown,
+    Committed { unix_ms: u64 },
+    Contradictory { claimed_unix_ms: String },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum DetectorGroupBindingEvidence {
+    Unresolved,
+    Resolved { group_key_hash: Digest32 },
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DetectorHealthEvidence {
     pub tenant_id: TenantId,
+    pub policy_version: RecordId,
     pub rule_id: RuleId,
-    pub group_key_hash: Digest32,
+    pub rule_version_hash: Digest32,
+    pub group_binding: DetectorGroupBindingEvidence,
     pub kind: DetectorHealthKind,
     pub event_id: EventId,
     pub observed_at_unix_ms: u64,
-    pub watermark_unix_ms: u64,
+    pub watermark: DetectorWatermarkEvidence,
 }

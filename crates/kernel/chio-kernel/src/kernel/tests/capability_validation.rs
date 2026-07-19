@@ -128,10 +128,9 @@ fn issue_and_use_capability() {
 #[test]
 fn kernel_accepts_capabilities_from_configured_authority() {
     let authority_keypair = make_keypair();
-    let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
-        authority_keypair.clone(),
-    )));
+    let mut config = make_config();
+    config.keypair = authority_keypair.clone();
+    let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
     let agent_kp = make_keypair();
@@ -153,10 +152,9 @@ fn kernel_accepts_capabilities_from_configured_authority() {
 fn kernel_reports_capability_issuer_trust() {
     let authority_keypair = make_keypair();
     let untrusted_keypair = make_keypair();
-    let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
-        authority_keypair.clone(),
-    )));
+    let mut config = make_config();
+    config.keypair = authority_keypair.clone();
+    let kernel = make_kernel(config);
 
     assert!(kernel.capability_issuer_is_trusted(&authority_keypair.public_key()));
     assert!(kernel.capability_issuer_is_trusted(&kernel.public_key()));
@@ -210,10 +208,9 @@ fn sqlite_revocation_store_survives_kernel_restart() {
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
 
     let cap = {
-        let mut kernel = make_kernel(make_config());
-        kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
-            authority_keypair.clone(),
-        )));
+        let mut config = make_config();
+        config.keypair = authority_keypair.clone();
+        let mut kernel = make_kernel(config);
         kernel.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
         kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
@@ -222,8 +219,9 @@ fn sqlite_revocation_store_survives_kernel_restart() {
         cap
     };
 
-    let mut restarted = make_kernel(make_config());
-    restarted.set_capability_authority(Box::new(LocalCapabilityAuthority::new(authority_keypair)));
+    let mut config = make_config();
+    config.keypair = authority_keypair;
+    let mut restarted = make_kernel(config);
     restarted.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
     restarted.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
@@ -432,7 +430,9 @@ fn untrusted_issuer_denied() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1061,7 +1061,9 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1094,7 +1096,9 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1142,7 +1146,9 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1271,12 +1277,13 @@ fn threshold_approval_kernel_requires_explicit_resolver() {
         1,
     )
     .expect("valid requirement");
-    kernel.set_threshold_approval_requirement_resolver(std::sync::Arc::new({
-        let requirement = requirement.clone();
-        move |_: &chio_core::capability::threshold_approval::ThresholdApprovalRequest, _: &str| {
-            Ok(requirement.clone())
-        }
-    }));
+    kernel
+        .set_threshold_approval_requirement_resolver(std::sync::Arc::new({
+            let requirement = requirement.clone();
+            move |_: &chio_core::capability::threshold_approval::ThresholdApprovalRequest,
+                  _: &str| { Ok(requirement.clone()) }
+        }))
+        .expect("threshold resolver");
     let request = chio_core::capability::threshold_approval::ThresholdApprovalRequest::new(
         "request-1",
         "server-1",

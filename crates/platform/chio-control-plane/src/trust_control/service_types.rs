@@ -28,13 +28,16 @@ mod responses;
 #[path = "service_types/state.rs"]
 mod state;
 
-#[allow(unused_imports)]
 pub(crate) use self::admission_budget::{
-    AdmissionCaptureMetadataView, AdmissionCaptureOutcomeView, BudgetGuaranteeLevelView,
-    BudgetInvocationAdmissionEvidenceView, BudgetInvocationQuotaUsageView,
-    BudgetInvocationQuotaView, BudgetInvocationReservationStateView, BudgetMonetaryHoldStateView,
-    BudgetQuotaKeyView, BudgetQuotaProfileView, BudgetSupplementalQuotaBindingView,
-    CanonicalRevocationSetView, CaptureInvocationReservationsRequest,
+    AdmissionCaptureInvocationQuotaTransitionView, AdmissionCaptureInvocationQuotaView,
+    AdmissionCaptureMetadataView, AdmissionCaptureOutcomeView, AdmissionCapturePointQueryRequest,
+    AdmissionCapturePointQueryResponse, AdmissionCaptureReplicaQueryResponse,
+    BudgetGuaranteeLevelView, BudgetInvocationAdmissionEvidenceView,
+    BudgetInvocationQuotaUsageView, BudgetInvocationQuotaView,
+    BudgetInvocationReservationStateView, BudgetMonetaryHoldStateView, BudgetQuotaKeyView,
+    BudgetQuotaProfileView, BudgetSupplementalQuotaBindingView, CanonicalRevocationSetView,
+    CaptureInvocationPointQueryRequest, CaptureInvocationPointQueryResponse,
+    CaptureInvocationReplicaQueryResponse, CaptureInvocationReservationsRequest,
     CaptureInvocationReservationsResponse, CombinedAdmissionCaptureRequest,
     CombinedAdmissionCaptureResponse, CompositeBudgetAuthorizeRequest,
     CompositeBudgetAuthorizeResponse,
@@ -46,7 +49,8 @@ pub(crate) use self::admission_consensus::{
     AdmissionGenesisTable, AdmissionGenesisValue, AdmissionGenesisValueType, AdmissionLogEntry,
     AdmissionProposalRequest, AdmissionRequestVoteRequest, AdmissionRequestVoteResponse,
     ConsensusCombinedCaptureCommand, ConsensusCompositeAuthorizeCommand,
-    ConsensusRevocationCommand, ConsensusRevocationProposal, ADMISSION_CONSENSUS_PROTOCOL_VERSION,
+    ConsensusIncrementInvocationCommand, ConsensusRevocationCommand, ConsensusRevocationProposal,
+    ADMISSION_CONSENSUS_PROTOCOL_VERSION,
 };
 pub(crate) use self::aggregate_family_root::{
     validate_lookup_nonce, AggregateFamilyRootCorruptionCode, AggregateFamilyRootLookupBody,
@@ -61,11 +65,11 @@ pub(crate) use self::capability_issuance::{
 };
 pub(crate) use self::cluster_budget::{
     AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
-    BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse, BudgetMutationAuthorityView,
-    BudgetMutationEventView, BudgetOriginAck, BudgetWriteCommitView, ClusterAuthorityLeaseView,
-    ClusterPartitionRequest, ClusterPartitionResponse, ClusterReplicationHeadsView,
-    ClusterStateSnapshotResponse, ClusterStatusResponse, LineageDeltaResponse, PeerStatusView,
-    ReceiptDeltaQuery, ReceiptDeltaResponse, ReduceChargeCostRequest, ReduceChargeCostResponse,
+    BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse, BudgetInvocationQuotaUsageRecordView,
+    BudgetMutationAuthorityView, BudgetMutationEventView, BudgetOriginAck, BudgetWriteCommitView,
+    ClusterAuthorityLeaseView, ClusterReplicationHeadsView, ClusterStateSnapshotResponse,
+    ClusterStatusResponse, LineageDeltaResponse, PeerStatusView, ReceiptDeltaQuery,
+    ReceiptDeltaResponse, ReduceChargeCostRequest, ReduceChargeCostResponse,
     ReverseChargeCostRequest, ReverseChargeCostResponse, RevocationCursorView,
     RevocationDeltaQuery, RevocationDeltaResponse, StoredLineageView, StoredReceiptView,
     TryChargeCostRequest, TryChargeCostResponse, TryIncrementBudgetRequest,
@@ -74,15 +78,12 @@ pub(crate) use self::cluster_budget::{
 pub use self::cluster_budget::{
     LeaseHeartbeatRequest, LeaseTerminateRequest, LeaseTerminationReason,
 };
-pub(crate) use self::config::validate_control_secret;
-pub use self::config::TrustServiceConfig;
+pub(crate) use self::config::{load_strict_cluster_node_keypair, validate_control_secret};
+pub use self::config::{AuthorityWorkloadPolicy, ClusterMemberIdentity, TrustServiceConfig};
 pub use self::paths::FEDERATED_DELEGATION_POLICY_SCHEMA;
-#[allow(unused_imports)]
 pub(crate) use self::paths::{
-    ADMISSION_CAPTURE_PATH, BUDGET_AUTHORIZE_HOLD_PATH, BUDGET_CAPTURE_INVOCATIONS_PATH,
-};
-pub(crate) use self::paths::{
-    AGENT_RECEIPTS_PATH, AGGREGATE_FAMILY_ROOT_LOOKUP_PATH, AUTHORITY_PATH,
+    ACTIVE_DEFENSE_EVENTS_PATH, ACTIVE_DEFENSE_HEALTH_PATH, AGENT_RECEIPTS_PATH,
+    AGGREGATE_FAMILY_ROOT_LOOKUP_PATH, AUTHORITY_KEY_LOG_SYNC_PATH, AUTHORITY_PATH,
     AUTHORIZATION_CONTEXT_REPORT_PATH, AUTHORIZATION_PROFILE_METADATA_PATH,
     AUTHORIZATION_REVIEW_PACK_PATH, BEHAVIORAL_FEED_PATH, BUDGETS_PATH,
     BUDGET_AUTHORIZE_EXPOSURE_PATH, BUDGET_CAPTURE_EXPOSURE_PATH, BUDGET_DELTA_MAX_RECORDS,
@@ -93,25 +94,27 @@ pub(crate) use self::paths::{
     CERTIFICATION_DISCOVERY_TRANSPARENCY_PATH, CERTIFICATION_DISPUTE_PATH, CERTIFICATION_PATH,
     CERTIFICATION_RESOLVE_PATH, CERTIFICATION_REVOKE_PATH, CHILD_RECEIPTS_PATH,
     CLUSTER_AUTH_BODY_DIGEST_HEADER, CLUSTER_AUTH_FAILURE_BURST, CLUSTER_AUTH_FAILURE_WINDOW_SECS,
-    CLUSTER_AUTH_ISSUED_AT_HEADER, CLUSTER_AUTH_MAX_SKEW_SECS, CLUSTER_AUTH_SCHEME,
-    CLUSTER_AUTH_SIGNATURE_HEADER, CLUSTER_AUTH_TERM_HEADER, CLUSTER_NODE_ID_HEADER,
-    CLUSTER_SNAPSHOT_RECORD_THRESHOLD, CONTROL_HTTP_TIMEOUT, COST_ATTRIBUTION_PATH,
-    CREDIT_BACKTEST_PATH, CREDIT_BONDED_EXECUTION_SIMULATION_PATH, CREDIT_BONDS_REPORT_PATH,
-    CREDIT_BOND_ISSUE_PATH, CREDIT_BOND_REPORT_PATH, CREDIT_FACILITIES_REPORT_PATH,
-    CREDIT_FACILITY_ISSUE_PATH, CREDIT_FACILITY_REPORT_PATH, CREDIT_LOSS_LIFECYCLE_ISSUE_PATH,
-    CREDIT_LOSS_LIFECYCLE_LIST_PATH, CREDIT_LOSS_LIFECYCLE_REPORT_PATH,
-    CREDIT_PROVIDER_RISK_PACKAGE_PATH, CREDIT_SCORECARD_PATH, CSP_VALUE, DASHBOARD_DIST_DIR,
-    DEFAULT_LIST_LIMIT, ECONOMIC_COMPLETION_FLOW_REPORT_PATH, ECONOMIC_RECEIPT_REPORT_PATH,
-    EVIDENCE_EXPORT_PATH, EVIDENCE_IMPORT_PATH, EXPOSURE_LEDGER_PATH, FEDERATED_ISSUE_PATH,
+    CLUSTER_AUTH_ISSUED_AT_HEADER, CLUSTER_AUTH_MAX_SKEW_SECS, CLUSTER_AUTH_METHOD_HEADER,
+    CLUSTER_AUTH_NONCE_HEADER, CLUSTER_AUTH_SCHEME, CLUSTER_AUTH_SIGNATURE_HEADER,
+    CLUSTER_AUTH_TERM_HEADER, CLUSTER_NODE_ID_HEADER, CLUSTER_SNAPSHOT_RECORD_THRESHOLD,
+    CONTROL_HTTP_TIMEOUT, COST_ATTRIBUTION_PATH, CREDIT_BACKTEST_PATH,
+    CREDIT_BONDED_EXECUTION_SIMULATION_PATH, CREDIT_BONDS_REPORT_PATH, CREDIT_BOND_ISSUE_PATH,
+    CREDIT_BOND_REPORT_PATH, CREDIT_FACILITIES_REPORT_PATH, CREDIT_FACILITY_ISSUE_PATH,
+    CREDIT_FACILITY_REPORT_PATH, CREDIT_LOSS_LIFECYCLE_ISSUE_PATH, CREDIT_LOSS_LIFECYCLE_LIST_PATH,
+    CREDIT_LOSS_LIFECYCLE_REPORT_PATH, CREDIT_PROVIDER_RISK_PACKAGE_PATH, CREDIT_SCORECARD_PATH,
+    CSP_VALUE, DASHBOARD_DIST_DIR, DASHBOARD_SESSION_PATH, DEFAULT_LIST_LIMIT,
+    ECONOMIC_COMPLETION_FLOW_REPORT_PATH, ECONOMIC_RECEIPT_REPORT_PATH, EVIDENCE_EXPORT_PATH,
+    EVIDENCE_IMPORT_PATH, EXPOSURE_LEDGER_PATH, FEDERATED_ISSUE_PATH,
     FEDERATION_EVIDENCE_SHARES_PATH, FEDERATION_POLICIES_PATH, FEDERATION_POLICY_EVALUATE_PATH,
     FEDERATION_POLICY_PATH, FEDERATION_PROVIDERS_PATH, FEDERATION_PROVIDER_PATH,
     GENERIC_GOVERNANCE_CASE_EVALUATE_PATH, GENERIC_GOVERNANCE_CASE_ISSUE_PATH,
     GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH, GENERIC_TRUST_ACTIVATION_EVALUATE_PATH,
     GENERIC_TRUST_ACTIVATION_ISSUE_PATH, HEALTH_PATH, INTERNAL_ADMISSION_APPEND_ENTRIES_PATH,
-    INTERNAL_ADMISSION_PROPOSAL_PATH, INTERNAL_ADMISSION_REQUEST_VOTE_PATH,
-    INTERNAL_ADMISSION_SNAPSHOT_PATH, INTERNAL_AUTHORITY_SNAPSHOT_PATH,
-    INTERNAL_BUDGETS_DELTA_PATH, INTERNAL_CHILD_RECEIPTS_DELTA_PATH,
-    INTERNAL_CLUSTER_PARTITION_PATH, INTERNAL_CLUSTER_SNAPSHOT_PATH, INTERNAL_CLUSTER_STATUS_PATH,
+    INTERNAL_ADMISSION_CAPTURE_QUERY_PATH, INTERNAL_ADMISSION_PROPOSAL_PATH,
+    INTERNAL_ADMISSION_REQUEST_VOTE_PATH, INTERNAL_ADMISSION_SNAPSHOT_PATH,
+    INTERNAL_AUTHORITY_SNAPSHOT_PATH, INTERNAL_BUDGETS_DELTA_PATH,
+    INTERNAL_CHILD_RECEIPTS_DELTA_PATH, INTERNAL_CLUSTER_SNAPSHOT_PATH,
+    INTERNAL_CLUSTER_STATUS_PATH, INTERNAL_INVOCATION_CAPTURE_QUERY_PATH,
     INTERNAL_LINEAGE_DELTA_PATH, INTERNAL_REVOCATIONS_DELTA_PATH,
     INTERNAL_TOOL_RECEIPTS_DELTA_PATH, ISSUE_CAPABILITY_PATH,
     LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH, LIABILITY_BOUND_COVERAGE_ISSUE_PATH,
@@ -151,11 +154,16 @@ pub(crate) use self::paths::{
     UNDERWRITING_DECISIONS_REPORT_PATH, UNDERWRITING_DECISION_ISSUE_PATH,
     UNDERWRITING_DECISION_PATH, UNDERWRITING_INPUT_PATH, UNDERWRITING_SIMULATION_PATH,
 };
+pub(crate) use self::paths::{
+    ADMISSION_CAPTURE_PATH, ADMISSION_CAPTURE_QUERY_PATH, BUDGET_AUTHORIZE_HOLD_PATH,
+    BUDGET_CAPTURE_INVOCATIONS_PATH, BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH,
+};
 pub(crate) use self::requests::{
     build_capability_snapshot, build_federated_delegation_anchor_snapshot,
     ensure_federated_delegation_policy_active,
     ensure_requested_capability_within_delegation_policy,
-    ensure_requested_capability_within_parent_snapshot, RecordCapabilitySnapshotRequest,
+    ensure_requested_capability_within_parent_snapshot, AuthorityKeyLogSyncRequest,
+    RecordCapabilitySnapshotRequest,
 };
 pub use self::requests::{
     verify_federated_delegation_policy, AgentReceiptsHttpQuery, CapitalAllocationDecisionRequest,
@@ -191,7 +199,7 @@ pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
     BudgetCursor, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
     ClusterRuntimeState, FederationAdmissionRateLimiter, PeerHealth, PeerSyncState,
-    RemoteAdmissionCaptureAuthority, RemoteBudgetStore, RemoteCapabilityAuthority,
-    RemoteCompositeHoldEvidence, RemoteReceiptStore, RemoteRevocationStore, RevocationCursor,
-    TrustServiceState,
+    RemoteAdmissionCaptureAuthority, RemoteAuthorityEpoch, RemoteBudgetStore,
+    RemoteCapabilityAuthority, RemoteCompositeHoldEvidence, RemoteReceiptStore,
+    RemoteRevocationStore, RevocationCursor, TrustServiceState,
 };

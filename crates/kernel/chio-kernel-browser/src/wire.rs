@@ -6,6 +6,7 @@ use chio_core_types::capability::{
     attenuation::ScopeHash, features::CapabilityNegotiation, token::CapabilityToken,
 };
 use chio_core_types::receipt::body::ChioReceiptBody;
+use chio_core_types::OpaqueSupplementalAuthorization;
 use chio_kernel_core::{PortableToolCallRequest, VerifiedCapability};
 use serde::{Deserialize, Serialize};
 
@@ -14,23 +15,37 @@ use serde::{Deserialize, Serialize};
 /// Declared locally so the wasm bindings have a stable wire contract
 /// independent of the kernel-core types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolCallRequestJson {
     pub request_id: String,
     pub tool_name: String,
     pub server_id: String,
     pub agent_id: String,
     pub arguments: serde_json::Value,
+    /// Opaque authority carried without reinterpretation. Browser-only
+    /// evaluation rejects it because no trusted verifier or durable quota
+    /// authority exists in this adapter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
 }
 
-impl From<ToolCallRequestJson> for PortableToolCallRequest {
-    fn from(value: ToolCallRequestJson) -> Self {
-        PortableToolCallRequest {
+impl TryFrom<ToolCallRequestJson> for PortableToolCallRequest {
+    type Error = BindingError;
+
+    fn try_from(value: ToolCallRequestJson) -> Result<Self, Self::Error> {
+        if value.supplemental_authorization.is_some() {
+            return Err(BindingError::new(
+                "supplemental_authority_unavailable",
+                "browser evaluation cannot verify or reserve supplemental authorization",
+            ));
+        }
+        Ok(PortableToolCallRequest {
             request_id: value.request_id,
             tool_name: value.tool_name,
             server_id: value.server_id,
             agent_id: value.agent_id,
             arguments: value.arguments,
-        }
+        })
     }
 }
 

@@ -57,6 +57,13 @@ fn bearer(token: &str) -> String {
     format!("Bearer {token}")
 }
 
+fn unix_timestamp_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before unix epoch")
+        .as_secs()
+}
+
 fn spawn_trust_service(
     listen: std::net::SocketAddr,
     service_token: &str,
@@ -376,10 +383,16 @@ fn trust_service_scim_delete_users_deactivates_identity_revokes_capabilities_and
         resource_grants: Vec::new(),
         prompt_grants: Vec::new(),
     };
+    let request_nonce = "66".repeat(32);
     let issue_response = client
         .post(format!("{base_url}/v1/capabilities/issue"))
         .header(AUTHORIZATION, bearer(service_token))
         .json(&json!({
+            "schema": "chio.capability-issuance-request.v2",
+            "requestNonce": request_nonce.clone(),
+            "requestedAt": unix_timestamp_now(),
+            "tenantId": "tenant-scim-lifecycle",
+            "lineageId": "lineage-scim-lifecycle-deprovision",
             "subjectPublicKey": subject_keypair.public_key().to_hex(),
             "scope": scope,
             "ttlSeconds": 3600
@@ -388,7 +401,19 @@ fn trust_service_scim_delete_users_deactivates_identity_revokes_capabilities_and
         .expect("send issue capability request");
     assert_eq!(issue_response.status(), reqwest::StatusCode::OK);
     let issue_body: Value = issue_response.json().expect("decode issue capability");
-    let capability_id = issue_body["capability"]["id"]
+    assert_eq!(
+        issue_body["schema"].as_str(),
+        Some("chio.capability-issuance-response-envelope.v2")
+    );
+    assert_eq!(
+        issue_body["body"]["schema"].as_str(),
+        Some("chio.capability-issuance-response.v1")
+    );
+    assert_eq!(
+        issue_body["body"]["requestNonce"].as_str(),
+        Some(request_nonce.as_str())
+    );
+    let capability_id = issue_body["body"]["capability"]["id"]
         .as_str()
         .expect("issued capability id")
         .to_string();

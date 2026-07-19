@@ -45,11 +45,14 @@ pub fn verify_signed_manifest_json(input: &str) -> Result<ManifestVerification> 
 mod tests {
     use super::verify_signed_manifest;
     use chio_core::Keypair;
-    use chio_manifest::{sign_manifest, LatencyHint, ToolDefinition, ToolManifest};
+    use chio_manifest::{
+        sign_manifest, LatencyHint, ToolAnnotations, ToolDefinition, ToolManifest,
+        TOOL_MANIFEST_SCHEMA,
+    };
 
     fn sample_manifest(public_key: String) -> ToolManifest {
         ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "srv-bindings-demo".to_string(),
             name: "Bindings Demo".to_string(),
             description: Some("Bindings manifest verification sample".to_string()),
@@ -71,8 +74,14 @@ mod tests {
                     }
                 })),
                 pricing: None,
-                has_side_effects: false,
+                annotations: ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: true,
+                    requires_approval: false,
+                },
                 latency_hint: Some(LatencyHint::Fast),
+                flow: None,
             }],
             server_tools: Vec::new(),
             required_permissions: None,

@@ -33,5 +33,7 @@ mod spec_discovery;
 
 pub use error::ProtectError;
 pub use evaluator::{EvaluationResult, RequestEvaluator, RouteEntry};
-pub use proxy::{ProtectConfig, ProtectProxy, DEFAULT_UPSTREAM_REQUEST_TIMEOUT};
+pub use proxy::{
+    ProtectConfig, ProtectProxy, ThresholdApprovalCollectorConfig, DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
+};
 pub use spec_discovery::{discover_spec, load_spec_from_file};

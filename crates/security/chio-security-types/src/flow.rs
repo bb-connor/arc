@@ -776,12 +776,48 @@ mod tests {
         PrincipalId::new(value).unwrap_or_else(|error| panic!("valid principal: {error}"))
     }
 
+    fn compartment(value: &str) -> Compartment {
+        Compartment::new(value).unwrap_or_else(|error| panic!("valid compartment: {error}"))
+    }
+
+    fn label(readers: &[&str], compartments: &[&str]) -> InformationLabel {
+        let alice = principal("alice");
+        let owners = BTreeMap::from([(
+            alice.clone(),
+            readers.iter().map(|reader| principal(reader)).collect(),
+        )]);
+        let compartments = compartments
+            .iter()
+            .map(|value| compartment(value))
+            .collect();
+        InformationLabel::try_known(owners, compartments)
+            .unwrap_or_else(|error| panic!("valid label: {error}"))
+    }
+
     #[test]
     fn bottom_is_unique_public_label() {
         let empty = InformationLabel::try_known(BTreeMap::new(), BTreeSet::new())
             .unwrap_or_else(|error| panic!("empty label is valid: {error}"));
         assert_eq!(InformationLabel::bottom(), empty);
         assert!(empty.is_bottom());
+    }
+
+    #[test]
+    fn information_label_order_rejects_reversed_readers_and_partial_constraints() {
+        let broad = label(&["alice", "bob"], &["pii"]);
+        let narrow = label(&["alice"], &["pii", "billing"]);
+        assert!(broad.flows_to(&narrow));
+        assert!(!narrow.flows_to(&broad));
+
+        let reader_violation = label(&["alice", "bob", "carol"], &["pii", "billing"]);
+        assert!(!narrow.flows_to(&reader_violation));
+
+        let compartment_violation = label(&["alice"], &["pii"]);
+        assert!(!narrow.flows_to(&compartment_violation));
+
+        assert!(broad.flows_to(&broad));
+        assert!(broad.flows_to(&InformationLabel::Top));
+        assert!(!InformationLabel::Top.flows_to(&broad));
     }
 
     #[test]

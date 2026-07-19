@@ -3,12 +3,15 @@ use std::io::{BufRead, Write};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
-use crate::{AdapterError, McpTransport};
+use crate::{AdapterError, McpTransport, SecurityInvocationContextAuthority};
 use chio_core::capability::{
-    governance::GovernedTransactionIntent,
+    features::CapabilityNegotiation,
+    governance::{GovernedApprovalToken, GovernedTransactionIntent},
     scope::{ModelMetadata, Operation},
+    threshold_approval::ThresholdApprovalProposal,
     token::CapabilityToken,
 };
+use chio_core::message::OpaqueSupplementalAuthorization;
 use chio_core::receipt::decision::Decision;
 use chio_core::session::{
     CompleteOperation, CompletionArgument, CompletionReference, CreateElicitationOperation,
@@ -24,11 +27,16 @@ use chio_cross_protocol::execution::{
     metadata_with_source_receipt_context, CrossProtocolTargetExecution, CrossProtocolTargetRequest,
     TargetExecutionHop, TargetProtocolExecutor,
 };
+use chio_cross_protocol::negotiation::{
+    validate_execution_feature_negotiation, TrustedPeerNegotiation,
+};
 use chio_cross_protocol::routing::route_selection_metadata;
+#[cfg(test)]
+use chio_kernel::ToolCallRequest;
 use chio_kernel::{
-    ChioKernel, LateSessionEvent, NestedFlowClient, PeerCapabilities, SessionOperationResponse,
-    SignedExecutionNonce, ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream,
-    ToolServerEvent, Verdict,
+    ChioKernel, LateSessionEvent, NestedFlowClient, PeerCapabilities, SecurityInvocationContext,
+    SecurityPreDispatchPolicy, SessionOperationResponse, SignedExecutionNonce, ToolCallOutput,
+    ToolCallResponse, ToolCallStream, ToolServerEvent, Verdict,
 };
 use chio_manifest::ToolManifest;
 #[cfg(test)]
@@ -129,9 +137,12 @@ impl Default for McpEdgeConfig {
 
 pub struct ChioMcpEdge {
     config: McpEdgeConfig,
-    kernel: ChioKernel,
+    kernel: Arc<ChioKernel>,
+    manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
+    security_context_authority: Option<Arc<dyn SecurityInvocationContextAuthority>>,
     agent_id: String,
     session_auth_context: SessionAuthContext,
+    initial_session_id: Option<SessionId>,
     capabilities: Vec<CapabilityToken>,
     tools: Vec<ExposedToolBinding>,
     tool_index: BTreeMap<String, usize>,
@@ -146,6 +157,8 @@ pub struct ChioMcpEdge {
     tasks: BTreeMap<String, EdgeTask>,
     pending_background_tasks: Vec<String>,
     upstream_transport: Option<Arc<dyn McpTransport>>,
+    local_protocol_features: CapabilityNegotiation,
+    trusted_peer_negotiation: TrustedPeerNegotiation,
 }
 
 impl ChioMcpEdge {
@@ -154,15 +167,198 @@ impl ChioMcpEdge {
         kernel: ChioKernel,
         agent_id: String,
         capabilities: Vec<CapabilityToken>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_manifest_registry_arc(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            Arc::new(registry.clone()),
+        )
+    }
+
+    /// Construct a production edge with a trusted per-dispatch security
+    /// context authority.
+    pub fn new_with_security_context_authority(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security_context_authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_manifest_registry_arc_and_security_context_authority(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            Arc::new(registry.clone()),
+            security_context_authority,
+        )
+    }
+
+    /// Construct a production edge while retaining the caller's exact live
+    /// admitted-manifest registry allocation.
+    ///
+    /// Product compositions that share registry admission across ordinary and
+    /// broker-only routes must use this constructor so no detached registry
+    /// clone can drift from the runtime trust root.
+    pub fn new_with_manifest_registry_arc(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_shared_kernel_and_manifest_registry_arc(
+            config,
+            Arc::new(kernel),
+            agent_id,
+            capabilities,
+            registry,
+        )
+    }
+
+    /// Construct a production edge while retaining the exact kernel used by
+    /// other trusted control-plane services.
+    pub fn new_with_shared_kernel_and_manifest_registry_arc(
+        config: McpEdgeConfig,
+        kernel: Arc<ChioKernel>,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, AdapterError> {
+        if registry.requires_flow_runtime() && !kernel.has_installed_flow_runtime() {
+            return Err(AdapterError::FlowManifestRequiresRuntime);
+        }
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal_shared(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            manifests,
+            Some(registry),
+            None,
+        )
+    }
+
+    /// Construct a production edge over the exact live registry allocation
+    /// and a trusted per-dispatch security context authority.
+    pub fn new_with_manifest_registry_arc_and_security_context_authority(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+        security_context_authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_shared_kernel_manifest_registry_arc_and_security_context_authority(
+            config,
+            Arc::new(kernel),
+            agent_id,
+            capabilities,
+            registry,
+            security_context_authority,
+        )
+    }
+
+    /// Construct a production edge over the exact shared kernel, live
+    /// manifest registry, and trusted per-dispatch security context authority.
+    pub fn new_with_shared_kernel_manifest_registry_arc_and_security_context_authority(
+        config: McpEdgeConfig,
+        kernel: Arc<ChioKernel>,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+        security_context_authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) -> Result<Self, AdapterError> {
+        if registry.requires_flow_runtime() && !kernel.has_installed_flow_runtime() {
+            return Err(AdapterError::FlowManifestRequiresRuntime);
+        }
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal_shared(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            manifests,
+            Some(registry),
+            Some(security_context_authority),
+        )
+    }
+
+    #[cfg(any(test, feature = "fuzz"))]
+    pub(crate) fn new_from_unverified_internal(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
         manifests: Vec<ToolManifest>,
     ) -> Result<Self, AdapterError> {
-        let (tools, tool_index) = build_exposed_tool_bindings(manifests)?;
+        Self::new_internal(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            manifests,
+            None,
+            None,
+        )
+    }
+
+    #[cfg(any(test, feature = "fuzz"))]
+    fn new_internal(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        manifests: Vec<ToolManifest>,
+        registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
+        security_context_authority: Option<Arc<dyn SecurityInvocationContextAuthority>>,
+    ) -> Result<Self, AdapterError> {
+        Self::new_internal_shared(
+            config,
+            Arc::new(kernel),
+            agent_id,
+            capabilities,
+            manifests,
+            registry,
+            security_context_authority,
+        )
+    }
+
+    fn new_internal_shared(
+        config: McpEdgeConfig,
+        kernel: Arc<ChioKernel>,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        manifests: Vec<ToolManifest>,
+        registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
+        security_context_authority: Option<Arc<dyn SecurityInvocationContextAuthority>>,
+    ) -> Result<Self, AdapterError> {
+        if kernel.security_pre_dispatch_policy() == SecurityPreDispatchPolicy::Enforce
+            && security_context_authority.is_none()
+        {
+            return Err(AdapterError::SecurityInvocationContextAuthorityRequired);
+        }
+        let (tools, tool_index) = build_exposed_tool_bindings(manifests, registry.as_deref())?;
 
         Ok(Self {
             config,
             kernel,
+            manifest_registry: registry,
+            security_context_authority,
             agent_id,
             session_auth_context: SessionAuthContext::stdio_anonymous(),
+            initial_session_id: None,
             capabilities,
             tools,
             tool_index,
@@ -177,7 +373,27 @@ impl ChioMcpEdge {
             tasks: BTreeMap::new(),
             pending_background_tasks: Vec::new(),
             upstream_transport: None,
+            local_protocol_features: CapabilityNegotiation::t1_default(),
+            trusted_peer_negotiation: TrustedPeerNegotiation::default(),
         })
+    }
+
+    /// Configure the feature advertisement owned by this trusted MCP edge.
+    /// The authenticated initialize handshake is intersected with this profile.
+    pub fn set_local_protocol_features(
+        &mut self,
+        features: CapabilityNegotiation,
+    ) -> Result<(), AdapterError> {
+        if !matches!(self.state, EdgeState::Uninitialized) {
+            return Err(AdapterError::ParseError(
+                "local protocol features require an uninitialized MCP edge".to_string(),
+            ));
+        }
+        features
+            .validate()
+            .map_err(|error| AdapterError::ParseError(error.to_string()))?;
+        self.local_protocol_features = features;
+        Ok(())
     }
 
     pub fn attach_upstream_transport(&mut self, transport: Arc<dyn McpTransport>) {
@@ -188,16 +404,58 @@ impl ChioMcpEdge {
         self.session_auth_context = auth_context;
     }
 
+    /// Configure the authoritative kernel session identifier that the edge
+    /// must open when it processes its initialize request.
+    ///
+    /// Hosted transports allocate this identifier before protocol
+    /// initialization so the same authenticated identifier can be persisted
+    /// and reused after a process restart.
+    pub fn set_initial_session_id(&mut self, session_id: SessionId) -> Result<(), AdapterError> {
+        if !matches!(self.state, EdgeState::Uninitialized) {
+            return Err(AdapterError::ParseError(
+                "initial session id requires an uninitialized MCP edge".to_string(),
+            ));
+        }
+        if self.initial_session_id.is_some() {
+            return Err(AdapterError::ParseError(
+                "initial session id may only be configured once".to_string(),
+            ));
+        }
+        self.initial_session_id = Some(session_id);
+        Ok(())
+    }
+
     pub fn restore_ready_session(
         &mut self,
         session_id: SessionId,
         peer_capabilities: PeerCapabilities,
+    ) -> Result<(), AdapterError> {
+        self.restore_ready_session_with_peer_protocol_features(
+            session_id,
+            peer_capabilities,
+            CapabilityNegotiation::v1_default(),
+        )
+    }
+
+    /// Restore a session together with the peer advertisement authenticated by
+    /// the restoring transport. Request metadata cannot supply this profile.
+    pub fn restore_ready_session_with_peer_protocol_features(
+        &mut self,
+        session_id: SessionId,
+        peer_capabilities: PeerCapabilities,
+        peer_protocol_features: CapabilityNegotiation,
     ) -> Result<(), AdapterError> {
         if !matches!(self.state, EdgeState::Uninitialized) {
             return Err(AdapterError::ParseError(
                 "restore_ready_session requires an uninitialized MCP edge".to_string(),
             ));
         }
+
+        let trusted_peer_negotiation = TrustedPeerNegotiation::from_advertised_intersection(
+            &self.local_protocol_features,
+            &peer_protocol_features,
+        )
+        .map_err(AdapterError::ParseError)?;
 
         let restored_session_id = self
             .kernel
@@ -229,6 +487,7 @@ impl ChioMcpEdge {
         self.state = EdgeState::Ready {
             session_id: restored_session_id.clone(),
         };
+        self.trusted_peer_negotiation = trusted_peer_negotiation;
         if self
             .kernel
             .session(&restored_session_id)

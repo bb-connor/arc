@@ -18,7 +18,15 @@ pub struct AdaptedMcpServer {
 
 impl AdaptedMcpServer {
     pub fn new(adapter: McpAdapter) -> Result<Self, AdapterError> {
-        let manifest = adapter.generate_manifest()?;
+        let manifest = match adapter.generate_manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                return Err(crate::adapter::merge_shutdown_error(
+                    error,
+                    adapter.shutdown(),
+                ));
+            }
+        };
         Ok(Self { adapter, manifest })
     }
 
@@ -26,8 +34,22 @@ impl AdaptedMcpServer {
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
+        launch: crate::transport::NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
-        Self::new(McpAdapter::from_command(command, args, config)?)
+        Self::new(McpAdapter::from_command(command, args, config, launch)?)
+    }
+
+    /// Construct a server whose native subprocess cannot fall back from cage
+    /// enforcement to the legacy direct launcher.
+    pub fn from_cage_required_command(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        launch: crate::transport::CageRequiredLaunch,
+    ) -> Result<Self, AdapterError> {
+        Self::new(McpAdapter::from_cage_required_command(
+            command, args, config, launch,
+        )?)
     }
 
     pub fn manifest(&self) -> &ToolManifest {
@@ -42,8 +64,18 @@ impl AdaptedMcpServer {
         self.adapter.capabilities()
     }
 
+    #[must_use]
+    pub fn native_enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
+        self.adapter.native_enforcement_evidence()
+    }
+
     pub fn notification_source(&self) -> Arc<dyn McpTransport> {
         self.adapter.transport.clone()
+    }
+
+    /// Shut down the upstream transport and persist terminal security evidence.
+    pub fn shutdown(&self) -> Result<(), AdapterError> {
+        self.adapter.shutdown()
     }
 
     pub fn resource_provider(&self) -> Option<AdaptedMcpResourceProvider> {

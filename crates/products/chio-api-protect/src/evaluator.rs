@@ -92,6 +92,17 @@ impl RequestEvaluator {
         }
     }
 
+    /// Install the immutable verified manifest registry required before this
+    /// evaluator accepts a tool-targeted HTTP request.
+    #[must_use]
+    pub fn with_verified_manifest_registry(
+        mut self,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Self {
+        self.authority = self.authority.with_verified_manifest_registry(registry);
+        self
+    }
+
     #[cfg(test)]
     #[must_use]
     pub fn approval_store(&self) -> Arc<dyn ApprovalStore> {
@@ -248,6 +259,59 @@ impl RequestEvaluator {
         };
         (pattern, policy, false)
     }
+}
+
+#[cfg(test)]
+pub(crate) fn compatibility_manifest_registry_for_tests(
+) -> Arc<chio_manifest::VerifiedManifestRegistry> {
+    use chio_manifest::{
+        sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
+
+    let signer = Keypair::from_seed(&[91; 32]);
+    let mut registry = VerifiedManifestRegistry::default();
+    for (server_id, tool_names) in [
+        ("matrix", &["files.read", "admin.delete"][..]),
+        ("billing", &["charge", "read"][..]),
+        ("acp", &["terminal/create"][..]),
+        ("math", &["double", "increment"][..]),
+    ] {
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: server_id.to_string(),
+            name: format!("{server_id} test server"),
+            description: None,
+            version: "1.0.0".to_string(),
+            tools: tool_names
+                .iter()
+                .map(|tool_name| ToolDefinition {
+                    name: (*tool_name).to_string(),
+                    description: format!("{tool_name} test tool"),
+                    input_schema: serde_json::json!({"type": "object"}),
+                    output_schema: None,
+                    pricing: None,
+                    annotations: ToolAnnotations {
+                        read_only: true,
+                        destructive: false,
+                        idempotent: true,
+                        requires_approval: false,
+                    },
+                    latency_hint: None,
+                    flow: None,
+                })
+                .collect(),
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = sign_manifest(&manifest, &signer)
+            .unwrap_or_else(|error| panic!("sign HTTP compatibility manifest: {error}"));
+        registry
+            .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())
+            .unwrap_or_else(|error| panic!("register HTTP compatibility manifest: {error}"));
+    }
+    Arc::new(registry)
 }
 
 fn extract_presented_capability<'a>(
@@ -560,7 +624,8 @@ mod tests {
     #[test]
     fn evaluate_denies_get_reserved_tools_path_without_capability() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string())
+            .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
 
         let result = evaluator
             .evaluate(
@@ -584,7 +649,8 @@ mod tests {
     #[test]
     fn evaluate_chio_request_allows_reserved_tools_path_context() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string())
+            .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-matrix-read",
@@ -680,7 +746,8 @@ mod tests {
     #[test]
     fn evaluate_chio_request_denies_capability_for_different_tool_identity() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string())
+            .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-tool-scope",
@@ -726,7 +793,8 @@ mod tests {
     #[test]
     fn evaluate_chio_request_allows_model_constrained_capability_when_metadata_matches() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string())
+            .with_verified_manifest_registry(compatibility_manifest_registry_for_tests());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-model-scope",

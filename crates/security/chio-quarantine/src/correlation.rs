@@ -1,13 +1,16 @@
 use crate::rules::{GroupingKey, TemporalRule};
 use chio_core_types::{canonical_json_bytes, sha256};
+pub use chio_security_types::ports::CorrelationOutcomeStatus as CorrelationStatus;
 use chio_security_types::ports::{
-    CanonicalBody, CorrelationCasRequest, CorrelationEventIndexRequest, CorrelationPartial,
-    CorrelationPartitionKey, Digest32, EventAppend, EventId, EventPartitionScan, PortError,
-    PortErrorKind, ProducerTrustClass, RecordId, SecurityEventStore, VerifiedSecurityEvent,
+    CanonicalBody, CorrelationCasRequest, CorrelationEventAdmissionRequest,
+    CorrelationEventIndexRequest, CorrelationOutcomeCommitRequest, CorrelationOutcomeKey,
+    CorrelationOutcomePublication, CorrelationPartial, CorrelationPartitionKey, Digest32,
+    EventAppend, EventId, EventPartitionScan, PortError, PortErrorKind, ProducerTrustClass,
+    RecordId, SecurityEventStore, VerifiedSecurityEvent,
 };
 use chio_security_types::{
-    CorrelatedFinding, CorrelatedFindingInput, DetectorHealthEvidence, DetectorHealthKind,
-    SecurityEventBody,
+    CorrelatedFinding, CorrelatedFindingInput, DetectorGroupBindingEvidence,
+    DetectorHealthEvidence, DetectorHealthKind, DetectorWatermarkEvidence, SecurityEventBody,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -20,27 +23,31 @@ const TRANSITION_ID_DOMAIN: &[u8] = b"chio.temporal-transition.v1\0";
 const FINDING_ID_DOMAIN: &[u8] = b"chio.correlated-finding.v1\0";
 const PARTITION_STATE_VERSION: u8 = 1;
 const CAPACITY_STATE_VERSION: u8 = 1;
+const CORRELATION_OUTCOME_JOURNAL_VERSION: u8 = 2;
 const MAX_PORT_SCAN_EVENTS: u32 = 4_096;
 const MAX_CAS_RETRIES: u8 = 32;
+const MAX_JSON_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CorrelationStatus {
-    Accepted,
-    AdvisoryOnly,
-    Duplicate,
-    Irrelevant,
-    Matched,
-    Suppressed,
-    TooLate,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct CorrelationOutcome {
     pub status: CorrelationStatus,
     pub findings: Vec<CorrelatedFinding>,
     pub detector_health: Vec<DetectorHealthEvidence>,
     pub automatic_response_suppressed: bool,
     pub watermark_unix_ms: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CorrelationOutcomeJournal {
+    schema_version: u8,
+    key: CorrelationOutcomeKey,
+    partition_hash: Digest32,
+    rule_version_hash: Digest32,
+    event_body_hash: Digest32,
+    event_evidence_hash: Digest32,
+    outcome: CorrelationOutcome,
 }
 
 impl CorrelationOutcome {
@@ -112,16 +119,163 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
         Self { store, policy }
     }
 
+    pub fn load_durable_outcome(
+        &self,
+        rule: &TemporalRule,
+        event: &VerifiedSecurityEvent,
+    ) -> Result<Option<CorrelationOutcome>, PortError> {
+        let key = CorrelationOutcomeKey {
+            tenant_id: event.tenant_id.clone(),
+            rule_id: rule.rule_id().clone(),
+            event_id: event.event_id.clone(),
+        };
+        let body = parse_verified_event(event).map_err(|()| PortError::integrity_failure())?;
+        let expected_partition_hash =
+            group_hash(rule, &body).map_err(|()| PortError::integrity_failure())?;
+        self.store
+            .load_correlation_outcome(&key)?
+            .map(|publication| {
+                let journal: CorrelationOutcomeJournal =
+                    serde_json::from_slice(publication.canonical_body.as_bytes())
+                        .map_err(|_| PortError::integrity_failure())?;
+                let canonical =
+                    canonical_json_bytes(&journal).map_err(|_| PortError::integrity_failure())?;
+                let body_hash = Digest32::new(*sha256(&canonical).as_bytes());
+                if canonical.as_slice() != publication.canonical_body.as_bytes()
+                    || body_hash != publication.body_hash
+                    || journal.schema_version != CORRELATION_OUTCOME_JOURNAL_VERSION
+                    || journal.key != key
+                    || journal.key != publication.key
+                    || journal.partition_hash != expected_partition_hash
+                    || journal.partition_hash != publication.partition_hash
+                    || journal.outcome.status != publication.status
+                    || journal.outcome.watermark_unix_ms != publication.watermark_unix_ms
+                    || journal.rule_version_hash != rule.version_hash()
+                    || journal.rule_version_hash != publication.rule_version_hash
+                    || journal.event_body_hash != event.body_hash
+                    || journal.event_body_hash != publication.event_body_hash
+                    || journal.event_evidence_hash != event.evidence_hash
+                    || journal.event_evidence_hash != publication.event_evidence_hash
+                {
+                    return Err(PortError::integrity_failure());
+                }
+                Ok(journal.outcome)
+            })
+            .transpose()
+    }
+
+    fn outcome_publication(
+        rule: &TemporalRule,
+        event: &VerifiedSecurityEvent,
+        partition_hash: Digest32,
+        outcome: &CorrelationOutcome,
+    ) -> Result<CorrelationOutcomePublication, PortError> {
+        let key = CorrelationOutcomeKey {
+            tenant_id: event.tenant_id.clone(),
+            rule_id: rule.rule_id().clone(),
+            event_id: event.event_id.clone(),
+        };
+        let journal = CorrelationOutcomeJournal {
+            schema_version: CORRELATION_OUTCOME_JOURNAL_VERSION,
+            key: key.clone(),
+            partition_hash,
+            rule_version_hash: rule.version_hash(),
+            event_body_hash: event.body_hash,
+            event_evidence_hash: event.evidence_hash,
+            outcome: outcome.clone(),
+        };
+        let (canonical_body, body_hash) =
+            canonical_body_and_hash(&journal).map_err(|_| PortError::invalid_data())?;
+        Ok(CorrelationOutcomePublication {
+            key,
+            partition_hash,
+            status: outcome.status,
+            watermark_unix_ms: outcome.watermark_unix_ms,
+            rule_version_hash: rule.version_hash(),
+            event_body_hash: event.body_hash,
+            event_evidence_hash: event.evidence_hash,
+            canonical_body,
+            body_hash,
+        })
+    }
+
+    fn finalize_plain_outcome(
+        &self,
+        rule: &TemporalRule,
+        event: &VerifiedSecurityEvent,
+        group_hash: Digest32,
+        group_watermark: GroupWatermarkKnowledge,
+        outcome: CorrelationOutcome,
+    ) -> CorrelationOutcome {
+        let publication = match Self::outcome_publication(rule, event, group_hash, &outcome) {
+            Ok(publication) => publication,
+            Err(error) => {
+                return self.port_health_outcome(rule, event, group_hash, group_watermark, &error)
+            }
+        };
+        match self.store.commit_correlation_outcome_only(&publication) {
+            Ok(_) => outcome,
+            Err(error) if error.kind() == PortErrorKind::Conflict => {
+                match self.load_durable_outcome(rule, event) {
+                    Ok(Some(_)) => outcome,
+                    Ok(None) => {
+                        self.port_health_outcome(rule, event, group_hash, group_watermark, &error)
+                    }
+                    Err(load_error) => self.port_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        group_watermark,
+                        &load_error,
+                    ),
+                }
+            }
+            Err(error) => {
+                self.port_health_outcome(rule, event, group_hash, group_watermark, &error)
+            }
+        }
+    }
+
     pub fn ingest(&self, rule: &TemporalRule, event: &VerifiedSecurityEvent) -> CorrelationOutcome {
+        self.ingest_with_idle_watermark(rule, event, None, event.received_at_unix_ms)
+    }
+
+    /// Admits an event durably, but defers its final outcome until either a
+    /// later event or wall-clock idleness closes the bounded-lateness window.
+    /// A deferred outcome is never written to the immutable outcome journal.
+    #[must_use]
+    pub fn ingest_observed_at(
+        &self,
+        rule: &TemporalRule,
+        event: &VerifiedSecurityEvent,
+        observed_at_unix_ms: u64,
+    ) -> CorrelationOutcome {
+        let idle_watermark_unix_ms =
+            observed_at_unix_ms.saturating_sub(self.policy.bounded_lateness_ms);
+        self.ingest_with_idle_watermark(
+            rule,
+            event,
+            Some(idle_watermark_unix_ms),
+            observed_at_unix_ms,
+        )
+    }
+
+    fn ingest_with_idle_watermark(
+        &self,
+        rule: &TemporalRule,
+        event: &VerifiedSecurityEvent,
+        idle_watermark_unix_ms: Option<u64>,
+        observed_at_unix_ms: u64,
+    ) -> CorrelationOutcome {
         let body = match parse_verified_event(event) {
             Ok(body) => body,
             Err(()) => {
                 return self.health_outcome(
                     rule,
                     event,
-                    Digest32::new([0_u8; 32]),
+                    DetectorGroupBindingEvidence::Unresolved,
                     DetectorHealthKind::CorruptEvent,
-                    0,
+                    DetectorWatermarkEvidence::Unknown,
                 )
             }
         };
@@ -137,73 +291,26 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
                 return self.health_outcome(
                     rule,
                     event,
-                    Digest32::new([0_u8; 32]),
+                    DetectorGroupBindingEvidence::Unresolved,
                     DetectorHealthKind::CorruptEvent,
-                    0,
+                    DetectorWatermarkEvidence::Unknown,
                 )
             }
         };
+        if group_hash.as_bytes().iter().all(|byte| *byte == 0) {
+            return self.health_outcome(
+                rule,
+                event,
+                DetectorGroupBindingEvidence::Unresolved,
+                DetectorHealthKind::CorruptEvent,
+                DetectorWatermarkEvidence::Unknown,
+            );
+        }
         let key = CorrelationPartitionKey {
             tenant_id: event.tenant_id.clone(),
             rule_id: rule.rule_id().clone(),
             partition_hash: group_hash,
         };
-
-        let append = match self.store.append_verified(event) {
-            Ok(outcome) => outcome,
-            Err(error) => {
-                return self.port_health_outcome(rule, event, group_hash, 0, &error);
-            }
-        };
-        let initial = match self.store.load_correlation(&key) {
-            Ok(partial) => partial,
-            Err(error) => {
-                return self.port_health_outcome(rule, event, group_hash, 0, &error);
-            }
-        };
-        let initial_state = match initial.as_ref().map(load_partition_state).transpose() {
-            Ok(state) => state,
-            Err(()) => {
-                return self.health_outcome(
-                    rule,
-                    event,
-                    group_hash,
-                    DetectorHealthKind::CorruptState,
-                    initial
-                        .as_ref()
-                        .map_or(0, |partial| partial.watermark_unix_ms),
-                )
-            }
-        };
-        let behind_watermark = initial_state
-            .as_ref()
-            .is_some_and(|state| event.event_time_unix_ms <= state.watermark_unix_ms);
-        if behind_watermark && append == EventAppend::Inserted {
-            return CorrelationOutcome::plain(
-                CorrelationStatus::TooLate,
-                initial_state
-                    .as_ref()
-                    .map_or(0, |state| state.watermark_unix_ms),
-            );
-        }
-
-        if !behind_watermark {
-            match self.reserve_group(rule, event, group_hash) {
-                CapacityReservation::Reserved => {}
-                CapacityReservation::Overflow(watermark) => {
-                    return self.health_outcome(
-                        rule,
-                        event,
-                        group_hash,
-                        DetectorHealthKind::StateOverflow,
-                        watermark,
-                    );
-                }
-                CapacityReservation::Health(kind, watermark) => {
-                    return self.health_outcome(rule, event, group_hash, kind, watermark);
-                }
-            }
-        }
 
         let index_transition = match transition_id(
             "index",
@@ -216,45 +323,166 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
         ) {
             Ok(id) => id,
             Err(()) => {
-                return self.health_outcome(
+                return self.known_health_outcome(
                     rule,
                     event,
                     group_hash,
                     DetectorHealthKind::CorruptState,
-                    initial_state
-                        .as_ref()
-                        .map_or(0, |state| state.watermark_unix_ms),
+                    GroupWatermarkKnowledge::Unknown,
                 )
             }
         };
-        if let Err(error) = self
-            .store
-            .index_partition_event(&CorrelationEventIndexRequest {
-                key: key.clone(),
-                event_id: event.event_id.clone(),
-                transition_id: index_transition,
-            })
-        {
-            return self.port_health_outcome(
-                rule,
-                event,
-                group_hash,
-                initial_state
-                    .as_ref()
-                    .map_or(0, |state| state.watermark_unix_ms),
-                &error,
-            );
+        let index = CorrelationEventIndexRequest {
+            key: key.clone(),
+            event_id: event.event_id.clone(),
+            transition_id: index_transition,
+        };
+        let mut last_group_watermark = GroupWatermarkKnowledge::Unknown;
+        for _ in 0..self.policy.cas_retries {
+            let initial = match self.store.load_correlation(&key) {
+                Ok(partial) => partial,
+                Err(error) => {
+                    return self.port_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        last_group_watermark,
+                        &error,
+                    );
+                }
+            };
+            if let Some(contradictory) =
+                contradictory_stored_group_watermark(initial.as_ref(), observed_at_unix_ms)
+            {
+                return self.known_health_outcome(
+                    rule,
+                    event,
+                    group_hash,
+                    DetectorHealthKind::CorruptState,
+                    contradictory,
+                );
+            }
+            let initial_state = match initial.as_ref().map(load_partition_state).transpose() {
+                Ok(state) => state,
+                Err(()) => {
+                    return self.known_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        DetectorHealthKind::CorruptState,
+                        last_group_watermark,
+                    )
+                }
+            };
+            let group_watermark = match merge_validated_group_watermark(
+                last_group_watermark,
+                validated_group_watermark(initial.as_ref()),
+            ) {
+                ValidatedGroupWatermarkMerge::Accepted(knowledge) => knowledge,
+                ValidatedGroupWatermarkMerge::Regression { retained } => {
+                    return self.known_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        DetectorHealthKind::CorruptState,
+                        retained,
+                    )
+                }
+            };
+            last_group_watermark = group_watermark;
+            let watermark_unix_ms = group_watermark.as_legacy_unix_ms();
+            if initial_state
+                .as_ref()
+                .is_some_and(|state| event.event_time_unix_ms <= state.watermark_unix_ms)
+            {
+                let append = match self.store.append_verified(event) {
+                    Ok(append) => append,
+                    Err(error) => {
+                        return self.port_health_outcome(
+                            rule,
+                            event,
+                            group_hash,
+                            group_watermark,
+                            &error,
+                        )
+                    }
+                };
+                let outcome = CorrelationOutcome::plain(
+                    if append == EventAppend::Inserted {
+                        CorrelationStatus::TooLate
+                    } else {
+                        CorrelationStatus::Duplicate
+                    },
+                    watermark_unix_ms,
+                );
+                return self.finalize_plain_outcome(
+                    rule,
+                    event,
+                    group_hash,
+                    group_watermark,
+                    outcome,
+                );
+            }
+            let capacity = match self.prepare_group_reservation(rule, event, group_hash) {
+                CapacityReservation::Ready(capacity) => capacity.map(|request| *request),
+                CapacityReservation::Overflow => {
+                    return self.known_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        DetectorHealthKind::StateOverflow,
+                        group_watermark,
+                    );
+                }
+                CapacityReservation::Health(kind) => {
+                    return self.known_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        kind,
+                        group_watermark,
+                    );
+                }
+            };
+            match self
+                .store
+                .admit_verified_correlation_event(&CorrelationEventAdmissionRequest {
+                    event: event.clone(),
+                    index: index.clone(),
+                    capacity,
+                }) {
+                Ok(admission) => {
+                    return self.advance_partition(
+                        rule,
+                        event,
+                        admission.append,
+                        key,
+                        PartitionAdvanceContext {
+                            authoritative_group_watermark: group_watermark,
+                            idle_watermark_unix_ms,
+                            observed_at_unix_ms,
+                        },
+                    )
+                }
+                Err(error) if error.kind() == PortErrorKind::Conflict => continue,
+                Err(error) => {
+                    return self.port_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        group_watermark,
+                        &error,
+                    )
+                }
+            }
         }
-        if behind_watermark {
-            return CorrelationOutcome::plain(
-                CorrelationStatus::Duplicate,
-                initial_state
-                    .as_ref()
-                    .map_or(0, |state| state.watermark_unix_ms),
-            );
-        }
-
-        self.advance_partition(rule, event, append, key)
+        self.known_health_outcome(
+            rule,
+            event,
+            group_hash,
+            DetectorHealthKind::StoreConflict,
+            last_group_watermark,
+        )
     }
 
     fn advance_partition(
@@ -263,44 +491,125 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
         trigger: &VerifiedSecurityEvent,
         append: EventAppend,
         key: CorrelationPartitionKey,
+        context: PartitionAdvanceContext,
     ) -> CorrelationOutcome {
+        let PartitionAdvanceContext {
+            authoritative_group_watermark,
+            idle_watermark_unix_ms,
+            observed_at_unix_ms,
+        } = context;
+        let mut last_group_watermark = authoritative_group_watermark;
         for _ in 0..self.policy.cas_retries {
             let current = match self.store.load_correlation(&key) {
                 Ok(partial) => partial,
                 Err(error) => {
-                    return self.port_health_outcome(rule, trigger, key.partition_hash, 0, &error)
+                    return self.port_health_outcome(
+                        rule,
+                        trigger,
+                        key.partition_hash,
+                        last_group_watermark,
+                        &error,
+                    )
                 }
             };
+            if let Some(contradictory) =
+                contradictory_stored_group_watermark(current.as_ref(), observed_at_unix_ms)
+            {
+                return self.known_health_outcome(
+                    rule,
+                    trigger,
+                    key.partition_hash,
+                    DetectorHealthKind::CorruptState,
+                    contradictory,
+                );
+            }
             let mut state = match current.as_ref().map(load_partition_state).transpose() {
                 Ok(Some(state)) => state,
                 Ok(None) => PartitionState::empty(),
                 Err(()) => {
-                    return self.health_outcome(
+                    return self.known_health_outcome(
                         rule,
                         trigger,
                         key.partition_hash,
                         DetectorHealthKind::CorruptState,
-                        current
-                            .as_ref()
-                            .map_or(0, |partial| partial.watermark_unix_ms),
+                        last_group_watermark,
                     )
                 }
             };
+            let group_watermark = match merge_validated_group_watermark(
+                last_group_watermark,
+                validated_group_watermark(current.as_ref()),
+            ) {
+                ValidatedGroupWatermarkMerge::Accepted(knowledge) => knowledge,
+                ValidatedGroupWatermarkMerge::Regression { retained } => {
+                    return self.known_health_outcome(
+                        rule,
+                        trigger,
+                        key.partition_hash,
+                        DetectorHealthKind::CorruptState,
+                        retained,
+                    )
+                }
+            };
+            last_group_watermark = group_watermark;
+            let indexed_max_seen_event_time =
+                match self.store.load_correlation_max_seen_event_time(&key) {
+                    Ok(max_seen) => max_seen.unwrap_or(0),
+                    Err(error) => {
+                        return self.port_health_outcome(
+                            rule,
+                            trigger,
+                            key.partition_hash,
+                            group_watermark,
+                            &error,
+                        )
+                    }
+                };
             if current.is_some() && trigger.event_time_unix_ms <= state.watermark_unix_ms {
                 let status = if append == EventAppend::Duplicate {
                     CorrelationStatus::Duplicate
                 } else {
                     CorrelationStatus::Accepted
                 };
-                return CorrelationOutcome::plain(status, state.watermark_unix_ms);
+                let outcome = CorrelationOutcome::plain(status, state.watermark_unix_ms);
+                return self.finalize_plain_outcome(
+                    rule,
+                    trigger,
+                    key.partition_hash,
+                    group_watermark,
+                    outcome,
+                );
             }
             state.max_seen_event_time_unix_ms = state
                 .max_seen_event_time_unix_ms
+                .max(indexed_max_seen_event_time)
                 .max(trigger.event_time_unix_ms);
-            let next_watermark = state
+            let stream_watermark = state
                 .max_seen_event_time_unix_ms
-                .saturating_sub(self.policy.bounded_lateness_ms)
+                .saturating_sub(self.policy.bounded_lateness_ms);
+            let idle_watermark = idle_watermark_unix_ms
+                .map(|watermark| watermark.min(state.max_seen_event_time_unix_ms))
+                .unwrap_or(0);
+            let next_watermark = stream_watermark
+                .max(idle_watermark)
                 .max(state.watermark_unix_ms);
+            let next_group_watermark =
+                GroupWatermarkKnowledge::committed(next_watermark, observed_at_unix_ms);
+            if matches!(
+                next_group_watermark,
+                GroupWatermarkKnowledge::Contradictory { .. }
+            ) {
+                return self.known_health_outcome(
+                    rule,
+                    trigger,
+                    key.partition_hash,
+                    DetectorHealthKind::CorruptState,
+                    next_group_watermark,
+                );
+            }
+            if idle_watermark_unix_ms.is_some() && trigger.event_time_unix_ms > next_watermark {
+                return CorrelationOutcome::plain(CorrelationStatus::Deferred, next_watermark);
+            }
             let scan_request = EventPartitionScan {
                 tenant_id: key.tenant_id.clone(),
                 rule_id: key.rule_id.clone(),
@@ -317,18 +626,18 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
                         rule,
                         trigger,
                         key.partition_hash,
-                        state.watermark_unix_ms,
+                        group_watermark,
                         &error,
                     )
                 }
             };
             if scan.truncated {
-                return self.health_outcome(
+                return self.known_health_outcome(
                     rule,
                     trigger,
                     key.partition_hash,
                     DetectorHealthKind::TruncatedScan,
-                    state.watermark_unix_ms,
+                    group_watermark,
                 );
             }
             let process = match process_events(
@@ -341,12 +650,12 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
             ) {
                 Ok(process) => process,
                 Err(()) => {
-                    return self.health_outcome(
+                    return self.known_health_outcome(
                         rule,
                         trigger,
                         key.partition_hash,
                         DetectorHealthKind::CorruptState,
-                        state.watermark_unix_ms,
+                        group_watermark,
                     )
                 }
             };
@@ -354,12 +663,12 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
             let (canonical_body, body_hash) = match canonical_body_and_hash(&state) {
                 Ok(value) => value,
                 Err(()) => {
-                    return self.health_outcome(
+                    return self.known_health_outcome(
                         rule,
                         trigger,
                         key.partition_hash,
                         DetectorHealthKind::CorruptState,
-                        state.watermark_unix_ms,
+                        group_watermark,
                     )
                 }
             };
@@ -367,12 +676,12 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
                 Some(partial) => match partial.generation.checked_add(1) {
                     Some(generation) => generation,
                     None => {
-                        return self.health_outcome(
+                        return self.known_health_outcome(
                             rule,
                             trigger,
                             key.partition_hash,
                             DetectorHealthKind::CorruptState,
-                            state.watermark_unix_ms,
+                            group_watermark,
                         )
                     }
                 },
@@ -399,72 +708,110 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
             ) {
                 Ok(id) => id,
                 Err(()) => {
-                    return self.health_outcome(
+                    return self.known_health_outcome(
                         rule,
                         trigger,
                         key.partition_hash,
                         DetectorHealthKind::CorruptState,
-                        state.watermark_unix_ms,
+                        group_watermark,
                     )
                 }
             };
+            let mut outcome = CorrelationOutcome::plain(
+                if process.suppressed {
+                    CorrelationStatus::Suppressed
+                } else if process.findings.is_empty() {
+                    CorrelationStatus::Accepted
+                } else {
+                    CorrelationStatus::Matched
+                },
+                next_watermark,
+            );
+            outcome.findings = process.findings;
+            if process.overflow {
+                outcome.detector_health.push(DetectorHealthEvidence {
+                    tenant_id: trigger.tenant_id.clone(),
+                    policy_version: rule.policy_version().clone(),
+                    rule_id: rule.rule_id().clone(),
+                    rule_version_hash: rule.version_hash(),
+                    group_binding: detector_group_binding(key.partition_hash),
+                    kind: DetectorHealthKind::StateOverflow,
+                    event_id: trigger.event_id.clone(),
+                    observed_at_unix_ms: trigger.received_at_unix_ms,
+                    watermark: next_group_watermark.as_evidence(),
+                });
+                outcome.automatic_response_suppressed = true;
+            }
+            let publication =
+                match Self::outcome_publication(rule, trigger, key.partition_hash, &outcome) {
+                    Ok(publication) => publication,
+                    Err(error) => {
+                        return self.port_health_outcome(
+                            rule,
+                            trigger,
+                            key.partition_hash,
+                            group_watermark,
+                            &error,
+                        )
+                    }
+                };
             match self
                 .store
-                .compare_and_swap_correlation(&CorrelationCasRequest {
-                    scan: scan_request,
-                    observed_partition_generation: scan.partition_generation,
-                    partial,
-                    expected_generation: current.as_ref().map(|partial| partial.generation),
-                    transition_id: cas_transition,
+                .commit_correlation_outcome(&CorrelationOutcomeCommitRequest {
+                    correlation: CorrelationCasRequest {
+                        scan: scan_request,
+                        observed_partition_generation: scan.partition_generation,
+                        partial,
+                        expected_generation: current.as_ref().map(|partial| partial.generation),
+                        transition_id: cas_transition,
+                    },
+                    outcome: publication,
                 }) {
-                Ok(_) => {
-                    let mut outcome = CorrelationOutcome::plain(
-                        if process.suppressed {
-                            CorrelationStatus::Suppressed
-                        } else if process.findings.is_empty() {
-                            CorrelationStatus::Accepted
-                        } else {
-                            CorrelationStatus::Matched
-                        },
-                        next_watermark,
-                    );
-                    outcome.findings = process.findings;
-                    if process.overflow {
-                        outcome.detector_health.push(DetectorHealthEvidence {
-                            tenant_id: trigger.tenant_id.clone(),
-                            rule_id: rule.rule_id().clone(),
-                            group_key_hash: key.partition_hash,
-                            kind: DetectorHealthKind::StateOverflow,
-                            event_id: trigger.event_id.clone(),
-                            observed_at_unix_ms: trigger.received_at_unix_ms,
-                            watermark_unix_ms: next_watermark,
-                        });
-                        outcome.automatic_response_suppressed = true;
+                Ok(_) => return outcome,
+                Err(error) if error.kind() == PortErrorKind::Conflict => {
+                    match self.load_durable_outcome(rule, trigger) {
+                        Ok(Some(committed)) => {
+                            return CorrelationOutcome::plain(
+                                CorrelationStatus::Duplicate,
+                                committed.watermark_unix_ms,
+                            )
+                        }
+                        Ok(None) => continue,
+                        Err(load_error) => {
+                            return self.port_health_outcome(
+                                rule,
+                                trigger,
+                                key.partition_hash,
+                                group_watermark,
+                                &load_error,
+                            )
+                        }
                     }
-                    return outcome;
                 }
-                Err(error) if error.kind() == PortErrorKind::Conflict => continue,
                 Err(error) => {
+                    if let Ok(Some(committed)) = self.load_durable_outcome(rule, trigger) {
+                        return committed;
+                    }
                     return self.port_health_outcome(
                         rule,
                         trigger,
                         key.partition_hash,
-                        state.watermark_unix_ms,
+                        group_watermark,
                         &error,
-                    )
+                    );
                 }
             }
         }
-        self.health_outcome(
+        self.known_health_outcome(
             rule,
             trigger,
             key.partition_hash,
             DetectorHealthKind::StoreConflict,
-            0,
+            last_group_watermark,
         )
     }
 
-    fn reserve_group(
+    fn prepare_group_reservation(
         &self,
         rule: &TemporalRule,
         event: &VerifiedSecurityEvent,
@@ -472,171 +819,119 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     ) -> CapacityReservation {
         let key = match capacity_key(rule, event) {
             Ok(key) => key,
-            Err(()) => return CapacityReservation::Health(DetectorHealthKind::CorruptState, 0),
+            Err(()) => return CapacityReservation::Health(DetectorHealthKind::CorruptState),
         };
         let retention = match rule
             .maximum_window_ms()
             .checked_add(self.policy.bounded_lateness_ms)
         {
             Some(value) => value,
-            None => return CapacityReservation::Overflow(u64::MAX),
+            None => return CapacityReservation::Overflow,
         };
         let expires_at = match event.event_time_unix_ms.checked_add(retention) {
             Some(value) => value,
-            None => return CapacityReservation::Overflow(u64::MAX),
+            None => return CapacityReservation::Overflow,
         };
-        for _ in 0..self.policy.cas_retries {
-            let current = match self.store.load_correlation(&key) {
-                Ok(partial) => partial,
-                Err(error) => return CapacityReservation::Health(port_health_kind(&error), 0),
-            };
-            let mut state = match current.as_ref().map(load_capacity_state).transpose() {
-                Ok(Some(state)) => state,
-                Ok(None) => CapacityState::empty(rule.version_hash()),
-                Err(()) => {
-                    return CapacityReservation::Health(
-                        DetectorHealthKind::CorruptState,
-                        current
-                            .as_ref()
-                            .map_or(0, |partial| partial.watermark_unix_ms),
-                    )
-                }
-            };
-            if state.rule_version_hash != rule.version_hash() {
-                return CapacityReservation::Health(
-                    DetectorHealthKind::CorruptState,
-                    state.watermark_unix_ms,
-                );
-            }
-            if state.groups.len() > rule.max_groups() as usize {
-                return CapacityReservation::Health(
-                    DetectorHealthKind::CorruptState,
-                    state.watermark_unix_ms,
-                );
-            }
-            let next_watermark = state.watermark_unix_ms.max(event.event_time_unix_ms);
-            state
-                .groups
-                .retain(|entry| entry.expires_at_unix_ms >= next_watermark);
-            if let Some(entry) = state
-                .groups
-                .iter_mut()
-                .find(|entry| entry.group_hash == group_hash)
+        let current = match self.store.load_correlation(&key) {
+            Ok(partial) => partial,
+            Err(error) => return CapacityReservation::Health(port_health_kind(&error)),
+        };
+        let mut state = match current.as_ref().map(load_capacity_state).transpose() {
+            Ok(Some(state)) => state,
+            Ok(None) => CapacityState::empty(rule.version_hash()),
+            Err(()) => return CapacityReservation::Health(DetectorHealthKind::CorruptState),
+        };
+        if state.rule_version_hash != rule.version_hash() {
+            return CapacityReservation::Health(DetectorHealthKind::CorruptState);
+        }
+        if state.groups.len() > rule.max_groups() as usize {
+            return CapacityReservation::Health(DetectorHealthKind::CorruptState);
+        }
+        let next_watermark = state.watermark_unix_ms.max(event.event_time_unix_ms);
+        state
+            .groups
+            .retain(|entry| entry.expires_at_unix_ms >= next_watermark);
+        if let Some(entry) = state
+            .groups
+            .iter_mut()
+            .find(|entry| entry.group_hash == group_hash)
+        {
+            if entry.expires_at_unix_ms >= expires_at
+                && state.watermark_unix_ms >= event.event_time_unix_ms
             {
-                if entry.expires_at_unix_ms >= expires_at
-                    && state.watermark_unix_ms >= event.event_time_unix_ms
-                {
-                    return CapacityReservation::Reserved;
-                }
-                entry.expires_at_unix_ms = entry.expires_at_unix_ms.max(expires_at);
-            } else {
-                if state.groups.len() >= rule.max_groups() as usize {
-                    return CapacityReservation::Overflow(next_watermark);
-                }
-                state.groups.push(CapacityEntry {
-                    group_hash,
-                    expires_at_unix_ms: expires_at,
-                });
+                return CapacityReservation::Ready(None);
             }
-            state.groups.sort_by_key(|entry| entry.group_hash);
-            state.watermark_unix_ms = next_watermark;
-            let (canonical_body, body_hash) = match canonical_body_and_hash(&state) {
-                Ok(value) => value,
-                Err(()) => {
-                    return CapacityReservation::Health(
-                        DetectorHealthKind::CorruptState,
-                        state.watermark_unix_ms,
-                    )
-                }
-            };
-            let generation = match current.as_ref() {
-                Some(partial) => match partial.generation.checked_add(1) {
-                    Some(generation) => generation,
-                    None => {
-                        return CapacityReservation::Health(
-                            DetectorHealthKind::CorruptState,
-                            state.watermark_unix_ms,
-                        )
-                    }
-                },
-                None => 0,
-            };
-            let scan = EventPartitionScan {
-                tenant_id: key.tenant_id.clone(),
-                rule_id: key.rule_id.clone(),
-                partition_hash: key.partition_hash,
-                after_event_time_unix_ms: current.as_ref().map(|partial| partial.watermark_unix_ms),
-                after_event_id: None,
-                through_event_time_unix_ms: next_watermark,
-                max_results: 1,
-            };
-            let observed = match self.store.scan_partition(&scan) {
-                Ok(observed) if !observed.truncated && observed.events.is_empty() => observed,
-                Ok(_) => {
-                    return CapacityReservation::Health(
-                        DetectorHealthKind::CorruptState,
-                        state.watermark_unix_ms,
-                    )
-                }
-                Err(error) => {
-                    return CapacityReservation::Health(
-                        port_health_kind(&error),
-                        state.watermark_unix_ms,
-                    )
-                }
-            };
-            let transition = match transition_id(
-                "capacity",
-                &PartitionTransition {
-                    tenant_id: key.tenant_id.as_str(),
-                    rule_id: key.rule_id.as_str(),
-                    group_hash: key.partition_hash,
-                    generation,
-                    watermark_unix_ms: next_watermark,
-                    body_hash,
-                },
-            ) {
-                Ok(id) => id,
-                Err(()) => {
-                    return CapacityReservation::Health(
-                        DetectorHealthKind::CorruptState,
-                        state.watermark_unix_ms,
-                    )
-                }
-            };
-            let partial = CorrelationPartial {
-                key: key.clone(),
+            entry.expires_at_unix_ms = entry.expires_at_unix_ms.max(expires_at);
+        } else {
+            if state.groups.len() >= rule.max_groups() as usize {
+                return CapacityReservation::Overflow;
+            }
+            state.groups.push(CapacityEntry {
+                group_hash,
+                expires_at_unix_ms: expires_at,
+            });
+        }
+        state.groups.sort_by_key(|entry| entry.group_hash);
+        state.watermark_unix_ms = next_watermark;
+        let (canonical_body, body_hash) = match canonical_body_and_hash(&state) {
+            Ok(value) => value,
+            Err(()) => return CapacityReservation::Health(DetectorHealthKind::CorruptState),
+        };
+        let generation = match current.as_ref() {
+            Some(partial) => match partial.generation.checked_add(1) {
+                Some(generation) => generation,
+                None => return CapacityReservation::Health(DetectorHealthKind::CorruptState),
+            },
+            None => 0,
+        };
+        let scan = EventPartitionScan {
+            tenant_id: key.tenant_id.clone(),
+            rule_id: key.rule_id.clone(),
+            partition_hash: key.partition_hash,
+            after_event_time_unix_ms: current.as_ref().map(|partial| partial.watermark_unix_ms),
+            after_event_id: None,
+            through_event_time_unix_ms: next_watermark,
+            max_results: 1,
+        };
+        let observed = match self.store.scan_partition(&scan) {
+            Ok(observed) if !observed.truncated && observed.events.is_empty() => observed,
+            Ok(_) => return CapacityReservation::Health(DetectorHealthKind::CorruptState),
+            Err(error) => return CapacityReservation::Health(port_health_kind(&error)),
+        };
+        let transition = match transition_id(
+            "capacity",
+            &PartitionTransition {
+                tenant_id: key.tenant_id.as_str(),
+                rule_id: key.rule_id.as_str(),
+                group_hash: key.partition_hash,
                 generation,
                 watermark_unix_ms: next_watermark,
-                expires_at_unix_ms: state
-                    .groups
-                    .iter()
-                    .map(|entry| entry.expires_at_unix_ms)
-                    .max()
-                    .unwrap_or(next_watermark),
-                canonical_body,
                 body_hash,
-            };
-            match self
-                .store
-                .compare_and_swap_correlation(&CorrelationCasRequest {
-                    scan,
-                    observed_partition_generation: observed.partition_generation,
-                    partial,
-                    expected_generation: current.as_ref().map(|partial| partial.generation),
-                    transition_id: transition,
-                }) {
-                Ok(_) => return CapacityReservation::Reserved,
-                Err(error) if error.kind() == PortErrorKind::Conflict => continue,
-                Err(error) => {
-                    return CapacityReservation::Health(
-                        port_health_kind(&error),
-                        state.watermark_unix_ms,
-                    )
-                }
-            }
-        }
-        CapacityReservation::Health(DetectorHealthKind::StoreConflict, 0)
+            },
+        ) {
+            Ok(id) => id,
+            Err(()) => return CapacityReservation::Health(DetectorHealthKind::CorruptState),
+        };
+        let partial = CorrelationPartial {
+            key: key.clone(),
+            generation,
+            watermark_unix_ms: next_watermark,
+            expires_at_unix_ms: state
+                .groups
+                .iter()
+                .map(|entry| entry.expires_at_unix_ms)
+                .max()
+                .unwrap_or(next_watermark),
+            canonical_body,
+            body_hash,
+        };
+        CapacityReservation::Ready(Some(Box::new(CorrelationCasRequest {
+            scan,
+            observed_partition_generation: observed.partition_generation,
+            partial,
+            expected_generation: current.as_ref().map(|partial| partial.generation),
+            transition_id: transition,
+        })))
     }
 
     fn port_health_outcome(
@@ -644,36 +939,150 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
         rule: &TemporalRule,
         event: &VerifiedSecurityEvent,
         group_hash: Digest32,
-        watermark: u64,
+        watermark: GroupWatermarkKnowledge,
         error: &PortError,
     ) -> CorrelationOutcome {
-        self.health_outcome(rule, event, group_hash, port_health_kind(error), watermark)
+        self.known_health_outcome(rule, event, group_hash, port_health_kind(error), watermark)
+    }
+
+    fn known_health_outcome(
+        &self,
+        rule: &TemporalRule,
+        event: &VerifiedSecurityEvent,
+        group_hash: Digest32,
+        kind: DetectorHealthKind,
+        watermark: GroupWatermarkKnowledge,
+    ) -> CorrelationOutcome {
+        let health_kind = if matches!(watermark, GroupWatermarkKnowledge::Contradictory { .. }) {
+            DetectorHealthKind::CorruptState
+        } else {
+            kind
+        };
+        self.health_outcome(
+            rule,
+            event,
+            detector_group_binding(group_hash),
+            health_kind,
+            watermark.as_evidence(),
+        )
     }
 
     fn health_outcome(
         &self,
         rule: &TemporalRule,
         event: &VerifiedSecurityEvent,
-        group_hash: Digest32,
+        group_binding: DetectorGroupBindingEvidence,
         kind: DetectorHealthKind,
-        watermark: u64,
+        watermark: DetectorWatermarkEvidence,
     ) -> CorrelationOutcome {
+        let watermark_unix_ms = match &watermark {
+            DetectorWatermarkEvidence::Unknown => 0,
+            DetectorWatermarkEvidence::Committed { unix_ms } => *unix_ms,
+            DetectorWatermarkEvidence::Contradictory { claimed_unix_ms } => {
+                claimed_unix_ms.parse::<u64>().unwrap_or(u64::MAX)
+            }
+        };
         CorrelationOutcome {
             status: CorrelationStatus::Suppressed,
             findings: Vec::new(),
             detector_health: vec![DetectorHealthEvidence {
                 tenant_id: event.tenant_id.clone(),
+                policy_version: rule.policy_version().clone(),
                 rule_id: rule.rule_id().clone(),
-                group_key_hash: group_hash,
+                rule_version_hash: rule.version_hash(),
+                group_binding,
                 kind,
                 event_id: event.event_id.clone(),
                 observed_at_unix_ms: event.received_at_unix_ms,
-                watermark_unix_ms: watermark,
+                watermark,
             }],
             automatic_response_suppressed: true,
-            watermark_unix_ms: watermark,
+            watermark_unix_ms,
         }
     }
+}
+
+fn detector_group_binding(group_key_hash: Digest32) -> DetectorGroupBindingEvidence {
+    if group_key_hash.as_bytes().iter().all(|byte| *byte == 0) {
+        DetectorGroupBindingEvidence::Unresolved
+    } else {
+        DetectorGroupBindingEvidence::Resolved { group_key_hash }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum GroupWatermarkKnowledge {
+    Unknown,
+    Committed { unix_ms: u64 },
+    Contradictory { unix_ms: u64 },
+}
+
+impl GroupWatermarkKnowledge {
+    fn committed(unix_ms: u64, observed_at_unix_ms: u64) -> Self {
+        if unix_ms == 0 || unix_ms > observed_at_unix_ms || unix_ms > MAX_JSON_SAFE_INTEGER {
+            Self::Contradictory { unix_ms }
+        } else {
+            Self::Committed { unix_ms }
+        }
+    }
+
+    fn as_evidence(self) -> DetectorWatermarkEvidence {
+        match self {
+            Self::Unknown => DetectorWatermarkEvidence::Unknown,
+            Self::Committed { unix_ms } => DetectorWatermarkEvidence::Committed { unix_ms },
+            Self::Contradictory { unix_ms } => DetectorWatermarkEvidence::Contradictory {
+                claimed_unix_ms: unix_ms.to_string(),
+            },
+        }
+    }
+
+    const fn as_legacy_unix_ms(self) -> u64 {
+        match self {
+            Self::Committed { unix_ms } | Self::Contradictory { unix_ms } => unix_ms,
+            Self::Unknown => 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ValidatedGroupWatermarkMerge {
+    Accepted(GroupWatermarkKnowledge),
+    Regression { retained: GroupWatermarkKnowledge },
+}
+
+const fn merge_validated_group_watermark(
+    previous: GroupWatermarkKnowledge,
+    candidate: GroupWatermarkKnowledge,
+) -> ValidatedGroupWatermarkMerge {
+    match (previous, candidate) {
+        (
+            GroupWatermarkKnowledge::Committed { unix_ms: previous },
+            GroupWatermarkKnowledge::Committed { unix_ms: candidate },
+        ) if candidate < previous => ValidatedGroupWatermarkMerge::Regression {
+            retained: GroupWatermarkKnowledge::Committed { unix_ms: previous },
+        },
+        (GroupWatermarkKnowledge::Committed { .. }, GroupWatermarkKnowledge::Unknown) => {
+            ValidatedGroupWatermarkMerge::Accepted(previous)
+        }
+        (_, candidate) => ValidatedGroupWatermarkMerge::Accepted(candidate),
+    }
+}
+
+fn contradictory_stored_group_watermark(
+    partial: Option<&CorrelationPartial>,
+    observed_at_unix_ms: u64,
+) -> Option<GroupWatermarkKnowledge> {
+    let claimed = partial?.watermark_unix_ms;
+    (claimed == 0 || claimed > observed_at_unix_ms || claimed > MAX_JSON_SAFE_INTEGER)
+        .then_some(GroupWatermarkKnowledge::Contradictory { unix_ms: claimed })
+}
+
+fn validated_group_watermark(partial: Option<&CorrelationPartial>) -> GroupWatermarkKnowledge {
+    partial.map_or(GroupWatermarkKnowledge::Unknown, |partial| {
+        GroupWatermarkKnowledge::Committed {
+            unix_ms: partial.watermark_unix_ms,
+        }
+    })
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -710,6 +1119,7 @@ struct PartialCandidate {
 struct StageContribution {
     event_id: EventId,
     evidence_digest: Digest32,
+    source_receipt_id: chio_security_types::ports::OpaqueReceiptRef,
     event_time_unix_ms: u64,
 }
 
@@ -746,10 +1156,16 @@ struct ProcessResult {
     suppressed: bool,
 }
 
+struct PartitionAdvanceContext {
+    authoritative_group_watermark: GroupWatermarkKnowledge,
+    idle_watermark_unix_ms: Option<u64>,
+    observed_at_unix_ms: u64,
+}
+
 enum CapacityReservation {
-    Reserved,
-    Overflow(u64),
-    Health(DetectorHealthKind, u64),
+    Ready(Option<Box<CorrelationCasRequest>>),
+    Overflow,
+    Health(DetectorHealthKind),
 }
 
 fn process_events(
@@ -814,6 +1230,7 @@ fn process_events(
             let contribution = StageContribution {
                 event_id: event.event_id.clone(),
                 evidence_digest: event.evidence_hash,
+                source_receipt_id: body.source_receipt_id.clone(),
                 event_time_unix_ms: event.event_time_unix_ms,
             };
             let candidates = if stage_index == 0 {
@@ -843,14 +1260,16 @@ fn process_events(
                     else {
                         continue;
                     };
-                    if event.event_time_unix_ms < predecessor_event.event_time_unix_ms
-                        || event.event_time_unix_ms - predecessor_event.event_time_unix_ms > window
-                        || !rule.allow_event_reuse()
-                            && source
-                                .stages
-                                .iter()
-                                .flatten()
-                                .any(|existing| existing.event_id == event.event_id)
+                    if !event_time_is_ordered_and_within(
+                        event.event_time_unix_ms,
+                        predecessor_event.event_time_unix_ms,
+                        window,
+                    ) || !rule.allow_event_reuse()
+                        && source
+                            .stages
+                            .iter()
+                            .flatten()
+                            .any(|existing| existing.event_id == event.event_id)
                     {
                         continue;
                     }
@@ -891,6 +1310,16 @@ fn process_events(
         overflow: false,
         suppressed: false,
     })
+}
+
+fn event_time_is_ordered_and_within(
+    event_time_unix_ms: u64,
+    predecessor_time_unix_ms: u64,
+    within_ms: u64,
+) -> bool {
+    event_time_unix_ms
+        .checked_sub(predecessor_time_unix_ms)
+        .is_some_and(|elapsed| elapsed <= within_ms)
 }
 
 fn valid_candidate_shape(rule: &TemporalRule, candidate: &PartialCandidate) -> bool {
@@ -1039,6 +1468,7 @@ struct FindingCommitment<'a> {
     group_key_hash: Digest32,
     ordered_event_ids: &'a [EventId],
     ordered_evidence_digests: &'a [Digest32],
+    ordered_source_receipt_ids: &'a [chio_security_types::ports::OpaqueReceiptRef],
     first_event_time_unix_ms: u64,
     last_event_time_unix_ms: u64,
     lineage_seed: &'a str,
@@ -1062,6 +1492,10 @@ fn correlated_finding(
         .iter()
         .map(|contribution| contribution.evidence_digest)
         .collect();
+    let ordered_source_receipt_ids = contributions
+        .iter()
+        .map(|contribution| contribution.source_receipt_id.clone())
+        .collect::<Vec<_>>();
     let first = contributions
         .iter()
         .map(|contribution| contribution.event_time_unix_ms)
@@ -1080,6 +1514,7 @@ fn correlated_finding(
         group_key_hash,
         ordered_event_ids: &ordered_event_ids,
         ordered_evidence_digests: &ordered_evidence_digests,
+        ordered_source_receipt_ids: &ordered_source_receipt_ids,
         first_event_time_unix_ms: first,
         last_event_time_unix_ms: last,
         lineage_seed: candidate.lineage_seed.as_str(),
@@ -1096,6 +1531,7 @@ fn correlated_finding(
         group_key_hash,
         ordered_event_ids,
         ordered_evidence_digests,
+        ordered_source_receipt_ids,
         first_event_time_unix_ms: first,
         last_event_time_unix_ms: last,
         lineage_seed: candidate.lineage_seed.clone(),
@@ -1213,6 +1649,77 @@ fn hex_bytes(bytes: &[u8]) -> String {
         output.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     output
+}
+
+#[cfg(test)]
+mod mutation_tests {
+    use super::{
+        event_time_is_ordered_and_within, merge_validated_group_watermark, GroupWatermarkKnowledge,
+        ValidatedGroupWatermarkMerge, MAX_JSON_SAFE_INTEGER,
+    };
+
+    #[test]
+    fn event_time_window_rejects_reverse_and_expired_sequences() {
+        assert!(event_time_is_ordered_and_within(120, 100, 20));
+        assert!(!event_time_is_ordered_and_within(99, 100, 20));
+        assert!(!event_time_is_ordered_and_within(121, 100, 20));
+    }
+
+    #[test]
+    fn committed_group_watermark_rejects_contradictory_values() {
+        assert_eq!(
+            GroupWatermarkKnowledge::committed(0, 10),
+            GroupWatermarkKnowledge::Contradictory { unix_ms: 0 }
+        );
+        assert_eq!(
+            GroupWatermarkKnowledge::committed(11, 10),
+            GroupWatermarkKnowledge::Contradictory { unix_ms: 11 }
+        );
+        assert_eq!(
+            GroupWatermarkKnowledge::committed(
+                MAX_JSON_SAFE_INTEGER.saturating_add(1),
+                MAX_JSON_SAFE_INTEGER.saturating_add(1),
+            ),
+            GroupWatermarkKnowledge::Contradictory {
+                unix_ms: MAX_JSON_SAFE_INTEGER.saturating_add(1),
+            }
+        );
+        assert_eq!(
+            GroupWatermarkKnowledge::committed(9, 10),
+            GroupWatermarkKnowledge::Committed { unix_ms: 9 }
+        );
+    }
+
+    #[test]
+    fn validated_group_watermark_merge_is_numerically_monotonic() {
+        let committed_90 = GroupWatermarkKnowledge::Committed { unix_ms: 90 };
+        assert_eq!(
+            merge_validated_group_watermark(GroupWatermarkKnowledge::Unknown, committed_90,),
+            ValidatedGroupWatermarkMerge::Accepted(committed_90)
+        );
+        assert_eq!(
+            merge_validated_group_watermark(committed_90, GroupWatermarkKnowledge::Unknown,),
+            ValidatedGroupWatermarkMerge::Accepted(committed_90)
+        );
+        assert_eq!(
+            merge_validated_group_watermark(
+                committed_90,
+                GroupWatermarkKnowledge::Committed { unix_ms: 100 },
+            ),
+            ValidatedGroupWatermarkMerge::Accepted(GroupWatermarkKnowledge::Committed {
+                unix_ms: 100,
+            })
+        );
+        assert_eq!(
+            merge_validated_group_watermark(
+                committed_90,
+                GroupWatermarkKnowledge::Committed { unix_ms: 80 },
+            ),
+            ValidatedGroupWatermarkMerge::Regression {
+                retained: committed_90,
+            }
+        );
+    }
 }
 
 #[derive(Debug, Error)]

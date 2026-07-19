@@ -1,11 +1,13 @@
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-use sha2::{Digest, Sha256};
-
-use crate::support::{digest_to_hex, display_path, walk_schema_json, workspace_root};
+use crate::support::{
+    authoritative_schema_json_inventory, display_path, hash_schema_inventory,
+    validate_workspace_subdirectory, workspace_root, TempDir,
+};
 use crate::XtaskError;
 
 use super::CHIO_WIRE_V1_SCHEMAS;
@@ -35,6 +37,7 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
             display_path(&schemas_dir)
         )));
     }
+    validate_workspace_subdirectory(&workspace_root, &schemas_dir)?;
     let json2ts = scripts_dir.join("node_modules/.bin/json2ts");
     if !json2ts.exists() {
         return Err(XtaskError::Usage(format!(
@@ -46,9 +49,7 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
         )));
     }
 
-    let mut schema_files: Vec<PathBuf> = Vec::new();
-    walk_schema_json(&schemas_dir, &mut schema_files)?;
-    schema_files.sort();
+    let schema_files = authoritative_schema_json_inventory(&workspace_root, &schemas_dir)?;
     if schema_files.is_empty() {
         return Err(XtaskError::Usage(format!(
             "codegen ts: no *.schema.json files under {}",
@@ -56,31 +57,12 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
         )));
     }
 
-    // Compute a deterministic schema-set sha256: hash each schema's relative
-    // path plus its bytes plus a NUL separator, in lex order. This is the
-    // "schema git SHA" surfaced in the file header. Using content rather
-    // than `git rev-parse` keeps `--check` byte-stable on dirty trees and on
-    // shallow CI clones where the repository SHA may not be available.
-    let mut schema_hasher = Sha256::new();
-    for path in &schema_files {
-        let rel = path.strip_prefix(&workspace_root).map_err(|_| {
-            XtaskError::Usage(format!(
-                "codegen ts: schema {} is not under workspace root",
-                display_path(path)
-            ))
-        })?;
-        let rel_str = rel
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy().into_owned())
-            .collect::<Vec<_>>()
-            .join("/");
-        schema_hasher.update(rel_str.as_bytes());
-        schema_hasher.update([0u8]);
-        let bytes = fs::read(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
-        schema_hasher.update(&bytes);
-        schema_hasher.update([0u8]);
-    }
-    let schema_sha = digest_to_hex(&schema_hasher.finalize());
+    let schema_sha = hash_schema_inventory(&workspace_root, &schema_files)?;
+
+    let staging = TempDir::new("chio-codegen-ts")
+        .map_err(|err| XtaskError::Io("<temp staging dir for codegen ts>".to_string(), err))?;
+    let clean_input = staging.path().join("input");
+    super::python::mirror_schema_tree(&schemas_dir, &clean_input, &schema_files)?;
 
     // Render each schema in isolation, then wrap each emitted file in a
     // namespace keyed by its `<group>/<name>` path so the cross-schema name
@@ -88,6 +70,7 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
     // capability/token) do not surface at the module top level.
     let mut body = String::with_capacity(64 * 1024);
     body.push_str(&ts_header(&schema_sha));
+    let mut namespace_sources = BTreeMap::new();
     for path in &schema_files {
         let rel = path.strip_prefix(&workspace_root).map_err(|_| {
             XtaskError::Usage(format!(
@@ -106,8 +89,25 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
                 display_path(path)
             ))
         })?;
-        let raw_ts = run_json2ts(&json2ts, path)?;
+        if let Some(first) = namespace_sources.insert(ns_name.clone(), rel_str.clone()) {
+            return Err(XtaskError::Usage(format!(
+                "codegen ts: schema paths {first} and {rel_str} both normalize to namespace {ns_name}"
+            )));
+        }
+        let schema_relative_path = path.strip_prefix(&schemas_dir).map_err(|_| {
+            XtaskError::Usage(format!(
+                "codegen ts: schema {} is not under schema root {}",
+                display_path(path),
+                display_path(&schemas_dir)
+            ))
+        })?;
+        let raw_ts = run_json2ts(&json2ts, &clean_input.join(schema_relative_path))?;
         let normalized = normalize_ts_chunk(&raw_ts);
+        let normalized = if ns_name == "Security_DetectorHealthReceiptBodyV1" {
+            harden_detector_health_ts_chunk(&normalized)?
+        } else {
+            normalized
+        };
         body.push_str(
             "// -----------------------------------------------------------------------------\n",
         );
@@ -291,4 +291,70 @@ fn run_json2ts(json2ts: &Path, schema: &Path) -> Result<String, XtaskError> {
 pub(crate) fn normalize_ts_chunk(raw: &str) -> String {
     let trimmed = raw.trim_end_matches(['\n', '\r']);
     trimmed.to_string()
+}
+
+fn harden_detector_health_ts_chunk(raw: &str) -> Result<String, XtaskError> {
+    let needle = r#"export type ChioDetectorHealthReceiptBodyV1 = {
+  [k: string]: unknown;
+} & {
+  event_id: Identifier;
+  evidence_hash: Digest;
+  group_binding: GroupBinding;
+  header: Header;
+  health_kind:
+    | "corrupt_event"
+    | "corrupt_state"
+    | "state_overflow"
+    | "store_conflict"
+    | "store_unavailable"
+    | "truncated_scan";
+  policy: Policy;
+  rule_id: Identifier;
+  rule_version_hash: Digest;
+  watermark: Watermark;
+};"#;
+    let replacement = r#"export type HealthKind =
+  | "corrupt_event"
+  | "corrupt_state"
+  | "state_overflow"
+  | "store_conflict"
+  | "store_unavailable"
+  | "truncated_scan";
+export interface DetectorHealthReceiptBase {
+  event_id: Identifier;
+  evidence_hash: Digest;
+  header: Header;
+  policy: Policy;
+  rule_id: Identifier;
+  rule_version_hash: Digest;
+}
+export type ChioDetectorHealthReceiptBodyV1 = DetectorHealthReceiptBase &
+  (
+    | {
+        group_binding: Extract<GroupBinding, { kind: "unresolved" }>;
+        health_kind: HealthKind;
+        watermark: Extract<Watermark, { kind: "unknown" }>;
+      }
+    | {
+        group_binding: Extract<GroupBinding, { kind: "resolved" }>;
+        health_kind: HealthKind;
+        watermark: Exclude<Watermark, { kind: "contradictory" }>;
+      }
+    | {
+        group_binding: Extract<GroupBinding, { kind: "resolved" }>;
+        health_kind: "corrupt_state";
+        watermark: Extract<Watermark, { kind: "contradictory" }>;
+      }
+  );"#;
+    if !raw.contains(needle) {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts detector health hardening pattern missing".to_string(),
+        ));
+    }
+    if raw.matches(needle).count() != 1 {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts detector health hardening pattern is ambiguous".to_string(),
+        ));
+    }
+    Ok(raw.replacen(needle, replacement, 1))
 }

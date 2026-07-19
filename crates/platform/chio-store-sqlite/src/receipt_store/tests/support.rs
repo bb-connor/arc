@@ -663,6 +663,12 @@ pub(super) fn seed_pre_projection_store(
     checkpoints: &[chio_kernel::KernelCheckpoint],
 ) {
     let mut connection = rusqlite::Connection::open(path).test_unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).test_unwrap();
+    }
     connection
         .execute_batch(
             r#"

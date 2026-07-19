@@ -12,7 +12,9 @@ mod finalization;
 mod receipt_persistence;
 mod terminal_responses;
 
-pub(crate) use finalization::FinalizeToolOutputCostContext;
+pub(crate) use finalization::{
+    FinalizeToolOutputCostContext, FinalizeToolOutputRequest, PostInvocationHandling,
+};
 
 #[derive(Clone, Copy)]
 enum ReceiptRecordMode {

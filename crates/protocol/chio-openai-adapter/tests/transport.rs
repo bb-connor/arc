@@ -12,6 +12,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_core::crypto::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use chio_openai::adapter::OpenAiAdapterConfig;
 use chio_openai::transport::{
     OpenAiTransport, OPENAI_CHAT_COMPLETIONS_PATH, OPENAI_RESPONSES_PATH,
@@ -35,6 +40,41 @@ fn config_with_api_version(api_version: &str) -> OpenAiAdapterConfig {
     let mut config = OpenAiAdapterConfig::new("org_mock");
     config.api_version = api_version.to_string();
     config
+}
+
+fn admitted_registry(tool_name: &str) -> VerifiedManifestRegistry {
+    let signer = Keypair::from_seed(&[56; 32]);
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "openai-transport".to_string(),
+        name: "OpenAI transport".to_string(),
+        description: None,
+        version: "1".to_string(),
+        tools: vec![ToolDefinition {
+            name: tool_name.to_string(),
+            description: "Admitted OpenAI transport function".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: false,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: Some(ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    registry
 }
 
 fn assert_api_version_drift(error: ProviderError) {
@@ -162,7 +202,14 @@ async fn send_responses_posts_to_responses_path_and_lifts_tool_calls() {
         .into_bytes(),
     );
 
-    let transport = OpenAiTransport::with_transport(mock.clone(), "org_mock");
+    let registry = admitted_registry("get_weather");
+    let transport = OpenAiTransport::with_transport_and_registry(
+        mock.clone(),
+        "org_mock",
+        "openai-transport",
+        &registry,
+    )
+    .unwrap();
     let request = json!({
         "model": "gpt-5",
         "input": "what is the weather",
@@ -301,7 +348,14 @@ async fn streaming_send_gates_buffered_sse_through_adapter() {
         Some("text/event-stream".to_string()),
     ));
 
-    let transport = OpenAiTransport::with_transport(mock.clone(), "org_mock");
+    let registry = admitted_registry("get_weather");
+    let transport = OpenAiTransport::with_transport_and_registry(
+        mock.clone(),
+        "org_mock",
+        "openai-transport",
+        &registry,
+    )
+    .unwrap();
     let mut evaluated = Vec::new();
     let gated = transport
         .stream_responses(b"{\"model\":\"gpt-5\",\"stream\":true}", |invocation| {

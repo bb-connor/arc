@@ -781,7 +781,9 @@ fn wasmtime_fuel_consumed_tracked_on_wasm_guard() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let ctx = chio_kernel::GuardContext {
         request: &tool_request,
@@ -790,6 +792,7 @@ fn wasmtime_fuel_consumed_tracked_on_wasm_guard() {
         server_id: &req.server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     let _ = guard.evaluate(&ctx).unwrap();
 

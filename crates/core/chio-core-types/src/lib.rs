@@ -25,6 +25,7 @@ extern crate alloc;
 pub mod canonical;
 pub mod capability;
 pub mod crypto;
+pub mod declassification;
 pub mod delegation_receipt;
 pub mod error;
 pub mod hashing;
@@ -50,11 +51,13 @@ pub use canonical::{
 };
 pub use crypto::{
     sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    SigningOutcome,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};
 #[cfg(feature = "fips")]
 pub use crypto::{P256Backend, P384Backend};
+pub use declassification::{SignedDeclassificationGrant, DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN};
 pub use delegation_receipt::{DelegationReceipt, ScopeAttenuation};
 pub use error::{Error, Result};
 pub use hashing::{sha256, Hash};
@@ -62,10 +65,14 @@ pub use loaded_weights::{
     loaded_weights_hash_of, loaded_weights_hash_of_chunks, LoadedWeights, LoadedWeightsUnavailable,
 };
 pub use manifest::{
-    PricingModel, ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody, ToolPricing,
+    DeclassificationPurpose, LatencyHint, PricingModel, ToolAnnotations, ToolDefinition,
+    ToolFlowDeclaration, ToolFlowValidationError, ToolManifest, ToolManifestBody, ToolPricing,
 };
 pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
-pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
+pub use message::{
+    AgentMessage, KernelMessage, OpaqueSupplementalAuthorization, ToolCallError, ToolCallResult,
+    MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES, MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES,
+};
 pub use oracle::{OracleConversionEvidence, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA};
 pub use plan::{
     PlanEvaluationRequest, PlanEvaluationResponse, PlanVerdict, PlannedToolCall, PlannedToolCallId,
@@ -95,6 +102,9 @@ pub use signed_artifact::{
     built_in_signed_artifact_registry, is_supported_signed_artifact_schema,
     validate_signed_artifact_schema, SignedArtifactSchemaEntry, CHIO_ANCHOR_BATCH_V1_SCHEMA,
     CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA, CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
+    CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA, CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA,
+    CHIO_ENTERPRISE_MIGRATION_CANARY_EVIDENCE_V1_SCHEMA,
+    CHIO_ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_V1_SCHEMA, CHIO_TOOL_MANIFEST_V2_SCHEMA,
     CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA, KNOWN_SIGNED_ARTIFACT_SCHEMAS,
 };
 

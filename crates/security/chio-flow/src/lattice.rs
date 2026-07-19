@@ -1,4 +1,3 @@
-use alloc::collections::{btree_map::Entry, BTreeSet};
 use chio_security_types::{InformationLabel, LabelValidationError};
 use core::fmt;
 
@@ -55,71 +54,11 @@ impl core::error::Error for EgressDenial {}
 
 impl InformationFlowLattice for InformationLabel {
     fn flows_to(&self, destination: &Self) -> bool {
-        match (self, destination) {
-            (_, Self::Top) => true,
-            (Self::Top, Self::Known { .. }) => false,
-            (
-                Self::Known {
-                    owners: source_owners,
-                    compartments: source_compartments,
-                    ..
-                },
-                Self::Known {
-                    owners: destination_owners,
-                    compartments: destination_compartments,
-                    ..
-                },
-            ) => {
-                source_compartments.is_subset(destination_compartments)
-                    && source_owners.iter().all(|(owner, source_readers)| {
-                        destination_owners
-                            .get(owner)
-                            .is_some_and(|destination_readers| {
-                                destination_readers.is_subset(source_readers)
-                            })
-                    })
-            }
-        }
+        InformationLabel::flows_to(self, destination)
     }
 
     fn join(&self, other: &Self) -> Result<Self, LatticeError> {
-        let (
-            Self::Known {
-                owners: left_owners,
-                compartments: left_compartments,
-                ..
-            },
-            Self::Known {
-                owners: right_owners,
-                compartments: right_compartments,
-                ..
-            },
-        ) = (self, other)
-        else {
-            return Ok(Self::Top);
-        };
-
-        let mut owners = left_owners.clone();
-        for (owner, right_readers) in right_owners {
-            match owners.entry(owner.clone()) {
-                Entry::Vacant(entry) => {
-                    entry.insert(right_readers.clone());
-                }
-                Entry::Occupied(mut entry) => {
-                    let readers = entry
-                        .get()
-                        .intersection(right_readers)
-                        .cloned()
-                        .collect::<BTreeSet<_>>();
-                    entry.insert(readers);
-                }
-            }
-        }
-        let compartments = left_compartments
-            .union(right_compartments)
-            .cloned()
-            .collect();
-        InformationLabel::try_known(owners, compartments).map_err(Into::into)
+        self.join_restrictions(other).map_err(Into::into)
     }
 }
 

@@ -8,6 +8,10 @@ use chio_core_types::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityTokenAttenuationBody, CapabilityTokenBody},
 };
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration,
+    ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 
 use chio_test_support::prelude::*;
 
@@ -85,25 +89,119 @@ fn caller() -> CallerIdentity {
     }
 }
 
-fn authority() -> HttpAuthority {
+fn verified_manifest_registry(
+    entries: &[(&str, &[&str])],
+    topology: RuntimeToolTopology,
+    flow: Option<ToolFlowDeclaration>,
+) -> VerifiedManifestRegistry {
+    let signer = Keypair::from_seed(&[91; 32]);
+    let mut registry = VerifiedManifestRegistry::default();
+    for (server_id, tool_names) in entries {
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: (*server_id).to_string(),
+            name: format!("{server_id} test server"),
+            description: None,
+            version: "1.0.0".to_string(),
+            tools: tool_names
+                .iter()
+                .map(|tool_name| ToolDefinition {
+                    name: (*tool_name).to_string(),
+                    description: format!("{tool_name} test tool"),
+                    input_schema: serde_json::json!({"type": "object"}),
+                    output_schema: None,
+                    pricing: None,
+                    annotations: ToolAnnotations {
+                        read_only: true,
+                        destructive: false,
+                        idempotent: true,
+                        requires_approval: false,
+                    },
+                    latency_hint: None,
+                    flow: flow.clone(),
+                })
+                .collect(),
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = sign_manifest(&manifest, &signer).test_unwrap();
+        registry
+            .register_public_only(signed, &signer.public_key(), topology)
+            .test_unwrap();
+    }
+    registry
+}
+
+fn compatibility_manifest_registry() -> VerifiedManifestRegistry {
+    verified_manifest_registry(
+        &[
+            ("matrix", &["files.read", "admin.delete"]),
+            ("billing", &["charge", "read"]),
+            ("acp", &["terminal/create"]),
+            ("math", &["double", "increment"]),
+        ],
+        RuntimeToolTopology::local(),
+        None,
+    )
+}
+
+fn configure_compatibility_registry(authority: HttpAuthority) -> HttpAuthority {
+    authority.with_verified_manifest_registry(Arc::new(compatibility_manifest_registry()))
+}
+
+fn bare_authority() -> HttpAuthority {
     HttpAuthority::new(Keypair::generate(), "policy-hash".to_string())
+}
+
+fn authority() -> HttpAuthority {
+    configure_compatibility_registry(bare_authority())
 }
 
 fn authority_with_issuer() -> (HttpAuthority, Keypair) {
     let issuer = Keypair::generate();
     (
-        HttpAuthority::new(issuer.clone(), "policy-hash".to_string()),
+        configure_compatibility_registry(HttpAuthority::new(
+            issuer.clone(),
+            "policy-hash".to_string(),
+        )),
         issuer,
     )
 }
 
 fn authority_with_trusted_issuer(trusted_issuer: PublicKey) -> HttpAuthority {
-    HttpAuthority::new_with_approval_store_and_trusted_issuers(
+    configure_compatibility_registry(HttpAuthority::new_with_approval_store_and_trusted_issuers(
         Keypair::generate(),
         "policy-hash".to_string(),
         Arc::new(InMemoryApprovalStore::new()),
         vec![trusted_issuer],
-    )
+    ))
+}
+
+fn manifest_target_input<'a>(
+    query: &'a HashMap<String, String>,
+    server_id: &'a str,
+    tool_name: &'a str,
+) -> HttpAuthorityInput<'a> {
+    HttpAuthorityInput {
+        request_id: "req-manifest-compatibility".to_string(),
+        method: HttpMethod::Post,
+        route_pattern: "/proxy".to_string(),
+        path: "/proxy",
+        query,
+        caller: caller(),
+        body_hash: None,
+        body_length: 0,
+        session_id: None,
+        capability_id_hint: None,
+        presented_capability: None,
+        requested_tool_server: Some(server_id),
+        requested_tool_name: Some(tool_name),
+        requested_arguments: None,
+        model_metadata: None,
+        execution_nonce: None,
+        policy: HttpAuthorityPolicy::SessionAllow,
+    }
 }
 
 fn authority_with_strict_execution_nonce() -> HttpAuthority {
@@ -116,8 +214,133 @@ fn authority_with_strict_execution_nonce() -> HttpAuthority {
     let store = Box::new(chio_kernel::InMemoryExecutionNonceStore::from_config(&cfg));
     Arc::get_mut(&mut authority.kernel)
         .test_unwrap()
-        .set_execution_nonce_store(cfg, store);
+        .set_execution_nonce_store(cfg, store)
+        .test_unwrap();
     authority
+}
+
+#[test]
+fn plain_http_authorization_without_manifest_registry_preserves_existing_behavior() {
+    let query = HashMap::new();
+    let result = bare_authority()
+        .evaluate(HttpAuthorityInput {
+            request_id: "req-plain-http-no-manifest-registry".to_string(),
+            method: HttpMethod::Get,
+            route_pattern: "/pets".to_string(),
+            path: "/pets",
+            query: &query,
+            caller: caller(),
+            body_hash: None,
+            body_length: 0,
+            session_id: None,
+            capability_id_hint: None,
+            presented_capability: None,
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
+            execution_nonce: None,
+            policy: HttpAuthorityPolicy::SessionAllow,
+        })
+        .test_unwrap();
+
+    assert!(result.verdict.is_allowed());
+}
+
+#[test]
+fn tool_target_without_manifest_registry_fails_closed() {
+    let query = HashMap::new();
+    let error = bare_authority()
+        .evaluate(manifest_target_input(&query, "compat", "read"))
+        .test_unwrap_err();
+
+    assert!(matches!(
+        error,
+        HttpAuthorityError::Kernel(ref message)
+            if message == VERIFIED_MANIFEST_REGISTRY_MISSING_REASON
+    ));
+}
+
+#[test]
+fn local_flow_free_verified_manifest_target_is_compatible() {
+    let query = HashMap::new();
+    let registry =
+        verified_manifest_registry(&[("compat", &["read"])], RuntimeToolTopology::local(), None);
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+    let result = authority
+        .evaluate(manifest_target_input(&query, "compat", "read"))
+        .test_unwrap();
+
+    assert!(result.verdict.is_allowed());
+}
+
+#[test]
+fn explicit_flow_manifest_target_is_rejected_by_http_compatibility_mode() {
+    let query = HashMap::new();
+    let registry = verified_manifest_registry(
+        &[("compat", &["export"])],
+        RuntimeToolTopology::local(),
+        Some(ToolFlowDeclaration::public_egress()),
+    );
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+    let error = authority
+        .evaluate(manifest_target_input(&query, "compat", "export"))
+        .test_unwrap_err();
+
+    assert!(matches!(
+        error,
+        HttpAuthorityError::Kernel(ref message)
+            if message.contains("compat/export")
+                && message.contains("requires active flow mediation")
+    ));
+}
+
+#[test]
+fn topology_derived_egress_is_rejected_by_http_compatibility_mode() {
+    let query = HashMap::new();
+    let registry = verified_manifest_registry(
+        &[("remote", &["read"])],
+        RuntimeToolTopology::remote(),
+        None,
+    );
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+    let error = authority
+        .evaluate(manifest_target_input(&query, "remote", "read"))
+        .test_unwrap_err();
+
+    assert!(matches!(
+        error,
+        HttpAuthorityError::Kernel(ref message)
+            if message.contains("remote/read")
+                && message.contains("requires active flow mediation")
+    ));
+}
+
+#[test]
+fn unknown_or_mismatched_verified_manifest_target_is_rejected() {
+    let query = HashMap::new();
+    let registry = verified_manifest_registry(
+        &[("known-server", &["known-tool"])],
+        RuntimeToolTopology::local(),
+        None,
+    );
+    let authority = bare_authority().with_verified_manifest_registry(Arc::new(registry));
+
+    for (server_id, tool_name) in [
+        ("known-server", "unknown-tool"),
+        ("unknown-server", "known-tool"),
+    ] {
+        let error = authority
+            .evaluate(manifest_target_input(&query, server_id, tool_name))
+            .test_unwrap_err();
+        assert!(matches!(
+            error,
+            HttpAuthorityError::Kernel(ref message)
+                if message.contains("no exact HTTP tool target match")
+                    && message.contains(server_id)
+                    && message.contains(tool_name)
+        ));
+    }
 }
 
 #[test]

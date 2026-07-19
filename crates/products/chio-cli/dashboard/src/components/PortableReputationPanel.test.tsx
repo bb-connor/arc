@@ -45,7 +45,6 @@ describe('PortableReputationPanel', () => {
   })
 
   it('uploads a passport and renders comparison drift from the backend', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({

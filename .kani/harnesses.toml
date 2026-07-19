@@ -204,6 +204,22 @@ notes = "An existing quota key rejects every changed signed maximum."
 
 [[harness]]
 crate = "chio-kernel-core"
+harness = "verify_captured_invocation_count_monotonic"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+notes = "Successful invocation capture advances exactly once and denied capture preserves the count."
+
+[[harness]]
+crate = "chio-kernel-core"
+harness = "verify_replay_fingerprint_uniqueness"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+notes = "Replay fingerprint reservation admits one unique insertion and preserves state on denial."
+
+[[harness]]
+crate = "chio-kernel-core"
 harness = "verify_family_binding_preservation"
 default_unwind = 8
 timeout_secs = 1800

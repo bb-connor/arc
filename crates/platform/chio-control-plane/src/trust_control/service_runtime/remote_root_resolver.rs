@@ -13,7 +13,12 @@ use super::*;
 
 pub struct RemoteAggregateFamilyRootResolver {
     client: TrustControlClient,
-    pinned_authority: PinnedControlAuthority,
+    authority_trust: RemoteRootAuthorityTrust,
+}
+
+enum RemoteRootAuthorityTrust {
+    Verified(Arc<super::remote_authority::RemoteControlAuthorityTrust>),
+    Static(Box<PinnedControlAuthority>),
 }
 
 enum RemoteFetchError {
@@ -25,9 +30,14 @@ impl RemoteAggregateFamilyRootResolver {
     pub fn new(
         control_url: &str,
         control_token: &str,
-        pinned_authority: PinnedControlAuthority,
+        authority_trust: Arc<super::remote_authority::RemoteControlAuthorityTrust>,
     ) -> Result<Self, CliError> {
-        Self::new_with_transport(control_url, control_token, pinned_authority, false)
+        Self::new_with_transport(
+            control_url,
+            control_token,
+            RemoteRootAuthorityTrust::Verified(authority_trust),
+            false,
+        )
     }
 
     #[cfg(test)]
@@ -36,27 +46,40 @@ impl RemoteAggregateFamilyRootResolver {
         control_token: &str,
         pinned_authority: PinnedControlAuthority,
     ) -> Result<Self, CliError> {
-        Self::new_with_transport(control_url, control_token, pinned_authority, true)
+        Self::new_with_transport(
+            control_url,
+            control_token,
+            RemoteRootAuthorityTrust::Static(Box::new(pinned_authority)),
+            true,
+        )
+    }
+
+    pub fn new_with_pinned_authority(
+        control_url: &str,
+        control_token: &str,
+        pinned_authority: PinnedControlAuthority,
+    ) -> Result<Self, CliError> {
+        Self::new_with_transport(
+            control_url,
+            control_token,
+            RemoteRootAuthorityTrust::Static(Box::new(pinned_authority)),
+            false,
+        )
     }
 
     fn new_with_transport(
         control_url: &str,
         control_token: &str,
-        pinned_authority: PinnedControlAuthority,
+        authority_trust: RemoteRootAuthorityTrust,
         allow_loopback_http: bool,
     ) -> Result<Self, CliError> {
-        let mut client = build_client(control_url, control_token)?;
+        let client = build_client(control_url, control_token)?;
         for endpoint in client.endpoints.iter() {
             require_authenticated_lookup_transport(endpoint, allow_loopback_http)?;
         }
-        client.http = ureq::AgentBuilder::new()
-            .timeout(CONTROL_HTTP_TIMEOUT)
-            .redirects(0)
-            .https_only(!allow_loopback_http)
-            .build();
         Ok(Self {
             client,
-            pinned_authority,
+            authority_trust,
         })
     }
 
@@ -84,7 +107,20 @@ impl RemoteAggregateFamilyRootResolver {
                     continue;
                 }
             };
-            match verify_remote_lookup(&self.pinned_authority, signed, root_capability_id, nonce) {
+            let (current_signer, trusted_root_issuers) = match self.authority_keys() {
+                Ok(keys) => keys,
+                Err(error) => {
+                    corrupt = Some(error);
+                    continue;
+                }
+            };
+            match verify_remote_lookup(
+                &current_signer,
+                &trusted_root_issuers,
+                signed,
+                root_capability_id,
+                nonce,
+            ) {
                 Ok(resolution) => {
                     self.client.mark_preferred(index);
                     return Ok(resolution);
@@ -105,6 +141,21 @@ impl RemoteAggregateFamilyRootResolver {
         Err(AggregateFamilyRootResolutionError::Unavailable(
             "no aggregate family-root authority endpoint completed the lookup".to_string(),
         ))
+    }
+
+    fn authority_keys(&self) -> Result<(PublicKey, Vec<PublicKey>), String> {
+        match &self.authority_trust {
+            RemoteRootAuthorityTrust::Verified(trust) => {
+                let epoch = trust
+                    .epoch_snapshot()
+                    .map_err(|error| format!("verified authority epoch is unavailable: {error}"))?;
+                Ok((epoch.public_key, epoch.trusted_public_keys))
+            }
+            RemoteRootAuthorityTrust::Static(pinned) => Ok((
+                pinned.current_signer().clone(),
+                pinned.trusted_root_issuers().to_vec(),
+            )),
+        }
     }
 
     fn fetch_lookup(
@@ -155,23 +206,38 @@ impl AggregateFamilyRootResolver for RemoteAggregateFamilyRootResolver {
 pub fn build_remote_aggregate_family_root_resolver(
     control_url: &str,
     control_token: &str,
-    pinned_authority: PinnedControlAuthority,
+    authority_trust: Arc<super::remote_authority::RemoteControlAuthorityTrust>,
 ) -> Result<Arc<dyn AggregateFamilyRootResolver + Send + Sync>, CliError> {
     Ok(Arc::new(RemoteAggregateFamilyRootResolver::new(
         control_url,
         control_token,
-        pinned_authority,
+        authority_trust,
     )?))
 }
 
+pub fn build_remote_aggregate_family_root_resolver_with_pinned_authority(
+    control_url: &str,
+    control_token: &str,
+    pinned_authority: PinnedControlAuthority,
+) -> Result<Arc<dyn AggregateFamilyRootResolver + Send + Sync>, CliError> {
+    Ok(Arc::new(
+        RemoteAggregateFamilyRootResolver::new_with_pinned_authority(
+            control_url,
+            control_token,
+            pinned_authority,
+        )?,
+    ))
+}
+
 fn verify_remote_lookup(
-    pinned_authority: &PinnedControlAuthority,
+    current_signer: &PublicKey,
+    trusted_root_issuers: &[PublicKey],
     signed: SignedAggregateFamilyRootLookup,
     requested_root_capability_id: &str,
     nonce: &str,
 ) -> Result<AggregateFamilyRootResolution, AggregateFamilyRootResolutionError> {
     signed
-        .verify_signature(pinned_authority.current_signer())
+        .verify_signature(current_signer)
         .map_err(AggregateFamilyRootResolutionError::Corrupt)?;
     if signed.body.request_nonce != nonce {
         return Err(AggregateFamilyRootResolutionError::Corrupt(
@@ -238,12 +304,11 @@ fn verify_remote_lookup(
                     "aggregate family-root token identifier mismatch".to_string(),
                 ));
             }
-            verify_direct_aggregate_root_record(&token, pinned_authority.trusted_root_issuers())
-                .map_err(|error| {
-                    AggregateFamilyRootResolutionError::Corrupt(format!(
-                        "aggregate family-root token authentication failed: {error}"
-                    ))
-                })
+            verify_direct_aggregate_root_record(&token, trusted_root_issuers).map_err(|error| {
+                AggregateFamilyRootResolutionError::Corrupt(format!(
+                    "aggregate family-root token authentication failed: {error}"
+                ))
+            })
         }
         AggregateFamilyRootLookupOutcome::Missing => {
             Err(AggregateFamilyRootResolutionError::Unavailable(

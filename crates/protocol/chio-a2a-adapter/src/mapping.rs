@@ -255,7 +255,7 @@ fn build_manifest(
     }
 
     let manifest = ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: server_id.to_string(),
         name: format!("{} (A2A)", agent_card.name),
         description: Some(format!(
@@ -282,7 +282,11 @@ fn build_tool_definition(
     if !skill.tags.is_empty() {
         description.push_str(&format!("\n\nTags: {}", skill.tags.join(", ")));
     }
-    if let Some(examples) = skill.examples.as_ref().filter(|examples| !examples.is_empty()) {
+    if let Some(examples) = skill
+        .examples
+        .as_ref()
+        .filter(|examples| !examples.is_empty())
+    {
         description.push_str(&format!("\n\nExamples: {}", examples.join(" | ")));
     }
 
@@ -433,7 +437,9 @@ fn build_tool_definition(
     input_schema
         .as_object_mut()
         .ok_or_else(|| {
-            AdapterError::Protocol("internal A2A input schema template was not an object".to_string())
+            AdapterError::Protocol(
+                "internal A2A input schema template was not an object".to_string(),
+            )
         })?
         .insert("oneOf".to_string(), Value::Array(one_of));
 
@@ -456,8 +462,14 @@ fn build_tool_definition(
             }
         })),
         pricing: None,
-        has_side_effects: true,
+        annotations: chio_manifest::ToolAnnotations {
+            read_only: false,
+            destructive: true,
+            idempotent: false,
+            requires_approval: true,
+        },
         latency_hint: Some(LatencyHint::Moderate),
+        flow: None,
     })
 }
 

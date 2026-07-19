@@ -2,8 +2,10 @@ use chio_test_support::prelude::*;
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CapturedRequest {
@@ -16,6 +18,7 @@ pub(super) struct CapturedRequest {
 pub(super) struct StaticResponseServer {
     pub(super) url: String,
     captured: Arc<Mutex<Vec<CapturedRequest>>>,
+    shutdown: Arc<AtomicBool>,
     join: Option<thread::JoinHandle<()>>,
 }
 
@@ -28,18 +31,26 @@ pub(super) struct ScriptedResponse {
 pub(super) struct ScriptedResponseServer {
     pub(super) url: String,
     captured: Arc<Mutex<Vec<CapturedRequest>>>,
+    shutdown: Arc<AtomicBool>,
     join: Option<thread::JoinHandle<()>>,
 }
 
 impl ScriptedResponseServer {
     pub(super) fn spawn(responses: Vec<ScriptedResponse>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").test_expect("bind scripted server");
+        listener
+            .set_nonblocking(true)
+            .test_expect("set scripted server nonblocking");
         let addr = listener.local_addr().test_expect("scripted server address");
         let captured = Arc::new(Mutex::new(Vec::new()));
         let captured_requests = Arc::clone(&captured);
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = Arc::clone(&shutdown);
         let join = thread::spawn(move || {
             for response in responses {
-                let (mut stream, _) = listener.accept().test_expect("accept scripted request");
+                let Some(mut stream) = accept_until_shutdown(&listener, &worker_shutdown) else {
+                    return;
+                };
                 let request = read_http_request(&mut stream);
                 captured_requests
                     .lock()
@@ -60,6 +71,7 @@ impl ScriptedResponseServer {
         Self {
             url: format!("http://{addr}"),
             captured,
+            shutdown,
             join: Some(join),
         }
     }
@@ -69,12 +81,19 @@ impl ScriptedResponseServer {
         F: Fn(&CapturedRequest) -> ScriptedResponse + Send + 'static,
     {
         let listener = TcpListener::bind("127.0.0.1:0").test_expect("bind scripted server");
+        listener
+            .set_nonblocking(true)
+            .test_expect("set dynamic scripted server nonblocking");
         let addr = listener.local_addr().test_expect("scripted server address");
         let captured = Arc::new(Mutex::new(Vec::new()));
         let captured_requests = Arc::clone(&captured);
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = Arc::clone(&shutdown);
         let join = thread::spawn(move || {
             for _ in 0..expected_requests {
-                let (mut stream, _) = listener.accept().test_expect("accept scripted request");
+                let Some(mut stream) = accept_until_shutdown(&listener, &worker_shutdown) else {
+                    return;
+                };
                 let request = read_http_request(&mut stream);
                 let response = handler(&request);
                 captured_requests
@@ -96,6 +115,7 @@ impl ScriptedResponseServer {
         Self {
             url: format!("http://{addr}"),
             captured,
+            shutdown,
             join: Some(join),
         }
     }
@@ -110,8 +130,12 @@ impl ScriptedResponseServer {
 
 impl Drop for ScriptedResponseServer {
     fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Release);
         if let Some(join) = self.join.take() {
-            join.join().test_expect("join scripted server");
+            let result = join.join();
+            if !thread::panicking() {
+                result.test_expect("join scripted server");
+            }
         }
     }
 }
@@ -124,14 +148,21 @@ impl StaticResponseServer {
         expected_requests: usize,
     ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").test_expect("bind static response server");
+        listener
+            .set_nonblocking(true)
+            .test_expect("set static response server nonblocking");
         let addr = listener.local_addr().test_expect("server local addr");
         let body = body.to_string();
         let content_type = content_type.to_string();
         let captured = Arc::new(Mutex::new(Vec::new()));
         let captured_requests = Arc::clone(&captured);
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = Arc::clone(&shutdown);
         let join = thread::spawn(move || {
             for _ in 0..expected_requests {
-                let (mut stream, _) = listener.accept().test_expect("accept request");
+                let Some(mut stream) = accept_until_shutdown(&listener, &worker_shutdown) else {
+                    return;
+                };
                 let request = read_http_request(&mut stream);
                 captured_requests
                     .lock()
@@ -150,6 +181,7 @@ impl StaticResponseServer {
         Self {
             url: format!("http://{addr}"),
             captured,
+            shutdown,
             join: Some(join),
         }
     }
@@ -164,8 +196,32 @@ impl StaticResponseServer {
 
 impl Drop for StaticResponseServer {
     fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Release);
         if let Some(join) = self.join.take() {
-            join.join().test_expect("join response server");
+            let result = join.join();
+            if !thread::panicking() {
+                result.test_expect("join response server");
+            }
+        }
+    }
+}
+
+fn accept_until_shutdown(listener: &TcpListener, shutdown: &AtomicBool) -> Option<TcpStream> {
+    loop {
+        if shutdown.load(Ordering::Acquire) {
+            return None;
+        }
+        match listener.accept() {
+            Ok((stream, _)) => {
+                stream
+                    .set_nonblocking(false)
+                    .test_expect("set accepted test stream blocking");
+                return Some(stream);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(1));
+            }
+            Err(error) => panic!("accept test HTTP request failed: {error}"),
         }
     }
 }

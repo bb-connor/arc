@@ -144,7 +144,8 @@ pub(super) fn refresh_agent_web_envelopes_for_subjects(
             required_json_string(&envelope, "external_subject_path", &envelope_path)?;
         envelope["external_subject_digest"] =
             serde_json::Value::String(sha256_file(&bundle.join(subject_path))?);
-        let manifest_ref = required_json_string(&envelope, "projection_manifest_ref", &envelope_path)?;
+        let manifest_ref =
+            required_json_string(&envelope, "projection_manifest_ref", &envelope_path)?;
         let manifest_path = projection_manifest_paths
             .get(&manifest_ref)
             .map(String::as_str)
@@ -167,7 +168,10 @@ fn agent_web_projection_manifest_paths(
     evidence_graph: &serde_json::Value,
 ) -> Result<BTreeMap<String, String>, CliError> {
     let mut manifests = BTreeMap::new();
-    let Some(nodes) = evidence_graph.get("nodes").and_then(serde_json::Value::as_array) else {
+    let Some(nodes) = evidence_graph
+        .get("nodes")
+        .and_then(serde_json::Value::as_array)
+    else {
         return Ok(manifests);
     };
     for node in nodes {

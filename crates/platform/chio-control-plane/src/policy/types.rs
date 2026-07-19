@@ -6,9 +6,20 @@ use chio_core::capability::{
 use chio_guards::{GuardPipeline, PostInvocationPipeline};
 use chio_reputation::ReputationConfig as LocalReputationConfig;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use super::capability_config::CapabilityPolicyConfig;
 use super::guard_config::GuardPolicyConfig;
+use crate::security::ActiveDefenseMode;
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActiveDefensePolicyConfig {
+    #[serde(default)]
+    pub mode: ActiveDefenseMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rule_files: Vec<PathBuf>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultCapability {
@@ -96,6 +107,9 @@ pub struct LoadedPolicy {
     pub issuance_policy: Option<ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
     pub threshold_approval_resolver: Option<chio_policy::ThresholdApprovalResolver>,
+    pub threshold_approval_policy_authority: Option<chio_core::PublicKey>,
+    pub active_defense: ActiveDefensePolicyConfig,
+    pub active_defense_rules: Vec<chio_quarantine::TemporalRule>,
 }
 
 impl LoadedPolicy {
@@ -141,6 +155,9 @@ pub struct ChioPolicy {
     /// Initial capabilities to issue to the agent.
     #[serde(default)]
     pub capabilities: CapabilityPolicyConfig,
+
+    #[serde(default)]
+    pub active_defense: ActiveDefensePolicyConfig,
 }
 
 /// Kernel-level configuration from the policy.

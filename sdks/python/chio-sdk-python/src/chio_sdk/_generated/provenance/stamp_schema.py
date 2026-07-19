@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9d7b17b15b33f7dcc9d52da37c9fb906c57911cdfd78424c344f5ce58b160468
+# Schema sha256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,7 +11,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChioProvenanceStamp(BaseModel):
@@ -22,23 +24,38 @@ class ChioProvenanceStamp(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    provider: constr(min_length=1) = Field(
-        ...,
-        description="Stable identifier of the upstream provider adapter that handled the tool call (for example `openai`, `anthropic`, `google-vertex`).",
-    )
-    request_id: constr(min_length=1) = Field(
-        ...,
-        description="Upstream request identifier returned by the provider for this call. Opaque to Chio; preserved verbatim so operators can correlate Chio receipts with provider-side logs.",
-    )
-    api_version: constr(min_length=1) = Field(
-        ...,
-        description="Wire version of the upstream provider API that served the call. Free-form per provider (for example `2024-08-01-preview` for Azure OpenAI, `v1` for Anthropic). Frozen per stamp; bumps require a new stamp.",
-    )
-    principal: constr(min_length=1) = Field(
-        ...,
-        description="Calling subject Chio resolved at the kernel boundary, in the same canonical form used by capability tokens (subject public key or normalized workload identity). Bound into the provenance graph alongside the receipt principal.",
-    )
-    received_at: conint(ge=0) = Field(
-        ...,
-        description="Unix timestamp (seconds) at which Chio observed the provider response. Monotonic with respect to receipts emitted from the same kernel; Chio fails closed if the value is in the future relative to the kernel clock.",
-    )
+    api_version: Annotated[
+        str,
+        Field(
+            description="Wire version of the upstream provider API that served the call. Free-form per provider (for example `2024-08-01-preview` for Azure OpenAI, `v1` for Anthropic). Frozen per stamp; bumps require a new stamp.",
+            min_length=1,
+        ),
+    ]
+    principal: Annotated[
+        str,
+        Field(
+            description="Calling subject Chio resolved at the kernel boundary, in the same canonical form used by capability tokens (subject public key or normalized workload identity). Bound into the provenance graph alongside the receipt principal.",
+            min_length=1,
+        ),
+    ]
+    provider: Annotated[
+        str,
+        Field(
+            description="Stable identifier of the upstream provider adapter that handled the tool call (for example `openai`, `anthropic`, `google-vertex`).",
+            min_length=1,
+        ),
+    ]
+    received_at: Annotated[
+        int,
+        Field(
+            description="Unix timestamp (seconds) at which Chio observed the provider response. Monotonic with respect to receipts emitted from the same kernel; Chio fails closed if the value is in the future relative to the kernel clock.",
+            ge=0,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description="Upstream request identifier returned by the provider for this call. Opaque to Chio; preserved verbatim so operators can correlate Chio receipts with provider-side logs.",
+            min_length=1,
+        ),
+    ]

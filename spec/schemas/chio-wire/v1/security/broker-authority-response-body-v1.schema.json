@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-authority-response-body-v1.schema.json",
+  "title": "Chio broker authority RPC response body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "requestId", "requestDigest", "issuedAtUnixSeconds", "authority", "result"],
+  "properties": {
+    "schema": { "const": "chio.broker-authority-rpc.v1" },
+    "requestId": { "$ref": "#/$defs/identifier" },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "issuedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
+    "authority": { "$ref": "#/$defs/publicKey" },
+    "result": { "$ref": "#/$defs/result" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "positiveU64": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 },
+    "u64": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "atomicMultiKeyHolds", "combinedCaptureAndRevocation", "queryById", "sharedRevocationWriteDomain"],
+      "properties": {
+        "profile": { "const": "authoritative_hold_event" },
+        "atomicMultiKeyHolds": { "type": "boolean" },
+        "combinedCaptureAndRevocation": { "type": "boolean" },
+        "queryById": { "type": "boolean" },
+        "sharedRevocationWriteDomain": { "type": "boolean" }
+      }
+    },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "maximumExecutions"],
+      "properties": {
+        "keyId": { "$ref": "#/$defs/identifier" },
+        "maximumExecutions": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "trustedExecutionContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["admissionOperationId", "preparedDispatchId", "quotas", "authorityMetadataDigest", "revocationAuthorityDomain", "sourceReceiptIds"],
+      "properties": {
+        "admissionOperationId": { "$ref": "#/$defs/identifier" },
+        "preparedDispatchId": { "$ref": "#/$defs/identifier" },
+        "quotas": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/quota" } },
+        "authorityMetadataDigest": { "$ref": "#/$defs/digest" },
+        "revocationAuthorityDomain": { "$ref": "#/$defs/identifier" },
+        "sourceReceiptIds": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } }
+      }
+    },
+    "liveParent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilityId", "subject", "audience", "delegationAncestorIds", "expiresAtUnixSeconds", "verifiedAtUnixSeconds", "authoritySnapshotDigest"],
+      "properties": {
+        "capabilityId": { "$ref": "#/$defs/identifier" },
+        "subject": { "$ref": "#/$defs/publicKey" },
+        "audience": { "$ref": "#/$defs/identifier" },
+        "delegationAncestorIds": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } },
+        "expiresAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
+        "verifiedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
+        "authoritySnapshotDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "revocationSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revoked", "observedAtUnixSeconds", "commitIndex", "authorityDomain"],
+      "properties": {
+        "revoked": { "type": "boolean" },
+        "observedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
+        "commitIndex": { "$ref": "#/$defs/u64" },
+        "authorityDomain": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "captureCommit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkedRevocationSetDigest", "budgetCommitIndex", "revocationCommitIndex", "authorityCommitIndex", "leaderEpoch"],
+      "properties": {
+        "checkedRevocationSetDigest": { "$ref": "#/$defs/digest" },
+        "budgetCommitIndex": { "$ref": "#/$defs/u64" },
+        "revocationCommitIndex": { "$ref": "#/$defs/u64" },
+        "authorityCommitIndex": { "$ref": "#/$defs/u64" },
+        "leaderEpoch": { "$ref": "#/$defs/u64" }
+      }
+    },
+    "holdState": {
+      "oneOf": [
+        { "enum": ["unknown", "denied", "held", "reversed"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["captured"],
+          "properties": { "captured": { "$ref": "#/$defs/captureCommit" } }
+        }
+      ]
+    },
+    "capabilitiesResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "response"],
+      "properties": { "kind": { "const": "capabilities" }, "response": { "$ref": "#/$defs/capabilities" } }
+    },
+    "preparedResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "response"],
+      "properties": { "kind": { "const": "prepared" }, "response": { "$ref": "#/$defs/trustedExecutionContext" } }
+    },
+    "liveParentResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "response"],
+      "properties": { "kind": { "const": "live_parent" }, "response": { "$ref": "#/$defs/liveParent" } }
+    },
+    "revocationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "response"],
+      "properties": { "kind": { "const": "revocation" }, "response": { "$ref": "#/$defs/revocationSnapshot" } }
+    },
+    "holdResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "response"],
+      "properties": { "kind": { "const": "hold" }, "response": { "$ref": "#/$defs/holdState" } }
+    },
+    "controlResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "response"],
+      "properties": {
+        "kind": { "const": "control" },
+        "response": { "type": "array", "maxItems": 1048576, "items": { "type": "integer", "minimum": 0, "maximum": 255 } }
+      }
+    },
+    "rejectedResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "response"],
+      "properties": {
+        "kind": { "const": "rejected" },
+        "response": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code"],
+          "properties": { "code": { "$ref": "#/$defs/identifier" } }
+        }
+      }
+    },
+    "result": {
+      "oneOf": [
+        { "$ref": "#/$defs/capabilitiesResult" },
+        { "$ref": "#/$defs/preparedResult" },
+        { "$ref": "#/$defs/liveParentResult" },
+        { "$ref": "#/$defs/revocationResult" },
+        { "$ref": "#/$defs/holdResult" },
+        { "$ref": "#/$defs/controlResult" },
+        { "$ref": "#/$defs/rejectedResult" }
+      ]
+    }
+  }
+}

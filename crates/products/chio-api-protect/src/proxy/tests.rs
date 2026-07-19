@@ -3,14 +3,24 @@ use axum::body::to_bytes;
 use chio_core_types::capability::{
     governance::{GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody},
     scope::ChioScope,
+    threshold_approval::{
+        ThresholdApprovalProposal, ThresholdApprovalProposalBody, ThresholdApprovalRequest,
+        ThresholdApprovalRequirement,
+    },
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_http_core::{
-    http_status_scope, AuthMethod, RespondResponse, CHIO_HTTP_STATUS_SCOPE_DECISION,
+    http_status_scope, AppendThresholdApprovalVoteRequest, AuthMethod,
+    AuthenticatedThresholdApprovalRequestContext, CreateThresholdApprovalProposalRequest,
+    DeliverThresholdApprovalResponseRequest, RespondResponse, CHIO_HTTP_STATUS_SCOPE_DECISION,
     CHIO_HTTP_STATUS_SCOPE_FINAL,
 };
-use chio_kernel::{ApprovalOutcome, ApprovalRequest};
+use chio_kernel::{
+    ApprovalOutcome, ApprovalRequest, ThresholdApprovalProposalCreationContext,
+    ThresholdApprovalProposalCreationParameters,
+};
 use chio_openapi::PolicyDecision;
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::thread;
@@ -223,7 +233,8 @@ fn test_state_with_receipt_db(
         keypair.clone(),
         "test-policy".to_string(),
         Arc::clone(&approval_store),
-    );
+    )
+    .with_verified_manifest_registry(crate::evaluator::compatibility_manifest_registry_for_tests());
     let egress_contract = default_upstream_egress_contract(&upstream).test_unwrap();
     let http_client = client_builder_with_contract(&egress_contract)
         .build()
@@ -264,7 +275,8 @@ fn test_state_with_client_timeout(
         keypair.clone(),
         "test-policy".to_string(),
         Arc::clone(&approval_store),
-    );
+    )
+    .with_verified_manifest_registry(crate::evaluator::compatibility_manifest_registry_for_tests());
     let egress_contract = default_upstream_egress_contract(&upstream).test_unwrap();
     let http_client = client_builder_with_contract(&egress_contract)
         .timeout(timeout)
@@ -682,6 +694,234 @@ async fn approval_routes_are_handled_before_proxy_catch_all() {
         .get_pending("ap-route-1")
         .test_unwrap()
         .is_none());
+}
+
+#[tokio::test]
+async fn threshold_approval_routes_collect_and_deliver_original_tokens() {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let policy_authority = Keypair::generate();
+    let subject = Keypair::generate();
+    let submitter = Keypair::generate();
+    let second = Keypair::generate();
+    let third = Keypair::generate();
+    let policy_hash = "ab".repeat(32);
+    let intent_hash = "cd".repeat(32);
+    let requirement = ThresholdApprovalRequirement::new(
+        2,
+        BTreeMap::from([
+            ("submitter".to_string(), submitter.public_key()),
+            ("second".to_string(), second.public_key()),
+            ("third".to_string(), third.public_key()),
+        ]),
+        300,
+        policy_hash.clone(),
+        1,
+    )
+    .test_unwrap();
+    let now = chrono::Utc::now().timestamp() as u64;
+    let proposal = ThresholdApprovalProposal::sign(
+        ThresholdApprovalProposalBody::new(
+            "proposal-product-route",
+            "request-product-route",
+            intent_hash.clone(),
+            subject.public_key(),
+            "ef".repeat(32),
+            policy_hash.clone(),
+            requirement.required(),
+            requirement.eligible_set_digest(),
+            now.saturating_sub(1),
+            requirement.proposal_timeout_seconds(),
+            now + 600,
+            now + 600,
+        )
+        .test_unwrap(),
+        &policy_authority,
+    )
+    .test_unwrap();
+    let approval_store = Arc::clone(state.approval_admin.store());
+    let matched_request =
+        ThresholdApprovalRequest::new(proposal.body().request_id(), "payments", "transfer")
+            .test_unwrap();
+    let resolved_context = AuthenticatedThresholdApprovalRequestContext::new(
+        matched_request.clone(),
+        ThresholdApprovalProposalCreationContext::new(
+            ThresholdApprovalProposalCreationParameters {
+                matched_request,
+                requirement: requirement.clone(),
+                subject: subject.public_key(),
+                governed_intent_hash: intent_hash.clone(),
+                authorization_capability_hash: "ef".repeat(32),
+                authorizing_capability_expires_at: now + 600,
+                governed_operation_expires_at: now + 600,
+                submitter: Some(submitter.public_key()),
+                separation_of_duties: true,
+            },
+        )
+        .test_unwrap(),
+    );
+    let resolved_request_id = proposal.body().request_id().to_string();
+    let resolved_policy_hash = policy_hash.clone();
+    let admin = ApprovalAdmin::new_with_threshold_policy(
+        approval_store,
+        policy_hash.clone(),
+        vec![policy_authority.public_key()],
+        Arc::new(move |request_id: &str, current_policy_hash: &str| {
+            if request_id != resolved_request_id || current_policy_hash != resolved_policy_hash {
+                return Err(
+                    chio_core_types::capability::threshold_approval::ThresholdApprovalResolutionError::Missing,
+                );
+            }
+            Ok(resolved_context.clone())
+        }),
+    )
+    .test_unwrap();
+    let mut state = Arc::try_unwrap(state).ok().test_unwrap();
+    state.approval_admin = admin;
+    let state = Arc::new(state);
+
+    let create = with_loopback_peer(
+        Request::builder()
+            .method("POST")
+            .uri("/approvals/threshold/proposals")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&CreateThresholdApprovalProposalRequest {
+                    proposal: proposal.clone(),
+                })
+                .test_unwrap(),
+            ))
+            .test_unwrap(),
+    );
+    let response = build_app(Arc::clone(&state))
+        .oneshot(create)
+        .await
+        .test_unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let sign_vote = |id: &str, approver: &Keypair| {
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: id.to_string(),
+                approver: approver.public_key(),
+                subject: subject.public_key(),
+                governed_intent_hash: intent_hash.clone(),
+                threshold_proposal_hash: Some(proposal.proposal_hash().test_unwrap()),
+                request_id: proposal.body().request_id().to_string(),
+                issued_at: now,
+                expires_at: now + 200,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            approver,
+        )
+        .test_unwrap()
+    };
+    let first = sign_vote("threshold-product-1", &second);
+    let second_token = sign_vote("threshold-product-2", &third);
+    for token in [&first, &second_token] {
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/approvals/threshold/proposals/proposal-product-route/votes")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&AppendThresholdApprovalVoteRequest {
+                        token: token.clone(),
+                    })
+                    .test_unwrap(),
+                ))
+                .test_unwrap(),
+        );
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .test_unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    let deliver = with_loopback_peer(
+        Request::builder()
+            .method("POST")
+            .uri("/approvals/threshold/proposals/proposal-product-route/deliver")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&DeliverThresholdApprovalResponseRequest {}).test_unwrap(),
+            ))
+            .test_unwrap(),
+    );
+    let response = build_app(state).oneshot(deliver).await.test_unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
+    assert_eq!(json["proposal"]["status"], "delivered");
+    assert_eq!(
+        json["approval_tokens"],
+        serde_json::to_value(vec![first, second_token]).test_unwrap()
+    );
+}
+
+#[tokio::test]
+async fn threshold_approval_routes_are_unmounted_when_policy_authority_is_unconfigured() {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let response = build_app(state)
+        .oneshot(with_loopback_peer(
+            Request::builder()
+                .method("GET")
+                .uri("/approvals/threshold/proposals/unknown")
+                .body(Body::empty())
+                .test_unwrap(),
+        ))
+        .await
+        .test_unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let body = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
+    assert_eq!(json["error"], "not_found");
+}
+
+#[tokio::test]
+async fn threshold_approval_production_config_rejects_ephemeral_store() {
+    let policy_authority = Keypair::generate();
+    let config = ProtectConfig {
+        upstream: "http://127.0.0.1:1".to_string(),
+        spec_content: Some(PETSTORE_YAML.to_string()),
+        spec_path: None,
+        listen_addr: "127.0.0.1:0".to_string(),
+        receipt_db: None,
+        sidecar_control_token: None,
+        signer_seed_hex: None,
+        trusted_capability_issuers: Vec::new(),
+        upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
+    };
+    let threshold = ThresholdApprovalCollectorConfig::new(
+        "ab".repeat(32),
+        vec![policy_authority.public_key()],
+        Arc::new(
+            |_: &str,
+             _: &str|
+             -> Result<
+                AuthenticatedThresholdApprovalRequestContext,
+                chio_core_types::capability::threshold_approval::ThresholdApprovalResolutionError,
+            > {
+                Err(
+                chio_core_types::capability::threshold_approval::ThresholdApprovalResolutionError::Missing,
+            )
+            },
+        ),
+    );
+    let Err(error) = ProtectProxy::new(config)
+        .with_threshold_approval_collector(threshold)
+        .run_with_observer(|_| panic!("ephemeral collector must fail before binding"))
+        .await
+    else {
+        panic!("ephemeral threshold collector must be rejected");
+    };
+    assert!(
+        matches!(error, ProtectError::Config(message) if message.contains("durable approval store"))
+    );
 }
 
 #[tokio::test]
@@ -2716,439 +2956,4 @@ async fn sidecar_evaluate_advisory_route_wraps_non_authorization_response() {
     assert!(receipt.decision.is_none());
 }
 
-#[tokio::test]
-async fn sidecar_advisory_json_fallback_preserves_trust_header() {
-    let signer = Keypair::generate();
-    let parameters = serde_json::json!({"path": "/etc/hostname"});
-    let parameter_hash = chio_core_types::canonical_json_bytes(&parameters)
-        .map(|canonical| chio_core_types::sha256_hex(&canonical))
-        .test_unwrap();
-    let receipt = ChioReceipt::sign(
-        ChioReceiptBody {
-            id: uuid::Uuid::now_v7().to_string(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
-            capability_id: "cap-advisory".to_string(),
-            tool_server: "fs".to_string(),
-            tool_name: "read".to_string(),
-            action: ToolCallAction {
-                parameters,
-                parameter_hash,
-            },
-            decision: None,
-            receipt_kind: ReceiptKind::AdvisoryEvaluation,
-            boundary_class: BoundaryClass::AdvisoryOnly,
-            observation_outcome: Some(ObservationOutcome::Evaluated),
-            tool_origin: ToolOrigin::HostExecutedUnmediated,
-            redaction_mode: RedactionMode::None,
-            actor_chain: Vec::new(),
-            content_hash: chio_core_types::sha256_hex(b"test"),
-            policy_hash: manual_receipt_policy_hash(
-                "advisory_json_fallback_preserves_trust_header",
-            ),
-            evidence: Vec::new(),
-            metadata: None,
-            trust_level: TrustLevel::Advisory,
-            tenant_id: None,
-            kernel_key: signer.public_key(),
-            bbs_projection_version: None,
-        },
-        &signer,
-    )
-    .test_unwrap();
-
-    let receipt_id = receipt.id.clone();
-    let response = sidecar_advisory_tool_call_evaluate_json_response(receipt);
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response
-            .headers()
-            .get(CHIO_TRUST_LEVEL_HEADER)
-            .and_then(|value| value.to_str().ok()),
-        Some("advisory")
-    );
-    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let (_body, wrapped_receipt) = parse_advisory_evaluation_body(&body);
-    assert_eq!(wrapped_receipt.id, receipt_id);
-}
-
-#[tokio::test]
-async fn sidecar_verify_receipt_rejects_untrusted_signer() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let attacker = Keypair::generate();
-    let parameters = serde_json::json!({"path": "/etc/hostname"});
-    let parameter_hash = chio_core_types::canonical_json_bytes(&parameters)
-        .map(|canonical| chio_core_types::sha256_hex(&canonical))
-        .test_unwrap();
-    let receipt = ChioReceipt::sign(
-        ChioReceiptBody {
-            id: uuid::Uuid::now_v7().to_string(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
-            capability_id: "cap-attacker".to_string(),
-            tool_server: "fs".to_string(),
-            tool_name: "read".to_string(),
-            action: ToolCallAction {
-                parameters,
-                parameter_hash,
-            },
-            decision: Some(Decision::Allow),
-            receipt_kind: ReceiptKind::MediatedDecision,
-            boundary_class: BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: ToolOrigin::CallerExecuted,
-            redaction_mode: RedactionMode::None,
-            actor_chain: Vec::new(),
-            content_hash: chio_core_types::sha256_hex(b"forged-request-body"),
-            policy_hash: manual_receipt_policy_hash("forged_sidecar_receipt_test"),
-            evidence: Vec::new(),
-            metadata: None,
-            trust_level: TrustLevel::Mediated,
-            tenant_id: None,
-            kernel_key: attacker.public_key(),
-            bbs_projection_version: None,
-        },
-        &attacker,
-    )
-    .test_unwrap();
-    assert!(receipt.verify_signature().test_unwrap());
-
-    let verify_body = serde_json::to_value(&receipt).test_unwrap();
-    let verify_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/receipts/verify", verify_body))
-        .await
-        .test_unwrap();
-    assert_eq!(verify_response.status(), StatusCode::OK);
-    let verify_json: serde_json::Value = serde_json::from_slice(
-        &to_bytes(verify_response.into_body(), 1024 * 1024)
-            .await
-            .test_unwrap(),
-    )
-    .test_unwrap();
-    assert_eq!(verify_json["valid"], false);
-    assert!(verify_json["reason"]
-        .as_str()
-        .test_unwrap()
-        .contains("signer is not trusted"));
-
-    let verification: VerifyReceiptResponse = serde_json::from_value(verify_json).test_unwrap();
-    assert!(verification.signature_valid);
-    assert!(!verification.signer_trusted);
-    assert!(!verification.authorized);
-    assert!(!verification.ok);
-}
-
-#[tokio::test]
-async fn sidecar_verify_receipt_rejects_capability_issuer_as_receipt_signer() {
-    let attacker = Keypair::generate();
-    let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    Arc::get_mut(&mut state)
-        .test_expect("state is not shared yet")
-        .trusted_capability_issuers
-        .push(attacker.public_key());
-
-    let parameters = serde_json::json!({"path": "/etc/hostname"});
-    let action = ToolCallAction::from_parameters(parameters).test_unwrap();
-    let receipt = ChioReceipt::sign(
-        ChioReceiptBody {
-            id: uuid::Uuid::now_v7().to_string(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
-            capability_id: "cap-attacker".to_string(),
-            tool_server: "fs".to_string(),
-            tool_name: "read".to_string(),
-            action,
-            decision: Some(Decision::Allow),
-            receipt_kind: ReceiptKind::MediatedDecision,
-            boundary_class: BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: ToolOrigin::CallerExecuted,
-            redaction_mode: RedactionMode::None,
-            actor_chain: Vec::new(),
-            content_hash: chio_core_types::sha256_hex(b"forged-request-body"),
-            policy_hash: manual_receipt_policy_hash("forged_capability_issuer_receipt_test"),
-            evidence: Vec::new(),
-            metadata: None,
-            trust_level: TrustLevel::Mediated,
-            tenant_id: None,
-            kernel_key: attacker.public_key(),
-            bbs_projection_version: None,
-        },
-        &attacker,
-    )
-    .test_unwrap();
-
-    let verify_body = serde_json::to_value(&receipt).test_unwrap();
-    let verify_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/receipts/verify", verify_body))
-        .await
-        .test_unwrap();
-    assert_eq!(verify_response.status(), StatusCode::OK);
-    let verify_json: serde_json::Value = serde_json::from_slice(
-        &to_bytes(verify_response.into_body(), 1024 * 1024)
-            .await
-            .test_unwrap(),
-    )
-    .test_unwrap();
-    assert_eq!(verify_json["valid"], false);
-    assert!(verify_json["reason"]
-        .as_str()
-        .test_unwrap()
-        .contains("signer is not trusted"));
-
-    let verification: VerifyReceiptResponse = serde_json::from_value(verify_json).test_unwrap();
-    assert!(verification.signature_valid);
-    assert!(!verification.signer_trusted);
-    assert!(!verification.authorized);
-    assert!(!verification.ok);
-}
-
-#[tokio::test]
-async fn sidecar_verify_receipt_rejects_action_parameter_hash_mismatch() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let parameters = serde_json::json!({"path": "/etc/hostname"});
-    let receipt = ChioReceipt::sign(
-        ChioReceiptBody {
-            id: uuid::Uuid::now_v7().to_string(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
-            capability_id: "cap-sidecar".to_string(),
-            tool_server: "fs".to_string(),
-            tool_name: "read".to_string(),
-            action: ToolCallAction {
-                parameters,
-                parameter_hash: "0".repeat(64),
-            },
-            decision: Some(Decision::Allow),
-            receipt_kind: ReceiptKind::MediatedDecision,
-            boundary_class: BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: ToolOrigin::CallerExecuted,
-            redaction_mode: RedactionMode::None,
-            actor_chain: Vec::new(),
-            content_hash: chio_core_types::sha256_hex(b"trusted-request-body"),
-            policy_hash: manual_receipt_policy_hash("bad_action_hash_receipt_test"),
-            evidence: Vec::new(),
-            metadata: None,
-            trust_level: TrustLevel::Mediated,
-            tenant_id: None,
-            kernel_key: state.signer_keypair.public_key(),
-            bbs_projection_version: None,
-        },
-        &state.signer_keypair,
-    )
-    .test_unwrap();
-    assert!(receipt.verify_signature().test_unwrap());
-
-    let verify_body = serde_json::to_value(&receipt).test_unwrap();
-    let verify_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/receipts/verify", verify_body))
-        .await
-        .test_unwrap();
-    assert_eq!(verify_response.status(), StatusCode::OK);
-    let verify_json: serde_json::Value = serde_json::from_slice(
-        &to_bytes(verify_response.into_body(), 1024 * 1024)
-            .await
-            .test_unwrap(),
-    )
-    .test_unwrap();
-    assert_eq!(verify_json["valid"], false);
-    assert!(verify_json["reason"]
-        .as_str()
-        .test_unwrap()
-        .contains("parameter_hash"));
-
-    let verification: VerifyReceiptResponse = serde_json::from_value(verify_json).test_unwrap();
-    assert!(verification.signature_valid);
-    assert!(verification.signer_trusted);
-    assert!(verification.receipt_id_valid);
-    assert!(!verification.parameter_hash_valid);
-    assert!(!verification.authorized);
-    assert!(!verification.ok);
-}
-
-#[tokio::test]
-async fn sidecar_verify_receipt_rejects_expected_decision_mismatch() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-
-    let mint_body = serde_json::json!({
-        "subject": Keypair::generate().public_key().to_hex(),
-        "scope": { "grants": [], "resource_grants": [], "prompt_grants": [] },
-        "ttl_seconds": 600,
-    });
-    let mint_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/capabilities", mint_body))
-        .await
-        .test_unwrap();
-    let token: CapabilityToken = serde_json::from_slice(
-        &to_bytes(mint_response.into_body(), 1024 * 1024)
-            .await
-            .test_unwrap(),
-    )
-    .test_unwrap();
-
-    let evaluate_body = serde_json::json!({
-        "capability_id": token.id,
-        "tool_server": "fs",
-        "tool_name": "read",
-        "parameters": {"path": "/etc/hostname"},
-    });
-    let evaluate_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/evaluate/advisory", evaluate_body))
-        .await
-        .test_unwrap();
-    let receipt_bytes = to_bytes(evaluate_response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let (_body, receipt) = parse_advisory_evaluation_body(&receipt_bytes);
-
-    let mut verify_body = serde_json::to_value(&receipt).test_unwrap();
-    verify_body
-        .as_object_mut()
-        .test_unwrap()
-        .insert("expected_decision".to_string(), serde_json::json!("deny"));
-
-    let verify_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/receipts/verify", verify_body))
-        .await
-        .test_unwrap();
-    let verify_json: serde_json::Value = serde_json::from_slice(
-        &to_bytes(verify_response.into_body(), 1024 * 1024)
-            .await
-            .test_unwrap(),
-    )
-    .test_unwrap();
-    assert_eq!(verify_json["valid"], false);
-    assert!(verify_json["reason"]
-        .as_str()
-        .test_unwrap()
-        .contains("does not match"));
-}
-
-#[tokio::test]
-async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
-    let receipt_db = temp_receipt_db_path();
-    let state = test_state_with_receipt_db(
-        Vec::new(),
-        "http://127.0.0.1:1".to_string(),
-        Some(&receipt_db),
-    );
-
-    let mint_body = serde_json::json!({
-        "subject": Keypair::generate().public_key().to_hex(),
-        "scope": { "grants": [], "resource_grants": [], "prompt_grants": [] },
-        "ttl_seconds": 600,
-    });
-    let mint_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/capabilities", mint_body))
-        .await
-        .test_unwrap();
-    let token: CapabilityToken = serde_json::from_slice(
-        &to_bytes(mint_response.into_body(), 1024 * 1024)
-            .await
-            .test_unwrap(),
-    )
-    .test_unwrap();
-
-    let release_body = serde_json::json!({"capability_id": token.id});
-    let release_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/capabilities/release", release_body))
-        .await
-        .test_unwrap();
-    assert_eq!(release_response.status(), StatusCode::OK);
-
-    let evaluate_body = serde_json::json!({
-        "capability_id": token.id,
-        "tool_server": "fs",
-        "tool_name": "read",
-        "parameters": {},
-    });
-    let evaluate_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/evaluate/advisory", evaluate_body))
-        .await
-        .test_unwrap();
-    assert_eq!(evaluate_response.status(), StatusCode::OK);
-    assert_eq!(
-        evaluate_response
-            .headers()
-            .get(CHIO_TRUST_LEVEL_HEADER)
-            .and_then(|value| value.to_str().ok()),
-        Some("advisory")
-    );
-    let receipt_bytes = to_bytes(evaluate_response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let (_body, receipt) = parse_advisory_evaluation_body(&receipt_bytes);
-    assert!(receipt.decision.is_none());
-    assert!(!receipt.is_allowed());
-    assert_eq!(receipt.receipt_kind, ReceiptKind::AdvisoryEvaluation);
-    assert_eq!(receipt.trust_level, TrustLevel::Advisory);
-    assert_eq!(
-        receipt.observation_outcome,
-        Some(ObservationOutcome::Dropped)
-    );
-    let alias_outcome = receipt
-        .metadata
-        .as_ref()
-        .and_then(|m| m.get("advisory_check_outcome"))
-        .and_then(|v| v.as_str());
-    assert_eq!(alias_outcome, Some("capability_revoked"));
-    assert!(receipt.verify_signature().test_unwrap());
-
-    let log = state.tool_receipt_log.lock().await;
-    assert_eq!(log.receipts.len(), 1);
-    assert_eq!(log.receipts[0].id, receipt.id);
-    drop(log);
-
-    let reloaded = test_state_with_receipt_db(
-        Vec::new(),
-        "http://127.0.0.1:1".to_string(),
-        Some(&receipt_db),
-    );
-    let persisted = reloaded.tool_receipt_log.lock().await;
-    assert_eq!(persisted.receipts.len(), 1);
-    assert_eq!(persisted.receipts[0].id, receipt.id);
-
-    let _ = std::fs::remove_file(receipt_db);
-}
-
-#[tokio::test]
-async fn sidecar_evaluate_tool_call_denies_parameter_hash_mismatch() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-
-    let evaluate_body = serde_json::json!({
-        "capability_id": "cap-test",
-        "tool_server": "fs",
-        "tool_name": "read",
-        "parameters": {"path": "/etc/hostname"},
-        "parameter_hash": "deadbeef".to_string(),
-    });
-    let evaluate_response = build_app(Arc::clone(&state))
-        .oneshot(loopback_post("/v1/evaluate/advisory", evaluate_body))
-        .await
-        .test_unwrap();
-    assert_eq!(evaluate_response.status(), StatusCode::OK);
-    assert_eq!(
-        evaluate_response
-            .headers()
-            .get(CHIO_TRUST_LEVEL_HEADER)
-            .and_then(|value| value.to_str().ok()),
-        Some("advisory")
-    );
-    let receipt_bytes = to_bytes(evaluate_response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let (_body, receipt) = parse_advisory_evaluation_body(&receipt_bytes);
-    assert!(receipt.decision.is_none());
-    assert!(!receipt.is_allowed());
-    assert_eq!(receipt.receipt_kind, ReceiptKind::AdvisoryEvaluation);
-    assert_eq!(receipt.trust_level, TrustLevel::Advisory);
-    assert_eq!(
-        receipt.observation_outcome,
-        Some(ObservationOutcome::Dropped)
-    );
-    let alias_outcome = receipt
-        .metadata
-        .as_ref()
-        .and_then(|m| m.get("advisory_check_outcome"))
-        .and_then(|v| v.as_str());
-    assert_eq!(alias_outcome, Some("parameter_hash_mismatch"));
-}
+include!("tests/advisory_and_receipt.rs");

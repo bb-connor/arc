@@ -43,6 +43,211 @@ The machine-readable companion artifact for this document is:
 
 - `spec/security/chio-threat-model.v1.json`
 
+### Runtime evidence boundary
+
+Runtime attestation is verifier-appraised evidence, not proof that arbitrary
+policy is satisfied. Admission **MUST** verify the configured verifier,
+signature, freshness, workload identity, assurance tier, request binding, and
+policy binding before any budget or replay mutation. Malformed, stale,
+future-dated, revoked, untrusted, or insufficient evidence **MUST** fail closed.
+
+Proof-parity reports are diagnostic artifacts. A report that claims acceptance
+while carrying a mismatch **MUST** be rejected, and a bare parity report
+**MUST NOT** authorize a request. Chio **MUST NOT** accept request-carried
+proof-parity claims until a signed export envelope binds request and run ids,
+package and verifier hashes, signer, generation time, expiry, membership,
+trusted-verifier policy, policy version, and revocation state.
+
+A Transaction Passport, passport reference, or signed passport-derived claim
+is evidence for its registered verifier workflow, not tool-call authorization.
+Admission **MUST NOT** treat it as a substitute for capability, approval,
+replay, budget, revocation, runtime-attestation, or exact request binding.
+
+### Enterprise execution boundary
+
+The secret broker is a separate trusted process and part of the execution TCB.
+Its trusted inputs are a service-private canonical configuration, sealed tenant
+master-key and receipt-signing descriptors, pinned capability issuer and
+authority keys, governed administrator keys, fresh authenticated authority
+snapshots, and the configured HTTPS trust roots. The kernel, agent, cage, and
+tool server receive credential references only. A broker deployment **MUST**
+pin Unix peer credentials and the broker receipt key, use durable attempt and
+receipt stores, and deny on authority, custody, storage, receipt, or IPC
+failure. It **MUST NOT** fall back to direct provider execution.
+
+The broker TCB does not include the caller's capability, proof, preview, or
+destination assertions until they have been independently verified. Provider
+adapters own credential placement and callers cannot supply provider-owned
+headers. Diagnostics and failure receipts carry closed redacted codes, never
+credential bytes. Root or process-inspection access to broker memory remains a
+host-level credential risk, and the upstream provider necessarily receives the
+credential selected for that request.
+
+The cage boundary is the Linux cage-init helper, retained file descriptors,
+Landlock, seccompiler-generated seccomp BPF, ptrace exec observation, and the
+parent verifier. A manifest or compiled plan is not evidence of confinement.
+Compilation **MUST** consume a non-forgeable authorization from the live
+verified-manifest registry, never a raw or discovery-supplied manifest. That
+authorization **MUST** bind the registry snapshot, exact signed manifest,
+server and tools, runtime topology, and native profile. Minimal and standard
+profiles require local topology, while the brokered profile requires brokered
+topology. Remote, mixed, missing, or profile-confused topology **MUST** deny.
+The compiled profile digest **MUST** transitively bind this authorization.
+The signed cage policy **MUST** be pinned before a resumable factory is exposed,
+and its manifest envelope **MUST** be byte-identical to the live registry entry
+before compilation. Its durable migration posture **MUST** bind every
+authority-bearing policy component, including ceilings, artifacts, argv,
+limits, receipt authority, broker binding, and migration-ledger trust roots.
+A resumable runtime **MUST** bind the pinned policy digest and reject a session
+whose launch authorization differs.
+The parent **MUST** withhold target stdio until it verifies pinned enforcement
+versions, complete Landlock filesystem and network enforcement, complete
+seccomp enforcement on the reviewed x86_64 architecture, exact target identity,
+the exec transition, and status-channel EOF. It **MUST** terminate the child on
+rejection, timeout, malformed evidence, identity drift, partial enforcement,
+receipt-signature failure, receipt-store failure, or missing terminal evidence.
+Only a launch-bound plan with authenticated descriptor identities may cross to
+cage-init.
+
+Key-log operators, witnesses, and auditors have distinct assumptions. The
+operator orders and signs events and checkpoints but cannot by itself satisfy a
+witnessed activation policy. A witness is trusted only for its pinned identity,
+algorithm, roster membership, and signature over the exact checkpoint binding.
+Witness independence is an operational trust assumption; multiple keys under
+one administrative principal do not provide independent observation. Auditors
+**MUST** retain a trusted checkpoint, verify event and checkpoint hash links,
+verify consistency proofs before advancing it, verify the activation commit,
+and reject split views, sequence rollback, witness-roster substitution, or a
+pending receipt represented as active. An enterprise receipt is audit evidence,
+not authority to rotate or recover a key.
+
+### Failure, revocation, and durable admission semantics
+
+Revocation and execution-count capture share one combined authority boundary
+for brokered admission. The checked revocation set contains the leaf capability,
+every verified delegation ancestor, and every supplemental revocation id in
+canonical sorted form. Omission, addition, duplication, digest mismatch,
+authority-domain mismatch, or snapshot staleness denies. A successful combined
+capture binds both commit indexes and the fenced leader epoch; implementations
+**MUST NOT** report dispatch authorization from only one side of that commit.
+
+Aggregate family authority depends on the signed root binding, not on a caller
+chosen root id. Implementations **MUST** verify the root signature and exact
+root id, commitment hash, issuer, subject, scope hash, expiry, maximum, and
+preserved envelope digest before deriving a family quota key. All applicable
+quota keys are authorized atomically with immutable maxima. A caller-supplied
+supplemental quota is opaque until the installed verifier binds its subject,
+request, destination, freshness, negotiation, and artifact signature.
+
+Threshold approval is a set decision, not a list of independent booleans. The
+proposal authority, policy, eligible-set digest, distinct signer membership,
+typed intent, request, subject, authorizing capability, time window, and exact
+threshold all require verification. The complete canonical set is reserved in
+one replay transaction. Reordering does not change the set hash; duplication,
+partial forwarding, stale policy, or reuse of one member in a consumed set
+denies.
+
+The durable `AdmissionOperation` is the recovery authority for every
+multi-authority call. Before dispatch it may compensate quota holds, broker
+registration, and uncommitted participants, while preserving security
+tombstones. After `DispatchCommitted`, absence of a response is
+`OutcomeUnknownAfterDispatch`, not permission to retry the effect. Restart and
+concurrent coordinators use the same operation id and compare-and-swap state.
+Unavailable or topology-incompatible durable stores deny before mutation.
+
+Success and failure are both evidence-bearing outcomes. Broker failure receipts
+bind whether dispatch is known not to have started or may have started. Cage
+receipts bind rejection, bootstrap failure, full enforcement, and exit. The
+consumer **MUST** verify the pinned signer, request or process binding,
+canonical bytes, lineage, and durable append before releasing an outcome.
+Receipt persistence does not convert an unknown effect into a safe retry.
+
+Cross-protocol adapters are inside the authorization boundary when they carry
+security extensions. They **MUST** apply negotiated-feature checks, preserve
+authenticated fields, and publish truthful bridge fidelity. A protocol that
+cannot authenticate aggregate, supplemental, threshold, governed-intent, or
+operation metadata is unsupported for that call rather than a lossy success.
+
+### Active-defense security boundary
+
+The information-flow boundary consists of the verified v2 manifest registry,
+authenticated tenant or data-owner policy, authenticated runtime topology,
+classifiers, durable principal, lineage, and session stores, the kernel flow
+adapters, and the dispatch-generation fence. A publisher declaration can only
+narrow acceptance. Runtime topology can force egress, and only policy can grant
+clearance. Unknown classification, label overflow, missing egress clearance,
+malformed declarations, unverified sidecars, or a classifier, store, or fence
+failure **MUST** deny the invocation or block output delivery. `Top` **MUST
+NOT** egress even to a `Top` clearance.
+
+Agent knowledge is durable across session boundaries. Principal taint is keyed
+by tenant, subject, and isolation epoch and is indexed by capability-lineage
+root; a session begins at their join. Closing or replacing a session **MUST
+NOT** lower either durable label. A fresh isolation epoch is trusted only when
+a launcher or attestation verifier proves destruction of the prior process,
+model context, writable memory, and inherited state. Otherwise the prior taint
+is inherited. Cardinality overflow moves every affected label to `Top`.
+
+Pre-dispatch flow evaluation **MUST** include classified arguments, operator
+floors, principal taint, lineage taint, and session taint, and **MUST** compare
+that source to every applicable policy and manifest clearance. Its monotonic
+context-generation fence remains valid through dispatch commitment. A
+concurrent taint advance requires re-evaluation or denial. After execution, raw
+watermark detection runs first, sanitizers and redactors run next, and final
+representation classification and atomic taint advancement run last before
+delivery. Delivery before durable taint advancement is forbidden.
+
+Declassification is a narrowly trusted authority action, not a caller-selected
+label cast. A valid grant is canonical, signed under a dedicated domain by a
+trusted Capability Authority, and binds identity, exact source and target,
+destination, purpose, exact request, and time. The target is strictly lower,
+not equal, and never derived from `Top`. The one-shot grant is atomically
+consumed before dispatch and remains consumed on downstream failure. It lowers
+only that request and **MUST NOT** lower principal, lineage, or session taint.
+
+Tripwire matches are preventive decisions: canary and honey-tool matches deny
+before dispatch, and verified watermark matches block before response
+delivery. Event append failure cannot turn either block into an allow and
+**MUST** be evidenced. Raw deception markers, credentials, private artifact
+ids, tainted payloads, and rollback material **MUST NOT** enter ordinary
+receipts, logs, or exports. A deception match is high-confidence evidence, not
+proof that independently authorizes heavy containment.
+
+Only events signed by configured internal detector keys or projected from
+verified Chio receipts can authorize automatic response. Verification binds
+tenant, producer trust, freshness, event time, and policy. External SIEM
+imports, unsigned events, and untrusted producers are advisory. Temporal rules
+use ordered `after` stages, positive bounded `within` windows, event time,
+deduplication, grouping, bounded lateness, deterministic watermarks, and
+deterministic finding ids. Detector overflow or store failure **MUST** emit
+health evidence and suppress automatic heavy response for the affected
+partition.
+
+Lineage-scoped containment trusts only a complete authoritative snapshot at a
+committed index. A truncated, stale, lagging, or unavailable result cannot be
+represented as an exact blast radius and permits dry-run or escalation only.
+After approval, issuance is fenced first under a bounded lease and the exact
+set is recomputed. Any set-hash or commit-index change invalidates the approval.
+Lift uses the recorded set and releases the fence last; it never recomputes a
+new subtree.
+
+Every executable response requires a live operator capability scoped to the
+exact internal response tools and bound into a typed governed intent. Heavy
+effects additionally require the shared threshold-approval and durable
+`AdmissionOperation` contracts; a private quorum is outside the trust model.
+Temporary effects are independent effect-id contributions. Intents are durable
+before port calls, mutations use compare-and-swap generations and scheduler
+fencing tokens, and stale workers fail closed. Partial apply triggers rollback.
+Rollback failure remains restrictive and **MUST NOT** be reported as lifted.
+Permanent revocation remains a separate manual operation.
+
+Active-defense receipts **MUST** distinguish denial, grant consumption,
+dispatch outcome, observation, plan, partial application, rollback, completion,
+lift, and detector or scheduler failure. Kernel-boundary blocks are mediated
+decisions with `GuardEvidence`; off-boundary findings and plans are signed
+advisory or trace evidence. Causal receipt, finding, plan, affected-set, and
+effect identifiers are lineage inputs, not alternate authorization paths.
+
 ## 2. Threat Register
 
 The required threats for the shipped Chio boundary are:

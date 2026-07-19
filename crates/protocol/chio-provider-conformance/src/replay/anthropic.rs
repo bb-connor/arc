@@ -105,24 +105,43 @@ fn anthropic_adapter(
     use chio_anthropic_tools_adapter::transport::MockTransport;
     use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
 
+    let signer = chio_core::Keypair::from_seed(&[31u8; 32]);
     let config = AnthropicAdapterConfig::new(
         "anthropic-1",
         "Anthropic Messages",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         workspace_id,
     );
-    AnthropicAdapter::new_with_manifest(
-        config,
-        Arc::new(MockTransport::new()),
-        &anthropic_server_tool_manifest(),
-    )
-    .map_err(|error| {
-        invalid_fixture(
-            path,
-            format!("Anthropic conformance manifest failed validation: {error}"),
+    let signed = chio_manifest::sign_manifest(&anthropic_server_tool_manifest(), &signer).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Anthropic conformance manifest signing failed: {error}"),
+            )
+        },
+    )?;
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(
+            signed,
+            &signer.public_key(),
+            chio_manifest::RuntimeToolTopology::remote(),
         )
-    })
+        .map_err(|error| {
+            invalid_fixture(
+                path,
+                format!("Anthropic conformance manifest admission failed: {error}"),
+            )
+        })?;
+    AnthropicAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Anthropic conformance manifest failed validation: {error}"),
+            )
+        },
+    )
 }
 
 #[cfg(feature = "fixtures-anthropic")]
@@ -143,8 +162,14 @@ fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
             input_schema: serde_json::json!({"type": "object"}),
             output_schema: Some(serde_json::json!({"type": "object"})),
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: Some(LatencyHint::Fast),
+            flow: None,
         }],
         server_tools: vec![
             ServerTool::ComputerUse,

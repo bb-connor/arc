@@ -39,6 +39,10 @@ JSON-RPC paths return `-32602` before preview, invocation, deferred task
 allocation, owner checks, lifecycle mutation, or kernel dispatch. The
 authenticated identifier is not trimmed or normalized.
 
+`AcpKernelExecutionContext` also carries the exact authenticated `session_id`.
+Any supplied security context must name that same session before preview,
+blocking dispatch, or deferred lifecycle mutation.
+
 Kernel-backed ACP permission preview uses the kernel-owned stateless DPoP
 verifier, so preview and invoke agree on installed DPoP TTL, skew, and
 store/config presence without consuming the nonce that invoke will later spend.
@@ -49,7 +53,10 @@ The ACP lifecycle advertises deferred `tool/stream` tasks resolved by
 `tool/resume` with `resumed_terminal_payload` delivery. Completed, failed, and
 cancelled task records are retained until TTL expiry so repeated `tool/resume`
 or idempotent `tool/cancel` returns owner-bound terminal task state. The deferred
-kernel request is never executed more than once. The deferred-task capacity gate
+kernel request is never executed more than once. Once orchestration begins,
+every error terminalizes the retained task as failed with `outcome_unknown`
+metadata, so a post-dispatch persistence failure cannot replay the tool side
+effect. The deferred-task capacity gate
 counts every retained task record after TTL pruning, not only working tasks, so
 terminal retention cannot grow without bound. Signed receipt metadata is
 preserved on completed or failed resumed results and cancellation metadata on
@@ -57,17 +64,19 @@ cancelled tasks.
 
 ## Security And API Constraints
 
-- Public Rust structs and method signatures stay compatible.
+- ACP wire structs stay compatible. The Rust-only `AcpKernelExecutionContext` requires an authenticated `session_id`.
 - Authoritative invocation continues through `CrossProtocolOrchestrator` and the Chio kernel.
 - Permission preview stays preview-only, must not imply receipt-bearing execution, and must not consume the DPoP nonce that invoke will spend.
 - Compatibility-surface helpers stay visibly non-authoritative and feature-gated.
-- Deferred task ownership stays bound to the authenticated `agent_id`.
+- Deferred task ownership stays bound to the exact authenticated `agent_id` and `session_id`.
+- Deferred security-context authorities are registered per session, and every resolved context is compared with the retained session before dispatch.
+- Deferred task ids use cryptographic key material rather than a process-local counter.
 - Receipt metadata, bridge route metadata, and lifecycle metadata stay byte-stable for valid requests.
 - The `fuzz` feature exercises the JSON-RPC handler without pulling fuzz dependencies into default builds.
 
 ## Affected Dependents
 
-- `chio-kernel` is the execution authority and DPoP preview verifier.
-- `chio-cross-protocol` supplies bridge and lifecycle metadata contracts, preserved here.
+- `chio-kernel` is the execution authority and DPoP preview verifier, including the session-aware manifest-security entrypoint.
+- `chio-cross-protocol` carries the authenticated session through bridge and lifecycle execution.
 - `chio-mcp-edge` remains a target executor dependency for multi-hop routes.
 - ACP clients may see construction-time manifest errors earlier; valid capability, permission, invocation, and deferred-task response shapes stay compatible.

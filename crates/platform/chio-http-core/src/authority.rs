@@ -21,7 +21,8 @@ use thiserror::Error;
 
 use crate::{
     authority_projection::{
-        capability_binding, HttpKernelAuthorizationRequest, HttpKernelCapabilityState,
+        capability_binding, CapabilityBinding, HttpKernelAuthorizationRequest,
+        HttpKernelCapabilityState,
     },
     http_status_metadata_decision, http_status_metadata_final, CallerIdentity, ChioHttpRequest,
     HttpMethod, HttpReceipt, HttpReceiptBody, Verdict, CHIO_KERNEL_RECEIPT_ID_KEY,
@@ -32,6 +33,8 @@ pub const HTTP_AUTHORITY_SERVER_ID: &str = "chio_http_authority";
 /// Tool name for HTTP-sidecar capability grants.
 pub const HTTP_AUTHORITY_TOOL_NAME: &str = "authorize_http_request";
 const HTTP_AUTHORITY_TTL_SECS: u64 = 60;
+const VERIFIED_MANIFEST_REGISTRY_MISSING_REASON: &str =
+    "tool-targeted HTTP authorization requires a verified manifest registry";
 
 #[must_use]
 pub fn http_authority_tool_grant() -> ToolGrant {
@@ -63,6 +66,7 @@ pub struct HttpAuthority {
     kernel_agent_id: String,
     approval_store: Arc<dyn ApprovalStore>,
     trusted_capability_issuers: Vec<PublicKey>,
+    verified_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
 }
 
 impl std::fmt::Debug for HttpAuthority {
@@ -70,6 +74,10 @@ impl std::fmt::Debug for HttpAuthority {
         f.debug_struct("HttpAuthority")
             .field("policy_hash", &self.policy_hash)
             .field("kernel_agent_id", &self.kernel_agent_id)
+            .field(
+                "verified_manifest_registry_configured",
+                &self.verified_manifest_registry.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -302,7 +310,20 @@ impl HttpAuthority {
             kernel_agent_id,
             approval_store,
             trusted_capability_issuers,
+            verified_manifest_registry: None,
         }
+    }
+
+    /// Configure the immutable verified-manifest registry used for HTTP tool
+    /// compatibility admission. HTTP authorization accepts only exact targets
+    /// whose admitted security does not require an active flow runtime.
+    #[must_use]
+    pub fn with_verified_manifest_registry(
+        mut self,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Self {
+        self.verified_manifest_registry = Some(registry);
+        self
     }
 
     #[must_use]
@@ -321,7 +342,9 @@ impl HttpAuthority {
                     .to_string(),
             ));
         };
-        kernel.set_execution_nonce_store(config, store);
+        kernel
+            .set_execution_nonce_store(config, store)
+            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
         Ok(())
     }
 
@@ -395,6 +418,7 @@ impl HttpAuthority {
             .identity_hash()
             .map_err(|e| HttpAuthorityError::CallerIdentity(e.to_string()))?;
         let binding = capability_binding(&input, &caller_identity_hash);
+        self.validate_manifest_compatibility(&binding)?;
         let presented_capability = if let Some(reason) = binding.invalid_reason.clone() {
             PresentedCapabilityState {
                 capability_id: None,
@@ -519,6 +543,41 @@ impl HttpAuthority {
             .cloned(),
             execution_nonce: kernel_response.execution_nonce.as_deref().cloned(),
         })
+    }
+
+    fn validate_manifest_compatibility(
+        &self,
+        binding: &CapabilityBinding,
+    ) -> Result<(), HttpAuthorityError> {
+        if !binding.requires_manifest_compatibility {
+            return Ok(());
+        }
+
+        let registry = self.verified_manifest_registry.as_ref().ok_or_else(|| {
+            HttpAuthorityError::Kernel(VERIFIED_MANIFEST_REGISTRY_MISSING_REASON.to_string())
+        })?;
+        let (Some(server_id), Some(tool_name)) = (
+            binding.requested_tool_server.as_deref(),
+            binding.requested_tool_name.as_deref(),
+        ) else {
+            return Err(HttpAuthorityError::Kernel(format!(
+                "verified manifest registry has no exact HTTP tool target match for server={:?} tool={:?}",
+                binding.requested_tool_server, binding.requested_tool_name
+            )));
+        };
+        let security = registry
+            .tool_security(server_id, tool_name)
+            .ok_or_else(|| {
+                HttpAuthorityError::Kernel(format!(
+                    "verified manifest registry has no exact HTTP tool target match for server={server_id:?} tool={tool_name:?}"
+                ))
+            })?;
+        if security.requires_flow_runtime() {
+            return Err(HttpAuthorityError::Kernel(format!(
+                "verified manifest target {server_id}/{tool_name} requires active flow mediation unavailable in HTTP compatibility mode"
+            )));
+        }
+        Ok(())
     }
 
     pub fn sign_decision_receipt(
@@ -674,7 +733,9 @@ impl HttpAuthority {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let route_plan = plan_authoritative_route(
             request_id,

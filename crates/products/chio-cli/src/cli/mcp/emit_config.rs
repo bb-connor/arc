@@ -16,18 +16,29 @@ pub(crate) fn render_ide_config(
     target: IdeTarget,
     server_id: &str,
     display_name: Option<&str>,
+    manifest_path: &std::path::Path,
+    cage_policy_path: &std::path::Path,
+    cage_policy_signer: &str,
     command: &[String],
 ) -> Result<String, CliError> {
-    let (program, child_args) = command
-        .split_first()
-        .ok_or_else(|| CliError::cli_other_error("emit-config requires a wrapped command".to_string()))?;
+    let (program, child_args) = command.split_first().ok_or_else(|| {
+        CliError::cli_other_error("emit-config requires a wrapped command".to_string())
+    })?;
     let child_args_vec: Vec<String> = child_args.to_vec();
+    let manifest_path = path_argument(manifest_path, "manifest")?;
+    let cage_policy_path = path_argument(cage_policy_path, "cage policy")?;
 
     let mut chio_argv: Vec<String> = vec![
         "mcp".to_string(),
         "wrap".to_string(),
         "--server-id".to_string(),
         server_id.to_string(),
+        "--manifest".to_string(),
+        manifest_path,
+        "--cage-policy".to_string(),
+        cage_policy_path,
+        "--cage-policy-signer".to_string(),
+        cage_policy_signer.to_string(),
         "--".to_string(),
     ];
     chio_argv.push(program.clone());
@@ -81,11 +92,41 @@ pub(crate) fn render_ide_config(
         .map_err(|e| CliError::cli_other_error(format!("failed to encode IDE config: {e}")))
 }
 
+fn path_argument(path: &std::path::Path, label: &str) -> Result<String, CliError> {
+    path.to_str().map(str::to_string).ok_or_else(|| {
+        CliError::cli_other_error(format!(
+            "emit-config {label} path must be valid UTF-8: {}",
+            path.display()
+        ))
+    })
+}
+
 pub(crate) fn cmd_mcp_emit_config(args: &McpWrapArgs, target: IdeTarget) -> Result<(), CliError> {
+    let manifest_path = args.manifest.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "chio mcp wrap --emit-config requires --manifest for runtime tool admission"
+                .to_string(),
+        )
+    })?;
+    let cage_policy_path = args.cage_policy.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "chio mcp wrap --emit-config requires --cage-policy for native launch admission"
+                .to_string(),
+        )
+    })?;
+    let cage_policy_signer = args.cage_policy_signer.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "chio mcp wrap --emit-config requires --cage-policy-signer for policy verification"
+                .to_string(),
+        )
+    })?;
     let blob = render_ide_config(
         target,
         &args.server_id,
         args.display_name.as_deref(),
+        manifest_path,
+        cage_policy_path,
+        cage_policy_signer,
         &args.command,
     )?;
     print!("{blob}");

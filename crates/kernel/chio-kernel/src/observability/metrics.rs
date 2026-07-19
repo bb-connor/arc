@@ -137,7 +137,7 @@ pub fn guard_metrics_endpoint(path: &str) -> Option<MetricsEndpointResponse> {
 /// families (whose sole producers are chio-wasm-guards and the OTLP ingress,
 /// which cannot be depended on by the kernel) plus the signing-queue block
 /// family, so every sample is a real, correctly-labeled counter rather than a
-/// hardcoded zero placeholder.
+/// hardcoded zero stand-in.
 #[must_use]
 pub fn render_guard_metrics_prometheus() -> String {
     let mut output = String::new();

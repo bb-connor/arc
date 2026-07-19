@@ -95,7 +95,7 @@ fn make_edge() -> Option<ChioMcpEdge> {
     // unhappy path surfaces JSON-RPC errors before consulting capabilities.
     let _scope = ChioScope::default();
     let capabilities = vec![];
-    ChioMcpEdge::new(
+    ChioMcpEdge::new_from_unverified_internal(
         McpEdgeConfig::default(),
         kernel,
         agent_id_str,

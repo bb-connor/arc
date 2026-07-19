@@ -33,7 +33,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{
-    sign_canonical_with_backend, Keypair, PublicKey, Signature, SigningBackend,
+    sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature, SigningBackend,
 };
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
@@ -114,10 +114,19 @@ impl DpopProof {
         body: DpopProofBody,
         backend: &dyn SigningBackend,
     ) -> Result<DpopProof, KernelError> {
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!("failed to sign proof body: {e}"))
+        let expected_key = body.agent_key.clone();
+        let (outcome, _bytes) = sign_canonical_with_backend_for_identity(
+            backend,
+            &expected_key,
+            &body,
+        )
+        .map_err(|error| {
+            KernelError::DpopVerificationFailed(format!("failed to sign proof body: {error}"))
         })?;
-        Ok(DpopProof { body, signature })
+        Ok(DpopProof {
+            body,
+            signature: outcome.signature,
+        })
     }
 }
 

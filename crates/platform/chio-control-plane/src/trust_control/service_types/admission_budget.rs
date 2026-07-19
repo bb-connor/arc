@@ -31,6 +31,36 @@ pub(crate) struct BudgetInvocationQuotaView {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AdmissionCaptureInvocationQuotaTransitionView {
+    pub(crate) key: BudgetQuotaKeyView,
+    pub(crate) max_invocations: u32,
+    pub(crate) reserved_invocations_before: u32,
+    pub(crate) reserved_invocations_after: u32,
+    pub(crate) captured_invocations_before: u32,
+    pub(crate) captured_invocations_after: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum AdmissionCaptureInvocationQuotaView {
+    Transition(AdmissionCaptureInvocationQuotaTransitionView),
+    Definition(BudgetInvocationQuotaView),
+}
+
+impl AdmissionCaptureInvocationQuotaView {
+    pub(crate) fn quota(&self) -> BudgetInvocationQuotaView {
+        match self {
+            Self::Transition(transition) => BudgetInvocationQuotaView {
+                key: transition.key.clone(),
+                max_invocations: transition.max_invocations,
+            },
+            Self::Definition(quota) => quota.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct BudgetInvocationQuotaUsageView {
     pub(crate) quota: BudgetInvocationQuotaView,
     pub(crate) reserved_invocations_after: u32,
@@ -58,6 +88,8 @@ pub(crate) struct BudgetSupplementalQuotaBindingView {
 pub(crate) struct BudgetInvocationAdmissionEvidenceView {
     pub(crate) invocation_quotas: Vec<BudgetInvocationQuotaView>,
     pub(crate) revocation_set: CanonicalRevocationSetView,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) aggregate_root_capability_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) aggregate_binding_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,6 +120,8 @@ pub(crate) enum BudgetMonetaryHoldStateView {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CompositeBudgetAuthorizeRequest {
+    pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) requested_exposure_units: u64,
@@ -103,6 +137,8 @@ pub(crate) struct CompositeBudgetAuthorizeRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CompositeBudgetAuthorizeResponse {
+    pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) hold_id: String,
@@ -127,6 +163,8 @@ pub(crate) struct CompositeBudgetAuthorizeResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CaptureInvocationReservationsRequest {
+    pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) hold_id: String,
@@ -138,6 +176,8 @@ pub(crate) struct CaptureInvocationReservationsRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CaptureInvocationReservationsResponse {
+    pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) hold_id: String,
@@ -156,10 +196,36 @@ pub(crate) struct CaptureInvocationReservationsResponse {
     pub(crate) budget_commit: Option<BudgetWriteCommitView>,
 }
 
+/// Exact, non-mutating lookup for an ordinary invocation capture.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CaptureInvocationPointQueryRequest {
+    pub(crate) capture_request: CaptureInvocationReservationsRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CaptureInvocationPointQueryResponse {
+    pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) capture: Option<CaptureInvocationReservationsResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CaptureInvocationReplicaQueryResponse {
+    pub(crate) protocol_version: String,
+    pub(crate) membership_digest: String,
+    pub(crate) node_id: String,
+    pub(crate) query: CaptureInvocationPointQueryResponse,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CombinedAdmissionCaptureRequest {
     pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) hold_id: String,
@@ -169,6 +235,10 @@ pub(crate) struct CombinedAdmissionCaptureRequest {
     pub(crate) revocation_set: CanonicalRevocationSetView,
     pub(crate) bound_revocation_set_digest: String,
     pub(crate) authorization_artifact_digests: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) aggregate_root_capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) aggregate_root_binding_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) last_observed_revocation_index: Option<u64>,
 }
@@ -196,23 +266,29 @@ pub(crate) struct AdmissionCaptureMetadataView {
     pub(crate) hold_id: String,
     pub(crate) event_id: String,
     pub(crate) checked_revocation_set_digest: String,
-    pub(crate) invocation_quotas: Vec<BudgetInvocationQuotaView>,
+    pub(crate) invocation_quotas: Vec<AdmissionCaptureInvocationQuotaView>,
     pub(crate) authorization_artifact_digests: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) aggregate_root_capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) aggregate_root_binding_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) budget_commit_index: Option<u64>,
     pub(crate) revocation_commit_index: u64,
     pub(crate) authority_commit_index: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) leader_epoch: Option<u64>,
+    pub(crate) leader_epoch: u64,
     pub(crate) guarantee_level: BudgetGuaranteeLevelView,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) authority: Option<BudgetMutationAuthorityView>,
+    pub(crate) invocation_state: BudgetInvocationReservationStateView,
+    pub(crate) monetary_state: BudgetMonetaryHoldStateView,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CombinedAdmissionCaptureResponse {
     pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) hold_id: String,
@@ -223,6 +299,37 @@ pub(crate) struct CombinedAdmissionCaptureResponse {
     pub(crate) revocation_set: CanonicalRevocationSetView,
     pub(crate) revoked_capability_ids: Vec<String>,
     pub(crate) metadata: AdmissionCaptureMetadataView,
+}
+
+/// Exact, non-mutating lookup for a previously committed combined admission
+/// capture. The full capture request is retained so a reused operation ID can
+/// never be queried under a different request binding or security projection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AdmissionCapturePointQueryRequest {
+    pub(crate) capture_request: CombinedAdmissionCaptureRequest,
+}
+
+/// A point-query miss is represented only by an absent capture body. The
+/// operation and request-binding identities remain present on every response
+/// so clients can reject cross-request response substitution even for misses.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AdmissionCapturePointQueryResponse {
+    pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) capture: Option<CombinedAdmissionCaptureResponse>,
+}
+
+/// Authenticated replica response used to assemble one quorum point read.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AdmissionCaptureReplicaQueryResponse {
+    pub(crate) protocol_version: String,
+    pub(crate) membership_digest: String,
+    pub(crate) node_id: String,
+    pub(crate) query: AdmissionCapturePointQueryResponse,
 }
 
 #[cfg(test)]
@@ -250,6 +357,19 @@ mod tests {
         }
     }
 
+    fn capture_transition(quota: BudgetInvocationQuotaView) -> AdmissionCaptureInvocationQuotaView {
+        AdmissionCaptureInvocationQuotaView::Transition(
+            AdmissionCaptureInvocationQuotaTransitionView {
+                key: quota.key,
+                max_invocations: quota.max_invocations,
+                reserved_invocations_before: 1,
+                reserved_invocations_after: 0,
+                captured_invocations_before: 0,
+                captured_invocations_after: 1,
+            },
+        )
+    }
+
     fn revocation_set() -> CanonicalRevocationSetView {
         CanonicalRevocationSetView {
             ids: vec!["cap-leaf".to_string(), "cap-root".to_string()],
@@ -271,6 +391,7 @@ mod tests {
                 ),
             ],
             revocation_set: revocation_set(),
+            aggregate_root_capability_id: Some("cap-root".to_string()),
             aggregate_binding_digest: Some("44".repeat(32)),
             supplemental_binding: Some(BudgetSupplementalQuotaBindingView {
                 artifact_digest: "55".repeat(32),
@@ -383,6 +504,8 @@ mod tests {
     #[test]
     fn composite_authorize_contract_round_trips_without_caller_authority() {
         let request = CompositeBudgetAuthorizeRequest {
+            operation_id: "operation-42".to_string(),
+            request_binding_hash: "44".repeat(32),
             capability_id: "cap-leaf".to_string(),
             grant_index: 2,
             requested_exposure_units: 120,
@@ -401,6 +524,8 @@ mod tests {
         assert_unknown_field_rejected(&request);
 
         let response = CompositeBudgetAuthorizeResponse {
+            operation_id: "operation-42".to_string(),
+            request_binding_hash: "44".repeat(32),
             capability_id: "cap-leaf".to_string(),
             grant_index: 2,
             hold_id: "hold-42".to_string(),
@@ -427,6 +552,8 @@ mod tests {
     #[test]
     fn invocation_capture_contract_is_distinct_from_monetary_capture() {
         let request = CaptureInvocationReservationsRequest {
+            operation_id: "operation-42".to_string(),
+            request_binding_hash: "44".repeat(32),
             capability_id: "cap-leaf".to_string(),
             grant_index: 2,
             hold_id: "hold-42".to_string(),
@@ -441,6 +568,8 @@ mod tests {
         assert_unknown_field_rejected(&request);
 
         let response = CaptureInvocationReservationsResponse {
+            operation_id: "operation-42".to_string(),
+            request_binding_hash: "44".repeat(32),
             capability_id: "cap-leaf".to_string(),
             grant_index: 2,
             hold_id: "hold-42".to_string(),
@@ -464,12 +593,34 @@ mod tests {
         assert_eq!(encoded["realizedSpendUnits"], 0);
         assert_round_trip(&response);
         assert_unknown_field_rejected(&response);
+
+        let point_request = CaptureInvocationPointQueryRequest {
+            capture_request: request,
+        };
+        let point_response = CaptureInvocationPointQueryResponse {
+            operation_id: "operation-42".to_string(),
+            request_binding_hash: "44".repeat(32),
+            capture: Some(response),
+        };
+        let replica_response = CaptureInvocationReplicaQueryResponse {
+            protocol_version: "chio.admission-consensus.v1".to_string(),
+            membership_digest: "55".repeat(32),
+            node_id: "https://node-a.example".to_string(),
+            query: point_response.clone(),
+        };
+        assert_round_trip(&point_request);
+        assert_unknown_field_rejected(&point_request);
+        assert_round_trip(&point_response);
+        assert_unknown_field_rejected(&point_response);
+        assert_round_trip(&replica_response);
+        assert_unknown_field_rejected(&replica_response);
     }
 
     #[test]
     fn combined_admission_capture_contract_round_trips_all_commit_evidence() {
         let request = CombinedAdmissionCaptureRequest {
             operation_id: "operation-42".to_string(),
+            request_binding_hash: "44".repeat(32),
             capability_id: "cap-leaf".to_string(),
             grant_index: 2,
             hold_id: "hold-42".to_string(),
@@ -478,6 +629,8 @@ mod tests {
             revocation_set: revocation_set(),
             bound_revocation_set_digest: "11".repeat(32),
             authorization_artifact_digests: vec!["55".repeat(32)],
+            aggregate_root_capability_id: Some("cap-root".to_string()),
+            aggregate_root_binding_digest: Some("44".repeat(32)),
             last_observed_revocation_index: Some(40),
         };
         let encoded = serde_json::to_value(&request).test_unwrap();
@@ -491,25 +644,36 @@ mod tests {
             hold_id: "hold-42".to_string(),
             event_id: "hold-42:combined-capture".to_string(),
             checked_revocation_set_digest: "11".repeat(32),
-            invocation_quotas: admission_evidence().invocation_quotas,
+            invocation_quotas: admission_evidence()
+                .invocation_quotas
+                .into_iter()
+                .map(capture_transition)
+                .collect(),
             authorization_artifact_digests: vec!["55".repeat(32)],
+            aggregate_root_capability_id: Some("cap-root".to_string()),
+            aggregate_root_binding_digest: Some("44".repeat(32)),
             budget_commit_index: Some(42),
             revocation_commit_index: 42,
             authority_commit_index: 42,
-            leader_epoch: Some(7),
+            leader_epoch: 7,
             guarantee_level: BudgetGuaranteeLevelView::HaLinearizable,
             authority: Some(mutation_authority()),
+            invocation_state: BudgetInvocationReservationStateView::Captured,
+            monetary_state: BudgetMonetaryHoldStateView::Exposed,
         };
         assert_round_trip(&metadata);
         assert_unknown_field_rejected(&metadata);
         let response = CombinedAdmissionCaptureResponse {
             operation_id: "operation-42".to_string(),
+            request_binding_hash: "44".repeat(32),
             capability_id: "cap-leaf".to_string(),
             grant_index: 2,
             hold_id: "hold-42".to_string(),
             event_id: "hold-42:combined-capture".to_string(),
             outcome: AdmissionCaptureOutcomeView::Captured,
             budget: Some(CaptureInvocationReservationsResponse {
+                operation_id: "operation-42".to_string(),
+                request_binding_hash: "44".repeat(32),
                 capability_id: "cap-leaf".to_string(),
                 grant_index: 2,
                 hold_id: "hold-42".to_string(),
@@ -542,8 +706,40 @@ mod tests {
         assert_round_trip(&response);
         assert_unknown_field_rejected(&response);
 
+        let point_request = AdmissionCapturePointQueryRequest {
+            capture_request: request.clone(),
+        };
+        assert_round_trip(&point_request);
+        assert_unknown_field_rejected(&point_request);
+        let point_response = AdmissionCapturePointQueryResponse {
+            operation_id: request.operation_id.clone(),
+            request_binding_hash: request.request_binding_hash.clone(),
+            capture: Some(response.clone()),
+        };
+        assert_round_trip(&point_response);
+        assert_unknown_field_rejected(&point_response);
+        let miss = AdmissionCapturePointQueryResponse {
+            operation_id: request.operation_id.clone(),
+            request_binding_hash: request.request_binding_hash.clone(),
+            capture: None,
+        };
+        let encoded_miss = serde_json::to_value(&miss).test_unwrap();
+        assert!(encoded_miss.get("capture").is_none());
+        assert_round_trip(&miss);
+        assert_unknown_field_rejected(&miss);
+
+        let replica = AdmissionCaptureReplicaQueryResponse {
+            protocol_version: ADMISSION_CONSENSUS_PROTOCOL_VERSION.to_string(),
+            membership_digest: "66".repeat(32),
+            node_id: "https://node-a.example".to_string(),
+            query: point_response,
+        };
+        assert_round_trip(&replica);
+        assert_unknown_field_rejected(&replica);
+
         let denied = CombinedAdmissionCaptureResponse {
             operation_id: "operation-43".to_string(),
+            request_binding_hash: "45".repeat(32),
             capability_id: "cap-leaf".to_string(),
             grant_index: 2,
             hold_id: "hold-43".to_string(),
@@ -557,14 +753,22 @@ mod tests {
                 hold_id: "hold-43".to_string(),
                 event_id: "hold-43:combined-capture".to_string(),
                 checked_revocation_set_digest: "11".repeat(32),
-                invocation_quotas: admission_evidence().invocation_quotas,
+                invocation_quotas: admission_evidence()
+                    .invocation_quotas
+                    .into_iter()
+                    .map(AdmissionCaptureInvocationQuotaView::Definition)
+                    .collect(),
                 authorization_artifact_digests: vec!["55".repeat(32)],
+                aggregate_root_capability_id: Some("cap-root".to_string()),
+                aggregate_root_binding_digest: Some("44".repeat(32)),
                 budget_commit_index: None,
                 revocation_commit_index: 43,
                 authority_commit_index: 43,
-                leader_epoch: Some(7),
+                leader_epoch: 7,
                 guarantee_level: BudgetGuaranteeLevelView::HaLinearizable,
                 authority: Some(mutation_authority()),
+                invocation_state: BudgetInvocationReservationStateView::Authorized,
+                monetary_state: BudgetMonetaryHoldStateView::Exposed,
             },
         };
         let encoded = serde_json::to_value(&denied).test_unwrap();
@@ -582,6 +786,19 @@ mod tests {
             BUDGET_CAPTURE_INVOCATIONS_PATH,
             "/v1/budgets/capture-invocations"
         );
+        assert_eq!(
+            BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH,
+            "/v1/budgets/capture-invocations/query"
+        );
         assert_eq!(ADMISSION_CAPTURE_PATH, "/v1/admissions/capture");
+        assert_eq!(ADMISSION_CAPTURE_QUERY_PATH, "/v1/admissions/capture/query");
+        assert_eq!(
+            INTERNAL_ADMISSION_CAPTURE_QUERY_PATH,
+            "/v1/internal/admission-consensus/capture-query"
+        );
+        assert_eq!(
+            INTERNAL_INVOCATION_CAPTURE_QUERY_PATH,
+            "/v1/internal/admission-consensus/invocation-capture-query"
+        );
     }
 }

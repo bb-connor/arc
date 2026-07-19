@@ -21,7 +21,8 @@ fn write_file(dir: &std::path::Path, name: &str, content: &str) -> std::io::Resu
 }
 
 #[test]
-fn loader_collects_artifacts_from_all_three_families() -> Result<(), Box<dyn std::error::Error>> {
+fn loader_collects_artifacts_from_all_registered_families() -> Result<(), Box<dyn std::error::Error>>
+{
     let tmp = TempDir::new()?;
     let root = tmp.path();
     write_file(&root.join("fuzz/artifacts"), "crash-01.bin", "alpha")?;
@@ -36,15 +37,21 @@ fn loader_collects_artifacts_from_all_three_families() -> Result<(), Box<dyn std
         "01_flipped_byte.json",
         "{}",
     )?;
+    write_file(
+        &root.join("crates/core/chio-adversarial-suite/cases/label_downgrade"),
+        "label-downgrade-001.json",
+        "{}",
+    )?;
     let sources = SeedCorpusSources::rooted_at(root);
     let corpus = load_seed_corpus(&sources)?;
-    assert_eq!(corpus.len(), 4);
+    assert_eq!(corpus.len(), 5);
     assert!(corpus.missing_sources.is_empty());
 
     let families: Vec<&str> = corpus.artifacts.iter().map(|a| a.family.as_str()).collect();
     assert!(families.contains(&"fuzz_artifacts"));
     assert!(families.contains(&"replay_attack"));
     assert!(families.contains(&"tampered_signature"));
+    assert!(families.contains(&"security_adversarial_cases"));
 
     // Sorted lexicographically by path: ascending order.
     let paths: Vec<_> = corpus.artifacts.iter().map(|a| a.path.clone()).collect();
@@ -72,13 +79,16 @@ fn loader_records_missing_sources_without_failing() -> Result<(), Box<dyn std::e
     let sources = SeedCorpusSources::rooted_at(root);
     let corpus = load_seed_corpus(&sources)?;
     assert_eq!(corpus.len(), 1);
-    assert_eq!(corpus.missing_sources.len(), 2);
+    assert_eq!(corpus.missing_sources.len(), 3);
     assert!(corpus
         .missing_sources
         .contains(&"fuzz_artifacts".to_string()));
     assert!(corpus
         .missing_sources
         .contains(&"tampered_signature".to_string()));
+    assert!(corpus
+        .missing_sources
+        .contains(&"security_adversarial_cases".to_string()));
     Ok(())
 }
 
@@ -89,7 +99,7 @@ fn loader_returns_empty_corpus_when_all_sources_missing() -> Result<(), Box<dyn 
     let sources = SeedCorpusSources::rooted_at(tmp.path());
     let corpus = load_seed_corpus(&sources)?;
     assert!(corpus.is_empty());
-    assert_eq!(corpus.missing_sources.len(), 3);
+    assert_eq!(corpus.missing_sources.len(), 4);
     Ok(())
 }
 

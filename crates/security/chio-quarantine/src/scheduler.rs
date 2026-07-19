@@ -2,16 +2,19 @@ use crate::executor::{ExecutorError, ResponseExecutor};
 use crate::state_machine::decode_response_record;
 use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{
-    ActionId, EffectPort, ErrorCode, LeaseOwnerId, PortError, PortErrorKind, RecordId,
-    ResponsePlanKey, ResponsePlanRecord, ResponseSchedulerStore, ScheduledWork,
+    ActionId, AlertDeliveryStatus, EffectId, EffectPort, ErrorCode, LeaseOwnerId,
+    LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, PortError, PortErrorKind,
+    RecordId, ResponsePlanKey, ResponsePlanRecord, ResponseSchedulerStore, ScheduledWork,
     SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerHealthPageRequest,
     SchedulerHealthPort, SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest,
     SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey, SecurityAlert, SecurityAlertPort,
-    SecurityReceiptSink, TenantId,
+    SecurityReceiptSink, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
 };
-use chio_security_types::ResponseState;
+use chio_security_types::{
+    ResponseEffectKind, ResponseEffectProgress, ResponseSnapshot, ResponseState,
+};
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -26,6 +29,13 @@ pub trait ScheduledResponseExecutor: Send + Sync {
         work: &ScheduledWork,
         now_unix_ms: u64,
     ) -> Result<ResponsePlanRecord, ExecutorError>;
+
+    fn maintain_lineage_fences(
+        &self,
+        _request: &LineageFenceMaintenanceRequest,
+    ) -> Result<LineageFenceMaintenanceOutcome, PortError> {
+        Err(PortError::unavailable())
+    }
 }
 
 impl<
@@ -42,6 +52,13 @@ impl<
         now_unix_ms: u64,
     ) -> Result<ResponsePlanRecord, ExecutorError> {
         self.execute(current, work, now_unix_ms)
+    }
+
+    fn maintain_lineage_fences(
+        &self,
+        request: &LineageFenceMaintenanceRequest,
+    ) -> Result<LineageFenceMaintenanceOutcome, PortError> {
+        self.maintain_effect_lineage_fences(request)
     }
 }
 
@@ -134,6 +151,33 @@ impl<
         &self,
         request: &SchedulerTickRequest,
     ) -> Result<Vec<SchedulerWorkOutcome>, SchedulerError> {
+        let claimed = self.claim(request)?;
+        let mut outcomes = Vec::with_capacity(claimed.len());
+        for work in claimed {
+            match self.process(&work, request.now_unix_ms) {
+                Ok(outcome) => outcomes.push(outcome),
+                Err(SchedulerError::Store(error) | SchedulerError::Health(error)) => {
+                    outcomes.push(SchedulerWorkOutcome::ProcessingFailed {
+                        action_id: work.action_id,
+                        error_code: error.code().clone(),
+                    });
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(outcomes)
+    }
+
+    /// Claims one bounded deterministic batch without beginning effect work.
+    ///
+    /// Production lifecycle workers use this split phase to release work that
+    /// has not started when shutdown begins and to renew queued leases before
+    /// handing them to the executor. The returned order is authoritative store
+    /// order and must be preserved by the caller.
+    pub fn claim(
+        &self,
+        request: &SchedulerTickRequest,
+    ) -> Result<Vec<ScheduledWork>, SchedulerError> {
         self.observe_clock(&request.tenant_id, request.now_unix_ms)?;
         let lease_expires_at_unix_ms = request
             .now_unix_ms
@@ -147,26 +191,15 @@ impl<
             lease_expires_at_unix_ms,
             max_claims: self.policy.max_claims,
         })?;
-        let mut outcomes = Vec::with_capacity(claimed.len());
-        for work in claimed {
+        for work in &claimed {
             if work.tenant_id != request.tenant_id
                 || work.lease_owner_id != request.lease_owner_id
                 || work.lease_expires_at_unix_ms != lease_expires_at_unix_ms
             {
                 return Err(SchedulerError::InvalidClaim);
             }
-            match self.process(&work, request.now_unix_ms) {
-                Ok(outcome) => outcomes.push(outcome),
-                Err(SchedulerError::Store(error) | SchedulerError::Health(error)) => {
-                    outcomes.push(SchedulerWorkOutcome::ProcessingFailed {
-                        action_id: work.action_id,
-                        error_code: error.code().clone(),
-                    });
-                }
-                Err(error) => return Err(error),
-            }
         }
-        Ok(outcomes)
+        Ok(claimed)
     }
 
     pub fn process(
@@ -196,6 +229,25 @@ impl<
         };
         let current_snapshot =
             decode_response_record(&current).map_err(|_| SchedulerError::InvalidExecutionRecord)?;
+        let installed_lineage_fences = installed_lineage_fence_effect_ids(&current_snapshot);
+        if !installed_lineage_fences.is_empty() {
+            match self.maintain_lineage_fences(
+                &current_snapshot,
+                &installed_lineage_fences,
+                work,
+                now_unix_ms,
+            ) {
+                Ok(()) => {}
+                Err(error) if error.kind() == PortErrorKind::Conflict => {
+                    return Ok(SchedulerWorkOutcome::LeaseLost {
+                        action_id: work.action_id.clone(),
+                    });
+                }
+                Err(error) => {
+                    return self.schedule_retry(work, now_unix_ms, error.code().clone());
+                }
+            }
+        }
         match self.executor.execute_scheduled(&current, work, now_unix_ms) {
             Ok(record) => {
                 let snapshot = decode_response_record(&record)
@@ -285,6 +337,51 @@ impl<
             .map_err(SchedulerError::Store)
     }
 
+    fn maintain_lineage_fences(
+        &self,
+        snapshot: &ResponseSnapshot,
+        effect_ids: &[EffectId],
+        work: &ScheduledWork,
+        now_unix_ms: u64,
+    ) -> Result<(), PortError> {
+        let renewed_expires_at_unix_ms = now_unix_ms
+            .checked_add(LINEAGE_FENCE_MAX_LEASE_MS)
+            .ok_or_else(PortError::invalid_data)?;
+        if renewed_expires_at_unix_ms <= now_unix_ms {
+            return Err(PortError::conflict());
+        }
+        let outcome = self
+            .executor
+            .maintain_lineage_fences(&LineageFenceMaintenanceRequest {
+                plan: snapshot.plan.clone(),
+                effect_ids: effect_ids.to_vec(),
+                scheduler_work: work.clone(),
+                observed_at_unix_ms: now_unix_ms,
+                renewed_expires_at_unix_ms,
+            })?;
+        let selected = effect_ids
+            .iter()
+            .map(EffectId::as_str)
+            .collect::<BTreeSet<_>>();
+        let mut observed = BTreeSet::new();
+        let invalid_maintained = outcome.maintained.iter().any(|maintained| {
+            !selected.contains(maintained.effect_id.as_str())
+                || !observed.insert(maintained.effect_id.as_str())
+                || maintained.fence.tenant_id != work.tenant_id
+                || maintained.fence.action_id != work.action_id
+                || maintained.fence.scheduler_lease_owner_id != work.lease_owner_id
+                || maintained.fence.scheduler_fencing_token != work.fencing_token
+                || maintained.fence.expires_at_unix_ms != renewed_expires_at_unix_ms
+        });
+        let invalid_completed = outcome.completed_releases.iter().any(|effect_id| {
+            !selected.contains(effect_id.as_str()) || !observed.insert(effect_id.as_str())
+        });
+        if invalid_maintained || invalid_completed || observed != selected {
+            return Err(PortError::integrity_failure());
+        }
+        Ok(())
+    }
+
     pub fn release_for_shutdown(&self, work: &ScheduledWork) -> Result<(), SchedulerError> {
         self.release(work, false)
     }
@@ -349,21 +446,30 @@ impl<
             )?,
         };
         let retry = self.store.record_retry(&request)?;
-        self.deliver_health_event(&retry)?;
+        self.deliver_health_event(&retry, work, now_unix_ms)?;
         Ok(retry_outcome(retry))
     }
 
-    fn deliver_health_event(&self, retry: &SchedulerRetryState) -> Result<(), SchedulerError> {
+    fn deliver_health_event(
+        &self,
+        retry: &SchedulerRetryState,
+        work: &ScheduledWork,
+        now_unix_ms: u64,
+    ) -> Result<(), SchedulerError> {
         if retry.health_event_delivered {
             return Ok(());
         }
         let Some(event_id) = retry.health_event_id.as_ref() else {
             return Ok(());
         };
-        let request = scheduler_health_page_request(retry, event_id)?;
-        self.health
+        let request = scheduler_health_page_request(retry, work, event_id, now_unix_ms)?;
+        let delivery = self
+            .health
             .page_once(&request)
             .map_err(SchedulerError::Health)?;
+        if matches!(delivery, AlertDeliveryStatus::Pending { .. }) {
+            return Ok(());
+        }
         self.store
             .acknowledge_health_event(&SchedulerHealthAckRequest {
                 key: retry.key.clone(),
@@ -397,6 +503,30 @@ impl<
         clocks.insert(tenant_id.as_str().to_owned(), now_unix_ms);
         Ok(())
     }
+}
+
+fn installed_lineage_fence_effect_ids(snapshot: &ResponseSnapshot) -> Vec<EffectId> {
+    if snapshot.state.is_terminal() {
+        return Vec::new();
+    }
+    snapshot
+        .plan
+        .effects
+        .as_slice()
+        .iter()
+        .filter(|effect| effect.kind == ResponseEffectKind::FreezeIssuance)
+        .filter(|effect| {
+            matches!(
+                snapshot.effect_progress(&effect.effect_id),
+                Some(
+                    ResponseEffectProgress::Applied
+                        | ResponseEffectProgress::RollbackRequested
+                        | ResponseEffectProgress::RollbackFailed
+                )
+            )
+        })
+        .map(|effect| effect.effect_id.clone())
+        .collect()
 }
 
 fn bounded_backoff(policy: SchedulerPolicy, completed_attempts: u32) -> u64 {
@@ -458,6 +588,23 @@ fn scheduler_health_ack_id(
     )
 }
 
+fn scheduler_health_page_id(
+    key: &SchedulerWorkKey,
+    event_id: &RecordId,
+    first_failure_at_unix_ms: u64,
+) -> Result<RecordId, SchedulerError> {
+    scheduler_health_id(
+        &SchedulerHealthEventCommitment {
+            kind: "page_command",
+            tenant_id: key.tenant_id.as_str(),
+            action_id: key.action_id.as_str(),
+            first_failure_at_unix_ms,
+            event_id: Some(event_id.as_str()),
+        },
+        "response_scheduler_health_page_",
+    )
+}
+
 fn scheduler_health_id(
     commitment: &SchedulerHealthEventCommitment<'_>,
     prefix: &str,
@@ -470,8 +617,18 @@ fn scheduler_health_id(
 
 fn scheduler_health_page_request(
     retry: &SchedulerRetryState,
+    work: &ScheduledWork,
     event_id: &RecordId,
+    now_unix_ms: u64,
 ) -> Result<SchedulerHealthPageRequest, SchedulerError> {
+    if retry.key.tenant_id != work.tenant_id
+        || retry.key.action_id != work.action_id
+        || retry.attempts == 0
+        || work.fencing_token == 0
+        || retry.first_failure_at_unix_ms > now_unix_ms
+    {
+        return Err(SchedulerError::InvalidRetryState);
+    }
     let event_hash = scheduler_health_hash(
         SCHEDULER_HEALTH_ALERT_HASH_DOMAIN,
         event_id.as_str().as_bytes(),
@@ -480,13 +637,23 @@ fn scheduler_health_page_request(
         SCHEDULER_HEALTH_ALERT_HASH_DOMAIN,
         retry.key.action_id.as_str().as_bytes(),
     );
+    let idempotency_key =
+        scheduler_health_page_id(&retry.key, event_id, retry.first_failure_at_unix_ms)?;
     Ok(SchedulerHealthPageRequest {
         event_id: event_id.clone(),
+        idempotency_key: idempotency_key.clone(),
+        occurred_at_unix_ms: now_unix_ms,
         tenant_id: retry.key.tenant_id.clone(),
         action_id: retry.key.action_id.clone(),
         first_failure_at_unix_ms: retry.first_failure_at_unix_ms,
+        attempts: retry.attempts,
+        scheduler_fencing_token: work.fencing_token,
+        error_code: retry.last_error.clone(),
         alert: SecurityAlert {
             tenant_id: retry.key.tenant_id.clone(),
+            event_id: event_id.clone(),
+            idempotency_key,
+            occurred_at_unix_ms: retry.first_failure_at_unix_ms,
             alert_type: RecordId::new("response_scheduler_unavailable")
                 .map_err(|_| SchedulerError::Canonical)?,
             finding_id_hash: event_hash,
@@ -560,6 +727,8 @@ fn executor_error_code(error: &ExecutorError) -> Result<ErrorCode, SchedulerErro
         ExecutorError::GenerationOverflow => error_code("response.generation_overflow"),
         ExecutorError::InvalidEffectResult => error_code("response.effect_result_invalid"),
         ExecutorError::InvalidEffectJournal => error_code("response.effect_journal_invalid"),
+        ExecutorError::InvalidActiveEvidence => error_code("response.active_evidence_invalid"),
+        ExecutorError::ReceiptLineageMismatch => error_code("response.receipt_lineage_mismatch"),
         ExecutorError::StaleLease => error_code("response.scheduler_lease_stale"),
         ExecutorError::StateMachine(_) => error_code("response.state_machine_error"),
         ExecutorError::WorkMismatch => error_code("response.scheduler_work_mismatch"),

@@ -2,18 +2,39 @@
   "schema": "chio.runtime.proof-regeneration-report.v1",
   "runId": "runtime-loopback-1",
   "accepted": true,
-  "generatedAtUnixMs": 1800000001000,
-  "proofPackageSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "verifierReportSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  "workflowReceiptSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "generatedAtUnixMs": 1766000001000,
+  "proofPackageSha256": "cf14d012202671d7d135c4f7a260772409ecddc9084b668d965ecaedf0561d5f",
+  "verifierReportSha256": "5adaff574d4aa9a1a5d8e8a796fc9d5e1c89385e6d966ac652da6bf07e82c1cb",
+  "workflowReceiptSha256": "fc471951ad918964a9f2393e77a76bff7a22d130aca77b4e18b1d5692c615357",
   "sourceRecords": [
     {
+      "stepIndex": 0,
+      "admissionReportSha256": "f071c68d3f64eeb5ab8b340c6df9badd42b6e019a57b2c85b963af1f7965a923",
+      "toolReceiptSha256": "5b0d97416083f78761c8bad92b582def3841fb0bb22f16d5d8c5d88a35d0fcbb",
+      "bilateralDsseSha256": "a1bf2d847c06442cbda31ef32092ba87e8a995dc2fb644618b600938ca484816",
+      "workflowStepSha256": "6602127ba72b0173fa227442e5a2a6cee99b97457659e42d2a2798d23df90c41"
+    },
+    {
       "stepIndex": 1,
-      "admissionReportSha256": "1111111111111111111111111111111111111111111111111111111111111111",
-      "toolReceiptSha256": "2222222222222222222222222222222222222222222222222222222222222222",
-      "bilateralDsseSha256": "4444444444444444444444444444444444444444444444444444444444444444",
-      "workflowStepSha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      "admissionReportSha256": "a5a704dc5b6935d488c9af753a20ad1ec768a77dc76c6cdb8be842b2b27840da",
+      "toolReceiptSha256": "ff1fb6909480dbb95f2a18635afd410bba37a592c7630ac72537d2208f3c08be",
+      "bilateralDsseSha256": "a3ccb8713c04538863edef80ae458bd192a43388237b65376e44ba1d52e1f86b",
+      "workflowStepSha256": "aecdfe759b4da2761ec2504bbfdebf94c06a03b9f4824a7890ed2d7c8e24c2ba"
+    },
+    {
+      "stepIndex": 2,
+      "admissionReportSha256": "800e0196b18fc5b41cfd204ea90c82e30e98196405ad9b28e317b7e0eba7f19a",
+      "toolReceiptSha256": "e105ef9ec67a1c850ef4b8892bde742eaee5ab7341dac3400388401c75971464",
+      "bilateralDsseSha256": "5063f4543b4713e86bda18ffb567c96a15a2459fa5bc4d418878cf7506984027",
+      "workflowStepSha256": "d9f634101c73cc50eefdb8f61d3892c483810f4edf905bf2b6744eb3f204187b"
     }
   ],
-  "checks": ["runtime_source_records.bound"]
+  "checks": [
+    "runtime_source_records.bound",
+    "runtime_kernel_receipts.captured",
+    "runtime_live_receipts.bound_to_proof_package",
+    "runtime_treaty_buyer_closure.bound",
+    "runtime_verifier_report.canonical_hash_recorded",
+    "runtime_semantic_proof_regeneration.verified"
+  ]
 }

@@ -10,12 +10,90 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::capability::token::CapabilityToken;
+use crate::capability::{
+    governance::{GovernedApprovalToken, GovernedTransactionIntent},
+    threshold_approval::{ThresholdApprovalProposal, MAX_THRESHOLD_APPROVAL_TOKENS},
+    token::CapabilityToken,
+};
+use crate::declassification::SignedDeclassificationGrant;
+use crate::error::{Error, Result};
 use crate::receipt::body::ChioReceipt;
+
+/// Maximum opaque supplemental authorization bytes accepted on one request.
+pub const MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES: usize = 64 * 1024;
+/// Maximum UTF-8 byte length of its non-authoritative correlation reference.
+pub const MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES: usize = 512;
+
+/// Opaque, signed supplemental authorization carried to an installed verifier.
+///
+/// The reference is correlation metadata only. Neither field can directly
+/// supply a quota key or maximum. The kernel derives those values only from
+/// the result of its trusted verifier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct OpaqueSupplementalAuthorization {
+    reference: String,
+    artifact: Vec<u8>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+struct OpaqueSupplementalAuthorizationWire {
+    reference: String,
+    artifact: Vec<u8>,
+}
+
+impl OpaqueSupplementalAuthorization {
+    pub fn new(reference: impl Into<String>, artifact: Vec<u8>) -> Result<Self> {
+        let authorization = Self {
+            reference: reference.into(),
+            artifact,
+        };
+        authorization.validate()?;
+        Ok(authorization)
+    }
+
+    pub fn reference(&self) -> &str {
+        &self.reference
+    }
+
+    pub fn artifact(&self) -> &[u8] {
+        &self.artifact
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.reference.is_empty()
+            || self.reference.len() > MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES
+            || self.reference.chars().any(char::is_control)
+        {
+            return Err(Error::CanonicalJson(
+                "supplemental authorization reference is invalid".into(),
+            ));
+        }
+        if self.artifact.is_empty() || self.artifact.len() > MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES {
+            return Err(Error::CanonicalJson(
+                "supplemental authorization artifact is empty or oversized".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for OpaqueSupplementalAuthorization {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error as _;
+
+        let wire = OpaqueSupplementalAuthorizationWire::deserialize(deserializer)?;
+        Self::new(wire.reference, wire.artifact).map_err(D::Error::custom)
+    }
+}
 
 /// Messages sent from the Agent to the Kernel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AgentMessage {
     /// Request to invoke a tool, presenting a capability token as authority.
     ToolCallRequest {
@@ -28,12 +106,58 @@ pub enum AgentMessage {
         /// Name of the tool to invoke (must be in the token's scope).
         tool: String,
         /// Tool input parameters.
-        params: serde_json::Value,
+        params: Box<serde_json::Value>,
+        /// Opaque signed authorization interpreted only by the installed verifier.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        supplemental_authorization: Option<Box<OpaqueSupplementalAuthorization>>,
+        /// Optional governed transaction intent bound to this invocation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        governed_intent: Option<Box<GovernedTransactionIntent>>,
+        /// Singular one-of-one approval compatibility field.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        approval_token: Option<Box<GovernedApprovalToken>>,
+        /// Complete threshold approval token set.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        approval_tokens: Vec<GovernedApprovalToken>,
+        /// Policy-authority-signed threshold proposal.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        threshold_approval_proposal: Option<Box<ThresholdApprovalProposal>>,
+        /// Optional one-shot grant bound to this exact invocation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        declassification_grant: Option<Box<SignedDeclassificationGrant>>,
     },
     /// Request a listing of the agent's current capabilities.
     ListCapabilities,
     /// Liveness probe.
     Heartbeat,
+}
+
+impl AgentMessage {
+    /// Validate request-level bounds that serde cannot express on a vector field.
+    pub fn validate(&self) -> Result<()> {
+        if let Self::ToolCallRequest {
+            supplemental_authorization,
+            approval_token,
+            approval_tokens,
+            ..
+        } = self
+        {
+            if let Some(authorization) = supplemental_authorization {
+                authorization.validate()?;
+            }
+            if approval_token.is_some() && !approval_tokens.is_empty() {
+                return Err(Error::CanonicalJson(
+                    "approval_token and approval_tokens must not both be supplied".into(),
+                ));
+            }
+            if approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+                return Err(Error::CanonicalJson(
+                    "approval token set exceeds the protocol ceiling".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Messages sent from the Kernel to the Agent.
@@ -211,7 +335,15 @@ mod tests {
             capability_token: Box::new(make_token(&kp)),
             server_id: "srv".to_string(),
             tool: "echo".to_string(),
-            params: serde_json::json!({"text": "hello"}),
+            params: Box::new(serde_json::json!({"text": "hello"})),
+            supplemental_authorization: Some(Box::new(
+                OpaqueSupplementalAuthorization::new("broker:attempt-1", vec![1, 2, 3]).unwrap(),
+            )),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            declassification_grant: None,
         };
 
         let json = serde_json::to_string_pretty(&msg).unwrap();
@@ -222,14 +354,46 @@ mod tests {
                 id,
                 server_id,
                 tool,
+                supplemental_authorization,
                 ..
             } => {
                 assert_eq!(id, "req-001");
                 assert_eq!(server_id, "srv");
                 assert_eq!(tool, "echo");
+                let authorization = supplemental_authorization.unwrap();
+                assert_eq!(authorization.reference(), "broker:attempt-1");
+                assert_eq!(authorization.artifact(), &[1, 2, 3]);
             }
             _ => panic!("wrong variant"),
         }
+    }
+
+    #[test]
+    fn supplemental_authorization_rejects_invalid_bounds() {
+        assert!(OpaqueSupplementalAuthorization::new("", vec![1]).is_err());
+        assert!(OpaqueSupplementalAuthorization::new("broker\nclaim", vec![1]).is_err());
+        assert!(OpaqueSupplementalAuthorization::new("broker:claim", Vec::new()).is_err());
+        assert!(OpaqueSupplementalAuthorization::new(
+            "x".repeat(MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES + 1),
+            vec![1],
+        )
+        .is_err());
+        assert!(OpaqueSupplementalAuthorization::new(
+            "broker:claim",
+            vec![0; MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES + 1],
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn supplemental_authorization_wire_rejects_unknown_fields() {
+        let error = serde_json::from_value::<OpaqueSupplementalAuthorization>(serde_json::json!({
+            "reference": "broker:claim",
+            "artifact": [1, 2, 3],
+            "quota_key": "caller-controlled"
+        }))
+        .unwrap_err();
+        assert!(error.to_string().contains("unknown field"));
     }
 
     #[test]

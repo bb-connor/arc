@@ -1,11 +1,12 @@
 use super::*;
 
-pub(crate) const ADMISSION_CONSENSUS_PROTOCOL_VERSION: &str = "chio.admission-consensus.v2";
+pub(crate) const ADMISSION_CONSENSUS_PROTOCOL_VERSION: &str = "chio.admission-consensus.v3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AdmissionCommandKind {
     LeadershipBarrier,
+    IncrementInvocation,
     CompositeAuthorize,
     CaptureInvocations,
     ReverseExposure,
@@ -183,6 +184,13 @@ pub(crate) struct AdmissionConsensusSnapshot {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ConsensusCompositeAuthorizeCommand {
     pub(crate) request: CompositeBudgetAuthorizeRequest,
+    pub(crate) authority: BudgetMutationAuthorityView,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ConsensusIncrementInvocationCommand {
+    pub(crate) request: TryIncrementBudgetRequest,
     pub(crate) authority: BudgetMutationAuthorityView,
 }
 

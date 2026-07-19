@@ -125,7 +125,9 @@ fn make_request(id: &str, cap: &CapabilityToken) -> ToolCallRequest {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 

@@ -359,7 +359,7 @@ fn evaluate_scenario(scenario: &VerdictScenario) -> Result<VerdictTuple, String>
     }
 
     let mut kernel = ChioKernel::new(kernel_config());
-    configure_replay_store(&mut kernel, scenario);
+    configure_replay_store(&mut kernel, scenario)?;
     configure_redaction_hooks(&mut kernel, scenario);
     kernel.register_tool_server(Box::new(MatrixToolServer::new()));
 
@@ -390,7 +390,9 @@ fn evaluate_scenario(scenario: &VerdictScenario) -> Result<VerdictTuple, String>
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     if scenario.category == ScenarioCategory::Replay {
@@ -434,9 +436,12 @@ fn kernel_config() -> KernelConfig {
     }
 }
 
-fn configure_replay_store(kernel: &mut ChioKernel, scenario: &VerdictScenario) {
+fn configure_replay_store(
+    kernel: &mut ChioKernel,
+    scenario: &VerdictScenario,
+) -> Result<(), String> {
     if scenario.category != ScenarioCategory::Replay {
-        return;
+        return Ok(());
     }
 
     let mut config = ExecutionNonceConfig::default();
@@ -447,7 +452,10 @@ fn configure_replay_store(kernel: &mut ChioKernel, scenario: &VerdictScenario) {
         config.require_nonce = true;
     }
     let store = InMemoryExecutionNonceStore::from_config(&config);
-    kernel.set_execution_nonce_store(config, Box::new(store));
+    kernel
+        .set_execution_nonce_store(config, Box::new(store))
+        .map_err(|error| format!("nonce store installation failed: {error}"))?;
+    Ok(())
 }
 
 fn configure_redaction_hooks(kernel: &mut ChioKernel, scenario: &VerdictScenario) {
@@ -670,6 +678,7 @@ fn replay_reason_code(error: &ExecutionNonceError) -> &'static str {
         | ExecutionNonceError::InvalidSignature
         | ExecutionNonceError::BadSchema { .. }
         | ExecutionNonceError::Encoding(_)
+        | ExecutionNonceError::AuthorityTrust(_)
         | ExecutionNonceError::Store(_) => REASON_REPLAY_DRIFT,
     }
 }

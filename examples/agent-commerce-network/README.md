@@ -36,6 +36,12 @@ cargo build --bin chio
 Set `OPENAI_API_KEY` for live agent reasoning. Without it, runs a
 deterministic fallback flow (CI mode).
 
+`provider/run-edge.sh` requires `PROVIDER_RESUME_HMAC_KEYRING` to name a
+mode-0600 keyring using schema `chio.remote-mcp.resume-hmac-keyring.v1`. Keep
+that dedicated resume key stable across edge restarts and separate from edge,
+admin, control, and authority credentials. `smoke.sh` provisions an isolated
+random keyring inside its artifact directory.
+
 ## What Chio Governs
 
 - **Budget limits** on capability grants (`maxTotalCost`, `maxCostPerInvocation`)

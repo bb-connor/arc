@@ -186,7 +186,9 @@ fn capability_request() -> (ToolCallRequest, ChioScope, String, String) {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     (request, scope, "agent-1".to_string(), "srv".to_string())
@@ -241,6 +243,7 @@ fn publish_pull_verify_swap_rollback_and_metrics_gate() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
 
     let mut canary_verdicts = Vec::new();

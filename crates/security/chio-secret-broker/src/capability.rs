@@ -1,4 +1,4 @@
-use chio_core_types::{canonical_json_bytes, Keypair};
+use chio_core_types::{canonical_json_bytes, SigningBackend};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -16,26 +16,33 @@ struct CapabilitySigningInput<'a> {
 
 pub fn issue_capability(
     body: BrokerCapabilityBody,
-    signer: &Keypair,
+    signer: &dyn SigningBackend,
     production: bool,
 ) -> Result<SignedBrokerCapability> {
     body.validate(production)?;
-    if body.issuer != signer.public_key() {
-        return Err(BrokerError::AuthorizationDenied(
-            "capability issuer does not match the signing key".to_string(),
-        ));
-    }
     let input = CapabilitySigningInput {
         domain: CAPABILITY_SIGNATURE_DOMAIN,
         body: &body,
     };
-    let (signature, _) = signer
-        .sign_canonical(&input)
+    let canonical = canonical_json_bytes(&input).map_err(|error| {
+        BrokerError::Invariant(format!("capability signing input encoding failed: {error}"))
+    })?;
+    let signed = signer
+        .sign_bytes_for_identity(&body.issuer, &canonical)
         .map_err(|error| BrokerError::Invariant(format!("capability signing failed: {error}")))?;
+    if signed.public_key != body.issuer
+        || signed.algorithm != body.issuer.algorithm()
+        || signed.signature.algorithm() != signed.algorithm
+        || !signed.public_key.verify(&canonical, &signed.signature)
+    {
+        return Err(BrokerError::Invariant(
+            "capability signing backend returned a mismatched identity or signature".to_string(),
+        ));
+    }
     Ok(SignedBrokerCapability {
         body,
-        algorithm: signer.public_key().algorithm(),
-        signature,
+        algorithm: signed.algorithm,
+        signature: signed.signature,
     })
 }
 
@@ -89,7 +96,11 @@ pub fn capability_digest(capability: &SignedBrokerCapability) -> Result<String> 
 
 #[cfg(test)]
 mod tests {
-    use chio_core_types::Keypair;
+    use chio_core_types::{
+        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+        SigningOutcome,
+    };
+    use chio_test_support::prelude::*;
 
     use super::*;
     use crate::protocol::{
@@ -148,7 +159,8 @@ mod tests {
     #[test]
     fn every_body_byte_is_covered_by_canonical_signature() {
         let signer = Keypair::from_seed(&[1; 32]);
-        let capability = issue_capability(body(&signer), &signer, true).expect("issue");
+        let backend = Ed25519Backend::new(signer.clone());
+        let capability = issue_capability(body(&signer), &backend, true).test_expect("issue");
         verify_capability(
             &capability,
             &signer.public_key(),
@@ -156,11 +168,104 @@ mod tests {
             20,
             true,
         )
-        .expect("verify");
+        .test_expect("verify");
         let mut changed = capability.clone();
         changed.body.destination.exact_path_and_query = "/other".to_string();
         assert!(
             verify_capability(&changed, &signer.public_key(), "broker-service", 20, true).is_err()
         );
+    }
+
+    struct AtomicOnlyBackend {
+        keypair: Keypair,
+    }
+
+    impl SigningBackend for AtomicOnlyBackend {
+        fn algorithm(&self) -> SigningAlgorithm {
+            self.keypair.public_key().algorithm()
+        }
+
+        fn public_key(&self) -> PublicKey {
+            self.keypair.public_key()
+        }
+
+        fn sign_bytes(&self, _message: &[u8]) -> chio_core_types::Result<Signature> {
+            Err(Error::InvalidSignature(
+                "legacy split signing is disabled".to_string(),
+            ))
+        }
+
+        fn sign_bytes_with_identity(
+            &self,
+            message: &[u8],
+        ) -> chio_core_types::Result<SigningOutcome> {
+            Ok(SigningOutcome {
+                public_key: self.keypair.public_key(),
+                algorithm: self.keypair.public_key().algorithm(),
+                signature: self.keypair.sign(message),
+            })
+        }
+    }
+
+    struct SelectorCutoverBackend {
+        selected_before_sign: Keypair,
+        selected_during_sign: Keypair,
+    }
+
+    impl SigningBackend for SelectorCutoverBackend {
+        fn algorithm(&self) -> SigningAlgorithm {
+            self.selected_before_sign.public_key().algorithm()
+        }
+
+        fn public_key(&self) -> PublicKey {
+            self.selected_before_sign.public_key()
+        }
+
+        fn sign_bytes(&self, _message: &[u8]) -> chio_core_types::Result<Signature> {
+            Err(Error::InvalidSignature(
+                "legacy split signing is disabled".to_string(),
+            ))
+        }
+
+        fn sign_bytes_with_identity(
+            &self,
+            message: &[u8],
+        ) -> chio_core_types::Result<SigningOutcome> {
+            Ok(SigningOutcome {
+                public_key: self.selected_during_sign.public_key(),
+                algorithm: self.selected_during_sign.public_key().algorithm(),
+                signature: self.selected_during_sign.sign(message),
+            })
+        }
+    }
+
+    #[test]
+    fn capability_issuance_uses_atomic_identity_signing() {
+        let keypair = Keypair::from_seed(&[3; 32]);
+        let backend = AtomicOnlyBackend {
+            keypair: keypair.clone(),
+        };
+
+        let capability = issue_capability(body(&keypair), &backend, true).test_expect("issue");
+
+        verify_capability(
+            &capability,
+            &keypair.public_key(),
+            "broker-service",
+            20,
+            true,
+        )
+        .test_expect("verify");
+    }
+
+    #[test]
+    fn capability_issuance_fails_closed_across_selector_cutover() {
+        let selected_before_sign = Keypair::from_seed(&[4; 32]);
+        let backend = SelectorCutoverBackend {
+            selected_before_sign: selected_before_sign.clone(),
+            selected_during_sign: Keypair::from_seed(&[5; 32]),
+        };
+
+        assert!(issue_capability(body(&selected_before_sign), &backend, true).is_err());
     }
 }

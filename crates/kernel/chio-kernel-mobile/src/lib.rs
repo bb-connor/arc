@@ -73,6 +73,7 @@ use chio_core_types::capability::{
 };
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
+use chio_core_types::OpaqueSupplementalAuthorization;
 use chio_custody_hw::{
     verify_app_attest, verify_mobile_receipt_chain, verify_play_integrity,
     AppAttestVerificationInput, AttestationError, PlayIntegrityVerificationInput,
@@ -195,6 +196,7 @@ struct AdmittedChildBudget {
 
 /// Tool-call request payload.
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct EvaluateRequestBody {
     request_id: String,
     tool_name: String,
@@ -202,6 +204,8 @@ struct EvaluateRequestBody {
     agent_id: String,
     #[serde(default)]
     arguments: serde_json::Value,
+    #[serde(default)]
+    supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
 }
 
 /// Shape of the JSON object returned by [`evaluate`].
@@ -322,6 +326,13 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
                 message: format!("capability token: {error}"),
             }
         })?;
+
+    if parsed.request.supplemental_authorization.is_some() {
+        return Err(ChioMobileError::InvalidCapability {
+            message: "mobile evaluation cannot verify or reserve supplemental authorization"
+                .to_string(),
+        });
+    }
 
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
 

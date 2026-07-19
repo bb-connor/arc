@@ -34,6 +34,7 @@ pub mod budget_store;
 pub mod capability_lineage;
 pub mod dead_letters;
 pub mod encrypted_blob;
+pub mod enterprise_migration_state;
 pub mod evidence_export;
 pub mod execution_nonce_store;
 pub mod iou_store;
@@ -43,6 +44,7 @@ pub mod memory_provenance_store;
 pub mod receipt_query;
 pub mod receipt_store;
 pub mod revocation_store;
+pub mod sealed_decoy_registry;
 pub mod security_state;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
@@ -109,16 +111,27 @@ pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{
-    SqliteBudgetAuthorizationAuthority, SqliteBudgetAuthorizationOutcome,
-    SqliteBudgetCurrentAuthority, SqliteBudgetStore,
+    BudgetInvocationQuotaUsageRecord, SqliteBudgetAuthorizationAuthority,
+    SqliteBudgetAuthorizationOutcome, SqliteBudgetCurrentAuthority, SqliteBudgetStore,
+};
+pub use capability_lineage::{
+    CapabilitySessionAdmissionRegistration, FinalizeCapabilityIssuanceInput,
+    PrepareCapabilityIssuanceIntentInput, PreparedCapabilityIssuance,
 };
 pub use encrypted_blob::{
-    decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
-    EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,
+    decrypt_blob, encrypt_blob, BlobHandle, BlobReference, BlobReferenceMutationOutcome,
+    BlobStoreError, DecryptError, EncryptError, EncryptedBlob, SqliteEncryptedBlobStore, TenantId,
+    TenantKey,
+};
+pub use enterprise_migration_state::{
+    enterprise_migration_transition_digest, sign_enterprise_migration_transition,
+    SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore,
+    SqliteEnterpriseMigrationStateStoreError,
 };
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
 pub use receipt_store::{BackgroundCheckpointSigner, SqliteReceiptStore};
 pub use revocation_store::SqliteRevocationStore;
+pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
 pub use security_state::SqliteSecurityStateStore;

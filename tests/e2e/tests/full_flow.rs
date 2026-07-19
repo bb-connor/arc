@@ -213,7 +213,9 @@ fn make_request(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -484,6 +486,7 @@ async fn full_flow_revocation_cascade() {
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "before revocation"}),
         dpop_proof: None,
@@ -492,6 +495,7 @@ async fn full_flow_revocation_cascade() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        declassification_grant: None,
     };
     let resp_ok = kernel.evaluate_tool_call(&req_ok).await.unwrap();
     assert_eq!(
@@ -512,6 +516,7 @@ async fn full_flow_revocation_cascade() {
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "after revocation"}),
         dpop_proof: None,
@@ -520,6 +525,7 @@ async fn full_flow_revocation_cascade() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        declassification_grant: None,
     };
     let resp_revoked = kernel.evaluate_tool_call(&req_revoked).await.unwrap();
 
@@ -832,6 +838,7 @@ async fn full_flow_untrusted_issuer() {
         server_id: "srv".to_string(),
         agent_id: agent_kp.public_key().to_hex(),
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
         arguments: serde_json::json!({}),
         dpop_proof: None,
@@ -840,6 +847,7 @@ async fn full_flow_untrusted_issuer() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let resp = kernel.evaluate_tool_call(&req).await.unwrap();

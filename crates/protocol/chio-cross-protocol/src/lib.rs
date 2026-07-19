@@ -11,6 +11,7 @@ pub mod discovery;
 pub mod error;
 pub mod execution;
 pub mod lifecycle;
+pub mod negotiation;
 pub mod orchestrator;
 pub mod routing;
 pub mod semantic_hints;

@@ -48,6 +48,40 @@ fn parse_tool_call_operation_execution_nonce(
     }
 }
 
+fn reject_session_operation_reserved_receipt_metadata(
+    operation: &SessionOperation,
+) -> Result<(), KernelError> {
+    match operation {
+        SessionOperation::ToolCall(tool_call) => {
+            reject_reserved_receipt_metadata(tool_call.extra_metadata.as_ref())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn tool_call_operation_with_manifest_security(
+    operation: &ToolCallOperation,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+    security: &chio_manifest::BridgeSecurityMetadata,
+) -> Result<ToolCallOperation, KernelError> {
+    reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
+    registry
+        .validate_invocation_arguments(
+            &operation.server_id,
+            &operation.tool_name,
+            security,
+            &operation.arguments,
+        )
+        .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))?;
+    let mut trusted = operation.clone();
+    trusted.extra_metadata = Some(
+        security
+            .merge_into_kernel_metadata(trusted.extra_metadata.take())
+            .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))?,
+    );
+    Ok(trusted)
+}
+
 impl ChioKernel {
     pub fn open_session(
         &self,
@@ -468,6 +502,17 @@ impl ChioKernel {
         &self,
         snapshot: &SessionAnchorSnapshot,
     ) -> Result<chio_core::session::SessionAnchor, KernelError> {
+        self.signed_session_anchor_for_snapshot_with_backend(
+            snapshot,
+            self.authority_signing_backend.as_ref(),
+        )
+    }
+
+    pub(crate) fn signed_session_anchor_for_snapshot_with_backend(
+        &self,
+        snapshot: &SessionAnchorSnapshot,
+        backend: &dyn chio_core::crypto::SigningBackend,
+    ) -> Result<chio_core::session::SessionAnchor, KernelError> {
         let body = chio_core::session::SessionAnchorBody::new(
             snapshot.session_anchor.id().to_string(),
             chio_core::session::SessionAnchorContext::new(
@@ -478,15 +523,22 @@ impl ChioKernel {
             ),
             snapshot.session_anchor.auth_epoch(),
             snapshot.session_anchor.issued_at(),
-            self.config.keypair.public_key(),
+            backend.public_key(),
         )
         .map_err(|error| {
             KernelError::Internal(format!("failed to build session anchor body: {error}"))
         })?;
 
-        chio_core::session::SessionAnchor::sign(body, &self.config.keypair).map_err(|error| {
-            KernelError::Internal(format!("failed to sign session anchor: {error}"))
-        })
+        let anchor = chio_core::session::SessionAnchor::sign_with_backend(body, backend).map_err(
+            |error| KernelError::Internal(format!("failed to sign session anchor: {error}")),
+        )?;
+        if !self.verify_trusted_session_anchor(&anchor)? {
+            return Err(KernelError::Internal(
+                "freshly signed session anchor is not trusted under the runtime authority"
+                    .to_string(),
+            ));
+        }
+        Ok(anchor)
     }
 
     fn persist_session_anchor_snapshot(
@@ -611,9 +663,82 @@ impl ChioKernel {
         operation: &ToolCallOperation,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
+        self.evaluate_tool_call_operation_with_nested_flow_client_inner(
+            context, operation, client, None,
+        )
+    }
+
+    /// Evaluate a nested-flow session tool call with exact live-registry metadata.
+    pub fn evaluate_tool_call_operation_with_nested_flow_client_and_manifest_security<
+        C: NestedFlowClient,
+    >(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+        client: &mut C,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let operation = tool_call_operation_with_manifest_security(operation, registry, security)?;
+        self.evaluate_tool_call_operation_with_nested_flow_client_inner(
+            context, &operation, client, None,
+        )
+    }
+
+    /// Evaluate a nested-flow session tool call with exact live-registry
+    /// metadata and authoritative identity and isolation state.
+    pub fn evaluate_tool_call_operation_with_nested_flow_client_and_manifest_security_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+        client: &mut C,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let operation = tool_call_operation_with_manifest_security(operation, registry, security)?;
+        self.evaluate_tool_call_operation_with_nested_flow_client_inner(
+            context,
+            &operation,
+            client,
+            Some(security_context),
+        )
+    }
+
+    /// Evaluate a nested-flow tool call with authoritative identity and
+    /// isolation state supplied by the trusted session boundary.
+    pub fn evaluate_tool_call_operation_with_nested_flow_client_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+        client: &mut C,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
+        self.evaluate_tool_call_operation_with_nested_flow_client_inner(
+            context,
+            operation,
+            client,
+            Some(security_context),
+        )
+    }
+
+    fn evaluate_tool_call_operation_with_nested_flow_client_inner<C: NestedFlowClient>(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+        client: &mut C,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<ToolCallResponse, KernelError> {
         self.validate_web3_evidence_prerequisites()?;
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        self.begin_session_request(context, OperationKind::ToolCall, true)?;
 
         let request = ToolCallRequest {
             request_id: context.request_id.to_string(),
@@ -622,22 +747,40 @@ impl ChioKernel {
             server_id: operation.server_id.clone(),
             agent_id: context.agent_id.clone(),
             arguments: operation.arguments.clone(),
+            supplemental_authorization: operation.supplemental_authorization.clone(),
             dpop_proof: None,
             execution_nonce,
             governed_intent: operation.governed_intent.clone(),
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
+            approval_token: operation.approval_token.clone(),
+            approval_tokens: operation.approval_tokens.clone(),
+            threshold_approval_proposal: operation.threshold_approval_proposal.clone(),
             model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: operation.declassification_grant.clone(),
         };
-
-        let result = self.evaluate_tool_call_with_nested_flow_client(
-            context,
+        self.validate_security_invocation_context_binding(
             &request,
-            client,
-            operation.extra_metadata.clone(),
-        );
+            security_context,
+            Some(&context.session_id),
+        )?;
+        self.begin_session_request(context, OperationKind::ToolCall, true)?;
+
+        let result = match security_context {
+            Some(security_context) => self
+                .evaluate_tool_call_with_nested_flow_client_and_security_context(
+                    context,
+                    &request,
+                    client,
+                    operation.extra_metadata.clone(),
+                    security_context,
+                ),
+            None => self.evaluate_tool_call_with_nested_flow_client(
+                context,
+                &request,
+                client,
+                operation.extra_metadata.clone(),
+            ),
+        };
         let terminal_state = match &result {
             Ok(response) => response.terminal_state.clone(),
             Err(KernelError::RequestCancelled { request_id, reason })
@@ -673,9 +816,69 @@ impl ChioKernel {
         operation: &ToolCallOperation,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
+        self.evaluate_tool_call_operation_with_nested_flow_client_async_inner(
+            context, operation, client, None,
+        )
+        .await
+    }
+
+    /// Async-native nested-flow evaluation with authoritative identity and
+    /// isolation state supplied by the trusted session boundary.
+    pub async fn evaluate_tool_call_operation_with_nested_flow_client_async_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+        client: &mut C,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
+        self.evaluate_tool_call_operation_with_nested_flow_client_async_inner(
+            context,
+            operation,
+            client,
+            Some(security_context),
+        )
+        .await
+    }
+
+    /// Async-native nested-flow evaluation with exact live-registry metadata
+    /// and authoritative identity and isolation state.
+    pub async fn evaluate_tool_call_operation_with_nested_flow_client_async_and_manifest_security_and_security_context<
+        C: NestedFlowClient,
+    >(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+        client: &mut C,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let operation = tool_call_operation_with_manifest_security(operation, registry, security)?;
+        self.evaluate_tool_call_operation_with_nested_flow_client_async_inner(
+            context,
+            &operation,
+            client,
+            Some(security_context),
+        )
+        .await
+    }
+
+    async fn evaluate_tool_call_operation_with_nested_flow_client_async_inner<
+        C: NestedFlowClient,
+    >(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+        client: &mut C,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<ToolCallResponse, KernelError> {
         self.validate_web3_evidence_prerequisites()?;
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        self.begin_session_request(context, OperationKind::ToolCall, true)?;
 
         let request = ToolCallRequest {
             request_id: context.request_id.to_string(),
@@ -684,24 +887,45 @@ impl ChioKernel {
             server_id: operation.server_id.clone(),
             agent_id: context.agent_id.clone(),
             arguments: operation.arguments.clone(),
+            supplemental_authorization: operation.supplemental_authorization.clone(),
             dpop_proof: None,
             execution_nonce,
             governed_intent: operation.governed_intent.clone(),
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
+            approval_token: operation.approval_token.clone(),
+            approval_tokens: operation.approval_tokens.clone(),
+            threshold_approval_proposal: operation.threshold_approval_proposal.clone(),
             model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: operation.declassification_grant.clone(),
         };
+        self.validate_security_invocation_context_binding(
+            &request,
+            security_context,
+            Some(&context.session_id),
+        )?;
+        self.begin_session_request(context, OperationKind::ToolCall, true)?;
 
-        let result = self
-            .evaluate_tool_call_with_nested_flow_client_async(
-                context,
-                &request,
-                client,
-                operation.extra_metadata.clone(),
-            )
-            .await;
+        let result = match security_context {
+            Some(security_context) => {
+                self.evaluate_tool_call_with_nested_flow_client_async_and_security_context(
+                    context,
+                    &request,
+                    client,
+                    operation.extra_metadata.clone(),
+                    security_context,
+                )
+                .await
+            }
+            None => {
+                self.evaluate_tool_call_with_nested_flow_client_async(
+                    context,
+                    &request,
+                    client,
+                    operation.extra_metadata.clone(),
+                )
+                .await
+            }
+        };
         let terminal_state = match &result {
             Ok(response) => response.terminal_state.clone(),
             Err(KernelError::RequestCancelled { request_id, reason })
@@ -735,6 +959,99 @@ impl ChioKernel {
         context: &OperationContext,
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
+        reject_session_operation_reserved_receipt_metadata(operation)?;
+        self.evaluate_session_operation_inner(context, operation, None)
+    }
+
+    /// Evaluate a session tool call with exact live-registry bridge security.
+    pub fn evaluate_session_operation_with_manifest_security(
+        &self,
+        context: &OperationContext,
+        operation: &SessionOperation,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+    ) -> Result<SessionOperationResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let SessionOperation::ToolCall(tool_call) = operation else {
+            return Err(KernelError::InvalidReceiptMetadata(
+                "manifest security is valid only for session tool calls".to_string(),
+            ));
+        };
+        let trusted = SessionOperation::ToolCall(Box::new(
+            tool_call_operation_with_manifest_security(tool_call, registry, security)?,
+        ));
+        self.evaluate_session_operation_inner(context, &trusted, None)
+    }
+
+    /// Evaluate a session tool call with exact live-registry metadata and
+    /// authoritative identity and isolation state.
+    pub fn evaluate_session_operation_with_manifest_security_and_security_context(
+        &self,
+        context: &OperationContext,
+        operation: &SessionOperation,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        security: &chio_manifest::BridgeSecurityMetadata,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<SessionOperationResponse, KernelError> {
+        self.require_manifest_flow_runtime(registry)?;
+        let SessionOperation::ToolCall(tool_call) = operation else {
+            return Err(KernelError::InvalidReceiptMetadata(
+                "manifest security is valid only for session tool calls".to_string(),
+            ));
+        };
+        let trusted = SessionOperation::ToolCall(Box::new(
+            tool_call_operation_with_manifest_security(tool_call, registry, security)?,
+        ));
+        self.evaluate_session_operation_inner(context, &trusted, Some(security_context))
+    }
+
+    /// Evaluate a session operation with authoritative identity and isolation
+    /// data supplied by the session boundary.
+    pub fn evaluate_session_operation_with_security_context(
+        &self,
+        context: &OperationContext,
+        operation: &SessionOperation,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<SessionOperationResponse, KernelError> {
+        reject_session_operation_reserved_receipt_metadata(operation)?;
+        self.evaluate_session_operation_inner(context, operation, Some(security_context))
+    }
+
+    fn evaluate_session_operation_inner(
+        &self,
+        context: &OperationContext,
+        operation: &SessionOperation,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<SessionOperationResponse, KernelError> {
+        let tool_call_request = match operation {
+            SessionOperation::ToolCall(tool_call) => Some(ToolCallRequest {
+                request_id: context.request_id.to_string(),
+                capability: tool_call.capability.clone(),
+                tool_name: tool_call.tool_name.clone(),
+                server_id: tool_call.server_id.clone(),
+                agent_id: context.agent_id.clone(),
+                arguments: tool_call.arguments.clone(),
+                supplemental_authorization: tool_call.supplemental_authorization.clone(),
+                dpop_proof: None,
+                execution_nonce: parse_tool_call_operation_execution_nonce(tool_call)?,
+                governed_intent: tool_call.governed_intent.clone(),
+                approval_token: tool_call.approval_token.clone(),
+                approval_tokens: tool_call.approval_tokens.clone(),
+                threshold_approval_proposal: tool_call.threshold_approval_proposal.clone(),
+                model_metadata: tool_call.model_metadata.clone(),
+                federated_origin_kernel_id: None,
+                declassification_grant: tool_call.declassification_grant.clone(),
+            }),
+            _ => None,
+        };
+        if let Some(request) = tool_call_request.as_ref() {
+            self.validate_security_invocation_context_binding(
+                request,
+                security_context,
+                Some(&context.session_id),
+            )?;
+        }
+
         // Install tenant_id scope for the duration of this session-scoped
         // evaluation so every receipt signed here (tool call, resource read
         // deny, etc.) is tagged with the session's tenant. The ToolCall
@@ -742,7 +1059,9 @@ impl ChioKernel {
         // path; the nested scope is a no-op because the value matches, but
         // it keeps non-tool-call branches (e.g. evaluate_resource_read)
         // covered.
-        let tenant_id = self.resolve_tenant_id_for_session(Some(&context.session_id));
+        let tenant_id = security_context
+            .map(|security| security.as_v1().tenant_id().as_str().to_string())
+            .or_else(|| self.resolve_tenant_id_for_session(Some(&context.session_id)));
         let _tenant_request_scope = self
             .scope_receipt_tenant_id_for_request(context.request_id.as_str(), tenant_id.clone());
         let _tenant_scope = scope_receipt_tenant_id(tenant_id);
@@ -756,13 +1075,6 @@ impl ChioKernel {
                 | SessionOperation::GetPrompt(_)
                 | SessionOperation::Complete(_)
         );
-        let parsed_tool_call_execution_nonce = match operation {
-            SessionOperation::ToolCall(tool_call) => {
-                parse_tool_call_operation_execution_nonce(tool_call)?
-            }
-            _ => None,
-        };
-
         if should_track_inflight {
             self.begin_session_request(context, operation_kind, true)?;
         } else {
@@ -775,33 +1087,24 @@ impl ChioKernel {
 
         let evaluation = match operation {
             SessionOperation::ToolCall(tool_call) => {
-                let request = ToolCallRequest {
-                    request_id: context.request_id.to_string(),
-                    capability: tool_call.capability.clone(),
-                    tool_name: tool_call.tool_name.clone(),
-                    server_id: tool_call.server_id.clone(),
-                    agent_id: context.agent_id.clone(),
-                    arguments: tool_call.arguments.clone(),
-                    dpop_proof: None,
-                    execution_nonce: parsed_tool_call_execution_nonce,
-                    governed_intent: tool_call.governed_intent.clone(),
-                    approval_token: None,
-                    approval_tokens: Vec::new(),
-                    threshold_approval_proposal: None,
-                    model_metadata: tool_call.model_metadata.clone(),
-                    federated_origin_kernel_id: None,
-                };
+                let request = tool_call_request.as_ref().ok_or_else(|| {
+                    KernelError::Internal(
+                        "session tool call request was not constructed before admission"
+                            .to_string(),
+                    )
+                })?;
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
 
                 // Pass the session_id so the evaluate path can resolve
                 // tenant_id from session.auth_context for every receipt
                 // signed during this tool call.
-                self.evaluate_tool_call_sync_with_session_context(
-                    &request,
+                self.evaluate_tool_call_sync_with_session_and_security_context(
+                    request,
                     Some(session_roots.as_slice()),
                     tool_call.extra_metadata.clone(),
                     Some(&context.session_id),
+                    security_context,
                 )
                 .map(SessionOperationResponse::ToolCall)
             }

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-privileged-audit-open-v1.schema.json",
+  "title": "Chio broker privileged audit open request v1",
+  "description": "First-phase request on the isolated broker privileged audit transport.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "auditId",
+    "referenceSource",
+    "revocationAuthorityDomain",
+    "request",
+    "referenceCommitmentSalt",
+    "referenceCommitmentSha256",
+    "referenceRequestHead",
+    "referenceRequestBody"
+  ],
+  "properties": {
+    "schema": { "const": "chio.broker-privileged-audit-open.v1" },
+    "auditId": { "$ref": "#/$defs/identifier" },
+    "referenceSource": { "$ref": "#/$defs/identifier" },
+    "revocationAuthorityDomain": { "$ref": "#/$defs/identifier" },
+    "request": { "$ref": "broker-execute-request-v1.schema.json" },
+    "referenceCommitmentSalt": { "$ref": "#/$defs/nonzeroDigest" },
+    "referenceCommitmentSha256": { "$ref": "#/$defs/digest" },
+    "referenceRequestHead": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1048576,
+      "items": { "$ref": "#/$defs/byte" }
+    },
+    "referenceRequestBody": {
+      "type": "array",
+      "maxItems": 524288,
+      "items": { "$ref": "#/$defs/byte" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nonzeroDigest": {
+      "allOf": [
+        { "$ref": "#/$defs/digest" },
+        { "not": { "const": "0000000000000000000000000000000000000000000000000000000000000000" } }
+      ]
+    },
+    "byte": { "type": "integer", "minimum": 0, "maximum": 255 }
+  }
+}

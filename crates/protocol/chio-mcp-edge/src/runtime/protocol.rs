@@ -41,8 +41,11 @@ pub(super) use self::metadata::{
 };
 pub(super) use self::parsing::{
     build_operation_context, parse_completion_argument, parse_completion_reference, parse_cursor,
-    parse_peer_capabilities, parse_request_execution_nonce, parse_request_extra_metadata,
-    parse_request_governed_intent, parse_request_model_metadata, parse_task_id,
+    parse_peer_capabilities, parse_peer_protocol_features, parse_request_approval_token,
+    parse_request_approval_tokens, parse_request_execution_nonce, parse_request_extra_metadata,
+    parse_request_governed_intent, parse_request_model_metadata,
+    parse_request_supplemental_authorization, parse_request_threshold_approval_proposal,
+    parse_task_id,
 };
 pub(super) use self::response::{
     adapter_jsonrpc_error, jsonrpc_error, jsonrpc_error_with_data, jsonrpc_result,

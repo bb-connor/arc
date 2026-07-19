@@ -85,6 +85,13 @@ fn wait_for_trust_service(client: &Client, base_url: &str) {
     panic!("trust service did not become ready");
 }
 
+fn unix_timestamp_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before unix epoch")
+        .as_secs()
+}
+
 #[test]
 fn trust_service_enforces_reputation_gated_issuance_policy() {
     if skip_when_loopback_bind_denied("trust_service_enforces_reputation_gated_issuance_policy") {
@@ -118,8 +125,16 @@ fn trust_service_enforces_reputation_gated_issuance_policy() {
 
     let subject_kp = chio_core::crypto::Keypair::generate();
     let subject_hex = subject_kp.public_key().to_hex();
+    let requested_at = unix_timestamp_now();
+    let denied_request_nonce = "44".repeat(32);
+    let allowed_request_nonce = "55".repeat(32);
 
     let denied_issue_body = serde_json::json!({
+        "schema": "chio.capability-issuance-request.v2",
+        "requestNonce": denied_request_nonce,
+        "requestedAt": requested_at,
+        "tenantId": "tenant-reputation-issuance",
+        "lineageId": "lineage-reputation-issuance-denied",
         "subjectPublicKey": subject_hex,
         "scope": {
             "grants": [{
@@ -148,6 +163,11 @@ fn trust_service_enforces_reputation_gated_issuance_policy() {
     );
 
     let allowed_issue_body = serde_json::json!({
+        "schema": "chio.capability-issuance-request.v2",
+        "requestNonce": allowed_request_nonce.clone(),
+        "requestedAt": requested_at,
+        "tenantId": "tenant-reputation-issuance",
+        "lineageId": "lineage-reputation-issuance-allowed",
         "subjectPublicKey": subject_hex,
         "scope": {
             "grants": [{
@@ -190,7 +210,19 @@ fn trust_service_enforces_reputation_gated_issuance_policy() {
     let allowed_json: serde_json::Value = allowed_response
         .json()
         .expect("parse allowed capability response");
-    let capability_id = allowed_json["capability"]["id"]
+    assert_eq!(
+        allowed_json["schema"].as_str(),
+        Some("chio.capability-issuance-response-envelope.v2")
+    );
+    assert_eq!(
+        allowed_json["body"]["schema"].as_str(),
+        Some("chio.capability-issuance-response.v1")
+    );
+    assert_eq!(
+        allowed_json["body"]["requestNonce"].as_str(),
+        Some(allowed_request_nonce.as_str())
+    );
+    let capability_id = allowed_json["body"]["capability"]["id"]
         .as_str()
         .expect("capability id")
         .to_string();

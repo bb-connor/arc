@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
 use crate::proof::RequestProof;
+use crate::receipt::{SignedBrokerFailureReceipt, SignedBrokerReceipt};
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
 
 pub const BROKER_CAPABILITY_SCHEMA: &str = "chio.broker-capability.v1";
@@ -536,6 +537,15 @@ pub struct BrokerExecuteResponse {
     pub body: Vec<u8>,
     pub evidence: BrokerExecutionEvidence,
     pub receipt_reference: String,
+    pub receipt: SignedBrokerReceipt,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BrokerExecuteFailure {
+    pub diagnostic_code: String,
+    pub receipt_reference: String,
+    pub receipt: SignedBrokerFailureReceipt,
 }
 
 pub fn decode_execute_request(bytes: &[u8]) -> Result<BrokerExecuteRequest> {
@@ -647,6 +657,7 @@ fn normalize_method(method: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
 
     #[test]
     fn http_is_limited_to_explicit_ip_loopback_tests() {
@@ -659,8 +670,8 @@ mod tests {
     #[test]
     fn request_targets_and_methods_reject_ambiguous_transport_syntax() {
         assert!(BrokerDestination::parse("https://example.com/v1", "TRACE", false).is_err());
-        let mut destination =
-            BrokerDestination::parse("https://example.com/v1", "POST", false).expect("destination");
+        let mut destination = BrokerDestination::parse("https://example.com/v1", "POST", false)
+            .test_expect("destination");
         destination.exact_path_and_query = "/v1\\admin".to_string();
         assert!(destination.validate(false).is_err());
         destination.exact_path_and_query = "/v1%0".to_string();

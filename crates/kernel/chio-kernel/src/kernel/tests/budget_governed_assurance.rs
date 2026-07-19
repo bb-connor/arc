@@ -43,7 +43,9 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -114,7 +116,9 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -131,6 +135,7 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
 #[test]
 fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_optional() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -174,7 +179,9 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -264,7 +271,9 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -281,6 +290,7 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
 #[test]
 fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
@@ -328,7 +338,9 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -400,7 +412,9 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -417,6 +431,7 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
 #[test]
 fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
@@ -464,7 +479,9 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -485,6 +502,7 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
 #[test]
 fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
@@ -532,7 +550,9 @@ fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -619,7 +639,9 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -694,7 +716,9 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -786,7 +810,9 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -800,6 +826,7 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
 #[test]
 fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metadata() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
@@ -878,7 +905,9 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -929,7 +958,9 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -973,6 +1004,7 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
     config.max_stream_total_bytes = 1;
 
     let mut kernel = make_kernel(config);
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(StreamingServer {
         id: "stream".to_string(),
@@ -1015,7 +1047,9 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1075,6 +1109,7 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
 
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     kernel.set_payment_adapter(Box::new(
         X402PaymentAdapter::new(url)
             .with_bearer_token("bridge-token")
@@ -1122,7 +1157,9 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1189,6 +1226,7 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
 
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     kernel.set_payment_adapter(Box::new(
         X402PaymentAdapter::new(url).with_timeout(Duration::from_secs(2)),
     ));
@@ -1234,7 +1272,9 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1299,6 +1339,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
 
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
     kernel.set_payment_adapter(Box::new(
         AcpPaymentAdapter::new(url)
             .with_authorize_path("/commerce/authorize")
@@ -1357,7 +1398,9 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1474,7 +1517,9 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 

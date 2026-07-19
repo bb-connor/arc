@@ -1,16 +1,17 @@
 use chio_quarantine::{
-    build_response_plan, decode_response_record, ExecutorError, ResponseScheduler,
-    ResponseStateMachine, ResponseTransitionRequest, ScheduledResponseExecutor, SchedulerError,
-    SchedulerPolicy, SchedulerTickRequest, SchedulerWorkOutcome,
+    build_response_plan, decode_response_record, EffectMutation, EffectMutationRequest,
+    ExecutorError, ResponseScheduler, ResponseStateMachine, ResponseTransitionRequest,
+    ScheduledResponseExecutor, SchedulerError, SchedulerPolicy, SchedulerTickRequest,
+    SchedulerWorkOutcome,
 };
 use chio_security_types::ports::{
-    ActionId, CanonicalBody, CreateOutcome, Digest32, LeaseOwnerId, PortError, PortResult,
-    RecordId, ResponseCasRequest, ResponseEffectCasRequest, ResponseEffectKey,
-    ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseSchedulerStore,
-    ResponseStore, ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest,
-    SchedulerHealthPageRequest, SchedulerHealthPort, SchedulerLeaseReleaseRequest,
-    SchedulerLeaseRenewRequest, SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey,
-    SessionId, TenantId,
+    ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, CreateOutcome, Digest32,
+    LeaseOwnerId, PortError, PortResult, RecordId, ResponseCasRequest, ResponseEffectCasRequest,
+    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
+    ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseStore, ScheduledWork,
+    SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerHealthPageRequest,
+    SchedulerHealthPort, SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest,
+    SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey, SessionId, TenantId,
 };
 use chio_security_types::{
     OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectSpec,
@@ -39,9 +40,15 @@ fn plan_with_action(store: Arc<SchedulerStore>, action_id: &str) -> ResponsePlan
     let plan = build_response_plan(ResponsePlanInput {
         action_id: ActionId::new(action_id).unwrap_or_else(|error| panic!("action id: {error}")),
         trigger_finding_id: record("scheduler-finding"),
+        trigger_finding_hash: digest(31),
+        trigger_finding_receipt_id: chio_security_types::ports::OpaqueReceiptRef::new(
+            "scheduler-finding-receipt",
+        )
+        .unwrap_or_else(|error| panic!("finding receipt id: {error}")),
         tenant_id: TenantId::new("scheduler-tenant")
             .unwrap_or_else(|error| panic!("tenant id: {error}")),
         policy_version: record("scheduler-policy"),
+        policy_hash: digest(32),
         affected_ids: vec![record("scheduler-session")],
         effects: vec![ResponseEffectSpec {
             kind: ResponseEffectKind::ThrottleSession,
@@ -96,6 +103,7 @@ fn tick(now_unix_ms: u64, claim: &str) -> SchedulerTickRequest {
 struct SchedulerState {
     plan: Option<ResponsePlanRecord>,
     transitions: BTreeMap<String, ResponseCasRequest>,
+    scheduled_transitions: BTreeMap<String, ResponseScheduledMutationCasRequest>,
     effects: BTreeMap<String, ResponseEffectRecord>,
     effect_transitions: BTreeMap<String, ResponseEffectCasRequest>,
     work: Option<ScheduledWork>,
@@ -298,6 +306,34 @@ impl ResponseSchedulerStore for SchedulerStore {
         }
     }
 
+    fn compare_and_swap_scheduled_mutation(
+        &self,
+        request: &ResponseScheduledMutationCasRequest,
+    ) -> PortResult<ResponsePlanRecord> {
+        let mut state = self.state()?;
+        if state.work.as_ref() != Some(&request.work) {
+            return Err(PortError::conflict());
+        }
+        if let Some(existing) = state
+            .scheduled_transitions
+            .get(request.transition_id.as_str())
+        {
+            if existing != request {
+                return Err(PortError::conflict());
+            }
+            return Ok(request.candidate.clone());
+        }
+        let current = state.plan.as_ref().ok_or_else(PortError::invalid_data)?;
+        if current != &request.current {
+            return Err(PortError::conflict());
+        }
+        state
+            .scheduled_transitions
+            .insert(request.transition_id.as_str().to_owned(), request.clone());
+        state.plan = Some(request.candidate.clone());
+        Ok(request.candidate.clone())
+    }
+
     fn renew_lease(&self, request: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork> {
         self.validate_lease(&request.work)?;
         let renewed = ScheduledWork {
@@ -481,15 +517,26 @@ impl ScheduledResponseExecutor for SubstitutionExecutor {
     }
 }
 
-#[derive(Default)]
 struct TestHealthSink {
     state: Mutex<TestHealthState>,
 }
 
-#[derive(Default)]
 struct TestHealthState {
     calls: usize,
     pages: BTreeMap<String, SchedulerHealthPageRequest>,
+    delivered: bool,
+}
+
+impl Default for TestHealthSink {
+    fn default() -> Self {
+        Self {
+            state: Mutex::new(TestHealthState {
+                calls: 0,
+                pages: BTreeMap::new(),
+                delivered: true,
+            }),
+        }
+    }
 }
 
 impl TestHealthSink {
@@ -507,23 +554,106 @@ impl TestHealthSink {
             .unwrap_or_else(|_| panic!("health mutex poisoned"))
             .calls
     }
+
+    fn set_delivered(&self, delivered: bool) {
+        self.state
+            .lock()
+            .unwrap_or_else(|_| panic!("health mutex poisoned"))
+            .delivered = delivered;
+    }
 }
 
 impl SchedulerHealthPort for TestHealthSink {
-    fn page_once(&self, request: &SchedulerHealthPageRequest) -> PortResult<()> {
+    fn ensure_scheduler_health_ready(&self) -> PortResult<()> {
+        Ok(())
+    }
+
+    fn page_once(&self, request: &SchedulerHealthPageRequest) -> PortResult<AlertDeliveryStatus> {
         let mut state = self.state.lock().map_err(|_| PortError::unavailable())?;
         state.calls = state.calls.saturating_add(1);
-        match state.pages.get(request.event_id.as_str()) {
-            Some(existing) if existing == request => Ok(()),
+        let status = if state.delivered {
+            AlertDeliveryStatus::Delivered {
+                attempts: 1,
+                delivered_at_unix_ms: request.occurred_at_unix_ms,
+            }
+        } else {
+            AlertDeliveryStatus::Pending {
+                attempts: 0,
+                next_attempt_at_unix_ms: request.occurred_at_unix_ms,
+            }
+        };
+        match state.pages.get(request.idempotency_key.as_str()) {
+            Some(existing) if existing.alert == request.alert => Ok(status),
             Some(_) => Err(PortError::conflict()),
             None => {
                 state
                     .pages
-                    .insert(request.event_id.as_str().to_owned(), request.clone());
-                Ok(())
+                    .insert(request.idempotency_key.as_str().to_owned(), request.clone());
+                Ok(status)
             }
         }
     }
+
+    fn load_delivery(&self, query: &AlertDeliveryQuery) -> PortResult<Option<AlertDeliveryStatus>> {
+        let state = self.state.lock().map_err(|_| PortError::unavailable())?;
+        match state.pages.get(query.alert.idempotency_key.as_str()) {
+            Some(existing) if existing.alert == query.alert && state.delivered => {
+                Ok(Some(AlertDeliveryStatus::Delivered {
+                    attempts: 1,
+                    delivered_at_unix_ms: query.alert.occurred_at_unix_ms,
+                }))
+            }
+            Some(existing) if existing.alert == query.alert => {
+                Ok(Some(AlertDeliveryStatus::Pending {
+                    attempts: 0,
+                    next_attempt_at_unix_ms: query.alert.occurred_at_unix_ms,
+                }))
+            }
+            Some(_) => Err(PortError::conflict()),
+            None => Ok(None),
+        }
+    }
+}
+
+#[test]
+fn scheduler_keeps_health_event_unacked_while_outbox_delivery_is_pending() {
+    let store = Arc::new(SchedulerStore::default());
+    let _planned = plan(Arc::clone(&store));
+    let executor = Arc::new(UnavailableExecutor::default());
+    let health = Arc::new(TestHealthSink::default());
+    health.set_delivered(false);
+    let scheduler =
+        ResponseScheduler::new(Arc::clone(&store), executor, Arc::clone(&health), policy())
+            .unwrap_or_else(|error| panic!("scheduler: {error}"));
+
+    for (now, claim) in [
+        (1_000, "pending-page-1"),
+        (1_010, "pending-page-2"),
+        (1_030, "pending-page-3"),
+        (1_070, "pending-page-threshold"),
+    ] {
+        scheduler
+            .tick(&tick(now, claim))
+            .unwrap_or_else(|error| panic!("pending page tick: {error}"));
+    }
+    let pending = store
+        .retry()
+        .unwrap_or_else(|| panic!("pending retry state missing"));
+    assert!(pending.health_event_id.is_some());
+    assert!(!pending.health_event_delivered);
+    assert_eq!(health.pages(), 1);
+    assert_eq!(health.calls(), 1);
+
+    health.set_delivered(true);
+    scheduler
+        .tick(&tick(1_110, "pending-page-delivered"))
+        .unwrap_or_else(|error| panic!("delivered page tick: {error}"));
+    let delivered = store
+        .retry()
+        .unwrap_or_else(|| panic!("delivered retry state missing"));
+    assert!(delivered.health_event_delivered);
+    assert_eq!(health.pages(), 1);
+    assert_eq!(health.calls(), 2);
 }
 
 #[test]
@@ -886,11 +1016,42 @@ fn scheduler_fencing_restart_routes_persisted_apply_and_rollback_states() {
             },
         )
         .unwrap_or_else(|error| panic!("enter applying: {error}"));
+    let effect_id = decode_response_record(&applying)
+        .unwrap_or_else(|error| panic!("decode applying rollback fixture: {error}"))
+        .plan
+        .effects
+        .as_slice()[0]
+        .effect_id
+        .clone();
+    let requested = rollback_machine
+        .record_effect(
+            &applying,
+            &EffectMutationRequest {
+                expected_generation: applying.generation,
+                effect_id: effect_id.clone(),
+                occurred_at_unix_ms: 115,
+                mutation: EffectMutation::Requested,
+            },
+        )
+        .unwrap_or_else(|error| panic!("request rollback fixture effect: {error}"));
+    let applied = rollback_machine
+        .record_effect(
+            &requested,
+            &EffectMutationRequest {
+                expected_generation: requested.generation,
+                effect_id,
+                occurred_at_unix_ms: 116,
+                mutation: EffectMutation::Applied {
+                    resulting_version_hash: digest(70),
+                },
+            },
+        )
+        .unwrap_or_else(|error| panic!("apply rollback fixture effect: {error}"));
     let partial = rollback_machine
         .transition(
-            &applying,
+            &applied,
             &ResponseTransitionRequest {
-                expected_generation: applying.generation,
+                expected_generation: applied.generation,
                 target_state: ResponseState::ApplyPartial,
                 occurred_at_unix_ms: 120,
                 applying_lease_expires_at_unix_ms: None,

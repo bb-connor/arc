@@ -75,6 +75,14 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) authority_seed_file: Option<PathBuf>,
 
+    /// Operator-supplied keyring configuration with a durable key log and independent trust roots.
+    #[arg(long, global = true)]
+    pub(crate) keyring_config: Option<PathBuf>,
+
+    /// Canonical production broker composition with sealed signing-key custody.
+    #[arg(long, global = true)]
+    pub(crate) broker_config: Option<PathBuf>,
+
     /// Optional SQLite database path for shared capability-authority state.
     #[arg(long, global = true)]
     pub(crate) authority_db: Option<PathBuf>,
@@ -83,11 +91,45 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) budget_db: Option<PathBuf>,
 
+    /// Enable durable aggregate invocation admission for ordinary tool calls.
+    #[arg(long, global = true, default_value_t = false)]
+    pub(crate) aggregate_invocation_admission: bool,
+
+    /// SQLite database path for durable aggregate and threshold admission operations.
+    #[arg(long, global = true)]
+    pub(crate) admission_operation_db: Option<PathBuf>,
+
+    /// SQLite database path for durable threshold approval replay state.
+    #[arg(long, global = true)]
+    pub(crate) approval_db: Option<PathBuf>,
+
+    /// Authenticated approver-directory YAML used to compile threshold policy.
+    #[arg(long, global = true)]
+    pub(crate) approver_directory: Option<PathBuf>,
+
+    /// Independently configured authority trusted to sign threshold proposals.
+    #[arg(
+        long,
+        global = true,
+        env = "CHIO_THRESHOLD_PROPOSAL_AUTHORITY_PUBLIC_KEY",
+        value_parser = parse_threshold_proposal_authority_public_key
+    )]
+    pub(crate) threshold_proposal_authority_public_key: Option<chio_core::PublicKey>,
+
     /// Optional SQLite database path for durable remote MCP session tombstones.
     #[arg(long, global = true)]
     pub(crate) session_db: Option<PathBuf>,
 
-    /// Optional shared trust-control service base URL.
+    /// Dedicated HMAC keyring used only for durable remote MCP resume records.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub(crate) resume_hmac_keyring: Option<PathBuf>,
+
+    /// Comma-separated final trust-control endpoint URLs.
+    ///
+    /// Endpoints require HTTPS unless the host is a numeric loopback address.
+    /// Control clients do not follow redirects. For private PKI, set
+    /// `CHIO_CONTROL_TLS_ROOT_CA_FILE` to a regular, non-symlink PEM CA bundle.
+    /// The configured bundle replaces the ambient public WebPKI roots.
     #[arg(long, global = true)]
     pub(crate) control_url: Option<String>,
 
@@ -102,7 +144,8 @@ pub(crate) struct Cli {
     )]
     pub(crate) control_token: Option<String>,
 
-    /// Independently pinned capability-authority public key for remote trust control.
+    /// Independently pinned exact current capability-authority signer for fresh
+    /// remote lookup envelopes and hosted MCP local-authority epoch matching.
     #[arg(
         long,
         global = true,
@@ -112,6 +155,8 @@ pub(crate) struct Cli {
     pub(crate) control_authority_public_key: Option<chio_core::PublicKey>,
 
     /// Previously active authority keys trusted only for durable remote artifacts.
+    /// These keys cannot satisfy the current-signer pin. The complete current
+    /// and historical bundle is limited to 256 unique keys.
     #[arg(
         long,
         global = true,
@@ -127,6 +172,13 @@ fn parse_control_authority_public_key(value: &str) -> Result<chio_core::PublicKe
         .map_err(|error| format!("invalid control-authority public key: {error}"))
 }
 
+fn parse_threshold_proposal_authority_public_key(
+    value: &str,
+) -> Result<chio_core::PublicKey, String> {
+    chio_core::PublicKey::from_hex(value)
+        .map_err(|error| format!("invalid threshold proposal-authority public key: {error}"))
+}
+
 impl Cli {
     pub(crate) fn json_output(&self) -> bool {
         self.json || matches!(self.format, OutputFormat::Json)
@@ -136,6 +188,7 @@ impl Cli {
 #[cfg(test)]
 mod cli_env_tests {
     use super::*;
+    use clap::CommandFactory as _;
     use std::ffi::OsString;
     use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -196,6 +249,10 @@ mod cli_env_tests {
             "policy.yaml",
             "--server-id",
             "mcp",
+            "--cage-policy",
+            "cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "/bin/true",
         ])
         .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
@@ -222,6 +279,41 @@ mod cli_env_tests {
     }
 
     #[test]
+    fn mcp_serve_http_parses_dedicated_resume_hmac_keyring() {
+        let parsed = parse_cli([
+            "chio",
+            "--session-db",
+            "sessions.sqlite3",
+            "--resume-hmac-keyring",
+            "resume-hmac-keyring.json",
+            "mcp",
+            "serve-http",
+            "--policy",
+            "policy.yaml",
+            "--server-id",
+            "mcp",
+            "--cage-policy",
+            "cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "/bin/true",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+
+        assert_eq!(parsed.session_db, Some(PathBuf::from("sessions.sqlite3")));
+        assert_eq!(
+            parsed.resume_hmac_keyring,
+            Some(PathBuf::from("resume-hmac-keyring.json"))
+        );
+        assert!(matches!(
+            parsed.command,
+            Commands::Mcp {
+                command: McpCommands::ServeHttp { .. }
+            }
+        ));
+    }
+
+    #[test]
     fn remote_control_authority_keys_parse_at_the_cli_boundary() {
         let _guard = env_lock();
         let prior_current = std::env::var_os("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY");
@@ -234,14 +326,8 @@ mod cli_env_tests {
             format!("{},{}", previous.to_hex(), current.to_hex()),
         );
 
-        let parsed = parse_cli([
-            "chio",
-            "run",
-            "--policy",
-            "policy.yaml",
-            "/bin/true",
-        ])
-        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+        let parsed = parse_cli(["chio", "run", "--policy", "policy.yaml", "/bin/true"])
+            .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
 
         assert_eq!(parsed.control_authority_public_key.as_ref(), Some(&current));
         assert_eq!(
@@ -250,9 +336,69 @@ mod cli_env_tests {
         );
 
         restore_env("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY", prior_current);
-        restore_env(
-            "CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS",
-            prior_trusted,
+        restore_env("CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS", prior_trusted);
+    }
+
+    #[test]
+    fn remote_control_long_help_states_transport_and_authority_contracts() {
+        let help = std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(|| Cli::command().render_long_help().to_string())
+            .unwrap_or_else(|error| panic!("spawn 8 MiB help thread: {error}"))
+            .join()
+            .unwrap_or_else(|_| panic!("help thread must not panic"));
+
+        for required in [
+            "CHIO_CONTROL_TLS_ROOT_CA_FILE",
+            "numeric loopback",
+            "do not follow redirects",
+            "exact current capability-authority signer",
+            "cannot satisfy the current-signer pin",
+            "256 unique keys",
+        ] {
+            assert!(help.contains(required), "long help omits `{required}`");
+        }
+    }
+
+    #[test]
+    fn ordinary_admission_authorities_parse_at_the_cli_boundary() {
+        let proposal_authority = chio_core::Keypair::from_seed(&[43_u8; 32]).public_key();
+        let proposal_authority_hex: &'static str =
+            Box::leak(proposal_authority.to_hex().into_boxed_str());
+        let parsed = parse_cli([
+            "chio",
+            "--aggregate-invocation-admission",
+            "--admission-operation-db",
+            "operations.sqlite3",
+            "--approval-db",
+            "approvals.sqlite3",
+            "--approver-directory",
+            "approvers.yaml",
+            "--threshold-proposal-authority-public-key",
+            proposal_authority_hex,
+            "run",
+            "--policy",
+            "policy.yaml",
+            "/bin/true",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+
+        assert!(parsed.aggregate_invocation_admission);
+        assert_eq!(
+            parsed.admission_operation_db.as_deref(),
+            Some(std::path::Path::new("operations.sqlite3"))
+        );
+        assert_eq!(
+            parsed.approval_db.as_deref(),
+            Some(std::path::Path::new("approvals.sqlite3"))
+        );
+        assert_eq!(
+            parsed.approver_directory.as_deref(),
+            Some(std::path::Path::new("approvers.yaml"))
+        );
+        assert_eq!(
+            parsed.threshold_proposal_authority_public_key.as_ref(),
+            Some(&proposal_authority)
         );
     }
 
@@ -315,6 +461,83 @@ mod cli_env_tests {
         }
 
         restore_env("CHIO_GUARD_REGISTRY_PASSWORD", prior);
+    }
+
+    #[test]
+    fn parses_keyring_runtime_configuration_path() {
+        let parsed = parse_cli([
+            "chio",
+            "--authority-seed-file",
+            "authority.seed",
+            "--keyring-config",
+            "keyring.yaml",
+            "run",
+            "--policy",
+            "policy.yaml",
+            "echo",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+        assert_eq!(
+            parsed.keyring_config.as_deref(),
+            Some(std::path::Path::new("keyring.yaml"))
+        );
+        assert_eq!(
+            parsed.authority_seed_file.as_deref(),
+            Some(std::path::Path::new("authority.seed"))
+        );
+    }
+
+    #[test]
+    fn broker_product_configuration_is_explicit_and_global_for_mcp_runtimes() {
+        let parsed_stdio = parse_cli([
+            "chio",
+            "--broker-config",
+            "/etc/chio/broker-product.json",
+            "mcp",
+            "serve",
+            "--policy",
+            "policy.yaml",
+            "--signed-manifest",
+            "manifest.json",
+            "--manifest-public-key",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--cage-policy",
+            "cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "/bin/true",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+        assert_eq!(
+            parsed_stdio.broker_config.as_deref(),
+            Some(std::path::Path::new("/etc/chio/broker-product.json"))
+        );
+
+        let parsed_http = parse_cli([
+            "chio",
+            "mcp",
+            "serve-http",
+            "--policy",
+            "policy.yaml",
+            "--server-id",
+            "upstream",
+            "--signed-manifest",
+            "manifest.json",
+            "--manifest-public-key",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--cage-policy",
+            "cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--broker-config",
+            "/etc/chio/broker-product.json",
+            "/bin/true",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+        assert_eq!(
+            parsed_http.broker_config.as_deref(),
+            Some(std::path::Path::new("/etc/chio/broker-product.json"))
+        );
     }
 }
 
@@ -470,6 +693,12 @@ pub(crate) enum Commands {
     Runtime {
         #[command(subcommand)]
         command: ChioRuntimeCommands,
+    },
+
+    /// Inventory signed manifests and emit active-defense migration evidence.
+    Security {
+        #[command(subcommand)]
+        command: SecurityCommands,
     },
 
     /// Receive, query, and relay pheromone artifacts.
@@ -629,6 +858,78 @@ pub(crate) enum Commands {
         /// the banner short.
         #[arg(long, default_value_t = false)]
         print_config: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum SecurityCommands {
+    /// Verify registry evidence and atomically write a deterministic migration report.
+    ShadowMigrate {
+        /// Closed JSON inventory containing registered keys, manifests, receipts, and observations.
+        #[arg(long, value_name = "PATH")]
+        input: PathBuf,
+
+        /// Destination for the canonical JSON report.
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+    },
+
+    /// Provision a signed native MCP demo at migration stage Disabled.
+    ///
+    /// Disabled is legacy-authorized demo mode, not cage containment. The
+    /// command creates demo-only private signers and must not be used as a
+    /// production containment claim.
+    ProvisionNativeMcpDemo {
+        /// New absolute output directory, or an exact prior provision for an idempotent rerun.
+        #[arg(long, value_name = "PATH")]
+        output_dir: PathBuf,
+
+        /// Exact absolute non-symlink directory committed to runtime policy paths.
+        ///
+        /// Defaults to the output directory. Provisioned artifacts are always
+        /// created and validated under the output directory.
+        #[arg(long, value_name = "PATH")]
+        runtime_security_dir: Option<PathBuf>,
+
+        /// Reviewed JSON tools/list fixture used to build the signed manifest.
+        #[arg(long, value_name = "PATH")]
+        tools_fixture: PathBuf,
+
+        /// Exact absolute canonical MCP server executable bound into the launch policy.
+        #[arg(long, value_name = "PATH")]
+        target: PathBuf,
+
+        /// One exact target argv element after the executable. Repeat for multiple elements.
+        #[arg(long = "target-arg", value_name = "VALUE", allow_hyphen_values = true)]
+        target_args: Vec<String>,
+
+        /// Exact absolute canonical working directory. Defaults to the target's parent.
+        #[arg(long, value_name = "PATH")]
+        working_directory: Option<PathBuf>,
+
+        /// Exact non-root UID applied to the target before sandboxing.
+        #[arg(long, value_name = "UID")]
+        execution_uid: u32,
+
+        /// Exact non-root primary GID applied to the target before sandboxing.
+        #[arg(long, value_name = "GID")]
+        execution_gid: u32,
+
+        /// Supplementary target GID in sorted ascending order. Repeat for multiple groups.
+        #[arg(long = "execution-supplementary-gid", value_name = "GID")]
+        execution_supplementary_gids: Vec<u32>,
+
+        /// Server identifier committed to the manifest, policy, and migration ledger.
+        #[arg(long, default_value = "docker-demo")]
+        server_id: String,
+
+        /// Human-readable server name committed to the signed manifest.
+        #[arg(long, default_value = "Docker demo MCP")]
+        server_name: String,
+
+        /// Server version committed to the signed manifest.
+        #[arg(long, default_value = "1")]
+        server_version: String,
     },
 }
 

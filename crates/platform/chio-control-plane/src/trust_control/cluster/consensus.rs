@@ -4,9 +4,12 @@ pub(crate) async fn handle_internal_cluster_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_STATUS_PATH)
-    {
+    if let Err(response) = validate_cluster_peer_empty_request(
+        &headers,
+        &state.config,
+        "GET",
+        INTERNAL_CLUSTER_STATUS_PATH,
+    ) {
         return response;
     }
 
@@ -120,13 +123,6 @@ pub(crate) fn build_cluster_state(
     local_addr: SocketAddr,
 ) -> Result<Option<Arc<Mutex<ClusterRuntimeState>>>, CliError> {
     config.validate()?;
-    if !config.peer_urls.is_empty() && config.authority_seed_path.is_some() {
-        return Err(CliError::cli_other_error(
-            "clustered trust control requires --authority-db instead of --authority-seed-file"
-                .to_string(),
-        ));
-    }
-
     if config.peer_urls.is_empty() {
         return Ok(None);
     }
@@ -148,35 +144,11 @@ pub(crate) fn build_cluster_state(
     if peers.is_empty() {
         return Ok(None);
     }
-    let mut persisted_term = 0u64;
-    let mut persisted_leader_url = None;
-    if let Some(path) = config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)?;
-        let status = authority.status()?;
-        let fence = authority.cluster_fence()?;
-        if fence.authority_generation == status.generation
-            && fence.authority_rotated_at == status.rotated_at
-        {
-            persisted_term = fence.election_term;
-            persisted_leader_url = fence
-                .leader_url
-                .and_then(|leader_url| normalize_cluster_url(&leader_url).ok())
-                .filter(|leader_url| leader_url == &self_url || peers.contains_key(leader_url));
-        } else if fence.election_term > 0 || fence.leader_url.is_some() {
-            warn!(
-                fence_generation = fence.authority_generation,
-                authority_generation = status.generation,
-                fence_rotated_at = fence.authority_rotated_at,
-                authority_rotated_at = status.rotated_at,
-                "discarding stale persisted authority fence after authority rotation"
-            );
-        }
-    }
     Ok(Some(Arc::new(Mutex::new(ClusterRuntimeState {
         self_url,
         peers,
-        election_term: persisted_term,
-        last_leader_url: persisted_leader_url,
+        election_term: 0,
+        last_leader_url: None,
         term_started_at: None,
         lease_expires_at: None,
         lease_ttl_ms: authority_lease_ttl(config.cluster_sync_interval).as_millis() as u64,

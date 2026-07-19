@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/capability/threshold-approval-proposal-body.schema.json",
+  "title": "Chio threshold approval proposal body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "proposalId", "requestId", "governedIntentHash", "subject", "authorizationCapabilityHash", "policyHash", "required", "eligibleSetDigest", "proposalCreatedAt", "proposalDeadline"],
+  "properties": {
+    "schema": { "const": "chio.threshold-approval-proposal.v1" },
+    "proposalId": { "$ref": "#/$defs/governanceIdentifier" },
+    "requestId": { "$ref": "#/$defs/governanceIdentifier" },
+    "governedIntentHash": { "$ref": "#/$defs/digest" },
+    "subject": { "$ref": "#/$defs/publicKey" },
+    "authorizationCapabilityHash": { "$ref": "#/$defs/digest" },
+    "policyHash": { "$ref": "#/$defs/digest" },
+    "required": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "eligibleSetDigest": { "$ref": "#/$defs/digest" },
+    "proposalCreatedAt": { "type": "integer", "minimum": 0 },
+    "proposalDeadline": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "governanceIdentifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

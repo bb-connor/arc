@@ -6,6 +6,12 @@
         "wrap",
         "--server-id",
         "demo",
+        "--manifest",
+        "/etc/chio/demo-wrap.toml",
+        "--cage-policy",
+        "/etc/chio/demo-cage-policy.json",
+        "--cage-policy-signer",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "--",
         "node",
         "server.js"

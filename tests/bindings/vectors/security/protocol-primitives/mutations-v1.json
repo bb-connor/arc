@@ -1,0 +1,126 @@
+{
+  "schema": "chio.test-vector.protocol-primitives.mutations.v1",
+  "operation_format": "RFC 6902 single-operation subset plus append_bytes",
+  "cases": [
+    {
+      "id": "aggregate_binding_noncanonical_trailing_newline",
+      "base": "positive/aggregate-budget-root-binding-v1.json",
+      "mutation": { "op": "append_bytes", "hex": "0a" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_binding_bytes" }
+    },
+    {
+      "id": "aggregate_binding_signature_tampered",
+      "base": "positive/aggregate-budget-root-binding-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_root_binding_signature" }
+    },
+    {
+      "id": "aggregate_budget_maximum_rebound",
+      "base": "positive/aggregate-invocation-budget-v1.json",
+      "mutation": { "op": "replace", "path": "/max_invocations", "value": 8 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "root_maximum_mismatch" }
+    },
+    {
+      "id": "aggregate_preservation_digest_rebound",
+      "base": "positive/aggregate-family-preservation-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/rootBindingDigest", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "family_binding_digest_mismatch" }
+    },
+    {
+      "id": "aggregate_preservation_root_identity_omitted",
+      "base": "positive/aggregate-family-preservation-evidence-v1.json",
+      "mutation": { "op": "remove", "path": "/rootCapabilityId" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "family_root_identity_required" }
+    },
+    {
+      "id": "threshold_proposal_lifetime_exceeds_protocol_maximum",
+      "base": "positive/threshold-approval-proposal-body-v1.json",
+      "mutation": { "op": "replace", "path": "/proposalDeadline", "value": 3701 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "proposal_window_exceeds_3600_seconds" }
+    },
+    {
+      "id": "threshold_proposal_signature_tampered",
+      "base": "positive/threshold-approval-proposal-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_policy_authority_signature" }
+    },
+    {
+      "id": "governed_token_proposal_rebound",
+      "base": "positive/governed-approval-token-alice-v1.json",
+      "mutation": { "op": "replace", "path": "/threshold_proposal_hash", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "approval_proposal_binding_or_signature" }
+    },
+    {
+      "id": "verified_approval_set_not_canonically_sorted",
+      "base": "positive/verified-approval-set-v1.json",
+      "mutation": { "op": "replace", "path": "/canonicalTokenDigests", "value": ["8a0d072aa00cfdb7e4f9ec360505fdfc5c0c33101a60ebb6e0abc86c9a1f6f1a", "7da382120539f5bfc7c0b751a74eb4851667624d1986c36b9aad1dfab191a40f"] },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_approval_set_order" }
+    },
+    {
+      "id": "verified_approval_set_proposal_rebound",
+      "base": "positive/verified-approval-set-v1.json",
+      "mutation": { "op": "replace", "path": "/thresholdProposalHash", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "verified_set_proposal_mismatch" }
+    },
+    {
+      "id": "admission_request_supplemental_pair_incomplete",
+      "base": "positive/admission-request-binding-v1.json",
+      "mutation": { "op": "replace", "path": "/supplementalAuthorizationDigest", "value": null },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "supplemental_reference_digest_pair_required" }
+    },
+    {
+      "id": "admission_request_approval_digests_not_sorted",
+      "base": "positive/admission-request-binding-v1.json",
+      "mutation": { "op": "replace", "path": "/approvalTokenDigests", "value": ["8a0d072aa00cfdb7e4f9ec360505fdfc5c0c33101a60ebb6e0abc86c9a1f6f1a", "7da382120539f5bfc7c0b751a74eb4851667624d1986c36b9aad1dfab191a40f"] },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_approval_digest_order" }
+    },
+    {
+      "id": "admission_evidence_revocation_digest_tampered",
+      "base": "positive/budget-invocation-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/revocationSet/digest", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "revocation_set_digest_mismatch" }
+    },
+    {
+      "id": "admission_evidence_supplemental_binding_rebound",
+      "base": "positive/budget-invocation-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/supplementalBinding/requestBindingHash", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "supplemental_request_binding_mismatch" }
+    },
+    {
+      "id": "admission_evidence_non_grant_carries_grant_index",
+      "base": "positive/budget-invocation-admission-evidence-v1.json",
+      "mutation": { "op": "add", "path": "/invocationQuotas/1/key/grantIndex", "value": 0 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "quota_profile_key_shape_mismatch" }
+    },
+    {
+      "id": "admission_evidence_family_root_identity_omitted",
+      "base": "positive/budget-invocation-admission-evidence-v1.json",
+      "mutation": { "op": "remove", "path": "/aggregateRootCapabilityId" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "aggregate_family_root_identity_required" }
+    },
+    {
+      "id": "capture_checked_revocation_digest_tampered",
+      "base": "positive/admission-capture-metadata-v1.json",
+      "mutation": { "op": "replace", "path": "/checkedRevocationSetDigest", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "capture_revocation_binding_mismatch" }
+    },
+    {
+      "id": "capture_unknown_authority_field",
+      "base": "positive/admission-capture-metadata-v1.json",
+      "mutation": { "op": "add", "path": "/authority/credential", "value": "never-on-wire" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_authority_field" }
+    },
+    {
+      "id": "capture_family_root_identity_omitted",
+      "base": "positive/admission-capture-metadata-v1.json",
+      "mutation": { "op": "remove", "path": "/aggregateRootCapabilityId" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "capture_family_root_identity_required" }
+    },
+    {
+      "id": "capture_zero_leader_epoch",
+      "base": "positive/admission-capture-metadata-v1.json",
+      "mutation": { "op": "replace", "path": "/leaderEpoch", "value": 0 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "capture_nonzero_leader_epoch_required" }
+    }
+  ]
+}

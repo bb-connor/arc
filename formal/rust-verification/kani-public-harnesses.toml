@@ -24,6 +24,8 @@ harness_groups = [
   "verify oracle inclusion proof soundness",
   "verify composite quota all-or-nothing authorization",
   "verify immutable quota maxima",
+  "verify captured invocation count monotonicity",
+  "verify replay fingerprint uniqueness",
   "verify delegation-family binding preservation",
   "verify threshold distinct signer counting",
 ]
@@ -46,6 +48,8 @@ covered_symbols = [
   "chio_revocation_oracle::api::InclusionProof::verify",
   "chio_kernel_core::formal_core::authorize_composite_quotas",
   "chio_kernel_core::formal_core::admit_quota_maximum",
+  "chio_kernel_core::formal_core::capture_invocation_count",
+  "chio_kernel_core::formal_core::reserve_replay_fingerprint",
   "chio_kernel_core::formal_core::family_binding_is_preserved",
   "chio_kernel_core::formal_core::validate_threshold_signers",
 ]
@@ -89,6 +93,8 @@ harnesses = [
   "verify_oracle_inclusion_soundness",
   "verify_composite_quota_all_or_nothing",
   "verify_quota_maximum_immutable",
+  "verify_captured_invocation_count_monotonic",
+  "verify_replay_fingerprint_uniqueness",
   "verify_family_binding_preservation",
   "verify_threshold_distinct_signers",
 ]

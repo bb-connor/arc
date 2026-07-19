@@ -71,7 +71,9 @@ fn make_request(request_id: &str, tenant_id: &str) -> KernelRequest {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     KernelRequest::new(call, tenant_id)

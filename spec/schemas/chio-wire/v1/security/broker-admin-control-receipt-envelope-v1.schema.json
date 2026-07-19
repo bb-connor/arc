@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-admin-control-receipt-envelope-v1.schema.json",
+  "title": "Chio signed broker admin control receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["body", "signer", "algorithm", "signature"],
+  "properties": {
+    "body": { "$ref": "broker-admin-control-receipt-body-v1.schema.json" },
+    "signer": { "$ref": "#/$defs/publicKey" },
+    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" },
+    "signature": { "type": "string", "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

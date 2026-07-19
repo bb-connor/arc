@@ -1,6 +1,9 @@
 use std::fs;
 
-use crate::support::{display_path, workspace_root, TempDir};
+use crate::support::{
+    authoritative_schema_json_inventory, display_path, validate_workspace_subdirectory,
+    workspace_root, TempDir,
+};
 use crate::XtaskError;
 
 use super::CHIO_WIRE_V1_SCHEMAS;
@@ -94,6 +97,8 @@ pub(super) fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
     let workspace_root = workspace_root()?;
     let schemas_dir = workspace_root.join(CHIO_WIRE_V1_SCHEMAS);
     let out_dir = workspace_root.join(CHIO_WIRE_V1_RUST_OUT);
+    validate_workspace_subdirectory(&workspace_root, &schemas_dir)?;
+    let schema_files = authoritative_schema_json_inventory(&workspace_root, &schemas_dir)?;
 
     if check_only {
         // Render BOTH the consolidated chio_wire_v1.rs and the generated
@@ -103,7 +108,7 @@ pub(super) fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
         let staging = TempDir::new("chio-codegen-rust-check").map_err(|err| {
             XtaskError::Io("<temp staging dir for codegen rust --check>".into(), err)
         })?;
-        chio_spec_codegen::codegen_rust(&schemas_dir, staging.path())
+        chio_spec_codegen::codegen_rust_with_inventory(&schemas_dir, staging.path(), &schema_files)
             .map_err(XtaskError::Codegen)?;
 
         let mut differences: Vec<String> = Vec::new();
@@ -151,7 +156,8 @@ pub(super) fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
         return Ok(());
     }
 
-    chio_spec_codegen::codegen_rust(&schemas_dir, &out_dir).map_err(XtaskError::Codegen)?;
+    chio_spec_codegen::codegen_rust_with_inventory(&schemas_dir, &out_dir, &schema_files)
+        .map_err(XtaskError::Codegen)?;
     let out_path = out_dir.join(chio_spec_codegen::CHIO_WIRE_V1_OUTPUT);
     let mod_path = out_dir.join(chio_spec_codegen::MOD_FILE);
     let bytes = fs::metadata(&out_path).map(|m| m.len()).unwrap_or_default();

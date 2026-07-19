@@ -32,6 +32,7 @@ cp "${tmp_dir}/Cargo.toml.generated" "${tmp_dir}/Cargo.toml"
 ln -s "${repo_root}/crates" "${tmp_dir}/crates"
 ln -s "${repo_root}/fixtures" "${tmp_dir}/fixtures"
 ln -s "${repo_root}/spec" "${tmp_dir}/spec"
+ln -s "${repo_root}/third_party" "${tmp_dir}/third_party"
 ln -s "${repo_root}/wit" "${tmp_dir}/wit"
 
 (

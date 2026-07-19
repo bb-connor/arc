@@ -6,15 +6,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::canonical::canonical_json_bytes;
 use crate::crypto::{
-    is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend, Keypair, PublicKey,
-    Signature, SigningAlgorithm, SigningBackend,
+    is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend_for_identity, Keypair,
+    PublicKey, Signature, SigningAlgorithm, SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::schema_binding::ensure_schema_matches;
 use crate::session::SessionAnchorReference;
-use crate::signer_binding::{
-    ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-};
+use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
 use super::runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence};
 use super::scope::MonetaryAmount;
@@ -1370,13 +1368,9 @@ impl GovernedApprovalToken {
     ) -> Result<Self> {
         validate_governed_approval_token_id(&body.id)?;
         validate_threshold_proposal_hash(body.threshold_proposal_hash.as_deref())?;
-        ensure_backend_matches_embedded_key(
-            &body.approver,
-            backend,
-            "governed approval token",
-            "approver",
-        )?;
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        let expected_key = body.approver.clone();
+        let (outcome, _bytes) =
+            sign_canonical_with_backend_for_identity(backend, &expected_key, &body)?;
         Ok(Self {
             id: body.id,
             approver: body.approver,
@@ -1387,8 +1381,8 @@ impl GovernedApprovalToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
-            algorithm: Some(backend.algorithm()),
-            signature,
+            algorithm: Some(outcome.algorithm),
+            signature: outcome.signature,
         })
     }
 

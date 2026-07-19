@@ -589,7 +589,8 @@ fn cli_reputation_local_surfaces_imported_trust_guardrails() {
     let authority_seed_path = dir.join("authority-seed.txt");
 
     let kernel_kp = Keypair::generate();
-    std::fs::write(&authority_seed_path, kernel_kp.seed_hex()).expect("write authority seed");
+    chio_control_plane::persist_authority_keypair(&authority_seed_path, &kernel_kp)
+        .expect("write authority seed");
     let subject_kp = Keypair::generate();
     let subject_hex =
         seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp, &kernel_kp);
@@ -700,7 +701,8 @@ fn cli_reputation_compare_reports_drift_against_fresh_passport() {
     // to `passport create` (--signing-seed-file) and `reputation compare`
     // (--authority-seed-file).
     let kernel_kp = Keypair::generate();
-    std::fs::write(&signing_seed_path, kernel_kp.seed_hex()).expect("write signing seed");
+    chio_control_plane::persist_authority_keypair(&signing_seed_path, &kernel_kp)
+        .expect("write signing seed");
     let subject_kp = Keypair::generate();
     let subject_hex =
         seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp, &kernel_kp);

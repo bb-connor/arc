@@ -1,3 +1,5 @@
+#[path = "service_runtime/active_defense.rs"]
+mod active_defense;
 #[path = "service_runtime/budget.rs"]
 pub mod budget;
 #[path = "service_runtime/client.rs"]
@@ -14,6 +16,8 @@ mod pinned_authority;
 pub mod public_registry;
 #[path = "service_runtime/remote_authority.rs"]
 pub mod remote_authority;
+#[path = "service_runtime/remote_capability_request_store.rs"]
+pub(crate) mod remote_capability_request_store;
 #[path = "service_runtime/remote_root_resolver.rs"]
 pub mod remote_root_resolver;
 #[path = "service_runtime/remote_stores.rs"]
@@ -29,5 +33,7 @@ mod tests;
 
 use super::*;
 
+pub(crate) use active_defense::TrustControlActiveDefenseRuntimeConfig;
+pub(crate) use active_defense::TrustControlActiveDefenseService;
 pub(crate) use init::serve_async;
-pub use pinned_authority::PinnedControlAuthority;
+pub use pinned_authority::{PinnedAuthoritySuccessor, PinnedControlAuthority};

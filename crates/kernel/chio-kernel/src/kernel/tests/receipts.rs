@@ -394,9 +394,14 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
         governed_intent: None,
+        supplemental_authorization: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     };
 
     let response = kernel
@@ -501,9 +506,14 @@ fn nested_admission_denied_while_rss_shedding() {
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
         governed_intent: None,
+        supplemental_authorization: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     };
 
     let result = kernel.evaluate_tool_call_operation_with_nested_flow_client(
@@ -548,7 +558,17 @@ fn rss_shed_persists_signed_overload_deny_receipt() {
     // emergency-stop fast path, even though it also returns Overloaded to the
     // caller for backpressure. error.rs guarantees the OverloadResource appears in
     // a receipt deny reason.
-    let mut kernel = make_kernel(make_config());
+    let config = make_config();
+    let signer = config.keypair.clone();
+    let resolver_enabled = Arc::new(AtomicBool::new(true));
+    let resolver = Arc::new(ToggleCurrentArtifactTrustResolver {
+        key: signer.public_key(),
+        allowed: Arc::clone(&resolver_enabled),
+    });
+    let backend: Arc<dyn chio_core::crypto::SigningBackend> =
+        Arc::new(chio_core::crypto::Ed25519Backend::new(signer));
+    let mut kernel =
+        ChioKernel::new_with_authority_signing_runtime(config, backend, resolver).unwrap();
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -559,6 +579,8 @@ fn rss_shed_persists_signed_overload_deny_receipt() {
     kernel.set_rss_shed_for_test(true);
 
     let request = make_request("req-rss-shed-receipt", &cap, "read_file", "srv-a");
+    let transport_observation =
+        kernel.begin_transport_receipt_observation(&request.request_id);
     let result = kernel.evaluate_tool_call_blocking(&request);
 
     // Backpressure edge preserved: the shed still surfaces as Overloaded.
@@ -588,6 +610,38 @@ fn rss_shed_persists_signed_overload_deny_receipt() {
         }
         other => panic!("expected overload deny decision, got {other:?}"),
     }
+
+    resolver_enabled.store(false, Ordering::SeqCst);
+    assert!(kernel
+        .record_transport_internal_error_deny_receipt(&request, &transport_observation)
+        .is_err());
+    assert_eq!(
+        kernel.receipt_log().len(),
+        1,
+        "a resolver-denied receipt must not be reused or duplicated"
+    );
+
+    resolver_enabled.store(true, Ordering::SeqCst);
+    let transport_receipt = kernel
+        .record_transport_internal_error_deny_receipt(&request, &transport_observation)
+        .expect("reuse persisted overload deny receipt");
+    assert_eq!(transport_receipt.id, receipts[0].id);
+    assert_eq!(
+        kernel.receipt_log().len(),
+        1,
+        "transport fallback must not duplicate the current request's overload receipt"
+    );
+
+    let next_observation = kernel.begin_transport_receipt_observation(&request.request_id);
+    let receipt_for_reused_request_id = kernel
+        .record_transport_internal_error_deny_receipt(&request, &next_observation)
+        .expect("record a receipt for the next invocation");
+    assert_ne!(receipt_for_reused_request_id.id, transport_receipt.id);
+    assert_eq!(
+        kernel.receipt_log().len(),
+        2,
+        "a prior invocation with the same request id must not be reused"
+    );
 }
 
 #[test]
@@ -650,9 +704,14 @@ fn session_tool_call_records_incomplete_terminal_state() {
         tool_name: "drop_stream".to_string(),
         arguments: serde_json::json!({}),
         governed_intent: None,
+        supplemental_authorization: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
+        declassification_grant: None,
     }));
 
     let response = session_tool_call(
@@ -987,7 +1046,9 @@ fn checkpoint_triggers_at_100_receipts() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .unwrap();
     }
@@ -1054,7 +1115,9 @@ fn concurrent_receipt_checkpointing_keeps_contiguous_batches() {
                         approval_tokens: Vec::new(),
                         threshold_approval_proposal: None,
                         model_metadata: None,
+                        supplemental_authorization: None,
                         federated_origin_kernel_id: None,
+                        declassification_grant: None,
                     })
                     .unwrap();
             })
@@ -1126,7 +1189,9 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .unwrap();
     }
@@ -1169,7 +1234,9 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .unwrap();
     }
@@ -1239,7 +1306,9 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     first_kernel
@@ -1260,7 +1329,9 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     second_kernel
@@ -1340,7 +1411,9 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .unwrap();
     }
@@ -1405,7 +1478,9 @@ fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
                 model_metadata: None,
+                supplemental_authorization: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .unwrap();
     }
@@ -1492,7 +1567,7 @@ impl ReceiptStore for CheckpointCapableWithBackgroundStore {
 
     fn enable_background_checkpoints(
         &self,
-        _keypair: Keypair,
+        _backend: std::sync::Arc<dyn chio_core::crypto::SigningBackend>,
         _max_batch: u64,
     ) -> Result<bool, ReceiptStoreError> {
         // Genuinely installs a signer.

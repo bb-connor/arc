@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9d7b17b15b33f7dcc9d52da37c9fb906c57911cdfd78424c344f5ce58b160468
+# Schema sha256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,9 +12,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Tier(Enum):
@@ -28,14 +28,6 @@ class Tier(Enum):
     verified = "verified"
 
 
-class Scheme(Enum):
-    """
-    Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` in `crates/core/chio-core-types`.
-    """
-
-    spiffe = "spiffe"
-
-
 class CredentialKind(Enum):
     """
     Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` in `crates/core/chio-core-types` which uses `serde(rename_all = snake_case)`.
@@ -46,6 +38,14 @@ class CredentialKind(Enum):
     jwt_svid = "jwt_svid"
 
 
+class Scheme(Enum):
+    """
+    Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` in `crates/core/chio-core-types`.
+    """
+
+    spiffe = "spiffe"
+
+
 class WorkloadIdentity(BaseModel):
     """
     Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in `crates/core/chio-core-types` which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity.
@@ -54,23 +54,31 @@ class WorkloadIdentity(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    scheme: Scheme = Field(
-        ...,
-        description="Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` in `crates/core/chio-core-types`.",
-    )
-    credentialKind: CredentialKind = Field(
-        ...,
-        description="Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` in `crates/core/chio-core-types` which uses `serde(rename_all = snake_case)`.",
-    )
-    uri: constr(min_length=1) = Field(
-        ..., description="Canonical workload identifier URI."
-    )
-    trustDomain: constr(min_length=1) = Field(
-        ..., description="Stable trust domain resolved from the identifier."
-    )
-    path: str = Field(
-        ..., description="Canonical workload path within the trust domain."
-    )
+    credentialKind: Annotated[
+        CredentialKind,
+        Field(
+            description="Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` in `crates/core/chio-core-types` which uses `serde(rename_all = snake_case)`."
+        ),
+    ]
+    path: Annotated[
+        str, Field(description="Canonical workload path within the trust domain.")
+    ]
+    scheme: Annotated[
+        Scheme,
+        Field(
+            description="Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` in `crates/core/chio-core-types`."
+        ),
+    ]
+    trustDomain: Annotated[
+        str,
+        Field(
+            description="Stable trust domain resolved from the identifier.",
+            min_length=1,
+        ),
+    ]
+    uri: Annotated[
+        str, Field(description="Canonical workload identifier URI.", min_length=1)
+    ]
 
 
 class ChioTrustControlRuntimeAttestationEvidence(BaseModel):
@@ -81,39 +89,64 @@ class ChioTrustControlRuntimeAttestationEvidence(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: constr(min_length=1) = Field(
-        ...,
-        alias="schema",
-        description="Schema or format identifier of the upstream attestation statement (for example `azure-maa-jwt`, `aws-nitro-cose-sign1`, `google-confidential-vm-jwt`).",
-    )
-    verifier: constr(min_length=1) = Field(
-        ...,
-        description="Attestation verifier or relying party that accepted the evidence.",
-    )
-    tier: Tier = Field(
-        ...,
-        description="Normalized assurance tier resolved from the evidence. Mirrors `RuntimeAssuranceTier` in `crates/core/chio-core-types` which uses `serde(rename_all = snake_case)`.",
-    )
-    issued_at: conint(ge=0) = Field(
-        ..., description="Unix timestamp (seconds) when this attestation was issued."
-    )
-    expires_at: conint(ge=0) = Field(
-        ...,
-        description="Unix timestamp (seconds) when this attestation expires. Trust-control fails closed when `now < issued_at` or `now >= expires_at`.",
-    )
-    evidence_sha256: constr(min_length=1) = Field(
-        ...,
-        description="Stable SHA-256 digest of the attestation evidence payload. Used as the binding identifier for receipts and for sender-constrained continuity proofs.",
-    )
-    runtime_identity: constr(min_length=1) | None = Field(
-        None,
-        description="Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.",
-    )
-    workload_identity: WorkloadIdentity | None = Field(
-        None,
-        description="Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in `crates/core/chio-core-types` which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity.",
-    )
-    claims: Any | None = Field(
-        None,
-        description="Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims.",
-    )
+    claims: Annotated[
+        Any | None,
+        Field(
+            description="Optional structured claims preserved for adapters or operator inspection. Verifier-family-specific (for example `claims.azureMaa`, `claims.awsNitro`, `claims.googleAttestation`) and validated by per-vendor bridges, not by this schema. Omitted when the verifier did not expose preserved claims."
+        ),
+    ] = None
+    evidence_sha256: Annotated[
+        str,
+        Field(
+            description="Stable SHA-256 digest of the attestation evidence payload. Used as the binding identifier for receipts and for sender-constrained continuity proofs.",
+            min_length=1,
+        ),
+    ]
+    expires_at: Annotated[
+        int,
+        Field(
+            description="Unix timestamp (seconds) when this attestation expires. Trust-control fails closed when `now < issued_at` or `now >= expires_at`.",
+            ge=0,
+        ),
+    ]
+    issued_at: Annotated[
+        int,
+        Field(
+            description="Unix timestamp (seconds) when this attestation was issued.",
+            ge=0,
+        ),
+    ]
+    runtime_identity: Annotated[
+        str | None,
+        Field(
+            description="Optional runtime or workload identifier associated with the evidence. SPIFFE URIs are normalized into `workload_identity`; non-SPIFFE values are preserved as opaque verifier metadata. Omitted via `serde(skip_serializing_if = Option::is_none)` when absent.",
+            min_length=1,
+        ),
+    ] = None
+    schema_: Annotated[
+        str,
+        Field(
+            alias="schema",
+            description="Schema or format identifier of the upstream attestation statement (for example `azure-maa-jwt`, `aws-nitro-cose-sign1`, `google-confidential-vm-jwt`).",
+            min_length=1,
+        ),
+    ]
+    tier: Annotated[
+        Tier,
+        Field(
+            description="Normalized assurance tier resolved from the evidence. Mirrors `RuntimeAssuranceTier` in `crates/core/chio-core-types` which uses `serde(rename_all = snake_case)`."
+        ),
+    ]
+    verifier: Annotated[
+        str,
+        Field(
+            description="Attestation verifier or relying party that accepted the evidence.",
+            min_length=1,
+        ),
+    ]
+    workload_identity: Annotated[
+        WorkloadIdentity | None,
+        Field(
+            description="Optional normalized workload identity when the upstream verifier exposed one explicitly. Mirrors `WorkloadIdentity` in `crates/core/chio-core-types` which uses `serde(rename_all = camelCase)`. Omitted when the upstream verifier did not expose a typed workload identity."
+        ),
+    ] = None

@@ -24,6 +24,12 @@ pub const DELEGATION_CHAIN_BINDING: &str = "delegation_chain_binding";
 /// durable composite quota authority is installed by the rollout composition.
 pub const AGGREGATE_INVOCATION_BUDGET: &str = "aggregate_invocation_budget";
 
+/// Peers can verify and atomically enforce an installed broker supplemental quota.
+///
+/// The feature remains opt-in because silently ignoring the supplemental
+/// authority would admit calls beyond the broker capability's signed limit.
+pub const SUPPLEMENTAL_BROKER_EXECUTION_QUOTA: &str = "supplemental_broker_execution_quota";
+
 /// Peers understand and enforce signed threshold proposals and bounded governed approval-token sets.
 ///
 /// This feature is intentionally absent from baseline profiles until the

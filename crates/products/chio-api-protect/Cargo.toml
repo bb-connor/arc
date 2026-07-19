@@ -20,6 +20,7 @@ chio-core-types = { workspace = true }
 chio-http-core = { workspace = true, features = ["reqwest-egress"] }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-openapi = { workspace = true }
 chio-store-sqlite = { workspace = true }

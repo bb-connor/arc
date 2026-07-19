@@ -17,6 +17,7 @@ impl RemoteSession {
         }
         Self {
             session_id: init.session_id,
+            kernel_session_id: init.kernel_session_id,
             agent_id: init.agent_id,
             capabilities: init.capabilities,
             issued_capabilities: init.issued_capabilities,
@@ -24,11 +25,13 @@ impl RemoteSession {
             auth_mode_fingerprint: init.auth_mode_fingerprint,
             policy_fingerprint: init.policy_fingerprint,
             hosted_isolation: init.hosted_isolation,
+            capability_issuance_binding: init.capability_issuance_binding,
             lifecycle_policy: init.lifecycle_policy,
             protocol_version: StdMutex::new(init.protocol_version),
             peer_capabilities: StdMutex::new(init.peer_capabilities),
             initialize_params: StdMutex::new(init.initialize_params),
             lifecycle: StdMutex::new(lifecycle_snapshot),
+            terminalization: Mutex::new(()),
             input_tx: init.input_tx,
             event_tx: init.event_tx,
             retained_notification_events: init.retained_notification_events,
@@ -36,14 +39,19 @@ impl RemoteSession {
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
             next_event_id: init.next_event_id,
             session_db_path: init.session_db_path,
-            resume_integrity_secret: init.resume_integrity_secret,
+            session_store_lease: init.session_store_lease,
+            resume_hmac_keyring: init.resume_hmac_keyring,
+            resume_generation: AtomicU64::new(init.resume_generation),
+            upstream_transport: RemoteSessionUpstreamTransport {
+                inner: init.upstream_transport,
+            },
         }
     }
 
     pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
-        self.input_tx
-            .send(message)
-            .map_err(|_| CliError::cli_other_error("remote MCP session worker is unavailable".to_string()))
+        self.input_tx.send(message).map_err(|_| {
+            CliError::cli_other_error("remote MCP session worker is unavailable".to_string())
+        })
     }
 
     pub(super) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
@@ -175,22 +183,27 @@ impl RemoteSession {
             .lock()
             .ok()
             .and_then(|guard| guard.clone())?;
+        let keyring = self.resume_hmac_keyring.as_ref()?;
+        let resume_generation = self.resume_generation.fetch_add(1, Ordering::SeqCst) + 1;
         let mut record = RemoteSessionResumeRecord {
             session_id: self.session_id.clone(),
+            kernel_session_id: self.kernel_session_id.clone(),
             agent_id: self.agent_id.clone(),
             auth_context: self.auth_context.clone(),
             auth_mode_fingerprint: Some(self.auth_mode_fingerprint.clone()),
             policy_fingerprint: Some(self.policy_fingerprint.clone()),
             hosted_isolation: self.hosted_isolation,
+            capability_issuance_binding: self.capability_issuance_binding.clone(),
             lifecycle,
             protocol_version,
             peer_capabilities,
             initialize_params,
             issued_capabilities: self.issued_capabilities.clone(),
-            resume_integrity_tag: None,
+            resume_generation,
+            resume_integrity: keyring.empty_tag_for_current(),
         };
-        let seed = self.resume_integrity_secret.as_ref()?;
-        record.resume_integrity_tag = Some(compute_resume_record_integrity_tag(seed, &record).ok()?);
+        record.resume_integrity.tag =
+            compute_resume_record_integrity_tag(&keyring.current, &record).ok()?;
         Some(record)
     }
 
@@ -201,7 +214,22 @@ impl RemoteSession {
         let Some(record) = self.resume_record() else {
             return;
         };
-        if let Err(error) = persist_active_session_record(path, &record) {
+        let Some(keyring) = self.resume_hmac_keyring.as_deref() else {
+            warn!(
+                session_id = %self.session_id,
+                "refusing to persist resumable MCP session without a dedicated HMAC keyring"
+            );
+            return;
+        };
+        if let Err(error) = self.ensure_session_store_owned() {
+            warn!(
+                session_id = %self.session_id,
+                error = %error,
+                "refusing to persist resumable MCP session after losing database ownership"
+            );
+            return;
+        }
+        if let Err(error) = persist_active_session_record(path, &record, keyring) {
             warn!(
                 session_id = %self.session_id,
                 error = %error,
@@ -214,7 +242,31 @@ impl RemoteSession {
         let Some(path) = self.session_db_path.as_deref() else {
             return Ok(());
         };
+        self.ensure_session_store_owned()?;
         delete_active_session_record(path, &self.session_id)
+    }
+
+    pub(super) fn ensure_session_store_owned(&self) -> Result<(), CliError> {
+        match self.session_store_lease.as_deref() {
+            Some(lease) => lease.ensure_owned(),
+            None if self.session_db_path.is_some() => Err(CliError::cli_other_error(
+                "remote MCP session has no retained database ownership lease".to_string(),
+            )),
+            None => Ok(()),
+        }
+    }
+
+    pub(super) fn next_terminal_persistence_epoch(&self) -> u64 {
+        self.resume_generation.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    pub(super) fn shutdown_upstream_transport(&self) -> Result<(), CliError> {
+        self.upstream_transport.inner.shutdown().map_err(|error| {
+            CliError::cli_other_error(format!(
+                "MCP session {} terminal receipt persistence failed: {error}",
+                self.session_id
+            ))
+        })
     }
 
     pub(super) fn mark_ready(

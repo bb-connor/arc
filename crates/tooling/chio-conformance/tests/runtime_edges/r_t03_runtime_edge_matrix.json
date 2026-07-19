@@ -10,7 +10,7 @@
     {
       "surface": "mcp_tools_call_route_metadata",
       "crateName": "chio-mcp-edge",
-      "sourcePath": "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs",
+      "sourcePath": "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests_parts/authorization_and_protocol.inc",
       "testName": "tools_call_jsonrpc_passes_route_selection_metadata_to_runtime_admission",
       "entrypoint": "tools/call",
       "expected": {
@@ -49,7 +49,7 @@
     {
       "surface": "acp_edge_stream_resume",
       "crateName": "chio-acp-edge",
-      "sourcePath": "crates/protocol/chio-acp-edge/src/tests/all.rs",
+      "sourcePath": "crates/protocol/chio-acp-edge/src/tests/all/lifecycle.rs",
       "testName": "jsonrpc_resume_runtime_admission_denies_before_stream_tool_dispatch",
       "entrypoint": "tool/resume",
       "expected": {
@@ -62,7 +62,7 @@
     {
       "surface": "a2a_edge_deferred_task_get",
       "crateName": "chio-a2a-edge",
-      "sourcePath": "crates/protocol/chio-a2a-edge/src/tests/all.rs",
+      "sourcePath": "crates/protocol/chio-a2a-edge/src/tests/all/lifecycle.rs",
       "testName": "jsonrpc_task_get_runtime_admission_denies_before_deferred_dispatch",
       "entrypoint": "message/stream task/get",
       "expected": {

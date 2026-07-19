@@ -6,7 +6,7 @@
 //! path, preventing the synchronous `build_and_sign_receipt` step from pinning a
 //! worker thread per concurrent evaluate call.
 //!
-//! A single signing task owns a clone of the kernel signing keypair and
+//! A single signing worker owns a clone of the kernel's shared authority backend and
 //! pulls signing requests from a bounded [`tokio::sync::mpsc`] channel.
 //! Producers `.await` on a oneshot reply channel rather than on a mutex.
 //! Admission is non-blocking: when the queue is full (by count or by the
@@ -60,7 +60,7 @@ use crate::{ChioReceipt, ChioReceiptBody, KernelError, Keypair, DEFAULT_MAX_STRE
 
 /// Default bounded capacity for the signing-task mpsc channel.
 ///
-/// 256 in-flight signing requests is generous for a single-process kernel
+/// 256 in-flight signing requests is generous for a single-writer kernel
 /// (each request is a `ChioReceiptBody` plus a `oneshot::Sender`, well under
 /// 1 KiB amortised) and small enough to surface backpressure during a
 /// signing-task stall before producer memory grows unbounded. Operators
@@ -273,7 +273,7 @@ impl SigningTaskInner {
 /// Handle owned by [`crate::ChioKernel`] for routing signing requests
 /// through the dedicated signing task.
 ///
-/// The handle stores the signing keypair and the configured channel
+/// The handle stores the signing backend and the configured channel
 /// capacity. The task is spawned **lazily** on the first call to
 /// [`Self::sign`] so the kernel can be constructed outside a tokio
 /// runtime (the existing `ChioKernel::new` is sync and is invoked from
@@ -283,10 +283,10 @@ pub(crate) struct SigningTaskHandle {
     /// Lazy state: spawned on first `sign` call inside an async context.
     inner: OnceLock<SigningTaskInner>,
 
-    /// Cloned signing keypair. Held alongside the lazy `inner` so the
+    /// Cloned signing backend. Held alongside the lazy `inner` so the
     /// task can be spawned without re-deriving from `KernelConfig` at
     /// the call site.
-    keypair: Keypair,
+    backend: Arc<dyn SigningBackend>,
 
     /// Configured channel capacity. Exposed for diagnostics and tests.
     capacity: usize,
@@ -322,6 +322,10 @@ pub(crate) struct SigningTaskHandle {
 }
 
 impl SigningTaskHandle {
+    pub(crate) fn is_pristine(&self) -> bool {
+        self.inner.get().is_none() && !self.closed.load(Ordering::Acquire)
+    }
+
     /// Build a handle that will spawn the signing task lazily on first
     /// [`Self::sign`] call, with the default channel capacity
     /// ([`DEFAULT_SIGNING_CHANNEL_CAPACITY`]).
@@ -407,12 +411,26 @@ impl SigningTaskHandle {
         max_content_bytes: usize,
         max_queued_bytes: usize,
     ) -> Self {
+        Self::with_backend_capacity_max_content_and_queued_bytes(
+            Arc::new(Ed25519Backend::new(keypair)),
+            capacity,
+            max_content_bytes,
+            max_queued_bytes,
+        )
+    }
+
+    pub(crate) fn with_backend_capacity_max_content_and_queued_bytes(
+        backend: Arc<dyn SigningBackend>,
+        capacity: usize,
+        max_content_bytes: usize,
+        max_queued_bytes: usize,
+    ) -> Self {
         let capacity = capacity.max(1);
         // Do NOT `max(1)`: 0 is the explicit "no per-request cap" sentinel.
         let aggregate_budget_permits = clamp_aggregate_permits(max_queued_bytes);
         Self {
             inner: OnceLock::new(),
-            keypair,
+            backend,
             capacity,
             max_content_bytes,
             aggregate_byte_budget: Arc::new(Semaphore::new(aggregate_budget_permits as usize)),
@@ -498,7 +516,7 @@ impl SigningTaskHandle {
             )
         })?;
         let (sender, receiver) = mpsc::channel::<SignRequest>(self.capacity);
-        let join = handle.spawn(run_signing_task(self.keypair.clone(), receiver));
+        let join = handle.spawn(run_signing_task(Arc::clone(&self.backend), receiver));
         let candidate = SigningTaskInner {
             sender: Mutex::new(Some(sender)),
             join: Mutex::new(Some(join)),
@@ -617,7 +635,7 @@ impl SigningTaskHandle {
         body: ChioReceiptBody,
         canonical_content: Vec<u8>,
     ) -> Result<ChioReceipt, KernelError> {
-        sign_one(&self.keypair, body, canonical_content)
+        sign_one_with_backend(body, self.backend.as_ref(), canonical_content)
     }
 
     /// Submit a signing request and `.await` the signed receipt.
@@ -880,7 +898,7 @@ impl SigningTaskHandle {
 
         // Step 3: await join. The task drains the channel naturally
         // because we just dropped the only sender clone the kernel
-        // held. Any oneshot reply senders in the queue are processed
+        // held. Any oneshot reply senders in the queue are serviced
         // and replied to in order before the task returns.
         match join.await {
             Ok(()) => {}
@@ -906,7 +924,7 @@ impl Drop for SigningTaskHandle {
     /// runtime teardown). Pending oneshot receivers receive their reply
     /// if the task signs before the runtime stops, or observe a
     /// dropped sender otherwise. This matches the existing kernel
-    /// semantics for any in-flight async work at process exit.
+    /// semantics for any in-flight async work at application exit.
     fn drop(&mut self) {
         // Nothing to do: the inner cell drops, which drops the sender
         // mutex (closing the channel for the receiver), which lets the
@@ -918,13 +936,17 @@ impl Drop for SigningTaskHandle {
 }
 
 /// Body of the signing task. Pulls requests from `receiver`, signs each
-/// one against `keypair`, and replies on the per-request oneshot.
+/// one against the shared authority backend, and replies on the per-request
+/// oneshot.
 ///
 /// Returns when `receiver` is closed (every `Sender` clone has been
 /// dropped). The task does not panic on signing errors; it surfaces them
 /// via the oneshot reply so producers can observe them as
 /// [`KernelError::ReceiptSigningFailed`].
-async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignRequest>) {
+async fn run_signing_task(
+    backend: Arc<dyn SigningBackend>,
+    mut receiver: mpsc::Receiver<SignRequest>,
+) {
     debug!("signing task started");
     while let Some(request) = receiver.recv().await {
         let SignRequest {
@@ -933,7 +955,7 @@ async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignReq
             reply,
             _aggregate_permit,
         } = request;
-        let result = sign_one(&keypair, body, canonical_content);
+        let result = sign_one_with_backend(body, backend.as_ref(), canonical_content);
         // Release the aggregate byte-budget permit only AFTER `sign_one` has
         // consumed `canonical_content` (the preimage is no longer retained), so
         // the budget reflects bytes actually held in memory. Dropping the
@@ -947,18 +969,6 @@ async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignReq
         let _ = reply.send(result);
     }
     debug!("signing task exited (channel closed)");
-}
-
-/// Pure signing step: matches the inline path in `responses.rs` so
-/// receipts produced via the channel are byte-identical to receipts
-/// produced via `build_and_sign_receipt`.
-fn sign_one(
-    keypair: &Keypair,
-    body: ChioReceiptBody,
-    canonical_content: Vec<u8>,
-) -> Result<ChioReceipt, KernelError> {
-    let backend = Ed25519Backend::new(keypair.clone());
-    sign_one_with_backend(body, &backend, canonical_content)
 }
 
 fn sign_one_with_backend(
@@ -978,8 +988,8 @@ fn sign_one_with_backend(
     // wrapper, and sign. Routing the mpsc task through the same primitive means
     // there is exactly one signing implementation, so the inline and async
     // funnels are byte-identical *and* equally fail-closed by construction
-    // rather than by hand synchronization. The mpsc task still owns the keypair
-    // and channel plumbing; only the pure crypto step is delegated. We call the
+    // rather than by hand synchronization. The mpsc worker still owns the backend
+    // handle and channel plumbing; only the pure crypto step is delegated. We call the
     // portable kernel-core function directly (rather than the
     // `crate::receipt_support` wrapper) because this module is also
     // `#[path]`-included by the crash/backpressure integration tests, whose
@@ -987,21 +997,39 @@ fn sign_one_with_backend(
     // `chio_kernel_core` is reachable in both contexts.
     let handle =
         chio_core::receipt::signing::ReceiptSigningHandle::from_content_preimage(canonical_content);
-    chio_kernel_core::sign_receipt_with_handle(body, backend, handle).map_err(|error| {
-        use chio_kernel_core::ReceiptSigningError;
-        let message = match error {
-            ReceiptSigningError::KernelKeyMismatch => {
-                "kernel signing key does not match receipt body kernel_key".to_string()
-            }
-            ReceiptSigningError::ContentHashMismatch {
-                recomputed,
-                claimed,
-            } => format!(
-                "receipt content_hash mismatch: body claimed {claimed} but signer \
+    let receipt =
+        chio_kernel_core::sign_receipt_with_handle(body, backend, handle).map_err(|error| {
+            use chio_kernel_core::ReceiptSigningError;
+            let message = match error {
+                ReceiptSigningError::KernelKeyMismatch => {
+                    "kernel signing key does not match receipt body kernel_key".to_string()
+                }
+                ReceiptSigningError::ContentHashMismatch {
+                    recomputed,
+                    claimed,
+                } => format!(
+                    "receipt content_hash mismatch: body claimed {claimed} but signer \
                  recomputed {recomputed} over the canonical content (WYSIWYS refused)"
-            ),
-            ReceiptSigningError::SigningFailed(reason) => reason,
-        };
-        KernelError::ReceiptSigningFailed(message)
-    })
+                ),
+                ReceiptSigningError::SigningFailed(reason) => reason,
+            };
+            KernelError::ReceiptSigningFailed(message)
+        })?;
+    if receipt.algorithm != Some(receipt.signature.algorithm())
+        || receipt.kernel_key.algorithm() != receipt.signature.algorithm()
+    {
+        return Err(KernelError::ReceiptSigningFailed(
+            "freshly signed receipt algorithm does not match its embedded kernel key".to_string(),
+        ));
+    }
+    if !receipt.verify_signature().map_err(|error| {
+        KernelError::ReceiptSigningFailed(format!(
+            "failed to verify freshly signed receipt: {error}"
+        ))
+    })? {
+        return Err(KernelError::ReceiptSigningFailed(
+            "freshly signed receipt does not verify under its embedded kernel key".to_string(),
+        ));
+    }
+    Ok(receipt)
 }

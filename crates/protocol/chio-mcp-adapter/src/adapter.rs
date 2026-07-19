@@ -13,6 +13,18 @@ use crate::manifest;
 use crate::result_mapping::mcp_tool_result_to_chio_value;
 use crate::transport::StdioMcpTransport;
 
+pub(crate) fn merge_shutdown_error(
+    primary: AdapterError,
+    shutdown: Result<(), AdapterError>,
+) -> AdapterError {
+    match shutdown {
+        Ok(()) => primary,
+        Err(shutdown_error) => AdapterError::ConnectionFailed(format!(
+            "{primary}; terminal receipt persistence also failed: {shutdown_error}"
+        )),
+    }
+}
+
 /// Configuration for the MCP adapter.
 #[derive(Clone)]
 pub struct McpAdapterConfig {
@@ -33,17 +45,11 @@ pub struct McpAdapterConfig {
 ///
 /// Usage:
 ///
-/// ```ignore
-/// let transport = StdioMcpTransport::spawn("npx", &["-y", "some-mcp-server"]);
-/// let config = McpAdapterConfig { /* ... */ };
-/// let adapter = McpAdapter::new(config, Box::new(transport));
-/// let manifest = adapter.generate_manifest()?;
-/// let result = adapter.invoke("read_file", json!({"path": "/tmp/test.txt"}))?;
-/// ```
 #[derive(Clone)]
 pub struct McpAdapter {
     pub(crate) config: McpAdapterConfig,
     pub(crate) transport: Arc<dyn McpTransport>,
+    native_enforcement_evidence: Option<chio_cage::FullyEnforcedEvidence>,
 }
 
 /// Transport wrapper that serializes upstream MCP calls through one shared gate.
@@ -157,6 +163,13 @@ impl McpTransport for SerializedMcpTransport {
                 vec![]
             })
     }
+
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        // Shutdown must be able to cancel the request currently holding the
+        // serialization gate. The underlying transport owns that cancellation
+        // and terminal-evidence synchronization.
+        self.inner.shutdown()
+    }
 }
 
 impl McpAdapter {
@@ -164,7 +177,13 @@ impl McpAdapter {
         Self {
             config,
             transport: Arc::from(transport),
+            native_enforcement_evidence: None,
         }
+    }
+
+    /// Shut down the upstream transport and persist terminal security evidence.
+    pub fn shutdown(&self) -> Result<(), AdapterError> {
+        self.transport.shutdown()
     }
 
     /// Create an adapter that spawns an MCP server as a subprocess.
@@ -176,9 +195,52 @@ impl McpAdapter {
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
+        launch: crate::transport::NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
-        let transport = StdioMcpTransport::spawn(command, args)?;
-        Ok(Self::new(config, Box::new(transport)))
+        if launch.server_id() != config.server_id {
+            return Err(AdapterError::ConnectionFailed(
+                "native MCP launch authorization belongs to a different server".to_string(),
+            ));
+        }
+        let cage_required = matches!(&launch, crate::transport::NativeMcpLaunch::CageRequired(_));
+        let transport = StdioMcpTransport::spawn(command, args, launch)?;
+        let enforcement_evidence = if cage_required {
+            match transport.enforcement_evidence().cloned() {
+                Some(evidence) => Some(evidence),
+                None => {
+                    let error = AdapterError::ConnectionFailed(
+                        "cage-required transport returned no fully enforced evidence".into(),
+                    );
+                    return Err(merge_shutdown_error(error, transport.shutdown()));
+                }
+            }
+        } else {
+            None
+        };
+        let mut adapter = Self::new(config, Box::new(transport));
+        adapter.native_enforcement_evidence = enforcement_evidence;
+        Ok(adapter)
+    }
+
+    /// Create an adapter whose subprocess is required to reach verified cage
+    /// enforcement. Cage admission or launch failure is terminal.
+    pub fn from_cage_required_command(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        launch: crate::transport::CageRequiredLaunch,
+    ) -> Result<Self, AdapterError> {
+        Self::from_command(
+            command,
+            args,
+            config,
+            crate::transport::NativeMcpLaunch::CageRequired(Box::new(launch)),
+        )
+    }
+
+    #[must_use]
+    pub fn native_enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
+        self.native_enforcement_evidence.as_ref()
     }
 
     /// Query the MCP server for its tool list and generate a Chio manifest.

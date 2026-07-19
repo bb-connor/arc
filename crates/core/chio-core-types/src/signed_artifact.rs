@@ -4,7 +4,10 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use crate::capability::{features::CHIO_CAPABILITIES_SCHEMA, token::CHIO_CAPABILITY_SCHEMA};
+use crate::capability::{
+    aggregate_budget::CHIO_AGGREGATE_BUDGET_ROOT_SCHEMA, features::CHIO_CAPABILITIES_SCHEMA,
+    threshold_approval::CHIO_THRESHOLD_APPROVAL_PROPOSAL_SCHEMA, token::CHIO_CAPABILITY_SCHEMA,
+};
 use crate::error::{Error, Result};
 use crate::oracle::CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA;
 use crate::receipt::{body::CHIO_RECEIPT_SCHEMA, lineage::CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA};
@@ -100,6 +103,13 @@ pub const CHIO_ENTERPRISE_TELEMETRY_PROJECTION_V1_SCHEMA: &str =
 pub const CHIO_ENTERPRISE_APPROVAL_CASE_V1_SCHEMA: &str = "chio.enterprise.approval-case.v1";
 pub const CHIO_ENTERPRISE_CONTROL_EVIDENCE_MAP_V1_SCHEMA: &str =
     "chio.enterprise.control-evidence-map.v1";
+pub const CHIO_ENTERPRISE_MIGRATION_CANARY_EVIDENCE_V1_SCHEMA: &str =
+    "chio.enterprise-migration-canary-evidence.v1";
+pub const CHIO_ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_V1_SCHEMA: &str =
+    "chio.enterprise-migration-cutover-attestation.v1";
+pub const CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA: &str = "chio.broker-audit-comparison.v1";
+pub const CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA: &str =
+    "chio.broker-audit-runner-authorization.v1";
 pub const CHIO_AGENT_WEB_PROOF_ENVELOPE_V1_SCHEMA: &str = "chio.agent-web-proof-envelope.v1";
 pub const CHIO_AGENT_WEB_EXTERNAL_PROJECTION_MANIFEST_V1_SCHEMA: &str =
     "chio.agent-web.external-projection-manifest.v1";
@@ -143,6 +153,7 @@ pub const CHIO_SWARM_BUDGET_POOL_V1_SCHEMA: &str = "chio.swarm.budget-pool.v1";
 pub const CHIO_SWARM_REVOCATION_EPOCH_V1_SCHEMA: &str = "chio.swarm.revocation-epoch.v1";
 pub const CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA: &str =
     "chio.swarm.authority-verifier-report.v1";
+pub const CHIO_TOOL_MANIFEST_V2_SCHEMA: &str = "chio.manifest.v2";
 
 type SignedArtifactSchemaSpec = (&'static str, Option<(&'static str, &'static str)>);
 
@@ -157,6 +168,20 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_CAPABILITY_SCHEMA,
         Some(("capability_token", "schema-registry/v1/capability-token-v1")),
+    ),
+    (
+        CHIO_AGGREGATE_BUDGET_ROOT_SCHEMA,
+        Some((
+            "aggregate_budget_root_binding",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
+        CHIO_THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+        Some((
+            "threshold_approval_proposal",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         CHIO_RECEIPT_SCHEMA,
@@ -427,6 +452,34 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("enterprise_control_evidence_map", "enterprise-export-v1")),
     ),
     (
+        CHIO_ENTERPRISE_MIGRATION_CANARY_EVIDENCE_V1_SCHEMA,
+        Some((
+            "enterprise_migration_canary_evidence",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
+        CHIO_ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_V1_SCHEMA,
+        Some((
+            "enterprise_migration_cutover_attestation",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
+        CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA,
+        Some((
+            "broker_audit_comparison",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
+        CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA,
+        Some((
+            "broker_audit_runner_authorization",
+            "enterprise-security-execution-v1",
+        )),
+    ),
+    (
         CHIO_AGENT_WEB_PROOF_ENVELOPE_V1_SCHEMA,
         Some(("agent_web_proof_envelope", "agent-web-interop-v1")),
     ),
@@ -552,6 +605,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA,
         Some(("swarm_authority_verifier_report", "swarm-authority-v1")),
+    ),
+    (
+        CHIO_TOOL_MANIFEST_V2_SCHEMA,
+        Some(("tool_manifest", "manifest-v2")),
     ),
     (AZURE_MAA_ATTESTATION_SCHEMA, None),
     (AWS_NITRO_ATTESTATION_SCHEMA, None),

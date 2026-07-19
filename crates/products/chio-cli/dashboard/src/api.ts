@@ -1,6 +1,6 @@
 // Typed fetch wrappers for Chio receipt query, analytics, lineage endpoints, and
-// static Proof Room assets. Runtime API endpoints require Bearer auth. Static
-// Proof Room assets are verifier outputs and are fetched without auth.
+// static Proof Room assets. Runtime dashboard requests use the same-origin,
+// HttpOnly session cookie. Static Proof Room assets are fetched without auth.
 
 import type {
   CapabilitySnapshot,
@@ -69,52 +69,101 @@ import {
   type ProofRoomDsseSignature,
 } from './proofRoomArtifactEvidence'
 
-const TOKEN_KEY = 'chio_token'
+type DashboardUnauthorizedListener = () => void
 
-/**
- * Read Bearer token from sessionStorage or URL query param.
- * Stores in sessionStorage for subsequent calls.
- * Returns empty string if neither source provides a token.
- */
-export function getToken(): string {
-  const stored = sessionStorage.getItem(TOKEN_KEY)
-  if (stored) return stored
+const dashboardUnauthorizedListeners = new Set<DashboardUnauthorizedListener>()
+let dashboardSessionEpoch = 0
 
-  const param = new URLSearchParams(window.location.search).get('token')
-  if (param) {
-    sessionStorage.setItem(TOKEN_KEY, param)
-    // Remove only the token from the URL bar and history so it is not leaked via
-    // the Referer header, browser history, or shoulder-surfing.
-    const url = new URL(window.location.href)
-    url.searchParams.delete('token')
-    const search = url.searchParams.toString()
-    window.history.replaceState(
-      {},
-      document.title,
-      `${url.pathname}${search ? `?${search}` : ''}${url.hash}`,
-    )
-    return param
+export function onDashboardUnauthorized(listener: DashboardUnauthorizedListener): () => void {
+  dashboardUnauthorizedListeners.add(listener)
+  return () => {
+    dashboardUnauthorizedListeners.delete(listener)
   }
-  return ''
 }
 
-/**
- * Wraps fetch with Authorization header injection.
- */
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  const token = getToken()
+function notifyDashboardUnauthorized(requestEpoch: number): void {
+  if (requestEpoch !== dashboardSessionEpoch) return
+  dashboardSessionEpoch += 1
+  for (const listener of [...dashboardUnauthorizedListeners]) {
+    listener()
+  }
+}
+
+async function dashboardFetch(path: string, init?: RequestInit): Promise<Response> {
+  const requestEpoch = dashboardSessionEpoch
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> | undefined),
   }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
+  if (response.status === 401) {
+    notifyDashboardUnauthorized(requestEpoch)
   }
-  const res = await fetch(path, { ...init, headers })
+  return response
+}
+
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const res = await dashboardFetch(path, init)
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${res.statusText}`)
   }
   return res
+}
+
+export interface DashboardReportAvailability {
+  observability: boolean
+  alerts: boolean
+  trends: boolean
+  alertHandoff: boolean
+  alertDelivery: boolean
+  alertAssurance: boolean
+  alertAssuranceExport: boolean
+  alertAssuranceReplay: boolean
+  alertAssuranceRetention: boolean
+  alertAssuranceArchive: boolean
+  alertAssuranceCloseout: boolean
+  alertAssuranceArchivePackage: boolean
+  alertAssuranceArchiveExtraction: boolean
+  alertAssurancePhysicalArchive: boolean
+  alertAssuranceRetentionHandoff: boolean
+  alertAssuranceArchiveRestoreDrill: boolean
+  alertAssuranceExternalRetentionReview: boolean
+}
+
+export interface DashboardSessionStatus {
+  authenticated: boolean
+  expiresAt: number
+  relayReports: DashboardReportAvailability
+}
+
+export async function createDashboardSession(token: string): Promise<DashboardSessionStatus> {
+  const res = await dashboardFetch('/v1/dashboard/session', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  })
+  if (!res.ok) {
+    throw new Error(`Dashboard login failed: ${res.status} ${res.statusText}`)
+  }
+  const session = await res.json() as DashboardSessionStatus
+  dashboardSessionEpoch += 1
+  return session
+}
+
+export async function hasDashboardSession(): Promise<DashboardSessionStatus | null> {
+  const res = await dashboardFetch('/v1/dashboard/session')
+  if (res.status === 401) return null
+  if (!res.ok) {
+    throw new Error(`Dashboard session check failed: ${res.status} ${res.statusText}`)
+  }
+  return res.json() as Promise<DashboardSessionStatus>
+}
+
+export async function deleteDashboardSession(): Promise<void> {
+  const res = await dashboardFetch('/v1/dashboard/session', { method: 'DELETE' })
+  if (!res.ok) {
+    throw new Error(`Dashboard logout failed: ${res.status} ${res.statusText}`)
+  }
+  dashboardSessionEpoch += 1
 }
 
 /**
@@ -953,259 +1002,113 @@ export async function fetchProofRoomFixtureVerifierReport(
   return report
 }
 
-export async function fetchRelayObservabilityReport(): Promise<RelayObservabilityReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/observability', { headers })
+async function fetchRelayReport<T>(path: string, label: string): Promise<T> {
+  const res = await dashboardFetch(path)
   if (!res.ok) {
-    throw new Error(`Relay observability request failed: ${res.status} ${res.statusText}`)
+    throw new Error(`${label} request failed: ${res.status} ${res.statusText}`)
   }
-  return res.json() as Promise<RelayObservabilityReport>
+  return res.json() as Promise<T>
+}
+
+export async function fetchRelayObservabilityReport(): Promise<RelayObservabilityReport> {
+  return fetchRelayReport('/v1/chio/pheromone/observability', 'Relay observability')
 }
 
 export async function fetchRelayAlertReport(): Promise<RelayAlertReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alerts', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertReport>
+  return fetchRelayReport('/v1/chio/pheromone/alerts', 'Relay alert')
 }
 
 export async function fetchRelayTrendReport(): Promise<RelayTrendReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/trends', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay trend request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayTrendReport>
+  return fetchRelayReport('/v1/chio/pheromone/trends', 'Relay trend')
 }
 
 export async function fetchRelayAlertHandoffReport(): Promise<RelayAlertHandoffReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-handoff', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert handoff request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertHandoffReport>
+  return fetchRelayReport('/v1/chio/pheromone/alert-handoff', 'Relay alert handoff')
 }
 
 export async function fetchRelayAlertDeliveryReport(): Promise<RelayAlertDeliveryReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-delivery', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert delivery request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertDeliveryReport>
+  return fetchRelayReport('/v1/chio/pheromone/alert-delivery', 'Relay alert delivery')
 }
 
 export async function fetchRelayAlertAssurancePackage(): Promise<RelayAlertAssurancePackage> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssurancePackage>
+  return fetchRelayReport('/v1/chio/pheromone/alert-assurance', 'Relay alert assurance')
 }
 
 export async function fetchRelayAlertAssuranceExportReport(): Promise<RelayAlertAssuranceExportReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/export', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance export request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceExportReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/export',
+    'Relay alert assurance export',
+  )
 }
 
 export async function fetchRelayAlertAssuranceReplayReport(): Promise<RelayAlertAssuranceReplayReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/replay', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance replay request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceReplayReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/replay',
+    'Relay alert assurance replay',
+  )
 }
 
 export async function fetchRelayAlertAssuranceRetentionReport(): Promise<RelayAlertAssuranceRetentionReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/retention', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance retention request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceRetentionReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/retention',
+    'Relay alert assurance retention',
+  )
 }
 
 export async function fetchRelayAlertAssuranceArchiveReport(): Promise<RelayAlertAssuranceArchiveReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/archive', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance archive request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceArchiveReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/archive',
+    'Relay alert assurance archive',
+  )
 }
 
 export async function fetchRelayAlertAssuranceCloseoutReport(): Promise<RelayAlertAssuranceCloseoutReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/closeout', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance closeout request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceCloseoutReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/closeout',
+    'Relay alert assurance closeout',
+  )
 }
 
 export async function fetchRelayAlertAssuranceArchivePackageReport(): Promise<RelayAlertAssuranceArchivePackageReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/archive-package', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance archive package request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceArchivePackageReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/archive-package',
+    'Relay alert assurance archive package',
+  )
 }
 
 export async function fetchRelayAlertAssuranceArchiveExtractionReport(): Promise<RelayAlertAssuranceArchiveExtractionReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/archive-extraction', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance archive extraction request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceArchiveExtractionReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/archive-extraction',
+    'Relay alert assurance archive extraction',
+  )
 }
 
 export async function fetchRelayAlertAssurancePhysicalArchiveDrillReport(): Promise<RelayAlertAssurancePhysicalArchiveDrillReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/physical-archive', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance physical archive request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssurancePhysicalArchiveDrillReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/physical-archive',
+    'Relay alert assurance physical archive',
+  )
 }
 
 export async function fetchRelayAlertAssuranceRetentionHandoffReport(): Promise<RelayAlertAssuranceRetentionHandoffReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/retention-handoff', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance retention handoff request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceRetentionHandoffReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/retention-handoff',
+    'Relay alert assurance retention handoff',
+  )
 }
 
 export async function fetchRelayAlertAssuranceArchiveRestoreDrillReport(): Promise<RelayAlertAssuranceArchiveRestoreDrillReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/archive-restore-drill', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance archive restore drill request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceArchiveRestoreDrillReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/archive-restore-drill',
+    'Relay alert assurance archive restore drill',
+  )
 }
 
 export async function fetchRelayAlertAssuranceExternalRetentionReviewReport(): Promise<RelayAlertAssuranceExternalRetentionReviewReport> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch('/v1/chio/pheromone/alert-assurance/external-retention-review', { headers })
-  if (!res.ok) {
-    throw new Error(`Relay alert assurance external retention request failed: ${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<RelayAlertAssuranceExternalRetentionReviewReport>
+  return fetchRelayReport(
+    '/v1/chio/pheromone/alert-assurance/external-retention-review',
+    'Relay alert assurance external retention',
+  )
 }
 
 /**

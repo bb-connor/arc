@@ -34,12 +34,12 @@ path = "src/bin/record.rs"
 default = []
 fixtures-openai = ["dep:chio-openai"]
 fixtures-anthropic = ["dep:chio-anthropic-tools-adapter", "dep:chio-manifest"]
-fixtures-bedrock = ["dep:chio-bedrock-converse-adapter"]
-fixtures-cohere = ["dep:chio-cohere-tools-adapter"]
+fixtures-bedrock = ["dep:chio-bedrock-converse-adapter", "dep:chio-manifest"]
+fixtures-cohere = ["dep:chio-cohere-tools-adapter", "dep:chio-manifest"]
 fixtures-gemini = ["dep:chio-gemini-tools-adapter"]
 fixtures-groq = ["dep:chio-groq-tools-adapter"]
 fixtures-mistral = ["dep:chio-mistral-tools-adapter"]
-fixtures-ollama = ["dep:chio-ollama-tools-adapter"]
+fixtures-ollama = ["dep:chio-ollama-tools-adapter", "dep:chio-manifest"]
 
 [lints]
 workspace = true

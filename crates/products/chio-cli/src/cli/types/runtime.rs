@@ -663,9 +663,23 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy bound to the durable cage
+        /// migration ledger.
+        #[arg(long, value_name = "PATH")]
+        cage_policy: PathBuf,
+
+        /// Externally configured public key trusted to sign the native-launch
+        /// policy.
+        #[arg(long, value_name = "PUBLIC_KEY")]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -698,9 +712,23 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy bound to the durable cage
+        /// migration ledger.
+        #[arg(long, value_name = "PATH")]
+        cage_policy: PathBuf,
+
+        /// Externally configured public key trusted to sign the native-launch
+        /// policy.
+        #[arg(long, value_name = "PUBLIC_KEY")]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -779,6 +807,15 @@ pub(crate) enum McpCommands {
         /// does not leak via `ps` / `/proc/<pid>/cmdline`.
         #[arg(long, env = "CHIO_ADMIN_TOKEN", hide_env_values = true)]
         admin_token: Option<String>,
+
+        /// Dedicated trust-control workload bearer used only for remote
+        /// capability issuance.
+        #[arg(
+            long,
+            env = "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        remote_authority_workload_token: Option<String>,
 
         /// Public base URL used when constructing protected-resource metadata URLs.
         #[arg(long)]

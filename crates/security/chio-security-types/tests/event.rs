@@ -80,10 +80,48 @@ fn portable_event_and_finding_reject_unknown_or_inconsistent_shapes() {
         group_key_hash: Digest32::new([2_u8; 32]),
         ordered_event_ids: vec![],
         ordered_evidence_digests: vec![],
+        ordered_source_receipt_ids: vec![],
         first_event_time_unix_ms: 10,
         last_event_time_unix_ms: 9,
         lineage_seed: LineageId::new("lineage-1")
             .unwrap_or_else(|error| panic!("invalid lineage id: {error}")),
     };
     assert!(CorrelatedFinding::new(base).is_err());
+}
+
+#[test]
+fn correlated_finding_preserves_event_to_source_receipt_cardinality_and_order() {
+    let first_receipt = OpaqueReceiptRef::new("receipt-event-1")
+        .unwrap_or_else(|error| panic!("invalid first receipt id: {error}"));
+    let second_receipt = OpaqueReceiptRef::new("receipt-event-2")
+        .unwrap_or_else(|error| panic!("invalid second receipt id: {error}"));
+    let input = CorrelatedFindingInput {
+        finding_id: record("finding-1"),
+        tenant_id: TenantId::new("tenant-1")
+            .unwrap_or_else(|error| panic!("invalid tenant id: {error}")),
+        rule_id: RuleId::new("rule-1").unwrap_or_else(|error| panic!("invalid rule id: {error}")),
+        rule_version_hash: Digest32::new([1_u8; 32]),
+        policy_version: record("policy-1"),
+        group_key_hash: Digest32::new([2_u8; 32]),
+        ordered_event_ids: vec![
+            EventId::new("event-1").unwrap_or_else(|error| panic!("event id: {error}")),
+            EventId::new("event-2").unwrap_or_else(|error| panic!("event id: {error}")),
+        ],
+        ordered_evidence_digests: vec![Digest32::new([3_u8; 32]), Digest32::new([4_u8; 32])],
+        ordered_source_receipt_ids: vec![first_receipt.clone(), second_receipt.clone()],
+        first_event_time_unix_ms: 10,
+        last_event_time_unix_ms: 11,
+        lineage_seed: LineageId::new("lineage-1")
+            .unwrap_or_else(|error| panic!("invalid lineage id: {error}")),
+    };
+    let finding = CorrelatedFinding::new(input.clone())
+        .unwrap_or_else(|error| panic!("valid finding rejected: {error}"));
+    assert_eq!(
+        finding.ordered_source_receipt_ids.as_slice(),
+        [first_receipt, second_receipt]
+    );
+
+    let mut missing = input;
+    missing.ordered_source_receipt_ids.pop();
+    assert!(CorrelatedFinding::new(missing).is_err());
 }

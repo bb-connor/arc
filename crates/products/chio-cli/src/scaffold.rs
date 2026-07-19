@@ -51,7 +51,8 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
     println!();
     println!("Next steps:");
     println!("  cd {}", absolute.display());
-    println!("  cargo build");
+    println!("  cargo build --bin hello_server --bin demo");
+    println!("  configure the signed native-launch inputs described in README.md");
     println!("  CHIO_BIN={} cargo run --quiet --bin demo", chio_bin_hint);
 
     Ok(())

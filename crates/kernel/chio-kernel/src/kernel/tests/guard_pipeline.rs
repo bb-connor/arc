@@ -264,7 +264,9 @@ fn guard_denial_precedes_every_budget_store_mutation() {
 
     let mut kernel = make_kernel(make_config());
     let budget_store = std::sync::Arc::new(ObservingBudgetStore::new());
-    kernel.set_budget_store_handle(budget_store.clone());
+    kernel
+        .set_budget_store_handle(budget_store.clone())
+        .expect("budget store");
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["dangerous"])));
 
     struct DenyAll;
@@ -417,7 +419,9 @@ fn matched_grant_index_populated_in_guard_context() {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
@@ -488,7 +492,9 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // First two invocations allowed.

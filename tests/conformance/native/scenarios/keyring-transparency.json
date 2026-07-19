@@ -1,0 +1,30 @@
+{
+  "id": "keyring-transparency",
+  "title": "Key transparency separates signatures and rejects synchronization gaps",
+  "category": "keyring_transparency",
+  "driver": "artifact",
+  "fixture": "security-vector-key-log",
+  "specVersion": "chio-wire-v1",
+  "assertions": [
+    {
+      "name": "key_log_signature_separation",
+      "kind": "key_log_signature_separation",
+      "expectedBool": true
+    },
+    {
+      "name": "key_log_contiguous_sync_applies",
+      "kind": "key_log_contiguous_sync_applies",
+      "expectedBool": true
+    },
+    {
+      "name": "key_log_omitted_noncontiguous_gap_rejected",
+      "kind": "key_log_omitted_noncontiguous_gap_rejected",
+      "expectedBool": true
+    },
+    {
+      "name": "key_log_witness_conflict_rejected",
+      "kind": "key_log_witness_conflict_rejected",
+      "expectedBool": true
+    }
+  ]
+}

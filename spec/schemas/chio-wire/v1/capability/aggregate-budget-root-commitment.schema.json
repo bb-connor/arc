@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-budget-root-commitment.schema.json",
+  "title": "Chio aggregate budget root commitment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["root_capability_id", "root_issuer", "root_subject", "root_scope_hash", "root_issued_at", "root_expires_at", "aggregate_scope", "max_invocations"],
+  "properties": {
+    "root_capability_id": { "$ref": "#/$defs/identifier" },
+    "root_issuer": { "$ref": "#/$defs/publicKey" },
+    "root_subject": { "$ref": "#/$defs/publicKey" },
+    "root_scope_hash": { "$ref": "#/$defs/digest" },
+    "root_issued_at": { "type": "integer", "minimum": 0 },
+    "root_expires_at": { "type": "integer", "minimum": 1 },
+    "aggregate_scope": { "const": "delegation_family" },
+    "max_invocations": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

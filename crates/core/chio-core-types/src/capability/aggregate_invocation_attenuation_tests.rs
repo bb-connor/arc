@@ -303,16 +303,17 @@ fn aggregate_invocation_attenuation_absent_link_evidence_preserves_signing_bytes
 #[test]
 fn aggregate_invocation_attenuation_evidence_has_closed_camel_case_wire_shape() {
     let evidence = AggregateFamilyPreservationEvidence {
+        root_capability_id: "family-root".to_string(),
         root_binding_digest: "binding-digest".to_string(),
         max_invocations: 7,
     };
 
     assert_eq!(
         canonical_json_bytes(&evidence).unwrap(),
-        br#"{"maxInvocations":7,"rootBindingDigest":"binding-digest"}"#
+        br#"{"maxInvocations":7,"rootBindingDigest":"binding-digest","rootCapabilityId":"family-root"}"#
     );
     assert!(serde_json::from_str::<AggregateFamilyPreservationEvidence>(
-        r#"{"rootBindingDigest":"binding-digest","maxInvocations":7,"extra":true}"#
+        r#"{"rootCapabilityId":"family-root","rootBindingDigest":"binding-digest","maxInvocations":7,"extra":true}"#
     )
     .is_err());
 }
@@ -329,7 +330,7 @@ fn aggregate_invocation_attenuation_verified_projection_is_family_only_and_stabl
     )
     .unwrap()
     .unwrap();
-    let descendant = fixture.signed_descendant(Some(fixture.evidence()), None);
+    let descendant = fixture.signed_descendant(Some(fixture.evidence()), Some(fixture.evidence()));
     let descendant_authority = verify_aggregate_invocation_authority(
         &descendant,
         &[],
@@ -382,6 +383,15 @@ fn aggregate_invocation_attenuation_family_proof_requires_exact_evidence() {
         ),
         (
             Some(AggregateFamilyPreservationEvidence {
+                root_capability_id: "different-family-root".to_string(),
+                root_binding_digest: fixture.verified_root.root_binding_digest().to_string(),
+                max_invocations: 7,
+            }),
+            "aggregate family preservation root capability ID does not match the authenticated root",
+        ),
+        (
+            Some(AggregateFamilyPreservationEvidence {
+                root_capability_id: fixture.root_token.id.clone(),
                 root_binding_digest: "wrong-digest".to_string(),
                 max_invocations: 7,
             }),
@@ -389,6 +399,7 @@ fn aggregate_invocation_attenuation_family_proof_requires_exact_evidence() {
         ),
         (
             Some(AggregateFamilyPreservationEvidence {
+                root_capability_id: fixture.root_token.id.clone(),
                 root_binding_digest: fixture.verified_root.root_binding_digest().to_string(),
                 max_invocations: 8,
             }),
@@ -456,7 +467,7 @@ fn aggregate_invocation_attenuation_signed_token_mutations_are_rejected() {
     let fixture = FamilyFixture::new("signed-proof-root", 7);
     let valid = fixture.signed_descendant(Some(fixture.evidence()), Some(fixture.evidence()));
 
-    for mutation in ["missing", "digest", "maximum"] {
+    for mutation in ["missing", "root_id", "digest", "maximum"] {
         let mut token = valid.clone();
         let evidence = &mut token
             .attenuation_proof
@@ -465,6 +476,9 @@ fn aggregate_invocation_attenuation_signed_token_mutations_are_rejected() {
             .aggregate_family_preservation;
         match mutation {
             "missing" => *evidence = None,
+            "root_id" => {
+                evidence.as_mut().unwrap().root_capability_id = "different-root".to_string()
+            }
             "digest" => evidence.as_mut().unwrap().root_binding_digest = "wrong".to_string(),
             "maximum" => evidence.as_mut().unwrap().max_invocations = 8,
             _ => unreachable!(),
@@ -482,6 +496,9 @@ fn aggregate_invocation_attenuation_signed_token_mutations_are_rejected() {
             "missing" => {
                 "attenuated delegation-family capability must preserve aggregate family evidence"
             }
+            "root_id" => {
+                "aggregate family preservation root capability ID does not match the authenticated root"
+            }
             "digest" => "aggregate family preservation digest does not match the root binding",
             "maximum" => {
                 "aggregate family preservation maximum does not match the immutable maximum"
@@ -493,7 +510,7 @@ fn aggregate_invocation_attenuation_signed_token_mutations_are_rejected() {
 }
 
 #[test]
-fn aggregate_invocation_attenuation_plain_family_descendant_remains_resolver_authoritative() {
+fn aggregate_invocation_attenuation_plain_family_descendant_requires_link_evidence() {
     let fixture = FamilyFixture::new("plain-descendant-root", 7);
     let plain = CapabilityToken::sign(
         CapabilityTokenBody {
@@ -511,17 +528,19 @@ fn aggregate_invocation_attenuation_plain_family_descendant_remains_resolver_aut
     .unwrap();
     let resolver = CountingResolver::family(&fixture);
 
-    let authority = verify_aggregate_invocation_authority(
+    let error = verify_aggregate_invocation_authority(
         &plain,
         &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
-    .unwrap()
-    .unwrap();
+    .unwrap_err();
 
     assert_eq!(resolver.calls.get(), 1);
-    assert_eq!(authority.preservation_evidence(), Some(fixture.evidence()));
+    assert_authority_reason(
+        error,
+        "delegation-family capability link is missing aggregate family preservation evidence",
+    );
 }
 
 #[test]
@@ -692,6 +711,7 @@ fn aggregate_invocation_attenuation_verified_delegate_supports_family_descendant
 fn aggregate_invocation_attenuation_verified_delegate_rejects_wrong_parent_link_evidence() {
     let fixture = FamilyFixture::new("wrong-parent-evidence-root", 7);
     let wrong_evidence = AggregateFamilyPreservationEvidence {
+        root_capability_id: fixture.root_token.id.clone(),
         root_binding_digest: "wrong-parent-digest".to_string(),
         max_invocations: 7,
     };
@@ -726,6 +746,91 @@ fn aggregate_invocation_attenuation_verified_delegate_rejects_wrong_parent_link_
     assert_attenuation_reason(
         error,
         "aggregate family preservation digest does not match the root binding",
+    );
+}
+
+#[test]
+fn aggregate_invocation_attenuation_verified_delegate_rejects_missing_parent_link_evidence() {
+    let fixture = FamilyFixture::new("missing-parent-evidence-root", 7);
+    let parent = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "missing-evidence-intermediate".to_string(),
+            issuer: fixture.root_subject.public_key(),
+            subject: fixture.child_subject.public_key(),
+            scope: family_root_scope(),
+            issued_at: 1_100,
+            expires_at: 1_900,
+            delegation_chain: vec![fixture.link(None)],
+            aggregate_invocation_budget: Some(fixture.family_budget()),
+        },
+        &fixture.root_subject,
+    )
+    .unwrap();
+    let grandchild = Keypair::from_seed(&[46; 32]);
+
+    let error = delegate_with_aggregate_family_authority(
+        &parent,
+        &fixture.verified_root,
+        &fixture.child_scope(),
+        &fixture.child_subject,
+        &grandchild.public_key(),
+        ScopeAttenuation::empty(),
+        1_200,
+        [16; 16],
+    )
+    .unwrap_err();
+
+    assert_attenuation_reason(
+        error,
+        "delegation-family capability link is missing aggregate family preservation evidence",
+    );
+}
+
+#[test]
+fn aggregate_invocation_attenuation_receipt_rejects_missing_parent_link_evidence() {
+    let fixture = FamilyFixture::new("receipt-missing-parent-evidence-root", 7);
+    let intermediate = Keypair::from_seed(&[47; 32]);
+    let leaf = Keypair::from_seed(&[48; 32]);
+    let parent_link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: fixture.root_token.id.clone(),
+            delegator: fixture.root_subject.public_key(),
+            delegatee: intermediate.public_key(),
+            attenuations: Vec::new(),
+            timestamp: 1_100,
+            scope_hash: Some(scope_hash(&fixture.root_token.scope).unwrap()),
+            aggregate_family_preservation: None,
+        },
+        &fixture.root_subject,
+    )
+    .unwrap();
+    let receipt = DelegationReceipt {
+        parent_chain: vec![parent_link],
+        attenuation: ScopeAttenuation::empty(),
+        signed_at: 1_200,
+        nonce: [17; 16],
+        link: DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: "intermediate".to_string(),
+                delegator: intermediate.public_key(),
+                delegatee: leaf.public_key(),
+                attenuations: Vec::new(),
+                timestamp: 1_200,
+                scope_hash: Some(scope_hash(&fixture.root_token.scope).unwrap()),
+                aggregate_family_preservation: Some(fixture.evidence()),
+            },
+            &intermediate,
+        )
+        .unwrap(),
+        parent_capability_id: "intermediate".to_string(),
+    };
+
+    let error = receipt
+        .verify_aggregate_family_preservation(&fixture.verified_root)
+        .unwrap_err();
+    assert_attenuation_reason(
+        error,
+        "delegation receipt link is missing aggregate family preservation evidence",
     );
 }
 

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  createDashboardSession,
+  deleteDashboardSession,
   fetchAgentCostSeries,
   fetchOperatorReport,
   fetchProofRoomFixtureBundle,
@@ -25,7 +27,8 @@ import {
   fetchRelayTrendReport,
   fetchReputationComparison,
   fetchReceiptAnalytics,
-  getToken,
+  hasDashboardSession,
+  onDashboardUnauthorized,
 } from './api'
 import { sha256Hex } from './proofRoomArtifactEvidence'
 import { decisionKind, receiptSubjectKey, type Receipt } from './types'
@@ -100,7 +103,6 @@ async function signedProofRoomBundleSignatureJson(manifestJson: string): Promise
 
 describe('dashboard api helpers', () => {
   beforeEach(() => {
-    sessionStorage.clear()
     vi.restoreAllMocks()
     window.history.replaceState({}, '', '/')
   })
@@ -109,17 +111,93 @@ describe('dashboard api helpers', () => {
     vi.restoreAllMocks()
   })
 
-  it('stores token from the URL and removes it from the visible location', () => {
-    window.history.replaceState({}, '', '/?token=secret-token')
+  it('exchanges the dashboard credential once and uses same-origin sessions', async () => {
+    const session = {
+      authenticated: true,
+      expiresAt: 1_700_000_900,
+      relayReports: {
+        observability: false,
+        alerts: false,
+        trends: false,
+        alertHandoff: false,
+        alertDelivery: false,
+        alertAssurance: false,
+        alertAssuranceExport: false,
+        alertAssuranceReplay: false,
+        alertAssuranceRetention: false,
+        alertAssuranceArchive: false,
+        alertAssuranceCloseout: false,
+        alertAssuranceArchivePackage: false,
+        alertAssuranceArchiveExtraction: false,
+        alertAssurancePhysicalArchive: false,
+        alertAssuranceRetentionHandoff: false,
+        alertAssuranceArchiveRestoreDrill: false,
+        alertAssuranceExternalRetentionReview: false,
+      },
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => session })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => session })
+      .mockResolvedValueOnce({ ok: true, status: 204 })
+    vi.stubGlobal('fetch', fetchMock)
 
-    expect(getToken()).toBe('secret-token')
-    expect(sessionStorage.getItem('chio_token')).toBe('secret-token')
-    expect(window.location.pathname).toBe('/')
-    expect(window.location.search).toBe('')
+    await expect(createDashboardSession('dashboard-secret')).resolves.toEqual(session)
+    await expect(hasDashboardSession()).resolves.toEqual(session)
+    await deleteDashboardSession()
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/v1/dashboard/session',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ token: 'dashboard-secret' }),
+        credentials: 'same-origin',
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/v1/dashboard/session',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/v1/dashboard/session',
+      expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }),
+    )
+    for (const call of fetchMock.mock.calls) {
+      expect(call[1]?.headers).not.toHaveProperty('Authorization')
+    }
   })
 
-  it('calls the backend analytics endpoint with auth headers', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
+  it('treats an unauthorized dashboard session check as logged out', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+    }))
+
+    await expect(hasDashboardSession()).resolves.toBeNull()
+  })
+
+  it('notifies the centralized dashboard listener for unauthorized API responses', async () => {
+    const listener = vi.fn()
+    const unsubscribe = onDashboardUnauthorized(listener)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+    }))
+
+    await expect(fetchReceiptAnalytics({ agentSubject: 'agent-a' }))
+      .rejects.toThrow('API error 401')
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    unsubscribe()
+    await expect(hasDashboardSession()).resolves.toBeNull()
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls the backend analytics endpoint with the same-origin session', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -149,11 +227,13 @@ describe('dashboard api helpers', () => {
       '/v1/receipts/analytics?agentSubject=agent-a&groupLimit=10&timeBucket=day',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(request.headers).not.toHaveProperty('Authorization')
   })
 
   it('maps backend analytics buckets into sparkline points', async () => {
@@ -212,7 +292,6 @@ describe('dashboard api helpers', () => {
   })
 
   it('calls the backend operator report endpoint with dashboard defaults', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -306,15 +385,14 @@ describe('dashboard api helpers', () => {
       '/v1/reports/operator?agentSubject=agent-a&toolServer=shell&toolName=bash&since=123&until=456&groupLimit=10&timeBucket=day&attributionLimit=10&budgetLimit=10',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })
 
   it('fetches relay observability with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -359,9 +437,9 @@ describe('dashboard api helpers', () => {
       '/v1/chio/pheromone/observability',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })
@@ -382,7 +460,6 @@ describe('dashboard api helpers', () => {
   })
 
   it('fetches relay alert reports with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -404,15 +481,14 @@ describe('dashboard api helpers', () => {
       '/v1/chio/pheromone/alerts',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })
 
   it('fetches relay trend reports with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -435,15 +511,14 @@ describe('dashboard api helpers', () => {
       '/v1/chio/pheromone/trends',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })
 
   it('fetches relay alert handoff reports with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -469,15 +544,14 @@ describe('dashboard api helpers', () => {
       '/v1/chio/pheromone/alert-handoff',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })
 
   it('fetches relay alert delivery reports with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -506,15 +580,14 @@ describe('dashboard api helpers', () => {
       '/v1/chio/pheromone/alert-delivery',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })
 
   it('fetches relay alert assurance packages with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -550,15 +623,14 @@ describe('dashboard api helpers', () => {
       '/v1/chio/pheromone/alert-assurance',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })
 
   it('fetches relay alert assurance lifecycle reports with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true }),
@@ -582,9 +654,9 @@ describe('dashboard api helpers', () => {
       '/v1/chio/pheromone/alert-assurance/export',
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -640,7 +712,6 @@ describe('dashboard api helpers', () => {
   })
 
   it('posts portable reputation comparison requests with bearer auth', async () => {
-    sessionStorage.setItem('chio_token', 'bearer-token')
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -692,9 +763,9 @@ describe('dashboard api helpers', () => {
           passport: { schema: 'chio.agent-passport.v1' },
         }),
         headers: expect.objectContaining({
-          Authorization: 'Bearer bearer-token',
           'Content-Type': 'application/json',
         }),
+        credentials: 'same-origin',
       }),
     )
   })

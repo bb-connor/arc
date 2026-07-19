@@ -35,7 +35,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_core::crypto::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
@@ -270,7 +270,29 @@ fn validate_nonce_operation_id(value: &str) -> Result<(), ExecutionNonceReservat
 /// exactly once per nonce identifier. All subsequent calls for the same
 /// identifier return `false`. Fail-closed: any internal error is returned
 /// via `KernelError` so the caller can deny the request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionNonceStoreProfile {
+    EphemeralLocal,
+    SingleNodeDurable,
+    SharedLinearizable,
+}
+
+impl ExecutionNonceStoreProfile {
+    #[must_use]
+    pub fn supports_dispatch_workers(self, dispatch_worker_count: usize) -> bool {
+        match self {
+            Self::EphemeralLocal => false,
+            Self::SingleNodeDurable => dispatch_worker_count == 1,
+            Self::SharedLinearizable => dispatch_worker_count > 0,
+        }
+    }
+}
+
 pub trait ExecutionNonceStore: Send + Sync {
+    fn authority_profile(&self) -> ExecutionNonceStoreProfile {
+        ExecutionNonceStoreProfile::EphemeralLocal
+    }
+
     /// Attempt to reserve (consume) the given nonce identifier.
     ///
     /// * `Ok(true)`  -- nonce was fresh; it is now marked consumed.
@@ -278,17 +300,15 @@ pub trait ExecutionNonceStore: Send + Sync {
     /// * `Err(_)`    -- the store is unreachable or corrupted; fail-closed.
     ///
     /// Prefer [`Self::reserve_until`] when the caller knows the signed
-    /// expiry of the nonce: durable stores need to retain the consumed
-    /// marker at least as long as the signed nonce is valid, otherwise
-    /// the row may be pruned and the nonce can be replayed within its
-    /// remaining validity window.
+    /// expiry of the nonce. Durable store profiles must retain a permanent
+    /// tombstone for every consumed identifier. Wall-clock expiry is metadata,
+    /// never authority to forget a nonce.
     fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError>;
 
-    /// Reserve a nonce while telling the store when the nonce stops
-    /// being cryptographically valid. Durable implementations (SQLite,
-    /// remote KV stores) MUST retain the consumed marker until at least
-    /// `nonce_expires_at` so replay protection covers the nonce's full
-    /// validity window.
+    /// Reserve a nonce while telling the store when the signed artifact stops
+    /// being cryptographically valid. Durable implementations (SQLite and
+    /// remote KV stores) MUST keep the consumed marker permanently so a
+    /// forward wall-clock jump followed by rollback cannot resurrect it.
     ///
     /// The default implementation falls back to [`Self::reserve`] for
     /// in-memory / best-effort stores that already track retention
@@ -297,7 +317,12 @@ pub trait ExecutionNonceStore: Send + Sync {
         self.reserve(nonce_id)
     }
 
-    /// Atomically bind a nonce and its signed expiry to one operation.
+    /// Atomically bind a nonce and its signed expiry to one operation. An exact
+    /// retry returns the existing reservation; a different operation or nonce
+    /// binding conflicts. Both committed and cancelled reservations are
+    /// permanent replay tombstones. Cancellation compensates the owning
+    /// operation but never makes the nonce reusable.
+    ///
     /// The default fails closed and never delegates to immediate consumption.
     fn reserve_nonce_for_operation(
         &self,
@@ -310,6 +335,7 @@ pub trait ExecutionNonceStore: Send + Sync {
         ))
     }
 
+    /// Idempotently make an operation-owned reservation committed.
     fn commit_nonce_reservation(
         &self,
         _operation_id: &str,
@@ -319,6 +345,7 @@ pub trait ExecutionNonceStore: Send + Sync {
         ))
     }
 
+    /// Idempotently cancel the operation while retaining its nonce tombstone.
     fn cancel_nonce_reservation(
         &self,
         _operation_id: &str,
@@ -569,10 +596,21 @@ fn duration_until_unix_secs(expires_at: i64) -> Option<Duration> {
 ///
 /// The kernel calls this on every `Verdict::Allow` so tool servers can
 /// verify that a call was authorized by the kernel at a known, recent
-/// time. The returned nonce is signed by `kernel_keypair`; downstream
-/// verifiers check the signature with the kernel's public key.
+/// time. This keypair entry point is retained for standalone callers. The
+/// governed kernel calls [`mint_execution_nonce_with_backend`] with its shared
+/// authority backend.
 pub fn mint_execution_nonce(
     kernel_keypair: &Keypair,
+    binding: NonceBinding,
+    config: &ExecutionNonceConfig,
+    now: i64,
+) -> Result<SignedExecutionNonce, KernelError> {
+    let backend = Ed25519Backend::new(kernel_keypair.clone());
+    mint_execution_nonce_with_backend(&backend, binding, config, now)
+}
+
+pub fn mint_execution_nonce_with_backend(
+    backend: &dyn SigningBackend,
     binding: NonceBinding,
     config: &ExecutionNonceConfig,
     now: i64,
@@ -586,9 +624,26 @@ pub fn mint_execution_nonce(
         expires_at,
         bound_to: binding,
     };
-    let (signature, _bytes) = kernel_keypair.sign_canonical(&nonce).map_err(|e| {
-        KernelError::ReceiptSigningFailed(format!("failed to sign execution nonce: {e}"))
+    let canonical_bytes = canonical_json_bytes(&nonce).map_err(|error| {
+        KernelError::ReceiptSigningFailed(format!(
+            "failed to canonicalize execution nonce: {error}"
+        ))
     })?;
+    let outcome = backend
+        .sign_bytes_with_identity(&canonical_bytes)
+        .map_err(|e| {
+            KernelError::ReceiptSigningFailed(format!("failed to sign execution nonce: {e}"))
+        })?;
+    let expected_algorithm = outcome.algorithm;
+    let signature = outcome.signature;
+    if signature.algorithm() != expected_algorithm
+        || !outcome.public_key.verify(&canonical_bytes, &signature)
+    {
+        return Err(KernelError::ReceiptSigningFailed(
+            "freshly signed execution nonce does not verify under the signing backend snapshot"
+                .to_string(),
+        ));
+    }
     Ok(SignedExecutionNonce { nonce, signature })
 }
 
@@ -609,8 +664,10 @@ pub enum ExecutionNonceError {
     Expired { now: i64, expires_at: i64 },
     /// Binding fields did not match the presented invocation.
     BindingMismatch { field: &'static str },
-    /// Ed25519 signature did not verify under the kernel's public key.
+    /// Signature did not verify under the kernel's public key.
     InvalidSignature,
+    /// Runtime authority trust resolution denied the signed nonce artifact.
+    AuthorityTrust(String),
     /// Nonce was already consumed (single-use).
     Replayed,
     /// Canonical JSON serialization failed during verification.
@@ -634,6 +691,9 @@ impl std::fmt::Display for ExecutionNonceError {
                 write!(f, "execution nonce binding mismatch on field {field}")
             }
             Self::InvalidSignature => write!(f, "execution nonce signature is invalid"),
+            Self::AuthorityTrust(error) => {
+                write!(f, "execution nonce authority trust verification failed: {error}")
+            }
             Self::Replayed => write!(f, "execution nonce has already been consumed"),
             Self::Encoding(e) => write!(f, "execution nonce canonical encoding failed: {e}"),
             Self::Store(e) => write!(f, "execution nonce store error: {e}"),
@@ -656,13 +716,52 @@ impl From<ExecutionNonceError> for KernelError {
 /// 2. Expiry check -- `now < nonce.expires_at`.
 /// 3. Binding check -- subject, capability, server, tool, parameter_hash.
 /// 4. Signature check -- canonical JSON under the kernel's pubkey.
-/// 5. Replay check -- `nonce_store.reserve(nonce_id)` must return `true`.
+/// 5. Replay check -- `nonce_store.reserve_until(nonce_id, expires_at)` must return `true`.
 pub fn verify_execution_nonce(
     presented: &SignedExecutionNonce,
     kernel_pubkey: &PublicKey,
     expected: &NonceBinding,
     now: i64,
     nonce_store: &dyn ExecutionNonceStore,
+) -> Result<(), ExecutionNonceError> {
+    verify_execution_nonce_stateless(presented, kernel_pubkey, expected, now)?;
+    consume_verified_execution_nonce(presented, nonce_store)
+}
+
+/// Consume a nonce only after every stateless and authority-trust check passed.
+pub(crate) fn consume_verified_execution_nonce(
+    presented: &SignedExecutionNonce,
+    nonce_store: &dyn ExecutionNonceStore,
+) -> Result<(), ExecutionNonceError> {
+    // Pass the signed expiry as audit metadata. Durable stores retain the
+    // consumed identifier permanently, independent of wall-clock movement.
+    match nonce_store.reserve_until(&presented.nonce.nonce_id, presented.nonce.expires_at) {
+        Ok(true) => Ok(()),
+        Ok(false) => {
+            warn!(
+                nonce_id = %presented.nonce.nonce_id,
+                "rejecting replayed execution nonce"
+            );
+            Err(ExecutionNonceError::Replayed)
+        }
+        Err(e) => Err(ExecutionNonceError::Store(e.to_string())),
+    }
+}
+
+/// Return the exact canonical nonce body covered by its detached signature.
+pub(crate) fn execution_nonce_signed_artifact(
+    presented: &SignedExecutionNonce,
+) -> Result<Vec<u8>, ExecutionNonceError> {
+    canonical_json_bytes(&presented.nonce)
+        .map_err(|error| ExecutionNonceError::Encoding(error.to_string()))
+}
+
+/// Verify schema, expiry, binding, and signature without replay-state mutation.
+pub fn verify_execution_nonce_stateless(
+    presented: &SignedExecutionNonce,
+    kernel_pubkey: &PublicKey,
+    expected: &NonceBinding,
+    now: i64,
 ) -> Result<(), ExecutionNonceError> {
     if !is_supported_execution_nonce_schema(&presented.nonce.schema) {
         warn!(
@@ -712,8 +811,7 @@ pub fn verify_execution_nonce(
         });
     }
 
-    let signed_bytes = canonical_json_bytes(&presented.nonce)
-        .map_err(|e| ExecutionNonceError::Encoding(e.to_string()))?;
+    let signed_bytes = execution_nonce_signed_artifact(presented)?;
     if !kernel_pubkey.verify(&signed_bytes, &presented.signature) {
         warn!(
             nonce_id = %presented.nonce.nonce_id,
@@ -722,21 +820,7 @@ pub fn verify_execution_nonce(
         return Err(ExecutionNonceError::InvalidSignature);
     }
 
-    // Pass the nonce's signed expiry so durable stores retain the
-    // consumed marker for the full validity window - otherwise the row
-    // can be pruned while the nonce is still cryptographically valid,
-    // allowing replay within the remaining window.
-    match nonce_store.reserve_until(&presented.nonce.nonce_id, presented.nonce.expires_at) {
-        Ok(true) => Ok(()),
-        Ok(false) => {
-            warn!(
-                nonce_id = %presented.nonce.nonce_id,
-                "rejecting replayed execution nonce"
-            );
-            Err(ExecutionNonceError::Replayed)
-        }
-        Err(e) => Err(ExecutionNonceError::Store(e.to_string())),
-    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -773,6 +857,21 @@ mod tests {
         assert_eq!(signed.nonce.expires_at, now + cfg.nonce_ttl_secs as i64);
 
         verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store).unwrap();
+    }
+
+    #[test]
+    fn stateless_verification_does_not_consume_the_nonce() {
+        let kp = Keypair::generate();
+        let store = InMemoryExecutionNonceStore::default();
+        let cfg = ExecutionNonceConfig::default();
+        let binding = sample_binding();
+        let now = 1_000_000;
+        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+
+        verify_execution_nonce_stateless(&signed, &kp.public_key(), &binding, now + 1).unwrap();
+        assert!(store
+            .reserve_until(signed.nonce_id(), signed.expires_at())
+            .unwrap());
     }
 
     #[test]
@@ -853,6 +952,10 @@ mod tests {
     #[test]
     fn store_reserves_each_nonce_exactly_once() {
         let store = InMemoryExecutionNonceStore::default();
+        assert_eq!(
+            store.authority_profile(),
+            ExecutionNonceStoreProfile::EphemeralLocal
+        );
         assert!(store.reserve("a").unwrap());
         assert!(!store.reserve("a").unwrap());
         assert!(store.reserve("b").unwrap());

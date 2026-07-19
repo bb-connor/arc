@@ -181,6 +181,76 @@ fn evaluate_allow_roundtrip() {
 }
 
 #[test]
+fn evaluate_rejects_supplemental_authorization_without_a_trusted_authority() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let request_json = serde_json::json!({
+        "capability": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "request": {
+            "request_id": "req-supplemental",
+            "tool_name": "echo",
+            "server_id": "srv-a",
+            "agent_id": subject.public_key().to_hex(),
+            "arguments": {"msg": "hello"},
+            "supplemental_authorization": {
+                "reference": "broker:mobile-attempt",
+                "artifact": [1, 2, 3]
+            }
+        },
+        "now_secs": EVAL_TIME as i64,
+    })
+    .to_string();
+
+    let error = evaluate(request_json).unwrap_err();
+    match error {
+        ChioMobileError::InvalidCapability { message } => {
+            assert!(message.contains("cannot verify or reserve supplemental authorization"));
+        }
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+}
+
+#[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let extensions = [
+        ("approval_tokens", serde_json::json!([{}])),
+        ("threshold_approval_proposal", serde_json::json!({})),
+        ("governed_intent", serde_json::json!({})),
+    ];
+
+    for (field, value) in extensions {
+        let mut envelope = serde_json::json!({
+            "capability": capability.clone(),
+            "trusted_issuers": [issuer.public_key().to_hex()],
+            "request": {
+                "request_id": "req-unnegotiated-authorization",
+                "tool_name": "echo",
+                "server_id": "srv-a",
+                "agent_id": subject.public_key().to_hex(),
+                "arguments": {"msg": "hello"}
+            },
+            "now_secs": EVAL_TIME as i64,
+        });
+        envelope["request"][field] = value;
+
+        let error = evaluate(envelope.to_string())
+            .expect_err("unnegotiated authorization extension must fail closed");
+        match error {
+            ChioMobileError::InvalidJson { message } => {
+                assert!(message.contains("unknown field"), "message: {message}");
+                assert!(message.contains(field), "message: {message}");
+            }
+            other => panic!("expected InvalidJson, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -525,7 +595,7 @@ fn verify_capability_happy_path() {
 }
 
 #[test]
-fn verify_capability_with_context_denies_mixed_version_aggregate_budget_and_preserves_latch() {
+fn verify_capability_with_context_denies_unnegotiated_and_accepts_negotiated_aggregate_budget() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = make_aggregate_capability(&subject, &issuer);
@@ -564,15 +634,9 @@ fn verify_capability_with_context_denies_mixed_version_aggregate_budget_and_pres
         "peer_capabilities": rollout_peer,
     })
     .to_string();
-    let rollout_error = verify_capability_with_context(rollout_request)
-        .expect_err("feature negotiation alone must not enable aggregate enforcement");
-    match rollout_error {
-        ChioMobileError::InvalidCapability { message } => assert!(
-            message.contains("aggregate invocation budget enforcement is disabled"),
-            "message: {message}"
-        ),
-        other => panic!("expected InvalidCapability, got {other:?}"),
-    }
+    let verified = verify_capability_with_context(rollout_request)
+        .expect("negotiated mobile verification must preserve the aggregate semantic");
+    assert_eq!(verified.id, "cap-aggregate-ffi");
 }
 
 #[test]

@@ -122,7 +122,7 @@ pub fn replay_cohere_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     fixture.ensure_cohere()?;
     let captured = fixture.captured_verdicts()?;
     let org_id = fixture.cohere_org_id()?;
-    let adapter = cohere_adapter(org_id);
+    let adapter = cohere_adapter(&fixture.path, org_id)?;
 
     let (mode, invocations, verdicts) = if fixture.has_cohere_stream_tool_events() {
         let (invocations, verdicts) = replay_cohere_stream(&fixture, &adapter, &captured)?;
@@ -707,15 +707,88 @@ fn ollama_adapter(host: String) -> chio_ollama_tools_adapter::OllamaAdapter {
 }
 
 #[cfg(feature = "fixtures-cohere")]
-fn cohere_adapter(org_id: String) -> chio_cohere_tools_adapter::CohereAdapter {
+fn cohere_adapter(
+    path: &Path,
+    org_id: String,
+) -> Result<chio_cohere_tools_adapter::CohereAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_cohere_tools_adapter::{CohereAdapter, CohereAdapterConfig, MockTransport};
 
-    CohereAdapter::new(
-        CohereAdapterConfig::new("cohere-1", "Cohere Chat", "0.1.0", "deadbeef", org_id),
-        Arc::new(MockTransport::new()),
+    let signer = chio_core::Keypair::from_seed(&[34u8; 32]);
+    let config = CohereAdapterConfig::new(
+        "cohere-1",
+        "Cohere Chat",
+        "0.1.0",
+        signer.public_key().to_hex(),
+        org_id,
+    );
+    let signed = chio_manifest::sign_manifest(&cohere_replay_manifest(&config), &signer).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Cohere conformance manifest signing failed: {error}"),
+            )
+        },
+    )?;
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(
+            signed,
+            &signer.public_key(),
+            chio_manifest::RuntimeToolTopology::remote(),
+        )
+        .map_err(|error| {
+            invalid_fixture(
+                path,
+                format!("Cohere conformance manifest admission failed: {error}"),
+            )
+        })?;
+    CohereAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Cohere conformance manifest failed validation: {error}"),
+            )
+        },
     )
+}
+
+#[cfg(feature = "fixtures-cohere")]
+fn cohere_replay_manifest(
+    config: &chio_cohere_tools_adapter::CohereAdapterConfig,
+) -> chio_manifest::ToolManifest {
+    use chio_manifest::{ToolAnnotations, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA};
+
+    let tools = ["get_weather", "lookup_policy", "run_sql"]
+        .into_iter()
+        .map(|name| ToolDefinition {
+            name: name.to_string(),
+            description: format!("Cohere conformance tool {name}"),
+            input_schema: serde_json::json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: false,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        })
+        .collect();
+    ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: Some("Cohere conformance replay manifest".to_string()),
+        version: config.server_version.clone(),
+        tools,
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: config.public_key.clone(),
+    }
 }
 
 #[cfg(feature = "fixtures-gemini")]

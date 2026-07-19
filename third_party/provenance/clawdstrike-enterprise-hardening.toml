@@ -1,10 +1,10 @@
 schema = "chio.enterprise-provenance.v1"
-source_repository = "/Users/connor/Medica/backbay/standalone/clawdstrike"
+source_repository = "https://github.com/backbay-labs/clawdstrike"
 source_commit = "666303e5f3428f3b6e6b72f118c269a02388e0a4"
 license = "Apache-2.0"
 source_notice = "ClawdStrike; Copyright 2026 Backbay Industries"
 notice_update_required = false
-reviewer = "Codex security implementation review"
+reviewer = "Chio security review"
 reviewed_at = "2026-07-12"
 
 [[inputs]]
@@ -26,7 +26,7 @@ modifications = "Chio capability verification, complete caller-option binding, d
 [[inputs]]
 source_path = "crates/services/clawdstrike-brokerd/src/provider/generic_https.rs"
 source_blob = "95f76e68053b12438bad1943cb030c55865c8f89"
-destinations = ["crates/security/chio-secret-broker/src/provider/generic_https.rs"]
+destinations = ["crates/security/chio-secret-broker/src/generic_https.rs"]
 reuse = "concept"
 copied = false
 modifications = "Provider-owned credential injection, normalized destinations, streaming bounds, and credential canary rejection"
@@ -58,34 +58,34 @@ modifications = "Contiguous checkpoint and leaf synchronization, full replay, du
 [[inputs]]
 source_path = "crates/libs/clawdstrike/src/sandbox/capability_builder.rs"
 source_blob = "97ae47a40eabb8b8ae35169bf44a0298652cf983"
-destinations = ["crates/security/chio-cage/src/compiler.rs"]
+destinations = ["crates/security/chio-cage/src/lib.rs"]
 reuse = "concept"
 copied = false
-modifications = "Deny-all compilation from verified manifest v2, retained file descriptors, fixed syscall profiles, and operator ceilings"
+modifications = "Only the policy-to-capability concept was retained; Chio independently uses verified manifests, deny-all plans, retained descriptors, fixed syscall profiles, and operator ceilings"
 
 [[inputs]]
 source_path = "crates/libs/clawdstrike/src/sandbox/preflight.rs"
 source_blob = "5abe9620cda286b58ef933a201afe86704050bd7"
-destinations = ["crates/security/chio-cage/src/admission.rs"]
+destinations = ["crates/security/chio-cage/src/lib.rs", "crates/security/chio-cage/src/linux.rs", "crates/security/chio-cage/tests/linux_compile.rs"]
 reuse = "test_shape"
 copied = false
-modifications = "Race-resistant openat2 admission, identity pinning, forbidden-path resolution, and explicit failure states"
+modifications = "Only negative preflight test shape was retained; Chio independently replaces pathname viability checks with openat2 descriptor admission, identity pinning, forbidden-path resolution, and explicit failure states"
 
 [[inputs]]
 source_path = "crates/services/hush-cli/src/sandbox_nono.rs"
 source_blob = "ae5bc38c7b00e21b6d6b9cfc4dfa02e0c3e50f23"
-destinations = ["crates/security/chio-cage-init/src/linux.rs"]
+destinations = ["third_party/nono-chio/src/lib.rs", "crates/security/chio-cage/src/launch/linux.rs"]
 reuse = "concept"
 copied = false
-modifications = "Single-threaded helper with sealed plans, retained descriptors, mandatory Landlock status, and independent seccomp"
+modifications = "Only the sandboxed child process concept was retained; Chio independently uses a descriptor-launched single-threaded helper, sealed plans, caller-FD Landlock hard requirements, and independent seccompiler filters"
 
 [[inputs]]
 source_path = "crates/services/hush-cli/src/supervised_exec.rs"
 source_blob = "8a2b8b8cad3ff35c78daea86594cc766c6d57cfe"
-destinations = ["crates/security/chio-cage/src/supervisor.rs"]
+destinations = ["crates/security/chio-cage/src/enforcement.rs", "crates/security/chio-cage/src/launch.rs", "crates/security/chio-cage/src/launch/linux.rs"]
 reuse = "concept"
 copied = false
-modifications = "Normal spawn, pidfd identity, kernel-observed exec transition, structured bootstrap evidence, and fail-closed reaping"
+modifications = "Only the supervisory lifecycle concept was retained; no seccomp-notify code was copied, and Chio independently uses descriptor-backed spawn, pidfd identity, ptrace exec observation, structured evidence, and fail-closed reaping"
 
 [[inputs]]
 source_path = "infra/vendor/nono/"
@@ -93,7 +93,7 @@ source_blob = "241cac3a3f59fb1d60ec8c460bbd5238bc693055"
 destinations = []
 reuse = "no_use"
 copied = false
-modifications = "Vendored source rejected; any Chio dependency must use independently pinned upstream source and reviewed patches"
+modifications = "Clawdstrike's vendored copy is unused; Chio pins upstream nono 0.53.0 behind the independently written nono-chio wrapper"
 
 [excluded_spine]
 source_path = "crates/libs/spine/"

@@ -52,6 +52,10 @@ impl ReceiptStore for RemoteReceiptStore {
             .map_err(into_receipt_store_error)
     }
 
+    fn supports_native_security_receipts(&self) -> bool {
+        true
+    }
+
     fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
         self.client
             .append_child_receipt(receipt)

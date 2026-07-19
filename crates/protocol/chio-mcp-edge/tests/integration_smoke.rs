@@ -3,7 +3,9 @@
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
 use chio_kernel::{ChioKernel, KernelConfig, KernelError, ToolServerConnection};
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+};
 use chio_mcp_edge::{ChioMcpEdge, McpEdgeConfig};
 use serde_json::{json, Value};
 
@@ -75,36 +77,53 @@ fn make_edge() -> ChioMcpEdge {
         .expect("issue capability")];
     let manifest_key = Keypair::generate();
 
+    let manifest = ToolManifest {
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "srv".to_string(),
+        name: "Echo Server".to_string(),
+        description: Some("loopback echo server".to_string()),
+        version: "0.1.0".to_string(),
+        tools: vec![ToolDefinition {
+            name: "echo_json".to_string(),
+            description: "Echo structured weather data".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: Some(json!({
+                "type": "object",
+                "properties": {
+                    "temperature": { "type": "number" },
+                    "conditions": { "type": "string" }
+                }
+            })),
+            pricing: None,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: manifest_key.public_key().to_hex(),
+    };
+    let signed = sign_manifest(&manifest, &manifest_key).expect("sign manifest");
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(
+            signed,
+            &manifest_key.public_key(),
+            RuntimeToolTopology::local(),
+        )
+        .expect("admit manifest");
+
     ChioMcpEdge::new(
         McpEdgeConfig::default(),
         kernel,
         agent.public_key().to_hex(),
         capabilities,
-        vec![ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
-            server_id: "srv".to_string(),
-            name: "Echo Server".to_string(),
-            description: Some("loopback echo server".to_string()),
-            version: "0.1.0".to_string(),
-            tools: vec![ToolDefinition {
-                name: "echo_json".to_string(),
-                description: "Echo structured weather data".to_string(),
-                input_schema: json!({"type": "object"}),
-                output_schema: Some(json!({
-                    "type": "object",
-                    "properties": {
-                        "temperature": { "type": "number" },
-                        "conditions": { "type": "string" }
-                    }
-                })),
-                pricing: None,
-                has_side_effects: false,
-                latency_hint: None,
-            }],
-            server_tools: Vec::new(),
-            required_permissions: None,
-            public_key: manifest_key.public_key().to_hex(),
-        }],
+        &registry,
     )
     .expect("create MCP edge")
 }

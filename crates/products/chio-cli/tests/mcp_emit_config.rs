@@ -30,6 +30,12 @@ fn run_emit(ide: &str) -> serde_json::Value {
             "demo",
             "--display-name",
             "Demo MCP",
+            "--manifest",
+            "/etc/chio/demo-wrap.toml",
+            "--cage-policy",
+            "/etc/chio/demo-cage-policy.json",
+            "--cage-policy-signer",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "--emit-config",
             ide,
             "--",
@@ -44,6 +50,31 @@ fn run_emit(ide: &str) -> serde_json::Value {
         String::from_utf8_lossy(&output.stderr)
     );
     serde_json::from_slice(&output.stdout).expect("emit-config produces JSON")
+}
+
+#[test]
+fn emit_config_requires_complete_runtime_admission_inputs() {
+    let output = Command::new(chio_bin())
+        .args([
+            "mcp",
+            "wrap",
+            "--server-id",
+            "demo",
+            "--emit-config",
+            "cursor",
+            "--",
+            "node",
+            "server.js",
+        ])
+        .output()
+        .expect("run incomplete chio mcp wrap --emit-config");
+
+    assert!(!output.status.success(), "incomplete emit-config must deny");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("requires --manifest for runtime tool admission"),
+        "{stderr}"
+    );
 }
 
 fn expected(name: &str) -> serde_json::Value {

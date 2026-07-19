@@ -12,7 +12,9 @@ pub(crate) fn receipt_checkpoint_report_error(
     )
 }
 
-pub(crate) fn receipt_health_report_error(report: &chio_kernel::ReceiptStoreHealthReport) -> CliError {
+pub(crate) fn receipt_health_report_error(
+    report: &chio_kernel::ReceiptStoreHealthReport,
+) -> CliError {
     CliError::cli_other_error(
         report
             .checkpoint_error
@@ -43,7 +45,9 @@ pub(crate) fn local_receipt_store(
     chio_store_sqlite::SqliteReceiptStore::open_existing(path).map_err(CliError::from)
 }
 
-pub(crate) fn load_existing_kernel_checkpoint_keypair(path: &Path) -> Result<chio_core::Keypair, CliError> {
+pub(crate) fn load_existing_kernel_checkpoint_keypair(
+    path: &Path,
+) -> Result<chio_core::Keypair, CliError> {
     let seed_hex = std::fs::read_to_string(path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             CliError::cli_other_error(format!(
@@ -196,10 +200,14 @@ mod receipt_operator_tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!("chio-{name}-{}-{stamp}.{suffix}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "chio-{name}-{}-{stamp}.{suffix}",
+            std::process::id()
+        ))
     }
 
-    fn operator_sample_receipt() -> Result<chio_core::receipt::body::ChioReceipt, chio_core::Error> {
+    fn operator_sample_receipt() -> Result<chio_core::receipt::body::ChioReceipt, chio_core::Error>
+    {
         let keypair = chio_core::crypto::Keypair::generate();
         operator_sample_receipt_with_keypair(&keypair)
     }
@@ -462,6 +470,14 @@ mod receipt_operator_tests {
     fn receipt_operator_commands_reject_touched_empty_receipt_db_file() -> Result<(), CliError> {
         let db_path = unique_temp_path("receipt-empty", "sqlite3");
         std::fs::write(&db_path, "")?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let mut permissions = std::fs::metadata(&db_path)?.permissions();
+            permissions.set_mode(0o600);
+            std::fs::set_permissions(&db_path, permissions)?;
+        }
 
         let error = match local_receipt_store(&backend(Some(&db_path), None), "receipt health") {
             Ok(_) => panic!("empty receipt database file must not be initialized"),
@@ -491,11 +507,11 @@ mod receipt_operator_tests {
         store.append_chio_receipt(&operator_sample_receipt()?)?;
         drop(store);
 
-        let error = match cmd_receipt_checkpoint_create(&seed_path, 10, backend(Some(&db_path), None))
-        {
-            Ok(_) => panic!("checkpoint create must not generate a missing seed"),
-            Err(error) => error,
-        };
+        let error =
+            match cmd_receipt_checkpoint_create(&seed_path, 10, backend(Some(&db_path), None)) {
+                Ok(_) => panic!("checkpoint create must not generate a missing seed"),
+                Err(error) => error,
+            };
 
         assert!(
             error
@@ -525,7 +541,10 @@ mod receipt_operator_tests {
         cmd_receipt_audit(false, backend(Some(&db_path), None))?;
         cmd_receipt_audit(true, backend(Some(&db_path), None))?;
 
-        assert_remote_unsupported(cmd_receipt_audit(false, backend(None, Some("http://127.0.0.1:9977"))));
+        assert_remote_unsupported(cmd_receipt_audit(
+            false,
+            backend(None, Some("http://127.0.0.1:9977")),
+        ));
 
         let _ = std::fs::remove_file(db_path);
         Ok(())
@@ -558,9 +577,9 @@ mod receipt_operator_tests {
         drop(connection);
 
         let error = match cmd_receipt_audit(false, backend(Some(&db_path), None)) {
-            Ok(()) => panic!(
-                "receipt audit without --repair must fail closed on a diverged checkpoint"
-            ),
+            Ok(()) => {
+                panic!("receipt audit without --repair must fail closed on a diverged checkpoint")
+            }
             Err(error) => error,
         };
         let message = error.to_string();

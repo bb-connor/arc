@@ -5,12 +5,16 @@ use std::sync::Arc;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
+use crate::audit::{
+    compare_audit_wire_requests, BrokerAuditComparisonSalt, BrokerAuditReferenceRequest,
+    BrokerAuditWireComparison,
+};
 use crate::backend::SecretMaterial;
 use crate::proof::{body_digest, caller_header_digest, caller_option_digest, RequestProof};
 use crate::protocol::{
     BrokerRequest, BrokerScheme, HeaderField, RequestConstraints, MAX_HEADER_COUNT,
 };
-use crate::provider::{rejects_forbidden_caller_header, PreparedProviderRequest, ProviderAdapter};
+use crate::provider::{rejects_forbidden_caller_header, ProviderAdapter};
 use crate::{BrokerError, Result};
 
 const MAX_RESOLVED_ADDRESSES: usize = 16;
@@ -37,6 +41,12 @@ pub(crate) struct PinnedHttpsRequest {
     timeout_ms: u64,
     response_limit_bytes: u64,
     redirects_allowed: bool,
+}
+
+/// Secret-bearing, DNS-pinned request retained only inside brokerd between
+/// pre-dispatch preparation and the post-capture network boundary.
+pub(crate) struct PreparedHttpsDispatch {
+    outbound: PinnedHttpsRequest,
 }
 
 impl PinnedHttpsRequest {
@@ -151,6 +161,11 @@ pub struct GenericHttpsExecutor {
     network_policy: NetworkPolicy,
 }
 
+pub(crate) enum HttpsDispatchFailure {
+    Transport(BrokerError),
+    Response(BrokerError),
+}
+
 impl GenericHttpsExecutor {
     /// Construct the only production executor, with system DNS, direct pinned
     /// rustls transport, and the production network policy.
@@ -162,7 +177,7 @@ impl GenericHttpsExecutor {
         })
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "conformance"))]
     pub(crate) fn new(
         resolver: Arc<dyn DestinationResolver>,
         transport: Arc<dyn PinnedHttpsTransport>,
@@ -190,6 +205,7 @@ impl GenericHttpsExecutor {
                 "request changed after proof verification".to_string(),
             ));
         }
+        let _ = self.resolve_and_pin(&request.destination)?;
         Ok(())
     }
 
@@ -199,18 +215,180 @@ impl GenericHttpsExecutor {
         request: &BrokerRequest,
         constraints: &RequestConstraints,
         credential: &SecretMaterial,
-    ) -> Result<PreparedProviderRequest> {
+    ) -> Result<PreparedHttpsDispatch> {
         validate_request_before_secret_use(request, constraints)?;
-        provider.prepare(request, constraints, credential)
+        let prepared = provider.prepare(request, constraints, credential)?;
+        let pinned_address = self.resolve_and_pin(&prepared.caller.destination)?;
+        let destination = &prepared.caller.destination;
+        Ok(PreparedHttpsDispatch {
+            outbound: PinnedHttpsRequest {
+                scheme: destination.scheme,
+                original_hostname: destination.normalized_host.clone(),
+                pinned_address,
+                port: destination.explicit_port,
+                method: destination.method.clone(),
+                path_and_query: destination.exact_path_and_query.clone(),
+                caller_headers: prepared.caller.headers.clone(),
+                secret_headers: prepared.secret_headers,
+                body: prepared.caller.body.clone(),
+                timeout_ms: prepared.caller.options.timeout_ms,
+                response_limit_bytes: prepared.caller.options.response_limit_bytes,
+                redirects_allowed: false,
+            },
+        })
     }
 
+    pub(crate) fn compare_prepared_request_for_audit(
+        &self,
+        provider: &dyn ProviderAdapter,
+        request: &BrokerRequest,
+        constraints: &RequestConstraints,
+        credential: &SecretMaterial,
+        comparison_salt: &BrokerAuditComparisonSalt,
+        reference: BrokerAuditReferenceRequest,
+    ) -> Result<BrokerAuditWireComparison> {
+        validate_request_before_secret_use(request, constraints)?;
+        let prepared = provider.prepare(request, constraints, credential)?;
+        let destination = &prepared.caller.destination;
+        let outbound = PinnedHttpsRequest {
+            scheme: destination.scheme,
+            original_hostname: destination.normalized_host.clone(),
+            pinned_address: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            port: destination.explicit_port,
+            method: destination.method.clone(),
+            path_and_query: destination.exact_path_and_query.clone(),
+            caller_headers: prepared.caller.headers.clone(),
+            secret_headers: prepared.secret_headers,
+            body: prepared.caller.body.clone(),
+            timeout_ms: prepared.caller.options.timeout_ms,
+            response_limit_bytes: prepared.caller.options.response_limit_bytes,
+            redirects_allowed: false,
+        };
+        let request_head = rustls_transport::build_request_head(&outbound)?;
+        compare_audit_wire_requests(comparison_salt, &request_head, &outbound.body, reference)
+    }
+
+    #[cfg(test)]
     pub(crate) fn dispatch(
         &self,
-        prepared: PreparedProviderRequest,
+        prepared: PreparedHttpsDispatch,
         constraints: &RequestConstraints,
         credential: &SecretMaterial,
     ) -> Result<(u16, Vec<HeaderField>, Vec<u8>)> {
-        let destination = &prepared.caller.destination;
+        self.dispatch_evidenced(prepared, constraints, credential)
+            .map_err(|failure| match failure {
+                HttpsDispatchFailure::Transport(error) | HttpsDispatchFailure::Response(error) => {
+                    error
+                }
+            })
+    }
+
+    pub(crate) fn dispatch_evidenced(
+        &self,
+        prepared: PreparedHttpsDispatch,
+        constraints: &RequestConstraints,
+        credential: &SecretMaterial,
+    ) -> std::result::Result<(u16, Vec<HeaderField>, Vec<u8>), HttpsDispatchFailure> {
+        let pinned = prepared.outbound.pinned_address;
+        let original_hostname = prepared.outbound.original_hostname.clone();
+        let method = prepared.outbound.method.clone();
+        let response_limit_bytes = prepared.outbound.response_limit_bytes;
+        let mut response = self
+            .transport
+            .dispatch(prepared.outbound)
+            .map_err(BrokerError::redacted)
+            .map_err(HttpsDispatchFailure::Transport)?;
+        let validated = (|| -> Result<(u16, Vec<HeaderField>, Vec<u8>)> {
+            if response.connected_address != pinned || response.tls_server_name != original_hostname
+            {
+                return Err(BrokerError::Upstream(
+                    "transport did not preserve DNS pinning and original-host TLS".to_string(),
+                ));
+            }
+            if response.redirected || (300..400).contains(&response.status) {
+                return Err(BrokerError::ResponseRejected(
+                    "redirect responses are forbidden".to_string(),
+                ));
+            }
+            if !(200..=599).contains(&response.status) {
+                return Err(BrokerError::ResponseRejected(
+                    "upstream returned an informational or invalid HTTP status".to_string(),
+                ));
+            }
+            let framing = validate_response_framing(&response.headers, &method, response.status)?;
+            let limit =
+                usize::try_from(constraints.maximum_response_bytes.min(response_limit_bytes))
+                    .map_err(|_| {
+                        BrokerError::InvalidRequest("response limit exceeds usize".to_string())
+                    })?;
+            let minimum_head_bytes = minimum_response_head_bytes(&response.headers)?;
+            if response.response_head_bytes < minimum_head_bytes
+                || response.response_head_bytes > MAX_RESPONSE_HEAD_BYTES
+                || response.response_head_bytes > limit
+            {
+                return Err(BrokerError::ResponseRejected(
+                    "response head violates the signed combined byte limit".to_string(),
+                ));
+            }
+            let body_limit = limit - response.response_head_bytes;
+            let mut decoded_body_bytes = 0_usize;
+            for chunk in &response.decoded_body_chunks {
+                decoded_body_bytes =
+                    decoded_body_bytes.checked_add(chunk.len()).ok_or_else(|| {
+                        BrokerError::ResponseRejected("response size overflow".to_string())
+                    })?;
+                if decoded_body_bytes > body_limit {
+                    return Err(BrokerError::ResponseRejected(
+                        "response headers and decoded body exceed the signed combined byte limit"
+                            .to_string(),
+                    ));
+                }
+            }
+            let mut body = Vec::with_capacity(decoded_body_bytes);
+            for mut chunk in std::mem::take(&mut response.decoded_body_chunks) {
+                body.extend_from_slice(&chunk);
+                chunk.zeroize();
+            }
+            match framing {
+                ResponseFraming::Fixed(expected) if body.len() != expected => {
+                    body.zeroize();
+                    return Err(BrokerError::ResponseRejected(
+                        "decoded response length does not match content length".to_string(),
+                    ));
+                }
+                ResponseFraming::BodyFree if !body.is_empty() => {
+                    body.zeroize();
+                    return Err(BrokerError::ResponseRejected(
+                        "body-free response contained decoded body bytes".to_string(),
+                    ));
+                }
+                ResponseFraming::Fixed(_)
+                | ResponseFraming::Chunked
+                | ResponseFraming::BodyFree => {}
+            }
+            let mut headers = match sanitize_response_headers(
+                std::mem::take(&mut response.headers),
+                credential,
+            ) {
+                Ok(headers) => headers,
+                Err(error) => {
+                    body.zeroize();
+                    return Err(error);
+                }
+            };
+            if contains_secret(&body, credential.as_bytes()) {
+                body.zeroize();
+                zeroize_header_values(&mut headers);
+                return Err(BrokerError::ResponseRejected(
+                    "response body contains credential material".to_string(),
+                ));
+            }
+            Ok((response.status, headers, body))
+        })();
+        validated.map_err(HttpsDispatchFailure::Response)
+    }
+
+    fn resolve_and_pin(&self, destination: &crate::protocol::BrokerDestination) -> Result<IpAddr> {
         let literal_address = destination.normalized_host.parse::<IpAddr>().ok();
         if literal_address.is_some() && literal_address != self.network_policy.allow_exact_address {
             return Err(BrokerError::AuthorizationDenied(
@@ -224,108 +402,7 @@ impl GenericHttpsExecutor {
                 .resolve(&destination.normalized_host, destination.explicit_port)
                 .map_err(BrokerError::redacted)?
         };
-        let pinned = validate_resolution(&resolved, self.network_policy)?;
-        let outbound = PinnedHttpsRequest {
-            scheme: destination.scheme,
-            original_hostname: destination.normalized_host.clone(),
-            pinned_address: pinned,
-            port: destination.explicit_port,
-            method: destination.method.clone(),
-            path_and_query: destination.exact_path_and_query.clone(),
-            caller_headers: prepared.caller.headers.clone(),
-            secret_headers: prepared.secret_headers,
-            body: prepared.caller.body.clone(),
-            timeout_ms: prepared.caller.options.timeout_ms,
-            response_limit_bytes: prepared.caller.options.response_limit_bytes,
-            redirects_allowed: false,
-        };
-        let mut response = self
-            .transport
-            .dispatch(outbound)
-            .map_err(BrokerError::redacted)?;
-        if response.connected_address != pinned
-            || response.tls_server_name != destination.normalized_host
-        {
-            return Err(BrokerError::Upstream(
-                "transport did not preserve DNS pinning and original-host TLS".to_string(),
-            ));
-        }
-        if response.redirected || (300..400).contains(&response.status) {
-            return Err(BrokerError::ResponseRejected(
-                "redirect responses are forbidden".to_string(),
-            ));
-        }
-        if !(200..=599).contains(&response.status) {
-            return Err(BrokerError::ResponseRejected(
-                "upstream returned an informational or invalid HTTP status".to_string(),
-            ));
-        }
-        let framing =
-            validate_response_framing(&response.headers, &destination.method, response.status)?;
-        let limit = usize::try_from(
-            constraints
-                .maximum_response_bytes
-                .min(prepared.caller.options.response_limit_bytes),
-        )
-        .map_err(|_| BrokerError::InvalidRequest("response limit exceeds usize".to_string()))?;
-        let minimum_head_bytes = minimum_response_head_bytes(&response.headers)?;
-        if response.response_head_bytes < minimum_head_bytes
-            || response.response_head_bytes > MAX_RESPONSE_HEAD_BYTES
-            || response.response_head_bytes > limit
-        {
-            return Err(BrokerError::ResponseRejected(
-                "response head violates the signed combined byte limit".to_string(),
-            ));
-        }
-        let body_limit = limit - response.response_head_bytes;
-        let mut decoded_body_bytes = 0_usize;
-        for chunk in &response.decoded_body_chunks {
-            decoded_body_bytes = decoded_body_bytes.checked_add(chunk.len()).ok_or_else(|| {
-                BrokerError::ResponseRejected("response size overflow".to_string())
-            })?;
-            if decoded_body_bytes > body_limit {
-                return Err(BrokerError::ResponseRejected(
-                    "response headers and decoded body exceed the signed combined byte limit"
-                        .to_string(),
-                ));
-            }
-        }
-        let mut body = Vec::with_capacity(decoded_body_bytes);
-        for mut chunk in std::mem::take(&mut response.decoded_body_chunks) {
-            body.extend_from_slice(&chunk);
-            chunk.zeroize();
-        }
-        match framing {
-            ResponseFraming::Fixed(expected) if body.len() != expected => {
-                body.zeroize();
-                return Err(BrokerError::ResponseRejected(
-                    "decoded response length does not match content length".to_string(),
-                ));
-            }
-            ResponseFraming::BodyFree if !body.is_empty() => {
-                body.zeroize();
-                return Err(BrokerError::ResponseRejected(
-                    "body-free response contained decoded body bytes".to_string(),
-                ));
-            }
-            ResponseFraming::Fixed(_) | ResponseFraming::Chunked | ResponseFraming::BodyFree => {}
-        }
-        let mut headers =
-            match sanitize_response_headers(std::mem::take(&mut response.headers), credential) {
-                Ok(headers) => headers,
-                Err(error) => {
-                    body.zeroize();
-                    return Err(error);
-                }
-            };
-        if contains_secret(&body, credential.as_bytes()) {
-            body.zeroize();
-            zeroize_header_values(&mut headers);
-            return Err(BrokerError::ResponseRejected(
-                "response body contains credential material".to_string(),
-            ));
-        }
-        Ok((response.status, headers, body))
+        validate_resolution(&resolved, self.network_policy)
     }
 }
 
@@ -650,6 +727,9 @@ pub(crate) fn response_digest(body: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use chio_test_support::prelude::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use crate::protocol::{BrokerDestination, CallerOptions, RedirectPolicy};
     use crate::provider::{CredentialPlacement, GenericCredentialProvider};
 
@@ -660,6 +740,19 @@ mod tests {
     impl DestinationResolver for StaticResolver {
         fn resolve(&self, _host: &str, _port: u16) -> Result<Vec<IpAddr>> {
             Ok(self.0.clone())
+        }
+    }
+
+    struct SequencedResolver {
+        calls: Arc<AtomicUsize>,
+        first: IpAddr,
+        later: IpAddr,
+    }
+
+    impl DestinationResolver for SequencedResolver {
+        fn resolve(&self, _host: &str, _port: u16) -> Result<Vec<IpAddr>> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(vec![if call == 0 { self.first } else { self.later }])
         }
     }
 
@@ -683,7 +776,7 @@ mod tests {
                 return Err(BrokerError::Upstream("injected timeout".to_string()));
             }
             let connected_address = if matches!(self.0, ResponseMode::WrongAddress) {
-                "1.1.1.1".parse().expect("address")
+                "1.1.1.1".parse().test_expect("address")
             } else {
                 request.pinned_address()
             };
@@ -710,7 +803,7 @@ mod tests {
                 let body_length = decoded_body_chunks.iter().map(Vec::len).sum::<usize>();
                 let value = body_length.to_string();
                 let header = HeaderField::normalized("content-length", value.as_bytes())
-                    .expect("content length");
+                    .test_expect("content length");
                 let head = format!("HTTP/1.1 200 OK\r\ncontent-length: {value}\r\n\r\n");
                 (vec![header], head.len())
             };
@@ -732,7 +825,7 @@ mod tests {
     fn request_and_constraints() -> (BrokerRequest, RequestConstraints) {
         let request = BrokerRequest {
             destination: BrokerDestination::parse("https://example.com/v1", "POST", false)
-                .expect("destination"),
+                .test_expect("destination"),
             headers: Vec::new(),
             body: b"body".to_vec(),
             approved_preview_sha256: None,
@@ -770,7 +863,7 @@ mod tests {
             1,
             CredentialPlacement::BearerAuthorization,
         )
-        .expect("provider")
+        .test_expect("provider")
     }
 
     #[test]
@@ -793,13 +886,16 @@ mod tests {
             "::ffff:127.0.0.1",
         ] {
             assert!(
-                is_restricted(address.parse().expect("IP"), false),
+                is_restricted(address.parse().test_expect("IP"), false),
                 "{address}"
             );
         }
-        assert!(!is_restricted("93.184.216.34".parse().expect("IP"), false));
         assert!(!is_restricted(
-            "2606:4700:4700::1111".parse().expect("IP"),
+            "93.184.216.34".parse().test_expect("IP"),
+            false
+        ));
+        assert!(!is_restricted(
+            "2606:4700:4700::1111".parse().test_expect("IP"),
             false
         ));
     }
@@ -810,12 +906,13 @@ mod tests {
         let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
         let executor = executor(
             ResponseMode::Valid,
-            vec!["93.184.216.34".parse().expect("address")],
+            vec!["93.184.216.34".parse().test_expect("address")],
         );
 
         let mut forbidden = request.clone();
-        forbidden.headers =
-            vec![HeaderField::normalized("Authorization", b"caller").expect("forbidden header")];
+        forbidden.headers = vec![
+            HeaderField::normalized("Authorization", b"caller").test_expect("forbidden header")
+        ];
         assert!(executor
             .prepare(&provider(), &forbidden, &constraints, &credential)
             .is_err());
@@ -841,7 +938,7 @@ mod tests {
 
     #[test]
     fn dns_rebinding_tls_redirect_size_timeout_and_canary_responses_fail_closed() {
-        let public = "93.184.216.34".parse().expect("address");
+        let public = "93.184.216.34".parse().test_expect("address");
         for mode in [
             ResponseMode::Redirect,
             ResponseMode::WrongAddress,
@@ -856,7 +953,7 @@ mod tests {
             let executor = executor(mode, vec![public]);
             let prepared = executor
                 .prepare(&provider(), &request, &constraints, &credential)
-                .expect("prepare");
+                .test_expect("prepare");
             assert!(executor
                 .dispatch(prepared, &constraints, &credential)
                 .is_err());
@@ -866,13 +963,10 @@ mod tests {
         let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
         let restricted = executor(
             ResponseMode::Valid,
-            vec!["127.0.0.1".parse().expect("address")],
+            vec!["127.0.0.1".parse().test_expect("address")],
         );
-        let prepared = restricted
-            .prepare(&provider(), &request, &constraints, &credential)
-            .expect("prepare");
         assert!(restricted
-            .dispatch(prepared, &constraints, &credential)
+            .prepare(&provider(), &request, &constraints, &credential)
             .is_err());
     }
 
@@ -880,21 +974,18 @@ mod tests {
     fn ip_literal_requires_the_matching_exact_exception() {
         let (mut request, constraints) = request_and_constraints();
         request.destination = BrokerDestination::parse("https://93.184.216.34/v1", "POST", true)
-            .expect("IP destination");
+            .test_expect("IP destination");
         let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
         let mismatched = GenericHttpsExecutor::new(
             Arc::new(StaticResolver(Vec::new())),
             Arc::new(StaticTransport(ResponseMode::Valid)),
             NetworkPolicy {
                 allow_loopback_test: false,
-                allow_exact_address: Some("1.1.1.1".parse().expect("address")),
+                allow_exact_address: Some("1.1.1.1".parse().test_expect("address")),
             },
         );
-        let prepared = mismatched
-            .prepare(&provider(), &request, &constraints, &credential)
-            .expect("prepare");
         assert!(mismatched
-            .dispatch(prepared, &constraints, &credential)
+            .prepare(&provider(), &request, &constraints, &credential)
             .is_err());
 
         let matching = GenericHttpsExecutor::new(
@@ -902,15 +993,41 @@ mod tests {
             Arc::new(StaticTransport(ResponseMode::Valid)),
             NetworkPolicy {
                 allow_loopback_test: false,
-                allow_exact_address: Some("93.184.216.34".parse().expect("address")),
+                allow_exact_address: Some("93.184.216.34".parse().test_expect("address")),
             },
         );
         let prepared = matching
             .prepare(&provider(), &request, &constraints, &credential)
-            .expect("prepare");
+            .test_expect("prepare");
         matching
             .dispatch(prepared, &constraints, &credential)
-            .expect("matching IP exception");
+            .test_expect("matching IP exception");
+    }
+
+    #[test]
+    fn prepared_dispatch_pins_dns_once_and_dispatch_never_resolves_again() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let executor = GenericHttpsExecutor::new(
+            Arc::new(SequencedResolver {
+                calls: Arc::clone(&calls),
+                first: "93.184.216.34".parse().test_expect("public address"),
+                later: "127.0.0.1".parse().test_expect("restricted address"),
+            }),
+            Arc::new(StaticTransport(ResponseMode::Valid)),
+            NetworkPolicy::production(),
+        );
+        let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
+        let (request, constraints) = request_and_constraints();
+
+        let prepared = executor
+            .prepare(&provider(), &request, &constraints, &credential)
+            .test_expect("prepare and pin public address");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        executor
+            .dispatch(prepared, &constraints, &credential)
+            .test_expect("dispatch retained pinned request");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -923,7 +1040,7 @@ mod tests {
             }],
             &credential,
         )
-        .expect("sanitize");
+        .test_expect("sanitize");
         assert!(stripped.is_empty());
 
         assert!(sanitize_response_headers(
@@ -938,7 +1055,7 @@ mod tests {
 
     #[test]
     fn executor_counts_response_head_overhead_in_the_signed_combined_budget() {
-        let public = "93.184.216.34".parse().expect("address");
+        let public = "93.184.216.34".parse().test_expect("address");
         let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
         let (mut request, mut constraints) = request_and_constraints();
         let response_head_bytes = b"HTTP/1.1 200 OK\r\ncontent-length: 8\r\n\r\n".len() as u64;
@@ -948,7 +1065,7 @@ mod tests {
         let allowed = executor(ResponseMode::Valid, vec![public]);
         let prepared = allowed
             .prepare(&provider(), &request, &constraints, &credential)
-            .expect("prepare");
+            .test_expect("prepare");
         assert!(allowed
             .dispatch(prepared, &constraints, &credential)
             .is_ok());
@@ -958,7 +1075,7 @@ mod tests {
         let denied = executor(ResponseMode::Valid, vec![public]);
         let prepared = denied
             .prepare(&provider(), &request, &constraints, &credential)
-            .expect("prepare");
+            .test_expect("prepare");
         assert!(denied
             .dispatch(prepared, &constraints, &credential)
             .is_err());

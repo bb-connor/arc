@@ -1,23 +1,74 @@
-use super::receipts::{record_receipt_write_error, record_receipt_write_kernel_error};
+use super::receipts::record_receipt_write_error;
+use super::receipts::record_receipt_write_kernel_error;
 use super::*;
 
-/// Bridge-only request for projecting a Chio tool invocation through MCP session semantics.
+// Raw bridge execution is test-only. Production execution must enter through
+// a registry-bound MCP session or the registry-bound cross-protocol executor.
+/// Test request for projecting a Chio tool invocation through MCP session semantics.
 #[derive(Debug, Clone)]
-pub struct BridgeMcpToolCallRequest {
-    pub request_id: String,
-    pub capability: CapabilityToken,
-    pub server_id: String,
-    pub tool_name: String,
-    pub arguments: Value,
-    pub agent_id: String,
-    pub execution_nonce: Option<SignedExecutionNonce>,
-    pub governed_intent: Option<GovernedTransactionIntent>,
-    pub model_metadata: Option<ModelMetadata>,
-    pub route_selection_metadata: Option<Value>,
-    pub peer_supports_chio_tool_streaming: bool,
+#[cfg(test)]
+pub(super) struct BridgeMcpToolCallRequest {
+    pub(super) request_id: String,
+    pub(super) capability: CapabilityToken,
+    pub(super) server_id: String,
+    pub(super) tool_name: String,
+    pub(super) arguments: Value,
+    pub(super) agent_id: String,
+    pub(super) execution_nonce: Option<SignedExecutionNonce>,
+    pub(super) governed_intent: Option<GovernedTransactionIntent>,
+    pub(super) approval_token: Option<GovernedApprovalToken>,
+    pub(super) approval_tokens: Vec<GovernedApprovalToken>,
+    pub(super) threshold_approval_proposal: Option<ThresholdApprovalProposal>,
+    pub(super) model_metadata: Option<ModelMetadata>,
+    pub(super) supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
+    pub(super) route_selection_metadata: Option<Value>,
+    pub(super) peer_supports_chio_tool_streaming: bool,
 }
 
-/// Bridge-only MCP tool-call execution result.
+#[cfg(test)]
+impl BridgeMcpToolCallRequest {
+    pub(super) fn to_tool_call_request(&self) -> Result<ToolCallRequest, AdapterError> {
+        let request = ToolCallRequest {
+            request_id: self.request_id.clone(),
+            capability: self.capability.clone(),
+            tool_name: self.tool_name.clone(),
+            server_id: self.server_id.clone(),
+            agent_id: self.agent_id.clone(),
+            arguments: self.arguments.clone(),
+            dpop_proof: None,
+            execution_nonce: self.execution_nonce.clone(),
+            governed_intent: self.governed_intent.clone(),
+            approval_token: self.approval_token.clone(),
+            approval_tokens: self.approval_tokens.clone(),
+            threshold_approval_proposal: self.threshold_approval_proposal.clone(),
+            model_metadata: self.model_metadata.clone(),
+            supplemental_authorization: self.supplemental_authorization.clone(),
+            federated_origin_kernel_id: None,
+            declassification_grant: None,
+        };
+        request.validate().map_err(|error| {
+            AdapterError::ParseError(format!("invalid MCP authorization context: {error}"))
+        })?;
+        Ok(request)
+    }
+}
+
+/// MCP projection of an already evaluated kernel tool-call response.
+///
+/// Raw bridge request execution is deliberately unavailable to production
+/// callers. Tool execution must enter through a registry-bound path.
+///
+/// ```compile_fail
+/// use chio_mcp_edge::BridgeMcpToolCallRequest;
+/// ```
+///
+/// ```compile_fail
+/// use chio_mcp_edge::execute_bridge_mcp_tool_call;
+/// ```
+///
+/// ```compile_fail
+/// use chio_mcp_edge::execute_bridge_mcp_tool_call_async;
+/// ```
 #[derive(Debug)]
 pub struct BridgeMcpToolCall {
     pub response: ToolCallResponse,
@@ -59,32 +110,59 @@ impl TargetProtocolExecutor for McpTargetExecutor {
         &self,
         request: CrossProtocolTargetRequest<'_>,
     ) -> Result<CrossProtocolTargetExecution, BridgeError> {
+        request
+            .manifest_registry
+            .validate_invocation_arguments(
+                &request.execution.target_server_id,
+                &request.execution.target_tool_name,
+                &request.execution.bridge_security,
+                &request.execution.arguments,
+            )
+            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
         let route_metadata = metadata_with_source_receipt_context(
             route_selection_metadata(request.route_selection)?,
             &request.execution.source_envelope,
         )?;
-        let response = request
-            .kernel
-            .evaluate_tool_call_blocking_with_metadata(
-                &ToolCallRequest {
-                    request_id: request.execution.kernel_request_id.clone(),
-                    capability: request.execution.capability.clone(),
-                    tool_name: request.execution.target_tool_name.clone(),
-                    server_id: request.execution.target_server_id.clone(),
-                    agent_id: request.execution.agent_id.clone(),
-                    arguments: request.execution.arguments.clone(),
-                    dpop_proof: request.execution.dpop_proof.clone(),
-                    execution_nonce: request.execution.execution_nonce.clone(),
-                    governed_intent: request.execution.governed_intent.clone(),
-                    approval_token: request.execution.approval_token.clone(),
-                    approval_tokens: Vec::new(),
-                    threshold_approval_proposal: None,
-                    model_metadata: request.execution.model_metadata.clone(),
-                    federated_origin_kernel_id: None,
-                },
-                Some(route_metadata),
-            )
-            .map_err(BridgeError::Kernel)?;
+        let kernel_request = request.execution.to_tool_call_request();
+        let evaluation = match (
+            request.execution.security_context.as_ref(),
+            request.execution.authenticated_session_id.as_ref(),
+        ) {
+            (Some(security_context), Some(authenticated_session_id)) => request
+                .kernel
+                .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
+                    &kernel_request,
+                    request.manifest_registry,
+                    &request.execution.bridge_security,
+                    Some(route_metadata),
+                    authenticated_session_id,
+                    security_context,
+                ),
+            (Some(security_context), None) => request
+                .kernel
+                .evaluate_tool_call_blocking_with_manifest_security_and_security_context(
+                    &kernel_request,
+                    request.manifest_registry,
+                    &request.execution.bridge_security,
+                    Some(route_metadata),
+                    security_context,
+                ),
+            (None, _) => request
+                .kernel
+                .evaluate_tool_call_blocking_with_manifest_security(
+                    &kernel_request,
+                    request.manifest_registry,
+                    &request.execution.bridge_security,
+                    Some(route_metadata),
+                ),
+        };
+        let response = match evaluation {
+            Ok(response) => response,
+            Err(error) => {
+                record_receipt_write_kernel_error(&error);
+                return Err(BridgeError::Kernel(error));
+            }
+        };
         let bridge = bridge_mcp_tool_call_from_response(
             response,
             &request.execution.kernel_request_id,
@@ -114,39 +192,15 @@ impl TargetProtocolExecutor for McpTargetExecutor {
     }
 }
 
-pub async fn execute_bridge_mcp_tool_call_async(
+#[cfg(test)]
+pub(super) async fn execute_bridge_mcp_tool_call_async(
     kernel: &ChioKernel,
     request: BridgeMcpToolCallRequest,
 ) -> Result<BridgeMcpToolCall, AdapterError> {
-    let BridgeMcpToolCallRequest {
-        request_id,
-        capability,
-        server_id,
-        tool_name,
-        arguments,
-        agent_id,
-        execution_nonce,
-        governed_intent,
-        model_metadata,
-        route_selection_metadata,
-        peer_supports_chio_tool_streaming,
-    } = request;
-    let kernel_request = ToolCallRequest {
-        request_id: request_id.clone(),
-        capability,
-        tool_name,
-        server_id,
-        agent_id,
-        arguments,
-        dpop_proof: None,
-        execution_nonce,
-        governed_intent,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        model_metadata,
-        federated_origin_kernel_id: None,
-    };
+    let request_id = request.request_id.clone();
+    let route_selection_metadata = request.route_selection_metadata.clone();
+    let peer_supports_chio_tool_streaming = request.peer_supports_chio_tool_streaming;
+    let kernel_request = request.to_tool_call_request()?;
     let response = match kernel
         .evaluate_tool_call_with_metadata(&kernel_request, route_selection_metadata)
         .await
@@ -165,7 +219,8 @@ pub async fn execute_bridge_mcp_tool_call_async(
     )
 }
 
-pub fn execute_bridge_mcp_tool_call(
+#[cfg(test)]
+pub(super) fn execute_bridge_mcp_tool_call(
     kernel: &ChioKernel,
     request: BridgeMcpToolCallRequest,
 ) -> Result<BridgeMcpToolCall, AdapterError> {
@@ -176,22 +231,7 @@ pub fn execute_bridge_mcp_tool_call(
             })
         }
         Ok(_) => {
-            let kernel_request = ToolCallRequest {
-                request_id: request.request_id.clone(),
-                capability: request.capability.clone(),
-                tool_name: request.tool_name.clone(),
-                server_id: request.server_id.clone(),
-                agent_id: request.agent_id.clone(),
-                arguments: request.arguments.clone(),
-                dpop_proof: None,
-                execution_nonce: request.execution_nonce.clone(),
-                governed_intent: request.governed_intent.clone(),
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                model_metadata: request.model_metadata.clone(),
-                federated_origin_kernel_id: None,
-            };
+            let kernel_request = request.to_tool_call_request()?;
             let response = match kernel.evaluate_tool_call_blocking_with_metadata(
                 &kernel_request,
                 request.route_selection_metadata.clone(),
@@ -271,6 +311,51 @@ pub(super) struct KernelToolResultArgs<'a> {
 }
 
 impl ChioMcpEdge {
+    fn resolve_security_invocation_context(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+    ) -> Result<Option<SecurityInvocationContext>, chio_kernel::KernelError> {
+        match self.security_context_authority.as_ref() {
+            Some(authority) => authority
+                .resolve_security_invocation_context(context, operation)
+                .map(Some),
+            None if self.kernel.security_pre_dispatch_policy()
+                == SecurityPreDispatchPolicy::Enforce =>
+            {
+                Err(chio_kernel::KernelError::GuardDenied(
+                    "enforced MCP dispatch has no security invocation context authority"
+                        .to_string(),
+                ))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn manifest_execution_binding(
+        &self,
+        operation: &ToolCallOperation,
+    ) -> Result<
+        Option<(
+            Arc<chio_manifest::VerifiedManifestRegistry>,
+            chio_manifest::BridgeSecurityMetadata,
+        )>,
+        chio_kernel::KernelError,
+    > {
+        let Some(registry) = self.manifest_registry.as_ref() else {
+            return Ok(None);
+        };
+        let security = registry
+            .bridge_security(&operation.server_id, &operation.tool_name)
+            .ok_or_else(|| {
+                chio_kernel::KernelError::InvalidReceiptMetadata(format!(
+                    "verified manifest registry has no bridge security for {}/{}",
+                    operation.server_id, operation.tool_name
+                ))
+            })?;
+        Ok(Some((Arc::clone(registry), security)))
+    }
+
     pub(super) fn prepare_tool_call_request(
         &mut self,
         id: &Value,
@@ -304,6 +389,10 @@ impl ChioMcpEdge {
         let model_metadata = parse_request_model_metadata(id, params)?;
         let execution_nonce = parse_request_execution_nonce(id, params)?;
         let governed_intent = parse_request_governed_intent(id, params)?;
+        let supplemental_authorization = parse_request_supplemental_authorization(id, params)?;
+        let approval_token = parse_request_approval_token(id, params)?;
+        let approval_tokens = parse_request_approval_tokens(id, params)?;
+        let threshold_approval_proposal = parse_request_threshold_approval_proposal(id, params)?;
         let extra_metadata = parse_request_extra_metadata(id, params)?;
 
         let Some(&tool_index) = self.tool_index.get(tool_name) else {
@@ -314,6 +403,20 @@ impl ChioMcpEdge {
             ));
         };
         let binding = self.tools[tool_index].clone();
+        if !arguments.is_object() {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "tool arguments must be a JSON object",
+            ));
+        }
+        if !binding.input_validator.is_valid(&arguments) {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "tool arguments do not match the admitted input schema",
+            ));
+        }
 
         let capability = match select_capability_for_request(
             &self.capabilities,
@@ -343,21 +446,46 @@ impl ChioMcpEdge {
         let request_id = self.next_request_id();
         let context =
             build_operation_context(id, session_id.clone(), request_id, &self.agent_id, params)?;
+        let operation = ToolCallOperation {
+            capability,
+            server_id: binding.server_id,
+            tool_name: binding.tool_name,
+            arguments,
+            supplemental_authorization,
+            governed_intent,
+            approval_token,
+            approval_tokens,
+            threshold_approval_proposal,
+            execution_nonce,
+            model_metadata,
+            extra_metadata,
+            declassification_grant: None,
+        };
+        operation.validate().map_err(|error| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                &format!("invalid MCP authorization context: {error}"),
+            )
+        })?;
+        validate_execution_feature_negotiation(
+            &self.trusted_peer_negotiation,
+            &operation.capability,
+            operation.governed_intent.as_ref(),
+            operation.approval_token.as_ref(),
+            &operation.approval_tokens,
+            operation.threshold_approval_proposal.as_ref(),
+            operation.supplemental_authorization.as_ref(),
+        )
+        .map_err(|error| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                &format!("MCP authorization context is not negotiated: {error}"),
+            )
+        })?;
 
-        Ok((
-            session_id,
-            context,
-            ToolCallOperation {
-                capability,
-                server_id: binding.server_id,
-                tool_name: binding.tool_name,
-                arguments,
-                governed_intent,
-                execution_nonce,
-                model_metadata,
-                extra_metadata,
-            },
-        ))
+        Ok((session_id, context, operation))
     }
 
     pub(super) fn evaluate_tool_call_operation(
@@ -368,8 +496,43 @@ impl ChioMcpEdge {
         operation: &ToolCallOperation,
         related_task_id: Option<&str>,
     ) -> ToolCallEdgeOutcome {
+        let security_context = match self.resolve_security_invocation_context(context, operation) {
+            Ok(context) => context,
+            Err(error) => return self.tool_call_error_outcome(session_id, error, related_task_id),
+        };
+        let manifest_binding = match self.manifest_execution_binding(operation) {
+            Ok(binding) => binding,
+            Err(error) => return self.tool_call_error_outcome(session_id, error, related_task_id),
+        };
         let operation = SessionOperation::ToolCall(Box::new(operation.clone()));
-        match self.kernel.evaluate_session_operation(context, &operation) {
+        let evaluation = match (manifest_binding, security_context.as_ref()) {
+            (Some((registry, security)), Some(security_context)) => self
+                .kernel
+                .evaluate_session_operation_with_manifest_security_and_security_context(
+                    context,
+                    &operation,
+                    registry.as_ref(),
+                    &security,
+                    security_context,
+                ),
+            (Some((registry, security)), None) => self
+                .kernel
+                .evaluate_session_operation_with_manifest_security(
+                    context,
+                    &operation,
+                    registry.as_ref(),
+                    &security,
+                ),
+            (None, Some(security_context)) => self
+                .kernel
+                .evaluate_session_operation_with_security_context(
+                    context,
+                    &operation,
+                    security_context,
+                ),
+            (None, None) => self.kernel.evaluate_session_operation(context, &operation),
+        };
+        match evaluation {
             Ok(SessionOperationResponse::ToolCall(response)) => self
                 .tool_result_for_kernel_response(KernelToolResultArgs {
                     client_request_id: id,
@@ -428,6 +591,14 @@ impl ChioMcpEdge {
             operation,
             related_task_id,
         } = request;
+        let security_context = match self.resolve_security_invocation_context(context, operation) {
+            Ok(context) => context,
+            Err(error) => return self.tool_call_error_outcome(session_id, error, related_task_id),
+        };
+        let manifest_binding = match self.manifest_execution_binding(operation) {
+            Ok(binding) => binding,
+            Err(error) => return self.tool_call_error_outcome(session_id, error, related_task_id),
+        };
         let mut parent_progress_step = 0;
         let mut accepted_url_elicitations = Vec::new();
         let mut nested_flow_client = EdgeNestedFlowClient {
@@ -445,13 +616,43 @@ impl ChioMcpEdge {
             writer,
         };
 
-        let outcome = match self
-            .kernel
-            .evaluate_tool_call_operation_with_nested_flow_client(
-                context,
-                operation,
-                &mut nested_flow_client,
-            ) {
+        let evaluation = match (manifest_binding, security_context.as_ref()) {
+            (Some((registry, security)), Some(security_context)) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client_and_manifest_security_and_security_context(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                    registry.as_ref(),
+                    &security,
+                    security_context,
+                ),
+            (Some((registry, security)), None) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client_and_manifest_security(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                    registry.as_ref(),
+                    &security,
+                ),
+            (None, Some(security_context)) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client_and_security_context(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                    security_context,
+                ),
+            (None, None) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                ),
+        };
+        let outcome = match evaluation {
             Ok(response) => self.tool_result_for_kernel_response(KernelToolResultArgs {
                 client_request_id: id,
                 session_id,
@@ -493,6 +694,14 @@ impl ChioMcpEdge {
             operation,
             related_task_id,
         } = request;
+        let security_context = match self.resolve_security_invocation_context(context, operation) {
+            Ok(context) => context,
+            Err(error) => return self.tool_call_error_outcome(session_id, error, related_task_id),
+        };
+        let manifest_binding = match self.manifest_execution_binding(operation) {
+            Ok(binding) => binding,
+            Err(error) => return self.tool_call_error_outcome(session_id, error, related_task_id),
+        };
         let mut parent_progress_step = 0;
         let mut accepted_url_elicitations = Vec::new();
         let mut nested_flow_client = QueuedEdgeNestedFlowClient {
@@ -511,13 +720,43 @@ impl ChioMcpEdge {
             writer,
         };
 
-        let outcome = match self
-            .kernel
-            .evaluate_tool_call_operation_with_nested_flow_client(
-                context,
-                operation,
-                &mut nested_flow_client,
-            ) {
+        let evaluation = match (manifest_binding, security_context.as_ref()) {
+            (Some((registry, security)), Some(security_context)) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client_and_manifest_security_and_security_context(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                    registry.as_ref(),
+                    &security,
+                    security_context,
+                ),
+            (Some((registry, security)), None) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client_and_manifest_security(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                    registry.as_ref(),
+                    &security,
+                ),
+            (None, Some(security_context)) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client_and_security_context(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                    security_context,
+                ),
+            (None, None) => self
+                .kernel
+                .evaluate_tool_call_operation_with_nested_flow_client(
+                    context,
+                    operation,
+                    &mut nested_flow_client,
+                ),
+        };
+        let outcome = match evaluation {
             Ok(response) => self.tool_result_for_kernel_response(KernelToolResultArgs {
                 client_request_id: id,
                 session_id,

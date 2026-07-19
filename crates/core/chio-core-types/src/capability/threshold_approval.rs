@@ -253,14 +253,10 @@ impl ThresholdApprovalProposal {
         backend: &dyn SigningBackend,
     ) -> CoreResult<Self> {
         let signing_bytes = body.signing_bytes()?;
-        let policy_authority = backend.public_key();
-        let algorithm = backend.algorithm();
-        if policy_authority.algorithm() != algorithm {
-            return Err(Error::InvalidSignature(
-                "threshold proposal backend algorithm does not match public key".into(),
-            ));
-        }
-        let signature = backend.sign_bytes(&signing_bytes)?;
+        let outcome = backend.sign_bytes_with_identity(&signing_bytes)?;
+        let policy_authority = outcome.public_key;
+        let algorithm = outcome.algorithm;
+        let signature = outcome.signature;
         if signature.algorithm() != algorithm
             || !policy_authority.verify(&signing_bytes, &signature)
         {
@@ -412,6 +408,36 @@ impl VerifiedApprovalSetBody {
         if lifetime == 0 || lifetime > MAX_THRESHOLD_APPROVAL_TIMEOUT_SECONDS {
             return Err(invalid_artifact(
                 "approval set carries an invalid proposal window",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Validate every proposal-derived field against the authenticated proposal.
+    pub fn validate_against_proposal(
+        &self,
+        proposal: &ThresholdApprovalProposal,
+    ) -> CoreResult<()> {
+        self.validate()?;
+        if !proposal.verify_signature()? {
+            return Err(Error::SignatureVerificationFailed);
+        }
+        let body = proposal.body();
+        let proposal_hash = proposal.proposal_hash()?;
+        if self.policy_hash != body.policy_hash
+            || self.required != body.required
+            || self.eligible_set_digest != body.eligible_set_digest
+            || self.request_id != body.request_id
+            || self.governed_intent_hash != body.governed_intent_hash
+            || self.subject != body.subject
+            || self.authorization_capability_hash != body.authorization_capability_hash
+            || self.threshold_proposal_hash != proposal_hash
+            || self.proposal_id != body.proposal_id
+            || self.proposal_created_at != body.proposal_created_at
+            || self.proposal_deadline != body.proposal_deadline
+        {
+            return Err(invalid_artifact(
+                "verified approval set does not match threshold proposal",
             ));
         }
         Ok(())

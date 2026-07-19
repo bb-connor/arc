@@ -1,6 +1,59 @@
 use super::super::*;
 use super::support::*;
 
+#[cfg(unix)]
+#[test]
+fn receipt_store_detects_post_open_hardlinks_and_path_rebinding() {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let directory = tempfile::tempdir().test_unwrap();
+    let path = directory.path().join("receipt-identity.sqlite3");
+    let hardlink = directory.path().join("receipt-identity-hardlink.sqlite3");
+    let displaced = directory.path().join("receipt-identity-displaced.sqlite3");
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
+
+    fs::hard_link(&path, &hardlink).test_unwrap();
+    assert!(store.max_tool_receipt_seq().is_err());
+    assert!(store.append_chio_receipt(&sample_receipt()).is_err());
+    fs::remove_file(&hardlink).test_unwrap();
+    assert!(store.max_tool_receipt_seq().is_ok());
+
+    fs::rename(&path, &displaced).test_unwrap();
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .test_unwrap();
+    assert!(store.max_tool_receipt_seq().is_err());
+    assert!(store.append_chio_receipt(&sample_receipt()).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn receipt_store_pins_a_resolved_parent_alias() {
+    use std::os::unix::fs::symlink;
+
+    let alias_directory = tempfile::tempdir().test_unwrap();
+    let original_directory = tempfile::tempdir().test_unwrap();
+    let replacement_directory = tempfile::tempdir().test_unwrap();
+    let alias = alias_directory.path().join("database-parent");
+    symlink(original_directory.path(), &alias).test_unwrap();
+    let aliased_path = alias.join("receipts.sqlite3");
+
+    let store = SqliteReceiptStore::open(&aliased_path).test_unwrap();
+    fs::remove_file(&alias).test_unwrap();
+    symlink(replacement_directory.path(), &alias).test_unwrap();
+
+    store.append_chio_receipt(&sample_receipt()).test_unwrap();
+    assert_eq!(store.tool_receipt_count().test_unwrap(), 1);
+    assert!(original_directory.path().join("receipts.sqlite3").is_file());
+    assert!(!replacement_directory
+        .path()
+        .join("receipts.sqlite3")
+        .exists());
+}
+
 #[test]
 fn sqlite_receipt_store_persists_across_reopen() {
     let path = unique_db_path("chio-receipts");
@@ -324,6 +377,12 @@ fn open_existing_missing_path_does_not_create_database_file() {
 fn open_existing_rejects_touched_empty_database_file() {
     let path = unique_db_path("chio-receipts-open-existing-empty");
     fs::write(&path, "").test_unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).test_unwrap();
+    }
 
     let error = SqliteReceiptStore::open_existing(&path).test_unwrap_err();
     assert!(

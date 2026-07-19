@@ -7,6 +7,7 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::runner_security::{materialize_remote_edge_security, RemoteEdgeSecurityMaterial};
 use crate::{
     generate_markdown_report, load_results_from_dir, load_scenarios_from_dir, CompatibilityReport,
 };
@@ -87,6 +88,12 @@ pub enum RunnerError {
     #[error("timeout while waiting for MCP edge on {listen}")]
     ServerStartupTimeout { listen: SocketAddr },
 
+    #[error("invalid conformance credential configuration: {reason}")]
+    InvalidCredentials { reason: &'static str },
+
+    #[error("failed to materialize conformance security state: {0}")]
+    SecurityMaterial(String),
+
     #[error("failed to load generated artifacts: {0}")]
     Load(#[from] crate::load::LoadError),
 
@@ -124,10 +131,7 @@ pub fn default_repo_root() -> PathBuf {
 /// `CHIO_CONFORMANCE_ADMIN_TOKEN` for CI or shared environments.
 fn conformance_token_from_env(var: &str, role: &str) -> String {
     if let Ok(value) = env::var(var) {
-        let trimmed = value.trim();
-        if !trimmed.is_empty() {
-            return trimmed.to_string();
-        }
+        return value;
     }
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -145,17 +149,19 @@ fn apply_conformance_auth_env(
 ) {
     command
         .env("CHIO_CONFORMANCE_AUTH_TOKEN", &options.auth_token)
-        .env("CHIO_CONFORMANCE_ADMIN_TOKEN", &options.admin_token);
+        .env("CHIO_CONFORMANCE_ADMIN_TOKEN", &options.admin_token)
+        .env("CHIO_ADMIN_TOKEN", &options.admin_token);
     match auth_mode {
         ConformanceAuthMode::StaticBearer => {
-            command.env("CHIO_AUTH_TOKEN", &options.auth_token);
+            command
+                .env_remove("CHIO_MCP_ADMIN_TOKEN")
+                .env("CHIO_AUTH_TOKEN", &options.auth_token);
         }
         ConformanceAuthMode::LocalOAuth => {
             command
                 .env_remove("CHIO_AUTH_TOKEN")
                 .env_remove("CHIO_MCP_AUTH_TOKEN")
                 .env_remove("CHIO_MCP_ADMIN_TOKEN");
-            command.env("CHIO_ADMIN_TOKEN", &options.admin_token);
         }
     }
 }
@@ -184,9 +190,35 @@ pub fn default_run_options() -> ConformanceRunOptions {
     }
 }
 
+fn validate_conformance_credentials(options: &ConformanceRunOptions) -> Result<(), RunnerError> {
+    if options.auth_token.is_empty()
+        || options.auth_token.trim() != options.auth_token
+        || options.auth_token.chars().any(char::is_control)
+    {
+        return Err(RunnerError::InvalidCredentials {
+            reason: "auth token must be non-empty, unpadded, and control-free",
+        });
+    }
+    if options.admin_token.is_empty()
+        || options.admin_token.trim() != options.admin_token
+        || options.admin_token.chars().any(char::is_control)
+    {
+        return Err(RunnerError::InvalidCredentials {
+            reason: "admin token must be non-empty, unpadded, and control-free",
+        });
+    }
+    if options.auth_token == options.admin_token {
+        return Err(RunnerError::InvalidCredentials {
+            reason: "admin token must differ from auth token",
+        });
+    }
+    Ok(())
+}
+
 pub fn run_conformance_harness(
     options: &ConformanceRunOptions,
 ) -> Result<ConformanceRunSummary, RunnerError> {
+    validate_conformance_credentials(options)?;
     if options.results_dir.exists() {
         fs::remove_dir_all(&options.results_dir)?;
     }
@@ -204,10 +236,17 @@ pub fn run_conformance_harness(
         None => reserve_listen_addr()?,
     };
     let chio_executable = ensure_chio_executable(&options.repo_root, &options.cargo_binary)?;
+    let security = materialize_remote_edge_security(&chio_executable, options, &artifacts_dir)?;
     let server_log_path = logs_dir.join("chio-mcp-serve-http.log");
-    let server = spawn_remote_edge(&chio_executable, options, listen, &server_log_path)?;
-    let _server_guard = ChildGuard { child: server };
-    wait_for_server(listen)?;
+    let server = spawn_remote_edge(
+        &chio_executable,
+        options,
+        &security,
+        listen,
+        &server_log_path,
+    )?;
+    let mut server_guard = ChildGuard { child: server };
+    wait_for_server(&mut server_guard.child, listen, &server_log_path)?;
 
     let mut peer_result_files = Vec::new();
     for peer in &options.peers {
@@ -335,6 +374,7 @@ fn push_chio_candidate(candidates: &mut Vec<PathBuf>, path: PathBuf) {
 fn spawn_remote_edge(
     chio_executable: &Path,
     options: &ConformanceRunOptions,
+    security: &RemoteEdgeSecurityMaterial,
     listen: SocketAddr,
     log_path: &Path,
 ) -> Result<Child, RunnerError> {
@@ -353,6 +393,14 @@ fn spawn_remote_edge(
         .arg("Conformance Fixture")
         .arg("--server-version")
         .arg("0.1.0")
+        .arg("--signed-manifest")
+        .arg(&security.signed_manifest_path)
+        .arg("--manifest-public-key")
+        .arg(&security.manifest_public_key)
+        .arg("--cage-policy")
+        .arg(&security.cage_policy_path)
+        .arg("--cage-policy-signer")
+        .arg(&security.cage_policy_signer)
         .arg("--listen")
         .arg(listen.to_string());
 
@@ -393,8 +441,8 @@ fn spawn_remote_edge(
 
     command
         .arg("--")
-        .arg(&options.python_binary)
-        .arg(&options.upstream_server_script)
+        .arg(&security.python_executable)
+        .arg(&security.upstream_server_script)
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(log_clone))
         .spawn()
@@ -402,8 +450,8 @@ fn spawn_remote_edge(
             command: format!(
                 "{} -- {} {}",
                 command_description,
-                PathBuf::from(&options.python_binary).display(),
-                options.upstream_server_script.display()
+                security.python_executable.display(),
+                security.upstream_server_script.display()
             ),
             source,
         })
@@ -598,8 +646,19 @@ fn reserve_listen_addr() -> Result<SocketAddr, RunnerError> {
     Ok(addr)
 }
 
-fn wait_for_server(listen: SocketAddr) -> Result<(), RunnerError> {
+fn wait_for_server(
+    child: &mut Child,
+    listen: SocketAddr,
+    log_path: &Path,
+) -> Result<(), RunnerError> {
     for _ in 0..100 {
+        if let Some(status) = child.try_wait()? {
+            return Err(RunnerError::ProcessFailed {
+                command: "chio mcp serve-http".to_string(),
+                status: status.code().unwrap_or(1),
+                log_path: log_path.display().to_string(),
+            });
+        }
         if TcpStream::connect(listen).is_ok() {
             thread::sleep(Duration::from_millis(100));
             return Ok(());
@@ -632,9 +691,10 @@ pub fn unique_run_dir(prefix: &str) -> PathBuf {
 mod tests {
     use super::{
         apply_conformance_auth_env, conformance_fixture_root_from_manifest_dir,
-        default_run_options, ConformanceAuthMode,
+        default_run_options, run_conformance_harness, validate_conformance_credentials,
+        ConformanceAuthMode, RunnerError,
     };
-    use std::ffi::OsStr;
+    use std::ffi::{OsStr, OsString};
     use std::fs;
     use std::path::Path;
     use std::process::Command;
@@ -735,5 +795,134 @@ mod tests {
             command_env(&command, "CHIO_CONFORMANCE_ADMIN_TOKEN"),
             Some(Some("local-admin-token".to_string()))
         );
+    }
+
+    #[test]
+    fn static_bearer_child_env_supplies_distinct_admin_token() {
+        let mut options = default_run_options();
+        options.auth_mode = ConformanceAuthMode::StaticBearer;
+        options.auth_token = "local-auth-token".to_string();
+        options.admin_token = "local-admin-token".to_string();
+        let mut command = Command::new("chio");
+        command.env("CHIO_MCP_ADMIN_TOKEN", "parent-mcp-admin-token");
+
+        apply_conformance_auth_env(&mut command, &options, options.auth_mode);
+
+        assert_eq!(
+            command_env(&command, "CHIO_AUTH_TOKEN"),
+            Some(Some("local-auth-token".to_string()))
+        );
+        assert_eq!(command_env(&command, "CHIO_MCP_ADMIN_TOKEN"), Some(None));
+        assert_eq!(
+            command_env(&command, "CHIO_ADMIN_TOKEN"),
+            Some(Some("local-admin-token".to_string()))
+        );
+    }
+
+    #[test]
+    fn credential_preflight_rejects_missing_and_reused_tokens_before_effects() {
+        for (label, auth_token, admin_token, expected_reason) in [
+            (
+                "missing-auth",
+                "",
+                "local-admin-token",
+                "auth token must be non-empty, unpadded, and control-free",
+            ),
+            (
+                "missing-admin",
+                "local-auth-token",
+                "",
+                "admin token must be non-empty, unpadded, and control-free",
+            ),
+            (
+                "reused",
+                "reused-token",
+                "reused-token",
+                "admin token must differ from auth token",
+            ),
+            (
+                "padded-auth",
+                " local-auth-token",
+                "local-admin-token",
+                "auth token must be non-empty, unpadded, and control-free",
+            ),
+            (
+                "control-admin",
+                "local-auth-token",
+                "local-admin-token\n",
+                "admin token must be non-empty, unpadded, and control-free",
+            ),
+        ] {
+            let root = unique_test_dir(label);
+            let results_dir = root.join("results");
+            let sentinel = results_dir.join("preflight-sentinel");
+            if let Err(error) = fs::create_dir_all(&results_dir) {
+                panic!("failed to create {}: {error}", results_dir.display());
+            }
+            if let Err(error) = fs::write(&sentinel, "unchanged\n") {
+                panic!("failed to write {}: {error}", sentinel.display());
+            }
+
+            let mut options = default_run_options();
+            options.repo_root = root.clone();
+            options.results_dir = results_dir.clone();
+            options.report_output = root.join("report.md");
+            options.auth_token = auth_token.to_string();
+            options.admin_token = admin_token.to_string();
+            let cargo_probe = root.join("cargo-must-not-spawn");
+            let spawn_marker = root.join("cargo-must-not-spawn.spawned");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+
+                if let Err(error) =
+                    fs::write(&cargo_probe, "#!/bin/sh\n: > \"${0}.spawned\"\nexit 1\n")
+                {
+                    panic!("failed to write {}: {error}", cargo_probe.display());
+                }
+                if let Err(error) =
+                    fs::set_permissions(&cargo_probe, fs::Permissions::from_mode(0o700))
+                {
+                    panic!("failed to chmod {}: {error}", cargo_probe.display());
+                }
+            }
+            options.cargo_binary = OsString::from(&cargo_probe);
+
+            let error = match run_conformance_harness(&options) {
+                Ok(_) => panic!("invalid {label} credentials unexpectedly launched the harness"),
+                Err(error) => error,
+            };
+            match error {
+                RunnerError::InvalidCredentials { reason } => {
+                    assert_eq!(reason, expected_reason);
+                }
+                other => panic!("invalid {label} credentials returned {other:?}"),
+            }
+            let sentinel_body = match fs::read_to_string(&sentinel) {
+                Ok(body) => body,
+                Err(error) => panic!("failed to read {}: {error}", sentinel.display()),
+            };
+            assert_eq!(sentinel_body, "unchanged\n");
+            assert!(!options.report_output.exists());
+            assert!(!spawn_marker.exists());
+
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    fn credential_preflight_recovers_after_distinct_tokens_are_supplied() {
+        let mut options = default_run_options();
+        options.auth_token = "same-token".to_string();
+        options.admin_token = "same-token".to_string();
+        assert!(matches!(
+            validate_conformance_credentials(&options),
+            Err(RunnerError::InvalidCredentials {
+                reason: "admin token must differ from auth token"
+            })
+        ));
+
+        options.admin_token = "dedicated-admin-token".to_string();
+        assert!(validate_conformance_credentials(&options).is_ok());
     }
 }

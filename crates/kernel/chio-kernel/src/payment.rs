@@ -84,6 +84,10 @@ pub struct CommercePaymentContext {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PaymentAuthorizeRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_binding_hash: Option<String>,
     pub amount_units: u64,
     pub currency: String,
     pub payer: String,
@@ -93,6 +97,28 @@ pub struct PaymentAuthorizeRequest {
     pub governed: Option<GovernedPaymentContext>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub commerce: Option<CommercePaymentContext>,
+}
+
+/// Operation-bound capture details passed to an idempotent payment rail.
+#[derive(Debug, Clone, Copy)]
+pub struct OperationPaymentCaptureRequest<'a> {
+    pub operation_id: &'a str,
+    pub request_binding_hash: &'a str,
+    pub authorization_id: &'a str,
+    pub amount_units: u64,
+    pub currency: &'a str,
+    pub reference: &'a str,
+}
+
+/// Operation-bound refund details passed to an idempotent payment rail.
+#[derive(Debug, Clone, Copy)]
+pub struct OperationPaymentRefundRequest<'a> {
+    pub operation_id: &'a str,
+    pub request_binding_hash: &'a str,
+    pub transaction_id: &'a str,
+    pub amount_units: u64,
+    pub currency: &'a str,
+    pub reference: &'a str,
 }
 
 impl ReceiptSettlement {
@@ -178,6 +204,125 @@ pub trait PaymentAdapter: Send + Sync {
         currency: &str,
         reference: &str,
     ) -> Result<PaymentResult, PaymentError>;
+
+    /// Authorize an operation-owned payment.
+    ///
+    /// Implementations must treat `operation_id` as an idempotency and lookup
+    /// key. An exact retry must return the original authorization without
+    /// creating a second rail-side hold, while reuse with a different request
+    /// binding must fail closed. The default deliberately rejects because the
+    /// legacy `authorize` contract provides neither guarantee.
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        validate_payment_operation_binding(operation_id, request_binding_hash)?;
+        if request.operation_id.as_deref() != Some(operation_id)
+            || request.request_binding_hash.as_deref() != Some(request_binding_hash)
+        {
+            return Err(PaymentError::RailError(
+                "payment authorization request does not match its admission operation".to_string(),
+            ));
+        }
+        Err(PaymentError::OperationIdempotencyUnsupported("authorize"))
+    }
+
+    /// Query the authoritative authorization result for an operation.
+    ///
+    /// The lookup must be linearizable with `authorize_for_operation`: `None`
+    /// proves that no authorization exists for the exact operation and request
+    /// binding at the observed point, while `Some` returns the original result.
+    /// This is the recovery boundary after an authorization acknowledgement is
+    /// lost. The default rejects because a legacy adapter cannot prove absence.
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        validate_payment_operation_binding(operation_id, request_binding_hash)?;
+        Err(PaymentError::OperationIdempotencyUnsupported(
+            "authorization lookup",
+        ))
+    }
+
+    /// Capture an operation-owned payment authorization. Exact retries must
+    /// return the original result without a second rail-side capture.
+    fn capture_for_operation(
+        &self,
+        request: OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        let OperationPaymentCaptureRequest {
+            operation_id,
+            request_binding_hash,
+            authorization_id,
+            amount_units,
+            currency,
+            reference,
+        } = request;
+        validate_payment_operation_binding(operation_id, request_binding_hash)?;
+        let _ = (authorization_id, amount_units, currency, reference);
+        Err(PaymentError::OperationIdempotencyUnsupported("capture"))
+    }
+
+    /// Void an unused operation-owned payment authorization. Exact retries
+    /// must return the original result without a second rail-side release.
+    fn release_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        validate_payment_operation_binding(operation_id, request_binding_hash)?;
+        let _ = (authorization_id, reference);
+        Err(PaymentError::OperationIdempotencyUnsupported("release"))
+    }
+
+    /// Refund an operation-owned payment that was already settled. Exact
+    /// retries must return the original result without a second rail-side
+    /// refund.
+    fn refund_for_operation(
+        &self,
+        request: OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        let OperationPaymentRefundRequest {
+            operation_id,
+            request_binding_hash,
+            transaction_id,
+            amount_units,
+            currency,
+            reference,
+        } = request;
+        validate_payment_operation_binding(operation_id, request_binding_hash)?;
+        let _ = (transaction_id, amount_units, currency, reference);
+        Err(PaymentError::OperationIdempotencyUnsupported("refund"))
+    }
+}
+
+fn validate_payment_operation_binding(
+    operation_id: &str,
+    request_binding_hash: &str,
+) -> Result<(), PaymentError> {
+    if operation_id.is_empty()
+        || operation_id.len() > 512
+        || operation_id.bytes().any(|byte| byte == 0)
+    {
+        return Err(PaymentError::RailError(
+            "payment operation_id is empty, oversized, or contains NUL".to_string(),
+        ));
+    }
+    if request_binding_hash.len() != 64
+        || !request_binding_hash
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(PaymentError::RailError(
+            "payment request_binding_hash must be lowercase SHA-256 hex".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -190,6 +335,9 @@ pub enum PaymentError {
 
     #[error("payment rail unavailable: {0}")]
     Unavailable(String),
+
+    #[error("payment adapter does not support operation-owned idempotency for {0}")]
+    OperationIdempotencyUnsupported(&'static str),
 
     #[error("payment rail error: {0}")]
     RailError(String),
@@ -687,6 +835,8 @@ mod tests {
 
         let authorization = adapter
             .authorize(&PaymentAuthorizeRequest {
+                operation_id: None,
+                request_binding_hash: None,
                 amount_units: 125,
                 currency: "USD".to_string(),
                 payer: "agent-1".to_string(),
@@ -725,6 +875,8 @@ mod tests {
 
         let error = adapter
             .authorize(&PaymentAuthorizeRequest {
+                operation_id: None,
+                request_binding_hash: None,
                 amount_units: 125,
                 currency: "USD".to_string(),
                 payer: "agent-1".to_string(),
@@ -759,6 +911,8 @@ mod tests {
 
         let authorization = adapter
             .authorize(&PaymentAuthorizeRequest {
+                operation_id: None,
+                request_binding_hash: None,
                 amount_units: 4200,
                 currency: "USD".to_string(),
                 payer: "agent-2".to_string(),
@@ -810,6 +964,8 @@ mod tests {
 
         let authorization = adapter
             .authorize(&PaymentAuthorizeRequest {
+                operation_id: None,
+                request_binding_hash: None,
                 amount_units: 4200,
                 currency: "USD".to_string(),
                 payer: "agent-9".to_string(),

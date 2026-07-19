@@ -45,6 +45,164 @@ fn assert_sqlite_durability_pragmas(connection: &Connection) -> Result<(), Recei
     Ok(())
 }
 
+fn ensure_indexed_security_evidence_schema(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
+            evidence_id TEXT NOT NULL PRIMARY KEY,
+            receipt_id TEXT NOT NULL UNIQUE
+                REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT
+        );
+
+        CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_update
+        BEFORE UPDATE ON chio_security_evidence_index
+        BEGIN
+            SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_delete
+        BEFORE DELETE ON chio_security_evidence_index
+        BEGIN
+            SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+        END;
+        "#,
+    )?;
+    validate_indexed_security_evidence_schema(connection)
+}
+
+pub(in crate::receipt_store) fn validate_indexed_security_evidence_schema(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    let mut columns_statement =
+        connection.prepare("PRAGMA table_info(chio_security_evidence_index)")?;
+    let columns = columns_statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, i64>(5)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    let expected_columns = vec![
+        ("evidence_id".to_string(), "TEXT".to_string(), 1, 1),
+        ("receipt_id".to_string(), "TEXT".to_string(), 1, 0),
+    ];
+    if columns != expected_columns {
+        return Err(ReceiptStoreError::Conflict(
+            "security evidence index columns, types, nullability, or primary key are invalid"
+                .to_string(),
+        ));
+    }
+
+    let mut foreign_key_statement =
+        connection.prepare("PRAGMA foreign_key_list(chio_security_evidence_index)")?;
+    let foreign_keys = foreign_key_statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    if foreign_keys
+        != vec![(
+            "chio_tool_receipts".to_string(),
+            "receipt_id".to_string(),
+            "receipt_id".to_string(),
+            "NO ACTION".to_string(),
+            "RESTRICT".to_string(),
+        )]
+    {
+        return Err(ReceiptStoreError::Conflict(
+            "security evidence index receipt foreign key is invalid".to_string(),
+        ));
+    }
+
+    let mut index_statement =
+        connection.prepare("PRAGMA index_list(chio_security_evidence_index)")?;
+    let indexes = index_statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(4)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut receipt_id_is_unique = false;
+    for (index_name, is_unique, is_partial) in indexes {
+        if is_unique != 1 || is_partial != 0 {
+            continue;
+        }
+        let escaped_name = index_name.replace('"', "\"\"");
+        let mut indexed_columns_statement =
+            connection.prepare(&format!("PRAGMA index_info(\"{escaped_name}\")"))?;
+        let indexed_columns = indexed_columns_statement
+            .query_map([], |row| row.get::<_, String>(2))?
+            .collect::<Result<Vec<_>, _>>()?;
+        if indexed_columns.len() == 1 && indexed_columns[0] == "receipt_id" {
+            receipt_id_is_unique = true;
+        }
+    }
+    if !receipt_id_is_unique {
+        return Err(ReceiptStoreError::Conflict(
+            "security evidence index receipt_id must be uniquely constrained".to_string(),
+        ));
+    }
+
+    let expected_triggers = [
+        (
+            "chio_security_evidence_index_reject_delete",
+            "create trigger chio_security_evidence_index_reject_delete before delete on chio_security_evidence_index begin select raise(abort, 'security evidence index entries are immutable'); end",
+        ),
+        (
+            "chio_security_evidence_index_reject_update",
+            "create trigger chio_security_evidence_index_reject_update before update on chio_security_evidence_index begin select raise(abort, 'security evidence index entries are immutable'); end",
+        ),
+    ];
+    let mut trigger_statement = connection.prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'chio_security_evidence_index' ORDER BY name ASC",
+    )?;
+    let triggers = trigger_statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    if triggers.len() != expected_triggers.len()
+        || triggers.iter().zip(expected_triggers).any(
+            |((actual_name, actual_sql), (expected_name, expected_sql))| {
+                actual_name != expected_name
+                    || normalize_index_schema_sql(actual_sql) != expected_sql
+            },
+        )
+    {
+        return Err(ReceiptStoreError::Conflict(
+            "security evidence index immutability triggers are missing or invalid".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn normalize_index_schema_sql(sql: &str) -> String {
+    sql.split_ascii_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+        .replace(" if not exists", "")
+        .trim_end_matches(';')
+        .to_string()
+}
+
 impl SqliteReceiptStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
         Self::open_with_pool_config(path, crate::SqlitePoolConfig::default())
@@ -119,21 +277,22 @@ impl SqliteReceiptStore {
         create_if_missing: bool,
         repair_existing: bool,
     ) -> Result<Self, ReceiptStoreError> {
-        let path = path.as_ref();
-        let connection_flags = if create_if_missing {
-            None
+        let requested_path = path.as_ref();
+        let initial_connection_flags = if create_if_missing {
+            create_database_open_flags()
         } else {
-            Some(existing_database_open_flags())
+            existing_database_open_flags()
         };
 
-        if create_if_missing {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-        }
+        let database_identity_file = Arc::new(ReceiptDatabaseIdentityFile::open(
+            requested_path,
+            create_if_missing,
+        )?);
+        let database_identity = database_identity_file.identity();
+        let path = database_identity_file.path().to_path_buf();
 
-        let mut connection = match connection_flags {
-            Some(flags) => Connection::open_with_flags(path, flags).map_err(|error| {
+        let mut connection =
+            Connection::open_with_flags(&path, initial_connection_flags).map_err(|error| {
                 if error.sqlite_error_code() == Some(rusqlite::ErrorCode::CannotOpen) {
                     ReceiptStoreError::NotFound(format!(
                         "receipt database {} does not exist",
@@ -142,16 +301,18 @@ impl SqliteReceiptStore {
                 } else {
                     ReceiptStoreError::Sqlite(error)
                 }
-            })?,
-            None => Connection::open(path)?,
-        };
+            })?;
+        database_identity_file.validate_path_binding(&path)?;
         if !create_if_missing {
-            require_existing_receipt_schema(path, &connection)?;
+            require_existing_receipt_schema(&path, &connection)?;
             configure_sqlite_connection(&mut connection)?;
             if repair_existing {
+                ensure_indexed_security_evidence_schema(&mut connection)?;
                 crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
+                crate::capability_lineage::ensure_causal_lineage_schema(&mut connection)?;
                 super::support::ensure_transparency_projection_guards(&connection)?;
             } else {
+                validate_indexed_security_evidence_schema(&connection)?;
                 crate::aggregate_family_root::validate_existing_aggregate_family_root_schema(
                     &connection,
                 )?;
@@ -159,24 +320,28 @@ impl SqliteReceiptStore {
             drop(connection);
 
             let reader_pool = build_receipt_pool(
-                path,
+                &path,
                 options.pool.reader_pool_max_size,
                 "reader",
-                connection_flags,
+                database_identity,
             )?;
             let writer_pool = build_receipt_pool(
-                path,
+                &path,
                 options.pool.writer_pool_max_size,
                 "writer",
-                connection_flags,
+                database_identity,
             )?;
+            database_identity_file.validate_path_binding(&path)?;
 
             return Ok(Self {
                 receipt_commit_actor: ReceiptCommitActor::start(
                     writer_pool,
                     options.incremental_verification,
+                    Arc::clone(&database_identity_file),
                 ),
                 pool: reader_pool,
+                database_identity,
+                database_identity_file,
                 strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
             });
@@ -213,6 +378,24 @@ impl SqliteReceiptStore {
                 ON chio_tool_receipts(tool_server, tool_name);
             CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_decision
                 ON chio_tool_receipts(decision_kind);
+
+            CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
+                evidence_id TEXT NOT NULL PRIMARY KEY,
+                receipt_id TEXT NOT NULL UNIQUE
+                    REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_update
+            BEFORE UPDATE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_delete
+            BEFORE DELETE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
 
             CREATE TABLE IF NOT EXISTS chio_authorization_receipt_consumptions (
                 authorization_receipt_id TEXT PRIMARY KEY REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT,
@@ -1091,6 +1274,7 @@ impl SqliteReceiptStore {
         )?;
         connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
         crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
+        crate::capability_lineage::ensure_causal_lineage_schema(&mut connection)?;
         ensure_tool_receipt_attribution_columns(&connection)?;
         super::support::ensure_receipt_lineage_statement_columns(&connection)?;
         super::support::drop_transparency_projection_guards(&connection)?;
@@ -1116,24 +1300,28 @@ impl SqliteReceiptStore {
         drop(connection);
 
         let reader_pool = build_receipt_pool(
-            path,
+            &path,
             options.pool.reader_pool_max_size,
             "reader",
-            connection_flags,
+            database_identity,
         )?;
         let writer_pool = build_receipt_pool(
-            path,
+            &path,
             options.pool.writer_pool_max_size,
             "writer",
-            connection_flags,
+            database_identity,
         )?;
+        database_identity_file.validate_path_binding(&path)?;
 
         Ok(Self {
             receipt_commit_actor: ReceiptCommitActor::start(
                 writer_pool,
                 options.incremental_verification,
+                Arc::clone(&database_identity_file),
             ),
             pool: reader_pool,
+            database_identity,
+            database_identity_file,
             strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
         })
@@ -1158,23 +1346,29 @@ fn build_receipt_pool(
     path: &Path,
     max_size: u32,
     pool_name: &str,
-    flags: Option<rusqlite::OpenFlags>,
+    expected_database_identity: chio_core::Hash,
 ) -> Result<Pool<SqliteConnectionManager>, ReceiptStoreError> {
     if max_size == 0 {
         return Err(ReceiptStoreError::Pool(format!(
             "{pool_name} receipt sqlite pool max_size must be greater than zero"
         )));
     }
-    let mut manager = SqliteConnectionManager::file(path);
-    if let Some(flags) = flags {
-        manager = manager.with_flags(flags);
-    }
-    let manager = manager.with_init(|connection| {
-        configure_sqlite_connection(connection).map_err(|error| match error {
-            ReceiptStoreError::Sqlite(error) => error,
-            other => rusqlite::Error::InvalidParameterName(other.to_string()),
-        })
-    });
+    let validation_path = path.to_path_buf();
+    let manager = SqliteConnectionManager::file(path)
+        .with_flags(existing_database_open_flags())
+        .with_init(move |connection| {
+            let opened = ReceiptDatabaseIdentityFile::open(&validation_path, false)
+                .map_err(|error| rusqlite::Error::InvalidParameterName(error.to_string()))?;
+            if opened.identity() != expected_database_identity {
+                return Err(rusqlite::Error::InvalidParameterName(
+                    "receipt database identity changed while opening a pool connection".to_string(),
+                ));
+            }
+            configure_sqlite_connection(connection).map_err(|error| match error {
+                ReceiptStoreError::Sqlite(error) => error,
+                other => rusqlite::Error::InvalidParameterName(other.to_string()),
+            })
+        });
     Pool::builder()
         .max_size(max_size)
         .build(manager)
@@ -1183,6 +1377,10 @@ fn build_receipt_pool(
 
 fn existing_database_open_flags() -> rusqlite::OpenFlags {
     rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+}
+
+fn create_database_open_flags() -> rusqlite::OpenFlags {
+    existing_database_open_flags() | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
 }
 
 fn require_existing_receipt_schema(

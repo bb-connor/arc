@@ -96,7 +96,7 @@ impl ChioKernel {
         )
     }
 
-    fn verify_governed_approval_signature(
+    pub(crate) fn verify_governed_approval_signature(
         &self,
         approval_token: &GovernedApprovalToken,
     ) -> Result<(), String> {
@@ -106,8 +106,36 @@ impl ChioKernel {
         // path), so ECDSA approvals are validated through aws-lc-rs when the
         // `chio-core-types/fips` feature is enabled without any kernel-side
         // algorithm plumbing.
-        let kernel_pk = self.config.keypair.public_key();
-        let mut trusted = self.config.ca_public_keys.clone();
+        match approval_token.verify_signature() {
+            Ok(true) => {}
+            Ok(false) => return Err("signature did not verify".to_string()),
+            Err(error) => return Err(error.to_string()),
+        }
+        if self
+            .config
+            .ca_public_keys
+            .contains(&approval_token.approver)
+        {
+            return Ok(());
+        }
+        if self.authority_artifact_trust_resolver.is_some() {
+            let artifact =
+                canonical_json_bytes(&approval_token.body()).map_err(|error| error.to_string())?;
+            return match self.verify_trusted_authority_artifact_signature(
+                &artifact,
+                &approval_token.approver,
+                &approval_token.signature,
+            ) {
+                Ok(true) => Ok(()),
+                Ok(false) => {
+                    Err("approval signer is not trusted by the runtime resolver".to_string())
+                }
+                Err(error) => Err(error.to_string()),
+            };
+        }
+
+        let kernel_pk = self.public_key();
+        let mut trusted = Vec::new();
         for authority_pk in self.capability_authority.trusted_public_keys() {
             if !trusted.contains(&authority_pk) {
                 trusted.push(authority_pk);
@@ -119,11 +147,7 @@ impl ChioKernel {
 
         for pk in &trusted {
             if *pk == approval_token.approver {
-                return match approval_token.verify_signature() {
-                    Ok(true) => Ok(()),
-                    Ok(false) => Err("signature did not verify".to_string()),
-                    Err(error) => Err(error.to_string()),
-                };
+                return Ok(());
             }
         }
 
@@ -234,8 +258,8 @@ impl ChioKernel {
             })?;
 
         // Step 7: Cap approval token lifetime. Tokens with expires_at more
-        // than MAX_APPROVAL_TTL_SECS beyond issued_at are rejected to prevent
-        // long-lived tokens from outliving the replay store's eviction window.
+        // than MAX_APPROVAL_TTL_SECS beyond issued_at are rejected to keep
+        // durable approval reservation deadlines bounded.
         const MAX_APPROVAL_TTL_SECS: u64 = 3600; // 1 hour max
         let token_lifetime = approval_token
             .expires_at
@@ -244,33 +268,6 @@ impl ChioKernel {
             return Err(KernelError::GovernedTransactionDenied(format!(
                 "approval token lifetime ({token_lifetime}s) exceeds maximum ({MAX_APPROVAL_TTL_SECS}s)"
             )));
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn reserve_governed_approval_replay(
-        &self,
-        request_id: &str,
-        intent_hash: &str,
-    ) -> Result<(), KernelError> {
-        if let Some(ref replay_store) = self.approval_replay_store {
-            let is_fresh = replay_store
-                .check_and_insert(request_id, intent_hash)
-                .map_err(|_| {
-                    KernelError::GovernedTransactionDenied(
-                        "approval replay store unavailable; denying as fail-closed".to_string(),
-                    )
-                })?;
-            if !is_fresh {
-                return Err(KernelError::GovernedTransactionDenied(
-                    "approval token has already been consumed (replay detected)".to_string(),
-                ));
-            }
-        } else {
-            return Err(KernelError::GovernedTransactionDenied(
-                "approval replay store not configured; denying as fail-closed".to_string(),
-            ));
         }
 
         Ok(())
@@ -505,9 +502,9 @@ impl ChioKernel {
                 .delegation_chain
                 .last()
                 .is_some_and(|link| link.delegator == continuation_token.signer);
-            if !self.is_trusted_governed_continuation_signer(&continuation_token.signer)
-                && !signer_matches_capability_lineage
-            {
+            let signer_trusted = signer_matches_capability_lineage
+                || self.verify_trusted_governed_continuation_signer(&continuation_token)?;
+            if !signer_trusted {
                 return Err(KernelError::GovernedTransactionDenied(
                     "governed call_chain continuation token signer is not trusted".to_string(),
                 ));
@@ -603,6 +600,20 @@ impl ChioKernel {
                         if !signature_valid {
                             return Err(KernelError::GovernedTransactionDenied(
                                 "governed call_chain parent receipt failed signature verification"
+                                    .to_string(),
+                            ));
+                        }
+                        let trusted_at_artifact_time = match &parent_receipt {
+                            LocalReceiptArtifact::Tool(receipt) => {
+                                self.verify_trusted_receipt(receipt)?
+                            }
+                            LocalReceiptArtifact::Child(receipt) => {
+                                self.verify_trusted_child_receipt(receipt)?
+                            }
+                        };
+                        if !trusted_at_artifact_time {
+                            return Err(KernelError::GovernedTransactionDenied(
+                                "governed call_chain parent receipt is not trusted at artifact time"
                                     .to_string(),
                             ));
                         }
@@ -1166,7 +1177,7 @@ impl ChioKernel {
         };
         let verify_threshold = threshold_policy_required || threshold_artifacts_present;
 
-        let (approval_replay_key, verified_approval_set) = if verify_threshold {
+        let verified_governed_approval = if verify_threshold {
             let negotiated = self
                 .capability_negotiation_for_remote(
                     request.federated_origin_kernel_id.as_deref(),
@@ -1236,20 +1247,24 @@ impl ChioKernel {
                 resolver,
             )
             .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-            let approval_set_hash = verified.approval_set_hash().map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "verified approval set hash failed: {error}"
-                ))
-            })?;
-            (
-                Some((approval_set_hash, intent_hash.clone())),
-                Some(verified),
+            Some(
+                crate::threshold_approval::VerifiedGovernedApprovalAdmission::from_threshold(
+                    &verified,
+                )
+                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
             )
         } else if let Some(approval_token) = approval_tokens.first() {
             self.verify_governed_approval_token(request, cap, &intent_hash, approval_token, now)?;
-            (
-                Some((approval_token.request_id.clone(), intent_hash.clone())),
-                None,
+            let capability_hash = crate::threshold_approval::authorization_capability_hash(cap)
+                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+            Some(
+                crate::threshold_approval::VerifiedGovernedApprovalAdmission::from_legacy_token(
+                    approval_token,
+                    &capability_hash,
+                    &intent_hash,
+                    &self.config.policy_hash,
+                )
+                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
             )
         } else if approval_required {
             return Err(KernelError::GovernedTransactionDenied(format!(
@@ -1257,14 +1272,13 @@ impl ChioKernel {
                 intent.id
             )));
         } else {
-            (None, None)
+            None
         };
 
         Ok(Some(ValidatedGovernedAdmission {
             call_chain_proof: validated_upstream_call_chain_proof,
             verified_runtime_attestation,
-            approval_replay_key,
-            verified_approval_set,
+            verified_governed_approval,
         }))
     }
 

@@ -25,6 +25,50 @@ The public surface re-exports `CliError` and `JwtProviderProfile` from
 `chio-control-plane` and exposes the HTTP service entrypoint via
 `serve_http(RemoteServeHttpConfig)`.
 
+## Durable resume integrity
+
+`--session-db` requires `--resume-hmac-keyring`. The keyring is dedicated to
+active resume records, terminal tombstones, and terminal generation fences. It
+must not reuse an authority seed, control token, edge bearer, or admin bearer.
+The file must be a regular non-symlink file with no group or world permissions.
+It is opened without following links, must be owned by the effective user or
+root, and must have exactly one hard link. It is parsed as strict I-JSON with
+duplicate fields, unknown fields, trailing values, non-UTF-8 text, and
+out-of-range integers rejected. Object member order and insignificant JSON
+whitespace are not part of the contract. Decoded key material and the parsed
+file buffer are zeroized on drop.
+
+```json
+{
+  "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+  "current": {
+    "keyId": "edge-resume-2026-07",
+    "version": 2,
+    "keyBase64": "<unpadded-base64url-encoding-of-32-random-bytes>"
+  },
+  "previous": [
+    {
+      "keyId": "edge-resume-2026-06",
+      "version": 1,
+      "keyBase64": "<unpadded-base64url-encoding-of-32-random-bytes>",
+      "verifyUntilMillis": 1784246400000
+    }
+  ]
+}
+```
+
+The current version must be positive and greater than every previous version.
+At most four previous keys are accepted, and each verification deadline must
+be no more than seven days in the future when the process starts. After the
+deadline, records signed by that key fail closed. A typical launch includes:
+
+```bash
+chmod 600 /etc/chio/edge-resume-hmac-keyring.json
+chio --session-db /var/lib/chio/edge-sessions.sqlite3 \
+  --resume-hmac-keyring /etc/chio/edge-resume-hmac-keyring.json \
+  mcp serve-http ...
+```
+
 ## Position in the system
 
 ```
@@ -54,10 +98,11 @@ crates/protocol/chio-mcp-remote/
       session_core.rs   session lifecycle, kernel dispatch, receipt signing
       session_identity.rs
                         OIDC/JWKS discovery and federated identity helpers
-      session_resume.rs resumable-session fingerprint and integrity helpers
+      session_resume.rs resumable-session fingerprints, keyring, and HMACs
       session_shared_upstream.rs
                         shared hosted upstream notification ownership
       session_forms.rs  admin query structs and OAuth request forms
+      session_store.rs  atomic active, tombstone, and terminal-fence storage
       tests.rs          integration tests
 ```
 

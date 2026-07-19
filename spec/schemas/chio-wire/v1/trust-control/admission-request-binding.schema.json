@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-request-binding.schema.json",
+  "title": "Chio admission operation request-binding projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actionHash", "policyHash", "governedIntentHash", "thresholdProposalHash", "verifiedApprovalSetHash", "approvalTokenDigests", "budgetHoldReference", "supplementalAuthorizationReference", "supplementalAuthorizationDigest", "executionNonceReference"],
+  "properties": {
+    "actionHash": { "$ref": "#/$defs/digest" },
+    "policyHash": { "$ref": "#/$defs/digest" },
+    "governedIntentHash": { "$ref": "#/$defs/optionalDigest" },
+    "thresholdProposalHash": { "$ref": "#/$defs/optionalDigest" },
+    "verifiedApprovalSetHash": { "$ref": "#/$defs/optionalDigest" },
+    "approvalTokenDigests": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/digest" } },
+    "budgetHoldReference": { "$ref": "#/$defs/optionalIdentifier" },
+    "supplementalAuthorizationReference": { "$ref": "#/$defs/optionalIdentifier" },
+    "supplementalAuthorizationDigest": { "$ref": "#/$defs/optionalDigest" },
+    "executionNonceReference": { "$ref": "#/$defs/optionalIdentifier" }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "supplementalAuthorizationReference": { "type": "null" },
+        "supplementalAuthorizationDigest": { "type": "null" }
+      }
+    },
+    {
+      "properties": {
+        "supplementalAuthorizationReference": { "$ref": "#/$defs/identifier" },
+        "supplementalAuthorizationDigest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "optionalIdentifier": { "oneOf": [{ "$ref": "#/$defs/identifier" }, { "type": "null" }] },
+    "optionalDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] }
+  }
+}

@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/kernel/capability_list.schema.json",
   "title": "Chio KernelMessage capability_list",
   "type": "object",
   "additionalProperties": false,
@@ -333,6 +334,9 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000
+          },
+          "aggregate_invocation_budget": {
+            "$ref": "../capability/aggregate-invocation-budget.schema.json"
           },
           "signature": {
             "type": "string",

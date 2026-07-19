@@ -36,6 +36,9 @@ pin is therefore a runtime contract across every provider-adapter trust boundary
 - Preserve existing public exports and the pinned Responses API version
   `responses.2026-04-25`.
 - Preserve canonical JSON bytes for successful tool-call invocations.
+- Authority-backed batches bind each resolved security context to the exact
+  authenticated session before dispatch and pass that session into the kernel's
+  manifest-security entrypoint.
 - Preserve fail-closed behavior: upstream status errors must map to concrete
   `ProviderError` classes before any body is interpreted as a tool response.
 - Do not introduce live-network dependencies into tests.

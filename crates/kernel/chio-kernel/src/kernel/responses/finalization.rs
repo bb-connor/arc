@@ -7,14 +7,25 @@ pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) cap: &'a CapabilityToken,
 }
 
-struct PostInvocationHandling {
-    output: ToolServerOutput,
-    extra_metadata: Option<serde_json::Value>,
-    blocked_reason: Option<String>,
-    evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
+pub(crate) struct FinalizeToolOutputRequest<'a> {
+    pub(crate) request: &'a ToolCallRequest,
+    pub(crate) output: ToolServerOutput,
+    pub(crate) elapsed: Duration,
+    pub(crate) timestamp: u64,
+    pub(crate) matched_grant_index: usize,
+    pub(crate) security_context: Option<&'a SecurityInvocationContext>,
+    pub(crate) extra_metadata: Option<serde_json::Value>,
+}
+
+pub(crate) struct PostInvocationHandling {
+    pub(crate) output: ToolServerOutput,
+    pub(crate) extra_metadata: Option<serde_json::Value>,
+    pub(crate) blocked_reason: Option<String>,
+    pub(crate) evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
 }
 
 impl ChioKernel {
+    #[cfg(test)]
     pub(crate) fn finalize_tool_output_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -24,11 +35,36 @@ impl ChioKernel {
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.finalize_tool_output_with_metadata_and_security_context(FinalizeToolOutputRequest {
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            security_context: None,
+            extra_metadata,
+        })
+    }
+
+    pub(crate) fn finalize_tool_output_with_metadata_and_security_context(
+        &self,
+        request: FinalizeToolOutputRequest<'_>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let FinalizeToolOutputRequest {
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            security_context,
+            extra_metadata,
+        } = request;
         let output = self.apply_stream_limits(output, elapsed)?;
         let post_invocation = self.apply_post_invocation_pipeline(
             request,
             output,
             Some(matched_grant_index),
+            security_context,
             extra_metadata,
         )?;
         let _post_invocation_evidence_scope =
@@ -86,11 +122,12 @@ impl ChioKernel {
         }
     }
 
-    fn apply_post_invocation_pipeline(
+    pub(crate) fn apply_post_invocation_pipeline(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
         matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<PostInvocationHandling, KernelError> {
         if self.post_invocation_pipeline.is_empty() {
@@ -103,10 +140,12 @@ impl ChioKernel {
         }
 
         let response = self.output_to_post_invocation_value(&output);
-        let context = crate::post_invocation::PostInvocationContext::from_request(
-            request,
-            matched_grant_index,
-        );
+        let context =
+            crate::post_invocation::PostInvocationContext::from_request_with_security_context(
+                request,
+                matched_grant_index,
+                security_context,
+            );
         let outcome = self
             .post_invocation_pipeline
             .evaluate_with_context_and_evidence(&context, &response);

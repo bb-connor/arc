@@ -1,3 +1,4 @@
+// Adapted from Clawdstrike concepts; see docs/security/clawdstrike-active-defense-provenance.md.
 use crate::ports::{ArtifactId, BoundedVec, Digest32, RecordId, TenantId};
 use alloc::vec::Vec;
 use core::fmt;

@@ -3,7 +3,7 @@
 //! Noun-group parents (gen/check/qualify/verify/fuzz/mutants/release/
 //! supply-chain/tools) carry the leaf subcommands. The flat leaf spellings
 //! (validate-scenarios, freeze-vectors, codegen, errors, snippets,
-//! eval-receipt-regen) remain as top-level aliases; the dispatch in `main.rs`
+//! eval-receipt-regen, freeze-schemas) remain as top-level aliases; the dispatch in `main.rs`
 //! routes each leaf to its handler.
 
 use std::path::PathBuf;
@@ -88,6 +88,13 @@ pub enum Command {
         #[arg(long)]
         check: bool,
     },
+    /// (alias) Freeze the schema inventory manifest. `--check` gates drift.
+    #[command(name = "freeze-schemas")]
+    FreezeSchemas {
+        /// Compare against the on-disk manifest and exit non-zero on drift.
+        #[arg(long)]
+        check: bool,
+    },
     /// (alias) Regenerate the eval-report golden vector. `--check` gates drift.
     #[command(name = "eval-receipt-regen")]
     EvalReceiptRegen {
@@ -145,6 +152,11 @@ pub enum GenCommand {
     },
     /// Freeze the bindings vector manifest.
     FreezeVectors {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Freeze the schema inventory manifest.
+    FreezeSchemas {
         #[arg(long)]
         check: bool,
     },
@@ -270,6 +282,18 @@ mod tests {
         assert!(matches!(
             parse(&["xtask", "freeze-vectors"]),
             Command::FreezeVectors { check: false }
+        ));
+    }
+
+    #[test]
+    fn flat_alias_freeze_schemas_check_parses() {
+        assert!(matches!(
+            parse(&["xtask", "freeze-schemas", "--check"]),
+            Command::FreezeSchemas { check: true }
+        ));
+        assert!(matches!(
+            parse(&["xtask", "freeze-schemas"]),
+            Command::FreezeSchemas { check: false }
         ));
     }
 

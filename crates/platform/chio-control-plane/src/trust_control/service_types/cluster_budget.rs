@@ -73,6 +73,8 @@ pub(crate) struct ClusterStateSnapshotResponse {
     pub(crate) replication: ClusterReplicationHeadsView,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
+    /// Backward-compatible wire slot only. New cluster snapshots omit authority
+    /// metadata, and snapshot application rejects any populated value.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) authority: Option<AuthoritySnapshotView>,
     pub(crate) revocations: Vec<RevocationRecordView>,
@@ -80,6 +82,11 @@ pub(crate) struct ClusterStateSnapshotResponse {
     pub(crate) child_receipts: Vec<StoredReceiptView>,
     pub(crate) lineage: Vec<StoredLineageView>,
     pub(crate) budgets: Vec<BudgetUsageView>,
+    /// Additive wire field for the immutable legacy invocation maximum. It is
+    /// default-empty for decoding, but snapshot import rejects every legacy
+    /// invocation event whose corresponding authority is absent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) budget_invocation_quotas: Vec<BudgetInvocationQuotaUsageRecordView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_mutation_events: Vec<BudgetMutationEventView>,
     /// Abandoned/tombstoned budget event_seqs (rolled-back-then-re-appended
@@ -107,29 +114,6 @@ pub(crate) struct ClusterStateSnapshotResponse {
 pub(crate) struct AbandonedSeqRange {
     pub(crate) start: u64,
     pub(crate) end: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ClusterPartitionRequest {
-    #[serde(default)]
-    pub(crate) blocked_peer_urls: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ClusterPartitionResponse {
-    pub(crate) self_url: String,
-    pub(crate) blocked_peer_urls: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) leader_url: Option<String>,
-    pub(crate) role: String,
-    pub(crate) has_quorum: bool,
-    pub(crate) reachable_nodes: usize,
-    pub(crate) quorum_size: usize,
-    pub(crate) election_term: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,12 +208,26 @@ pub(crate) struct BudgetMutationAuthorityView {
     pub(crate) lease_epoch: u64,
 }
 
+/// Replicated immutable invocation authority for the legacy one-grant budget
+/// projection. Composite quota rows are carried by admission consensus instead.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct BudgetInvocationQuotaUsageRecordView {
+    pub(crate) usage: BudgetInvocationQuotaUsageView,
+    pub(crate) updated_at: i64,
+    pub(crate) seq: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BudgetMutationEventView {
     pub(crate) event_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) hold_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) operation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) request_binding_hash: Option<String>,
     pub(crate) capability_id: String,
     pub(crate) grant_index: u32,
     pub(crate) kind: String,
@@ -257,6 +255,9 @@ pub(crate) struct BudgetMutationEventView {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AuthoritySnapshotView {
+    /// Authority snapshots are status evidence only. They never carry signing
+    /// custody, extend verifier trust, or select a cluster signing epoch.
+    pub(crate) observational_only: bool,
     pub(crate) public_key_hex: String,
     pub(crate) generation: u64,
     pub(crate) rotated_at: u64,
@@ -336,6 +337,11 @@ pub(crate) struct BudgetDeltaQuery {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BudgetDeltaResponse {
     pub(crate) records: Vec<BudgetUsageView>,
+    /// Additive wire field for the immutable legacy invocation maximum. It is
+    /// default-empty for decoding, but delta import rejects every legacy
+    /// invocation event whose corresponding authority is absent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) invocation_quotas: Vec<BudgetInvocationQuotaUsageRecordView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) mutation_events: Vec<BudgetMutationEventView>,
     /// Abandoned/tombstoned event_seqs above the cursor, so the puller can treat
@@ -376,7 +382,7 @@ pub(crate) struct BudgetAuthorityMetadataView {
     pub(crate) budget_commit_index: Option<u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TryIncrementBudgetRequest {
     pub(crate) capability_id: String,
@@ -394,6 +400,8 @@ pub(crate) struct TryIncrementBudgetResponse {
     pub(crate) invocation_count: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) budget_commit: Option<BudgetWriteCommitView>,
 }
 
 #[derive(Debug)]
@@ -422,6 +430,8 @@ pub(crate) struct TryChargeCostResponse {
 
 #[derive(Debug)]
 pub(crate) struct ReverseChargeCostRequest {
+    pub(crate) operation_id: Option<String>,
+    pub(crate) request_binding_hash: Option<String>,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) cost_units: u64,
@@ -443,6 +453,8 @@ pub(crate) struct ReverseChargeCostResponse {
 
 #[derive(Debug)]
 pub(crate) struct ReduceChargeCostRequest {
+    pub(crate) operation_id: Option<String>,
+    pub(crate) request_binding_hash: Option<String>,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) cost_units: u64,
@@ -620,6 +632,10 @@ impl<'de> Deserialize<'de> for TryChargeCostResponse {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ReverseChargeCostRequestWire<'a> {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    operation_id: Option<&'a str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    request_binding_hash: Option<&'a str>,
     capability_id: &'a str,
     grant_index: usize,
     exposure_units: u64,
@@ -634,6 +650,10 @@ struct ReverseChargeCostRequestWire<'a> {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ReverseChargeCostRequestWireInput {
+    #[serde(default)]
+    operation_id: Option<String>,
+    #[serde(default)]
+    request_binding_hash: Option<String>,
     capability_id: String,
     grant_index: usize,
     #[serde(default)]
@@ -652,6 +672,8 @@ impl Serialize for ReverseChargeCostRequest {
         S: Serializer,
     {
         ReverseChargeCostRequestWire {
+            operation_id: self.operation_id.as_deref(),
+            request_binding_hash: self.request_binding_hash.as_deref(),
             capability_id: &self.capability_id,
             grant_index: self.grant_index,
             exposure_units: self.cost_units,
@@ -669,7 +691,14 @@ impl<'de> Deserialize<'de> for ReverseChargeCostRequest {
         D: Deserializer<'de>,
     {
         let wire = ReverseChargeCostRequestWireInput::deserialize(deserializer)?;
+        if wire.operation_id.is_some() != wire.request_binding_hash.is_some() {
+            return Err(serde::de::Error::custom(
+                "budget admission ownership requires both operationId and requestBindingHash",
+            ));
+        }
         Ok(Self {
+            operation_id: wire.operation_id,
+            request_binding_hash: wire.request_binding_hash,
             capability_id: wire.capability_id,
             grant_index: wire.grant_index,
             cost_units: super::responses::require_budget_amount(
@@ -756,6 +785,10 @@ impl<'de> Deserialize<'de> for ReverseChargeCostResponse {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ReduceChargeCostRequestWire<'a> {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    operation_id: Option<&'a str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    request_binding_hash: Option<&'a str>,
     capability_id: &'a str,
     grant_index: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -774,6 +807,10 @@ struct ReduceChargeCostRequestWire<'a> {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ReduceChargeCostRequestWireInput {
+    #[serde(default)]
+    operation_id: Option<String>,
+    #[serde(default)]
+    request_binding_hash: Option<String>,
     capability_id: String,
     grant_index: usize,
     #[serde(default)]
@@ -802,6 +839,8 @@ impl Serialize for ReduceChargeCostRequest {
         S: Serializer,
     {
         ReduceChargeCostRequestWire {
+            operation_id: self.operation_id.as_deref(),
+            request_binding_hash: self.request_binding_hash.as_deref(),
             capability_id: &self.capability_id,
             grant_index: self.grant_index,
             authorized_exposure_units: self.exposure_units,
@@ -821,6 +860,11 @@ impl<'de> Deserialize<'de> for ReduceChargeCostRequest {
         D: Deserializer<'de>,
     {
         let wire = ReduceChargeCostRequestWireInput::deserialize(deserializer)?;
+        if wire.operation_id.is_some() != wire.request_binding_hash.is_some() {
+            return Err(serde::de::Error::custom(
+                "budget admission ownership requires both operationId and requestBindingHash",
+            ));
+        }
         let exposure_units = wire.authorized_exposure_units;
         let cost_units = match wire.reduction_units {
             Some(cost_units) => cost_units,
@@ -843,6 +887,8 @@ impl<'de> Deserialize<'de> for ReduceChargeCostRequest {
             }
         };
         Ok(Self {
+            operation_id: wire.operation_id,
+            request_binding_hash: wire.request_binding_hash,
             capability_id: wire.capability_id,
             grant_index: wire.grant_index,
             cost_units,
@@ -1029,5 +1075,43 @@ mod cluster_lease_rpc_tests {
     fn lease_terminate_request_rejects_unknown_field() {
         let json = r#"{"leaseId":"l","leaseEpoch":0,"leaderUrl":"https://n/1","reason":"quorum_lost","observedAt":1,"rogue":1}"#;
         assert!(serde_json::from_str::<LeaseTerminateRequest>(json).is_err());
+    }
+}
+
+#[cfg(test)]
+mod budget_admission_operation_wire_tests {
+    use chio_test_support::prelude::*;
+
+    use super::{ReduceChargeCostRequest, ReverseChargeCostRequest};
+
+    #[test]
+    fn terminal_budget_requests_round_trip_admission_operation_ownership() {
+        let reverse = ReverseChargeCostRequest {
+            operation_id: Some("operation-1".to_string()),
+            request_binding_hash: Some("44".repeat(32)),
+            capability_id: "cap-1".to_string(),
+            grant_index: 0,
+            cost_units: 5,
+            hold_id: Some("hold-1".to_string()),
+            event_id: Some("event-1".to_string()),
+            budget_authority: None,
+        };
+        let encoded = serde_json::to_value(&reverse).test_unwrap();
+        assert_eq!(encoded["operationId"], "operation-1");
+        assert_eq!(encoded["requestBindingHash"], "44".repeat(32));
+        let decoded: ReverseChargeCostRequest = serde_json::from_value(encoded).test_unwrap();
+        assert_eq!(decoded.operation_id, reverse.operation_id);
+        assert_eq!(decoded.request_binding_hash, reverse.request_binding_hash);
+    }
+
+    #[test]
+    fn terminal_budget_requests_reject_partial_admission_operation_ownership() {
+        let partial = serde_json::json!({
+            "operationId": "operation-1",
+            "capabilityId": "cap-1",
+            "grantIndex": 0,
+            "reductionUnits": 5
+        });
+        assert!(serde_json::from_value::<ReduceChargeCostRequest>(partial).is_err());
     }
 }

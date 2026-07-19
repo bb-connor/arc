@@ -19,3 +19,6 @@ clap = { version = "4", features = ["derive"] }
 chio-spec-validate = { workspace = true }
 chio-spec-codegen = { workspace = true }
 chio-eval-receipt = { workspace = true }
+
+[dev-dependencies]
+chio-test-support = { workspace = true }

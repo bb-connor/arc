@@ -6,25 +6,46 @@ This project was scaffolded by `chio init`.
 
 - `policy.yaml`: a minimal Chio policy that grants one governed tool call
 - `src/bin/hello_server.rs`: a tiny MCP tool server stub
-- `src/bin/demo.rs`: a smoke runner that launches `chio mcp serve`, calls the
-  governed tool, and prints the resulting receipt line
+- `src/bin/demo.rs`: a smoke runner that launches `chio mcp serve` against an
+  exact prebuilt server and operator-supplied signed launch material
 
 ## Run It
 
-1. Build the scaffold:
+1. Build the scaffold and the exact MCP server artifact:
 
    ```bash
-   cargo build
+   cargo build --bin hello_server --bin demo
    ```
 
-2. Point the demo at a `chio` binary if it is not already on your `PATH`:
+2. Provision a publisher-signed manifest and signed native-launch policy for
+   the absolute `hello_server` path. The policy must bind its durable cage
+   migration ledger and the exact zero-argument server command. The signed
+   manifest identity must be `server_id=hello`, `name=hello`, and
+   `version=0.1.0`, matching the demo command. Export those independently
+   reviewed inputs:
+
+   ```bash
+   export CHIO_DEMO_SERVER="$(pwd)/target/debug/hello_server"
+   export CHIO_SIGNED_MANIFEST=/absolute/path/to/signed-manifest.json
+   export CHIO_MANIFEST_PUBLIC_KEY=<publisher-public-key>
+   export CHIO_CAGE_POLICY=/absolute/path/to/cage-launch-policy.json
+   export CHIO_CAGE_POLICY_SIGNER=<operator-public-key>
+   ```
+
+3. Point the demo at a `chio` binary if it is not already on your `PATH`, then
+   run it:
 
    ```bash
    CHIO_BIN=/path/to/chio cargo run --quiet --bin demo
    ```
 
-3. The demo writes the local receipt store under `.chio/receipts.db` and prints
+4. The demo writes the local receipt store under `.chio/receipts.db` and prints
    the latest receipt after the governed tool call succeeds.
+
+An authenticated migration policy at stage `Disabled` authorizes the portable
+legacy launch while the deployment is being migrated. It is not Linux cage
+enforcement evidence. Stages `Enforced` and `LegacyRemoved` never fall back to
+an unconfined launch.
 
 ## Prove The Loop
 

@@ -63,7 +63,9 @@ pub use self::policy::{
 };
 pub use self::sign::{
     sign_chio_bilateral_dsse_envelope, sign_chio_bilateral_dsse_envelope_with_cosigner,
-    sign_dsse_envelope, sign_dsse_envelope_full, sign_dsse_envelope_with_cosigner,
+    sign_chio_bilateral_dsse_envelope_with_cosigner_backend, sign_dsse_envelope,
+    sign_dsse_envelope_full, sign_dsse_envelope_with_cosigner, BilateralDsseBackendCosigningInput,
+    BilateralDsseCosigningInput, BilateralDsseInvocationInput, BilateralDsseLocalSigningInput,
 };
 pub use self::types::{
     BilateralPredicate, CapabilityLeaseRef, DsseEnvelope, DsseSignature, DsseStatement,

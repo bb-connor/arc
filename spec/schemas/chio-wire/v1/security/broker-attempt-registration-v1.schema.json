@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-attempt-registration-v1.schema.json",
+  "title": "Chio broker attempt registration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ids",
+    "invocationId",
+    "parentCapabilityId",
+    "brokerCapabilityId",
+    "requestDigest",
+    "requestCanonicalDigest",
+    "proofDigest",
+    "proofKeyId",
+    "proofNonce",
+    "nonceExpiresAtUnixSeconds",
+    "quotas",
+    "authorityMetadataDigest",
+    "revocationAuthorityDomain"
+  ],
+  "properties": {
+    "ids": { "$ref": "#/$defs/attemptIds" },
+    "invocationId": { "$ref": "#/$defs/identifier" },
+    "parentCapabilityId": { "$ref": "#/$defs/identifier" },
+    "brokerCapabilityId": { "$ref": "#/$defs/identifier" },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "requestCanonicalDigest": { "$ref": "#/$defs/digest" },
+    "proofDigest": { "$ref": "#/$defs/digest" },
+    "proofKeyId": { "$ref": "#/$defs/identifier" },
+    "proofNonce": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "nonceExpiresAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "quotas": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/quota" }
+    },
+    "authorityMetadataDigest": { "$ref": "#/$defs/digest" },
+    "revocationAuthorityDomain": { "$ref": "#/$defs/identifier" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "attemptIds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "attemptId",
+        "holdId",
+        "authorizeEventId",
+        "reverseEventId",
+        "captureEventId"
+      ],
+      "properties": {
+        "operationId": { "$ref": "#/$defs/identifier" },
+        "attemptId": { "$ref": "#/$defs/identifier" },
+        "holdId": { "$ref": "#/$defs/identifier" },
+        "authorizeEventId": { "$ref": "#/$defs/identifier" },
+        "reverseEventId": { "$ref": "#/$defs/identifier" },
+        "captureEventId": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "maximumExecutions"],
+      "properties": {
+        "keyId": { "$ref": "#/$defs/identifier" },
+        "maximumExecutions": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    }
+  }
+}

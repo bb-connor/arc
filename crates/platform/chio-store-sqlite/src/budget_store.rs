@@ -1,20 +1,21 @@
 use std::fs;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::{
-    AuthorizedBudgetHold, BudgetAuthorityProfile, BudgetAuthorizeHoldDecision,
-    BudgetCaptureHoldDecision, BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest,
-    BudgetCommitMetadata, BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
-    BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetInvocationReservationState,
-    BudgetMeteringProfile, BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord,
-    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    AuthorizedBudgetHold, BudgetAdmissionOperationBinding, BudgetAuthorityProfile,
+    BudgetAuthorizeHoldDecision, BudgetCaptureHoldDecision, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetCommitMetadata, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationQuota,
+    BudgetInvocationQuotaUsage, BudgetInvocationReservationState, BudgetMeteringProfile,
+    BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey,
+    BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
     BudgetReverseHoldRequest, DeniedBudgetHold, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{
-    BudgetStore, BudgetStoreError, BudgetUsageRecord,
+    BudgetStore, BudgetStoreError, BudgetStoreProfile, BudgetUsageRecord,
     MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION,
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
@@ -39,6 +40,36 @@ use schema::*;
 
 pub struct SqliteBudgetStore {
     connection: Mutex<Connection>,
+    authority_profile: BudgetStoreProfile,
+}
+
+/// Replicated projection of one legacy grant's structured invocation authority.
+///
+/// Compatibility mutations still maintain [`BudgetUsageRecord`] for existing
+/// readers, but this record is the authoritative source for the immutable
+/// invocation maximum. It is deliberately limited to the one-grant legacy path:
+/// composite reserved state is replicated by admission consensus together with
+/// its authorization, hold, revocation, and evidence records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetInvocationQuotaUsageRecord {
+    pub usage: BudgetInvocationQuotaUsage,
+    pub updated_at: i64,
+    pub seq: u64,
+}
+
+impl BudgetInvocationQuotaUsageRecord {
+    pub fn validate_compatibility_projection(&self) -> Result<(), BudgetStoreError> {
+        self.usage.validate()?;
+        if self.usage.quota.key().profile() != BudgetQuotaProfile::GrantInvocation
+            || self.usage.quota.key().grant_index().is_none()
+            || self.usage.reserved_invocations_after != 0
+        {
+            return Err(BudgetStoreError::Invariant(
+                "replicated compatibility quota must be a captured-only grant quota".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Trusted backend input for a kernel-verified composite budget admission.
@@ -48,6 +79,8 @@ pub struct SqliteBudgetStore {
 /// mutating counters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SqliteCompositeAuthorizeInput {
+    pub operation_id: String,
+    pub request_binding_hash: String,
     pub capability_id: String,
     pub grant_index: usize,
     pub requested_exposure_units: u64,
@@ -61,6 +94,23 @@ pub struct SqliteCompositeAuthorizeInput {
     pub authorization_artifact_digests: Vec<String>,
 }
 
+/// Authenticated aggregate-family identity bound to a composite authorization.
+///
+/// This value is accepted only alongside an aggregate-family quota. Both fields
+/// are persisted with the authorization and must match on every exact replay.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SqliteAggregateFamilyEvidence {
+    pub root_capability_id: String,
+    pub root_binding_digest: String,
+}
+
+/// Immutable input reconstructed from a persisted composite authorization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SqliteStoredCompositeAuthorizeInput {
+    pub authorization: SqliteCompositeAuthorizeInput,
+    pub aggregate_family_evidence: Option<SqliteAggregateFamilyEvidence>,
+}
+
 /// Result of one durable SQLite authorization attempt.
 ///
 /// `event_created` is decided inside the same `BEGIN IMMEDIATE` transaction as
@@ -71,6 +121,18 @@ pub struct SqliteBudgetAuthorizationOutcome {
     pub allowed: bool,
     pub event_created: bool,
     pub authority: Option<BudgetEventAuthority>,
+}
+
+/// Frozen result of one invocation increment in the admission transaction.
+///
+/// Consensus callers persist the operation ID as the mutation event ID. An
+/// exact replay therefore returns this original result without consuming a
+/// second invocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SqliteBudgetIncrementOutcome {
+    pub allowed: bool,
+    pub invocation_count: u32,
+    pub event_seq: u64,
 }
 
 /// Authority source for an authorization request before its write transaction.

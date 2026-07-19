@@ -185,9 +185,14 @@ impl DelegationReceipt {
             });
         }
         for link in &chain {
-            if let Some(evidence) = link.aggregate_family_preservation.as_ref() {
-                evidence.validate_against_verified_root(verified_root)?;
-            }
+            let evidence = link.aggregate_family_preservation.as_ref().ok_or_else(|| {
+                Error::AttenuationViolation {
+                    reason:
+                        "delegation receipt link is missing aggregate family preservation evidence"
+                            .into(),
+                }
+            })?;
+            evidence.validate_against_verified_root(verified_root)?;
         }
         let evidence =
             self.aggregate_family_preservation()

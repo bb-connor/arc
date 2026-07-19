@@ -15,8 +15,13 @@ prepare_scenario_dir() {
 start_live_topology() {
   local bundle_dir="$1"
   CHIO_BIN="$(ensure_chio_bin)"
-  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
   CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
+  CHIO_ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
+  if [[ "${CHIO_ADMIN_TOKEN}" == "${CHIO_AUTH_TOKEN}" || "${CHIO_ADMIN_TOKEN}" == "${SERVICE_TOKEN}" || "${CHIO_AUTH_TOKEN}" == "${SERVICE_TOKEN}" ]]; then
+    echo "edge, admin, and control credentials must be pairwise distinct" >&2
+    return 64
+  fi
   LOG_DIR="${bundle_dir}/logs"
   STATE_DIR="${bundle_dir}/state"
   mkdir -p "${LOG_DIR}" "${STATE_DIR}"
@@ -76,7 +81,8 @@ start_live_topology() {
     "${CHIO_BIN}" mcp serve-http \
       --policy "${EXAMPLE_ROOT}/policies/${policy}.yaml" \
       --server-id "${sid}" --listen "127.0.0.1:${port}" \
-      --auth-token "${CHIO_AUTH_TOKEN}" --shared-hosted-owner \
+      --auth-token "${CHIO_AUTH_TOKEN}" --admin-token "${CHIO_ADMIN_TOKEN}" \
+      --shared-hosted-owner \
       -- python "${EXAMPLE_ROOT}/${script}" \
       >"${LOG_DIR}/chio-${sid}.log" 2>&1 &
   done

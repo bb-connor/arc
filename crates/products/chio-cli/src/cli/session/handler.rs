@@ -13,6 +13,8 @@ pub(crate) fn handle_agent_message(
     }
 
     let (context, operation) = normalize_agent_message(msg, session_id, session_agent_id);
+    let receipt_observation = matches!(&operation, SessionOperation::ToolCall(_))
+        .then(|| kernel.begin_transport_receipt_observation(context.request_id.as_str()));
     match kernel.evaluate_session_operation(&context, &operation) {
         Ok(SessionOperationResponse::ToolCall(response)) => {
             match response.verdict {
@@ -55,24 +57,16 @@ pub(crate) fn handle_agent_message(
                     "kernel session evaluation error"
                 );
 
-                let request = KernelToolCallRequest {
-                    request_id: context.request_id.to_string(),
-                    capability: tool_call.capability,
-                    tool_name: tool_call.tool_name,
-                    server_id: tool_call.server_id,
-                    agent_id: session_agent_id.to_string(),
-                    arguments: tool_call.arguments,
-                    dpop_proof: None,
-                    execution_nonce: None,
-                    governed_intent: None,
-                    approval_token: None,
-                    approval_tokens: Vec::new(),
-                    threshold_approval_proposal: None,
-                    model_metadata: None,
-                    federated_origin_kernel_id: None,
+                let request = kernel_request_for_failed_tool_call(&context, *tool_call);
+                let Some(receipt_observation) = receipt_observation.as_ref() else {
+                    error!(
+                        request_id = %context.request_id,
+                        "missing receipt observation for failed tool call; dropping response"
+                    );
+                    return vec![];
                 };
 
-                match make_error_receipt(kernel, &request) {
+                match record_internal_error_receipt(kernel, &request, receipt_observation) {
                     Ok(receipt) => vec![KernelMessage::ToolCallResponse {
                         id: context.request_id.to_string(),
                         result: ToolCallResult::Err {
@@ -80,11 +74,11 @@ pub(crate) fn handle_agent_message(
                         },
                         receipt: Box::new(receipt),
                     }],
-                    Err(sign_err) => {
+                    Err(record_err) => {
                         error!(
-                            error = %sign_err,
+                            error = %record_err,
                             request_id = %context.request_id,
-                            "failed to sign error receipt; dropping tool call response"
+                            "failed to record error receipt; dropping tool call response"
                         );
                         vec![]
                     }
@@ -120,6 +114,30 @@ pub(crate) fn handle_agent_message(
     }
 }
 
+pub(crate) fn kernel_request_for_failed_tool_call(
+    context: &OperationContext,
+    tool_call: ToolCallOperation,
+) -> KernelToolCallRequest {
+    KernelToolCallRequest {
+        request_id: context.request_id.to_string(),
+        capability: tool_call.capability,
+        tool_name: tool_call.tool_name,
+        server_id: tool_call.server_id,
+        agent_id: context.agent_id.clone(),
+        arguments: tool_call.arguments,
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: tool_call.governed_intent,
+        approval_token: tool_call.approval_token,
+        approval_tokens: tool_call.approval_tokens,
+        threshold_approval_proposal: tool_call.threshold_approval_proposal,
+        model_metadata: tool_call.model_metadata,
+        supplemental_authorization: tool_call.supplemental_authorization,
+        federated_origin_kernel_id: None,
+        declassification_grant: tool_call.declassification_grant,
+    }
+}
+
 pub(crate) fn normalize_agent_message(
     msg: &AgentMessage,
     session_id: &SessionId,
@@ -132,6 +150,12 @@ pub(crate) fn normalize_agent_message(
             server_id,
             tool,
             params,
+            supplemental_authorization,
+            governed_intent,
+            approval_token,
+            approval_tokens,
+            threshold_approval_proposal,
+            declassification_grant,
         } => (
             OperationContext::new(
                 session_id.clone(),
@@ -142,11 +166,16 @@ pub(crate) fn normalize_agent_message(
                 capability: *capability_token.clone(),
                 server_id: server_id.clone(),
                 tool_name: tool.clone(),
-                arguments: params.clone(),
-                governed_intent: None,
+                arguments: params.as_ref().clone(),
+                supplemental_authorization: supplemental_authorization.as_deref().cloned(),
+                governed_intent: governed_intent.as_deref().cloned(),
+                approval_token: approval_token.as_deref().cloned(),
+                approval_tokens: approval_tokens.clone(),
+                threshold_approval_proposal: threshold_approval_proposal.as_deref().cloned(),
                 execution_nonce: None,
                 model_metadata: None,
                 extra_metadata: None,
+                declassification_grant: declassification_grant.as_deref().cloned(),
             })),
         ),
         AgentMessage::ListCapabilities => (

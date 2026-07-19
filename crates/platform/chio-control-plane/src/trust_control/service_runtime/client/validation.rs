@@ -18,6 +18,20 @@ pub(super) fn normalize_control_endpoint(endpoint: &str) -> Result<String, CliEr
             )));
         }
     }
+    if parsed.scheme() == "http"
+        && !matches!(
+            parsed.host(),
+            Some(Host::Ipv4(address)) if address.is_loopback()
+        )
+        && !matches!(
+            parsed.host(),
+            Some(Host::Ipv6(address)) if address.is_loopback()
+        )
+    {
+        return Err(CliError::cli_other_error(format!(
+            "control URL `{endpoint}` requires HTTPS unless its host is a numeric loopback address"
+        )));
+    }
     if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err(CliError::cli_other_error(format!(
             "control URL `{endpoint}` must not contain username or password material"

@@ -7,7 +7,10 @@ pub(crate) const CSP_VALUE: &str = "default-src 'self'; script-src 'self'; \
     style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:";
 
 pub(crate) const HEALTH_PATH: &str = "/health";
+pub(crate) const ACTIVE_DEFENSE_HEALTH_PATH: &str = "/v1/active-defense/health";
+pub(crate) const ACTIVE_DEFENSE_EVENTS_PATH: &str = "/v1/active-defense/events";
 pub(crate) const AUTHORITY_PATH: &str = "/v1/authority";
+pub(crate) const AUTHORITY_KEY_LOG_SYNC_PATH: &str = "/v1/authority/key-log/sync";
 pub(crate) const ISSUE_CAPABILITY_PATH: &str = "/v1/capabilities/issue";
 pub(crate) const FEDERATED_ISSUE_PATH: &str = "/v1/federation/capabilities/issue";
 pub(crate) const FEDERATION_PROVIDERS_PATH: &str = "/v1/federation/providers";
@@ -99,16 +102,18 @@ pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-e
 pub(crate) const BUDGET_AUTHORIZE_HOLD_PATH: &str = "/v1/budgets/authorize-hold";
 #[allow(dead_code)]
 pub(crate) const BUDGET_CAPTURE_INVOCATIONS_PATH: &str = "/v1/budgets/capture-invocations";
+pub(crate) const BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH: &str =
+    "/v1/budgets/capture-invocations/query";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
 pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
 pub(crate) const BUDGET_CAPTURE_EXPOSURE_PATH: &str = "/v1/budgets/capture-exposure";
 #[allow(dead_code)]
 pub(crate) const ADMISSION_CAPTURE_PATH: &str = "/v1/admissions/capture";
+pub(crate) const ADMISSION_CAPTURE_QUERY_PATH: &str = "/v1/admissions/capture/query";
 pub(crate) const AGGREGATE_FAMILY_ROOT_LOOKUP_PATH: &str =
     "/v1/aggregate-family-roots/{root_capability_id}";
 pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
 pub(crate) const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
-pub(crate) const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
 pub(crate) const INTERNAL_ADMISSION_REQUEST_VOTE_PATH: &str =
     "/v1/internal/admission-consensus/request-vote";
 pub(crate) const INTERNAL_ADMISSION_APPEND_ENTRIES_PATH: &str =
@@ -117,6 +122,10 @@ pub(crate) const INTERNAL_ADMISSION_PROPOSAL_PATH: &str =
     "/v1/internal/admission-consensus/proposal";
 pub(crate) const INTERNAL_ADMISSION_SNAPSHOT_PATH: &str =
     "/v1/internal/admission-consensus/snapshot";
+pub(crate) const INTERNAL_ADMISSION_CAPTURE_QUERY_PATH: &str =
+    "/v1/internal/admission-consensus/capture-query";
+pub(crate) const INTERNAL_INVOCATION_CAPTURE_QUERY_PATH: &str =
+    "/v1/internal/admission-consensus/invocation-capture-query";
 pub(crate) const INTERNAL_AUTHORITY_SNAPSHOT_PATH: &str = "/v1/internal/authority/snapshot";
 pub(crate) const INTERNAL_REVOCATIONS_DELTA_PATH: &str = "/v1/internal/revocations/delta";
 pub(crate) const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/delta";
@@ -128,7 +137,9 @@ pub(crate) const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-chio-cluster-auth-issu
 pub(crate) const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
 pub(crate) const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
 pub(crate) const CLUSTER_AUTH_BODY_DIGEST_HEADER: &str = "x-chio-cluster-body-digest";
-pub(crate) const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
+pub(crate) const CLUSTER_AUTH_METHOD_HEADER: &str = "x-chio-cluster-auth-method";
+pub(crate) const CLUSTER_AUTH_NONCE_HEADER: &str = "x-chio-cluster-auth-nonce";
+pub(crate) const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.membership-request.v2";
 pub(crate) const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
 pub(crate) const CLUSTER_AUTH_FAILURE_WINDOW_SECS: u64 = 60;
 pub(crate) const CLUSTER_AUTH_FAILURE_BURST: usize = 8;
@@ -217,6 +228,7 @@ pub(crate) const LINEAGE_RECORD_PATH: &str = "/v1/lineage";
 pub(crate) const LINEAGE_PATH: &str = "/v1/lineage/{capability_id}";
 pub(crate) const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/{capability_id}/chain";
 pub(crate) const AGENT_RECEIPTS_PATH: &str = "/v1/agents/{subject_key}/receipts";
+pub(crate) const DASHBOARD_SESSION_PATH: &str = "/v1/dashboard/session";
 pub(crate) const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
 pub(crate) const DEFAULT_LIST_LIMIT: usize = 50;
 pub(crate) const MAX_LIST_LIMIT: usize = 200;

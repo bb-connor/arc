@@ -172,6 +172,46 @@ async fn handle_admin_rotate_authority(
         };
     }
 
+    if let Some(runtime) = state.factory.keyring_runtime.as_ref() {
+        let Some(active_seed_path) = state.factory.config.authority_seed_path.as_deref() else {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "keyring authority requires a persistent authority seed",
+            );
+        };
+        let Some(receipt_db_path) = state.factory.config.receipt_db_path.as_deref() else {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "keyring authority rotation requires a durable normal receipt database",
+            );
+        };
+        let receipt_store: Arc<dyn chio_kernel::ReceiptStore> =
+            match chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path) {
+                Ok(store) => Arc::new(store),
+                Err(error) => {
+                    return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                }
+            };
+        if let Err(error) = runtime.attach_receipt_store(receipt_store) {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+        return match runtime.rotate_remote_authority_seed(active_seed_path) {
+            Ok((public_key, outcome)) => Json(json!({
+                "configured": true,
+                "backend": "witnessed_keyring",
+                "rotated": true,
+                "publicKey": public_key.to_hex(),
+                "signingEpoch": outcome.signing_epoch,
+                "checkpointHash": outcome.checkpoint_hash.to_string(),
+                "auditPin": outcome.audit_pin,
+                "appliesToFutureSessionsOnly": false,
+                "trustedPublicKeys": vec![public_key.to_hex()],
+            }))
+            .into_response(),
+            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        };
+    }
+
     if let Some(path) = state.factory.config.authority_db_path.as_deref() {
         return match chio_store_sqlite::SqliteCapabilityAuthority::open(path)
             .and_then(|authority| authority.rotate())
@@ -823,6 +863,24 @@ fn load_authority_status(state: &RemoteAppState) -> Result<Value, Response> {
             "rotatedAt": status.rotated_at,
             "appliesToFutureSessionsOnly": status.applies_to_future_sessions_only,
             "trustedPublicKeys": status.trusted_public_keys,
+        }));
+    }
+
+    if let Some(runtime) = state.factory.keyring_runtime.as_ref() {
+        let status = runtime.authority_status().map_err(|error| {
+            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        })?;
+        return Ok(json!({
+            "configured": true,
+            "backend": "witnessed_keyring",
+            "publicKey": status.public_key.to_hex(),
+            "signingEpoch": status.signing_epoch,
+            "operatorHead": status.operator_head,
+            "checkpointStage": status.checkpoint_stage,
+            "witnessServiceCount": status.witness_service_count,
+            "auditServiceCount": status.audit_service_count,
+            "appliesToFutureSessionsOnly": false,
+            "trustedPublicKeys": vec![status.public_key.to_hex()],
         }));
     }
 

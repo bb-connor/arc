@@ -90,6 +90,8 @@ covered_rust_symbols = [
   "chio_revocation_oracle::api::InclusionProof::verify",
   "chio_kernel_core::formal_core::authorize_composite_quotas",
   "chio_kernel_core::formal_core::admit_quota_maximum",
+  "chio_kernel_core::formal_core::capture_invocation_count",
+  "chio_kernel_core::formal_core::reserve_replay_fingerprint",
   "chio_kernel_core::formal_core::family_binding_is_preserved",
   "chio_kernel_core::formal_core::validate_threshold_signers",
 ]

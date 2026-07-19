@@ -36,6 +36,17 @@ pub trait CapabilityLiveness: Send + Sync {
         &self,
         request: &CapabilityLivenessRequest,
     ) -> Result<LiveParentCapability>;
+
+    /// Return the exact signed authority exchange used for audit evidence.
+    /// Implementations without a signed authority transport fail closed.
+    fn verify_live_parent_with_audit_evidence(
+        &self,
+        _request: &CapabilityLivenessRequest,
+    ) -> Result<crate::authority_ipc::VerifiedAuthorityExchange> {
+        Err(BrokerError::AuthorityUnavailable(
+            "liveness authority does not expose signed audit evidence".to_string(),
+        ))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +71,17 @@ pub trait BrokerRevocations: Send + Sync {
         &self,
         request: &BrokerRevocationRequest,
     ) -> Result<BrokerRevocationSnapshot>;
+
+    /// Return the exact signed authority exchange used for audit evidence.
+    /// Implementations without a signed authority transport fail closed.
+    fn check_broker_revocation_with_audit_evidence(
+        &self,
+        _request: &BrokerRevocationRequest,
+    ) -> Result<crate::authority_ipc::VerifiedAuthorityExchange> {
+        Err(BrokerError::AuthorityUnavailable(
+            "revocation authority does not expose signed audit evidence".to_string(),
+        ))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,6 +238,7 @@ pub fn validate_revocation_snapshot(
 #[cfg(test)]
 mod tests {
     use chio_core_types::Keypair;
+    use chio_test_support::prelude::*;
 
     use super::*;
 
@@ -237,7 +260,7 @@ mod tests {
             verified_at_unix_seconds: 20,
             authority_snapshot_digest: "a".repeat(64),
         };
-        validate_parent_liveness(&request, &valid, 1).expect("valid parent");
+        validate_parent_liveness(&request, &valid, 1).test_expect("valid parent");
         let mut changed = valid.clone();
         changed.verified_at_unix_seconds = 18;
         assert!(validate_parent_liveness(&request, &changed, 1).is_err());
@@ -257,7 +280,7 @@ mod tests {
             commit_index: 1,
             authority_domain: "combined".to_string(),
         };
-        validate_revocation_snapshot(&valid, 20, 1, "combined").expect("valid snapshot");
+        validate_revocation_snapshot(&valid, 20, 1, "combined").test_expect("valid snapshot");
         let mut changed = valid.clone();
         changed.revoked = true;
         assert!(validate_revocation_snapshot(&changed, 20, 1, "combined").is_err());

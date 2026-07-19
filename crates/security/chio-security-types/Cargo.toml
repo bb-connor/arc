@@ -13,10 +13,12 @@ name = "chio_security_types"
 
 [dependencies]
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
 
 [features]
 default = []
-std = ["serde/std"]
+std = ["serde/std", "dep:serde_json", "dep:sha2"]
 
 [dev-dependencies]
 jsonschema = { workspace = true }

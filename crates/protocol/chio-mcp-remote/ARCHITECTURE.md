@@ -8,10 +8,10 @@
 - `remote_mcp/oauth.rs` owns local authorization-server flow handling, token exchange, bearer extraction, JWT and introspection authentication, protocol header validation, and HTTP error projection.
 - `remote_mcp/session_core.rs` owns remote session lifecycle state, session workers, capability issuance, and kernel construction.
 - `remote_mcp/session_identity.rs` owns OIDC/JWKS discovery, JWT key resolution, federated principal construction, and enterprise identity context helpers.
-- `remote_mcp/session_resume.rs` owns auth and policy fingerprints, federated agent derivation, and resumable-session integrity tags.
+- `remote_mcp/session_resume.rs` owns auth, policy, exact admitted-registry, and upstream service fingerprints, federated agent derivation, the dedicated resume HMAC keyring, record HMACs, and bounded old-key verification grace.
 - `remote_mcp/session_shared_upstream.rs` owns shared hosted upstream ownership, notification taps, and fan-out accounting.
 - `remote_mcp/session_forms.rs` owns admin query structs plus OAuth authorization and token request forms.
-- `remote_mcp/session_store.rs` owns SQLite-backed active session rows, terminal tombstones, resume-record loading, tombstone loading, tombstone purging, and persisted capability freshness checks.
+- `remote_mcp/session_store.rs` owns SQLite-backed active session rows, authenticated terminal tombstones, retained terminal generation fences, atomic terminalization, monotonic resume generations, replay-safe loading, tombstone purging, and persisted capability freshness checks.
 - `remote_mcp/admin.rs` owns operator-only health, authority, receipt, revocation, budget, session, and trust-control routes.
 
 ## Admission Boundaries
@@ -29,6 +29,26 @@ configuration load time: values must be non-empty, unpadded, and control-free
 before they can seed `RemoteAuthMode::StaticBearer` or admin route authorization
 state, so a malformed value fails at startup rather than becoming an unusable or
 log-breaking bearer credential.
+
+Durable resume state has an independent cryptographic boundary. Enabling a
+session database without a dedicated resume HMAC keyring fails startup. Active
+records carry a monotonic per-session generation. Terminalization signs a
+tombstone and compact terminal intent. Before upstream shutdown, it writes the
+authenticated intent and deletes the active row in one immediate SQLite
+transaction. Only after shutdown succeeds does it finalize the diagnostic
+tombstone in a second transaction. A crash at either boundary therefore leaves
+the session non-resumable. The intent fence remains after diagnostic tombstone
+retention so a missing, deleted, or corrupt tombstone cannot make an older
+validly MACed active row resumable. Key selection binds an explicit key ID and
+version into every HMAC envelope. Previous keys verify only within their
+configured grace deadline and are never selected for new writes. Runtime key
+bytes and parsed keyring buffers are zeroized on drop, and the keyring is opened
+through one no-follow descriptor before its type, size, mode, owner, single-link
+custody, mutation metadata, and contents are validated. Restoring a session
+persists a new monotonic context generation and fresh isolation epoch before
+launching its upstream process. Stored
+capabilities are discarded and reissued against that incarnation, so a
+capability bound to the prior process cannot authorize the replacement.
 
 ## Constraints
 

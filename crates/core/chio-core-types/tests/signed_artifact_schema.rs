@@ -133,6 +133,77 @@ fn built_in_signed_artifact_registry_matches_public_metadata() {
 }
 
 #[test]
+fn enterprise_security_execution_root_and_proposal_schemas_are_registered() {
+    let registry = chio_core_types::built_in_signed_artifact_registry();
+
+    for (schema, artifact_kind) in [
+        (
+            "chio.aggregate-budget-root.v1",
+            "aggregate_budget_root_binding",
+        ),
+        (
+            "chio.threshold-approval-proposal.v1",
+            "threshold_approval_proposal",
+        ),
+    ] {
+        assert!(
+            chio_core_types::is_supported_signed_artifact_schema(schema),
+            "enterprise security execution schema should be supported: {schema}"
+        );
+        let entry = registry
+            .iter()
+            .find(|entry| entry.schema == schema)
+            .expect("enterprise security execution schema has a built-in registry row");
+        assert_eq!(entry.artifact_kind, artifact_kind);
+        assert_eq!(entry.introduced_by, "enterprise-security-execution-v1");
+    }
+}
+
+#[test]
+fn enterprise_migration_canary_and_operator_attestation_are_distinct_registered_artifacts() {
+    let registry = chio_core_types::built_in_signed_artifact_registry();
+    for (schema, artifact_kind) in [
+        (
+            "chio.enterprise-migration-canary-evidence.v1",
+            "enterprise_migration_canary_evidence",
+        ),
+        (
+            "chio.enterprise-migration-cutover-attestation.v1",
+            "enterprise_migration_cutover_attestation",
+        ),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(registry.iter().any(|entry| {
+            entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "enterprise-security-execution-v1"
+        }));
+    }
+}
+
+#[test]
+fn broker_audit_authorization_and_comparison_are_distinct_registered_artifacts() {
+    let registry = chio_core_types::built_in_signed_artifact_registry();
+    for (schema, artifact_kind) in [
+        (
+            chio_core_types::CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA,
+            "broker_audit_runner_authorization",
+        ),
+        (
+            chio_core_types::CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA,
+            "broker_audit_comparison",
+        ),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(registry.iter().any(|entry| {
+            entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "enterprise-security-execution-v1"
+        }));
+    }
+}
+
+#[test]
 fn public_settlement_dispatch_and_receipt_schemas_are_supported() {
     let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

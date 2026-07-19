@@ -109,7 +109,9 @@ async fn runs_single_agent_scenario_and_collects_signed_receipt(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let runtime = ArenaRuntime::new(Arc::new(kernel));

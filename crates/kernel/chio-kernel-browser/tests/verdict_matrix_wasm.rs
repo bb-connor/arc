@@ -363,6 +363,7 @@ fn evaluate_browser_scenario(scenario: &VerdictScenario) -> DriverOutcome {
             server_id: MATRIX_SERVER_ID.to_string(),
             agent_id: subject.public_key().to_hex(),
             arguments,
+            supplemental_authorization: None,
         },
         capability,
         trusted_issuers_hex: vec![issuer.public_key().to_hex()],

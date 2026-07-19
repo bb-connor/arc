@@ -1,19 +1,9 @@
-use super::cluster::{cluster_authority_lease_view, cluster_consensus_view};
 use super::report_validation::{load_existing_authority_signing_context, validate_service_auth};
 use super::*;
 
 #[derive(Clone)]
-enum LookupReadContext {
-    Standalone {
-        source_node_id: String,
-    },
-    LeaderLocal {
-        source_node_id: String,
-        leader_url: String,
-        election_term: u64,
-        lease_id: String,
-        lease_expires_at: u64,
-    },
+struct LookupReadContext {
+    source_node_id: String,
 }
 
 pub(crate) async fn handle_lookup_aggregate_family_root(
@@ -136,53 +126,18 @@ pub(crate) async fn handle_lookup_aggregate_family_root(
 }
 
 fn lookup_read_context(state: &TrustServiceState) -> Result<LookupReadContext, Response> {
-    let Some(consensus) = cluster_consensus_view(state) else {
-        return Ok(LookupReadContext::Standalone {
-            source_node_id: state
-                .config
-                .advertise_url
-                .clone()
-                .unwrap_or_else(|| format!("http://{}", state.config.listen)),
-        });
-    };
-    let lease = cluster_authority_lease_view(state).ok_or_else(|| {
-        plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "aggregate family-root leader lease is unavailable",
-        )
-    })?;
-    if !consensus.has_quorum
-        || consensus.role != "leader"
-        || consensus.leader_url.as_deref() != Some(consensus.self_url.as_str())
-        || !lease.lease_valid
-        || lease.leader_url != consensus.self_url
-        || lease.term != consensus.election_term
-    {
+    if state.cluster.is_some() {
         return Err(plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
-            "aggregate family-root lookup requires the lease-valid cluster leader",
+            "clustered aggregate family-root authority lookup is unsupported",
         ));
     }
-    let authority_path = state.config.authority_db_path.as_deref().ok_or_else(|| {
-        plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "clustered aggregate family-root lookup requires durable authority state",
-        )
-    })?;
-    SqliteCapabilityAuthority::open_existing(authority_path)
-        .and_then(|authority| authority.enforce_cluster_fence(&lease.leader_url, lease.term))
-        .map_err(|_| {
-            plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "aggregate family-root authority fence is unavailable",
-            )
-        })?;
-    Ok(LookupReadContext::LeaderLocal {
-        source_node_id: consensus.self_url.clone(),
-        leader_url: consensus.self_url,
-        election_term: consensus.election_term,
-        lease_id: lease.lease_id,
-        lease_expires_at: lease.lease_expires_at,
+    Ok(LookupReadContext {
+        source_node_id: state
+            .config
+            .advertise_url
+            .clone()
+            .unwrap_or_else(|| format!("http://{}", state.config.listen)),
     })
 }
 
@@ -191,93 +146,31 @@ fn validate_lookup_read_context(
     expected: &LookupReadContext,
 ) -> Result<LookupReadContext, Response> {
     let current = lookup_read_context(state)?;
-    let unchanged = match (expected, &current) {
-        (
-            LookupReadContext::Standalone { source_node_id },
-            LookupReadContext::Standalone {
-                source_node_id: current_source,
-            },
-        ) => source_node_id == current_source,
-        (
-            LookupReadContext::LeaderLocal {
-                source_node_id,
-                leader_url,
-                election_term,
-                lease_id,
-                lease_expires_at,
-            },
-            LookupReadContext::LeaderLocal {
-                source_node_id: current_source,
-                leader_url: current_leader,
-                election_term: current_term,
-                lease_id: current_lease,
-                lease_expires_at: current_expiry,
-            },
-        ) => {
-            source_node_id == current_source
-                && leader_url == current_leader
-                && *election_term == *current_term
-                && lease_id == current_lease
-                && *lease_expires_at <= *current_expiry
-        }
-        _ => false,
-    };
-    if unchanged {
+    if expected.source_node_id == current.source_node_id {
         Ok(current)
     } else {
         Err(plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
-            "aggregate family-root leader context changed during lookup",
+            "aggregate family-root source context changed during lookup",
         ))
     }
 }
 
-fn lookup_response_expiry(now: u64, context: &LookupReadContext) -> Result<u64, Response> {
-    let maximum = now
-        .checked_add(AGGREGATE_FAMILY_ROOT_LOOKUP_MAX_TTL_SECS)
+fn lookup_response_expiry(now: u64, _context: &LookupReadContext) -> Result<u64, Response> {
+    now.checked_add(AGGREGATE_FAMILY_ROOT_LOOKUP_MAX_TTL_SECS)
         .ok_or_else(|| {
             plain_http_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "aggregate family-root lookup time overflow",
             )
-        })?;
-    let expires_at = match context {
-        LookupReadContext::Standalone { .. } => maximum,
-        LookupReadContext::LeaderLocal {
-            lease_expires_at, ..
-        } => maximum.min(*lease_expires_at),
-    };
-    if expires_at <= now {
-        return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "aggregate family-root leader lease expired before response signing",
-        ));
-    }
-    Ok(expires_at)
+        })
 }
 
 fn lookup_wire_context(context: LookupReadContext) -> (String, AggregateFamilyRootReadConsistency) {
-    match context {
-        LookupReadContext::Standalone { source_node_id } => (
-            source_node_id,
-            AggregateFamilyRootReadConsistency::Standalone,
-        ),
-        LookupReadContext::LeaderLocal {
-            source_node_id,
-            leader_url,
-            election_term,
-            lease_id,
-            lease_expires_at,
-        } => (
-            source_node_id,
-            AggregateFamilyRootReadConsistency::LeaderLocal {
-                leader_url,
-                election_term,
-                lease_id,
-                lease_expires_at,
-            },
-        ),
-    }
+    (
+        context.source_node_id,
+        AggregateFamilyRootReadConsistency::Standalone,
+    )
 }
 
 fn canonical_lookup_response(signed: &SignedAggregateFamilyRootLookup) -> Response {
@@ -327,11 +220,18 @@ mod tests {
             config: TrustServiceConfig {
                 listen: "127.0.0.1:0".parse().test_unwrap(),
                 service_token: "service-secret".to_string(),
+                dashboard_read_token: None,
+                dashboard_report_origin: None,
+                dashboard_report_token: None,
+                dashboard_allow_insecure_report_origin: false,
+                authority_admin_token: None,
+                authority_workloads: Vec::new(),
                 tenant_read_tokens: BTreeMap::new(),
                 receipt_db_path: Some(receipt_db_path),
                 revocation_db_path: None,
                 authority_seed_path: None,
                 authority_db_path: Some(authority_db_path),
+                authority_keyring_config_path: None,
                 budget_db_path: None,
                 enterprise_providers_file: None,
                 federation_policies_file: None,
@@ -348,14 +248,23 @@ mod tests {
                 allow_local_peer_urls: true,
                 certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
                 peer_urls: Vec::new(),
+                cluster_node_seed_path: None,
+                cluster_replay_db_path: None,
+                cluster_members: Vec::new(),
                 cluster_sync_interval: Duration::from_millis(25),
                 memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             },
+            dashboard_sessions: dashboard_auth::DashboardSessionStore::production(),
+            dashboard_report_bridge: None,
+            authority_keyring: None,
+            authority_test_backend: None,
+            active_defense: service_runtime::TrustControlActiveDefenseService::disabled(),
             enterprise_provider_registry: None,
             verifier_policy_registry: None,
             federation_admission_rate_limiter: Arc::new(Mutex::new(
                 FederationAdmissionRateLimiter::default(),
             )),
+            authority_issuance_rotation_lock: Arc::new(Mutex::new(())),
             cluster: None,
             cluster_progress: None,
         }
@@ -605,73 +514,6 @@ mod tests {
             )
             .test_unwrap();
         assert_eq!(object_count, 0);
-    }
-
-    #[test]
-    fn aggregate_family_root_lookup_accepts_only_lease_expiry_renewal() {
-        let directory = unique_test_directory();
-        let authority_path = directory.join("authority.db");
-        let mut state = test_state(directory.join("receipts.db"), authority_path.clone());
-        SqliteCapabilityAuthority::open(authority_path).test_unwrap();
-        let peer = PeerSyncState {
-            health: PeerHealth::Healthy,
-            last_contact_at: Some(unix_timestamp_now()),
-            ..PeerSyncState::default()
-        };
-        state.cluster = Some(Arc::new(Mutex::new(ClusterRuntimeState {
-            self_url: "http://node-a".to_string(),
-            peers: HashMap::from([("http://node-b".to_string(), peer)]),
-            election_term: 0,
-            last_leader_url: None,
-            term_started_at: None,
-            lease_expires_at: None,
-            lease_ttl_ms: 5_000,
-        })));
-
-        let current = lookup_read_context(&state).test_unwrap();
-        let LookupReadContext::LeaderLocal {
-            source_node_id,
-            leader_url,
-            election_term,
-            lease_id,
-            lease_expires_at,
-        } = current
-        else {
-            panic!("cluster leader context expected");
-        };
-        let before_renewal = LookupReadContext::LeaderLocal {
-            source_node_id: source_node_id.clone(),
-            leader_url: leader_url.clone(),
-            election_term,
-            lease_id: lease_id.clone(),
-            lease_expires_at: lease_expires_at.saturating_sub(1),
-        };
-        assert!(validate_lookup_read_context(&state, &before_renewal).is_ok());
-
-        let wrong_leader = LookupReadContext::LeaderLocal {
-            source_node_id: source_node_id.clone(),
-            leader_url: "http://node-b".to_string(),
-            election_term,
-            lease_id: lease_id.clone(),
-            lease_expires_at,
-        };
-        assert!(validate_lookup_read_context(&state, &wrong_leader).is_err());
-        let wrong_term = LookupReadContext::LeaderLocal {
-            source_node_id: source_node_id.clone(),
-            leader_url: leader_url.clone(),
-            election_term: election_term.saturating_add(1),
-            lease_id: lease_id.clone(),
-            lease_expires_at,
-        };
-        assert!(validate_lookup_read_context(&state, &wrong_term).is_err());
-        let wrong_lease = LookupReadContext::LeaderLocal {
-            source_node_id,
-            leader_url,
-            election_term,
-            lease_id: format!("{lease_id}-other"),
-            lease_expires_at,
-        };
-        assert!(validate_lookup_read_context(&state, &wrong_lease).is_err());
     }
 
     #[tokio::test]

@@ -25,6 +25,9 @@ pub enum TransportError {
     #[error("canonical json serialization error: {0}")]
     Serialize(String),
 
+    #[error("invalid protocol message: {0}")]
+    InvalidMessage(String),
+
     #[error("connection closed")]
     ConnectionClosed,
 }
@@ -58,6 +61,8 @@ impl<R: Read, W: Write> ChioTransport<R, W> {
     pub fn recv(&mut self) -> Result<AgentMessage, TransportError> {
         let bytes = read_frame(&mut self.reader)?;
         let msg: AgentMessage = serde_json::from_slice(&bytes)?;
+        msg.validate()
+            .map_err(|error| TransportError::InvalidMessage(error.to_string()))?;
         Ok(msg)
     }
 
@@ -223,7 +228,13 @@ mod tests {
             capability_token: Box::new(make_token(&kp)),
             server_id: "srv".to_string(),
             tool: "echo".to_string(),
-            params: serde_json::json!({"text": "hello"}),
+            params: Box::new(serde_json::json!({"text": "hello"})),
+            supplemental_authorization: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            declassification_grant: None,
         };
 
         // Serialize to a buffer (using canonical JSON, same as KernelMessage path).

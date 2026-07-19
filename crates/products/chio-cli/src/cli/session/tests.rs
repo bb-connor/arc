@@ -20,6 +20,9 @@ fn load_test_policy_runtime(policy: &policy::ChioPolicy) -> policy::LoadedPolicy
         issuance_policy: None,
         runtime_assurance_policy: None,
         threshold_approval_resolver: None,
+        threshold_approval_policy_authority: None,
+        active_defense: policy::ActiveDefensePolicyConfig::default(),
+        active_defense_rules: Vec::new(),
     }
 }
 
@@ -55,7 +58,7 @@ fn build_kernel_with_receipt_store(
     loaded_policy: policy::LoadedPolicy,
     kernel_kp: &Keypair,
 ) -> ChioKernel {
-    let mut kernel = build_kernel(loaded_policy, kernel_kp);
+    let mut kernel = build_kernel(loaded_policy, kernel_kp).expect("build session test kernel");
     let receipt_db_path = unique_db_path("chio-cli-session-receipts");
     configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None, None, &[])
         .expect("configure receipt store for session test");
@@ -115,7 +118,8 @@ capabilities:
 "#;
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
-    let kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     assert_eq!(kernel.guard_count(), 4); // default profile + configured pipeline
 }
 
@@ -136,7 +140,8 @@ capabilities:
 
     let agent_kp = Keypair::generate();
     let cap = {
-        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp)
+            .expect("build session test kernel");
         configure_revocation_store(&mut kernel, Some(&revocation_db_path), None, None).unwrap();
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "*".to_string(),
@@ -147,7 +152,8 @@ capabilities:
         cap
     };
 
-    let mut restarted = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut restarted = build_kernel(load_test_policy_runtime(&policy), &kp)
+        .expect("build restarted session test kernel");
     configure_revocation_store(&mut restarted, Some(&revocation_db_path), None, None).unwrap();
     restarted.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
@@ -168,6 +174,8 @@ capabilities:
         threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        supplemental_authorization: None,
+        declassification_grant: None,
     };
 
     let response = restarted.evaluate_tool_call(&request).await.unwrap();
@@ -214,11 +222,11 @@ capabilities:
     let default_capabilities =
         policy::build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
             .unwrap();
-    let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let kp = load_or_create_authority_keypair(&seed_path).unwrap();
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     configure_capability_authority(
         &mut kernel,
-        &kp,
         Some(&seed_path),
         None,
         None,
@@ -227,6 +235,7 @@ capabilities:
         None,
         None,
         &[],
+        None,
         None,
         None,
     )
@@ -246,12 +255,13 @@ capabilities:
             .unwrap()
             .expect("authority public key")
     );
+    assert_eq!(capability.issuer, kernel.public_key());
 
     let _ = std::fs::remove_file(seed_path);
 }
 
 #[test]
-fn configure_capability_authority_supports_shared_sqlite_backend() {
+fn configure_capability_authority_uses_sqlite_kernel_key_with_remote_stores() {
     let authority_db_path = unique_db_path("chio-cli-authority-db");
     let yaml = r#"
 capabilities:
@@ -266,67 +276,39 @@ capabilities:
     let default_capabilities =
         policy::build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
             .unwrap();
-    let first_kp = Keypair::generate();
-    let mut first_kernel = build_kernel(load_test_policy_runtime(&policy), &first_kp);
+    let kernel_kp = chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .unwrap()
+        .local_keypair()
+        .unwrap();
+    let expected_issuer = kernel_kp.public_key();
+    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kernel_kp)
+        .expect("build session test kernel");
     configure_capability_authority(
-        &mut first_kernel,
-        &first_kp,
+        &mut kernel,
         None,
         Some(&authority_db_path),
         None,
         None,
-        None,
+        Some("https://control.example.test"),
         None,
         None,
         &[],
         None,
         None,
-    )
-    .unwrap();
-
-    let first_capability = issue_default_capabilities(
-        &first_kernel,
-        &Keypair::generate().public_key(),
-        &default_capabilities,
-    )
-    .unwrap()
-    .into_iter()
-    .next()
-    .unwrap();
-    let original_issuer = first_capability.issuer.clone();
-
-    let authority = chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path).unwrap();
-    let rotated = authority.rotate().unwrap();
-
-    let second_kp = Keypair::generate();
-    let mut second_kernel = build_kernel(load_test_policy_runtime(&policy), &second_kp);
-    configure_capability_authority(
-        &mut second_kernel,
-        &second_kp,
-        None,
-        Some(&authority_db_path),
-        None,
-        None,
-        None,
-        None,
-        None,
-        &[],
-        None,
         None,
     )
     .unwrap();
-    let second_capability = issue_default_capabilities(
-        &second_kernel,
-        &Keypair::generate().public_key(),
-        &default_capabilities,
-    )
-    .unwrap()
-    .into_iter()
-    .next()
-    .unwrap();
 
-    assert_ne!(original_issuer, second_capability.issuer);
-    assert_eq!(second_capability.issuer, rotated.public_key);
+    let agent_kp = Keypair::generate();
+    let capability =
+        issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+    assert_eq!(capability.issuer, expected_issuer);
+    assert_eq!(capability.issuer, kernel.public_key());
 
     let _ = std::fs::remove_file(authority_db_path);
 }
@@ -372,6 +354,8 @@ capabilities:
         threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        supplemental_authorization: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call(&request).await.unwrap();
@@ -396,7 +380,8 @@ capabilities:
 "#;
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -419,6 +404,8 @@ capabilities:
         threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        supplemental_authorization: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call(&request).await.unwrap();
@@ -438,7 +425,8 @@ capabilities:
 "#;
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
 
     let agent_kp = Keypair::generate();
     let default_capabilities =
@@ -474,7 +462,8 @@ capabilities:
 "#;
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
 
     let agent_kp = Keypair::generate();
     let default_capabilities =
@@ -499,6 +488,214 @@ capabilities:
         }
         _ => panic!("wrong variant"),
     }
+}
+
+#[test]
+fn failed_tool_call_reconstruction_preserves_supplemental_authorization() {
+    let policy = policy::parse_policy(
+        r#"
+capabilities:
+  default:
+    tools:
+      - server: "*"
+        tool: "*"
+        operations: [invoke]
+        ttl: 300
+"#,
+    )
+    .unwrap();
+    let kernel_kp = Keypair::generate();
+    let kernel = build_kernel(load_test_policy_runtime(&policy), &kernel_kp)
+        .expect("build session test kernel");
+    let agent_kp = Keypair::generate();
+    let default_capabilities =
+        policy::build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
+            .unwrap();
+    let capability =
+        issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+            .unwrap()
+            .remove(0);
+    let supplemental_authorization = chio_core::message::OpaqueSupplementalAuthorization::new(
+        "broker:stdio-fallback",
+        vec![7, 11, 13],
+    )
+    .unwrap();
+    let message = AgentMessage::ToolCallRequest {
+        id: "stdio-fallback-field-preservation".to_string(),
+        capability_token: Box::new(capability),
+        server_id: "*".to_string(),
+        tool: "read_file".to_string(),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+        supplemental_authorization: Some(Box::new(supplemental_authorization.clone())),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
+    };
+    let session_id = SessionId::new("missing-stdio-session");
+    let agent_id = agent_kp.public_key().to_hex();
+    let (context, operation) = normalize_agent_message(&message, &session_id, &agent_id);
+    let SessionOperation::ToolCall(tool_call) = operation else {
+        panic!("tool-call message normalized to a non-tool operation");
+    };
+
+    let request = super::handler::kernel_request_for_failed_tool_call(&context, *tool_call);
+
+    assert_eq!(
+        request.supplemental_authorization,
+        Some(supplemental_authorization)
+    );
+    assert_eq!(request.agent_id, agent_id);
+}
+
+#[test]
+fn stdio_internal_error_receipt_uses_kernel_authority_and_durable_store() {
+    let policy = policy::parse_policy(
+        r#"
+capabilities:
+  default:
+    tools:
+      - server: "*"
+        tool: "*"
+        operations: [invoke]
+        ttl: 300
+"#,
+    )
+    .unwrap();
+    let kernel_kp = Keypair::generate();
+    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kernel_kp)
+        .expect("build session test kernel");
+    let receipt_db_path = unique_db_path("chio-cli-stdio-error-receipts");
+    configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None, None, &[])
+        .expect("configure durable receipt store");
+
+    let agent_kp = Keypair::generate();
+    let default_capabilities =
+        policy::build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
+            .unwrap();
+    let capability =
+        issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+            .unwrap()
+            .remove(0);
+    let agent_id = agent_kp.public_key().to_hex();
+    let missing_session_id = SessionId::new("missing-stdio-error-session");
+    let message = AgentMessage::ToolCallRequest {
+        id: "stdio-authoritative-error-receipt".to_string(),
+        capability_token: Box::new(capability),
+        server_id: "*".to_string(),
+        tool: "read_file".to_string(),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+        supplemental_authorization: Some(Box::new(
+            chio_core::message::OpaqueSupplementalAuthorization::new(
+                "broker:stdio-authority",
+                vec![17, 19, 23],
+            )
+            .unwrap(),
+        )),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
+    };
+    let mut stats = SessionStats::default();
+
+    let response = only_message(handle_agent_message(
+        &mut kernel,
+        &message,
+        &missing_session_id,
+        &agent_id,
+        &mut stats,
+    ));
+    let receipt = match response {
+        KernelMessage::ToolCallResponse {
+            result:
+                ToolCallResult::Err {
+                    error: ToolCallError::InternalError(_),
+                },
+            receipt,
+            ..
+        } => *receipt,
+        other => panic!("unexpected stdio fallback response: {other:?}"),
+    };
+
+    assert_eq!(receipt.kernel_key, kernel_kp.public_key());
+    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.is_denied());
+    assert_eq!(stats.denied, 1);
+    let mirrored = kernel.receipt_log().receipts();
+    assert_eq!(mirrored.len(), 1);
+    assert_eq!(mirrored[0].id, receipt.id);
+
+    drop(kernel);
+    let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&receipt_db_path)
+        .expect("reopen durable receipt store");
+    let persisted = chio_kernel::ReceiptStore::load_chio_receipt(&store, &receipt.id)
+        .expect("query persisted receipt")
+        .expect("stdio fallback receipt was not persisted");
+    assert_eq!(persisted.id, receipt.id);
+    assert_eq!(persisted.kernel_key, kernel_kp.public_key());
+    assert!(persisted.verify_signature().unwrap());
+
+    drop(store);
+    let _ = std::fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn stdio_internal_error_fails_closed_without_receipt_persistence() {
+    let policy = policy::parse_policy(
+        r#"
+kernel:
+  allow_ephemeral_receipt_log: false
+capabilities:
+  default:
+    tools:
+      - server: "*"
+        tool: "*"
+        operations: [invoke]
+        ttl: 300
+"#,
+    )
+    .unwrap();
+    let kernel_kp = Keypair::generate();
+    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kernel_kp)
+        .expect("build session test kernel");
+    let agent_kp = Keypair::generate();
+    let default_capabilities =
+        policy::build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
+            .unwrap();
+    let capability =
+        issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+            .unwrap()
+            .remove(0);
+    let agent_id = agent_kp.public_key().to_hex();
+    let message = AgentMessage::ToolCallRequest {
+        id: "stdio-error-without-receipt-store".to_string(),
+        capability_token: Box::new(capability),
+        server_id: "*".to_string(),
+        tool: "read_file".to_string(),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
+    };
+    let mut stats = SessionStats::default();
+
+    let messages = handle_agent_message(
+        &mut kernel,
+        &message,
+        &SessionId::new("missing-stdio-persistence-session"),
+        &agent_id,
+        &mut stats,
+    );
+
+    assert!(messages.is_empty());
+    assert!(kernel.receipt_log().is_empty());
+    assert_eq!(stats.denied, 1);
 }
 
 #[test]
@@ -538,7 +735,13 @@ capabilities:
         capability_token: Box::new(cap),
         server_id: "srv-b".to_string(),
         tool: "read_file".to_string(),
-        params: serde_json::json!({"path": "/app/src/main.rs"}),
+        params: Box::new(serde_json::json!({"path": "/app/src/main.rs"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -571,7 +774,8 @@ capabilities:
 "#;
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "srv-a".to_string(),
     }));
@@ -596,7 +800,13 @@ capabilities:
         capability_token: Box::new(stolen_capability),
         server_id: "srv-a".to_string(),
         tool: "read_file".to_string(),
-        params: serde_json::json!({"path": "/app/src/main.rs"}),
+        params: Box::new(serde_json::json!({"path": "/app/src/main.rs"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -646,7 +856,13 @@ fn hushspec_policy_drives_tool_access_via_session_runtime_path() {
         capability_token: Box::new(allowed_cap),
         server_id: "*".to_string(),
         tool: "read_file".to_string(),
-        params: serde_json::json!({"path": "/workspace/README.md"}),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let denied = AgentMessage::ToolCallRequest {
@@ -654,7 +870,13 @@ fn hushspec_policy_drives_tool_access_via_session_runtime_path() {
         capability_token: Box::new(caps[0].clone()),
         server_id: "*".to_string(),
         tool: "write_file".to_string(),
-        params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md", "content": "nope"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -737,7 +959,7 @@ extensions:
     let default_capabilities = loaded_policy.default_capabilities.clone();
 
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(loaded_policy, &kp);
+    let mut kernel = build_kernel(loaded_policy, &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -764,10 +986,16 @@ extensions:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "read_file".to_string(),
-        params: serde_json::json!({
+        params: Box::new(serde_json::json!({
             "path": "/workspace/README.md",
             "embedding": [1.0, 0.0, 0.0]
-        }),
+        })),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -834,7 +1062,13 @@ guards:
         capability_token: Box::new(allowed_cap),
         server_id: "*".to_string(),
         tool: "read_file".to_string(),
-        params: serde_json::json!({"path": "/workspace/README.md"}),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let denied = AgentMessage::ToolCallRequest {
@@ -842,7 +1076,13 @@ guards:
         capability_token: Box::new(caps[0].clone()),
         server_id: "*".to_string(),
         tool: "write_file".to_string(),
-        params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md", "content": "nope"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -905,7 +1145,13 @@ capabilities:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "stream_file".to_string(),
-        params: serde_json::json!({"path": "/workspace/README.md"}),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -960,7 +1206,13 @@ capabilities:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "stream_file".to_string(),
-        params: serde_json::json!({"path": "/workspace/README.md"}),
+        params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -987,7 +1239,7 @@ fn hushspec_policy_compiles_shell_guard_into_runtime_path() {
     let default_capabilities = loaded_policy.default_capabilities.clone();
 
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(loaded_policy, &kp);
+    let mut kernel = build_kernel(loaded_policy, &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -1011,7 +1263,13 @@ fn hushspec_policy_compiles_shell_guard_into_runtime_path() {
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "bash".to_string(),
-        params: serde_json::json!({"command": "rm -rf /"}),
+        params: Box::new(serde_json::json!({"command": "rm -rf /"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -1052,7 +1310,8 @@ guards:
     let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
 
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -1076,7 +1335,15 @@ guards:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "sql".to_string(),
-        params: serde_json::json!({"database": "postgres", "query": "DELETE FROM orders"}),
+        params: Box::new(
+            serde_json::json!({"database": "postgres", "query": "DELETE FROM orders"}),
+        ),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -1143,7 +1410,15 @@ guards:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "sql".to_string(),
-        params: serde_json::json!({"database": "postgres", "query": "SELECT email FROM orders"}),
+        params: Box::new(
+            serde_json::json!({"database": "postgres", "query": "SELECT email FROM orders"}),
+        ),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -1192,7 +1467,8 @@ guards:
     let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
 
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -1216,7 +1492,13 @@ guards:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "slack_send_message".to_string(),
-        params: serde_json::json!({"text": "classified incident details"}),
+        params: Box::new(serde_json::json!({"text": "classified incident details"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -1283,7 +1565,8 @@ guards:
     let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
 
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -1307,7 +1590,13 @@ guards:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "slack_send_message".to_string(),
-        params: serde_json::json!({"text": "violent escalation details"}),
+        params: Box::new(serde_json::json!({"text": "violent escalation details"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();
@@ -1377,7 +1666,8 @@ guards:
     let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
 
     let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let mut kernel =
+        build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -1401,7 +1691,13 @@ guards:
         capability_token: Box::new(cap),
         server_id: "*".to_string(),
         tool: "fetch_url".to_string(),
-        params: serde_json::json!({"url": "https://malicious.example/bad"}),
+        params: Box::new(serde_json::json!({"url": "https://malicious.example/bad"})),
+        supplemental_authorization: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        declassification_grant: None,
     };
 
     let mut stats = SessionStats::default();

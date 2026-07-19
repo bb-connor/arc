@@ -24,6 +24,13 @@ fn bearer(token: &str) -> String {
     format!("Bearer {token}")
 }
 
+fn unix_timestamp_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before unix epoch")
+        .as_secs()
+}
+
 fn issue_scope() -> ChioScope {
     ChioScope {
         grants: vec![ToolGrant {
@@ -42,10 +49,7 @@ fn issue_scope() -> ChioScope {
 }
 
 fn conflicting_runtime_attestation() -> RuntimeAttestationEvidence {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs();
+    let now = unix_timestamp_now();
     RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.v1".to_string(),
         verifier: "verifier.chio".to_string(),
@@ -179,6 +183,11 @@ fn issue_capability_records_lineage_snapshot() {
 
     // Issue a capability via the trust-control HTTP endpoint.
     let issue_body = serde_json::json!({
+        "schema": "chio.capability-issuance-request.v2",
+        "requestNonce": "11".repeat(32),
+        "requestedAt": unix_timestamp_now(),
+        "tenantId": "tenant-capability-lineage",
+        "lineageId": "lineage-capability-lineage",
         "subjectPublicKey": subject_hex,
         "scope": issue_scope(),
         "ttlSeconds": 3600
@@ -199,7 +208,15 @@ fn issue_capability_records_lineage_snapshot() {
     );
 
     let issue_json: serde_json::Value = issue_resp.json().expect("parse issue capability response");
-    let capability_id = issue_json["capability"]["id"]
+    assert_eq!(
+        issue_json["schema"].as_str(),
+        Some("chio.capability-issuance-response-envelope.v2")
+    );
+    assert_eq!(
+        issue_json["body"]["schema"].as_str(),
+        Some("chio.capability-issuance-response.v1")
+    );
+    let capability_id = issue_json["body"]["capability"]["id"]
         .as_str()
         .expect("capability.id should be a string")
         .to_string();
@@ -361,6 +378,11 @@ fn issue_capability_rejects_invalid_public_key() {
         .post(format!("{base_url}/v1/capabilities/issue"))
         .header(AUTHORIZATION, bearer(service_token))
         .json(&serde_json::json!({
+            "schema": "chio.capability-issuance-request.v2",
+            "requestNonce": "22".repeat(32),
+            "requestedAt": unix_timestamp_now(),
+            "tenantId": "tenant-invalid-capability-key",
+            "lineageId": "lineage-invalid-capability-key",
             "subjectPublicKey": "not-a-public-key",
             "scope": issue_scope(),
             "ttlSeconds": 120
@@ -372,7 +394,7 @@ fn issue_capability_rejects_invalid_public_key() {
     assert!(body["error"]
         .as_str()
         .expect("invalid key error string")
-        .contains("hex"));
+        .contains("capability issuance subject public key is invalid"));
 
     let _ = std::fs::remove_dir_all(dir);
 }
@@ -413,6 +435,11 @@ fn issue_capability_rejects_conflicting_runtime_attestation_binding() {
         .post(format!("{base_url}/v1/capabilities/issue"))
         .header(AUTHORIZATION, bearer(service_token))
         .json(&serde_json::json!({
+            "schema": "chio.capability-issuance-request.v2",
+            "requestNonce": "33".repeat(32),
+            "requestedAt": unix_timestamp_now(),
+            "tenantId": "tenant-conflicting-runtime-attestation",
+            "lineageId": "lineage-conflicting-runtime-attestation",
             "subjectPublicKey": subject_kp.public_key().to_hex(),
             "scope": issue_scope(),
             "ttlSeconds": 120,
@@ -427,7 +454,7 @@ fn issue_capability_rejects_conflicting_runtime_attestation_binding() {
     assert!(body["error"]
         .as_str()
         .expect("runtime attestation error string")
-        .contains("workload identity is invalid"));
+        .contains("capability issuance runtime attestation is invalid"));
 
     let _ = std::fs::remove_dir_all(dir);
 }

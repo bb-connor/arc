@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/budget-invocation-admission-evidence.schema.json",
+  "title": "Chio budget invocation admission evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invocationQuotas", "revocationSet"],
+  "properties": {
+    "invocationQuotas": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/invocationQuota" } },
+    "revocationSet": { "$ref": "#/$defs/revocationSet" },
+    "aggregateRootCapabilityId": { "$ref": "#/$defs/identifier" },
+    "aggregateBindingDigest": { "$ref": "#/$defs/digest" },
+    "supplementalBinding": { "$ref": "#/$defs/supplementalBinding" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "invocationQuotas": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "required": ["key"],
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "required": ["profile"],
+                  "properties": {
+                    "profile": { "const": "chio.aggregate-family-invocation.v1" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["aggregateRootCapabilityId", "aggregateBindingDigest"],
+        "properties": { "aggregateRootCapabilityId": true, "aggregateBindingDigest": true }
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            { "required": ["aggregateRootCapabilityId"], "properties": { "aggregateRootCapabilityId": true } },
+            { "required": ["aggregateBindingDigest"], "properties": { "aggregateBindingDigest": true } }
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "quotaKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "ownerId"],
+      "properties": {
+        "profile": { "enum": ["chio.grant-invocation.v1", "chio.aggregate-capability-invocation.v1", "chio.aggregate-family-invocation.v1", "chio.broker-capability-execution.v1"] },
+        "ownerId": { "$ref": "#/$defs/identifier" },
+        "grantIndex": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "profile": { "const": "chio.grant-invocation.v1" } } },
+          "then": { "required": ["grantIndex"], "properties": { "grantIndex": true } },
+          "else": { "not": { "required": ["grantIndex"], "properties": { "grantIndex": true } } }
+        },
+        {
+          "if": { "properties": { "profile": { "enum": ["chio.aggregate-family-invocation.v1", "chio.broker-capability-execution.v1"] } } },
+          "then": { "properties": { "ownerId": { "$ref": "#/$defs/digest" } } }
+        }
+      ]
+    },
+    "invocationQuota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "maxInvocations"],
+      "properties": {
+        "key": { "$ref": "#/$defs/quotaKey" },
+        "maxInvocations": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "revocationSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ids", "digest"],
+      "properties": {
+        "ids": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "supplementalBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactDigest", "verifierId", "requestBindingHash", "negotiatedFeaturesDigest"],
+      "properties": {
+        "artifactDigest": { "$ref": "#/$defs/digest" },
+        "verifierId": { "$ref": "#/$defs/identifier" },
+        "requestBindingHash": { "$ref": "#/$defs/digest" },
+        "negotiatedFeaturesDigest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

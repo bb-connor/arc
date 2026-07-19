@@ -18,6 +18,7 @@ use chio_core_types::capability::{
 };
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
+use chio_core_types::OpaqueSupplementalAuthorization;
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
 use chio_kernel_core::{
     evaluate_with_full_floor, sign_receipt as core_sign_receipt,
@@ -196,6 +197,7 @@ struct AdmittedChildBudget {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct EvaluateRequestBody {
     request_id: String,
     tool_name: String,
@@ -203,6 +205,8 @@ struct EvaluateRequestBody {
     agent_id: String,
     #[serde(default)]
     arguments: serde_json::Value,
+    #[serde(default)]
+    supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
 }
 
 #[derive(Debug, Serialize)]
@@ -376,6 +380,13 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
 
     let capability: CapabilityToken = serde_json::from_value(parsed.capability)
         .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
+
+    if parsed.request.supplemental_authorization.is_some() {
+        return Err(KernelFfiError::InvalidCapability(
+            "C++ portable evaluation cannot verify or reserve supplemental authorization"
+                .to_string(),
+        ));
+    }
 
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
     validate_capability_trust_roots(&parsed.capability_trust_roots)?;

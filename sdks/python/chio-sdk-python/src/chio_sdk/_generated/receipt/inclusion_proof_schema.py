@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9d7b17b15b33f7dcc9d52da37c9fb906c57911cdfd78424c344f5ce58b160468
+# Schema sha256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,7 +11,19 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, RootModel
+
+
+class AuditPathItem(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="Sibling hash. 32 bytes, lowercase hex with `0x` prefix.",
+            pattern="^0x[0-9a-f]{64}$",
+        ),
+    ]
 
 
 class ChioReceiptMerkleInclusionProof(BaseModel):
@@ -22,15 +34,23 @@ class ChioReceiptMerkleInclusionProof(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    tree_size: conint(ge=1) = Field(
-        ...,
-        description="Total number of leaves in the Merkle tree at the time the proof was issued.",
-    )
-    leaf_index: conint(ge=0) = Field(
-        ...,
-        description="Zero-based index of the leaf being proved. MUST satisfy `leaf_index < tree_size`.",
-    )
-    audit_path: list[constr(pattern=r"^0x[0-9a-f]{64}$")] = Field(
-        ...,
-        description="Ordered sibling hashes from leaf-level up to (but not including) the root. Siblings that were carried upward without pairing on the right edge of an unbalanced level are omitted, so the path length is not strictly `ceil(log2(tree_size))`. Each entry is a `chio-core-types::Hash` serialized via its transparent serde adapter (32-byte SHA-256 digest, hex-encoded with a `0x` prefix).",
-    )
+    audit_path: Annotated[
+        list[AuditPathItem],
+        Field(
+            description="Ordered sibling hashes from leaf-level up to (but not including) the root. Siblings that were carried upward without pairing on the right edge of an unbalanced level are omitted, so the path length is not strictly `ceil(log2(tree_size))`. Each entry is a `chio-core-types::Hash` serialized via its transparent serde adapter (32-byte SHA-256 digest, hex-encoded with a `0x` prefix)."
+        ),
+    ]
+    leaf_index: Annotated[
+        int,
+        Field(
+            description="Zero-based index of the leaf being proved. MUST satisfy `leaf_index < tree_size`.",
+            ge=0,
+        ),
+    ]
+    tree_size: Annotated[
+        int,
+        Field(
+            description="Total number of leaves in the Merkle tree at the time the proof was issued.",
+            ge=1,
+        ),
+    ]

@@ -35,11 +35,16 @@ r2d2_sqlite = "0.33.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 rusqlite = { workspace = true }
+rustix = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }
 
+[target.'cfg(target_vendor = "apple")'.dependencies]
+chio-keyring = { workspace = true }
+
 [dev-dependencies]
+chio-quarantine = { workspace = true }
 chio-test-support = { workspace = true }
 criterion = { workspace = true }
 loom = { workspace = true }

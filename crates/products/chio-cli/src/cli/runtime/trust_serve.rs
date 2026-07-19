@@ -1,0 +1,177 @@
+use super::*;
+
+fn load_authority_workload_public_key(
+    path: &Path,
+    description: &str,
+) -> Result<chio_core::PublicKey, CliError> {
+    let bytes = chio_keyring::read_custody_sensitive_file(path, 64).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "{description} could not be read through hardened custody: {error}"
+        ))
+    })?;
+    if bytes.len() != 64
+        || !bytes
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(CliError::cli_other_error(format!(
+            "{description} must contain exactly 64 lowercase hex characters"
+        )));
+    }
+    let public_key_hex = std::str::from_utf8(&bytes).map_err(|_| {
+        CliError::cli_other_error(format!("{description} is not valid UTF-8"))
+    })?;
+    chio_core::PublicKey::from_hex(public_key_hex).map_err(CliError::from)
+}
+
+pub(crate) fn cmd_trust_serve(
+    listen: SocketAddr,
+    service_token: &str,
+    dashboard_read_token: Option<&str>,
+    dashboard_report_origin: Option<&str>,
+    dashboard_report_token: Option<&str>,
+    dashboard_allow_insecure_report_origin: bool,
+    authority_admin_token: Option<&str>,
+    authority_workload_token: Option<&str>,
+    authority_workload_tenant_id: Option<&str>,
+    authority_workload_id: Option<&str>,
+    authority_workload_server_id: Option<&str>,
+    authority_workload_public_key_file: Option<&Path>,
+    authority_session_admission_public_key_file: Option<&Path>,
+    authority_keyring_config_path: Option<&Path>,
+    tenant_read_tokens: &[String],
+    policy_path: Option<&Path>,
+    enterprise_providers_file: Option<&Path>,
+    federation_policies_file: Option<&Path>,
+    scim_lifecycle_file: Option<&Path>,
+    verifier_policies_file: Option<&Path>,
+    verifier_challenge_db: Option<&Path>,
+    passport_statuses_file: Option<&Path>,
+    passport_issuance_offers_file: Option<&Path>,
+    certification_registry_file: Option<&Path>,
+    certification_discovery_file: Option<&Path>,
+    receipt_db_path: Option<&Path>,
+    revocation_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    _session_db_path: Option<&Path>,
+    advertise_url: Option<&str>,
+    cluster_node_seed_path: Option<&Path>,
+    cluster_replay_db_path: Option<&Path>,
+    cluster_members: &[String],
+    allow_local_peer_urls: bool,
+    certification_public_metadata_ttl_seconds: u64,
+    peer_urls: &[String],
+    cluster_sync_interval_ms: u64,
+) -> Result<(), CliError> {
+    if service_token.trim().is_empty() {
+        return Err(CliError::cli_other_error(
+            "trust serve requires a non-empty --service-token".to_string(),
+        ));
+    }
+    let tenant_read_tokens = parse_tenant_read_tokens(tenant_read_tokens)?;
+    if let Some((tenant_id, _)) = tenant_read_tokens
+        .iter()
+        .find(|(_, token)| token.as_str() == service_token)
+    {
+        return Err(CliError::cli_other_error(format!(
+            "--tenant-read-token for tenant {tenant_id} must not equal --service-token"
+        )));
+    }
+    let loaded_policy = policy_path.map(load_policy).transpose()?;
+    let authority_workload = match (
+        authority_workload_token,
+        authority_workload_tenant_id,
+        authority_workload_id,
+        authority_workload_server_id,
+        authority_workload_public_key_file,
+        authority_session_admission_public_key_file,
+    ) {
+        (
+            Some(token),
+            Some(tenant_id),
+            Some(workload_id),
+            Some(server_id),
+            Some(public_key_path),
+            Some(session_admission_public_key_path),
+        ) => {
+            let signer_public_key = load_authority_workload_public_key(
+                public_key_path,
+                "authority workload public-key file",
+            )?;
+            let session_admission_public_key =
+                load_authority_workload_public_key(
+                    session_admission_public_key_path,
+                    "authority session-admission public-key file",
+                )?;
+            let allowed_capabilities = loaded_policy
+                .as_ref()
+                .ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "authority workload issuance requires --policy for server-derived scope and TTL"
+                            .to_string(),
+                    )
+                })?
+                .default_capabilities
+                .clone();
+            Some(trust_control::AuthorityWorkloadPolicy {
+                credential_token: token.to_string(),
+                tenant_id: tenant_id.to_string(),
+                workload_id: workload_id.to_string(),
+                server_id: server_id.to_string(),
+                signer_public_key,
+                session_admission_public_key,
+                allowed_capabilities,
+            })
+        }
+        (None, None, None, None, None, None) => None,
+        _ => {
+            return Err(CliError::cli_other_error(
+                "authority workload token, tenant, workload, server, request-signer key, and session-admission key must be configured together"
+                    .to_string(),
+            ));
+        }
+    };
+    let (issuance_policy, runtime_assurance_policy) = loaded_policy
+        .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
+        .unwrap_or((None, None));
+    let cluster_members = parse_cluster_members(cluster_members)?;
+    trust_control::serve(trust_control::TrustServiceConfig {
+        listen,
+        service_token: service_token.to_string(),
+        dashboard_read_token: dashboard_read_token.map(ToOwned::to_owned),
+        dashboard_report_origin: dashboard_report_origin.map(ToOwned::to_owned),
+        dashboard_report_token: dashboard_report_token.map(ToOwned::to_owned),
+        dashboard_allow_insecure_report_origin,
+        authority_admin_token: authority_admin_token.map(ToOwned::to_owned),
+        authority_workloads: authority_workload.into_iter().collect(),
+        tenant_read_tokens,
+        receipt_db_path: receipt_db_path.map(Path::to_path_buf),
+        revocation_db_path: revocation_db_path.map(Path::to_path_buf),
+        authority_seed_path: authority_seed_path.map(Path::to_path_buf),
+        authority_db_path: authority_db_path.map(Path::to_path_buf),
+        authority_keyring_config_path: authority_keyring_config_path.map(Path::to_path_buf),
+        budget_db_path: budget_db_path.map(Path::to_path_buf),
+        enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
+        federation_policies_file: federation_policies_file.map(Path::to_path_buf),
+        scim_lifecycle_file: scim_lifecycle_file.map(Path::to_path_buf),
+        verifier_policies_file: verifier_policies_file.map(Path::to_path_buf),
+        verifier_challenge_db_path: verifier_challenge_db.map(Path::to_path_buf),
+        passport_statuses_file: passport_statuses_file.map(Path::to_path_buf),
+        passport_issuance_offers_file: passport_issuance_offers_file.map(Path::to_path_buf),
+        certification_registry_file: certification_registry_file.map(Path::to_path_buf),
+        certification_discovery_file: certification_discovery_file.map(Path::to_path_buf),
+        issuance_policy,
+        runtime_assurance_policy,
+        advertise_url: advertise_url.map(ToOwned::to_owned),
+        allow_local_peer_urls,
+        certification_public_metadata_ttl_seconds,
+        peer_urls: peer_urls.to_vec(),
+        cluster_node_seed_path: cluster_node_seed_path.map(Path::to_path_buf),
+        cluster_replay_db_path: cluster_replay_db_path.map(Path::to_path_buf),
+        cluster_members,
+        cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+    })
+}

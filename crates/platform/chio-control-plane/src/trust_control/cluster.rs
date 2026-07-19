@@ -1,11 +1,12 @@
 use super::report_rendering::{
-    authority_snapshot_from_view, authority_snapshot_view, budget_cursor_view,
-    json_response_with_leader_visibility, json_response_with_leader_visibility_and_budget_commit,
-    revocation_cursor_from_view, revocation_cursor_view, stored_child_receipt_views,
-    stored_lineage_views, stored_tool_receipt_views,
+    authority_snapshot_view, budget_cursor_view, json_response_with_leader_visibility,
+    json_response_with_leader_visibility_and_budget_commit, revocation_cursor_from_view,
+    revocation_cursor_view, stored_child_receipt_views, stored_lineage_views,
+    stored_tool_receipt_views,
 };
 use super::report_validation::{
-    normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_auth,
+    normalize_cluster_config_url, validate_cluster_peer_empty_request,
+    validate_cluster_peer_json_request,
 };
 use super::*;
 
@@ -23,10 +24,12 @@ mod pull_budget;
 mod snapshots;
 
 pub(crate) use admission_consensus::{
-    handle_internal_admission_append_entries, handle_internal_admission_proposal,
-    handle_internal_admission_request_vote, handle_internal_admission_snapshot,
-    handle_internal_admission_snapshot_install, initialize_admission_consensus,
-    propose_admission_command,
+    handle_internal_admission_append_entries, handle_internal_admission_capture_query,
+    handle_internal_admission_proposal, handle_internal_admission_request_vote,
+    handle_internal_admission_snapshot, handle_internal_admission_snapshot_install,
+    handle_internal_invocation_capture_query, initialize_admission_consensus,
+    propose_admission_command, query_admission_capture_consensus,
+    query_invocation_capture_consensus,
 };
 pub(crate) use consensus::{
     budget_authority_guarantee_level, budget_authority_metadata_view, build_cluster_state,
@@ -35,8 +38,9 @@ pub(crate) use consensus::{
     handle_internal_cluster_status,
 };
 pub(crate) use deltas::{
-    budget_cursor_from_event, budget_mutation_event_view, budget_mutation_record_from_view,
-    budget_usage_record_from_view, handle_internal_budgets_delta,
+    budget_cursor_from_event, budget_invocation_quota_usage_record_from_view,
+    budget_invocation_quota_usage_record_view, budget_mutation_event_view,
+    budget_mutation_record_from_view, budget_usage_record_from_view, handle_internal_budgets_delta,
     handle_internal_child_receipts_delta, handle_internal_lineage_delta,
     handle_internal_revocations_delta, handle_internal_tool_receipts_delta, merge_budget_cursor,
     observe_capability_revocation_lag, respond_after_budget_write_quorum_commit,
@@ -44,13 +48,12 @@ pub(crate) use deltas::{
     wait_for_budget_write_quorum_commit, BudgetWriteToken,
 };
 pub(crate) use partition::{
-    clamp_down_peer_budget_acks, handle_internal_cluster_partition, peer_budget_cursor,
-    peer_child_seq, peer_is_partitioned, peer_lineage_seq, peer_revocation_cursor,
-    peer_should_force_snapshot, peer_tool_seq, request_peer_snapshot_recovery,
-    update_peer_budget_acks, update_peer_budget_cursor, update_peer_child_seq,
-    update_peer_delta_records, update_peer_failure, update_peer_lineage_seq, update_peer_reachable,
-    update_peer_revocation_cursor, update_peer_state, update_peer_success, update_peer_sync_error,
-    update_peer_tool_seq,
+    clamp_down_peer_budget_acks, peer_budget_cursor, peer_child_seq, peer_is_partitioned,
+    peer_lineage_seq, peer_revocation_cursor, peer_should_force_snapshot, peer_tool_seq,
+    request_peer_snapshot_recovery, update_peer_budget_acks, update_peer_budget_cursor,
+    update_peer_child_seq, update_peer_delta_records, update_peer_failure, update_peer_lineage_seq,
+    update_peer_reachable, update_peer_revocation_cursor, update_peer_state, update_peer_success,
+    update_peer_sync_error, update_peer_tool_seq,
 };
 pub(crate) use pull_budget::{
     ensure_revocation_page_ascending, require_contiguous_page, require_forward_progress,

@@ -7,6 +7,7 @@
 //! ```text
 //! cargo xtask validate-scenarios
 //! cargo xtask freeze-vectors [--check]
+//! cargo xtask freeze-schemas [--check]
 //! cargo xtask eval-receipt-regen [--check]
 //! cargo xtask codegen <rust|ts|go|python> [--check]
 //! cargo xtask codegen --lang <rust|ts|go|python> [--check]
@@ -36,6 +37,11 @@
 //! `shasum -a 256` so the manifest can be verified with that tool. With
 //! `--check` it compares the computed manifest against the on-disk file and
 //! exits non-zero on drift; CI uses this mode to catch unfrozen vectors.
+//!
+//! `freeze-schemas` regenerates `spec/schemas/MANIFEST.sha256` from the exact
+//! tracked and unignored schema inventory used by the registry gate. The
+//! manifest includes its deterministic self-hash. With `--check` it reports
+//! drift without changing the workspace.
 //!
 //! `codegen rust` (alias: `codegen --lang rust`) regenerates the
 //! schema-derived Rust types under `crates/core/chio-core-types/src/_generated/`
@@ -98,6 +104,7 @@ mod fixtures;
 mod launch_acceptance;
 mod qualify;
 mod scenarios;
+mod schemas;
 mod snippets_subcommand;
 mod support;
 mod vectors;
@@ -112,6 +119,7 @@ pub(crate) use scenarios::validate_scenarios;
 pub(crate) use scenarios::{
     build_schema_index, collect_scenario_files, resolve_schema_path, SchemaIndex, SCHEMA_URI_PREFIX,
 };
+pub(crate) use schemas::freeze_schemas;
 #[cfg(test)]
 pub(crate) use support::TempDir;
 pub(crate) use support::{copy_dir_recursive, display_path, workspace_root};

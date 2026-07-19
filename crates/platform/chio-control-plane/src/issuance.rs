@@ -5,6 +5,7 @@ mod scope;
 mod types;
 mod util;
 
+pub(crate) use self::authority::apply_authoritative_issuance_policy;
 pub use self::authority::wrap_capability_authority;
 pub use self::reputation::{
     build_local_reputation_corpus, build_local_reputation_corpus_with_read_context,

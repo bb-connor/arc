@@ -332,4 +332,22 @@ impl SessionAuthContext {
             SessionAuthMethod::OAuthBearer { principal, .. } => principal.as_deref(),
         }
     }
+
+    /// Return the tenant asserted by the authenticated OAuth verifier state.
+    /// Enterprise identity is the normalized authority when present, with the
+    /// verified federated claim retained as the compatibility fallback.
+    #[must_use]
+    pub fn authenticated_tenant_id(&self) -> Option<&str> {
+        match &self.method {
+            SessionAuthMethod::OAuthBearer {
+                federated_claims,
+                enterprise_identity,
+                ..
+            } => enterprise_identity
+                .as_ref()
+                .and_then(|identity| identity.tenant_id.as_deref())
+                .or(federated_claims.tenant_id.as_deref()),
+            SessionAuthMethod::Anonymous | SessionAuthMethod::StaticBearer { .. } => None,
+        }
+    }
 }

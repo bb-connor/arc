@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-manifest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

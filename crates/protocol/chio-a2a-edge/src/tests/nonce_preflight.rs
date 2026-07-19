@@ -59,7 +59,7 @@ fn test_kernel_config() -> KernelConfig {
 
 fn test_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "test-srv".to_string(),
         name: "Test Server".to_string(),
         description: Some("Test".to_string()),
@@ -70,8 +70,14 @@ fn test_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -131,7 +137,7 @@ fn text_message(text: &str) -> SendMessageRequest {
 
 #[test]
 fn send_message_strict_nonce_preflight_returns_working_retry_metadata() {
-    let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let mut edge = verified_test_edge(A2aEdgeConfig::default(), test_manifest(), 1).test_unwrap();
     let config = test_kernel_config();
     let kernel_issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
@@ -139,21 +145,28 @@ fn send_message_strict_nonce_preflight_returns_working_retry_metadata() {
         require_nonce: true,
         ..Default::default()
     };
-    kernel.set_execution_nonce_store(
-        nonce_config.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            nonce_config.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
+        )
+        .test_unwrap();
     kernel.register_tool_server(Box::new(MockToolServer));
 
     let subject = Keypair::generate();
     let execution = A2aKernelExecutionContext {
         capability: capability_for_tool(&kernel_issuer, &subject),
         agent_id: subject.public_key().to_hex(),
+        session_id: chio_core::session::SessionId::new("a2a-authenticated-session"),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
+        security_context: None,
     };
 
     let response = edge

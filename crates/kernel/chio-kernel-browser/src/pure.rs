@@ -63,7 +63,7 @@ pub fn evaluate_pure(
     clock: &dyn chio_kernel_core::Clock,
 ) -> Result<EvaluationVerdictJson, BindingError> {
     let trusted = decode_trusted_issuers(&input.trusted_issuers_hex)?;
-    let portable_request: PortableToolCallRequest = input.request.into();
+    let portable_request = PortableToolCallRequest::try_from(input.request)?;
     let peer_profile = input
         .peer_capabilities
         .clone()

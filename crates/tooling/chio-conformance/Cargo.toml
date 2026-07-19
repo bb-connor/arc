@@ -40,10 +40,12 @@ path = "src/bin/chio_conformance_runner.rs"
 [[bin]]
 name = "chio-native-conformance-runner"
 path = "src/bin/chio_native_conformance_runner.rs"
+required-features = ["enterprise-native"]
 
 [[bin]]
 name = "chio-native-conformance-fixture"
 path = "src/bin/chio_native_conformance_fixture.rs"
+required-features = ["enterprise-native"]
 
 [features]
 # Default resolves fixture paths relative to the workspace root, pointing at
@@ -55,6 +57,7 @@ path = "src/bin/chio_native_conformance_fixture.rs"
 # directories through `ConformanceRunOptions`.
 default = ["in-repo-fixtures"]
 in-repo-fixtures = []
+enterprise-native = ["dep:chio-secret-broker"]
 chio-bbs = [
     "dep:chio-selective-disclosure",
     "dep:chio-workflow",
@@ -67,12 +70,19 @@ public_entrypoint = true
 [dependencies]
 chio-core = { package = "chio-core-types", version = "0.1.0", path = "../../core/chio-core-types" }
 chio-kernel = { workspace = true }
+chio-cage = { workspace = true }
+chio-keyring = { workspace = true }
+chio-manifest = { workspace = true }
+chio-security-types = { workspace = true }
+chio-secret-broker = { workspace = true, features = ["conformance"], optional = true }
+chio-store-sqlite = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = "0.8"
 reqwest = { workspace = true, features = ["blocking", "form", "query", "rustls"] }
 tiny_http = "0.12"
+tempfile = { workspace = true }
 chio-selective-disclosure = { path = "../../trust/chio-selective-disclosure", default-features = false, optional = true }
 chio-workflow = { workspace = true, optional = true }
 
@@ -96,10 +106,22 @@ path = "verdict_matrix/tests/deployment_shape_smoke.rs"
 name = "verdict_matrix_cross_language"
 path = "verdict_matrix/tests/verdict_matrix_cross_language.rs"
 
+[[test]]
+name = "native_suite"
+path = "tests/native_suite.rs"
+required-features = ["enterprise-native"]
+
+[[test]]
+name = "enterprise_cross_mechanism"
+path = "tests/enterprise_cross_mechanism.rs"
+required-features = ["enterprise-native"]
+
 [dev-dependencies]
 # verdict-matrix test targets (deployment_shape_smoke, diff_oracle_self_test)
 # compile verdict_matrix/src/diff_oracle.rs, which parses the error registry as YAML.
 serde_yaml = { workspace = true }
+chio-control-plane = { workspace = true, features = ["enterprise-conformance"] }
+chio-secret-broker = { workspace = true, features = ["conformance"] }
 # Cross-language verdict-matrix oracle exercises the WASM
 # browser kernel through its native (non-wasm32) cargo test surface.
 chio-kernel-browser = { workspace = true }
@@ -123,6 +145,10 @@ chio-custody-hw = { workspace = true, default-features = false, features = ["dev
 chio-http-core = { workspace = true }
 chio-http-session = { workspace = true }
 chio-guards = { workspace = true }
+chio-flow = { workspace = true }
+chio-decoy = { workspace = true }
+chio-quarantine = { workspace = true }
+chio-security-kernel = { workspace = true }
 chio-weights = { workspace = true }
 base64ct = { workspace = true, features = ["alloc"] }
 # Negative conformance fixture: `b4_bilateral_dsse_signature_slice.rs`
@@ -171,15 +197,13 @@ async-trait = "0.1"
 p256 = { version = "0.13", default-features = false, features = ["ecdsa", "pem"] }
 rand = { workspace = true }
 proptest = { workspace = true }
-chio-store-sqlite = { workspace = true }
+chio-test-support = { workspace = true }
 rusqlite = { workspace = true }
-tempfile = { workspace = true }
 # Registry-consumed smoke test pulls in the six edges plus
 # chio-wasm-guards so it can drive each emission boundary directly.
 chio-mcp-edge = { workspace = true }
 chio-acp-edge = { workspace = true }
 chio-a2a-edge = { workspace = true }
-chio-manifest = { workspace = true }
 chio-wasm-guards = { path = "../../guards/chio-wasm-guards", default-features = false, features = ["wasmtime-runtime"] }
 chio-metrics-spec = { workspace = true }
 # Registry-consumed smoke test also drives the iroh federation-transport security
@@ -192,7 +216,7 @@ iroh = { version = "1.0", default-features = false, features = ["tls-ring"] }
 # federation-transport families through their real public production paths:
 # `chio-pheromone-relay` supplies the `SqlitePheromoneRelayStore` outbox the
 # `drain_outbox_over_iroh` helper drains (driving `outbox_total`), and
-# `chio-revocation-oracle` supplies the `SignedEpochRoot` type the stub
+# `chio-revocation-oracle` supplies the `SignedEpochRoot` type the test-double
 # `RevocationRootSink` / `RevocationCatchupHistory` seams name so a real
 # `RevocationHandler` accept can be driven over loopback QUIC (driving
 # `lane_total` and `accept_duration_seconds`).

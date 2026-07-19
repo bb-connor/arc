@@ -1,8 +1,11 @@
 use chio_core::canonical::CanonicalBytes;
 use chio_core::capability::token::CapabilityToken;
 use chio_core::credit::CreditBondRow;
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{Keypair, SigningBackend};
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
+use chio_core::Hash;
+use chio_security_types::ports::OpaqueReceiptRef;
+use std::sync::Arc;
 
 use crate::capability_lineage::CapabilitySnapshot;
 use crate::checkpoint::KernelCheckpoint;
@@ -186,6 +189,19 @@ pub enum ReceiptStoreError {
 
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+
+    /// Return the immutable identity of the durable commit domain backing this
+    /// store. Production compositions that bind one store across independent
+    /// authorities must reject `None` rather than substituting process identity.
+    fn durable_storage_identity(&self) -> Result<Option<Hash>, ReceiptStoreError> {
+        Ok(None)
+    }
+
+    /// Whether this store is an authoritative, durable sink for signed native
+    /// security release evidence such as broker and cage receipts.
+    fn supports_native_security_receipts(&self) -> bool {
+        false
+    }
     /// Load a chio receipt by id. The provided default returns `None`; a store
     /// backing a store-authoritative deployment MUST override this (and
     /// `load_child_receipt`) with a real point lookup.
@@ -368,7 +384,7 @@ pub trait ReceiptStore: Send + Sync {
     /// the store does not support background checkpointing (default).
     fn enable_background_checkpoints(
         &self,
-        _keypair: Keypair,
+        _backend: Arc<dyn SigningBackend>,
         _max_batch: u64,
     ) -> Result<bool, ReceiptStoreError> {
         Ok(false)
@@ -380,6 +396,43 @@ pub trait ReceiptStore: Send + Sync {
         _parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
         Ok(())
+    }
+
+    /// Admit and record a capability under authoritative tenant and lineage
+    /// context.
+    ///
+    /// A production implementation must serialize the causal-fence check with
+    /// first visibility of a previously unseen capability. The default rejects
+    /// because falling back to the context-free snapshot API would reopen the
+    /// issuance-to-fence race and lose tenant isolation.
+    fn record_capability_snapshot_with_issuance_admission(
+        &self,
+        _tenant_id: &chio_security_types::ports::TenantId,
+        _lineage_root_id: &chio_security_types::ports::LineageId,
+        _token: &CapabilityToken,
+        _parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "receipt store does not support contextual capability issuance admission".to_string(),
+        ))
+    }
+
+    /// Return whether an exact capability snapshot is already bound to the
+    /// supplied authoritative tenant and lineage context.
+    ///
+    /// Implementations must reject conflicting token or context reuse. The
+    /// default fails closed because `false` would incorrectly authorize a
+    /// context migration on stores that cannot verify the first binding.
+    fn capability_snapshot_has_issuance_admission(
+        &self,
+        _tenant_id: &chio_security_types::ports::TenantId,
+        _lineage_root_id: &chio_security_types::ports::LineageId,
+        _token: &CapabilityToken,
+        _parent_capability_id: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "receipt store cannot verify contextual capability issuance admission".to_string(),
+        ))
     }
 
     fn get_capability_snapshot(
@@ -465,6 +518,26 @@ pub trait ReceiptStore: Send + Sync {
     fn as_any_mut(&self) -> Option<&dyn std::any::Any> {
         None
     }
+}
+
+/// Durable logical active-defense evidence index backed by signed Chio receipts.
+///
+/// Implementations must append the receipt and publish the unique logical
+/// evidence mapping in one transaction. A duplicate mapping to the same
+/// deterministic receipt is idempotent; rebinding either side is a conflict.
+pub trait IndexedSecurityEvidenceStore: Send + Sync {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError>;
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError>;
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError>;
 }
 
 #[cfg(test)]

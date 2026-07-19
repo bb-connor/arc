@@ -1,4 +1,5 @@
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use arc_swap::ArcSwap;
@@ -8,7 +9,8 @@ use super::*;
 
 /// Configuration for the Chio Runtime Kernel.
 pub struct KernelConfig {
-    /// Ed25519 keypair for signing receipts and issuing capabilities.
+    /// Ed25519 bootstrap keypair used by the default and hybrid constructors.
+    /// Governed runtime signing routes through the kernel's shared backend.
     pub keypair: Keypair,
 
     /// Public keys of trusted Capability Authorities.
@@ -81,7 +83,9 @@ impl KernelConfig {
 /// 32-byte ML-DSA-65 keygen seed. Construct one of these from a parsed
 /// HushSpec policy plus the boot-loaded PQ seed and pass it to
 /// [`ChioKernel::with_hybrid_signing_backend`] with a verified self-quote
-/// port to obtain a `Box<dyn SigningBackend>` for hybrid receipt signing.
+/// port before any signing or durable receipt configuration. The method
+/// installs the hybrid backend as the shared governed runtime authority and
+/// returns its algorithm.
 ///
 /// A separate input from [`KernelConfig`]: the hybrid fields are not folded
 /// into `KernelConfig`, so its wire form is unaffected.
@@ -281,6 +285,14 @@ fn read_process_rss_bytes() -> Option<u64> {
 ///
 /// The kernel is designed to be the sole trusted mediator. It never exposes its
 /// signing key, address, or internal state to the agent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct OperationOwnedDelegatedBudgetLease {
+    pub(super) request_binding_hash: String,
+    pub(super) parent_capability_id: String,
+    pub(super) child_capability_id: String,
+    pub(super) budget_share_bps: u16,
+}
+
 pub struct ChioKernel {
     pub(super) config: KernelConfig,
     pub(super) guards: Vec<Box<dyn Guard>>,
@@ -289,11 +301,26 @@ pub struct ChioKernel {
     pub(super) budget_store_lock: Mutex<()>,
     pub(super) admission_operation_store:
         Option<Arc<dyn crate::admission_operation::AdmissionOperationStore>>,
+    pub(super) approval_store: Option<Arc<dyn crate::approval::ApprovalStore>>,
     pub(super) dispatch_worker_count: usize,
+    pub(super) aggregate_invocation_admission_enabled: bool,
+    pub(super) supplemental_broker_admission_enabled: bool,
     pub(super) supplemental_quota_verifier:
         Option<Arc<dyn crate::supplemental_quota::SupplementalQuotaVerifier>>,
+    pub(super) supplemental_admission_registrar:
+        Option<Arc<dyn crate::supplemental_quota::SupplementalAdmissionRegistrar>>,
+    pub(super) admission_capture_authority:
+        Option<Arc<dyn crate::admission_capture_authority::AdmissionCaptureAuthority>>,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
+    /// Fallible source snapshotted before a capability authority can sign.
+    pub(super) capability_authority_clock: Arc<dyn chio_keyring::TrustedClock>,
+    pub(super) authority_signing_backend: Arc<dyn chio_core::crypto::SigningBackend>,
+    pub(super) authority_signing_used: Arc<AtomicBool>,
+    pub(super) authority_backend_topology_locked: bool,
+    pub(super) authority_composition_sealed: bool,
     pub(super) capability_authority: Box<dyn CapabilityAuthority>,
+    pub(super) authority_artifact_trust_resolver:
+        Option<Arc<dyn crate::authority::AuthorityArtifactTrustResolver>>,
     pub(super) tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
     pub(super) resource_providers: Vec<Box<dyn ResourceProvider>>,
     pub(super) prompt_providers: Vec<Box<dyn PromptProvider>>,
@@ -310,14 +337,29 @@ pub struct ChioKernel {
     pub(super) aggregate_family_root_resolver: Option<
         Arc<dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver + Send + Sync>,
     >,
+    pub(super) active_response_requirement_resolver:
+        Option<Arc<dyn super::active_response_policy::ActiveResponseRequirementResolver>>,
+    pub(super) active_response_finding_authority:
+        Option<Arc<dyn super::active_response_admission::ActiveResponseFindingAuthority>>,
+    pub(super) active_response_submission_authority: Option<chio_core::PublicKey>,
+    pub(super) active_response_executor:
+        Option<super::active_response_executor::InstalledActiveResponseExecutor>,
+    pub(super) capability_issuance_admission_authority:
+        Option<Arc<dyn CapabilityIssuanceAdmissionAuthority>>,
+    pub(super) active_response_executor_generation_floor: u64,
+    pub(super) governed_active_response_plans_enabled: bool,
     pub(super) threshold_approval_requirement_resolver:
         Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
     pub(super) threshold_approval_policy_configured: bool,
+    pub(super) threshold_governed_approvals_enabled: bool,
     pub(super) threshold_approval_policy_authorities: Vec<chio_core::PublicKey>,
+    pub(super) governed_security_runtime_generation: u64,
     pub(super) receipt_store_write_lock: Mutex<()>,
     pub(super) payment_adapter: Option<Box<dyn PaymentAdapter>>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
+    pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,
+    pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
     pub(super) attestation_trust_policy: Option<AttestationTrustPolicy>,
     pub(super) capability_crypto_floor: KernelCryptoFloor,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
@@ -338,10 +380,6 @@ pub struct ChioKernel {
     /// any tool server that delegates verification to the kernel. Boxed
     /// trait object so SQLite-backed stores can be plugged in.
     pub(super) execution_nonce_store: Option<Box<dyn crate::execution_nonce::ExecutionNonceStore>>,
-    /// Replay store for governed approval tokens. Prevents a signed approval
-    /// from being consumed more than once. Uses the same LRU + TTL pattern as
-    /// DPoP nonce verification. Key: (request_id, governed_intent_hash).
-    pub(super) approval_replay_store: Option<dpop::DpopNonceStore>,
     /// Emergency kill switch. When `true`, every evaluate entry point returns
     /// `Verdict::Deny` without performing capability validation or guard
     /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.
@@ -417,12 +455,18 @@ pub struct ChioKernel {
     /// after dispatch. This map keeps the admitted version and peer state
     /// available until the evaluation future finishes.
     pub(super) receipt_federation_admissions: Arc<DashMap<String, ReceiptFederationAdmission>>,
+    /// Request-keyed terminal operation intent installed only while a governed
+    /// tool response is being signed. Receipt persistence consumes the intent
+    /// by atomically committing the terminal operation and signed-receipt
+    /// outbox before appending the receipt.
+    pub(super) threshold_terminal_receipt_intents:
+        Arc<DashMap<String, super::admission_terminal_receipt::ThresholdTerminalReceiptIntent>>,
     /// Operator-declared kernel identifier used as the
     /// `org_b_kernel_id` in bilateral co-signing. Defaults to the hex
     /// encoding of the kernel's signing public key, but operators can
     /// override it to a stable DNS name via `with_federation_peers`.
     pub(super) federation_local_kernel_id: ArcSwap<Option<String>>,
-    /// Mpsc-backed signing task handle. Owns a clone of `config.keypair` and
+    /// Mpsc-backed signing worker handle. Owns the shared authority backend and
     /// pulls signing requests from a bounded channel; producers `.await` on
     /// backpressure rather than on a mutex. Spawned at [`ChioKernel::new`] and
     /// joined by [`ChioKernel::shutdown`]. Wrapped in `Arc` so shared kernel
@@ -443,6 +487,8 @@ pub struct ChioKernel {
     /// shape stays feature-flag agnostic.
     pub(super) revocation_view: Option<std::sync::Arc<chio_kernel_core::RevocationView>>,
     pub(super) budget_registry: Mutex<chio_kernel_core::InMemoryBudgetRegistry>,
+    pub(super) threshold_delegated_budget_leases:
+        Mutex<HashMap<String, OperationOwnedDelegatedBudgetLease>>,
     /// RSS soft-ceiling shed flag. Set by the sampler when process RSS exceeds
     /// `memory_budget.rss_soft_limit_bytes`; read on the
     /// admission fast path alongside the emergency stop.
@@ -452,6 +498,100 @@ pub struct ChioKernel {
 }
 
 impl ChioKernel {
+    /// Install the one runtime authority artifact resolver before publication.
+    ///
+    /// The resolver cannot be replaced, and the authority topology latch also
+    /// closes this surface so a keyring-backed verifier cannot be bypassed.
+    pub(crate) fn set_authority_artifact_trust_resolver(
+        &mut self,
+        resolver: Arc<dyn crate::authority::AuthorityArtifactTrustResolver>,
+    ) -> Result<(), KernelError> {
+        self.require_no_atomic_security_runtime_publication()?;
+        if self.authority_backend_topology_locked
+            || self.authority_composition_sealed
+            || self.authority_artifact_trust_resolver.is_some()
+        {
+            return Err(KernelError::Internal(
+                "authority artifact trust resolver topology is permanently locked".to_string(),
+            ));
+        }
+        self.authority_artifact_trust_resolver = Some(resolver);
+        Ok(())
+    }
+
+    pub fn governed_capability_authority(&self) -> Box<dyn CapabilityAuthority> {
+        Box::new(crate::authority::GovernedCapabilityAuthority::new(
+            Arc::clone(&self.authority_signing_backend),
+            Arc::clone(&self.capability_authority_clock),
+        ))
+    }
+
+    /// Permanently prevent replacement of the shared runtime signing backend.
+    ///
+    /// Keyring-backed compositions call this immediately after installing the
+    /// journaled signing router. Policy wrappers may still be installed around
+    /// the governed capability authority until [`Self::seal_authority_composition`]
+    /// is called, but no receipt, checkpoint, session, federation, or capability
+    /// signer or verifier can bypass the selected authority topology after
+    /// this latch closes.
+    pub fn lock_authority_signing_backend_topology(&mut self) {
+        self.authority_backend_topology_locked = true;
+    }
+
+    /// Permanently close every authority replacement surface.
+    ///
+    /// Runtime composition calls this after its final issuance-policy wrapper
+    /// has been installed. There is intentionally no corresponding unlock API.
+    pub fn seal_authority_composition(&mut self) {
+        self.authority_backend_topology_locked = true;
+        self.authority_composition_sealed = true;
+    }
+
+    pub(crate) fn replace_authority_signing_backend_before_use(
+        &mut self,
+        backend: Arc<dyn chio_core::crypto::SigningBackend>,
+    ) -> Result<(), KernelError> {
+        self.require_no_atomic_security_runtime_publication()?;
+        self.require_threshold_deactivated_for_authority_change()?;
+        if self.authority_backend_topology_locked || self.authority_composition_sealed {
+            return Err(KernelError::Internal(
+                "authority signing topology is permanently locked".to_string(),
+            ));
+        }
+        if self.authority_signing_used.load(Ordering::Acquire)
+            || !self.signing_task.is_pristine()
+            || self.receipt_store.is_some()
+            || !self.sessions.is_empty()
+            || !self
+                .receipt_log
+                .lock()
+                .map_err(|_| KernelError::Internal("receipt log lock poisoned".to_string()))?
+                .is_empty()
+            || !self
+                .child_receipt_log
+                .lock()
+                .map_err(|_| KernelError::Internal("child receipt log lock poisoned".to_string()))?
+                .is_empty()
+        {
+            return Err(KernelError::Internal(
+                "authority signer replacement is permitted only before any signing or durable receipt configuration"
+                    .to_string(),
+            ));
+        }
+        let (backend, used) = crate::authority::TrackedAuthoritySigningBackend::wrap(backend);
+        self.signing_task = build_authority_signing_task(&self.config, Arc::clone(&backend));
+        self.authority_signing_backend = Arc::clone(&backend);
+        self.authority_signing_used = used;
+        self.capability_authority = Box::new(crate::authority::GovernedCapabilityAuthority::new(
+            Arc::clone(&backend),
+            Arc::clone(&self.capability_authority_clock),
+        ));
+        if self.threshold_approval_policy_configured {
+            self.threshold_approval_policy_authorities = vec![backend.public_key()];
+        }
+        Ok(())
+    }
+
     /// Construct the hybrid signing backend the kernel would use under
     /// `hybrid`'s configured floor and PQ key material after the kernel
     /// self-quote gate has run.
@@ -465,14 +605,10 @@ impl ChioKernel {
     /// but only after [`crate::boot::load_kernel_signing_backend_after_self_quote`]
     /// accepts `self_quote_bytes`.
     ///
-    /// Receipt body construction continues to flow through the existing
-    /// inline path (`build_and_sign_receipt`); callers that opt in to
-    /// hybrid signing pass the returned backend through
-    /// [`crate::sign_receipt_body_with_backend`] (along with the canonical
-    /// content preimage the body's `content_hash` was derived from) before
-    /// persistence, so the hybrid path recomputes `content_hash` inside the
-    /// trust boundary and is WYSIWYS fail-closed just like the inline
-    /// classical path.
+    /// On success, every capability, receipt, nonce, session anchor,
+    /// checkpoint, and federation signature uses the installed shared
+    /// backend. The replacement is rejected after signing begins or durable
+    /// receipt state is installed.
     ///
     /// # Errors
     ///
@@ -488,7 +624,7 @@ impl ChioKernel {
         hybrid: &HybridSigningConfig,
         self_quote_bytes: &[u8],
         verifier: &dyn crate::boot::KernelSelfQuoteVerifier,
-    ) -> Result<Box<dyn chio_core::crypto::SigningBackend>, crate::boot::KernelBootError> {
+    ) -> Result<chio_core::SigningAlgorithm, crate::boot::KernelBootError> {
         let backend = crate::boot::load_kernel_signing_backend_after_self_quote(
             hybrid.crypto_floor,
             self.config.keypair.clone(),
@@ -496,7 +632,33 @@ impl ChioKernel {
             self_quote_bytes,
             verifier,
         )?;
+        let algorithm = backend.algorithm();
+        self.replace_authority_signing_backend_before_use(Arc::from(backend))
+            .map_err(|error| {
+                crate::boot::KernelBootError::AuthorityConfiguration(error.to_string())
+            })?;
         self.capability_crypto_floor = hybrid.crypto_floor;
-        Ok(backend)
+        Ok(algorithm)
     }
+}
+
+pub(super) fn build_authority_signing_task(
+    config: &KernelConfig,
+    backend: Arc<dyn chio_core::crypto::SigningBackend>,
+) -> Arc<signing_task::SigningTaskHandle> {
+    let configured_stream_max =
+        usize::try_from(config.max_stream_total_bytes).unwrap_or(usize::MAX);
+    let signing_queued_budget = if configured_stream_max == 0 {
+        signing_task::DEFAULT_MAX_SIGNING_QUEUED_BYTES
+    } else {
+        configured_stream_max
+    };
+    Arc::new(
+        signing_task::SigningTaskHandle::with_backend_capacity_max_content_and_queued_bytes(
+            backend,
+            signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY,
+            0,
+            signing_queued_budget,
+        ),
+    )
 }

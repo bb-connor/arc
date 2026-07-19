@@ -8,17 +8,31 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::{Arc, RwLock};
 
 use chio_core_types::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
 };
-use chio_core_types::crypto::Keypair;
-use chio_http_core::approvals::{
-    handle_batch_respond, handle_get_approval, handle_list_pending, handle_respond, ApprovalAdmin,
-    ApprovalHandlerError, BatchDecisionEntry, BatchRespondRequest, PendingQuery, RespondRequest,
+use chio_core_types::capability::threshold_approval::{
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ThresholdApprovalRequest,
+    ThresholdApprovalRequirement,
 };
-use chio_kernel::{ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore};
+use chio_core_types::crypto::{Keypair, PublicKey};
+use chio_http_core::approvals::{
+    handle_append_threshold_approval_vote, handle_batch_respond,
+    handle_create_threshold_approval_proposal, handle_deliver_threshold_approval_response,
+    handle_get_approval, handle_get_threshold_approval_proposal, handle_list_pending,
+    handle_respond, AppendThresholdApprovalVoteRequest, ApprovalAdmin, ApprovalHandlerError,
+    AuthenticatedThresholdApprovalRequestContext, BatchDecisionEntry, BatchRespondRequest,
+    CreateThresholdApprovalProposalRequest, DeliverThresholdApprovalResponseRequest, PendingQuery,
+    RespondRequest,
+};
+use chio_kernel::{
+    ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore,
+    ThresholdApprovalCollectorStatus, ThresholdApprovalProposalCreationContext,
+    ThresholdApprovalProposalCreationParameters,
+};
 
 fn make_admin() -> (ApprovalAdmin, Arc<InMemoryApprovalStore>) {
     let store = Arc::new(InMemoryApprovalStore::new());
@@ -331,4 +345,294 @@ fn respond_rejects_untrusted_approver() {
         }
         other => panic!("expected Rejected, got {other:?}"),
     }
+}
+
+struct ThresholdHttpFixture {
+    policy_authority: Keypair,
+    subject: Keypair,
+    submitter: Keypair,
+    second: Keypair,
+    third: Keypair,
+    requirement: ThresholdApprovalRequirement,
+    policy_hash: String,
+    intent_hash: String,
+    proposal: ThresholdApprovalProposal,
+}
+
+impl ThresholdHttpFixture {
+    fn new() -> Self {
+        let policy_authority = Keypair::generate();
+        let subject = Keypair::generate();
+        let submitter = Keypair::generate();
+        let second = Keypair::generate();
+        let third = Keypair::generate();
+        let eligible = BTreeMap::from([
+            ("submitter".to_string(), submitter.public_key()),
+            ("second".to_string(), second.public_key()),
+            ("third".to_string(), third.public_key()),
+        ]);
+        let policy_hash = "ab".repeat(32);
+        let intent_hash = "cd".repeat(32);
+        let requirement =
+            ThresholdApprovalRequirement::new(2, eligible, 100, policy_hash.clone(), 1).unwrap();
+        let proposal = ThresholdApprovalProposal::sign(
+            ThresholdApprovalProposalBody::new(
+                "proposal-http",
+                "request-http",
+                intent_hash.clone(),
+                subject.public_key(),
+                "ef".repeat(32),
+                policy_hash.clone(),
+                requirement.required(),
+                requirement.eligible_set_digest(),
+                100,
+                requirement.proposal_timeout_seconds(),
+                1_000,
+                1_000,
+            )
+            .unwrap(),
+            &policy_authority,
+        )
+        .unwrap();
+        Self {
+            policy_authority,
+            subject,
+            submitter,
+            second,
+            third,
+            requirement,
+            policy_hash,
+            intent_hash,
+            proposal,
+        }
+    }
+
+    fn admin(&self) -> ApprovalAdmin {
+        let store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
+        let context = self.authenticated_context();
+        let request_id = self.proposal.body().request_id().to_string();
+        let policy_hash = self.policy_hash.clone();
+        ApprovalAdmin::new_with_threshold_policy(
+            store,
+            self.policy_hash.clone(),
+            vec![self.policy_authority.public_key()],
+            Arc::new(move |received_request_id: &str, received_policy_hash: &str| {
+                if received_request_id != request_id || received_policy_hash != policy_hash {
+                    return Err(
+                        chio_core_types::capability::threshold_approval::ThresholdApprovalResolutionError::Missing,
+                    );
+                }
+                Ok(context.clone())
+            }),
+        )
+        .unwrap()
+    }
+
+    fn authenticated_context(&self) -> AuthenticatedThresholdApprovalRequestContext {
+        let matched_request = ThresholdApprovalRequest::new(
+            self.proposal.body().request_id(),
+            "payments",
+            "transfer",
+        )
+        .unwrap();
+        AuthenticatedThresholdApprovalRequestContext::new(
+            matched_request.clone(),
+            ThresholdApprovalProposalCreationContext::new(
+                ThresholdApprovalProposalCreationParameters {
+                    matched_request,
+                    requirement: self.requirement.clone(),
+                    subject: self.subject.public_key(),
+                    governed_intent_hash: self.intent_hash.clone(),
+                    authorization_capability_hash: "ef".repeat(32),
+                    authorizing_capability_expires_at: 1_000,
+                    governed_operation_expires_at: 1_000,
+                    submitter: Some(self.submitter.public_key()),
+                    separation_of_duties: true,
+                },
+            )
+            .unwrap(),
+        )
+    }
+
+    fn token(&self, id: &str, approver: &Keypair, issued_at: u64) -> GovernedApprovalToken {
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: id.to_string(),
+                approver: approver.public_key(),
+                subject: self.subject.public_key(),
+                governed_intent_hash: self.intent_hash.clone(),
+                threshold_proposal_hash: Some(self.proposal.proposal_hash().unwrap()),
+                request_id: self.proposal.body().request_id().to_string(),
+                issued_at,
+                expires_at: 190,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            approver,
+        )
+        .unwrap()
+    }
+}
+
+#[test]
+fn threshold_handlers_collect_and_deliver_original_tokens() {
+    let fixture = ThresholdHttpFixture::new();
+    let admin = fixture.admin();
+    let created = handle_create_threshold_approval_proposal(
+        &admin,
+        CreateThresholdApprovalProposalRequest {
+            proposal: fixture.proposal.clone(),
+        },
+        105,
+    )
+    .unwrap();
+    assert_eq!(
+        created.proposal.status,
+        ThresholdApprovalCollectorStatus::Collecting
+    );
+
+    let first = fixture.token("threshold-http-1", &fixture.second, 110);
+    let second = fixture.token("threshold-http-2", &fixture.third, 112);
+    let collecting = handle_append_threshold_approval_vote(
+        &admin,
+        fixture.proposal.body().proposal_id(),
+        AppendThresholdApprovalVoteRequest {
+            token: first.clone(),
+        },
+        111,
+    )
+    .unwrap();
+    assert_eq!(
+        collecting.proposal.status,
+        ThresholdApprovalCollectorStatus::Collecting
+    );
+    let satisfied = handle_append_threshold_approval_vote(
+        &admin,
+        fixture.proposal.body().proposal_id(),
+        AppendThresholdApprovalVoteRequest {
+            token: second.clone(),
+        },
+        113,
+    )
+    .unwrap();
+    assert_eq!(
+        satisfied.proposal.status,
+        ThresholdApprovalCollectorStatus::Satisfied
+    );
+    let pre_delivery = serde_json::to_string(&satisfied).unwrap();
+    assert!(!pre_delivery.contains("threshold-http-1"));
+    assert!(!pre_delivery.contains("threshold-http-2"));
+    assert!(!pre_delivery.contains("signature"));
+
+    let delivered = handle_deliver_threshold_approval_response(
+        &admin,
+        fixture.proposal.body().proposal_id(),
+        DeliverThresholdApprovalResponseRequest {},
+        114,
+    )
+    .unwrap();
+    assert_eq!(delivered.approval_tokens, vec![first, second]);
+    assert_eq!(
+        delivered.proposal.status,
+        ThresholdApprovalCollectorStatus::Delivered
+    );
+    let reopened =
+        handle_get_threshold_approval_proposal(&admin, fixture.proposal.body().proposal_id(), 115)
+            .unwrap();
+    assert_eq!(reopened.proposal.delivered_at, Some(114));
+}
+
+#[test]
+fn threshold_create_wire_shape_cannot_select_policy_or_separation_of_duties() {
+    let fixture = ThresholdHttpFixture::new();
+    let mut value = serde_json::to_value(CreateThresholdApprovalProposalRequest {
+        proposal: fixture.proposal,
+    })
+    .unwrap();
+    let object = value.as_object_mut().unwrap();
+    object.insert("separationOfDuties".to_string(), serde_json::json!(false));
+    object.insert(
+        "submitter".to_string(),
+        serde_json::json!(fixture.submitter.public_key()),
+    );
+    object.insert("server_id".to_string(), serde_json::json!("weaker-server"));
+    object.insert("tool_name".to_string(), serde_json::json!("weaker-tool"));
+    object.insert(
+        "eligibleApprovers".to_string(),
+        serde_json::json!({"attacker": PublicKey::from_hex(&"00".repeat(32)).ok()}),
+    );
+    assert!(serde_json::from_value::<CreateThresholdApprovalProposalRequest>(value).is_err());
+}
+
+#[test]
+fn threshold_handlers_fail_closed_without_authenticated_policy_configuration() {
+    let fixture = ThresholdHttpFixture::new();
+    let (admin, _) = make_admin();
+    let error = handle_create_threshold_approval_proposal(
+        &admin,
+        CreateThresholdApprovalProposalRequest {
+            proposal: fixture.proposal,
+        },
+        105,
+    )
+    .unwrap_err();
+    assert_eq!(error.status(), 500);
+}
+
+#[test]
+fn threshold_get_rejects_changed_authenticated_context() {
+    let fixture = ThresholdHttpFixture::new();
+    let store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
+    let context = Arc::new(RwLock::new(fixture.authenticated_context()));
+    let resolved_context = Arc::clone(&context);
+    let request_id = fixture.proposal.body().request_id().to_string();
+    let policy_hash = fixture.policy_hash.clone();
+    let admin = ApprovalAdmin::new_with_threshold_policy(
+        store,
+        fixture.policy_hash.clone(),
+        vec![fixture.policy_authority.public_key()],
+        Arc::new(move |received_request_id: &str, received_policy_hash: &str| {
+            if received_request_id != request_id || received_policy_hash != policy_hash {
+                return Err(
+                    chio_core_types::capability::threshold_approval::ThresholdApprovalResolutionError::Missing,
+                );
+            }
+            Ok(resolved_context.read().unwrap().clone())
+        }),
+    )
+    .unwrap();
+    handle_create_threshold_approval_proposal(
+        &admin,
+        CreateThresholdApprovalProposalRequest {
+            proposal: fixture.proposal.clone(),
+        },
+        105,
+    )
+    .unwrap();
+    let changed_route = ThresholdApprovalRequest::new(
+        fixture.proposal.body().request_id(),
+        "payments-v2",
+        "transfer",
+    )
+    .unwrap();
+    *context.write().unwrap() = AuthenticatedThresholdApprovalRequestContext::new(
+        changed_route.clone(),
+        ThresholdApprovalProposalCreationContext::new(
+            ThresholdApprovalProposalCreationParameters {
+                matched_request: changed_route,
+                requirement: fixture.requirement.clone(),
+                subject: fixture.subject.public_key(),
+                governed_intent_hash: fixture.intent_hash.clone(),
+                authorization_capability_hash: "ef".repeat(32),
+                authorizing_capability_expires_at: 1_000,
+                governed_operation_expires_at: 1_000,
+                submitter: Some(fixture.submitter.public_key()),
+                separation_of_duties: true,
+            },
+        )
+        .unwrap(),
+    );
+    let error =
+        handle_get_threshold_approval_proposal(&admin, fixture.proposal.body().proposal_id(), 106)
+            .unwrap_err();
+    assert_eq!(error.status(), 409);
 }

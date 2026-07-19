@@ -19,6 +19,7 @@ use chio_federation::demo::DemoAllowAllRevocationOracle;
 use chio_federation::{
     bilateral::InProcessCoSigner, bilateral_dsse::sign_dsse_envelope,
     bilateral_dsse::sign_dsse_envelope_with_cosigner, bilateral_dsse::verify_dsse_envelope,
+    bilateral_dsse::BilateralDsseCosigningInput, bilateral_dsse::BilateralDsseInvocationInput,
     bilateral_dsse::BilateralPredicateExtensions, bilateral_dsse::CapabilityLeaseRef,
     bilateral_dsse::PolicyEvaluationSummary, bilateral_dsse::PolicyVerdict,
     bilateral_verifier::verify_bilateral_cosign_invocation, bilateral_verifier::ActionClassKind,
@@ -181,17 +182,19 @@ fn verifier_config<'a>(
 #[test]
 fn full_dsse_pae_cosigner_path_verifies_under_strict_profile() {
     let fixture = strict_fixture();
-    let envelope = sign_dsse_envelope_with_cosigner(
-        &fixture.receipt,
-        &fixture.kp_a.public_key(),
-        &fixture.kp_b,
-        ORG_A,
-        ORG_B,
-        TOOL,
-        NOW_MS,
-        full_extensions(),
-        &fixture.cosigner,
-    )
+    let envelope = sign_dsse_envelope_with_cosigner(BilateralDsseCosigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &fixture.receipt,
+            org_a_kernel_id: ORG_A,
+            org_b_kernel_id: ORG_B,
+            tool_name: TOOL,
+            timestamp_unix_ms: NOW_MS,
+            extensions: full_extensions(),
+        },
+        org_a_public_key: &fixture.kp_a.public_key(),
+        org_b_signer: &fixture.kp_b,
+        org_a_cosigner: &fixture.cosigner,
+    })
     .expect("cosigner-routed DSSE PAE envelope must sign");
 
     verify_dsse_envelope(

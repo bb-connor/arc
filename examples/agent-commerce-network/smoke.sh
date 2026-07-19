@@ -11,8 +11,44 @@ STATE_DIR="${ARTIFACT_ROOT}/state"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
 CHIO_BIN="$(ensure_chio_bin)"
-SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
 EDGE_TOKEN="${CHIO_EDGE_TOKEN:-demo-token}"
+ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
+PROVIDER_RESUME_HMAC_KEYRING="${STATE_DIR}/provider-resume-hmac-keyring.json"
+
+python3 - "${PROVIDER_RESUME_HMAC_KEYRING}" <<'PY'
+import base64
+import json
+import os
+import secrets
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii").rstrip("=")
+path.write_text(
+    json.dumps(
+        {
+            "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+            "current": {
+                "keyId": "agent-commerce-provider-resume",
+                "version": 1,
+                "keyBase64": key,
+            },
+            "previous": [],
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+os.chmod(path, 0o600)
+PY
+
+if [[ "${ADMIN_TOKEN}" == "${EDGE_TOKEN}" || "${ADMIN_TOKEN}" == "${SERVICE_TOKEN}" || "${EDGE_TOKEN}" == "${SERVICE_TOKEN}" ]]; then
+  echo "edge, admin, and control credentials must be pairwise distinct" >&2
+  exit 64
+fi
 
 TRUST_PORT="$(pick_free_port)"
 PROVIDER_PORT="$(pick_free_port)"
@@ -49,8 +85,10 @@ CHIO_BIN="${CHIO_BIN}" \
 CHIO_CONTROL_URL="${CONTROL_URL}" \
 CHIO_CONTROL_TOKEN="${SERVICE_TOKEN}" \
 CHIO_EDGE_TOKEN="${EDGE_TOKEN}" \
+CHIO_ADMIN_TOKEN="${ADMIN_TOKEN}" \
 PROVIDER_EDGE_LISTEN="127.0.0.1:${PROVIDER_PORT}" \
 PROVIDER_SESSION_DB="${STATE_DIR}/provider-sessions.sqlite3" \
+PROVIDER_RESUME_HMAC_KEYRING="${PROVIDER_RESUME_HMAC_KEYRING}" \
   "${EXAMPLE_ROOT}/provider/run-edge.sh" \
   >"${LOG_DIR}/provider-edge.log" 2>&1 &
 BG_PIDS+=($!)

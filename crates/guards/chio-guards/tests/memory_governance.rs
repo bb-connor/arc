@@ -52,7 +52,9 @@ fn make_request_in_scope(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     (req, agent_id, server_id)
 }
@@ -73,6 +75,7 @@ fn eval_at<G: Guard>(
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index,
+        security_context: None,
     };
     guard.evaluate(&ctx).expect("guard evaluate").verdict
 }

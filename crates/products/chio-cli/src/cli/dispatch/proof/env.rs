@@ -21,8 +21,7 @@ const ENTERPRISE_TRUSTED_RECEIPT_KERNEL_KEYS_ENV: &str =
 const COMMERCE_TRUSTED_PROVIDER_KEYS_ENV: &str = "CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS";
 const COMMERCE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS_ENV: &str =
     "CHIO_COMMERCE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS";
-const COMMERCE_TRUSTED_PAYMENT_SIGNER_KEYS_ENV: &str =
-    "CHIO_COMMERCE_TRUSTED_PAYMENT_SIGNER_KEYS";
+const COMMERCE_TRUSTED_PAYMENT_SIGNER_KEYS_ENV: &str = "CHIO_COMMERCE_TRUSTED_PAYMENT_SIGNER_KEYS";
 const TRUST_MARKET_TRUSTED_AUTHORITY_KEYS_ENV: &str = "CHIO_TRUST_MARKET_TRUSTED_AUTHORITY_KEYS";
 const SWARM_TRUSTED_WITNESS_KEYS_ENV: &str = "CHIO_SWARM_TRUSTED_WITNESS_KEYS";
 const DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS_ENV: &str =
@@ -76,9 +75,7 @@ pub(super) fn agent_web_verifier_trust_from_env(
             )))
         }
     };
-    if let Some((now_unix_seconds, max_age_seconds)) =
-        standard_webhooks_replay_window_from_env()?
-    {
+    if let Some((now_unix_seconds, max_age_seconds)) = standard_webhooks_replay_window_from_env()? {
         trust = trust.with_standard_webhooks_replay_window(now_unix_seconds, max_age_seconds);
     }
     match std::env::var(AGENT_WEB_TRUSTED_KERNEL_KEYS_ENV) {
@@ -306,11 +303,13 @@ fn optional_public_settlement_independent_chain_head_from_env(
     proof_bundle: &chio_web3::settlement_proof::PublicSettlementProofBundle,
 ) -> Result<Option<chio_web3::settlement_proof::PublicSettlementIndependentChainHead>, CliError> {
     let head_from_json = match std::env::var(PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV) {
-        Ok(value) => serde_json::from_str(value.trim()).map(Some).map_err(|error| {
-            CliError::cli_other_error(format!(
+        Ok(value) => serde_json::from_str(value.trim())
+            .map(Some)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
                 "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid JSON: {error}"
             ))
-        }),
+            }),
         Err(std::env::VarError::NotPresent) => Ok(None),
         Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid UTF-8"
@@ -321,8 +320,10 @@ fn optional_public_settlement_independent_chain_head_from_env(
     }
 
     match std::env::var(PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV) {
-        Ok(value) => fetch_public_settlement_independent_chain_head_from_rpc(value.trim(), proof_bundle)
-            .map(Some),
+        Ok(value) => {
+            fetch_public_settlement_independent_chain_head_from_rpc(value.trim(), proof_bundle)
+                .map(Some)
+        }
         Err(std::env::VarError::NotPresent) => Ok(None),
         Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} must be valid UTF-8"
@@ -515,9 +516,10 @@ fn required_json_rpc_string<'a>(
     field: &str,
     label: &str,
 ) -> Result<&'a str, CliError> {
-    value.get(field).and_then(serde_json::Value::as_str).ok_or_else(|| {
-        CliError::cli_other_error(format!("{label}.{field} must be a string"))
-    })
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| CliError::cli_other_error(format!("{label}.{field} must be a string")))
 }
 
 pub(super) fn public_settlement_verifier_trust_from_env(
@@ -615,20 +617,25 @@ pub(super) fn commerce_trusted_event_authority_receipt_kernel_keys_from_env(
 
 pub(super) fn commerce_trusted_payment_signer_keys_from_env(
 ) -> Result<Vec<chio_core_types::PublicKey>, CliError> {
-    required_public_keys_from_env(COMMERCE_TRUSTED_PAYMENT_SIGNER_KEYS_ENV, "commerce payment signer")
+    required_public_keys_from_env(
+        COMMERCE_TRUSTED_PAYMENT_SIGNER_KEYS_ENV,
+        "commerce payment signer",
+    )
 }
 
 pub(super) fn disclosure_lineage_verifier_trust_from_env(
 ) -> Result<chio_selective_disclosure::DisclosureLineageVerifierTrust, CliError> {
-    Ok(chio_selective_disclosure::DisclosureLineageVerifierTrust::new()
-        .with_trusted_lineage_signer_keys(required_public_keys_from_env(
-            DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS_ENV,
-            "disclosure lineage signer",
-        )?)
-        .with_trusted_crypto_context_report_signer_keys(required_public_keys_from_env(
-            DISCLOSURE_TRUSTED_CRYPTO_CONTEXT_REPORT_SIGNER_KEYS_ENV,
-            "disclosure crypto context report signer",
-        )?))
+    Ok(
+        chio_selective_disclosure::DisclosureLineageVerifierTrust::new()
+            .with_trusted_lineage_signer_keys(required_public_keys_from_env(
+                DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS_ENV,
+                "disclosure lineage signer",
+            )?)
+            .with_trusted_crypto_context_report_signer_keys(required_public_keys_from_env(
+                DISCLOSURE_TRUSTED_CRYPTO_CONTEXT_REPORT_SIGNER_KEYS_ENV,
+                "disclosure crypto context report signer",
+            )?),
+    )
 }
 
 pub(super) fn transaction_trusted_root_keys_from_env(

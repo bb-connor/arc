@@ -197,16 +197,18 @@ pub(super) fn build_proof_package_unchecked(
                     cross_org_visibility: None,
                     treaty_binding_ref: None,
                 };
-                let envelope = sign_chio_bilateral_dsse_envelope(
-                    &receipt,
-                    &buyer_key,
-                    &vendor_key,
-                    BUYER_KERNEL_ID,
-                    vendor.kernel_id,
-                    vendor.tool_name,
-                    GENERATED_AT_UNIX_MS,
-                    extensions,
-                )
+                let envelope = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+                    invocation: BilateralDsseInvocationInput {
+                        receipt: &receipt,
+                        org_a_kernel_id: BUYER_KERNEL_ID,
+                        org_b_kernel_id: vendor.kernel_id,
+                        tool_name: vendor.tool_name,
+                        timestamp_unix_ms: GENERATED_AT_UNIX_MS,
+                        extensions,
+                    },
+                    org_a_signer: &buyer_key,
+                    org_b_signer: &vendor_key,
+                })
                 .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
                 let envelope_sha256 = canonical_sha256(&envelope)?;
                 let step = step_record(

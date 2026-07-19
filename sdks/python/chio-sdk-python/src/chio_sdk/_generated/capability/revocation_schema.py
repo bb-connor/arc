@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9d7b17b15b33f7dcc9d52da37c9fb906c57911cdfd78424c344f5ce58b160468
+# Schema sha256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,7 +11,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChioCapabilityRevocationEntry(BaseModel):
@@ -22,11 +24,16 @@ class ChioCapabilityRevocationEntry(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    capability_id: constr(min_length=1) = Field(
-        ...,
-        description="The `id` field of the revoked CapabilityToken. Used to match revocations against presented tokens.",
-    )
-    revoked_at: int = Field(
-        ...,
-        description="Unix timestamp (seconds) at which the revocation took effect. Stored as a signed integer in the kernel store; negative values are not produced by the issuer but are not rejected here in order to match the Rust `i64` shape.",
-    )
+    capability_id: Annotated[
+        str,
+        Field(
+            description="The `id` field of the revoked CapabilityToken. Used to match revocations against presented tokens.",
+            min_length=1,
+        ),
+    ]
+    revoked_at: Annotated[
+        int,
+        Field(
+            description="Unix timestamp (seconds) at which the revocation took effect. Stored as a signed integer in the kernel store; negative values are not produced by the issuer but are not rejected here in order to match the Rust `i64` shape."
+        ),
+    ]

@@ -1,8 +1,7 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
-
 use std::net::IpAddr;
 
 use chio_secret_broker::generic_https::is_restricted;
+use chio_test_support::prelude::*;
 
 #[test]
 fn restricted_ipv4_ipv6_decimal_equivalents_and_mapped_forms_are_denied() {
@@ -25,7 +24,7 @@ fn restricted_ipv4_ipv6_decimal_equivalents_and_mapped_forms_are_denied() {
         "2001:db8::1",
     ];
     for candidate in restricted {
-        let address: IpAddr = candidate.parse().expect("address");
+        let address: IpAddr = candidate.parse().test_expect("address");
         assert!(is_restricted(address, false), "{candidate}");
     }
 }
@@ -33,7 +32,7 @@ fn restricted_ipv4_ipv6_decimal_equivalents_and_mapped_forms_are_denied() {
 #[test]
 fn globally_routable_fixture_is_not_classified_as_restricted() {
     assert!(!is_restricted(
-        "93.184.216.34".parse().expect("address"),
+        "93.184.216.34".parse().test_expect("address"),
         false
     ));
 }

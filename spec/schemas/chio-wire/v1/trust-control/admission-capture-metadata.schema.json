@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json",
+  "title": "Chio authoritative admission capture receipt projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operationId", "holdId", "eventId", "checkedRevocationSetDigest", "invocationQuotas", "authorizationArtifactDigests", "budgetCommitIndex", "revocationCommitIndex", "authorityCommitIndex", "guaranteeLevel", "authority", "invocationState", "monetaryState"],
+  "properties": {
+    "operationId": { "$ref": "#/$defs/identifier" },
+    "holdId": { "$ref": "#/$defs/identifier" },
+    "eventId": { "$ref": "#/$defs/identifier" },
+    "checkedRevocationSetDigest": { "$ref": "#/$defs/digest" },
+    "invocationQuotas": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/invocationQuotaTransition" } },
+    "authorizationArtifactDigests": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "$ref": "#/$defs/digest" } },
+    "aggregateRootCapabilityId": { "$ref": "#/$defs/identifier" },
+    "aggregateRootBindingDigest": { "$ref": "#/$defs/digest" },
+    "budgetCommitIndex": { "type": "integer", "minimum": 1 },
+    "revocationCommitIndex": { "type": "integer", "minimum": 0 },
+    "authorityCommitIndex": { "type": "integer", "minimum": 0 },
+    "leaderEpoch": { "type": "integer", "minimum": 1 },
+    "guaranteeLevel": { "enum": ["single_node_atomic", "ha_linearizable"] },
+    "authority": { "$ref": "#/$defs/authority" },
+    "invocationState": { "const": "captured" },
+    "monetaryState": { "enum": ["none", "exposed", "released", "reconciled", "captured", "reversed"] }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "invocationQuotas": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "required": ["key"],
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "required": ["profile"],
+                  "properties": {
+                    "profile": { "const": "chio.aggregate-family-invocation.v1" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["aggregateRootCapabilityId", "aggregateRootBindingDigest"],
+        "properties": { "aggregateRootCapabilityId": true, "aggregateRootBindingDigest": true }
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            { "required": ["aggregateRootCapabilityId"], "properties": { "aggregateRootCapabilityId": true } },
+            { "required": ["aggregateRootBindingDigest"], "properties": { "aggregateRootBindingDigest": true } }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["guaranteeLevel"],
+        "properties": { "guaranteeLevel": { "const": "ha_linearizable" } }
+      },
+      "then": { "required": ["leaderEpoch"], "properties": { "leaderEpoch": true } },
+      "else": { "not": { "required": ["leaderEpoch"], "properties": { "leaderEpoch": true } } }
+    }
+  ],
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "invocationQuotaTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "maxInvocations", "reservedInvocationsBefore", "reservedInvocationsAfter", "capturedInvocationsBefore", "capturedInvocationsAfter"],
+      "properties": {
+        "key": { "$ref": "budget-invocation-admission-evidence.schema.json#/$defs/quotaKey" },
+        "maxInvocations": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "reservedInvocationsBefore": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "reservedInvocationsAfter": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "capturedInvocationsBefore": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "capturedInvocationsAfter": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorityId", "leaseId", "leaseEpoch"],
+      "properties": {
+        "authorityId": { "$ref": "#/$defs/identifier" },
+        "leaseId": { "$ref": "#/$defs/identifier" },
+        "leaseEpoch": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ pub(super) fn initialize_budget_replication_seq(
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let mut next_seq = current_budget_replication_seq(&transaction)?
         .max(max_budget_usage_seq(&transaction)?)
+        .max(max_budget_invocation_quota_seq(&transaction)?)
         .max(max_budget_mutation_event_seq(&transaction)?);
     let mut statement = transaction.prepare(
         r#"
@@ -108,8 +109,9 @@ pub(super) fn initialize_budget_replication_seq(
 pub(super) fn allocate_budget_replication_seq(
     transaction: &rusqlite::Transaction<'_>,
 ) -> Result<u64, BudgetStoreError> {
-    let authoritative =
-        max_budget_usage_seq(transaction)?.max(max_budget_mutation_event_seq(transaction)?);
+    let authoritative = max_budget_usage_seq(transaction)?
+        .max(max_budget_invocation_quota_seq(transaction)?)
+        .max(max_budget_mutation_event_seq(transaction)?);
     let current = if SqliteBudgetStore::admission_authority_mode(transaction)?.is_some() {
         authoritative
     } else {
@@ -147,6 +149,17 @@ fn max_budget_usage_seq(transaction: &rusqlite::Transaction<'_>) -> Result<u64, 
         "SELECT COALESCE(MAX(seq), 0) FROM capability_grant_budgets",
         [],
         |row| budget_u64_from_row(row, 0, "seq"),
+    )?;
+    Ok(max_seq)
+}
+
+fn max_budget_invocation_quota_seq(
+    transaction: &rusqlite::Transaction<'_>,
+) -> Result<u64, BudgetStoreError> {
+    let max_seq = transaction.query_row(
+        "SELECT COALESCE(MAX(seq), 0) FROM budget_invocation_quota_usage",
+        [],
+        |row| budget_u64_from_row(row, 0, "invocation quota usage sequence"),
     )?;
     Ok(max_seq)
 }

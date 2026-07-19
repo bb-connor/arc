@@ -104,7 +104,9 @@ fn make_context_request(index: usize) -> TestResult<ToolCallRequest> {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         model_metadata: None,
+        supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })
 }
 
@@ -120,6 +122,7 @@ fn evaluate_guard(guard: &WasmGuard, index: usize) -> TestResult<(usize, Verdict
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     Ok((index, guard.evaluate(&ctx)?.verdict))
 }

@@ -504,7 +504,9 @@ mod tests {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         }
     }
 
@@ -556,6 +558,7 @@ mod tests {
             server_id,
             session_filesystem_roots: None,
             matched_grant_index: grant_index,
+            security_context: None,
         }
     }
 
@@ -1319,7 +1322,9 @@ mod tests {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let request_b = chio_kernel::ToolCallRequest {
             request_id: "req-b".to_string(),
@@ -1335,7 +1340,9 @@ mod tests {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             model_metadata: None,
+            supplemental_authorization: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         // Exhaust cap-a.
