@@ -34,6 +34,7 @@ pub mod evidence_export;
 pub mod federation_policy;
 pub mod fiscal_runtime_readiness;
 pub mod fiscal_state_anchor;
+pub mod fiscal_state_commit;
 pub mod fiscal_state_recovery;
 pub mod issuance;
 pub mod passport_verifier;
