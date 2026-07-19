@@ -235,8 +235,11 @@ pub(crate) async fn handle_issue_open_market_fee_schedule(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_open_market_fee_schedule(&state.config, &request)
-    {
+    match service_runtime::issuance::issue_signed_open_market_fee_schedule(
+        &state.config,
+        &request,
+        state.fiscal_runtime.as_deref(),
+    ) {
         Ok(artifact) => Json(artifact).into_response(),
         Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     }
@@ -250,7 +253,11 @@ pub(crate) async fn handle_issue_open_market_penalty(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_open_market_penalty(&state.config, &request) {
+    match service_runtime::issuance::issue_signed_open_market_penalty(
+        &state.config,
+        &request,
+        state.fiscal_runtime.as_deref(),
+    ) {
         Ok(artifact) => Json(artifact).into_response(),
         Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     }
@@ -264,7 +271,11 @@ pub(crate) async fn handle_evaluate_open_market_penalty(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::evaluate_open_market_penalty_request(&state.config, &request) {
+    match service_runtime::issuance::evaluate_open_market_penalty_request(
+        &state.config,
+        &request,
+        state.fiscal_runtime.as_deref(),
+    ) {
         Ok(report) => Json(report).into_response(),
         Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     }
