@@ -204,6 +204,7 @@ pub(crate) async fn handle_issue_underwriting_decision(
         &request.query,
         request.supersedes_decision_id.as_deref(),
         chio_kernel::ReceiptReadContext::admin_service(),
+        state.fiscal_runtime.as_deref(),
     ) {
         Ok(decision) => Json::<SignedUnderwritingDecision>(decision).into_response(),
         Err(error) => error.into_response(),
