@@ -794,6 +794,31 @@ impl SqliteFiscalStore {
         )
     }
 
+    pub fn require_approval(
+        &self,
+        approval: &VerifiedFiscalApproval,
+    ) -> Result<(), FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let exact = transaction
+            .query_row(
+                "SELECT approval_digest = ?1 AND signed_json = ?2 FROM fiscal_approvals WHERE approval_id = ?3",
+                params![
+                    approval.digest(),
+                    canonical_json_bytes(approval.signed()).map_err(canonical_error)?,
+                    &approval.body().approval_id,
+                ],
+                |row| row.get::<_, bool>(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .unwrap_or(false);
+        if !exact {
+            return Err(FiscalStoreError::Conflict);
+        }
+        transaction.commit().map_err(sqlite_error)
+    }
+
     pub fn load_admission_state(
         &self,
         admission_id: &str,
