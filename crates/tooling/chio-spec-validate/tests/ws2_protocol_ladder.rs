@@ -93,7 +93,7 @@ fn protocol_names_the_exact_signed_and_unsigned_factoring_surfaces() -> TestResu
 }
 
 #[test]
-fn financial_ladder_pins_assignment_bind_and_refuses_unknown_classes() -> TestResult {
+fn financial_ladder_pins_governed_actions_and_refuses_unknown_classes() -> TestResult {
     let path = spec("CHIO_LADDER.md");
     let ladder = std::fs::read_to_string(&path)?;
     let schema = ladder_json(
@@ -126,6 +126,22 @@ fn financial_ladder_pins_assignment_bind_and_refuses_unknown_classes() -> TestRe
     });
     let refusal = json!("refuse");
     assert_eq!(matches, vec![&expected]);
+    let fiscal_matches: Vec<_> = actions
+        .iter()
+        .filter(|action| action["id"] == "fiscal.amendment_activate")
+        .collect();
+    let expected_fiscal = json!({
+        "id": "fiscal.amendment_activate",
+        "title": "Fiscal amendment activation",
+        "mode": "receipt_backed",
+        "destructive": true,
+        "cross_org_visibility": "private",
+        "evidence_required": ["operator_report", "workflow_receipt", "external"],
+        "co_sign": "none",
+        "consistency_model": "totally-ordered",
+        "consistency_anchor": "external-checkpoint"
+    });
+    assert_eq!(fiscal_matches, vec![&expected_fiscal]);
     assert_eq!(
         manifest.pointer("/ladder_refusal_policy/on_unknown_class"),
         Some(&refusal)

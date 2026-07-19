@@ -259,8 +259,8 @@ manifests against this schema before signature verification.
         },
         "consistency_anchor": {
           "type": "string",
-          "enum": ["chio-anchor", "hash-chain", "frost-quorum"],
-          "description": "REQUIRED for `totally-ordered` (hash-chain or chio-anchor) and `quorum-required` (frost-quorum)."
+          "enum": ["chio-anchor", "hash-chain", "frost-quorum", "external-checkpoint"],
+          "description": "REQUIRED for `totally-ordered` (hash-chain, chio-anchor, or external-checkpoint) and `quorum-required` (frost-quorum)."
         },
         "aliases": {
           "type": "array",
@@ -711,6 +711,17 @@ and [../crates/economy/chio-settle/src/lib.rs](../crates/economy/chio-settle/src
       "consistency_anchor": "chio-anchor"
     },
     {
+      "id": "fiscal.amendment_activate",
+      "title": "Fiscal amendment activation",
+      "mode": "receipt_backed",
+      "destructive": true,
+      "cross_org_visibility": "private",
+      "evidence_required": ["operator_report", "workflow_receipt", "external"],
+      "co_sign": "none",
+      "consistency_model": "totally-ordered",
+      "consistency_anchor": "external-checkpoint"
+    },
+    {
       "id": "factor.assignment_bind",
       "title": "Receivable assignment binding",
       "mode": "receipt_backed",
@@ -807,6 +818,13 @@ amount and effective ceiling, nonce, due date, and validity window. Completion
 requires the matching online authoritative exposure compare-and-swap. Receipts,
 audit chains, anchoring, and leases never substitute for that compare-and-swap,
 and this action class has no partition fallback.
+
+For `fiscal.amendment_activate`, the local authority floor is high assurance.
+The active fiscal charter's independent m-of-n approval set is the domain
+authorization check, so ladder `co_sign` remains `none` and does not imply a
+FROST quorum. The external checkpoint orders the continuity sequence, schedule
+heads, activation history, runtime readiness digest, and trusted clock
+high-water mark.
 
 For `factor.assignment_bind`, `bilateral_required` means signatures from the
 seller and buyer over the exact assignment agreement. The `hash-chain` anchor
