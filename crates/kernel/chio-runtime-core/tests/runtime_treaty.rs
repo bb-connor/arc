@@ -16,6 +16,10 @@ fn bilateral_dsse_consistency_models_use_wire_vocabulary() {
         ("totally_ordered", "totally-ordered"),
         ("single_kernel", "single-kernel"),
         ("quorum_required", "quorum-required"),
+        ("crdt-commutative", "crdt-commutative"),
+        ("totally-ordered", "totally-ordered"),
+        ("single-kernel", "single-kernel"),
+        ("quorum-required", "quorum-required"),
     ] {
         let actual = match bilateral_dsse_consistency_model(runtime) {
             Ok(actual) => actual,
@@ -23,7 +27,7 @@ fn bilateral_dsse_consistency_models_use_wire_vocabulary() {
         };
         assert_eq!(actual, wire);
     }
-    assert!(bilateral_dsse_consistency_model("totally-ordered").is_err());
+    assert!(bilateral_dsse_consistency_model("unsupported").is_err());
 }
 
 fn accepted_admission_report() -> CrossBoundaryAdmissionReport {

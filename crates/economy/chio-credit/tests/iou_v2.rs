@@ -30,7 +30,7 @@ use chio_credit::{
     verify_iou_envelope_v2, CreditEvaluatorHook, IouEnvelopeCryptoFloorV2,
     IouEnvelopeIssuerTrustV2, IouEnvelopeMintContextV2, IouEnvelopeReceiptTrustV2,
     IouEnvelopeV2Error, IouEnvelopeVerificationContextV2, LocalCreditAccount, SignedIouEnvelopeV2,
-    IOU_ENVELOPE_V2_SCHEMA,
+    RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
 };
 use credit_admission_support::{
     CreditAdmissionInput, PreparedCreditAdmission, TestCreditAdmissionStore,
@@ -435,7 +435,7 @@ fn replace_receipt_request_id(
 
 fn validate_schema(artifact: &impl serde::Serialize) -> TestResult {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../spec/schemas/chio-economy/credit-iou-envelope.v2.json");
+        .join("../../../spec/schemas/chio-economy/receivable-iou-envelope.v1.json");
     let schema = chio_spec_validate::load_json(&path)?;
     chio_spec_validate::validate_value(
         &path,
@@ -453,7 +453,7 @@ fn obligation_led_v2_mints_and_verifies_exact_evidence() -> TestResult {
     let canonical = signed.canonical_bytes()?;
     validate_schema(&signed)?;
     let parsed = SignedIouEnvelopeV2::from_canonical_bytes(&canonical)?;
-    assert_eq!(parsed.body().schema(), IOU_ENVELOPE_V2_SCHEMA);
+    assert_eq!(parsed.body().schema(), RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA);
     assert_eq!(
         parsed.body().operation_id(),
         sha256_hex(b"operation-credit-1")
@@ -591,7 +591,7 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
     let noncanonical = serde_json::to_vec_pretty(&value)?;
     assert!(SignedIouEnvelopeV2::from_canonical_bytes(&noncanonical).is_err());
 
-    value["body"]["schema"] = serde_json::json!("chio.credit.iou-envelope.v3");
+    value["body"]["schema"] = serde_json::json!("chio.credit.iou-envelope.v9");
     let unknown = canonical_json_bytes(&value)?;
     assert_eq!(
         SignedIouEnvelopeV2::from_canonical_bytes(&unknown),

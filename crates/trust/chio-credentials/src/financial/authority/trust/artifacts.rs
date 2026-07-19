@@ -105,7 +105,7 @@ pub fn sign_entry_activation_decision_v2(
     input: EntryActivationDecisionInputV2,
 ) -> Result<SignedEntryActivationDecisionV2, CredentialError> {
     let mut body = EntryActivationDecisionV2 {
-        schema: ENTRY_ACTIVATION_DECISION_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1.to_string(),
         pack_id: input.pack_id,
         verifier_id: input.verifier_id,
         signer_key_id: input.signer_key_id,
@@ -137,7 +137,7 @@ pub fn sign_cross_issuer_trust_pack_v2(
     input: CrossIssuerTrustPackInputV2,
 ) -> Result<SignedCrossIssuerTrustPackV2, CredentialError> {
     let body = CrossIssuerTrustPackV2 {
-        schema: CROSS_ISSUER_TRUST_PACK_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1.to_string(),
         pack_id: input.pack_id,
         verifier_id: input.verifier_id,
         signer_key_id: input.signer_key_id,
@@ -193,7 +193,7 @@ pub fn sign_cross_issuer_migration_v2(
     input: CrossIssuerMigrationInputV2,
 ) -> Result<SignedCrossIssuerMigrationV2, CredentialError> {
     let mut body = CrossIssuerMigrationV2 {
-        schema: CROSS_ISSUER_MIGRATION_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1.to_string(),
         migration_id: input.migration_id,
         attester_id: input.attester_id,
         signer_key_id: input.signer_key_id,
@@ -248,7 +248,7 @@ pub fn sign_legacy_credential_issuance_anchor_v2(
     input: LegacyCredentialIssuanceAnchorInputV2,
 ) -> Result<SignedLegacyCredentialIssuanceAnchorV2, CredentialError> {
     let mut body = LegacyCredentialIssuanceAnchorV2 {
-        schema: LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1.to_string(),
         authority_id: input.authority_id,
         signer_key_epoch: input.signer_key_epoch,
         registry_generation: input.registry_generation,
@@ -337,7 +337,7 @@ fn verify_activation_decision_signature(
 }
 
 fn validate_trust_pack_body(body: &CrossIssuerTrustPackV2) -> Result<(), CredentialError> {
-    if body.schema != CROSS_ISSUER_TRUST_PACK_SCHEMA_V2
+    if body.schema != FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1
         || body.created_at >= body.expires_at
         || body.decisions.is_empty()
     {
@@ -376,7 +376,7 @@ fn validate_trust_pack_body(body: &CrossIssuerTrustPackV2) -> Result<(), Credent
 fn normalize_activation_decision(
     body: &mut EntryActivationDecisionV2,
 ) -> Result<(), CredentialError> {
-    if body.schema != ENTRY_ACTIVATION_DECISION_SCHEMA_V2 {
+    if body.schema != FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1 {
         return Err(authority_error("entry activation schema is invalid"));
     }
     for (field, value) in [
@@ -428,7 +428,7 @@ fn normalize_activation_decision(
 }
 
 fn validate_migration_body(body: &mut CrossIssuerMigrationV2) -> Result<(), CredentialError> {
-    if body.schema != CROSS_ISSUER_MIGRATION_SCHEMA_V2 {
+    if body.schema != FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1 {
         return Err(authority_error("cross-issuer migration schema is invalid"));
     }
     for value in [
@@ -467,7 +467,7 @@ fn validate_migration_body(body: &mut CrossIssuerMigrationV2) -> Result<(), Cred
 fn validate_legacy_anchor_body(
     body: &LegacyCredentialIssuanceAnchorV2,
 ) -> Result<(), CredentialError> {
-    if body.schema != LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V2 {
+    if body.schema != FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1 {
         return Err(authority_error("legacy issuance anchor schema is invalid"));
     }
     validate_text("legacyAnchor.authorityId", &body.authority_id)?;

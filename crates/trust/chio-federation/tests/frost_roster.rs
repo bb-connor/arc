@@ -171,7 +171,7 @@ fn frost_roster_rejects_unknown_shape_and_invalid_contract_fields() {
     assert!(serde_json::from_value::<FrostRosterV1>(value).is_err());
 
     let mut unknown_schema = roster.clone();
-    unknown_schema.schema = "chio.frost.roster.v2".to_string();
+    unknown_schema.schema = "chio.frost.roster.v9".to_string();
     assert!(unknown_schema.validate().is_err());
 
     let mut unsorted = roster.clone();
@@ -297,7 +297,7 @@ fn frost_roster_published_schemas_validate_signed_fixtures() {
     for (case, mutate) in [
         (
             "unknown version",
-            ("schema", serde_json::json!("chio.frost.roster.v2")),
+            ("schema", serde_json::json!("chio.frost.roster.v9")),
         ),
         (
             "invalid domain",

@@ -51,7 +51,7 @@ fn assert_unknown_schema_rejected(name: &str, artifact: &impl Serialize) -> Test
     } else {
         &mut value["schema"]
     };
-    *schema_value = json!("chio.outcome.unknown.v2");
+    *schema_value = json!("chio.outcome.unknown.v9");
     assert!(chio_spec_validate::validate_value(
         &path,
         &schema,

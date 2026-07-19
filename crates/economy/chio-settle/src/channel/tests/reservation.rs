@@ -162,7 +162,7 @@ fn prepared_reservation_digest_is_domain_separated_and_canonical() -> Result<(),
     assert_ne!(changed_checkpoint.digest()?, prepared_digest);
 
     let mut wrong_schema = prepared;
-    wrong_schema.schema = "chio.channel.prepared-reservation.v2".to_owned();
+    wrong_schema.schema = "chio.channel.prepared-reservation.v9".to_owned();
     assert!(wrong_schema.digest().is_err());
     Ok(())
 }

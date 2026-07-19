@@ -20,7 +20,8 @@ use crate::dispatch_status::{
 use crate::runtime::ToolCallRequest;
 
 pub const RAW_INVOCATION_OUTCOME_SCHEMA: &str = "chio.raw-invocation-outcome.v1";
-pub const RAW_INVOCATION_OUTCOME_V2_SCHEMA: &str = "chio.raw-invocation-outcome.v2";
+pub const RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-request.v1";
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
 pub const POST_RETURN_EVALUATION_SCHEMA: &str = "chio.post-return-evaluation.v1";
 pub const POST_RETURN_EXACT_INPUTS_SCHEMA: &str = "chio.post-return-exact-inputs.v1";
@@ -404,7 +405,7 @@ impl RawInvocationOutcomeV1 {
         let request_canonical_json = String::from_utf8(canonical(request)?)
             .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))?;
         Self::from_committed_dispatch_parts(
-            RAW_INVOCATION_OUTCOME_V2_SCHEMA,
+            RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA,
             operation,
             commit,
             tool_server,
@@ -499,7 +500,9 @@ impl RawInvocationOutcomeV1 {
             value.request_canonical_json.is_some(),
         ) {
             (RAW_INVOCATION_OUTCOME_SCHEMA, false) => RAW_INVOCATION_OUTCOME_SCHEMA,
-            (RAW_INVOCATION_OUTCOME_V2_SCHEMA, true) => RAW_INVOCATION_OUTCOME_V2_SCHEMA,
+            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true) => {
+                RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
+            }
             _ => return Err(ToolOutcomeError::Invalid("raw.schema")),
         };
         if value.request_canonical_json.as_deref() == Some("") {

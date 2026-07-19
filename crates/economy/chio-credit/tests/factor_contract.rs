@@ -127,25 +127,25 @@ fn factor_artifacts_are_strict_canonical_and_schema_valid() -> TestResult {
     assert!(serde_json::from_value::<NormalizedAssignmentRequestV1>(unknown).is_err());
 
     let mut unknown = serde_json::to_value(&claim)?;
-    unknown["schema"] = serde_json::json!("chio.factor.receivable-claim.v2");
+    unknown["schema"] = serde_json::json!("chio.factor.receivable-claim.v9");
     assert_eq!(
         serde_json::from_value::<ReceivableClaimV1>(unknown)?.validate(),
         Err(FactorError::InvalidField("claim_schema"))
     );
     let mut unknown = serde_json::to_value(&offer)?;
-    unknown["schema"] = serde_json::json!("chio.factor.assignment-offer.v2");
+    unknown["schema"] = serde_json::json!("chio.factor.assignment-offer.v9");
     assert_eq!(
         serde_json::from_value::<AssignmentOfferV1>(unknown)?.validate(),
         Err(FactorError::InvalidField("offer_schema"))
     );
     let mut unknown = serde_json::to_value(&quote)?;
-    unknown["schema"] = serde_json::json!("chio.factor.discount-quote.v2");
+    unknown["schema"] = serde_json::json!("chio.factor.discount-quote.v9");
     assert_eq!(
         serde_json::from_value::<DiscountQuoteV1>(unknown)?.validate(),
         Err(FactorError::InvalidField("discount_quote_schema"))
     );
     let mut unknown = serde_json::to_value(&request)?;
-    unknown["schema"] = serde_json::json!("chio.factor.normalized-assignment-request.v2");
+    unknown["schema"] = serde_json::json!("chio.factor.normalized-assignment-request.v9");
     assert_eq!(
         serde_json::from_value::<NormalizedAssignmentRequestV1>(unknown)?.validate(),
         Err(FactorError::InvalidField("normalized_request_schema"))

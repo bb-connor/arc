@@ -167,7 +167,7 @@
     "validUntil"
   ],
   "properties": {
-    "schema": { "const": "chio.agent-passport.v2" },
+    "schema": { "const": "chio.financial-agent-passport.v1" },
     "subject": { "$ref": "https://chio.world/schemas/financial-credential-defs/v1.schema.json#/$defs/did" },
     "credentials": {
       "type": "array",

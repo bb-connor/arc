@@ -37,7 +37,7 @@ pub use iou_v2::{
     verify_iou_envelope_v2, IouEnvelopeBodyV2, IouEnvelopeCryptoFloorV2, IouEnvelopeIssuerTrustV2,
     IouEnvelopeMintContextV2, IouEnvelopeReceiptTrustV2, IouEnvelopeV2Error,
     IouEnvelopeVerificationContextV2, SignedIouEnvelopeV2, VerifiedIouEnvelopeV2,
-    CHIO_CREDIT_IOU_ENVELOPE_V2_SCHEMA, IOU_ENVELOPE_V2_SCHEMA,
+    CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA, RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
 };
 pub use local_account::LocalCreditAccount;
 pub use risk_reports::{

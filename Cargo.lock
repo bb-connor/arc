@@ -3062,6 +3062,7 @@ dependencies = [
  "chio-credentials",
  "chio-data-guards",
  "chio-did",
+ "chio-egress-contract",
  "chio-enterprise-export",
  "chio-errors",
  "chio-external-guards",

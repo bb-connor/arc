@@ -300,7 +300,7 @@ pub fn sign_single_passport_lifecycle_snapshot_v2(
     let result_digest = authority_digest(
         LIFECYCLE_RESULT_DIGEST_DOMAIN,
         &LifecycleResultDigestPreimageV2 {
-            schema: CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V2,
+            schema: FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1,
             resolver_identity: &input.resolver_identity,
             signer_key_id: &input.signer_key_id,
             signer_key_epoch: input.signer_key_epoch,
@@ -321,7 +321,7 @@ pub fn sign_single_passport_lifecycle_snapshot_v2(
     let leaf_bytes = canonical_json_bytes(&leaf)?;
     let tree = chio_core::MerkleTree::from_leaves(&[leaf_bytes])?;
     let mut checkpoint = IssuerLifecycleCheckpointV2 {
-        schema: ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1.to_string(),
         resolver_identity: input.resolver_identity.clone(),
         signer_key_id: input.signer_key_id.clone(),
         signer_key_epoch: input.signer_key_epoch,
@@ -336,7 +336,7 @@ pub fn sign_single_passport_lifecycle_snapshot_v2(
     checkpoint.checkpoint_digest = recompute_lifecycle_checkpoint_digest(&checkpoint)?;
     let checkpoint = SignedIssuerLifecycleCheckpointV2::sign(checkpoint, signer)?;
     let result = CrossIssuerLifecycleResultV2 {
-        schema: CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1.to_string(),
         resolver_identity: input.resolver_identity,
         signer_key_id: input.signer_key_id,
         signer_key_epoch: input.signer_key_epoch,
@@ -369,7 +369,7 @@ pub fn sign_issuer_lifecycle_generation_pin_v2(
     validate_epoch("generationPin.signerKeyEpoch", signer_key_epoch)?;
     validate_optional_digest("generationPin.previousPinDigest", previous_pin_digest)?;
     let mut body = IssuerLifecycleGenerationPinV2 {
-        schema: ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1.to_string(),
         anchor_id: anchor_id.to_string(),
         signer_key_epoch,
         resolver_identity: checkpoint.body.resolver_identity.clone(),
@@ -399,7 +399,7 @@ pub fn sign_lifecycle_checkpoint_pin_v2(
     validate_checkpoint_pin_candidate(candidate)?;
     validate_optional_digest("checkpointPin.previousPinDigest", previous_pin_digest)?;
     let mut body = LifecycleCheckpointPinV2 {
-        schema: LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1.to_string(),
         store_id: store_id.to_string(),
         signer_key_epoch,
         resolver_identity: candidate.resolver_identity.clone(),
@@ -661,7 +661,7 @@ fn validate_snapshot_input(
 fn validate_lifecycle_checkpoint_body(
     body: &IssuerLifecycleCheckpointV2,
 ) -> Result<(), CredentialError> {
-    if body.schema != ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V2 {
+    if body.schema != FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1 {
         return Err(authority_error("lifecycle checkpoint schema is invalid"));
     }
     validate_text("checkpoint.resolverIdentity", &body.resolver_identity)?;
@@ -685,7 +685,7 @@ fn validate_lifecycle_checkpoint_body(
 fn validate_lifecycle_result_body(
     body: &CrossIssuerLifecycleResultV2,
 ) -> Result<(), CredentialError> {
-    if body.schema != CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V2 {
+    if body.schema != FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1 {
         return Err(authority_error("lifecycle result schema is invalid"));
     }
     validate_text("lifecycleResult.resolverIdentity", &body.resolver_identity)?;
@@ -722,7 +722,7 @@ fn validate_generation_pin_body(
     body: &IssuerLifecycleGenerationPinV2,
     require_digest: bool,
 ) -> Result<(), CredentialError> {
-    if body.schema != ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V2 {
+    if body.schema != FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1 {
         return Err(authority_error(
             "lifecycle generation pin schema is invalid",
         ));
@@ -782,7 +782,7 @@ fn validate_checkpoint_pin_body(
     body: &LifecycleCheckpointPinV2,
     require_digest: bool,
 ) -> Result<(), CredentialError> {
-    if body.schema != LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V2 {
+    if body.schema != FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1 {
         return Err(authority_error(
             "lifecycle checkpoint pin schema is invalid",
         ));

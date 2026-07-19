@@ -524,7 +524,7 @@ fn unknown_fields_and_unknown_versions_fail_closed() -> Result<(), Box<dyn core:
     let next = head(resource_key("round-1"), 1, 1, None)?;
     let (batch, _) = signed_batch(vec![transition(next, None)])?;
     let mut value = serde_json::to_value(batch)?;
-    value["schema"] = json!("chio.economy.state-batch.v2");
+    value["schema"] = json!("chio.economy.state-batch.v9");
     let decoded: EconomicStateBatchV1 = serde_json::from_value(value)?;
     assert!(decoded.validate().is_err());
 
@@ -561,7 +561,7 @@ fn wire_schemas_accept_canonical_values_and_reject_one_field_tampering(
     tampered_effect["state"] = json!("future_state");
     assert!(!effect_validator.is_valid(&tampered_effect));
     let mut unknown_batch = batch_json;
-    unknown_batch["schema"] = json!("chio.economy.state-batch.v2");
+    unknown_batch["schema"] = json!("chio.economy.state-batch.v9");
     assert!(!batch_validator.is_valid(&unknown_batch));
     Ok(())
 }

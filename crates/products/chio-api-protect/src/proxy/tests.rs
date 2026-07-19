@@ -231,6 +231,14 @@ fn test_state_with_receipt_db(
         trusted_capability_issuers,
         trusted_receipt_signers,
         sidecar_control_token: None,
+        budget_store: None,
+        mediation_hold_capable: false,
+        mediation_kernel: None,
+        minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+            chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
+        )),
+        reaper_handle: Mutex::new(None),
+        allow_advisory: false,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",
     })
@@ -1854,6 +1862,12 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        revocation_db: None,
+        require_nonce: false,
+        allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
     let error = ProtectProxy::new(config).run().await.test_unwrap_err();
@@ -1883,6 +1897,12 @@ async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            control_url: None,
+            control_token: None,
+            budget_db: None,
+            revocation_db: None,
+            require_nonce: false,
+            allow_advisory: false,
             upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         };
         let error = ProtectProxy::new(config).run().await.test_unwrap_err();

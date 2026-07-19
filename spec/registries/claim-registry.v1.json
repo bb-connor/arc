@@ -640,7 +640,7 @@
     {
       "id": "claim.fincred.source_manifest.credential_set_bound",
       "status": "enforced",
-      "schema_artifact": "spec/schemas/chio-trust/v1/agent-passport-source-manifest-v2.schema.json",
+      "schema_artifact": "spec/schemas/chio-trust/v1/financial-agent-passport-source-manifest.schema.json",
       "summary": "The signed V2 source manifest binds the exact credential set, subject, validity, roots, enterprise provenance, and issuer-asserted trust tier; redundant passport fields must match it exactly.",
       "introduced_in": "financial-credentials-v1",
       "proof_manifest_ref": "manifest.fincred.source_manifest.credential_set_bound"
@@ -648,7 +648,7 @@
     {
       "id": "claim.fincred.presentation_challenge.signed_exact",
       "status": "enforced",
-      "schema_artifact": "spec/schemas/chio-trust/v1/passport-presentation-challenge-v2.schema.json",
+      "schema_artifact": "spec/schemas/chio-trust/v1/financial-passport-presentation-challenge.schema.json",
       "summary": "A V2 presentation challenge carries a domain-separated body digest and verifier signature, and holders reject digest, signer, signature, or unknown-field tampering before disclosure.",
       "introduced_in": "financial-credentials-v1",
       "proof_manifest_ref": "manifest.fincred.presentation_challenge.signed_exact"

@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const SIGNED_SCHEMAS: [&str; 6] = [
-    "chio.credit.iou-envelope.v2",
+    "chio.credit.receivable-iou-envelope.v1",
     "chio.factor.assignment-acknowledgement.v1",
     "chio.factor.assignment-agreement.v1",
     "chio.factor.assignment-bind-authorization.v1",
@@ -84,8 +84,8 @@ fn protocol_names_the_exact_signed_and_unsigned_factoring_surfaces() -> TestResu
     assert!(factoring.contains("MUST NOT downgrade, reinterpret, or fall back"));
     for schema in [
         "chio.credit.iou-envelope.v1",
-        "chio.credit.iou-envelope.v3",
-        "chio.factor.assignment-agreement.v2",
+        "chio.credit.iou-envelope.v9",
+        "chio.factor.assignment-agreement.v9",
     ] {
         assert!(!schema_bullets(signed).contains(schema));
     }
@@ -148,7 +148,7 @@ fn financial_ladder_pins_governed_actions_and_refuses_unknown_classes() -> TestR
     );
     assert!(actions
         .iter()
-        .all(|action| action["id"] != "factor.assignment_bind.v2"));
+        .all(|action| action["id"] != "factor.assignment_bind.v9"));
 
     manifest["signature"] = json!({
         "signer_key": "00",
@@ -157,7 +157,7 @@ fn financial_ladder_pins_governed_actions_and_refuses_unknown_classes() -> TestR
     });
     chio_spec_validate::validate_value(&path, &schema, &path, &manifest)?;
 
-    manifest["schema"] = json!("chio.federation.governance-ladder-manifest.v2");
+    manifest["schema"] = json!("chio.federation.governance-ladder-manifest.v9");
     assert!(chio_spec_validate::validate_value(&path, &schema, &path, &manifest).is_err());
     Ok(())
 }

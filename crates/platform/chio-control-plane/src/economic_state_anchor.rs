@@ -18,6 +18,7 @@ use chio_core::economic_continuity::{
     VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES, MAX_ECONOMIC_INLINE_CONTENT_BYTES,
     MAX_ECONOMIC_TERMINAL_CONTENT_BYTES, MAX_ECONOMIC_TRANSITIONS,
 };
+use chio_egress_contract::HttpEgressContract;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -63,6 +64,8 @@ pub enum EconomicStateAnchorConfigError {
     InvalidTimeout,
     #[error("failed to build economic anchor HTTP client: {0}")]
     HttpClient(String),
+    #[error("invalid economic anchor HTTP egress contract: {0}")]
+    InvalidEgressContract(String),
     #[error("invalid economic anchor pins: {0}")]
     InvalidPins(#[from] EconomicStateAnchorError),
 }
@@ -89,6 +92,12 @@ impl RemoteEconomicStateAnchorConfig {
         if self.timeout.is_zero() {
             return Err(EconomicStateAnchorConfigError::InvalidTimeout);
         }
+        crate::anchor_egress::strict_https_contract(
+            &endpoint,
+            "control-plane.economic-state-anchor",
+            ECONOMIC_STATE_RESPONSE_LIMIT as u64,
+        )
+        .map_err(EconomicStateAnchorConfigError::InvalidEgressContract)?;
         self.pins.validate()?;
         Ok(())
     }
@@ -102,6 +111,7 @@ struct HttpsEconomicStateAnchorTransport {
     client: reqwest::blocking::Client,
     base_url: String,
     bearer_token: Arc<str>,
+    egress_contract: HttpEgressContract,
 }
 
 impl fmt::Debug for HttpsEconomicStateAnchorTransport {
@@ -118,8 +128,20 @@ impl HttpsEconomicStateAnchorTransport {
     fn new(
         config: &RemoteEconomicStateAnchorConfig,
     ) -> Result<Self, EconomicStateAnchorConfigError> {
+        let endpoint = url::Url::parse(&config.base_url)
+            .map_err(|error| EconomicStateAnchorConfigError::InvalidUrl(error.to_string()))?;
+        let egress_contract = crate::anchor_egress::strict_https_contract(
+            &endpoint,
+            "control-plane.economic-state-anchor",
+            ECONOMIC_STATE_RESPONSE_LIMIT as u64,
+        )
+        .map_err(EconomicStateAnchorConfigError::InvalidEgressContract)?;
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
+        // denies redirects and proxies, and each request is contract-preflighted.
         let client = reqwest::blocking::Client::builder()
             .https_only(true)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
             .timeout(config.timeout)
             .build()
             .map_err(|error| EconomicStateAnchorConfigError::HttpClient(error.to_string()))?;
@@ -127,6 +149,7 @@ impl HttpsEconomicStateAnchorTransport {
             client,
             base_url: config.base_url.trim_end_matches('/').to_owned(),
             bearer_token: Arc::from(config.bearer_token.as_str()),
+            egress_contract,
         })
     }
 }
@@ -138,12 +161,18 @@ impl EconomicStateAnchorTransport for HttpsEconomicStateAnchorTransport {
                 "economic anchor request exceeds the transport bound".to_owned(),
             ));
         }
+        let endpoint = format!("{}{path}", self.base_url);
+        self.egress_contract
+            .enforce_url_with_dns(&endpoint, 0)
+            .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
         let response = self
             .client
-            .post(format!("{}{path}", self.base_url))
+            .post(endpoint)
             .bearer_auth(self.bearer_token.as_ref())
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(body.to_vec())
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
+            // enforced immediately above for this exact URL.
             .send()
             .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
         if !response.status().is_success() {
@@ -152,18 +181,18 @@ impl EconomicStateAnchorTransport for HttpsEconomicStateAnchorTransport {
                 response.status()
             )));
         }
-        if response
-            .content_length()
-            .is_some_and(|length| length > ECONOMIC_STATE_RESPONSE_LIMIT as u64)
-        {
-            return Err(EconomicStateAnchorError::Unavailable(
-                "economic anchor response exceeds the transport bound".to_owned(),
-            ));
+        if let Some(length) = response.content_length() {
+            self.egress_contract
+                .enforce_response_bytes(length)
+                .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
         }
         let mut body = Vec::new();
         response
             .take(ECONOMIC_STATE_RESPONSE_LIMIT as u64 + 1)
             .read_to_end(&mut body)
+            .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
+        self.egress_contract
+            .enforce_response_bytes(body.len() as u64)
             .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
         ensure_bounded_response(&body)?;
         Ok(body)

@@ -921,8 +921,9 @@ mod proxy_builder_tests {
             "a proxy defaults to no payment adapter, keeping governed MustPrepay denied"
         );
 
-        let configured = ProtectProxy::new(minimal_config())
-            .with_payment_adapter(Some(Box::new(chio_kernel::SimPaymentAdapter::new())));
+        let configured = ProtectProxy::new(minimal_config()).with_payment_adapter(Some(Box::new(
+            chio_kernel::payment::SimPaymentAdapter::new(),
+        )));
         assert!(
             configured.payment_adapter.is_some(),
             "with_payment_adapter must thread the configured adapter into the proxy"

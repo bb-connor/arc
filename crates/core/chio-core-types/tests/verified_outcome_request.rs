@@ -84,7 +84,7 @@ fn verified_outcome_extension_validates_derived_ids_and_schema() {
     assert!(invalid.validate().is_err());
 
     let mut invalid = request();
-    invalid.schema = "chio.outcome.request.v2".to_owned();
+    invalid.schema = "chio.outcome.request.v9".to_owned();
     assert!(invalid.validate().is_err());
 }
 

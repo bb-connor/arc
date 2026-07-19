@@ -575,7 +575,7 @@ fn acknowledgement_rejects_tampering_noncanonical_bytes_and_wrong_authority() ->
     assert_eq!(
         require_factor_error(verify_acknowledgement(
             &fixture,
-            &replace_schema(&canonical, "chio.factor.assignment-acknowledgement.v2")?,
+            &replace_schema(&canonical, "chio.factor.assignment-acknowledgement.v9")?,
         )),
         FactorError::InvalidField("acknowledgement_schema")
     );
@@ -752,7 +752,7 @@ fn not_applied_rejects_tampering_noncanonical_bytes_and_wrong_authority() -> Tes
     assert_eq!(
         require_factor_error(verify_not_applied(
             &fixture,
-            &replace_schema(&canonical, "chio.factor.assignment-not-applied.v2")?,
+            &replace_schema(&canonical, "chio.factor.assignment-not-applied.v9")?,
             &fixture.prior_disposition,
             &fixture.settlement_lifecycle,
             SNAPSHOT_VERSION + 1,

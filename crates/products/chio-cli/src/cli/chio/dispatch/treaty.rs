@@ -374,7 +374,7 @@ mod tests {
             continuation_sha256: continuation_sha256.clone(),
             lineage_statement_sha256: "00".repeat(32),
             action_class_id: continuation.action_class_id.clone(),
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             capability_id: continuation.capability_id.clone(),
             request_sha256: "55".repeat(32),
             outcome_sha256: "66".repeat(32),

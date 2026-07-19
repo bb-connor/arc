@@ -654,7 +654,7 @@ fn terminal_outcome_schema_and_wire_reject_noncanonical_or_unknown_fields() -> T
     }
 
     let mut wrong_schema = artifact.clone();
-    wrong_schema["body"]["schema"] = Value::String("chio.channel.terminal-outcome.v2".to_owned());
+    wrong_schema["body"]["schema"] = Value::String("chio.channel.terminal-outcome.v9".to_owned());
     assert!(validate_schema("channel-terminal-outcome-commitment.v1.json", &wrong_schema).is_err());
     let mut unknown = artifact.clone();
     unknown["unexpected"] = Value::Bool(true);
@@ -678,7 +678,7 @@ fn transition_replay_schema_rejects_unknown_format_version_kind_and_fields() -> 
     for mutation in [
         {
             let mut value = replay.clone();
-            value["format"] = Value::String("chio.channel.transition-replay.v2".to_owned());
+            value["format"] = Value::String("chio.channel.transition-replay.v9".to_owned());
             value
         },
         {

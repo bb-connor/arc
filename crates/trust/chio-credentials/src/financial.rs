@@ -1,17 +1,17 @@
-pub const AGENT_PASSPORT_SCHEMA_V2: &str = "chio.agent-passport.v2";
-pub const AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V2: &str = "chio.agent-passport.source-manifest.v2";
-pub const PRESENTED_AGENT_PASSPORT_SCHEMA_V2: &str = "chio.agent-passport.presentation.v2";
-pub const PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V2: &str =
-    "chio.agent-passport-presentation-challenge.v2";
-pub const PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V2: &str =
-    "chio.agent-passport-presentation-response.v2";
+pub const FINANCIAL_AGENT_PASSPORT_SCHEMA_V1: &str = "chio.financial-agent-passport.v1";
+pub const FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1: &str = "chio.financial-agent-passport.source-manifest.v1";
+pub const PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1: &str = "chio.financial-agent-passport.presentation.v1";
+pub const FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1: &str =
+    "chio.financial-agent-passport-presentation-challenge.v1";
+pub const FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1: &str =
+    "chio.financial-agent-passport-presentation-response.v1";
 
 const FINANCIAL_CREDENTIAL_ID_DOMAIN: &[u8] = b"chio.fincred.credential-id.v1\0";
-const PASSPORT_CREDENTIAL_REF_DOMAIN: &[u8] = b"chio.agent-passport.credential-ref.v2\0";
-const PASSPORT_SOURCE_MANIFEST_ID_DOMAIN: &[u8] = b"chio.agent-passport.source-manifest-id.v2\0";
-const PASSPORT_PRESENTATION_DIGEST_DOMAIN: &[u8] = b"chio.agent-passport.presentation-digest.v2\0";
+const PASSPORT_CREDENTIAL_REF_DOMAIN: &[u8] = b"chio.financial-agent-passport.credential-ref.v1\0";
+const PASSPORT_SOURCE_MANIFEST_ID_DOMAIN: &[u8] = b"chio.financial-agent-passport.source-manifest-id.v1\0";
+const PASSPORT_PRESENTATION_DIGEST_DOMAIN: &[u8] = b"chio.financial-agent-passport.presentation-digest.v1\0";
 const PASSPORT_PRESENTATION_CHALLENGE_DIGEST_DOMAIN: &[u8] =
-    b"chio.agent-passport.presentation-challenge-digest.v2\0";
+    b"chio.financial-agent-passport.presentation-challenge-digest.v1\0";
 const FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-artifact.v1\0";
 const FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-disclosure.v1\0";
 const MAX_FINANCIAL_SOURCE_ARTIFACTS: usize = 256;
@@ -641,7 +641,7 @@ fn decode_versioned_agent_passport_value(
         PASSPORT_SCHEMA => serde_json::from_value(value)
             .map(VersionedAgentPassport::V1)
             .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string())),
-        AGENT_PASSPORT_SCHEMA_V2 => {
+        FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 => {
             let passport = serde_json::from_value(value)
                 .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string()))?;
             validate_agent_passport_v2_contract(&passport)
@@ -657,7 +657,7 @@ fn decode_versioned_agent_passport_value(
 #[must_use]
 pub fn upgrade_v1_passport(passport: AgentPassport) -> AgentPassportV2 {
     AgentPassportV2 {
-        schema: AGENT_PASSPORT_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_AGENT_PASSPORT_SCHEMA_V1.to_string(),
         subject: passport.subject,
         credentials: passport
             .credentials
@@ -677,7 +677,7 @@ pub fn upgrade_v1_passport(passport: AgentPassport) -> AgentPassportV2 {
 pub fn try_downgrade_v2_passport(
     passport: AgentPassportV2,
 ) -> Result<AgentPassport, CredentialError> {
-    if passport.schema != AGENT_PASSPORT_SCHEMA_V2 {
+    if passport.schema != FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 {
         return Err(CredentialError::UnsupportedVersionedPassportSchema(
             passport.schema,
         ));

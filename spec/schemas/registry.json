@@ -1692,10 +1692,10 @@
       "schemaFile": "spec/schemas/chio-economy/credit-facility-bind.v1.json"
     },
     {
-      "schema": "chio.credit.iou-envelope.v2",
+      "schema": "chio.credit.receivable-iou-envelope.v1",
       "artifactKind": "credit_iou_envelope",
       "introducedBy": "receivables-factoring-v1",
-      "schemaFile": "spec/schemas/chio-economy/credit-iou-envelope.v2.json"
+      "schemaFile": "spec/schemas/chio-economy/receivable-iou-envelope.v1.json"
     },
     {
       "schema": "chio.factor.normalized-assignment-request.v1",
@@ -1890,16 +1890,16 @@
       "schemaFile": "spec/schemas/chio-economy/channel-transition-replay.v1.json"
     },
     {
-      "schema": "chio.agent-passport.source-manifest.v2",
+      "schema": "chio.financial-agent-passport.source-manifest.v1",
       "artifactKind": "agent_passport_source_manifest",
       "introducedBy": "financial-credentials-v1",
-      "schemaFile": "spec/schemas/chio-trust/v1/agent-passport-source-manifest-v2.schema.json"
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-agent-passport-source-manifest.schema.json"
     },
     {
-      "schema": "chio.agent-passport-presentation-challenge.v2",
+      "schema": "chio.financial-agent-passport-presentation-challenge.v1",
       "artifactKind": "agent_passport_presentation_challenge",
       "introducedBy": "financial-credentials-v1",
-      "schemaFile": "spec/schemas/chio-trust/v1/passport-presentation-challenge-v2.schema.json"
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-passport-presentation-challenge.schema.json"
     },
     {
       "schema": "chio.fincred.credit-scorecard.v1",
@@ -1950,16 +1950,16 @@
       "schemaFile": "spec/schemas/chio-trust/v1/financial-source-completeness-attestation.schema.json"
     },
     {
-      "schema": "chio.agent-passport.v2",
+      "schema": "chio.financial-agent-passport.v1",
       "artifactKind": "agent_passport_v2",
       "introducedBy": "financial-credentials-v1",
-      "schemaFile": "spec/schemas/chio-trust/v1/agent-passport-v2.schema.json"
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-agent-passport.schema.json"
     },
     {
-      "schema": "chio.agent-passport.presentation.v2",
+      "schema": "chio.financial-agent-passport.presentation.v1",
       "artifactKind": "presented_agent_passport_v2",
       "introducedBy": "financial-credentials-v1",
-      "schemaFile": "spec/schemas/chio-trust/v1/presented-agent-passport-v2.schema.json"
+      "schemaFile": "spec/schemas/chio-trust/v1/presented-financial-agent-passport.schema.json"
     },
     {
       "schema": "chio.fiscal.charter.v1",

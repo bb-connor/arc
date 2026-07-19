@@ -44,7 +44,7 @@
         "merkleRoots"
       ],
       "properties": {
-        "schema": { "const": "chio.agent-passport.source-manifest.v2" },
+        "schema": { "const": "chio.financial-agent-passport.source-manifest.v1" },
         "sourcePassportId": { "$ref": "https://chio.world/schemas/financial-credential-defs/v1.schema.json#/$defs/digest" },
         "issuer": { "$ref": "https://chio.world/schemas/financial-credential-defs/v1.schema.json#/$defs/did" },
         "subject": { "$ref": "https://chio.world/schemas/financial-credential-defs/v1.schema.json#/$defs/did" },

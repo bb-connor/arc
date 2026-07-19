@@ -1329,7 +1329,7 @@ impl ChioKernel {
         let post_guard_decision_digest = admission_digest(
             "post_guard_decision_digest",
             &KernelOutputGuardDecision {
-                schema: "chio.kernel-output-guard-decision.v2",
+                schema: "chio.kernel-output-guard-decision.post-return.v1",
                 resolved_output_digest: resolved_output_digest.as_str(),
                 decision: &terminal_decision,
             },

@@ -38,7 +38,7 @@
         "issuerKeyEpoch"
       ],
       "properties": {
-        "schema": { "const": "chio.credit.iou-envelope.v2" },
+        "schema": { "const": "chio.credit.receivable-iou-envelope.v1" },
         "iouId": { "$ref": "#/$defs/digest" },
         "operationId": { "$ref": "#/$defs/digest" },
         "obligationId": { "$ref": "#/$defs/digest" },

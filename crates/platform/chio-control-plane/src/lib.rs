@@ -15,6 +15,7 @@ use chio_errors::_generated::error_codes::{
 use chio_errors::{ChioError, ErrorCodeSpec};
 use chio_kernel::transport::TransportError;
 use chio_kernel::{ChioKernel, KernelConfig, StructuredErrorReport};
+mod anchor_egress;
 pub mod attestation;
 pub mod certify;
 mod durable_admission;

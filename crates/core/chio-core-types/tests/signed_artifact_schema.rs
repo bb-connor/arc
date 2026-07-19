@@ -119,7 +119,7 @@ fn clearing_signed_artifact_schemas_are_registered() {
                 && entry.introduced_by == "ws4-clearing-v1"));
     }
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.clearing.round-finalization.v2"
+        "chio.clearing.round-finalization.v9"
     ));
 }
 
@@ -157,7 +157,7 @@ fn channel_signed_artifact_schemas_are_registered() {
                 && entry.introduced_by == "micro-escrow-channels-v1"));
     }
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.channel.open.v2"
+        "chio.channel.open.v9"
     ));
 }
 
@@ -191,11 +191,11 @@ fn financial_credential_signed_artifact_schemas_are_registered() {
             "financial_source_completeness_attestation",
         ),
         (
-            "chio.agent-passport.source-manifest.v2",
+            "chio.financial-agent-passport.source-manifest.v1",
             "agent_passport_source_manifest",
         ),
         (
-            "chio.agent-passport-presentation-challenge.v2",
+            "chio.financial-agent-passport-presentation-challenge.v1",
             "agent_passport_presentation_challenge",
         ),
     ] {
@@ -207,7 +207,7 @@ fn financial_credential_signed_artifact_schemas_are_registered() {
                 && entry.introduced_by == "financial-credentials-v1"));
     }
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.fincred.credit-scorecard.v2"
+        "chio.fincred.credit-scorecard.v9"
     ));
 }
 
@@ -240,7 +240,7 @@ fn fiscal_signed_artifact_schemas_are_registered() {
                 && entry.introduced_by == "fiscal-constitutions-v1"));
     }
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.fiscal.charter.v2"
+        "chio.fiscal.charter.v9"
     ));
 }
 
@@ -278,7 +278,7 @@ fn econsim_qualification_matrix_is_registered_and_unknown_versions_fail_closed()
             && entry.introduced_by == "economic-wind-tunnel-v1"));
     assert!(chio_core_types::validate_signed_artifact_schema(schema).is_ok());
     assert!(chio_core_types::validate_signed_artifact_schema(
-        "chio.econsim.qualification-matrix.v2"
+        "chio.econsim.qualification-matrix.v9"
     )
     .is_err());
 
@@ -380,7 +380,7 @@ fn new_economy_artifact_families_are_registered_exactly() {
                 schema,
                 "chio.obligation.status-proof.v1"
                     | "chio.credit.facility-bind.v1"
-                    | "chio.credit.iou-envelope.v2"
+                    | "chio.credit.receivable-iou-envelope.v1"
                     | "chio.factor.normalized-assignment-request.v1"
                     | "chio.factor.receivable-claim.v1"
                     | "chio.factor.assignment-offer.v1"
@@ -427,10 +427,10 @@ fn new_economy_artifact_families_are_registered_exactly() {
                 "spec/schemas/chio-economy/credit-facility-bind.v1.json",
             ),
             (
-                "chio.credit.iou-envelope.v2",
+                "chio.credit.receivable-iou-envelope.v1",
                 "credit_iou_envelope",
                 "receivables-factoring-v1",
-                "spec/schemas/chio-economy/credit-iou-envelope.v2.json",
+                "spec/schemas/chio-economy/receivable-iou-envelope.v1.json",
             ),
             (
                 "chio.factor.normalized-assignment-request.v1",
@@ -492,19 +492,19 @@ fn new_economy_artifact_families_are_registered_exactly() {
         "chio.obligation.status-proof.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.obligation.status-proof.v2"
+        "chio.obligation.status-proof.v9"
     ));
     assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.credit.facility-bind.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.credit.facility-bind.v2"
+        "chio.credit.facility-bind.v9"
     ));
     assert!(chio_core_types::is_supported_signed_artifact_schema(
-        "chio.credit.iou-envelope.v2"
+        "chio.credit.receivable-iou-envelope.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.credit.iou-envelope.v3"
+        "chio.credit.iou-envelope.v9"
     ));
     for schema in [
         "chio.factor.normalized-assignment-request.v1",
@@ -520,31 +520,31 @@ fn new_economy_artifact_families_are_registered_exactly() {
         "chio.factor.assignment-bind-authorization.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.factor.assignment-bind-authorization.v2"
+        "chio.factor.assignment-bind-authorization.v9"
     ));
     assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.factor.assignment-agreement.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.factor.assignment-agreement.v2"
+        "chio.factor.assignment-agreement.v9"
     ));
     assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.factor.assignment-acknowledgement.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.factor.assignment-acknowledgement.v2"
+        "chio.factor.assignment-acknowledgement.v9"
     ));
     assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.factor.assignment-not-applied.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.factor.assignment-not-applied.v2"
+        "chio.factor.assignment-not-applied.v9"
     ));
     assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.parametric.policy.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
-        "chio.parametric.policy.v2"
+        "chio.parametric.policy.v9"
     ));
 }
 
@@ -642,7 +642,7 @@ fn outcome_signed_artifact_schemas_are_registered_exactly() {
     for (schema, ..) in expected {
         assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
         let unsupported = format!(
-            "{}.v2",
+            "{}.v9",
             schema.strip_suffix(".v1").expect("v1 schema suffix")
         );
         assert!(!chio_core_types::is_supported_signed_artifact_schema(

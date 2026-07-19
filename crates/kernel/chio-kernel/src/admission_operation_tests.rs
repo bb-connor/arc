@@ -514,7 +514,7 @@ fn persistence_round_trip_is_checked_and_versioned() {
 
     let mut encoded =
         serde_json::to_value(persisted).expect("persisted operation must serialize for the test");
-    encoded["schema"] = serde_json::Value::String("chio.admission-operation.v2".to_string());
+    encoded["schema"] = serde_json::Value::String("chio.admission-operation.v9".to_string());
     assert!(serde_json::from_value::<PersistedAdmissionOperationV1>(encoded).is_err());
 }
 

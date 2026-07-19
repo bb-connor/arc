@@ -364,7 +364,7 @@ authoritative exposure reservation.
 The receivables-factoring contract registers six signed artifact schemas:
 
 - `chio.obligation.status-proof.v1`
-- `chio.credit.iou-envelope.v2`
+- `chio.credit.receivable-iou-envelope.v1`
 - `chio.factor.assignment-bind-authorization.v1`
 - `chio.factor.assignment-agreement.v1`
 - `chio.factor.assignment-acknowledgement.v1`

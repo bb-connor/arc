@@ -78,7 +78,7 @@ fn issue_passport_source_manifest_v2_with_trust_tier(
     let tree = chio_core::MerkleTree::from_leaves(&leaf_bytes)?;
     let (merkle_roots, enterprise_identity_provenance) = derive_passport_metadata(credentials)?;
     let mut body = PassportSourceManifestV2 {
-        schema: AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1.to_string(),
         source_passport_id: String::new(),
         issuer,
         subject,
@@ -133,7 +133,7 @@ pub fn build_agent_passport_v2(
         trust_tier,
     )?;
     let passport = AgentPassportV2 {
-        schema: AGENT_PASSPORT_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_AGENT_PASSPORT_SCHEMA_V1.to_string(),
         subject,
         credentials,
         merkle_roots,
@@ -174,7 +174,7 @@ pub fn inspect_passport_source_manifest_v2_signature(
     now: u64,
 ) -> Result<(), CredentialError> {
     let body = &manifest.body;
-    if body.schema != AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V2 {
+    if body.schema != FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1 {
         return invalid_financial("source passport manifest schema is invalid");
     }
     validate_digest("sourcePassportId", &body.source_passport_id)?;
@@ -212,7 +212,7 @@ pub fn inspect_passport_source_manifest_v2_signature(
 pub(super) fn validate_agent_passport_v2_contract(
     passport: &AgentPassportV2,
 ) -> Result<(u64, u64), CredentialError> {
-    if passport.schema != AGENT_PASSPORT_SCHEMA_V2 {
+    if passport.schema != FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 {
         return Err(CredentialError::UnsupportedVersionedPassportSchema(
             passport.schema.clone(),
         ));
@@ -341,7 +341,7 @@ pub fn create_passport_presentation_challenge_v2(
     validity: PassportValidityWindowV2,
 ) -> Result<SignedPassportPresentationChallengeV2, CredentialError> {
     let mut challenge = PassportPresentationChallengeV2 {
-        schema: PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1.to_string(),
         verifier: DidChio::from_public_key(verifier_keypair.public_key())?.to_string(),
         verifier_key_epoch,
         challenge_id: challenge_id.into(),
@@ -427,7 +427,7 @@ pub fn build_presented_agent_passport_v2(
     let presentation_digest =
         recompute_presentation_digest(&source_manifest, &challenge_digest, &membership_proofs)?;
     Ok(PresentedAgentPassportV2 {
-        schema: PRESENTED_AGENT_PASSPORT_SCHEMA_V2.to_string(),
+        schema: PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1.to_string(),
         source_manifest,
         credentials,
         membership_proofs,
@@ -480,7 +480,7 @@ fn validate_presented_agent_passport_v2_contract(
     now: u64,
     validate_sources: bool,
 ) -> Result<(), CredentialError> {
-    if presentation.schema != PRESENTED_AGENT_PASSPORT_SCHEMA_V2 {
+    if presentation.schema != PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 {
         return invalid_financial("presented passport schema is invalid");
     }
     inspect_passport_source_manifest_v2_signature(&presentation.source_manifest, now)?;
@@ -558,13 +558,13 @@ pub fn respond_to_passport_presentation_challenge_v2(
     )?;
     inspect_presented_agent_passport_v2(&presentation, challenge, now)?;
     let unsigned = UnsignedPassportPresentationResponseV2 {
-        schema: PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V2,
+        schema: FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1,
         challenge,
         presentation: &presentation,
     };
     let (signature, _) = holder_keypair.sign_canonical(&unsigned)?;
     Ok(PassportPresentationResponseV2 {
-        schema: PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1.to_string(),
         challenge: challenge.clone(),
         presentation,
         proof: PresentationProof {
@@ -583,7 +583,7 @@ pub fn inspect_passport_presentation_response_v2(
     now: u64,
     challenge_use_store: &mut impl PassportPresentationChallengeUseStore,
 ) -> Result<(), CredentialError> {
-    if response.schema != PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V2 {
+    if response.schema != FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1 {
         return Err(CredentialError::InvalidPresentationSchema);
     }
     if &response.challenge != expected_challenge {
@@ -657,7 +657,7 @@ fn validate_passport_presentation_challenge_v2_contract(
 fn validate_passport_presentation_challenge_v2_body_contract(
     challenge: &PassportPresentationChallengeV2,
 ) -> Result<(u64, u64), CredentialError> {
-    if challenge.schema != PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V2 {
+    if challenge.schema != FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1 {
         return Err(CredentialError::InvalidChallengeSchema);
     }
     validate_text("challenge.verifier", &challenge.verifier)?;

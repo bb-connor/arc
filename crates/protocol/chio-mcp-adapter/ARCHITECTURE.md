@@ -38,7 +38,7 @@ the shared transport (including `drain_notifications`) passes through
 `with_request_gate`, while immutable `capabilities()` reads stay ungated to avoid
 deadlock on cached reads.
 
-## Invariants and failure modes
+## Trust invariants and failure modes
 
 - The stdio reader rejects EOF before the newline delimiter for a non-empty
   frame: a delimiterless final object is not a complete frame. `read_bounded_line`

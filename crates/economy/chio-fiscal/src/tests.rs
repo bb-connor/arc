@@ -439,7 +439,7 @@ fn open_market_schedule_requires_exact_operator_and_time_binding() {
 fn unknown_schema_self_id_and_signature_tamper_fail_closed() {
     let valid = charter_builder().build_body().test_unwrap();
     let mut unknown = valid.clone();
-    unknown.schema = "chio.fiscal.charter.v2".to_string();
+    unknown.schema = "chio.fiscal.charter.v9".to_string();
     assert!(matches!(
         VerifiedFiscalCharter::verify(resign_charter(unknown)),
         Err(FiscalError::UnknownSchema(_))
@@ -465,7 +465,7 @@ fn unknown_schema_self_id_and_signature_tamper_fail_closed() {
     let charter = verified_charter();
     let schedule = verified_tier_schedule(&charter);
     let mut unknown_schedule = schedule.body().clone();
-    unknown_schedule.schema = "chio.fiscal.schedule.v2".to_string();
+    unknown_schedule.schema = "chio.fiscal.schedule.v9".to_string();
     assert!(matches!(
         VerifiedFiscalSchedule::verify(resign_schedule(unknown_schedule), &charter, None),
         Err(FiscalError::UnknownSchema(_))

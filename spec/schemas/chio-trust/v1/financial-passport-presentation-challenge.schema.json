@@ -21,7 +21,7 @@
         "challengeDigest"
       ],
       "properties": {
-        "schema": { "const": "chio.agent-passport-presentation-challenge.v2" },
+        "schema": { "const": "chio.financial-agent-passport-presentation-challenge.v1" },
         "verifier": { "$ref": "https://chio.world/schemas/financial-credential-defs/v1.schema.json#/$defs/did" },
         "verifierKeyEpoch": { "$ref": "https://chio.world/schemas/financial-credential-defs/v1.schema.json#/$defs/positiveIJsonInteger" },
         "challengeId": { "$ref": "https://chio.world/schemas/financial-credential-defs/v1.schema.json#/$defs/identifier" },

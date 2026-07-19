@@ -17,7 +17,7 @@ use chio_credentials::{
     OfflinePassportPresentationChallengeUseStoreV2, PassportCredentialV2, PassportValidityWindowV2,
     PremiumHistoryCredentialSubjectV1, SettlementReliabilityCredentialSubjectV1,
     SignedPassportPresentationChallengeV2, SignedPassportSourceManifestV2, TrustTier,
-    VersionedAgentPassport, AGENT_PASSPORT_SCHEMA_V2,
+    VersionedAgentPassport, FINANCIAL_AGENT_PASSPORT_SCHEMA_V1,
 };
 use chio_did::DidChio;
 use chio_reputation::{
@@ -395,7 +395,7 @@ fn version_dispatch_is_schema_first_and_downgrade_never_drops_v2_state() {
     let holder = Keypair::from_seed(&[9; 32]);
     let v1 = passport_v1(&holder);
     let v2 = upgrade_v1_passport(v1.clone());
-    assert_eq!(v2.schema, AGENT_PASSPORT_SCHEMA_V2);
+    assert_eq!(v2.schema, FINANCIAL_AGENT_PASSPORT_SCHEMA_V1);
     assert_eq!(try_downgrade_v2_passport(v2).test_ok("downgrade"), v1);
 
     let unknown = br#"{"schema":"chio.agent-passport.v99","credentials":"bad"}"#;
@@ -423,7 +423,7 @@ fn version_dispatch_is_schema_first_and_downgrade_never_drops_v2_state() {
         ISSUED_AT,
         EXPIRES_AT,
     )
-    .test_ok("issue v2-only manifest");
+    .test_ok("issue financial manifest");
     v2.source_manifest = Some(manifest);
     assert!(matches!(
         try_downgrade_v2_passport(v2),
@@ -478,7 +478,7 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
     .test_ok("build bound v2 passport");
     assert_eq!(passport.valid_until, "2024-03-10T16:00:00Z");
     assert_eq!(proofs.len(), 1);
-    validate_schema("agent-passport-v2.schema.json", &passport)
+    validate_schema("financial-agent-passport.schema.json", &passport)
         .test_ok("validate v2 passport schema");
     inspect_agent_passport_v2(&passport, ISSUED_AT + 1).test_ok("inspect bound passport");
     let encoded = serde_json::to_vec(&passport).test_ok("encode bound passport");
@@ -488,12 +488,12 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
     ));
 
     let mut unknown_schema = passport.clone();
-    unknown_schema.schema = "chio.agent-passport.v3".to_string();
-    let encoded = serde_json::to_vec(&unknown_schema).test_ok("encode unknown v2 schema");
+    unknown_schema.schema = "chio.agent-passport.v9".to_string();
+    let encoded = serde_json::to_vec(&unknown_schema).test_ok("encode unknown schema");
     assert!(matches!(
         decode_versioned_agent_passport(&encoded),
         Err(CredentialError::UnsupportedVersionedPassportSchema(schema))
-            if schema == "chio.agent-passport.v3"
+            if schema == "chio.agent-passport.v9"
     ));
 
     let mut substituted = passport;
@@ -506,7 +506,7 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
 
     let legacy = valid_passport_v1(&issuer, &holder);
     let upgraded = upgrade_v1_passport(legacy.clone());
-    validate_schema("agent-passport-v2.schema.json", &upgraded)
+    validate_schema("financial-agent-passport.schema.json", &upgraded)
         .test_ok("validate lossless upgrade schema");
     let encoded = serde_json::to_vec(&upgraded).test_ok("encode lossless upgrade");
     let mut tampered_upgrade = upgraded.clone();
@@ -524,7 +524,9 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
     let decoded = match decode_versioned_agent_passport(&encoded).test_ok("decode lossless upgrade")
     {
         VersionedAgentPassport::V2(passport) => *passport,
-        VersionedAgentPassport::V1(_) => panic!("v2 schema dispatches to v2"),
+        VersionedAgentPassport::V1(_) => {
+            panic!("financial schema dispatches to financial passport")
+        }
     };
     inspect_agent_passport_v2(&decoded, ISSUED_AT + 1).test_ok("inspect lossless upgrade");
     assert_eq!(
@@ -533,7 +535,7 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
     );
 
     let financial_without_manifest = AgentPassportV2 {
-        schema: AGENT_PASSPORT_SCHEMA_V2.to_string(),
+        schema: FINANCIAL_AGENT_PASSPORT_SCHEMA_V1.to_string(),
         subject: did(&holder),
         credentials: vec![PassportCredentialV2::Financial(Box::new(
             synthetic_financial_credential(
@@ -555,7 +557,11 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
         Err(CredentialError::InvalidFinancialCredential(reason))
             if reason.contains("signed source manifest")
     ));
-    assert!(validate_schema("agent-passport-v2.schema.json", &financial_without_manifest).is_err());
+    assert!(validate_schema(
+        "financial-agent-passport.schema.json",
+        &financial_without_manifest
+    )
+    .is_err());
 }
 
 #[test]
@@ -819,11 +825,11 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
         None,
     )
     .test_ok("build v2 passport");
-    validate_schema("agent-passport-v2.schema.json", &passport)
+    validate_schema("financial-agent-passport.schema.json", &passport)
         .test_ok("validate v2 passport schema");
     let mut passport = serde_json::to_value(passport).test_ok("serialize v2 passport");
     passport["unknown"] = serde_json::json!(true);
-    assert!(validate_schema("agent-passport-v2.schema.json", &passport).is_err());
+    assert!(validate_schema("financial-agent-passport.schema.json", &passport).is_err());
     assert!(serde_json::from_value::<chio_credentials::AgentPassportV2>(passport).is_err());
 
     let mut credential_with_unknown =
@@ -879,22 +885,30 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
     )
     .test_ok("respond to challenge");
     let mut unknown_schema = response.presentation.clone();
-    unknown_schema.schema = "chio.agent-passport.presentation.v3".to_string();
+    unknown_schema.schema = "chio.agent-passport.presentation.v9".to_string();
     assert!(matches!(
         inspect_presented_agent_passport_v2(&unknown_schema, &challenge, ISSUED_AT + 1),
         Err(CredentialError::InvalidFinancialCredential(reason))
             if reason.contains("presented passport schema")
     ));
-    assert!(validate_schema("presented-agent-passport-v2.schema.json", &unknown_schema).is_err());
+    assert!(validate_schema(
+        "presented-financial-agent-passport.schema.json",
+        &unknown_schema
+    )
+    .is_err());
     validate_schema(
-        "presented-agent-passport-v2.schema.json",
+        "presented-financial-agent-passport.schema.json",
         &response.presentation,
     )
     .test_ok("validate presented passport schema");
     let mut presentation =
         serde_json::to_value(response.presentation).test_ok("serialize presentation");
     presentation["unknown"] = serde_json::json!(true);
-    assert!(validate_schema("presented-agent-passport-v2.schema.json", &presentation).is_err());
+    assert!(validate_schema(
+        "presented-financial-agent-passport.schema.json",
+        &presentation
+    )
+    .is_err());
     assert!(
         serde_json::from_value::<chio_credentials::PresentedAgentPassportV2>(presentation).is_err()
     );
@@ -929,8 +943,11 @@ fn signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering() {
     .test_ok("create signed challenge");
     inspect_passport_presentation_challenge_v2(&challenge, ISSUED_AT + 1)
         .test_ok("inspect signed challenge");
-    validate_schema("passport-presentation-challenge-v2.schema.json", &challenge)
-        .test_ok("validate signed challenge schema");
+    validate_schema(
+        "financial-passport-presentation-challenge.schema.json",
+        &challenge,
+    )
+    .test_ok("validate signed challenge schema");
 
     let mut wrong_digest = challenge.clone();
     wrong_digest.body.challenge_digest = "aa".repeat(32);

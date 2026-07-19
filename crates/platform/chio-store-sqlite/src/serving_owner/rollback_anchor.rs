@@ -362,7 +362,7 @@ impl DatabaseState {
 
     fn record(&self, generation: u64) -> AnchorRecord {
         AnchorRecord {
-            format: "chio.sqlite-authority-rollback-anchor.v2".to_string(),
+            format: "chio.sqlite-authority-rollback-anchor-global.v1".to_string(),
             generation,
             store_uuid: self.store_uuid.clone(),
             owner_epoch: self.owner_epoch,
@@ -380,7 +380,8 @@ impl AnchorRecord {
     fn validate(&self) -> Result<(), SqliteServingOwnerError> {
         if !matches!(
             self.format.as_str(),
-            "chio.sqlite-authority-rollback-anchor.v1" | "chio.sqlite-authority-rollback-anchor.v2"
+            "chio.sqlite-authority-rollback-anchor.v1"
+                | "chio.sqlite-authority-rollback-anchor-global.v1"
         ) || self.generation == 0
         {
             return Err(invalid("serving rollback anchor version is invalid"));
@@ -467,7 +468,7 @@ fn record_extends(current: &AnchorRecord, prior: &AnchorRecord) -> bool {
         && (current.global_commit_head != prior.global_commit_head
             || current.global_commit_chain_digest == prior.global_commit_chain_digest)
         && !(current.format == "chio.sqlite-authority-rollback-anchor.v1"
-            && prior.format == "chio.sqlite-authority-rollback-anchor.v2")
+            && prior.format == "chio.sqlite-authority-rollback-anchor-global.v1")
 }
 
 fn decode_slot(slot: &[u8; SLOT_SIZE]) -> Result<AnchorRecord, SqliteServingOwnerError> {

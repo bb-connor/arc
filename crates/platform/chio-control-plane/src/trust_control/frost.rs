@@ -1,6 +1,7 @@
 use std::io::Read;
 use std::time::Duration;
 
+use chio_egress_contract::HttpEgressContract;
 use chio_federation::frost::{
     FrostAnchorError, FrostAnchoredAuthorizationSlot, FrostAuthorizationSlotAnchor,
     FrostAuthorizationSlotAnchorWriter, FrostEpochAnchor, FrostEpochAnchorWriter,
@@ -52,6 +53,8 @@ pub enum RemoteFrostAnchorConfigError {
     InvalidTimeout,
     #[error("failed to construct FROST anchor HTTP client: {0}")]
     Client(String),
+    #[error("invalid FROST anchor HTTP egress contract: {0}")]
+    InvalidEgressContract(String),
 }
 
 #[derive(Clone)]
@@ -59,6 +62,7 @@ pub struct RemoteFrostAnchorClient {
     client: Client,
     base_url: Url,
     bearer_token: String,
+    egress_contract: HttpEgressContract,
 }
 
 impl std::fmt::Debug for RemoteFrostAnchorClient {
@@ -98,15 +102,26 @@ impl RemoteFrostAnchorClient {
         if config.timeout.is_zero() {
             return Err(RemoteFrostAnchorConfigError::InvalidTimeout);
         }
+        let egress_contract = crate::anchor_egress::strict_https_contract(
+            &base_url,
+            "control-plane.frost-anchor",
+            MAX_ANCHOR_RESPONSE_BYTES,
+        )
+        .map_err(RemoteFrostAnchorConfigError::InvalidEgressContract)?;
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
+        // denies redirects and proxies, and each request is contract-preflighted.
         let client = Client::builder()
             .timeout(config.timeout)
             .https_only(true)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
             .build()
             .map_err(|error| RemoteFrostAnchorConfigError::Client(error.to_string()))?;
         Ok(Self {
             client,
             base_url,
             bearer_token: config.bearer_token,
+            egress_contract,
         })
     }
 
@@ -122,13 +137,18 @@ impl RemoteFrostAnchorClient {
     }
 
     fn get_json<T: DeserializeOwned>(&self, url: Url) -> Result<T, FrostAnchorError> {
+        self.egress_contract
+            .enforce_url_with_dns(url.as_str(), 0)
+            .map_err(unavailable)?;
         let response = self
             .client
             .request(Method::GET, url)
             .bearer_auth(&self.bearer_token)
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
+            // enforced immediately above for this exact URL.
             .send()
             .map_err(unavailable)?;
-        decode_response(response)
+        decode_response(&self.egress_contract, response)
     }
 
     fn post_json<B: Serialize + ?Sized, T: DeserializeOwned>(
@@ -136,14 +156,19 @@ impl RemoteFrostAnchorClient {
         url: Url,
         body: &B,
     ) -> Result<T, FrostAnchorError> {
+        self.egress_contract
+            .enforce_url_with_dns(url.as_str(), 0)
+            .map_err(unavailable)?;
         let response = self
             .client
             .request(Method::POST, url)
             .bearer_auth(&self.bearer_token)
             .json(body)
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
+            // enforced immediately above for this exact URL.
             .send()
             .map_err(unavailable)?;
-        decode_response(response)
+        decode_response(&self.egress_contract, response)
     }
 }
 
@@ -258,20 +283,20 @@ impl FrostAuthorizationSlotAnchorWriter for RemoteFrostAnchorClient {
     }
 }
 
-fn decode_response<T: DeserializeOwned>(mut response: Response) -> Result<T, FrostAnchorError> {
+fn decode_response<T: DeserializeOwned>(
+    egress_contract: &HttpEgressContract,
+    mut response: Response,
+) -> Result<T, FrostAnchorError> {
     let status = response.status();
     if !status.is_success() {
         return Err(FrostAnchorError::Unavailable(format!(
             "anchor returned HTTP {status}"
         )));
     }
-    if response
-        .content_length()
-        .is_some_and(|length| length > MAX_ANCHOR_RESPONSE_BYTES)
-    {
-        return Err(FrostAnchorError::InvalidResponse(
-            "anchor response exceeds the size limit".to_string(),
-        ));
+    if let Some(length) = response.content_length() {
+        egress_contract
+            .enforce_response_bytes(length)
+            .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))?;
     }
     let mut bytes = Vec::new();
     response
@@ -279,11 +304,9 @@ fn decode_response<T: DeserializeOwned>(mut response: Response) -> Result<T, Fro
         .take(MAX_ANCHOR_RESPONSE_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(unavailable)?;
-    if bytes.len() as u64 > MAX_ANCHOR_RESPONSE_BYTES {
-        return Err(FrostAnchorError::InvalidResponse(
-            "anchor response exceeds the size limit".to_string(),
-        ));
-    }
+    egress_contract
+        .enforce_response_bytes(bytes.len() as u64)
+        .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))?;
     serde_json::from_slice(&bytes)
         .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))
 }

@@ -1067,6 +1067,7 @@ mod tests {
             call_chain: None,
             autonomy: None,
             context: None,
+            body: Default::default(),
         }
     }
 
@@ -1101,6 +1102,7 @@ mod tests {
                 expires_at: Some(now + 300),
             },
             max_billed_units: Some(2),
+            verified_outcome: None,
         });
         intent
     }
@@ -1122,6 +1124,7 @@ mod tests {
                 subject: subject.clone(),
                 governed_intent_hash: intent.binding_hash().test_unwrap(),
                 request_id: request_id.to_string(),
+                threshold_proposal_hash: None,
                 issued_at: now.saturating_sub(1),
                 expires_at: now + 300,
                 decision: GovernedApprovalDecision::Approved,
@@ -1491,6 +1494,8 @@ mod tests {
                 attenuations: vec![],
                 timestamp: now,
                 scope_hash: None,
+                aggregate_budget: None,
+                cumulative_approval: None,
             },
             delegator,
         )
@@ -1503,6 +1508,7 @@ mod tests {
             issued_at: now,
             expires_at: now + 3600,
             delegation_chain: vec![link],
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, issuer).test_unwrap()
     }
@@ -1773,7 +1779,7 @@ mod tests {
             Some(MEDIATED_CONTROL_TOKEN.to_string()),
             None,
             true,
-            Some(Box::new(chio_kernel::SimPaymentAdapter::new())),
+            Some(Box::new(chio_kernel::payment::SimPaymentAdapter::new())),
             None,
         );
 
@@ -2515,7 +2521,7 @@ mod tests {
     /// settlement behavior is delegated to the deterministic sim adapter.
     #[derive(Clone, Default)]
     struct RecordingPaymentAdapter {
-        inner: chio_kernel::SimPaymentAdapter,
+        inner: chio_kernel::payment::SimPaymentAdapter,
         captures: Arc<std::sync::atomic::AtomicUsize>,
         releases: Arc<std::sync::atomic::AtomicUsize>,
         refunds: Arc<std::sync::atomic::AtomicUsize>,
@@ -2765,7 +2771,7 @@ mod tests {
         let captures = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let refunds = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let adapter = RecordingPaymentAdapter {
-            inner: chio_kernel::SimPaymentAdapter::new(),
+            inner: chio_kernel::payment::SimPaymentAdapter::new(),
             captures: Arc::clone(&captures),
             releases: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             refunds: Arc::clone(&refunds),

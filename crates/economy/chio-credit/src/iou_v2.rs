@@ -8,7 +8,7 @@ use chio_core_types::receipt::crypto_floor::ReceiptCryptoFloor;
 use chio_core_types::receipt::economics::{
     EconomicAuthorizationReceiptMetadata, FinancialReceiptMetadata, SettlementStatus,
 };
-pub use chio_core_types::CHIO_CREDIT_IOU_ENVELOPE_V2_SCHEMA;
+pub use chio_core_types::CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -20,10 +20,10 @@ use crate::obligation::{
     ObligationSettlementStateV1, SignedCreditFacilityBindV1, VerifiedCreditFacilityBindV1,
 };
 
-pub const IOU_ENVELOPE_V2_SCHEMA: &str = CHIO_CREDIT_IOU_ENVELOPE_V2_SCHEMA;
+pub const RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA: &str = CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA;
 
-const IOU_ID_DOMAIN: &[u8] = b"chio.credit.iou-envelope.id.v2\0";
-const IOU_BODY_DIGEST_DOMAIN: &[u8] = b"chio.credit.iou-envelope.body.v2\0";
+const IOU_ID_DOMAIN: &[u8] = b"chio.credit.receivable-iou-envelope.id.v1\0";
+const IOU_BODY_DIGEST_DOMAIN: &[u8] = b"chio.credit.receivable-iou-envelope.body.v1\0";
 const MAX_TEXT_CHARS: usize = 2_048;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
@@ -211,7 +211,7 @@ struct IouIdPreimage<'a> {
 
 impl IouEnvelopeBodyV2 {
     fn validate(&self) -> Result<(), IouEnvelopeV2Error> {
-        if self.schema != IOU_ENVELOPE_V2_SCHEMA {
+        if self.schema != RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA {
             return Err(IouEnvelopeV2Error::InvalidField("schema"));
         }
         for (field, value) in [
@@ -798,7 +798,7 @@ fn build_body(
     validate_text("issuer_id", issuer_id)?;
     validate_positive("issuer_key_epoch", issuer_key_epoch)?;
     let mut body = IouEnvelopeBodyV2 {
-        schema: IOU_ENVELOPE_V2_SCHEMA.to_owned(),
+        schema: RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA.to_owned(),
         iou_id: String::new(),
         operation_id: bind.operation_id().to_owned(),
         obligation_id: atom.obligation_id().to_owned(),

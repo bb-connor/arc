@@ -1,30 +1,30 @@
 use super::*;
 
-pub const CROSS_ISSUER_TRUST_PACK_SCHEMA_V2: &str = "chio.cross-issuer-trust-pack.v2";
-pub const ENTRY_ACTIVATION_DECISION_SCHEMA_V2: &str =
-    "chio.cross-issuer-entry-activation-decision.v2";
-pub const CROSS_ISSUER_MIGRATION_SCHEMA_V2: &str = "chio.cross-issuer-migration.v2";
-pub const LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V2: &str =
-    "chio.legacy-credential-issuance-anchor.v2";
-pub const ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V2: &str = "chio.cross-issuer.lifecycle-checkpoint.v2";
-pub const CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V2: &str = "chio.cross-issuer.lifecycle-result.v2";
-pub const ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V2: &str =
-    "chio.cross-issuer.lifecycle-generation-pin.v2";
-pub const LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V2: &str =
-    "chio.cross-issuer.lifecycle-checkpoint-pin.v2";
+pub const FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1: &str = "chio.financial.cross-issuer-trust-pack.v1";
+pub const FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1: &str =
+    "chio.financial.cross-issuer-entry-activation-decision.v1";
+pub const FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1: &str = "chio.financial.cross-issuer-migration.v1";
+pub const FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1: &str =
+    "chio.financial.legacy-credential-issuance-anchor.v1";
+pub const FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-checkpoint.v1";
+pub const FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-result.v1";
+pub const FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1: &str =
+    "chio.financial.cross-issuer.lifecycle-generation-pin.v1";
+pub const FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1: &str =
+    "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1";
 
 const FINANCIAL_POLICY_DIGEST_DOMAIN: &[u8] = b"chio.fincred.verifier-policy-digest.v1\0";
-const ENTRY_ACTIVATION_DIGEST_DOMAIN: &[u8] = b"chio.cross-issuer.entry-activation-digest.v2\0";
-const CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN: &[u8] = b"chio.cross-issuer.migration-digest.v2\0";
+const ENTRY_ACTIVATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.entry-activation-digest.v1\0";
+const CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.migration-digest.v1\0";
 const LEGACY_ISSUANCE_ANCHOR_DIGEST_DOMAIN: &[u8] =
-    b"chio.legacy-credential.issuance-anchor-digest.v2\0";
-const LIFECYCLE_RESULT_DIGEST_DOMAIN: &[u8] = b"chio.cross-issuer.lifecycle-result-digest.v2\0";
+    b"chio.financial.legacy-credential.issuance-anchor-digest.v1\0";
+const LIFECYCLE_RESULT_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.lifecycle-result-digest.v1\0";
 const LIFECYCLE_CHECKPOINT_DIGEST_DOMAIN: &[u8] =
-    b"chio.cross-issuer.lifecycle-checkpoint-digest.v2\0";
+    b"chio.financial.cross-issuer.lifecycle-checkpoint-digest.v1\0";
 const LIFECYCLE_GENERATION_PIN_DIGEST_DOMAIN: &[u8] =
-    b"chio.cross-issuer.lifecycle-generation-pin-digest.v2\0";
+    b"chio.financial.cross-issuer.lifecycle-generation-pin-digest.v1\0";
 const LIFECYCLE_CHECKPOINT_PIN_DIGEST_DOMAIN: &[u8] =
-    b"chio.cross-issuer.lifecycle-checkpoint-pin-digest.v2\0";
+    b"chio.financial.cross-issuer.lifecycle-checkpoint-pin-digest.v1\0";
 
 fn authority_digest<T: Serialize>(domain: &[u8], value: &T) -> Result<String, CredentialError> {
     let canonical = canonical_json_bytes(value)?;

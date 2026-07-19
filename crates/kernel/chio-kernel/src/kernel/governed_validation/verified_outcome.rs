@@ -107,7 +107,7 @@ mod tests {
         let Some(request) = unknown.verified_outcome.as_mut() else {
             panic!("verified outcome request is missing");
         };
-        request.schema = "chio.outcome.request.v2".to_owned();
+        request.schema = "chio.outcome.request.v9".to_owned();
         assert!(reason(&unknown).contains("request is invalid"));
 
         let mut empty = context();

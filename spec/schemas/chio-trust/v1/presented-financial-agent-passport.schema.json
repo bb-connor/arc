@@ -45,7 +45,7 @@
     "presentationDigest"
   ],
   "properties": {
-    "schema": { "const": "chio.agent-passport.presentation.v2" },
+    "schema": { "const": "chio.financial-agent-passport.presentation.v1" },
     "sourceManifest": { "$ref": "https://chio.world/schemas/chio/agent-passport/source-manifest/v2.schema.json" },
     "credentials": {
       "type": "array",

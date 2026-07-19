@@ -16,7 +16,7 @@ schemas = (
     "obligation-disposition.v1.json",
     "obligation-settlement-lifecycle.v1.json",
     "obligation-status-proof.v1.json",
-    "credit-iou-envelope.v2.json",
+    "receivable-iou-envelope.v1.json",
 )
 for name in schemas:
     path = root / "spec/schemas/chio-economy" / name
@@ -50,13 +50,13 @@ cat >"${tmp}/spec/schemas/chio-transaction/v1/minimal.schema.json" <<'JSON'
 }
 JSON
 
-cat >"${tmp}/spec/schemas/chio-economy/minimal.v2.json" <<'JSON'
+cat >"${tmp}/spec/schemas/chio-economy/minimal.v9.json" <<'JSON'
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.chio.example/chio-economy/minimal.v2.json",
+  "$id": "https://schemas.chio.example/chio-economy/minimal.v9.json",
   "type": "object",
   "properties": {
-    "schema": { "const": "chio.economy.minimal.v2" }
+    "schema": { "const": "chio.economy.minimal.v9" }
   },
   "required": ["schema"],
   "additionalProperties": false
@@ -75,10 +75,10 @@ cat >"${tmp}/spec/schemas/registry.json" <<'JSON'
       "status": "Required"
     },
     {
-      "schema": "chio.economy.minimal.v2",
+      "schema": "chio.economy.minimal.v9",
       "artifactKind": "economy-test",
       "introducedBy": "schema-registry-test",
-      "schemaFile": "spec/schemas/chio-economy/minimal.v2.json",
+      "schemaFile": "spec/schemas/chio-economy/minimal.v9.json",
       "status": "Required"
     }
   ]
@@ -95,7 +95,7 @@ printf '{}\n' >"${tmp}/spec/schemas/unused/stale.extra"
   git config user.name test
   git add scripts/check-chio-schema-registry.sh \
     spec/schemas/VERSION \
-    spec/schemas/chio-economy/minimal.v2.json \
+    spec/schemas/chio-economy/minimal.v9.json \
     spec/schemas/chio-transaction/v1/minimal.schema.json \
     spec/schemas/registry.json
   python3 - <<'PY'
@@ -104,7 +104,7 @@ from pathlib import Path
 
 paths = [
     "spec/schemas/VERSION",
-    "spec/schemas/chio-economy/minimal.v2.json",
+    "spec/schemas/chio-economy/minimal.v9.json",
     "spec/schemas/chio-transaction/v1/minimal.schema.json",
     "spec/schemas/registry.json",
 ]

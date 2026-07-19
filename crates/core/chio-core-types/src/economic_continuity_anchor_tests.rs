@@ -991,7 +991,7 @@ fn anchor_view_and_dispatch_commit_wire_schemas_match_signed_values(
     assert!(dispatch_validator.is_valid(&commit_json));
 
     let mut unknown_view = view_json;
-    unknown_view["schema"] = json!("chio.economy.anchor-view.v2");
+    unknown_view["schema"] = json!("chio.economy.anchor-view.v9");
     assert!(!view_validator.is_valid(&unknown_view));
     let mut tampered_commit = commit_json;
     tampered_commit["signerKeyEpoch"] = json!(0);

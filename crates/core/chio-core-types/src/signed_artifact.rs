@@ -80,10 +80,10 @@ pub const CHIO_FINCRED_SOURCE_MEMBER_V1_SCHEMA: &str = "chio.fincred.source-memb
 pub const CHIO_FINCRED_SOURCE_CHECKPOINT_V1_SCHEMA: &str = "chio.fincred.source-checkpoint.v1";
 pub const CHIO_FINCRED_SOURCE_COMPLETENESS_ATTESTATION_V1_SCHEMA: &str =
     "chio.fincred.source-completeness-attestation.v1";
-pub const CHIO_AGENT_PASSPORT_SOURCE_MANIFEST_V2_SCHEMA: &str =
-    "chio.agent-passport.source-manifest.v2";
-pub const CHIO_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V2_SCHEMA: &str =
-    "chio.agent-passport-presentation-challenge.v2";
+pub const CHIO_FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_V1_SCHEMA: &str =
+    "chio.financial-agent-passport.source-manifest.v1";
+pub const CHIO_FINANCIAL_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V1_SCHEMA: &str =
+    "chio.financial-agent-passport-presentation-challenge.v1";
 pub const CHIO_FISCAL_CHARTER_V1_SCHEMA: &str = "chio.fiscal.charter.v1";
 pub const CHIO_FISCAL_SCHEDULE_V1_SCHEMA: &str = "chio.fiscal.schedule.v1";
 pub const CHIO_FISCAL_PROPOSAL_V1_SCHEMA: &str = "chio.fiscal.proposal.v1";
@@ -97,7 +97,7 @@ pub const CHIO_ECONSIM_QUALIFICATION_MATRIX_V1_SCHEMA: &str =
     "chio.econsim.qualification-matrix.v1";
 pub const CHIO_OBLIGATION_STATUS_PROOF_V1_SCHEMA: &str = "chio.obligation.status-proof.v1";
 pub const CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA: &str = "chio.credit.facility-bind.v1";
-pub const CHIO_CREDIT_IOU_ENVELOPE_V2_SCHEMA: &str = "chio.credit.iou-envelope.v2";
+pub const CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA: &str = "chio.credit.receivable-iou-envelope.v1";
 pub const CHIO_FACTOR_ASSIGNMENT_BIND_AUTHORIZATION_V1_SCHEMA: &str =
     "chio.factor.assignment-bind-authorization.v1";
 pub const CHIO_FACTOR_ASSIGNMENT_AGREEMENT_V1_SCHEMA: &str = "chio.factor.assignment-agreement.v1";
@@ -483,11 +483,11 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         )),
     ),
     (
-        CHIO_AGENT_PASSPORT_SOURCE_MANIFEST_V2_SCHEMA,
+        CHIO_FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_V1_SCHEMA,
         Some(("agent_passport_source_manifest", "financial-credentials-v1")),
     ),
     (
-        CHIO_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V2_SCHEMA,
+        CHIO_FINANCIAL_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V1_SCHEMA,
         Some((
             "agent_passport_presentation_challenge",
             "financial-credentials-v1",
@@ -541,7 +541,7 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("credit_facility_bind", "credit-admission-v1")),
     ),
     (
-        CHIO_CREDIT_IOU_ENVELOPE_V2_SCHEMA,
+        CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
         Some(("credit_iou_envelope", "receivables-factoring-v1")),
     ),
     (

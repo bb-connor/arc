@@ -801,6 +801,8 @@ fn sample_market_fixtures() -> MarketFixtures {
         outcome: LiabilityClaimAdjudicationOutcome::PartialSettlement,
         awarded_amount: Some(usd(6_000)),
         note: Some("partial settlement ordered".to_string()),
+        decision_rule_ref: None,
+        roster_anchor_ref: None,
         evidence_refs: Vec::new(),
     });
     let capital_instruction = sign_export(crate::credit::CapitalExecutionInstructionArtifact {
@@ -1866,7 +1868,7 @@ fn parametric_policy_verification_fails_closed_on_signer_schema_and_encoding() {
     );
 
     let mut unknown = fixture.policy.clone();
-    unknown.schema = "chio.parametric.policy.v2".to_string();
+    unknown.schema = "chio.parametric.policy.v9".to_string();
     let unknown = require_ok(
         SignedParametricPolicy::sign(unknown, &fixture.policy_signer),
         "sign unknown schema",
@@ -1876,7 +1878,7 @@ fn parametric_policy_verification_fails_closed_on_signer_schema_and_encoding() {
             VerifiedParametricPolicy::verify(unknown, &fixture.context()),
             "unknown policy schema",
         ),
-        ParametricContractError::UnknownSchema("chio.parametric.policy.v2".to_string())
+        ParametricContractError::UnknownSchema("chio.parametric.policy.v9".to_string())
     );
 
     let verified = require_ok(

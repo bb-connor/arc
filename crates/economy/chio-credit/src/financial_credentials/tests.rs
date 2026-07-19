@@ -457,7 +457,7 @@ fn checkpoint_qualification_rejects_older_sequence_and_rollback_generation() -> 
     ));
 
     let mut substituted_body = current_body;
-    substituted_body.schema = "chio.fincred.source-checkpoint.v2".to_string();
+    substituted_body.schema = "chio.fincred.source-checkpoint.v9".to_string();
     let substituted =
         SignedFinancialSourceCheckpointV1::sign(substituted_body.clone(), &authority)?;
     let substituted_pin = exact_checkpoint_pin(&substituted_body)?;
@@ -473,7 +473,7 @@ fn source_member_and_resolver_boundaries_fail_closed() -> TestResult {
     let signer = Keypair::from_seed(&[9; 32]);
     let member = SignedFinancialSourceMemberV1::sign(
         FinancialSourceMemberBodyV1 {
-            schema: "chio.fincred.source-member.v2".to_string(),
+            schema: "chio.fincred.source-member.v9".to_string(),
             query_key: FinancialSourceQueryKeyV1 {
                 source_family: FinancialCredentialFamilyV1::ExposureHistory,
                 subject: "did:chio:subject".to_string(),
@@ -665,7 +665,7 @@ fn completeness_attestation_rejects_body_schema_substitution() -> TestResult {
     };
     let proof = SignedFinancialSourceCompletenessAttestationV1::sign(
         FinancialSourceCompletenessAttestationBodyV1 {
-            schema: "chio.fincred.source-completeness-attestation.v2".to_string(),
+            schema: "chio.fincred.source-completeness-attestation.v9".to_string(),
             source_id: checkpoint_body.source_id,
             source_family: request.source_family,
             subject: request.subject.clone(),

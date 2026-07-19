@@ -622,7 +622,7 @@ fn status_proof_rejects_schema_tampering_and_mixed_snapshots() -> TestResult {
     );
 
     let mut unknown_schema = serde_json::to_value(&signed)?;
-    unknown_schema["body"]["schema"] = serde_json::json!("chio.obligation.status-proof.v2");
+    unknown_schema["body"]["schema"] = serde_json::json!("chio.obligation.status-proof.v9");
     let unknown_schema: SignedObligationStatusProofV1 = serde_json::from_value(unknown_schema)?;
     assert_eq!(
         require_error(verify_status(

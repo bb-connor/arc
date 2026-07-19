@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_egress_contract::HttpEgressContract;
 use chio_fiscal::{
     FiscalCharterRegistry, FiscalGenesisPolicy, FiscalStateAnchor, FiscalStateAnchorError,
     SignedFiscalContinuityCheckpoint, VerifiedFiscalContinuityAdvance,
@@ -49,6 +50,8 @@ pub enum FiscalStateAnchorConfigError {
     InvalidPins(String),
     #[error("failed to build fiscal anchor HTTP client: {0}")]
     HttpClient(String),
+    #[error("invalid fiscal anchor HTTP egress contract: {0}")]
+    InvalidEgressContract(String),
 }
 
 impl RemoteFiscalStateAnchorConfig {
@@ -73,6 +76,12 @@ impl RemoteFiscalStateAnchorConfig {
         if self.timeout.is_zero() {
             return Err(FiscalStateAnchorConfigError::InvalidTimeout);
         }
+        crate::anchor_egress::strict_https_contract(
+            &endpoint,
+            "control-plane.fiscal-state-anchor",
+            FISCAL_STATE_TRANSPORT_LIMIT as u64,
+        )
+        .map_err(FiscalStateAnchorConfigError::InvalidEgressContract)?;
         let genesis = self
             .charters
             .resolve(
@@ -94,12 +103,25 @@ struct HttpsFiscalStateAnchorTransport {
     client: reqwest::blocking::Client,
     base_url: String,
     bearer_token: Arc<str>,
+    egress_contract: HttpEgressContract,
 }
 
 impl HttpsFiscalStateAnchorTransport {
     fn new(config: &RemoteFiscalStateAnchorConfig) -> Result<Self, FiscalStateAnchorConfigError> {
+        let endpoint = url::Url::parse(&config.base_url)
+            .map_err(|error| FiscalStateAnchorConfigError::InvalidUrl(error.to_string()))?;
+        let egress_contract = crate::anchor_egress::strict_https_contract(
+            &endpoint,
+            "control-plane.fiscal-state-anchor",
+            FISCAL_STATE_TRANSPORT_LIMIT as u64,
+        )
+        .map_err(FiscalStateAnchorConfigError::InvalidEgressContract)?;
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
+        // denies redirects and proxies, and each request is contract-preflighted.
         let client = reqwest::blocking::Client::builder()
             .https_only(true)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
             .timeout(config.timeout)
             .build()
             .map_err(|error| FiscalStateAnchorConfigError::HttpClient(error.to_string()))?;
@@ -107,6 +129,7 @@ impl HttpsFiscalStateAnchorTransport {
             client,
             base_url: config.base_url.trim_end_matches('/').to_owned(),
             bearer_token: Arc::from(config.bearer_token.as_str()),
+            egress_contract,
         })
     }
 }
@@ -116,29 +139,36 @@ impl FiscalStateAnchorTransport for HttpsFiscalStateAnchorTransport {
         if body.len() > FISCAL_STATE_TRANSPORT_LIMIT {
             return Err(FiscalStateAnchorError::Unavailable);
         }
+        let endpoint = format!("{}{path}", self.base_url);
+        self.egress_contract
+            .enforce_url_with_dns(&endpoint, 0)
+            .map_err(|_| FiscalStateAnchorError::Unavailable)?;
         let response = self
             .client
-            .post(format!("{}{path}", self.base_url))
+            .post(endpoint)
             .bearer_auth(self.bearer_token.as_ref())
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(body.to_vec())
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
+            // enforced immediately above for this exact URL.
             .send()
             .map_err(|_| FiscalStateAnchorError::Unavailable)?;
-        if !response.status().is_success()
-            || response
-                .content_length()
-                .is_some_and(|length| length > FISCAL_STATE_TRANSPORT_LIMIT as u64)
-        {
+        if !response.status().is_success() {
             return Err(FiscalStateAnchorError::Unavailable);
+        }
+        if let Some(length) = response.content_length() {
+            self.egress_contract
+                .enforce_response_bytes(length)
+                .map_err(|_| FiscalStateAnchorError::Unavailable)?;
         }
         let mut body = Vec::new();
         response
             .take(FISCAL_STATE_TRANSPORT_LIMIT as u64 + 1)
             .read_to_end(&mut body)
             .map_err(|_| FiscalStateAnchorError::Unavailable)?;
-        if body.len() > FISCAL_STATE_TRANSPORT_LIMIT {
-            return Err(FiscalStateAnchorError::Unavailable);
-        }
+        self.egress_contract
+            .enforce_response_bytes(body.len() as u64)
+            .map_err(|_| FiscalStateAnchorError::Unavailable)?;
         Ok(body)
     }
 }

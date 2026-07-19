@@ -630,7 +630,7 @@ fn release_evidence_has_one_owned_canonical_encoding() {
     );
 
     let mut unknown_schema = bundle.to_persisted();
-    unknown_schema.schema = "chio.monetary-release-evidence.v2".to_owned();
+    unknown_schema.schema = "chio.monetary-release-evidence.v9".to_owned();
     assert!(
         MonetaryReleaseEvidenceV1::from_canonical_bytes(&canonical(&unknown_schema).unwrap())
             .is_err()

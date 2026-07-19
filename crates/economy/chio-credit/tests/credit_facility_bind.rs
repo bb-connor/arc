@@ -241,7 +241,7 @@ fn facility_bind_rejects_noncanonical_unknown_and_semantically_substituted_bytes
     let unknown = substituted_bytes(
         &canonical,
         "/body/schema",
-        serde_json::json!("chio.credit.facility-bind.v2"),
+        serde_json::json!("chio.credit.facility-bind.v9"),
     )?;
     assert_eq!(
         SignedCreditFacilityBindV1::from_canonical_bytes(&unknown),
