@@ -3,10 +3,11 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_fiscal::{
-    FiscalAuthorityState, FiscalCharterRegistry, FiscalGenesisPolicy, FiscalProposalAdmissionState,
-    FiscalProposalAdmissionStatus, VerifiedFiscalActivation, VerifiedFiscalApproval,
-    VerifiedFiscalCharter, VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint,
-    VerifiedFiscalProposal, VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
+    fee_schedule::SignedOpenMarketFeeSchedule, FiscalAuthorityState, FiscalCharterRegistry,
+    FiscalGenesisPolicy, FiscalParams, FiscalProposalAdmissionState, FiscalProposalAdmissionStatus,
+    VerifiedFiscalActivation, VerifiedFiscalApproval, VerifiedFiscalCharter,
+    VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint, VerifiedFiscalProposal,
+    VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
 };
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::Serialize;
@@ -14,7 +15,7 @@ use serde::Serialize;
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 const FISCAL_STORE_SCHEMA_KEY: &str = "fiscal";
-pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
 const FISCAL_STORE_SCHEMA: &str = include_str!("fiscal_store.sql");
 const FISCAL_GENESIS_PROJECTION_KEY: &str = "authority";
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -74,6 +75,14 @@ pub struct FiscalStagedTransitionRecord {
     pub proof_json: Vec<u8>,
     pub status: FiscalStageStatus,
     pub stage_version: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FiscalLegacyFeeScheduleBindingRecord {
+    pub legacy_schedule_id: String,
+    pub fiscal_schedule_id: String,
+    pub fiscal_schedule_digest: String,
+    pub legacy_envelope_digest: String,
 }
 
 #[derive(Serialize)]
@@ -499,27 +508,54 @@ impl SqliteFiscalStore {
 
     pub fn bind_legacy_fee_schedule(
         &self,
-        legacy_schedule_id: &str,
+        legacy_schedule: &SignedOpenMarketFeeSchedule,
         schedule: &VerifiedFiscalSchedule,
         fence: &StoreMutationFence,
     ) -> Result<(), FiscalStoreError> {
-        if legacy_schedule_id.is_empty() {
-            return Err(invariant("legacy fee schedule id is empty"));
+        legacy_schedule
+            .body
+            .validate()
+            .map_err(|error| invariant(format!("legacy fee schedule is invalid: {error}")))?;
+        if !legacy_schedule
+            .verify_signature()
+            .map_err(|error| invariant(format!("legacy fee schedule signature failed: {error}")))?
+        {
+            return Err(invariant("legacy fee schedule signature is invalid"));
         }
+        let FiscalParams::OpenMarketFeeAndBondSchedule { legacy_body } = &schedule.body().params
+        else {
+            return Err(FiscalStoreError::Conflict);
+        };
+        if legacy_body.as_ref() != &legacy_schedule.body {
+            return Err(FiscalStoreError::Conflict);
+        }
+        let legacy_schedule_id = &legacy_schedule.body.fee_schedule_id;
+        let legacy_envelope_json =
+            canonical_json_bytes(legacy_schedule).map_err(canonical_error)?;
+        let legacy_envelope_digest = sha256_hex(&legacy_envelope_json);
         let schedule_json = schedule.canonical_bytes()?;
         let schedule_digest = sha256_hex(&schedule_json);
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, fence)?;
         let retained = transaction
             .query_row(
-                "SELECT fiscal_schedule_id, fiscal_schedule_digest FROM fiscal_legacy_fee_schedule_bindings WHERE legacy_schedule_id = ?1",
+                "SELECT fiscal_schedule_id, fiscal_schedule_digest, legacy_envelope_digest FROM fiscal_legacy_fee_schedule_bindings WHERE legacy_schedule_id = ?1",
                 [legacy_schedule_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
             )
             .optional()
             .map_err(sqlite_error)?;
-        if let Some((schedule_id, digest)) = retained {
-            if schedule_id != schedule.body().schedule_id || digest != schedule_digest {
+        if let Some((schedule_id, digest, envelope_digest)) = retained {
+            if schedule_id != schedule.body().schedule_id
+                || digest != schedule_digest
+                || envelope_digest != legacy_envelope_digest
+            {
                 return Err(FiscalStoreError::Conflict);
             }
             transaction.commit().map_err(sqlite_error)?;
@@ -539,8 +575,13 @@ impl SqliteFiscalStore {
         }
         transaction
             .execute(
-                "INSERT INTO fiscal_legacy_fee_schedule_bindings (legacy_schedule_id, fiscal_schedule_id, fiscal_schedule_digest) VALUES (?1, ?2, ?3)",
-                params![legacy_schedule_id, &schedule.body().schedule_id, &schedule_digest],
+                "INSERT INTO fiscal_legacy_fee_schedule_bindings (legacy_schedule_id, fiscal_schedule_id, fiscal_schedule_digest, legacy_envelope_digest) VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    legacy_schedule_id,
+                    &schedule.body().schedule_id,
+                    &schedule_digest,
+                    &legacy_envelope_digest,
+                ],
             )
             .map_err(sqlite_error)?;
         let projection_key = format!("legacy-fee:{legacy_schedule_id}");
@@ -554,6 +595,32 @@ impl SqliteFiscalStore {
         )?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)
+    }
+
+    pub fn load_legacy_fee_schedule_binding(
+        &self,
+        fiscal_schedule_id: &str,
+    ) -> Result<FiscalLegacyFeeScheduleBindingRecord, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let record = transaction
+            .query_row(
+                "SELECT legacy_schedule_id, fiscal_schedule_id, fiscal_schedule_digest, legacy_envelope_digest FROM fiscal_legacy_fee_schedule_bindings WHERE fiscal_schedule_id = ?1",
+                [fiscal_schedule_id],
+                |row| {
+                    Ok(FiscalLegacyFeeScheduleBindingRecord {
+                        legacy_schedule_id: row.get(0)?,
+                        fiscal_schedule_id: row.get(1)?,
+                        fiscal_schedule_digest: row.get(2)?,
+                        legacy_envelope_digest: row.get(3)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .ok_or(FiscalStoreError::NotFound)?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(record)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1075,6 +1142,7 @@ pub(crate) fn initialize_fiscal_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    ensure_legacy_envelope_digest_column(&transaction)?;
     transaction
         .execute_batch(FISCAL_STORE_SCHEMA)
         .map_err(sqlite_error)?;
@@ -1138,6 +1206,17 @@ pub(crate) fn verify_fiscal_sql_invariants(
                     )
                 )
                 OR EXISTS(
+                    SELECT 1 FROM fiscal_legacy_fee_schedule_bindings AS binding
+                    WHERE binding.legacy_envelope_digest IS NULL
+                       OR length(binding.legacy_envelope_digest) <> 64
+                       OR binding.legacy_envelope_digest GLOB '*[^0-9a-f]*'
+                       OR NOT EXISTS(
+                           SELECT 1 FROM fiscal_schedules AS schedule
+                           WHERE schedule.schedule_id = binding.fiscal_schedule_id
+                             AND schedule.schedule_digest = binding.fiscal_schedule_digest
+                       )
+                )
+                OR EXISTS(
                     SELECT 1 FROM fiscal_projection_commits AS commit_record
                     WHERE commit_record.projection_sequence > 1
                       AND NOT EXISTS(
@@ -1161,6 +1240,41 @@ pub(crate) fn verify_fiscal_sql_invariants(
     } else {
         Ok(())
     }
+}
+
+fn ensure_legacy_envelope_digest_column(
+    transaction: &Transaction<'_>,
+) -> Result<(), FiscalStoreError> {
+    let table_present = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'fiscal_legacy_fee_schedule_bindings')",
+            [],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(sqlite_error)?;
+    if !table_present {
+        return Ok(());
+    }
+    let mut statement = transaction
+        .prepare("PRAGMA table_info(fiscal_legacy_fee_schedule_bindings)")
+        .map_err(sqlite_error)?;
+    let columns = statement
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(sqlite_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(sqlite_error)?;
+    if !columns
+        .iter()
+        .any(|column| column == "legacy_envelope_digest")
+    {
+        transaction
+            .execute(
+                "ALTER TABLE fiscal_legacy_fee_schedule_bindings ADD COLUMN legacy_envelope_digest TEXT",
+                [],
+            )
+            .map_err(sqlite_error)?;
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]

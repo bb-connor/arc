@@ -228,6 +228,32 @@ fn fiscal_schema_migrates_the_single_open_transition_guard() -> TestResult {
 }
 
 #[test]
+fn fiscal_schema_migrates_the_legacy_envelope_digest_binding() -> TestResult {
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    initialize_fiscal_schema(&mut connection)?;
+    connection.execute(
+        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'fiscal'",
+        [],
+    )?;
+    connection.execute_batch(
+        "DROP TRIGGER fiscal_legacy_fee_schedule_bindings_immutable;
+         DROP TRIGGER fiscal_legacy_fee_schedule_bindings_no_delete;
+         ALTER TABLE fiscal_legacy_fee_schedule_bindings DROP COLUMN legacy_envelope_digest;",
+    )?;
+
+    initialize_fiscal_schema(&mut connection)?;
+
+    let digest_column_present = connection
+        .prepare("PRAGMA table_info(fiscal_legacy_fee_schedule_bindings)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .any(|column| column == "legacy_envelope_digest");
+    assert!(digest_column_present);
+    Ok(())
+}
+
+#[test]
 fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;

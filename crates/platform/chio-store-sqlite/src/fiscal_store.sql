@@ -105,6 +105,10 @@ CREATE TABLE IF NOT EXISTS fiscal_legacy_fee_schedule_bindings (
         length(fiscal_schedule_digest) = 64
         AND fiscal_schedule_digest NOT GLOB '*[^0-9a-f]*'
     ),
+    legacy_envelope_digest TEXT NOT NULL CHECK (
+        length(legacy_envelope_digest) = 64
+        AND legacy_envelope_digest NOT GLOB '*[^0-9a-f]*'
+    ),
     FOREIGN KEY (fiscal_schedule_id) REFERENCES fiscal_schedules(schedule_id)
 );
 
@@ -177,6 +181,12 @@ BEGIN SELECT RAISE(ABORT, 'signed fiscal approval is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS fiscal_signed_activations_immutable
 BEFORE UPDATE ON fiscal_activations
 BEGIN SELECT RAISE(ABORT, 'signed fiscal activation is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_legacy_fee_schedule_bindings_immutable
+BEFORE UPDATE ON fiscal_legacy_fee_schedule_bindings
+BEGIN SELECT RAISE(ABORT, 'fiscal legacy fee schedule binding is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_legacy_fee_schedule_bindings_no_delete
+BEFORE DELETE ON fiscal_legacy_fee_schedule_bindings
+BEGIN SELECT RAISE(ABORT, 'fiscal legacy fee schedule binding is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS fiscal_checkpoints_immutable
 BEFORE UPDATE OF checkpoint_digest, continuity_sequence, signed_json
 ON fiscal_continuity_checkpoints
