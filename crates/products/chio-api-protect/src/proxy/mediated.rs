@@ -1616,7 +1616,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mediated_authorization_admits_caller_named_server_id() {
         // The operator does not pre-register tool servers; the mediated route
-        // registers a placeholder under whatever server id the caller names, so
+        // registers the caller's server id for the authorization attempt, so
         // an authorization for an arbitrary server is authorized rather than
         // denied `ToolNotRegistered` by the kernel's pre-dispatch registration
         // check.
@@ -2532,7 +2532,12 @@ mod tests {
             &self,
             request: &chio_kernel::PaymentAuthorizeRequest,
         ) -> Result<chio_kernel::PaymentAuthorization, chio_kernel::PaymentError> {
-            self.inner.authorize(request)
+            let authorization = self.inner.authorize(request)?;
+            if authorization.state.is_final() {
+                self.captures
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+            Ok(authorization)
         }
 
         fn capture(
@@ -2613,8 +2618,10 @@ mod tests {
 
         // The reserved hold stays OPEN with its budget committed: the caller holds a
         // real reservation backing the downstream execution.
-        let hold_id = format!("budget-hold:persist-fail:{cap_id}:0");
-        let hold = budget.get_budget_hold(&hold_id).unwrap();
+        let hold_id = json["execution_nonce"]["nonce"]["reserved_hold_id"]
+            .as_str()
+            .expect("the returned nonce must name its reserved hold");
+        let hold = budget.get_budget_hold(hold_id).unwrap();
         assert!(
             hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
             "a returned reservation must keep its reserved hold open"
@@ -2732,8 +2739,10 @@ mod tests {
             1,
             "the returned invocation reservation stays consumed against the grant"
         );
-        let hold_id = format!("budget-hold:invoke-persist-fail:{cap_id}:0");
-        let hold = budget.get_budget_hold(&hold_id).unwrap();
+        let hold_id = nonce_json["nonce"]["reserved_hold_id"]
+            .as_str()
+            .expect("the returned nonce must name its reserved hold");
+        let hold = budget.get_budget_hold(hold_id).unwrap();
         assert!(
             hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
             "the returned invocation reservation must keep its reserved hold open"
@@ -2764,7 +2773,6 @@ mod tests {
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
-        let cap_id = cap.id.clone();
         let cap_value = serde_json::to_value(&cap).unwrap();
         let approver = signer.clone();
 
@@ -2828,8 +2836,10 @@ mod tests {
         );
 
         // The reservation is intact: the reserved hold stays open.
-        let hold_id = format!("budget-hold:{request_id}:{cap_id}:0");
-        let hold = budget.get_budget_hold(&hold_id).unwrap();
+        let hold_id = json["execution_nonce"]["nonce"]["reserved_hold_id"]
+            .as_str()
+            .expect("the returned nonce must name its reserved hold");
+        let hold = budget.get_budget_hold(hold_id).unwrap();
         assert!(
             hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
             "the captured MustPrepay reservation must stay open, backing the returned nonce"

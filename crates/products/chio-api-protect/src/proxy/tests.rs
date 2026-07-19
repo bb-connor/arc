@@ -238,7 +238,7 @@ fn test_state_with_receipt_db(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
         )),
         reaper_handle: Mutex::new(None),
-        allow_advisory: false,
+        allow_advisory: true,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",
     })
@@ -2990,11 +2990,11 @@ async fn sidecar_evaluate_advisory_route_wraps_non_authorization_response() {
         "tool_name": "read",
         "parameters": {"path": "/etc/hostname"},
     });
-    let removed_response = build_app(Arc::clone(&state))
+    let mediated_response = build_app(Arc::clone(&state))
         .oneshot(loopback_post("/v1/evaluate", evaluate_body.clone()))
         .await
         .test_unwrap();
-    assert_eq!(removed_response.status(), StatusCode::GONE);
+    assert_eq!(mediated_response.status(), StatusCode::BAD_REQUEST);
 
     let evaluate_response = build_app(Arc::clone(&state))
         .oneshot(loopback_post("/v1/evaluate/advisory", evaluate_body))
