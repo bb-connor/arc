@@ -1393,19 +1393,17 @@ mechanisms working together:
    `governed_intent_hash`. Cannot replay for a different request or intent.
 2. **Time window** -- `issued_at` to `expires_at`. Cannot use after expiry.
 3. **Lifetime cap** -- the kernel rejects approval tokens with a lifetime
-   exceeding `MAX_APPROVAL_TTL_SECS` (1 hour). This prevents long-lived
-   tokens from outliving the replay store.
-4. **Single-use consumption store** -- an LRU replay store
-   (`approval_replay_store` on `ChioKernel`) records consumed
-   `(request_id, intent_hash)` pairs. A token presented a second time is
-   rejected with "replay detected". The store's TTL equals
-   `MAX_APPROVAL_TTL_SECS`, which is always >= any valid token's lifetime
-   (enforced by the lifetime cap). This guarantees a token expires before
-   it can be evicted from the store, closing the cache-eviction replay
-   window.
+   exceeding `MAX_APPROVAL_TTL_SECS` (1 hour). This keeps the durable
+   reservation deadline bounded.
+4. **Operation-owned durable reservation** -- the kernel normalizes a
+   permitted one-of-one token into a one-member approval set. The durable
+   `ApprovalStore` atomically binds its token id and complete token digest to
+   the admission operation, then retains the committed reservation as a
+   replay tombstone. The durable `AdmissionOperationStore` prevents a restart
+   or retry from producing a second dispatch permit for the same operation.
 
-Implementation: `crates/kernel/chio-kernel/src/kernel/mod.rs`, steps 7-8 of
-`validate_governed_approval_token()`.
+Implementation: `crates/kernel/chio-kernel/src/threshold_approval.rs` and
+`crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs`.
 
 ### Separation of Concerns
 

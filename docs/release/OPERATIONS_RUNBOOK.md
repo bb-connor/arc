@@ -37,7 +37,8 @@ Recommended persistent state:
 
 - `--receipt-db <path>`
 - `--revocation-db <path>`
-- `--authority-db <path>` for clustered or restart-stable authority state
+- `--authority-db <path>` for restart-stable authority state on a non-clustered
+  authority service
 - `--budget-db <path>` when monetary enforcement is enabled
 
 Optional shared registries and federation state:
@@ -53,12 +54,83 @@ Clustered deployments additionally require:
 
 - `--advertise-url <public-base-url>`
 - one or more `--peer-url <peer-base-url>` values
+- `--cluster-node-seed-file <path>` naming this node's strict Ed25519 seed file
+- `--cluster-replay-db <path>` naming durable replay state that survives restart
+- one `--cluster-member URL=ED25519_PUBLIC_KEY` pin for the advertised node and
+  every configured peer
+
+Cluster mode currently requires Linux with `/proc/self/fd` mounted. The replay
+database is opened through a retained parent-directory descriptor so SQLite is
+cryptographically adjacent to the same file identity that startup validated.
+Startup rejects cluster mode on platforms that cannot provide that binding.
+
+Do not combine `--peer-url` with `--authority-seed-file` or `--authority-db`.
+Authority snapshots are observational and do not provide a shared authority
+write or selector protocol. Clustered authority custody and issuance therefore
+fail closed until such a protocol is implemented.
+
+The member URL set must exactly equal the normalized advertised URL plus the
+normalized peer URL set. Every member key must be a unique bare Ed25519 public
+key. The local seed must match the advertised node's pin. Node membership keys
+must be distinct from every current or historical authority signer, authority
+workload and session-admission signers, and every configured bearer credential.
+The node seed and replay database require trusted ownership, private file mode,
+one hard link, no final or ancestor symlink, and a complete trusted parent
+chain. The final parent must not grant group or world write authority.
+
+Internal cluster routes do not accept service, admin, tenant, authority
+workload, or other bearer credentials. Each request carries an application-level
+Ed25519 signature over the HTTP method, internal endpoint, canonical body
+digest, intended receiver URL, current cluster term when applicable, freshness
+timestamp, UUIDv4 nonce, and pinned peer identity. HTTPS certificate and private-CA validation
+remain mandatory outside explicitly enabled local development. Reverse-proxy
+mTLS can add defense in depth, but it does not replace application-level member
+pins.
+
+The cluster replay database is part of the security boundary. Back it up and
+restore it with the node's other SQLite state. Do not delete, recreate, or roll
+it back independently while the node seed remains active, because doing so can
+make previously consumed signed requests replayable. Replay pruning uses a
+transactionally persisted maximum-observed-time watermark. A clock rollback
+beyond the authentication skew fails closed rather than reopening a pruned
+nonce window.
+
+There is no network route for partition fault injection. Qualification must
+isolate processes with the test harness, network namespace, firewall, or proxy
+layer outside the production service API.
+
+Cluster node identity rotation is coordinated configuration work:
+
+1. Generate a new strict seed for the target node without replacing the active
+   seed in place.
+2. Derive its Ed25519 public key and update that node's member pin in every
+   node's complete membership configuration.
+3. Stop cluster traffic and the target node. A mixed pin set intentionally
+   fails closed, so do not expect an uncoordinated rolling rotation to converge.
+4. Atomically install the new seed and the matching membership configuration,
+   then restart all affected nodes.
+5. Verify cluster health and confirm that requests signed by the retired key
+   are rejected.
+
+Membership authentication proves only that a request came from a pinned
+cluster node. It never grants capability issuance or authority rotation rights.
+The leader must independently validate the configured authority workload or
+administrator role for every privileged authority mutation.
 
 ### Remote MCP Edge
 
 Required:
 
-- `chio mcp serve-http --policy <path> --server-id <id> --listen <addr> -- <wrapped command>`
+- `--policy <path>` and an exact `--server-id`, `--server-name`, and
+  `--server-version`
+- `--signed-manifest <path>` and the independent registered
+  `--manifest-public-key <key>`
+- `--cage-policy <path>` and the independent
+  `--cage-policy-signer <key>`
+- an absolute wrapped executable and argv that exactly match the signed cage
+  policy
+- durable local authority custody through `--authority-seed-file` or
+  `--authority-db`
 
 Recommended persistent state:
 
@@ -67,6 +139,11 @@ Recommended persistent state:
 - `--authority-db <path>` or `--authority-seed-file <path>`
 - `--budget-db <path>` when monetary enforcement is enabled
 - `--session-db <path>` for restart-stable tombstones
+
+When `--control-url` is configured, the remote service owns receipts,
+revocations, and budgets. Do not also configure local `--receipt-db`,
+`--revocation-db`, or `--budget-db`. The locally selected authority signer must
+equal `--control-authority-public-key`.
 
 Optional auth and federation inputs:
 
@@ -90,6 +167,54 @@ Hosted session lifecycle tuning now uses these canonical env names:
 - `CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS`
 - `CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS`
 - `CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS`
+
+### Remote Trust-Control Client Security
+
+Configure `--control-url` with final HTTPS origins. A comma-separated endpoint
+list is supported. Chio does not follow redirects. Literal IPv4 and IPv6
+loopback HTTP endpoints are accepted for local development only.
+
+For private PKI:
+
+```bash
+export CHIO_CONTROL_TLS_ROOT_CA_FILE=/etc/chio/control-root-ca.pem
+```
+
+The file must be a nonempty regular file, must not be a symlink, must be no
+larger than 1 MiB, and must contain valid PEM certificates. When configured,
+this file replaces the ambient public WebPKI root set for every control
+endpoint in the process.
+
+Control-backed runtime composition also requires the exact current authority
+pin:
+
+```bash
+export CHIO_CONTROL_AUTHORITY_PUBLIC_KEY=<current-ed25519-public-key>
+export CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS=<prior-key-1>,<prior-key-2>
+```
+
+The current key authenticates fresh authority status and lookup envelopes.
+Prior keys authenticate only durable artifacts created before rotation. The
+complete current and historical set is limited to 256 unique keys.
+
+Authority rotation procedure:
+
+1. Read and retain `publicKey` and `trustedPublicKeys` from each endpoint's
+   authenticated `GET /v1/authority` response.
+2. Rotate through authenticated `POST /v1/authority`.
+3. Wait until every endpoint reports the same new `publicKey`, generation, and
+   trusted history.
+4. Move the old current key into
+   `CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS` and set the new key as
+   `CHIO_CONTROL_AUTHORITY_PUBLIC_KEY`.
+5. Select that same new signer in each hosted edge's local authority custody.
+6. Restart edges. Existing clients do not reload authority environment values.
+7. Verify that a new session uses the new issuer and that a retained
+   pre-rotation artifact still verifies.
+
+For CA rotation, first deploy a regular bundle containing both old and new
+roots and restart clients. Rotate server certificates, then remove the old root
+and restart clients again.
 
 ## 2. Initial Deployment Procedure
 
@@ -159,24 +284,44 @@ single source of truth.
 
 ### Remote MCP Edge
 
-1. Start the wrapped edge with persistent state and explicit admin auth:
+1. Provision a signed manifest, its registered publisher key, a signed cage
+   policy, its independent policy signer, a durable migration ledger, and a
+   local authority seed whose public key equals the current control pin.
+
+2. Start the wrapped edge with remote control, persistent session tombstones,
+   and explicit admin auth:
 
    ```bash
-   chio mcp serve-http \
+   export CHIO_CONTROL_TLS_ROOT_CA_FILE=/etc/chio/control-root-ca.pem
+   export CHIO_CONTROL_TOKEN=<service-token>
+   export CHIO_EDGE_TOKEN=<edge-admission-token>
+   export CHIO_ADMIN_TOKEN=<admin-token>
+   export CHIO_CONTROL_AUTHORITY_PUBLIC_KEY=<current-ed25519-public-key>
+   test "$CHIO_ADMIN_TOKEN" != "$CHIO_EDGE_TOKEN"
+   test "$CHIO_ADMIN_TOKEN" != "$CHIO_CONTROL_TOKEN"
+   test "$CHIO_EDGE_TOKEN" != "$CHIO_CONTROL_TOKEN"
+
+   chio \
+     --authority-seed-file /etc/chio/mcp-edge-authority.seed \
+     --control-url https://trust-control.example.com \
+     mcp serve-http \
      --policy examples/policies/canonical-hushspec.yaml \
      --server-id demo-server \
+     --server-name "Demo Server" \
+     --server-version 1.0.0 \
+     --signed-manifest /etc/chio/demo-server-signed-manifest.json \
+     --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+     --cage-policy /etc/chio/demo-server-cage-policy.json \
+     --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
      --listen 127.0.0.1:8931 \
      --auth-token "$CHIO_EDGE_TOKEN" \
      --admin-token "$CHIO_ADMIN_TOKEN" \
-     --receipt-db /var/lib/chio/edge-receipts.sqlite3 \
-     --revocation-db /var/lib/chio/edge-revocations.sqlite3 \
-     --authority-db /var/lib/chio/edge-authority.sqlite3 \
      --session-db /var/lib/chio/edge-sessions.sqlite3 \
      -- \
-     python3 tests/conformance/fixtures/mcp_core/mock_mcp_server.py
+     /usr/bin/python3 /opt/chio/mcp-server.py
    ```
 
-2. Initialize one session and confirm the admin diagnostics surface:
+3. Initialize one session and confirm the admin diagnostics surface:
 
    ```bash
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
@@ -197,7 +342,7 @@ Build it before deployment:
 Then load:
 
 ```text
-http://127.0.0.1:8940/?token=<service-token>
+https://trust-control.example.com/?token=<service-token>
 ```
 
 ## 3. Configuration Checks Before Promotion
@@ -291,11 +436,16 @@ sqlite3 /var/lib/chio/receipts.sqlite3 ".backup '/var/backups/chio/receipts.sqli
 sqlite3 /var/lib/chio/revocations.sqlite3 ".backup '/var/backups/chio/revocations.sqlite3'"
 sqlite3 /var/lib/chio/authority.sqlite3 ".backup '/var/backups/chio/authority.sqlite3'"
 sqlite3 /var/lib/chio/budgets.sqlite3 ".backup '/var/backups/chio/budgets.sqlite3'"
+sqlite3 /var/lib/chio/cluster-replay.sqlite3 ".backup '/var/backups/chio/cluster-replay.sqlite3'"
 sqlite3 /var/lib/chio/verifier-challenges.sqlite3 ".backup '/var/backups/chio/verifier-challenges.sqlite3'"
 sqlite3 /var/lib/chio/edge-sessions.sqlite3 ".backup '/var/backups/chio/edge-sessions.sqlite3'"
 ```
 
 Back up file-backed registries and policies:
+
+For clustered nodes, also back up the strict cluster node seed with its `0600`
+mode preserved. Store it separately from general database backups and restore
+it only together with the matching member pin configuration.
 
 ```bash
 cp /etc/chio/enterprise-providers.json /var/backups/chio/
@@ -339,8 +489,6 @@ Record the binary version and git commit used for the backup snapshot.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $CHIO_SERVICE_TOKEN" \
-     http://127.0.0.1:8940/v1/internal/cluster/status | jq
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
@@ -370,8 +518,9 @@ Rollback is a full binary-and-state rollback to the last known good backup.
 
 ## 8. Incident Triage Pointers
 
-- Trust-control cluster convergence: check `/health` and
-  `/v1/internal/cluster/status`
+- Trust-control cluster convergence: check `/health` externally and inspect
+  `/v1/internal/cluster/status` only through a pinned node-to-node diagnostic
+  request. Operator bearer tokens cannot authenticate internal routes.
 - Authority rotation or trust drift: check `/v1/authority`
 - Remote runtime lifecycle/auth failures: check `/admin/health`,
   `/admin/sessions`, and `/admin/sessions/{session_id}/trust`

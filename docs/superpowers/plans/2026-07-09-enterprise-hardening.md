@@ -141,7 +141,7 @@ rg -n "chio_core_types::manifest|chio_manifest::" crates
 - [ ] Define the minimum supported Linux kernel, Landlock ABI, CPU architectures, and seccomp feature set in `chio-cage` documentation and CI configuration.
 - [ ] Patch or extend nono to expose `RulesetStatus` and add Landlock rules from caller-owned FDs. `chio-cage` must observe and reject `PartiallyEnforced`, and it must not reopen a validated path.
 - [ ] Define the pinned `chio-cage-init` binary identity, sealed-memfd launch-plan format, O_PATH FD-table protocol, `execveat` or `fexecve`, and kernel-observed exec-transition requirements.
-- [ ] Provision an actual runner matching `[self-hosted, linux, x64, chio-enterprise-security]` with the required Landlock ABI, seccomp, `openat2`, `execveat`, memfd seals, O_PATH behavior, and permitted parent-child `PTRACE_TRACEME` plus `PTRACE_O_TRACEEXEC`. A planned label without an online runner is not release evidence.
+- [ ] Pin an ephemeral GitHub-hosted Ubuntu 24.04 Linux capture with the required Landlock ABI, seccomp, `openat2`, `execveat`, memfd seals, O_PATH behavior, and permitted parent-child `PTRACE_TRACEME` plus `PTRACE_O_TRACEEXEC`. Required pull-request CI must contain no persistent self-hosted target. Unsupported, skipped, or simulated enforcement is not release evidence.
 - [ ] Run `cargo deny check licenses advisories bans sources` for the proposed graph before implementation continues.
 
 **Gate:** Dependency review explicitly proves network-deny initialization, observable Landlock status, and independent seccomp enforcement.
@@ -601,7 +601,7 @@ cargo test -p chio-cage --all-targets
 cargo clippy -p chio-cage --all-targets -- -D warnings
 ```
 
-Real-kernel cage-init tests pass in `.github/workflows/enterprise-hardening.yml` on the designated labeled runner, including the parent-child exec-event observer. Other hosts assert `Unsupported` denial and do not count skipped enforcement tests as a pass.
+Real-kernel cage-init tests pass in `.github/workflows/enterprise-hardening.yml` on an ephemeral GitHub-hosted Ubuntu 24.04 runner, including the parent-child exec-event observer. Other hosts assert `Unsupported` denial and do not count skipped enforcement tests as a pass.
 
 ## Phase 9: runtime composition and signed evidence
 
@@ -613,6 +613,56 @@ Real-kernel cage-init tests pass in `.github/workflows/enterprise-hardening.yml`
 - [ ] Before accepting an authority key, fetch every contiguous leaf since the pin, verify consistency and checkpoint chains, rebuild the root, and replay full state. A single key inclusion proof is insufficient.
 - [ ] Require artifact-hash-bound trusted time evidence for old-key verification. Reject self-asserted backdating and new-key artifacts anchored before witnessed activation.
 - [ ] Add shadow mode metrics before enforcement, but shadow failure never silently converts an enforced verifier back to legacy trust.
+
+The shipped runtime path accepts `--keyring-config <path>` together with an existing `--authority-seed-file`. The seed file must already exist and match the active selector in the initialized key log. The configuration is closed to unknown fields. Ed25519 public keys use bare 64-character hexadecimal encoding; other supported algorithms retain the prefixes accepted by `PublicKey::from_hex`:
+
+```yaml
+schema: chio.keyring.runtime-config.v1
+database_path: /var/lib/chio/key-log.sqlite3
+enterprise_migration:
+  state_database_path: /var/lib/chio/key-log-migration.sqlite3
+  deployment_id: production.us-east-1
+  stage: enforced
+  trusted_transition_signers:
+    - <bare-ed25519-public-key-hex>
+  minimum_heads:
+    - key:
+        deployment_id: production.us-east-1
+        scope_kind: deployment
+        scope_id: production.us-east-1
+        control: key_log_verification
+      minimum_generation: 2
+      transition_digest: [<32 unsigned byte values from the external anchor>]
+log_id: production.authority.log
+authority_id: production.authority
+bootstrap_public_key: <bare-ed25519-public-key-hex>
+operator_public_key: <bare-ed25519-public-key-hex>
+operator_seed_file_path: /run/chio/operator.seed
+witness_roster_id: production.witnesses.v1
+witness_public_keys:
+  witness.one: <bare-ed25519-public-key-hex>
+  witness.two: <bare-ed25519-public-key-hex>
+  witness.three: <bare-ed25519-public-key-hex>
+witness_service_endpoints:
+  witness.one: /run/chio/witness-one.sock
+  witness.two: /run/chio/witness-two.sock
+  witness.three: /run/chio/witness-three.sock
+audit_service_endpoints:
+  audit.one: /run/chio/audit-one.sock
+  audit.two: /run/chio/audit-two.sock
+audit_public_keys:
+  audit.one: <bare-ed25519-public-key-hex>
+  audit.two: <bare-ed25519-public-key-hex>
+recovery_policy_id: production.recovery.v1
+recovery_public_keys: {}
+recovery_threshold: 0
+artifact_time_public_keys:
+  timestamp.primary: <bare-ed25519-public-key-hex>
+artifact_time_seed_file_path: /run/chio/artifact-time.seed
+max_checkpoint_future_skew_seconds: 30
+```
+
+The key-log and enterprise-migration database paths must name distinct, existing filesystem-backed files. The migration ledger must contain a valid signed chain for the exact deployment-scoped `key_log_verification` control. Production accepts only `enforced` with generation 2 or `legacy_removed` with generation 3, and the one configured minimum head must match that exact generation and the externally retained transition digest. The operator and artifact-time seed files contain exactly 32 raw bytes and must be singly linked regular files with mode 0600 or stricter. The authority seed file remains the existing hexadecimal seed format. Empty witness or artifact-time roots, an absent seed, an uninitialized log, a selector mismatch, an unanchored or stale migration ledger, or an in-memory SQLite URI denies startup. Direct seed rotation is disabled while this configuration is active; rotation proceeds through the witnessed key-log activation flow.
 
 ### Task 9.2: Wire broker routing
 
@@ -682,8 +732,8 @@ Add machine-readable cases and caught-mutant tests for:
 
 - [ ] `check-keyring-transparency.sh` runs fixed vectors, contiguous sync, stateful witness, two-stage activation, trusted artifact-time, monitor growth, and split-view tests.
 - [ ] `check-secret-broker-boundary.sh` runs encrypted provisioning, process boundary, crash reconciliation, multi-key budget, supplemental-verifier binding, header/option proof, combined revocation-capture races, SSRF, and fake-upstream tests.
-- [ ] `check-cage-enforcement.sh` checks designated runner prerequisites, runs FD and helper identity tests, real cage-init probes, bootstrap failures, and signed evidence verification.
-- [ ] Scripts fail when required Linux capabilities are missing on the designated release runner. Local non-Linux runs may report unsupported, but cannot produce release evidence.
+- [ ] `check-cage-enforcement.sh` checks hosted Linux prerequisites, runs FD and helper identity tests, real cage-init probes, bootstrap failures, and signed evidence verification.
+- [ ] Scripts fail when required Linux capabilities are missing on the ephemeral release runner. Local non-Linux runs may report unsupported, but cannot produce release evidence.
 
 ### Task 10.3: Land schemas, codegen, conformance, and CI
 
@@ -693,9 +743,18 @@ Add machine-readable cases and caught-mutant tests for:
 - [ ] Add canonical positive and negative cases under `tests/bindings/vectors/security/` and update `tests/bindings/vectors/MANIFEST.sha256` with `cargo xtask freeze-vectors`.
 - [ ] Extend xtask discovery where required, regenerate Rust, Python, TypeScript, and Go bindings, and require `make codegen-check` with no generated diff.
 - [ ] Extend `crates/tooling/chio-conformance` native suite and fixture binary for key sync/witness, broker proof/quota/custody, and cage-plan/evidence scenarios.
-- [ ] Create `.github/workflows/enterprise-hardening.yml`. Portable jobs run schema registry, codegen, vectors, and conformance. `linux-enforcement` uses `runs-on: [self-hosted, linux, x64, chio-enterprise-security]`, verifies the parent-child `PTRACE_EVENT_EXEC` contract, and runs all cage scripts without skip-to-success behavior.
+- [ ] Create `.github/workflows/enterprise-hardening.yml`. Portable jobs run schema registry, codegen, vectors, and conformance. Its non-optional `linux-enforcement` job uses ephemeral GitHub-hosted Ubuntu 24.04, verifies the parent-child `PTRACE_EVENT_EXEC` contract, runs all cage scripts without skip-to-success behavior, receives no repository secret, and is an unconditional dependency of the required security aggregate. The reusable workflow accepts an exact repository and head commit. Its first job checks out the exact event merge, proves ordered base and head parents plus tree, and uses one canonical closed-schema binding as both the custom attestation predicate and subject. A run-and-attempt-scoped artifact carries that file and the GitHub attestation bundle. After bootstrap, the caller uses a same-repository reusable-workflow path pinned to the full bootstrap commit and grants only the artifact and identity-token permissions needed by that attestation job.
+- [ ] Add a default-branch `pull_request_target` controller that revalidates the live same-repository owner, actor, workflow ID and path, actual execution head, run and attempt, head, base, explicit `refs/pull/<N>/merge` commit and tree, labels, and `CHIO_AUTHORIZED_SECURITY_SOURCE_SHA` without a checkout. Treat `CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA` as a workflow-content baseline: the workflow blob at the actual execution head must exactly equal the blob at that authorized commit. Permit only the authorized source or a linear descendant limited to the strict three-file committed evidence surface, then dispatch the default-branch capture definition with all immutable inputs.
+- [ ] Add `enterprise-linux-capture.yml` as a manual fixed-input worker. Before candidate checkout, independently revalidate the controller, source allowlist, live pull request, explicit merge-ref commit and tree, labels, actual controller and capture execution heads, workflow-blob equality to the authorized definition baseline, actors, and issuance freshness. Enforcement checks out the exact merge; refresh checks out the exact head. Both disable persisted checkout credentials, use source-SHA concurrency across modes, run on ephemeral hosted Linux, receive no repository secret, preserve the exact release and refresh behavior inventories, and upload only bounded fixed-schema unsigned data.
+- [ ] After enforcement upload, dispatch a default-branch finalizer explicitly from a no-checkout capture job. The dispatcher authenticates the current default-branch head and requires the finalizer workflow blob there to equal its authorized baseline before dispatch. The finalizer polls and verifies the exact capture run, then verifies the controller, capture, and finalizer workflow IDs, paths, actual execution heads and baseline-equivalent workflow blobs, actors, run IDs and attempts, runner job and reserved GitHub-hosted group identity, exact runner labels, exact artifact ID, digest, compressed size and timestamps, exact merge tree, label state, source authorization, and issuance freshness. It downloads only after the metadata bound passes, performs exact path-safe bounded extraction, and reduces candidate data to fixed-shape sanitized outputs. A protected no-checkout signing job downloads only a separately published verifier pinned by repository-variable URL and SHA-256. The seed exists only in the single signing step environment, is removed by a cleanup trap, and never reaches upload. The step creates the strict three committed migration-canary files and invokes `verify-committed-linux-evidence`; no custom detached envelope is signed.
+- [ ] Verify committed Linux evidence in a fresh reusable-workflow job against the detached `CHIO_COMMITTED_LINUX_EVIDENCE_SHA`. Run checker bytes from the exact `CHIO_AUTHORIZED_SECURITY_SOURCE_SHA` checkout, never from the current candidate tree. Independently bind the source input to the event head, and keep the event test commit (the pull-request synthetic merge or pushed commit) as the separate commit exercised by the ordinary enterprise jobs.
+- [ ] Make the security execution entrypoint a root supervisor with verifier UID `65533` and candidate UID `65532`. Run fixed trusted Python only with `-I`, a closed environment, and verifier-owned per-gate home, temporary, artifact, and log directories. Route every candidate Cargo, compiler, linker inspection, hostile Python, and hostile Cargo command through a root-owned verifier-only broker into disposable per-gate candidate home, temporary, Cargo home, target, and artifact directories. Kill and wait for candidate descendants after every command, kill verifier descendants after every trusted gate, delete disposable state, and recheck the exact repository inventory before publication. Add hostile probes for Python user-site, shared `/tmp`, Cargo home, target, trusted-log, and detached-child poisoning.
+- [ ] Pin the security execution image to the exact reviewed Rust `1.93.0` Alpine digest. Remove the mutable Dockerfile frontend directive. Pin every direct APK version and compare the exact sorted installed closure to a committed inventory. Download Rust components and `cargo-mutants` source from versioned URLs, verify fixed SHA-256 values before installation, verify the packaged Cargo lock, and bind the workspace `Cargo.lock` and `rust-toolchain.toml` hashes before fetching. Fail image construction on any package, archive, lock, component, tool-version, or inventory drift.
+- [ ] Add a secret-free publication authorizer that requires committed evidence `E` to remain the live pull-request head and authenticates the exact `CI N/E/base/M` run title, workflow, attempt, `E`-scoped jobs, Check Runs, suite, and Actions App. Separately verify the singleton merge-binding artifact digest, bounded archive, canonical predicate, and GitHub attestation certificate with a versioned SHA-256-pinned verifier. Require the certificate to bind the reusable signer, definition digest, source `M`, explicit merge ref, caller, exact CI run and attempt, repository identities, and GitHub-hosted runner. Add a protected main-only publisher that revalidates exact test merge `M` before and after each success write, creates four App `15368` mirrors on `M`, and uses the dedicated App key only for `Security contract` on `M`. Bind all five contexts to stable `(<PR>, <E>, <M>, <S>)` identity, make failure sticky, and make labels non-authoritative after capture. Add a default-branch failure-only `workflow_run` path that treats every completed non-success conclusion as failure, never trusts nested pull-request metadata, authenticates the exact run title and workflow blobs, proves the historical `M` directly, and requires verified signed binding evidence whenever the builder succeeded. If the live tuple advanced from `(base1, M1)` to `(base2, M2)`, the revoker and the publisher's displaced-revoker branch may normalize existing authority on `M1` but cannot create a missing namespace and never touch `M2`. Publication must never update existing checks, and revocation must only update them to failure so races converge to sticky failure. Keep an all-zero-freeze manual revocation path. Configure the ruleset externally with empty bypass actors, exactly four mirror contexts pinned to GitHub Actions App ID `15368`, and `Security contract` pinned to `CHIO_SECURITY_APP_ID`.
+- [ ] Ratchet this topology in `check-security-ci-contract.py` and its mutation suite with exact normalized job, step, input, environment, action, body, Docker-instruction, Python-AST, and control-flow inventories. Reject comments or dead code posing as enforcement, reordered validation, every persistent runner target, hosted-runner group or exact-label weakening, candidate secret reference, direct dispatch-input interpolation, source-allowlist bypass, actor, workflow, run, attempt, merge rebinding, candidate-ref workflow dispatch, credential-persisting checkout, source-mode concurrency split, pre-bound artifact metadata omission, unsafe extraction form, finalizer checkout, unpinned verifier, weakened digest or freshness binding, extra signing step, seed outside the one signing-step environment, missing cleanup, missing Linux behavior, upload with secret scope, committed-head mismatch, strict-checker bypass, missing or rebound CI job or aggregate, missing exact-M mirror, wrong App identity, unstable PR/E/M/S identity, non-sticky failure, label authority after capture, stale or cross-PR failure projection, incomplete pagination, cancelling M concurrency, publisher-key exposure, wrong dedicated App binding, or wrong published head or payload.
+- [ ] Land the controller, capture, and finalizer definitions on the default branch before relying on their evidence. The introducing pull request cannot establish a trusted controller or explicitly dispatched finalizer definition from its own revision.
 
-**Gate:** schema registry, MANIFEST, four-language generated bytes, vectors, native conformance, and the actual designated Linux workflow all pass.
+**Gate:** schema registry, MANIFEST, four-language generated bytes, vectors, native conformance, required ephemeral Linux enforcement, isolated unsigned capture, separate trusted finalization, and dedicated-App `Security contract` publication all pass. Candidate-executing jobs expose no repository secret, no required job targets a persistent self-hosted runner, and the protected ruleset accepts only the required checks from their exact App integrations.
 
 ### Task 10.4: Update normative documentation
 
@@ -711,7 +770,7 @@ Add machine-readable cases and caught-mutant tests for:
 3. Provision one provider credential through `EncryptedBlobSecretBackend` and run broker audit-only request comparison without returning raw credentials.
 4. Enable one-hold broker and parent quota enforcement plus crash reconciliation, then remove direct credential access for that provider.
 5. Generate sealed cage-init plans and retained FD tables and compare them with observed requirements without launching targets.
-6. Enforce cage-init for a canary tool server on the designated runner, then expand server by server.
+6. Enforce cage-init for a canary tool server through the isolated ephemeral Linux capture, then expand server by server.
 7. Turn on key-log pin enforcement only after witnessed checkpoint continuity and trusted artifact-time evidence are established.
 8. Remove legacy secret and launcher configuration after all dependents migrate.
 
@@ -757,7 +816,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 - Revocation and capture are linearized in one combined authority commit; sequential check-then-capture implementations cannot satisfy production support.
 - Cage admission starts from a registered-key-verified platform `SignedManifest`; retained O_PATH FDs remove path reopen races; trusted single-threaded cage-init applies Landlock and seccomp and executes the retained target FD.
 - Prepared evidence plus kernel `PTRACE_EVENT_EXEC`, verified post-exec target identity, and corroborating CLOEXEC EOF establish `FullyEnforced`; an immediate target exit is then recorded as `Exited`.
-- Enterprise wire schemas are registered and hashed, four-language generated bytes and conformance vectors are current, and the designated Linux workflow passes actual enforcement tests.
+- Enterprise wire schemas are registered and hashed, four-language generated bytes and conformance vectors are current, and the ephemeral Linux workflow passes actual enforcement tests with separate trusted finalization.
 - Unsupported and partial enforcement deny launch and are reported truthfully.
 - Adapted source has traceable provenance and required Apache-2.0 attribution.
 - Adversarial cases and caught mutants produce executable evidence; no threat row is closed by documentation alone.

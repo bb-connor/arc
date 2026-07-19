@@ -233,10 +233,12 @@ that does not match the implemented loader in `chio-config/src/schema.rs`
 UNIFIED-CONFIGURATION doc is aspirational, not current. The code in
 `chio-config` is the source of truth for what works today.
 
-**HITL approval replay (resolved)**: The kernel now has a single-use
-consumption store (`approval_replay_store` on `ChioKernel`) using the
-same LRU+TTL pattern as DPoP. Additionally, a lifetime cap
-(`MAX_APPROVAL_TTL_SECS = 3600`) rejects tokens with lifetimes exceeding
-the store's TTL, ensuring tokens expire before cache eviction can occur.
-See `chio-kernel/src/kernel/mod.rs`, steps 7-8 of
-`validate_governed_approval_token()`.
+**HITL approval replay (resolved)**: The kernel normalizes permitted
+one-of-one approvals into a one-member approval set and reserves that set
+through the operation-owned durable admission saga. `ApprovalStore` retains
+the committed token id and complete token digest as a replay tombstone, while
+`AdmissionOperationStore` prevents restart or retry from issuing another
+dispatch permit. The lifetime cap (`MAX_APPROVAL_TTL_SECS = 3600`) keeps the
+durable reservation deadline bounded. See
+`chio-kernel/src/threshold_approval.rs` and
+`chio-kernel/src/kernel/admission_coordinator.rs`.

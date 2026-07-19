@@ -111,6 +111,7 @@ The primary live release documents. Auditors and operators start here.
 
 ## Security
 
+- [Active defense rollout](security/active-defense-rollout.md) - promotion, enforcement, and fail-closed rollback contract
 - [Threat coverage](security/threat-coverage.md) - mapped threats and mitigations
 - [Expected identity migration](security/expected-identity-migration.md) - migrating expected-identity assertions
 - [Public witness semantics](security/public-witness-semantics.md)

@@ -17,25 +17,46 @@ The dashboard has no dependency on the `siem` feature flag. It communicates with
 
 ## Accessing the Dashboard
 
-Start the trust-control server, then open `http://localhost:<port>/` in a browser. The server port is set in your Chio configuration.
+Start the trust-control server, then open its HTTPS origin in a browser. The
+dashboard session uses a `Secure` host-only cookie, so production access must
+terminate TLS at the trust-control origin.
 
 ### Authentication
 
-All API calls from the dashboard require a Bearer token. The token is read in this order:
+Configure `CHIO_TRUST_DASHBOARD_READ_TOKEN` with a credential distinct from
+every service, administrator, workload, tenant, cluster, and relay credential.
+The login form sends that credential once in the JSON body of
+`POST /v1/dashboard/session`. The server returns a random, short-lived
+`__Host-chio_dashboard` cookie with `Secure`, `HttpOnly`, `SameSite=Strict`,
+and `Path=/`. Only the SHA-256 digest of the random session identifier is kept
+in the bounded in-memory session table.
 
-1. `sessionStorage` key `chio_token` (set from a previous visit)
-2. URL query parameter `?token=<value>`
+The browser sends the cookie with same-origin requests. It never writes the
+credential to a URL, `sessionStorage`, `localStorage`, JavaScript authorization
+header, or persistent application state. `DELETE /v1/dashboard/session` signs
+out and clears the cookie. Sessions expire after 15 minutes and a service
+restart requires a new login.
 
-When a token is found in the URL it is moved to `sessionStorage` and removed from the URL bar (using `window.history.replaceState`) to prevent it from appearing in browser history or the `Referer` header.
+The dashboard session is read-only. It is accepted by the receipt query,
+analytics, operator report, lineage, agent receipt, reputation comparison, and
+optional relay observability endpoints. Mutation, administrative, signing,
+issuance, revocation, budget-write, cluster, and evidence-export endpoints
+continue to require their existing dedicated bearers. The static Proof Room
+remains available without a dashboard session.
 
-Pass your service token on the initial URL:
+### Relay observability
 
-```
-http://localhost:7391/?token=my-service-token
-```
+The live pheromone relay exposes only
+`GET /v1/chio/pheromone/observability`. To show that panel, configure both
+`CHIO_TRUST_DASHBOARD_REPORT_ORIGIN` and a distinct
+`CHIO_TRUST_DASHBOARD_REPORT_TOKEN`. Trust-control sends the relay token only to
+the fixed observability path, disables redirects, bounds the response, requires
+strict I-JSON, and validates the authoritative observability JSON Schema before
+returning a no-store response.
 
-After the first load the token is stored in `sessionStorage` for the session. Closing the tab clears it.
-If no token is present, the dashboard shows an explicit operator guidance state instead of issuing unauthenticated API requests.
+The relay's alert, delivery, and assurance outputs are generated JSON files,
+not live HTTP endpoints. Their dashboard panels remain hidden and their former
+same-origin paths return 404 until a real read-only report service exists.
 
 ## Filtering Receipts
 

@@ -62,13 +62,27 @@ chio certify registry resolve \
   --certification-registry-file .chio/certifications.json
 ```
 
-Use the trust-control service instead of a local file:
+Use a loopback trust-control service instead of a local file during
+development:
 
 ```bash
 chio --control-url http://127.0.0.1:8940 \
   --control-token "$CHIO_CONTROL_TOKEN" \
   certify registry list
 ```
+
+For a private-PKI production service, configure the exclusive CA bundle and a
+final HTTPS origin:
+
+```bash
+export CHIO_CONTROL_TLS_ROOT_CA_FILE=/etc/chio/control-root-ca.pem
+chio --control-url https://trust.example.com \
+  --control-token "$CHIO_CONTROL_TOKEN" \
+  certify registry list
+```
+
+Control clients refuse redirects. The CA path must be a nonempty regular
+non-symlink PEM file no larger than 1 MiB.
 
 Publish across a configured discovery network:
 

@@ -3,7 +3,7 @@
 This tutorial takes the shortest honest path from "what is Chio?" to "I made a
 governed call and I understand how delegation continues from here."
 
-It reuses the phase `309` demo stack so the same local deployment can back the
+It uses the signed Docker demo stack so the same local deployment can back the
 tutorial, the SDK examples, and the receipt viewer.
 
 ## 1. Chio Concepts
@@ -28,18 +28,38 @@ For the local demo, the trust service and hosted edge are separate processes:
 From the repo root:
 
 ```bash
-docker compose -f examples/docker/compose.yaml up --build
+export CHIO_AUTH_TOKEN="$(openssl rand -hex 32)"
+export CHIO_ADMIN_TOKEN="$(openssl rand -hex 32)"
+export CHIO_SERVICE_TOKEN="$(openssl rand -hex 32)"
+export CHIO_DASHBOARD_READ_TOKEN="$(openssl rand -hex 32)"
+test "${CHIO_AUTH_TOKEN}" != "${CHIO_ADMIN_TOKEN}"
+test "${CHIO_AUTH_TOKEN}" != "${CHIO_SERVICE_TOKEN}"
+test "${CHIO_ADMIN_TOKEN}" != "${CHIO_SERVICE_TOKEN}"
+test "${CHIO_DASHBOARD_READ_TOKEN}" != "${CHIO_AUTH_TOKEN}"
+test "${CHIO_DASHBOARD_READ_TOKEN}" != "${CHIO_ADMIN_TOKEN}"
+test "${CHIO_DASHBOARD_READ_TOKEN}" != "${CHIO_SERVICE_TOKEN}"
+docker compose -f examples/docker/compose.yaml up -d --build --wait --wait-timeout 180
 ```
 
-That publishes three defaults used throughout the rest of this tutorial:
+That publishes two loopback-only endpoints used throughout the rest of this
+tutorial:
 
 - hosted edge: `http://127.0.0.1:8931`
-- trust service and receipt viewer: `http://127.0.0.1:8940`
-- auth token: `demo-token`
+- trust service and receipt viewer: `https://127.0.0.1:8940`
 
-If you prefer to run the processes directly instead of Docker, phase `309`
-already qualified the equivalent `chio trust serve` plus
-`chio mcp serve-http --control-url ...` topology.
+The stack has no default credentials. `CHIO_AUTH_TOKEN` authenticates ordinary
+hosted-edge calls, `CHIO_ADMIN_TOKEN` authenticates edge administration,
+`CHIO_SERVICE_TOKEN` authenticates the trust-control service, and
+`CHIO_DASHBOARD_READ_TOKEN` is exchanged once for a short-lived dashboard
+cookie. Keep all four pairwise-distinct values in the current shell until
+teardown and do not commit them to an environment file.
+
+The stack provisions a private demo CA in a one-shot container. Its signing key
+is never mounted into the TLS proxy, hosted edge, or trust service. The smoke
+client copies only the public CA certificate and uses it as an exclusive trust
+root. The trust service remains on a dedicated internal HTTP network; the
+hosted edge is not attached to that network and reaches it only through the
+final HTTPS proxy.
 
 ## 3. Write A Policy
 
@@ -70,37 +90,43 @@ This means:
 You can save this as `tutorial-policy.yaml` or reuse
 [examples/docker/policy.yaml](../../examples/docker/policy.yaml).
 
-## 4. Wrap A Tool
+## 4. Inspect The Signed Tool Boundary
 
 The upstream demo tool is a tiny MCP server that exposes `echo_text`:
 [examples/docker/mock_mcp_server.py](../../examples/docker/mock_mcp_server.py).
 
-To put Chio in front of it without Docker:
+Before either service starts, `chio-security-init` reviews
+`examples/docker/tools.json` and transactionally creates:
 
-```bash
-chio \
-  --control-url http://127.0.0.1:8940 \
-  --control-token demo-token \
-  mcp serve-http \
-  --policy tutorial-policy.yaml \
-  --server-id tutorial-echo \
-  --server-name "Tutorial Echo" \
-  --listen 127.0.0.1:8931 \
-  --auth-token demo-token \
-  -- \
-  python3 examples/docker/mock_mcp_server.py
-```
+- a strict signed `chio.manifest.v2`
+- an independently signed native launch policy
+- exact verifier public keys
+- a canonical full target argv
+- a signed generation-zero enterprise migration ledger
 
-At this point the upstream tool is no longer called directly. Clients connect
-to the Chio hosted edge, Chio issues the session capability, and every governed
-call produces a receipt.
+The hosted edge validates those inputs, the exact current trust-control
+authority, the executable path, and the full argv before it starts the upstream
+tool. The demo ledger is deliberately at `Disabled`: it authorizes the signed
+legacy launch, but it does not claim cage containment. Production containment
+requires `Enforced` or `LegacyRemoved` plus successful designated Linux cage
+evidence.
+
+The initializer destroys the manifest, policy, and migration signing seeds
+after exporting the runtime material. Public artifacts are mounted read-only.
+The edge keeps its runtime secrets in a root-owned private volume, while a fixed
+digest-verifying launcher erases the child environment and drops the demo tool
+to UID/GID 10002. That privilege split protects demo credentials, but it does
+not turn the `Disabled` migration stage into cage containment.
 
 ## 5. Execute A Governed Call
 
 The fastest end-to-end check is the host-side smoke client:
 
 ```bash
-python3 examples/docker/smoke_client.py
+CHIO_EDGE_TOKEN="${CHIO_AUTH_TOKEN}" \
+CHIO_ADMIN_TOKEN="${CHIO_ADMIN_TOKEN}" \
+CHIO_DASHBOARD_READ_TOKEN="${CHIO_DASHBOARD_READ_TOKEN}" \
+  python3 examples/docker/smoke_client.py
 ```
 
 The output includes:
@@ -110,7 +136,6 @@ The output includes:
 - the tool inventory returned by the hosted edge
 - the governed tool result
 - `receiptId`
-- the receipt viewer URL
 
 That single run proves the whole chain:
 
@@ -125,25 +150,27 @@ The smoke client already resolves the receipt, but it helps to see the raw
 query shape as well:
 
 ```bash
+docker compose -f examples/docker/compose.yaml cp \
+  chio-trust-tls:/var/lib/chio-tls-public/demo-ca.pem \
+  ./demo-ca.pem
 curl \
-  -H "Authorization: Bearer demo-token" \
-  "http://127.0.0.1:8940/v1/receipts/query?capabilityId=<capability-id>&limit=10"
+  --cacert ./demo-ca.pem \
+  -H "Authorization: Bearer ${CHIO_SERVICE_TOKEN}" \
+  "https://127.0.0.1:8940/v1/receipts/query?capabilityId=<capability-id>&limit=10"
+rm ./demo-ca.pem
 ```
 
-You can also inspect the viewer directly at:
-
-```text
-http://127.0.0.1:8940/?token=demo-token
-```
-
-The receipt detail view shows the decision, timestamp, and delegation-chain
-projection for the selected governed call.
+Browser access requires importing the private demo CA into a dedicated browser
+trust store. Open the trust-service origin and exchange
+`CHIO_DASHBOARD_READ_TOKEN` through the login form. The resulting host-only
+cookie is short-lived and inaccessible to JavaScript. Do not place any
+credential in a URL or browser storage.
 
 If you need the capability attached to a hosted session, query the hosted edge:
 
 ```bash
 curl \
-  -H "Authorization: Bearer demo-token" \
+  -H "Authorization: Bearer ${CHIO_ADMIN_TOKEN}" \
   "http://127.0.0.1:8931/admin/sessions/<session-id>/trust"
 ```
 

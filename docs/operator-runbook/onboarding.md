@@ -44,12 +44,16 @@ chio trust serve \
 
 `chio mcp serve-http` starts after trust-control readiness:
 
+`CHIO_ADMIN_TOKEN` is a dedicated admin bearer. It must differ from every
+edge-admission or trust-control service credential.
+
 ```bash
 chio mcp serve-http \
   --policy /etc/chio/healthcare-pilot/policy.yaml \
   --server-id healthcare-pilot-sidecar \
   --listen 127.0.0.1:8720 \
   --auth-jwt-public-key /etc/chio/healthcare-pilot/jwks.pem \
+  --admin-token "$CHIO_ADMIN_TOKEN" \
   -- chio-openapi-mcp-bridge --spec /etc/chio/healthcare-pilot/openapi.json
 ```
 

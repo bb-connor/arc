@@ -11,14 +11,18 @@ RuntimeDirectory=chio-trust-control
 StateDirectory=chio-trust-control
 ConfigurationDirectory=chio
 UMask=0077
-# Provide CHIO_TRUST_SERVICE_TOKEN (read by `chio trust serve` from the
-# environment so the secret is not visible via ps/proc) in this file, mode 0600.
+# Provide CHIO_TRUST_SERVICE_TOKEN and a distinct
+# CHIO_TRUST_DASHBOARD_READ_TOKEN in this file, mode 0600. They are read by
+# `chio trust serve` from the environment so neither secret is visible via
+# ps/proc. Optional relay observability requires both
+# CHIO_TRUST_DASHBOARD_REPORT_ORIGIN and a distinct
+# CHIO_TRUST_DASHBOARD_REPORT_TOKEN.
 EnvironmentFile=/etc/chio/chio-trust-control.env
 ExecStart=/usr/local/bin/chio trust serve \
   --listen 127.0.0.1:8940 \
   --receipt-db /var/lib/chio-trust-control/receipts.sqlite3 \
   --revocation-db /var/lib/chio-trust-control/revocations.sqlite3 \
-  --authority-db /var/lib/chio-trust-control/authority.sqlite3 \
+  --authority-seed-file /var/lib/chio-trust-control/authority.seed \
   --budget-db /var/lib/chio-trust-control/budgets.sqlite3 \
   --enterprise-providers-file /etc/chio/enterprise-providers.json \
   --verifier-policies-file /etc/chio/verifier-policies.json \

@@ -75,6 +75,14 @@ longer the front-door release framing.
 evaluation. External release, production, and GA claims remain on hold until a
 public v1 release decision is explicitly taken.
 
+The public v1 freeze is also blocked on the singular governed-approval removal
+defined by
+[ADR-0016](../adr/ADR-0016-singular-approval-removal.md). The compatibility
+field must be removed from core types, adapters, SDKs, schemas, generated
+bindings, fixtures, and conformance vectors before the freeze. Incomplete
+ecosystem migration delays the release; it does not extend the compatibility
+field into public v1.
+
 Qualified claim:
 
 - The current pre-release v1 branch contains locally verified implementation

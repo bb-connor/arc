@@ -160,9 +160,7 @@ delegation_family -> SHA256("chio.aggregate-budget-family-key.v1\0" || canonical
 **Gate:**
 
 ```bash
-cargo test -p chio-kernel budget
-cargo test -p chio-kernel approval
-cargo test -p chio-store-sqlite budget_store
+./scripts/check-protocol-primitives-focused.sh --baseline
 ```
 
 Commit: `test(security): lock budget and governed approval baseline`
@@ -219,8 +217,7 @@ Commit: `test(security): lock budget and governed approval baseline`
 **Gate:**
 
 ```bash
-cargo test -p chio-core-types aggregate_invocation
-cargo test -p chio-kernel-core delegation
+./scripts/check-protocol-primitives-focused.sh --model
 cargo fmt --all -- --check
 ```
 
@@ -356,8 +353,7 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 **Gate:**
 
 ```bash
-cargo test -p chio-store-sqlite budget_store
-cargo test -p chio-control-plane budget
+./scripts/check-protocol-primitives-focused.sh --persistence
 ```
 
 Commit: `feat(store-sqlite): persist composite invocation holds`
@@ -624,7 +620,7 @@ Commit: `feat(spec): define aggregate budgets and threshold approvals`
 
 **Files:**
 
-- Modify kernel request construction in MCP, A2A, ACP, OpenAI, and Tower crates under `crates/protocol/`
+- Modify kernel request construction in MCP, A2A, ACP-Client, OpenAI, and Tower crates under `crates/protocol/`
 - Modify browser, mobile, C++ FFI, Python, TypeScript, and Go SDK request models
 - Modify cross-protocol fidelity reporting where a protocol cannot carry the extension
 
@@ -640,7 +636,7 @@ Commit: `feat(spec): define aggregate budgets and threshold approvals`
 - [ ] Preserve combined capture metadata and authorizing-capability digests without inventing an adapter-local revocation check.
 - [ ] Report truthful bridge fidelity for unsupported external protocol surfaces.
 - [ ] Apply negotiated feature checks before adapter dispatch.
-- [ ] Add end-to-end tests for native, MCP, A2A, and ACP paths; add explicit rejection tests for any unsupported adapter.
+- [ ] Add end-to-end tests for native, MCP, A2A, and ACP-Client paths; add explicit rejection tests for any unsupported adapter.
 
 Commit: `feat(protocol): carry aggregate budgets and approval sets`
 
@@ -716,7 +712,7 @@ Commit: `test(conformance): cover aggregate budgets and threshold approvals`
 
 **Kani wiring:**
 
-- [ ] Add pure bounded models and the harnesses `verify_composite_quota_all_or_nothing`, `verify_quota_maximum_immutable`, `verify_family_binding_preservation`, and `verify_threshold_distinct_signers`.
+- [ ] Add pure bounded models and the exact harnesses `verify_composite_quota_all_or_nothing`, `verify_quota_maximum_immutable`, `verify_captured_invocation_count_monotonic`, `verify_replay_fingerprint_uniqueness`, `verify_family_binding_preservation`, and `verify_threshold_distinct_signers`.
 - [ ] Add every harness to `formal/rust-verification/kani-public-harnesses.toml` under `lanes.pr` and to `.kani/harnesses.toml` as `chio-kernel-core` PR entries.
 - [ ] Add each harness to `formal/MAPPING.md` and update the covered symbols in `formal/proof-manifest.toml`.
 - [ ] Run `scripts/check-mapping.sh` and `scripts/run-kani-manifest.sh --lane pr --crate chio-kernel-core`. An empty harness match is a failure.
@@ -724,7 +720,7 @@ Commit: `test(conformance): cover aggregate budgets and threshold approvals`
 **Loom wiring:**
 
 - [ ] Add `protocol_primitives_` tests to the existing `loom_concurrency.rs` for last-unit contention, three-key all-or-nothing admission, immutable-maximum races, capture-versus-reverse, and idempotent compensation.
-- [ ] Make `scripts/check-protocol-primitives-concurrency.sh` run `RUSTFLAGS="--cfg chio_kernel_loom" cargo test -p chio-kernel --test loom_concurrency protocol_primitives_`.
+- [ ] Make `scripts/check-protocol-primitives-concurrency.sh` run `RUSTFLAGS="--cfg chio_kernel_loom" cargo test -p chio-kernel --features loom-tests --test loom_concurrency protocol_primitives_`.
 - [ ] Add the script to PR CI and the final gate. `loom` is already a `chio-kernel` dev dependency; preserve the existing `cfg(chio_kernel_loom)` check-cfg registration.
 
 HA behavior still requires integration tests against the remote authority. Kani and loom do not support an HA correctness claim by themselves.

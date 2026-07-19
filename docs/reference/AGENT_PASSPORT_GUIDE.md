@@ -1,5 +1,10 @@
 # Chio Agent Passport Guide
 
+Remote examples below use final HTTPS origins and assume public WebPKI unless
+stated otherwise. Private PKI uses the exclusive
+`CHIO_CONTROL_TLS_ROOT_CA_FILE` PEM bundle. Control clients refuse redirects;
+literal loopback HTTP is development-only.
+
 **Status:** alpha plus verifier infrastructure, lifecycle status distribution,
 portable OID4VCI-compatible issuance, holder transport over public
 challenge/submit routes, multi-issuer composition, and shared-evidence

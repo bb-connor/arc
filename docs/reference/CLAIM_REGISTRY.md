@@ -38,7 +38,7 @@ The source-of-truth inputs are:
 | `ASSUME-CANONICAL-JSON` | approved_with_scope | Signed payload stability depends on deterministic RFC 8785 canonical JSON behavior. | `audited_assumption` |
 | `ASSUME-OS-CLOCK` | approved_with_scope | Time-window proofs rely on the injected deployment clock meeting the operator's accepted tolerance. | `audited_assumption` |
 | `ASSUME-SQLITE-ATOMICITY` | approved_with_scope | Store-backed revocation, budget, receipt, and registry transitions rely on atomic SQLite commits. | `audited_assumption` |
-| `ASSUME-TLS` | approved_with_scope | Remote session and control-plane evidence relies on configured TLS endpoint authentication. | `audited_assumption` |
+| `ASSUME-TLS` | approved_with_scope | Remote session and control-plane evidence relies on authenticated final HTTPS endpoints, an explicit trust-root set, and independently pinned current authority keys. | `audited_assumption` |
 | `ASSUME-NETWORK-TRANSPORT` | approved_with_scope | Chio proves fail-closed handling of received messages, not arbitrary network reliability. | `audited_assumption` |
 | `ASSUME-EXTERNAL-REGISTRIES` | approved_with_scope | Hosted registry and DID state is trusted only under its published fail-closed contract. | `audited_assumption` |
 | `ASSUME-SUBPROCESS-ISOLATION` | approved_with_scope | Tool effects after an allow verdict rely on OS process and sandbox boundaries. | `audited_assumption` |

@@ -49,6 +49,11 @@ The builder creates one service value that:
 - implements `PromptProvider`
 - can emit late `ToolServerEvent`s through an internal queue
 
+`NativeTool::new` leaves the tool's information-flow declaration absent. A
+publisher that declares flow constraints must add them explicitly with
+`NativeTool::flow(ToolFlowDeclaration)`. The builder validates and preserves
+that declaration in the emitted `chio.manifest.v2` tool definition.
+
 Advanced users can still drop to the lower-level kernel traits directly for custom streaming, resource templates, or transport-specific behavior.
 
 When you expose a native service through a Chio edge, the runtime contract does

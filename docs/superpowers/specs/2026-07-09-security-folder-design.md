@@ -136,7 +136,7 @@ The manifest is publisher-authenticated input, not authorization for the publish
 
 The kernel consults only a successfully verified v2 manifest from the manifest registry plus an authenticated policy snapshot and runtime topology record. An adapter-provided or model-provided description is never authoritative. An effective egress destination without every required policy clearance denies. A non-egress tool may omit manifest clearance, but operator policy still applies. An absent manifest `output_label` contributes `Bottom`; it does not disable classification or the operator floor.
 
-The migration must cover every constructor and protocol projection found by `rg "ToolDefinition \\{" crates sdks`. OpenAPI uses an `x-chio-flow` extension. MCP, A2A, ACP, OpenAI, and provider adapters retain the declaration in an internal `BridgeSecurityMetadata` sidecar when the external dialect cannot express it. Export code must never silently erase a declaration and then re-import the tool as unconstrained. The four-language wire codegen receives schemas for labels, declassification grants, security events, and response receipts, and `make codegen-check` is a required gate.
+The migration must cover every constructor and protocol projection found by `rg "ToolDefinition \\{" crates sdks`. OpenAPI uses an `x-chio-flow` extension. MCP, A2A, ACP-Client, OpenAI, and provider adapters retain the declaration in an internal `BridgeSecurityMetadata` sidecar when the external dialect cannot express it. Export code must never silently erase a declaration and then re-import the tool as unconstrained. The four-language wire codegen receives schemas for labels, declassification grants, security events, and response receipts, and `make codegen-check` is a required gate.
 
 ## 7. Typed declassification
 
@@ -230,14 +230,20 @@ The only legal transitions are:
 |---|---|
 | `planned` | `awaiting_approval`, `applying`, `cancelled`, `expired`, `failed` |
 | `awaiting_approval` | `applying`, `cancelled`, `expired`, `failed` |
-| `applying` | `active`, `apply_partial`, `failed` |
+| `applying` | `applying`, `active`, `apply_partial`, `failed` |
 | `apply_partial` | `rolling_back` |
 | `active` | `expiring`, `rolling_back` |
 | `expiring` | `rolling_back` |
 | `rolling_back` | `lifted`, `rollback_partial` |
 | `rollback_partial` | `rolling_back` |
 
-`cancelled`, `expired`, `failed`, and `lifted` are terminal. `failed` is legal only when no external effect was successfully applied; otherwise the state is `apply_partial`. Every transition is a compare-and-swap update carrying a monotonic generation and transition id. Duplicate commands return the existing result. An `applying` lease timeout moves to `apply_partial` and triggers rollback of recorded successful effects. An `active` TTL timeout moves to `expiring` and is claimed by a durable scheduler. A rollback failure remains restrictive, moves to `rollback_partial`, and pages an operator. It never reports `lifted`.
+`cancelled`, `expired`, `failed`, and `lifted` are terminal. `failed` is legal only when no external effect was successfully applied; otherwise the state is `apply_partial`. Every transition is a compare-and-swap update carrying a monotonic generation and transition id. Duplicate commands return the existing result. The `applying` to `applying` transition is reserved for lease renewal and carries cause `applying_lease_renewed`. Renewal is legal only while trusted time is strictly before the current lease expiry, must strictly extend that expiry, and sets the new expiry to exactly the lesser of the live scheduled-work lease expiry and plan expiry.
+
+After dispatch, every scheduler-owned response mutation, including state transitions, effect requests and results, failure records, and final records, commits through one exact-live `ScheduledWork` compare-and-swap primitive. The primitive binds the full immutable current mutation prefix, current canonical body and generation, dispatch authorization, exact transition id, lease owner, and positive fencing token. One owner and token may sequence multiple mutations while its lease remains live. A different owner requires a strictly greater token. Equal-token owner replacement, token regression, a missing owner-token pair, null, and zero are rejected. Existing canonical v1 receipt bodies that predate owner fields remain readable and retain their original digest, but a live scheduler cannot append a legacy-shaped mutation.
+
+Mutation capacity is a rolling lifecycle invariant, not a fixed renewal allowance. Before every append, the response reserves enough suffix capacity to reach a terminal state from its exact effect progress. The initial `applying` bound for 64 reversible effects is 390 mutations: every apply request and result, activation and expiry transitions, a first rollback pass in which every rollback may fail, a `rollback_partial` retry transition, a complete successful retry pass, and the final transition. Durable effect results are reconciled before renewal or due-time handling, including at exact expiry, so a committed external outcome cannot be replaced by timeout inference.
+
+Duplicate commands return the exact previously committed candidate. An `applying` lease timeout moves to `apply_partial` and triggers rollback of recorded successful effects. An `active` TTL timeout moves to `expiring` and is claimed by a durable scheduler. A rollback failure remains restrictive, moves to `rollback_partial`, and pages an operator. The first rollback pass attempts every reversible applied effect before entering `rollback_partial`; one automatic retry pass may then retry each failed effect once. It never reports `lifted` while any reversible effect remains applied, rollback-requested, or failed.
 
 ### 11.4 Effects and rollback
 

@@ -38,7 +38,9 @@ same Chio subject and therefore the same receipt attribution path.
 
 ## CLI
 
-Use `chio mcp serve-http` with explicit JWT admission:
+Use `chio mcp serve-http` with explicit JWT admission. The admin bearer must be
+dedicated to the admin surface and must not equal an edge-admission or
+trust-control service credential.
 
 ```bash
 chio mcp serve-http \

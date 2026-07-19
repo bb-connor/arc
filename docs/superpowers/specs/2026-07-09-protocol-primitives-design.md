@@ -158,7 +158,7 @@ Aggregate budgets are authority and must be lineage-bound:
 1. Load every quota row in a deterministic key order.
 2. Verify the maximum recorded for an existing key equals the presented signed maximum. A key's maximum is immutable; mismatch is an invariant failure.
 3. Verify each committed count plus live reservations is below its maximum.
-4. On any exhausted quota, record one denied mutation and change no usage row.
+4. On any exhausted quota, record one denied mutation and change no usage counters. The first authenticated presentation of a quota key still persists its immutable maximum and zero-count authority row, so a denial cannot be replayed with a larger maximum.
 5. On success, create one idempotent hold covering every quota key.
 6. Return the post-admission counts and `BudgetCommitMetadata` from the same commit.
 
@@ -398,7 +398,7 @@ cargo xtask codegen --lang go
 make codegen-check
 ```
 
-Kernel-backed MCP, A2A, ACP, OpenAI, and Tower paths must preserve the exact aggregate root binding, opaque signed supplemental authorization, signed threshold proposal, authorizing-capability digest, approval token set, and typed governed intent. An adapter that cannot represent these fields must reject the operation or use an authenticated Chio extension envelope. It must never construct a quota claim, silently drop approvals, reconstruct a root binding, or downgrade to one signer.
+Kernel-backed MCP, A2A, ACP-Client, OpenAI, and Tower paths must preserve the exact aggregate root binding, opaque signed supplemental authorization, signed threshold proposal, authorizing-capability digest, approval token set, and typed governed intent. An adapter that cannot represent these fields must reject the operation or use an authenticated Chio extension envelope. It must never construct a quota claim, silently drop approvals, reconstruct a root binding, or downgrade to one signer.
 
 ## 8. Negotiation and rollout
 
@@ -441,7 +441,7 @@ Required conformance classes:
 - proposal time-window, deadline, eligible-set digest, authorizing-capability digest, and active-response plan bindings deny on any mismatch
 - approval-only active-response admission recovers without budget or nonce participants and cannot apply twice
 - threshold result is invariant under token ordering
-- unnegotiated fields deny across native, browser, mobile, FFI, MCP, A2A, and ACP paths
+- unnegotiated fields deny across native, browser, mobile, FFI, MCP, A2A, and ACP-Client paths
 - Rust, Python, TypeScript, and Go fixtures round-trip byte-compatible canonical artifacts
 
 Formal targets are limited and useful: monotonic captured counts, all-or-nothing multi-key admission, immutable quota maxima, family-binding preservation, threshold distinctness, and replay-set uniqueness. Kani harnesses are registered in both `formal/rust-verification/kani-public-harnesses.toml` and `.kani/harnesses.toml`, mapped in `formal/MAPPING.md`, and run through `scripts/run-kani-manifest.sh`. Loom tests use the existing `crates/kernel/chio-kernel/tests/loom_concurrency.rs` and a checked-in script invoked by PR CI. Release gates execute both. Grep-only gates are not security evidence.

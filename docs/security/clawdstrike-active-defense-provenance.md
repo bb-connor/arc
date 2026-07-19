@@ -1,6 +1,6 @@
 # Clawdstrike active-defense provenance
 
-Source repository: `/Users/connor/Medica/backbay/standalone/clawdstrike`
+Source repository: `https://github.com/backbay-labs/clawdstrike`
 
 Source commit: `666303e5f3428f3b6e6b72f118c269a02388e0a4`
 
@@ -19,4 +19,4 @@ The information-label and lattice implementation is derived from the Chio DLM co
 
 Review record: source identity, listed paths, Apache-2.0 text, and source `NOTICE` verified on 2026-07-12.
 
-Signed off: Codex security implementation review, 2026-07-12.
+Signed off: Chio security review, 2026-07-12.
