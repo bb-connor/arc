@@ -169,6 +169,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             FISCAL_RUNTIME_STATUS_PATH,
             get(handle_fiscal_runtime_status),
         )
+        .route(FISCAL_PROPOSALS_PATH, post(handle_fiscal_proposal_persist))
+        .route(
+            FISCAL_PROPOSAL_PREVIEW_PATH,
+            post(handle_fiscal_proposal_preview),
+        )
         .route(
             PASSPORT_ISSUER_METADATA_PATH,
             get(handle_passport_issuer_metadata),

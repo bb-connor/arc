@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
@@ -591,6 +592,68 @@ impl SqliteFiscalStore {
         }
         transaction.commit().map_err(sqlite_error)?;
         Ok(readiness)
+    }
+
+    pub fn load_verified_schedule(
+        &self,
+        schedule_id: &str,
+        charters: &FiscalCharterRegistry,
+    ) -> Result<VerifiedFiscalSchedule, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let mut lineage = Vec::new();
+        let mut next_id = Some(schedule_id.to_owned());
+        let mut seen = HashSet::new();
+        while let Some(id) = next_id {
+            if lineage.len() >= 4096 || !seen.insert(id.clone()) {
+                return Err(invariant(
+                    "stored fiscal schedule lineage is cyclic or too deep",
+                ));
+            }
+            let bytes = transaction
+                .query_row(
+                    "SELECT signed_json FROM fiscal_schedules WHERE schedule_id = ?1",
+                    [&id],
+                    |row| row.get::<_, Vec<u8>>(0),
+                )
+                .optional()
+                .map_err(sqlite_error)?
+                .ok_or(FiscalStoreError::NotFound)?;
+            let signed: chio_fiscal::SignedFiscalSchedule = serde_json::from_slice(&bytes)
+                .map_err(|error| {
+                    invariant(format!("stored fiscal schedule is invalid: {error}"))
+                })?;
+            if canonical_json_bytes(&signed).map_err(canonical_error)? != bytes
+                || signed.body.schedule_id != id
+            {
+                return Err(invariant(
+                    "stored fiscal schedule canonical binding is invalid",
+                ));
+            }
+            next_id = signed.body.supersedes_schedule_id.clone();
+            lineage.push(signed);
+        }
+        lineage.reverse();
+        let mut verified: Option<VerifiedFiscalSchedule> = None;
+        for signed in lineage {
+            let charter = charters.resolve(&signed.body.charter_id, &signed.body.charter_digest)?;
+            let next = match verified.as_ref() {
+                Some(predecessor)
+                    if predecessor.body().charter_digest != signed.body.charter_digest =>
+                {
+                    VerifiedFiscalSchedule::verify_rotation_replacement(
+                        signed,
+                        &charter,
+                        predecessor,
+                    )?
+                }
+                predecessor => VerifiedFiscalSchedule::verify(signed, &charter, predecessor)?,
+            };
+            verified = Some(next);
+        }
+        let verified = verified.ok_or(FiscalStoreError::NotFound)?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(verified)
     }
 
     pub fn persist_approval(

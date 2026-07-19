@@ -1,5 +1,9 @@
 use super::*;
-use chio_fiscal::{FiscalGenesisPolicy, FiscalRuntimeAdapterRegistry, FiscalStateAnchor};
+use chio_fiscal::{
+    FiscalGenesisPolicy, FiscalProposalTarget, FiscalRuntimeAdapterRegistry, FiscalScheduleHead,
+    FiscalStateAnchor, SignedFiscalProposal, VerifiedFiscalCharter, VerifiedFiscalProposal,
+    VerifiedFiscalSchedule,
+};
 use chio_kernel::admission_operation::StoreMutationFence;
 use chio_store_sqlite::fiscal_store::SqliteFiscalStore;
 
@@ -17,6 +21,16 @@ pub(crate) struct TrustFiscalRuntime {
     registry: FiscalRuntimeAdapterRegistry,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum TrustFiscalOperationError {
+    #[error("{0}")]
+    Startup(String),
+    #[error("invalid fiscal proposal: {0}")]
+    InvalidProposal(#[source] chio_fiscal::FiscalError),
+    #[error("fiscal persistence failed: {0}")]
+    Store(#[source] chio_store_sqlite::fiscal_store::FiscalStoreError),
+}
+
 impl TrustFiscalRuntime {
     pub(crate) fn reconcile(&self) -> Result<FiscalRuntimeStartup, CliError> {
         reconcile_fiscal_runtime_startup(
@@ -28,6 +42,132 @@ impl TrustFiscalRuntime {
         )
         .map_err(fiscal_startup_error)
     }
+
+    pub(crate) fn preview_proposal(
+        &self,
+        signed: SignedFiscalProposal,
+    ) -> Result<VerifiedFiscalProposal, TrustFiscalOperationError> {
+        let startup = self
+            .reconcile()
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        self.verify_proposal_at(signed, &startup)
+    }
+
+    fn verify_proposal_at(
+        &self,
+        signed: SignedFiscalProposal,
+        startup: &FiscalRuntimeStartup,
+    ) -> Result<VerifiedFiscalProposal, TrustFiscalOperationError> {
+        let charter = current_charter(startup)
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let predecessor = match &signed.body.target {
+            FiscalProposalTarget::Schedule { candidate } => {
+                let state = startup
+                    .checkpoint
+                    .body()
+                    .domains
+                    .iter()
+                    .find(|state| state.domain == candidate.body.domain)
+                    .ok_or_else(|| {
+                        TrustFiscalOperationError::Startup(
+                            "fiscal domain state is missing".to_owned(),
+                        )
+                    })?;
+                match state.active.as_ref() {
+                    Some(head) => {
+                        let predecessor = self
+                            .store
+                            .load_verified_schedule(&head.schedule_id, &startup.charters)
+                            .map_err(TrustFiscalOperationError::Store)?;
+                        if FiscalScheduleHead::from_signed(predecessor.signed())
+                            .map_err(TrustFiscalOperationError::InvalidProposal)?
+                            != *head
+                        {
+                            return Err(TrustFiscalOperationError::Startup(
+                                "active fiscal schedule differs from the anchored head".to_owned(),
+                            ));
+                        }
+                        Some(predecessor)
+                    }
+                    None if !state.ever_activated => None,
+                    None => {
+                        return Err(TrustFiscalOperationError::Startup(
+                            "activated fiscal domain has no anchored active schedule".to_owned(),
+                        ));
+                    }
+                }
+            }
+            FiscalProposalTarget::CharterRotation { .. } => None,
+        };
+        VerifiedFiscalProposal::verify(signed, &charter, predecessor.as_ref())
+            .map_err(TrustFiscalOperationError::InvalidProposal)
+    }
+
+    pub(crate) fn persist_proposal(
+        &self,
+        signed: SignedFiscalProposal,
+    ) -> Result<VerifiedFiscalProposal, TrustFiscalOperationError> {
+        let startup = self
+            .reconcile()
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let proposal = self.verify_proposal_at(signed, &startup)?;
+        let charter = current_charter(&startup)
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        match &proposal.body().target {
+            FiscalProposalTarget::Schedule { candidate } => {
+                let state = startup
+                    .checkpoint
+                    .body()
+                    .domains
+                    .iter()
+                    .find(|state| state.domain == candidate.body.domain)
+                    .ok_or_else(|| {
+                        TrustFiscalOperationError::Startup(
+                            "fiscal domain state is missing".to_owned(),
+                        )
+                    })?;
+                let predecessor = state
+                    .active
+                    .as_ref()
+                    .map(|head| {
+                        self.store
+                            .load_verified_schedule(&head.schedule_id, &startup.charters)
+                    })
+                    .transpose()
+                    .map_err(TrustFiscalOperationError::Store)?;
+                let candidate = VerifiedFiscalSchedule::verify(
+                    candidate.as_ref().clone(),
+                    &charter,
+                    predecessor.as_ref(),
+                )
+                .map_err(TrustFiscalOperationError::InvalidProposal)?;
+                self.store
+                    .persist_schedule(&candidate, &self.fence)
+                    .map_err(TrustFiscalOperationError::Store)?;
+            }
+            FiscalProposalTarget::CharterRotation { successor } => {
+                let successor = VerifiedFiscalCharter::verify(successor.as_ref().clone())
+                    .map_err(TrustFiscalOperationError::InvalidProposal)?;
+                self.store
+                    .persist_charter(&successor, &self.fence)
+                    .map_err(TrustFiscalOperationError::Store)?;
+            }
+        }
+        self.store
+            .persist_proposal(&proposal, &self.fence)
+            .map_err(TrustFiscalOperationError::Store)?;
+        Ok(proposal)
+    }
+}
+
+fn current_charter(startup: &FiscalRuntimeStartup) -> Result<VerifiedFiscalCharter, CliError> {
+    startup
+        .charters
+        .resolve(
+            &startup.checkpoint.body().pinned_charter_id,
+            &startup.checkpoint.body().pinned_charter_digest,
+        )
+        .map_err(fiscal_startup_error)
 }
 
 pub(crate) fn compose_trust_fiscal_runtime(
@@ -96,11 +236,13 @@ fn fiscal_startup_error(error: impl std::fmt::Display) -> CliError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chio_core::crypto::Keypair;
+    use chio_core::capability::scope::MonetaryAmount;
+    use chio_core::crypto::{sha256_hex, Keypair};
     use chio_fiscal::{
         FiscalAuthorityState, FiscalBootstrapState, FiscalCharterRegistry,
-        FiscalContinuityCheckpointBuilder, FiscalDomain, FiscalDomainState,
-        FiscalRuntimeReadinessBuilder, FiscalStateAnchorError, SignedFiscalCharter,
+        FiscalContinuityCheckpointBuilder, FiscalDomain, FiscalDomainState, FiscalParams,
+        FiscalProposalBuilder, FiscalProposalTarget, FiscalRuntimeReadinessBuilder,
+        FiscalScheduleBuilder, FiscalStateAnchorError, SignedFiscalCharter,
         SignedFiscalContinuityCheckpoint, VerifiedFiscalCharter,
         VerifiedFiscalContinuityCheckpoint, VerifiedFiscalRuntimeReadiness,
     };
@@ -217,6 +359,45 @@ mod tests {
         assert_eq!(runtime.store.load_authority_state()?, authority_state);
         assert_eq!(runtime.fence, authority.mutation_fence());
         assert_eq!(runtime.anchor.read()?, *checkpoint.signed());
+
+        let candidate = FiscalScheduleBuilder {
+            domain: FiscalDomain::TierLimits,
+            params: FiscalParams::TierLimits {
+                ceilings: [100, 200, 300, 400].map(|units| MonetaryAmount {
+                    units,
+                    currency: "USD".to_owned(),
+                }),
+            },
+            valid_from: 60,
+            valid_until: 900,
+            issued_at: 50,
+            issued_by: "operator.example".to_owned(),
+        }
+        .sign(&charter, None, &Keypair::from_seed(&[1; 32]))?;
+        let signed_proposal = FiscalProposalBuilder {
+            target: FiscalProposalTarget::Schedule {
+                candidate: Box::new(candidate.clone()),
+            },
+            rationale_digest: sha256_hex(b"fixture rationale"),
+            proposed_at: 50,
+        }
+        .sign(&Keypair::from_seed(&[2; 32]))?;
+        assert_eq!(
+            runtime.preview_proposal(signed_proposal.clone())?.signed(),
+            &signed_proposal
+        );
+        let persisted = runtime.persist_proposal(signed_proposal)?;
+        assert_eq!(
+            persisted.body().proposal_id,
+            persisted.signed().body.proposal_id
+        );
+        assert_eq!(
+            runtime
+                .store
+                .load_verified_schedule(&candidate.body.schedule_id, &charters)?
+                .signed(),
+            &candidate
+        );
         Ok(())
     }
 }

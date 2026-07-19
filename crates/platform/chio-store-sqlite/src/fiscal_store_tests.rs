@@ -786,6 +786,15 @@ fn activation_finalize_atomically_consumes_admission_and_flips_schedule() -> Tes
         ("activated".to_owned(), 2, "active".to_owned())
     );
     assert_eq!(store.load_authority_state()?, activation.next_authority);
+    assert_eq!(
+        store
+            .load_verified_schedule(
+                &activation.schedule.body().schedule_id,
+                &FiscalCharterRegistry::new(vec![fixture.charter.signed().clone()])?,
+            )?
+            .signed(),
+        activation.schedule.signed()
+    );
     Ok(())
 }
 
@@ -921,6 +930,15 @@ fn charter_rotation_finalize_atomically_flips_charter_and_all_schedules() -> Tes
             )?
             .digest(),
         rotation.successor_charter.digest()
+    );
+    assert_eq!(
+        store
+            .load_verified_schedule(
+                &rotation.successor_schedule.body().schedule_id,
+                &rotation.charters,
+            )?
+            .signed(),
+        rotation.successor_schedule.signed()
     );
     Ok(())
 }
