@@ -277,11 +277,8 @@ fn verify_schedule_chain(
     let mut current = target;
     let mut visited = BTreeSet::new();
     loop {
-        activation_history.verify_head(
-            &FiscalScheduleHead::from_signed(current)?,
-            domain,
-            verify_at,
-        )?;
+        let current_head = FiscalScheduleHead::from_signed(current)?;
+        activation_history.verify_head(&current_head, domain, verify_at)?;
         if !visited.insert(current.body.schedule_id.as_str()) {
             return Err(FiscalError::InvalidLineage);
         }
@@ -291,9 +288,19 @@ fn verify_schedule_chain(
         match (current.body.sequence, &current.body.supersedes_schedule_id) {
             (1, None) => return Ok(()),
             (2.., Some(predecessor_id)) => {
+                let predecessor_head = activation_history
+                    .predecessor_for_head(&current_head, domain, verify_at)?
+                    .ok_or(FiscalError::InvalidLineage)?;
+                if predecessor_head.schedule_id != *predecessor_id {
+                    return Err(FiscalError::InvalidLineage);
+                }
                 let predecessor = schedules
                     .iter()
-                    .find(|schedule| schedule.body.schedule_id == *predecessor_id)
+                    .find(|schedule| {
+                        schedule.body.schedule_id == *predecessor_id
+                            && FiscalScheduleHead::from_signed(schedule)
+                                .is_ok_and(|head| head == predecessor_head)
+                    })
                     .ok_or(FiscalError::InvalidLineage)?;
                 let expected_sequence = predecessor
                     .body

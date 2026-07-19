@@ -1,6 +1,7 @@
 use super::*;
 
 use chio_core_types::capability::governance::GovernedTransactionIntent;
+use chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof};
 use chio_kernel::execution_nonce::{
@@ -257,6 +258,10 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// `dpop_required` can verify the proof instead of denying fail-closed.
     #[serde(default)]
     dpop_proof: Option<DpopProof>,
+    /// Opaque signed extension forwarded unchanged to the kernel's installed
+    /// supplemental authorization verifier.
+    #[serde(default)]
+    supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
     /// A signed execution nonce. This endpoint MINTS nonces; it does not settle
     /// presented ones. The field is parsed only so a caller that mistakenly
     /// presents a nonce here is rejected explicitly (fail-closed) rather than
@@ -498,7 +503,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         approval_token: parsed.approval_token,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        supplemental_authorization: None,
+        supplemental_authorization: parsed.supplemental_authorization,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -710,6 +715,9 @@ mod tests {
     use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
     use chio_test_support::prelude::*;
     use tower::ServiceExt;
+
+    #[path = "mediated_boundary_tests.rs"]
+    mod boundary_tests;
 
     /// Build an ephemeral kernel used only to mint capabilities in tests. It
     /// shares the budget store with the state's mediation kernel; cost is never
@@ -1374,44 +1382,6 @@ mod tests {
             second["status"], "deny",
             "the reserved hold must block a second authorization past max_total_cost"
         );
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_presented_execution_nonce_is_rejected() {
-        let signer = Keypair::generate();
-        let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
-        let cap =
-            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
-        let cap_value = serde_json::to_value(&cap).unwrap();
-        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
-
-        // Obtain a genuine minted nonce from a first authorization.
-        let body = serde_json::json!({
-            "capability": cap_value,
-            "tool_server": "cost-srv",
-            "tool_name": "compute",
-            "parameters": { "invoice": "inv-1" }
-        });
-        let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
-        let minted_nonce = authorized["execution_nonce"].clone();
-        assert!(minted_nonce.is_object());
-
-        // Presenting that nonce back to /v1/evaluate is rejected
-        // fail-closed. This endpoint mints nonces; it does not settle them, so
-        // the sidecar never consumes the downstream nonce (which would make the
-        // real tool server reject the caller as a replay).
-        let settle_body = serde_json::json!({
-            "capability": cap_value,
-            "tool_server": "cost-srv",
-            "tool_name": "compute",
-            "parameters": { "invoice": "inv-1" },
-            "execution_nonce": minted_nonce
-        });
-        let (status, json) = post_evaluate(Arc::clone(&state), &settle_body).await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_ne!(json["status"], "authorized");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

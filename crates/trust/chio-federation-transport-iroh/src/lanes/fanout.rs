@@ -100,8 +100,7 @@
 //! rests on federation admission plus routing separation, not join-time treaty
 //! enforcement. This is a documented API limitation, NOT a closed gap.
 //!
-//! Upstream tracking (iroh-gossip 0.101): the missing admission predicate is
-//! tracked in the compatibility ledger owned by the federation transport maintainers.
+//! Upstream tracking (iroh-gossip 0.101): the missing admission predicate is tracked in the compatibility ledger.
 //!
 //! ## The load-bearing correctness property: `delivered_from` is NOT the author
 //!

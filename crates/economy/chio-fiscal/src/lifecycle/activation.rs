@@ -654,22 +654,7 @@ impl FiscalActivationHistory {
             if !visited.insert((current.schedule_id.clone(), current.schedule_digest.clone())) {
                 return Err(FiscalError::InvalidLineage);
             }
-            let mut matched = None;
-            for activation in &self.activations {
-                for transition in activation.schedule_transitions()? {
-                    if transition.domain == domain && transition.candidate == current {
-                        if activation.body().activated_at > verify_at {
-                            return Err(FiscalError::InvalidLineage);
-                        }
-                        if matched.is_some() {
-                            return Err(FiscalError::InvalidLineage);
-                        }
-                        matched = Some(transition);
-                    }
-                }
-            }
-            let transition = matched.ok_or(FiscalError::InvalidLineage)?;
-            match transition.predecessor {
+            match self.predecessor_for_head(&current, domain, verify_at)? {
                 None if current.sequence == 1 => return Ok(()),
                 Some(predecessor) => {
                     let expected_sequence = predecessor
@@ -684,6 +669,27 @@ impl FiscalActivationHistory {
                 None => return Err(FiscalError::InvalidLineage),
             }
         }
+    }
+
+    pub(crate) fn predecessor_for_head(
+        &self,
+        head: &FiscalScheduleHead,
+        domain: FiscalDomain,
+        verify_at: u64,
+    ) -> Result<Option<FiscalScheduleHead>, FiscalError> {
+        head.validate()?;
+        let mut matched = None;
+        for activation in &self.activations {
+            for transition in activation.schedule_transitions()? {
+                if transition.domain == domain && transition.candidate == *head {
+                    if activation.body().activated_at > verify_at || matched.is_some() {
+                        return Err(FiscalError::InvalidLineage);
+                    }
+                    matched = Some(transition.predecessor);
+                }
+            }
+        }
+        matched.ok_or(FiscalError::InvalidLineage)
     }
 }
 

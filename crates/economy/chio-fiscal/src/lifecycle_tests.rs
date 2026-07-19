@@ -236,6 +236,80 @@ fn amendment_fixture() -> TestResult<AmendmentFixture> {
     })
 }
 
+fn successor_amendment(
+    predecessor: &VerifiedFiscalSchedule,
+    charter: &VerifiedFiscalCharter,
+    trust: &FiscalAdmissionTrustRegistry,
+) -> TestResult<(VerifiedFiscalSchedule, VerifiedFiscalActivation)> {
+    let schedule = schedule(charter, Some(predecessor))?;
+    let proposal = VerifiedFiscalProposal::verify(
+        FiscalProposalBuilder {
+            target: FiscalProposalTarget::Schedule {
+                candidate: Box::new(schedule.signed().clone()),
+            },
+            rationale_digest: digest("successor rationale"),
+            proposed_at: 71,
+        }
+        .sign(&key(1))?,
+        charter,
+        Some(predecessor),
+    )?;
+    let admission_key = key(7);
+    let admission = VerifiedFiscalProposalAdmission::verify(
+        FiscalProposalAdmissionBuilder {
+            admission_sequence: 2,
+            admitted_at: 72,
+            admission_authority_id: "local-admission".to_owned(),
+            signer_key_epoch: 1,
+        }
+        .sign(&proposal, charter, &admission_key)?,
+        &proposal,
+        charter,
+        trust,
+        72,
+    )?;
+    let admission_state = FiscalProposalAdmissionState::admitted(&admission);
+    let approvals = [key(1), key(2)]
+        .into_iter()
+        .map(|signer| {
+            FiscalApprovalBuilder { approved_at: 73 }.sign(&proposal, &admission, charter, &signer)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let signed_activation = FiscalActivationBuilder {
+        target: FiscalActivationTarget::Schedule {
+            schedule_id: schedule.body().schedule_id.clone(),
+            supersedes_schedule_id: Some(predecessor.body().schedule_id.clone()),
+        },
+        approvals,
+        activated_at: 82,
+    }
+    .sign(&proposal, &admission, charter, &key(1))?;
+    let staged = VerifiedFiscalActivation::verify(
+        signed_activation.clone(),
+        &proposal,
+        &admission,
+        &admission_state,
+        charter,
+        trust,
+        Some(predecessor),
+        &[],
+        82,
+    )?;
+    let activated_state = admission_state.activate(staged.digest().to_owned(), 2)?;
+    let activation = VerifiedFiscalActivation::verify(
+        signed_activation,
+        &proposal,
+        &admission,
+        &activated_state,
+        charter,
+        trust,
+        Some(predecessor),
+        &[],
+        82,
+    )?;
+    Ok((schedule, activation))
+}
+
 struct ContinuityFixture {
     amendment: AmendmentFixture,
     policy: FiscalGenesisPolicy,
@@ -779,6 +853,103 @@ fn activation_history_rebuilds_only_from_the_complete_checkpoint_chain() -> Test
         &fixture.activated,
     )
     .is_err());
+    Ok(())
+}
+
+#[test]
+fn resolver_selects_activated_predecessor_digest_from_duplicate_schedule_ids() -> TestResult {
+    let fixture = continuity_fixture()?;
+    let (successor, successor_activation) = successor_amendment(
+        &fixture.amendment.schedule,
+        &fixture.amendment.charter,
+        &fixture.amendment.trust,
+    )?;
+    let successor_head = FiscalScheduleHead::from_signed(successor.signed())?;
+    let mut domains = fixture.activated.body().domains.clone();
+    domains[0] = FiscalDomainState::activated(
+        FiscalDomain::TierLimits,
+        successor_head.clone(),
+        successor_head,
+    )?;
+    let transition = FiscalStagedTransition::new(
+        successor_activation.body().activation_id.clone(),
+        successor_activation.digest().to_owned(),
+    )?;
+    let next = FiscalContinuityCheckpointBuilder {
+        continuity_sequence: 2,
+        previous_checkpoint_digest: Some(fixture.activated.digest().to_owned()),
+        pinned_charter_id: fixture.amendment.charter.body().charter_id.clone(),
+        pinned_charter_digest: fixture.amendment.charter.digest().to_owned(),
+        pinned_charter_sequence: fixture.amendment.charter.body().sequence,
+        runtime_readiness_digest: fixture.readiness.digest().to_owned(),
+        domains,
+        trusted_clock_high_water: 82,
+        staged_transition: Some(transition),
+    }
+    .sign(&fixture.policy, &fixture.anchor_key)?;
+    let advance = VerifiedFiscalContinuityAdvance::verify(
+        &fixture.activated,
+        next,
+        &fixture.policy,
+        &fixture.charters,
+        &FiscalContinuityChange::Activation {
+            activation: Box::new(successor_activation.clone()),
+            readiness: Box::new(fixture.readiness.clone()),
+            domain: FiscalDomain::TierLimits,
+            schedule: Box::new(successor.clone()),
+        },
+    )?;
+    let anchor = TestAnchor {
+        state: Mutex::new(AnchorState::Available(Box::new(
+            fixture.activated.signed().clone(),
+        ))),
+    };
+    let commit =
+        commit_fiscal_continuity_advance(&anchor, advance, &fixture.policy, &fixture.charters)?;
+    let successor_checkpoint = commit.checkpoint().clone();
+    let history = FiscalActivationHistory::from_checkpoint_history(
+        vec![fixture.amendment.activation.clone(), successor_activation],
+        &[
+            fixture.genesis.clone(),
+            fixture.activated.clone(),
+            successor_checkpoint.clone(),
+        ],
+        &successor_checkpoint,
+    )?;
+    let authority = FiscalAuthorityState::from_checkpoint(
+        &fixture.policy,
+        &successor_checkpoint,
+        FiscalBootstrapState::CharterPinned,
+    )?;
+    let duplicate_predecessor = VerifiedFiscalSchedule::verify(
+        SignedFiscalSchedule::sign(fixture.amendment.schedule.body().clone(), &key(6))?,
+        &fixture.amendment.charter,
+        None,
+    )?;
+
+    let resolution = resolve_fiscal_schedule::<FiscalParams>(
+        FiscalContinuitySnapshot::Verified(&successor_checkpoint),
+        &fixture.policy,
+        &fixture.readiness,
+        &history,
+        &authority,
+        &fixture.charters,
+        &[
+            successor.signed().clone(),
+            duplicate_predecessor.signed().clone(),
+            fixture.amendment.schedule.signed().clone(),
+        ],
+        FiscalDomain::TierLimits,
+        Some("USD"),
+        82,
+    );
+    assert!(matches!(
+        resolution,
+        FiscalResolution::Governed {
+            source: GovernedSource::Active,
+            ..
+        }
+    ));
     Ok(())
 }
 

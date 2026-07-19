@@ -358,6 +358,29 @@ fn batch_binds_prepared_effect_slot_and_request_replay() -> Result<(), Box<dyn c
         .sort_unstable();
     assert!(duplicate_prepared.seal(&keypair).is_err());
 
+    let mut wrong_target = batch.clone();
+    let owner = wrong_target
+        .transitions
+        .iter_mut()
+        .find(|transition| transition.prepared_effect.is_some())
+        .ok_or("prepared effect owner is missing")?;
+    owner.resource_key = resource_key("round-2");
+    owner.next_head.resource_key = owner.resource_key.clone();
+    wrong_target
+        .transitions
+        .sort_by(|left, right| left.resource_key.cmp(&right.resource_key));
+    assert!(wrong_target.seal(&keypair).is_err());
+
+    let mut wrong_head = batch.clone();
+    wrong_head
+        .transitions
+        .iter_mut()
+        .find(|transition| transition.prepared_effect.is_some())
+        .ok_or("prepared effect owner is missing")?
+        .next_head
+        .trusted_clock_high_water += 1;
+    assert!(wrong_head.seal(&keypair).is_err());
+
     let mut conflicting = batch;
     conflicting.request_replays[0].request.request_id = "request-2".to_string();
     assert!(conflicting.seal(&keypair).is_err());
@@ -376,14 +399,14 @@ fn composite_prepared_effect_batch_accepts_two_exact_operation_owners(
     slot.request.request_binding_digest = digest("request-binding-2");
     slot.action_digest = digest("action-2");
     slot.parameters_digest = digest("parameters-2");
-    slot.resource_head_digest = digest("resource-head-2");
     slot.idempotency_key = digest("idempotency-key-2");
     slot.slot_id = slot.recompute_slot_id()?;
-    slot.validate()?;
 
     let mut owner_head = head(resource_key("round-2"), 1, 1, None)?;
     owner_head.operation_id = Some(slot.operation_id.clone());
     owner_head.effect_idempotency_key = Some(slot.idempotency_key.clone());
+    slot.resource_head_digest = owner_head.digest()?;
+    slot.validate()?;
     let mut owner_transition = transition(owner_head, None);
     owner_transition.prepared_effect = Some(EconomicPreparedEffectV1 {
         operation_id: slot.operation_id.clone(),
@@ -473,9 +496,14 @@ fn composite_prepared_effect_batch_accepts_two_exact_operation_owners(
 
 pub(crate) fn unsigned_prepared_effect_batch(
 ) -> Result<(EconomicStateBatchV1, EconomicEffectSlotV1), Box<dyn core::error::Error>> {
-    let slot = ready_effect_slot()?;
+    let mut slot = ready_effect_slot()?;
     let operation_id = slot.operation_id.clone();
     let idempotency_key = slot.idempotency_key.clone();
+    let mut resource_head = head(slot.resource_key.clone(), 1, 1, None)?;
+    resource_head.operation_id = Some(operation_id.clone());
+    resource_head.effect_idempotency_key = Some(slot.idempotency_key.clone());
+    slot.resource_head_digest = resource_head.digest()?;
+    slot.validate()?;
     let slot_content = inline_content(serde_json::to_value(&slot)?);
     let slot_key = slot.resource_head_key();
     let slot_head = EconomicResourceHeadV1 {
@@ -496,9 +524,6 @@ pub(crate) fn unsigned_prepared_effect_batch(
         trusted_clock_high_water: 110,
         predecessor_digest: None,
     };
-    let mut resource_head = head(resource_key("round-1"), 1, 1, None)?;
-    resource_head.operation_id = Some(operation_id.clone());
-    resource_head.effect_idempotency_key = Some(slot.idempotency_key.clone());
     let prepared = EconomicPreparedEffectV1 {
         operation_id: operation_id.clone(),
         action_digest: slot.action_digest.clone(),
