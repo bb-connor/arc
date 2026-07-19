@@ -2665,6 +2665,7 @@ name = "chio-appraisal"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-fiscal",
  "chio-test-support",
  "serde",
  "serde_json",
@@ -4673,6 +4674,7 @@ version = "0.1.0"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
+ "chio-fiscal",
  "serde",
 ]
 

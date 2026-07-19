@@ -62,6 +62,43 @@ impl FiscalDomainParams for FiscalParams {
     }
 }
 
+pub struct FiscalResolver<'a> {
+    pub continuity: FiscalContinuitySnapshot<'a>,
+    pub policy: &'a FiscalGenesisPolicy,
+    pub readiness: &'a VerifiedFiscalRuntimeReadiness,
+    pub activation_history: &'a FiscalActivationHistory,
+    pub authority: &'a FiscalAuthorityState,
+    pub charters: &'a FiscalCharterRegistry,
+    pub schedules: &'a [SignedFiscalSchedule],
+    pub verify_at: u64,
+}
+
+impl FiscalResolver<'_> {
+    pub fn resolve<P: FiscalDomainParams>(
+        &self,
+        domain: FiscalDomain,
+        request_currency: Option<&str>,
+    ) -> FiscalResolution<P> {
+        resolve_fiscal_schedule(
+            self.continuity,
+            self.policy,
+            self.readiness,
+            self.activation_history,
+            self.authority,
+            self.charters,
+            self.schedules,
+            domain,
+            request_currency,
+            self.verify_at,
+        )
+    }
+
+    #[must_use]
+    pub fn bootstrap_tier_limits(&self, currency: &str) -> Option<&[u64; 4]> {
+        self.policy.bootstrap_tier_limits.get(currency)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_fiscal_schedule<P: FiscalDomainParams>(
     continuity: FiscalContinuitySnapshot<'_>,

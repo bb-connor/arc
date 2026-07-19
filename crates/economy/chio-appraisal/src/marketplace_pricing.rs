@@ -8,6 +8,10 @@
 //! base price plus a tenant pricing context assembled from the publish path
 //! (manifest) and reputation tier ascertainment.
 
+use chio_fiscal::{
+    FiscalDenialReason, FiscalDomain, FiscalDomainParams, FiscalParams, FiscalResolution,
+    FiscalResolver,
+};
 use serde::{Deserialize, Serialize};
 
 /// Errors raised by checked marketplace pricing boundaries.
@@ -23,6 +27,16 @@ pub enum MarketplacePricingError {
         "marketplace pricing currency `{currency}` must be a three-letter uppercase ISO 4217 code"
     )]
     InvalidCurrency { currency: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum FiscalMarketplacePricingError {
+    #[error(transparent)]
+    Pricing(#[from] MarketplacePricingError),
+    #[error("fiscal marketplace pricing denied: {0:?}")]
+    Denied(FiscalDenialReason),
+    #[error("fiscal marketplace pricing arithmetic overflowed")]
+    ArithmeticOverflow,
 }
 
 /// Tenant-side reputation tier visible to the pricing helper. Mirrors
@@ -147,6 +161,22 @@ pub struct MarketplaceInvocationPrice {
 /// discount applied via integer arithmetic.
 pub const TIER_DISCOUNT_PER_HUNDRED: [u32; 4] = [0, 5, 10, 20];
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FiscalMarketplaceDiscounts {
+    pub discounts: [u32; 4],
+}
+
+impl FiscalDomainParams for FiscalMarketplaceDiscounts {
+    fn from_fiscal_params(params: &FiscalParams) -> Option<Self> {
+        match params {
+            FiscalParams::MarketplaceDiscountPerHundred { discounts } => Some(Self {
+                discounts: *discounts,
+            }),
+            _ => None,
+        }
+    }
+}
+
 /// Compute the per-invocation price for a guard manifest under a
 /// given tenant pricing context.
 ///
@@ -191,6 +221,50 @@ pub fn compute_checked_marketplace_invocation_price(
     base.validate()?;
     ctx.validate()?;
     Ok(compute_marketplace_invocation_price(base, ctx))
+}
+
+pub fn compute_fiscal_marketplace_invocation_price(
+    base: &MarketplaceBasePrice,
+    ctx: &MarketplacePricingContext,
+    resolver: &FiscalResolver<'_>,
+) -> Result<MarketplaceInvocationPrice, FiscalMarketplacePricingError> {
+    base.validate()?;
+    ctx.validate()?;
+    let discounts = match resolver
+        .resolve::<FiscalMarketplaceDiscounts>(FiscalDomain::MarketplaceDiscountPerHundred, None)
+    {
+        FiscalResolution::Governed { params, .. } => params.discounts,
+        FiscalResolution::Fallback(_) => TIER_DISCOUNT_PER_HUNDRED,
+        FiscalResolution::Denied(reason) => {
+            return Err(FiscalMarketplacePricingError::Denied(reason));
+        }
+    };
+    compute_marketplace_invocation_price_with_discounts(base, ctx, &discounts)
+}
+
+fn compute_marketplace_invocation_price_with_discounts(
+    base: &MarketplaceBasePrice,
+    ctx: &MarketplacePricingContext,
+    discounts: &[u32; 4],
+) -> Result<MarketplaceInvocationPrice, FiscalMarketplacePricingError> {
+    let discount = discounts
+        .get(ctx.reputation_tier as usize)
+        .copied()
+        .ok_or(FiscalMarketplacePricingError::ArithmeticOverflow)?;
+    let kept_per_hundred = 100_u128
+        .checked_sub(u128::from(discount))
+        .ok_or(FiscalMarketplacePricingError::ArithmeticOverflow)?;
+    let units = u128::from(base.units)
+        .checked_mul(kept_per_hundred)
+        .map(|scaled| scaled / 100)
+        .and_then(|scaled| u64::try_from(scaled).ok())
+        .ok_or(FiscalMarketplacePricingError::ArithmeticOverflow)?;
+    Ok(MarketplaceInvocationPrice {
+        units,
+        currency: base.currency.clone(),
+        applied_tier: ctx.reputation_tier,
+        discount_basis_points_per_hundred: discount,
+    })
 }
 
 fn discount_for_reputation_tier(tier: MarketplaceReputationTier) -> u32 {
@@ -351,5 +425,36 @@ mod tests {
                 .unwrap_or_else(|| panic!("padded tenant `{tenant_id}` should be rejected"));
             assert_eq!(error, MarketplacePricingError::EmptyTenantId);
         }
+    }
+
+    #[test]
+    fn fiscal_discount_table_preserves_bootstrap_parity_and_changes_output() {
+        let base = MarketplaceBasePrice::new(1_001, "USD");
+        for tier in [
+            MarketplaceReputationTier::Tier0,
+            MarketplaceReputationTier::Tier1,
+            MarketplaceReputationTier::Tier2,
+            MarketplaceReputationTier::Tier3,
+        ] {
+            let ctx = MarketplacePricingContext::new("tenant-a", tier);
+            assert_eq!(
+                compute_marketplace_invocation_price_with_discounts(
+                    &base,
+                    &ctx,
+                    &TIER_DISCOUNT_PER_HUNDRED,
+                )
+                .ok(),
+                Some(compute_marketplace_invocation_price(&base, &ctx))
+            );
+        }
+
+        let ctx = MarketplacePricingContext::new("tenant-a", MarketplaceReputationTier::Tier3);
+        let priced =
+            compute_marketplace_invocation_price_with_discounts(&base, &ctx, &[0, 10, 20, 30]).ok();
+        assert_eq!(priced.as_ref().map(|price| price.units), Some(700));
+        assert_eq!(
+            priced.map(|price| price.discount_basis_points_per_hundred),
+            Some(30)
+        );
     }
 }

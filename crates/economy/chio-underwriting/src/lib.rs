@@ -33,9 +33,9 @@ pub use decision::{
     UnderwritingSimulationDelta, UnderwritingSimulationReport, UnderwritingSimulationRequest,
 };
 pub use marketplace_limits::{
-    compute_marketplace_credit_limit, MarketplaceCreditLimitDecision,
-    MarketplaceCreditLimitRequest, MarketplaceLimitTier, MARKETPLACE_TIER_LIMIT_CURRENCY,
-    MARKETPLACE_TIER_LIMIT_UNITS,
+    compute_fiscal_marketplace_credit_limit, compute_marketplace_credit_limit, FiscalTierLimits,
+    MarketplaceCreditLimitDecision, MarketplaceCreditLimitRequest, MarketplaceLimitTier,
+    MARKETPLACE_TIER_LIMIT_CURRENCY, MARKETPLACE_TIER_LIMIT_UNITS,
 };
 pub use premium::{
     price_premium, risk_multiplier, LookbackWindow, PremiumDeclineReason, PremiumInputs,
