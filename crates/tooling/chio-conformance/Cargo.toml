@@ -45,6 +45,10 @@ path = "src/bin/chio_native_conformance_runner.rs"
 name = "chio-native-conformance-fixture"
 path = "src/bin/chio_native_conformance_fixture.rs"
 
+[[bin]]
+name = "chio-econsim-runner"
+path = "src/bin/chio_econsim_runner.rs"
+
 [features]
 # Default resolves fixture paths relative to the workspace root, pointing at
 # the tests/conformance/{scenarios,peers,fixtures}

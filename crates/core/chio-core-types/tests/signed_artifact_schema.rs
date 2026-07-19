@@ -268,6 +268,37 @@ fn fiscal_genesis_policy_remains_outside_the_signed_artifact_registry() {
 }
 
 #[test]
+fn econsim_qualification_matrix_is_registered_and_unknown_versions_fail_closed() {
+    let schema = "chio.econsim.qualification-matrix.v1";
+    assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+    assert!(chio_core_types::built_in_signed_artifact_registry()
+        .iter()
+        .any(|entry| entry.schema == schema
+            && entry.artifact_kind == "economic_simulation_qualification_matrix"
+            && entry.introduced_by == "economic-wind-tunnel-v1"));
+    assert!(chio_core_types::validate_signed_artifact_schema(schema).is_ok());
+    assert!(chio_core_types::validate_signed_artifact_schema(
+        "chio.econsim.qualification-matrix.v2"
+    )
+    .is_err());
+
+    let body: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../spec/schemas/chio-econsim/v1/fixtures/qualification-matrix.positive.json"
+    )))
+    .expect("econsim qualification fixture parses");
+    assert_eq!(body["schema"], schema);
+    let signed = chio_core_types::receipt::lineage::SignedExportEnvelope::sign(
+        body,
+        &chio_core_types::Keypair::from_seed(&[91; 32]),
+    )
+    .expect("econsim qualification fixture signs");
+    assert!(signed
+        .verify_signature()
+        .expect("econsim signature verifies"));
+}
+
+#[test]
 fn fiscal_signed_artifact_registry_names_exact_schema_files() {
     let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

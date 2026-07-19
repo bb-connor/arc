@@ -93,6 +93,8 @@ pub const CHIO_FISCAL_ACTIVATION_V1_SCHEMA: &str = "chio.fiscal.activation.v1";
 pub const CHIO_FISCAL_CONSUMER_READINESS_V1_SCHEMA: &str = "chio.fiscal.consumer-readiness.v1";
 pub const CHIO_FISCAL_CONTINUITY_CHECKPOINT_V1_SCHEMA: &str =
     "chio.fiscal.continuity-checkpoint.v1";
+pub const CHIO_ECONSIM_QUALIFICATION_MATRIX_V1_SCHEMA: &str =
+    "chio.econsim.qualification-matrix.v1";
 pub const CHIO_OBLIGATION_STATUS_PROOF_V1_SCHEMA: &str = "chio.obligation.status-proof.v1";
 pub const CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA: &str = "chio.credit.facility-bind.v1";
 pub const CHIO_CREDIT_IOU_ENVELOPE_V2_SCHEMA: &str = "chio.credit.iou-envelope.v2";
@@ -520,6 +522,13 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_FISCAL_CONTINUITY_CHECKPOINT_V1_SCHEMA,
         Some(("fiscal_continuity_checkpoint", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_ECONSIM_QUALIFICATION_MATRIX_V1_SCHEMA,
+        Some((
+            "economic_simulation_qualification_matrix",
+            "economic-wind-tunnel-v1",
+        )),
     ),
     (
         CHIO_OBLIGATION_STATUS_PROOF_V1_SCHEMA,

@@ -493,6 +493,88 @@ fn credit_account_provisioning_authorization_and_replay_are_exact() -> CreditAut
 }
 
 #[test]
+fn cumulative_credit_exposure_rejects_the_first_request_above_the_effective_ceiling(
+) -> CreditAuthorizationTestResult {
+    let fixture = fixture();
+    let authorities = CreditAuthorityFixture::new()?;
+    let now = now_ms();
+
+    for (index, expected_version) in [SOURCE_VERSION, SOURCE_VERSION + 1].into_iter().enumerate() {
+        let identity = format!("credit-capacity-{index}");
+        let operation = broker_registered_credit_operation(
+            &fixture,
+            &format!("request-{identity}"),
+            now + index as u64 * 10,
+        )?;
+        let credit_request = authorities.reservation_request(
+            operation.binding().operation_id().as_str(),
+            operation.binding().request_id().as_str(),
+            &format!("nonce-{identity}"),
+            expected_version,
+            now + index as u64 * 10 + 3,
+        )?;
+        if index == 0 {
+            provision_account(&fixture, &credit_request, now + 3)?;
+        }
+        let lease = claim(
+            &fixture,
+            &operation,
+            "sqlite-credit-authorizer",
+            now + index as u64 * 10 + 4,
+        );
+        let mut budget_request = budget_authorization_request(&fixture, &operation, &identity);
+        budget_request.max_invocations = None;
+        budget_request.max_total_cost_units = None;
+        fixture.store.authorize_budget_and_commit_admission(
+            &operation,
+            &lease,
+            budget_request,
+            None,
+            Some(credit_request),
+            &fixture.fence,
+            now + index as u64 * 10 + 5,
+        )?;
+    }
+    assert_eq!(account_state(&fixture)?, (1, 0, 2_000, 9, 9));
+
+    let denied_operation =
+        broker_registered_credit_operation(&fixture, "request-credit-capacity-denied", now + 20)?;
+    let denied_credit = authorities.reservation_request(
+        denied_operation.binding().operation_id().as_str(),
+        denied_operation.binding().request_id().as_str(),
+        "nonce-credit-capacity-denied",
+        SOURCE_VERSION + 2,
+        now + 23,
+    )?;
+    let denied_lease = claim(
+        &fixture,
+        &denied_operation,
+        "sqlite-credit-authorizer",
+        now + 24,
+    );
+    let mut denied_budget =
+        budget_authorization_request(&fixture, &denied_operation, "credit-capacity-denied");
+    denied_budget.max_invocations = None;
+    denied_budget.max_total_cost_units = None;
+    assert_eq!(
+        fixture.store.authorize_budget_and_commit_admission(
+            &denied_operation,
+            &denied_lease,
+            denied_budget,
+            None,
+            Some(denied_credit),
+            &fixture.fence,
+            now + 25,
+        ),
+        Err(AdmissionCaptureError::Invariant(
+            "budget state invariant violated: admission operation invariant failed: credit exposure exceeds the effective ceiling".to_owned()
+        ))
+    );
+    assert_eq!(account_state(&fixture)?, (1, 0, 2_000, 9, 9));
+    Ok(())
+}
+
+#[test]
 fn credit_authorization_rollback_restores_budget_reservation_and_account(
 ) -> CreditAuthorizationTestResult {
     let fixture = fixture();

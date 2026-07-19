@@ -2004,6 +2004,18 @@
       "schemaFile": "spec/schemas/chio-fiscal/v1/continuity-checkpoint.schema.json"
     },
     {
+      "schema": "chio.econsim.scenario-result.v1",
+      "artifactKind": "economic_simulation_scenario_result",
+      "introducedBy": "economic-wind-tunnel-v1",
+      "schemaFile": "spec/schemas/chio-econsim/v1/scenario-result.schema.json"
+    },
+    {
+      "schema": "chio.econsim.qualification-matrix.v1",
+      "artifactKind": "economic_simulation_qualification_matrix",
+      "introducedBy": "economic-wind-tunnel-v1",
+      "schemaFile": "spec/schemas/chio-econsim/v1/qualification-matrix.schema.json"
+    },
+    {
       "schema": "chio.parametric.policy.v1",
       "artifactKind": "parametric_policy",
       "introducedBy": "parametric-insurance-v1",

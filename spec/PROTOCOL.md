@@ -3553,6 +3553,22 @@ The current generic registry claim is intentionally bounded:
   activation authority remain visible as evidence but fail closed for
   admission, governance, and market-penalty evaluation
 
+### 12.1 Economic simulation qualification artifacts
+
+The `chio.econsim.scenario-result.v1` and
+`chio.econsim.qualification-matrix.v1` schemas describe deterministic,
+synthetic campaigns against named production economy validators. The v1 matrix
+enumerates sybil pricing, bid integrity, credit exposure, oracle divergence,
+cumulative approval, and settlement retry classes. Each result binds its seed,
+corpus digest, exact assertion scope, and explicit limits.
+
+An econsim matrix is self-signed internal qualification. Its signature binds
+the runner's assertion and recorded provenance, but does not independently
+prove what executed. Econsim artifacts are not runtime wire messages, external
+evidence, underwriting inputs, insurance facts, or capability claims. A
+missing production target or unresolved High or Critical finding prevents the
+runner from emitting a signed matrix.
+
 ## 13. Observability Contract
 
 Production observability is part of the shipped contract.
