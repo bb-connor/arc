@@ -299,7 +299,9 @@ impl SqliteReceiptStore {
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
         configure_sqlite_connection(&mut connection)?;
-        connection.execute_batch(
+        let schema_migration =
+            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        schema_migration.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS chio_tool_receipts (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1236,6 +1238,7 @@ impl SqliteReceiptStore {
 
             "#,
         )?;
+        schema_migration.commit()?;
         connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
         connection.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
         connection.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
