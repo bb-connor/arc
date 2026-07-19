@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: e8c20e080406a3a404979dce3e7ba6e5459fc0a33965c381ba3279c4b7419efe
+// Schema SHA: 495b1a67118a92cb60874dc7e98f894ebad28435accef8ef9dba53a2dfbdbbc0
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -2191,6 +2191,74 @@ export namespace Provenance_VerdictLink {
    */
   export interface Incomplete {
     verdict: "incomplete";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/admission-metadata.schema.json
+export namespace Receipt_AdmissionMetadata {
+  export type Digest = string;
+  export type Identifier = string;
+  export type PositiveIJsonInteger = number;
+
+  export interface ChioDurableAdmissionReceiptMetadata {
+    schema: "chio.admission-receipt.v1";
+    operation_id: Digest;
+    request_id: Identifier;
+    request_namespace_digest: Digest;
+    request_binding_hash: Digest;
+    projected_operation_version: PositiveIJsonInteger;
+    projected_state:
+      | "prepared"
+      | "broker_attempt_registered"
+      | "approval_required"
+      | "budget_authorized"
+      | "approval_reserved"
+      | "ready_to_dispatch"
+      | "capture_pending"
+      | "dispatch_committed"
+      | "finalizing"
+      | "completed"
+      | "compensated_before_dispatch"
+      | "not_accepted_after_dispatch_commit"
+      | "outcome_unknown_after_dispatch"
+      | "mutation_ready"
+      | "mutation_submitted"
+      | "economic_mutation_applied"
+      | "economic_mutation_not_applied";
+    projected_dispatch_state:
+      | "not_committed"
+      | "capture_pending"
+      | "committed"
+      | "finalizing"
+      | "terminal"
+      | "not_applicable";
+    trusted_time_unix_ms: PositiveIJsonInteger;
+    coordinator_lease_id: Identifier;
+    coordinator_lease_epoch: PositiveIJsonInteger;
+    store_fence: StoreFence;
+    retained_dispatch_commit: null | DispatchCommit;
+    compensation_status: "not_compensated" | "compensated_before_dispatch" | "not_accepted_after_dispatch_commit";
+    tool_outcome_id: null | Digest;
+    tool_outcome_version: null | PositiveIJsonInteger;
+  }
+  export interface StoreFence {
+    store_uuid: Identifier;
+    lease_id: Identifier;
+    owner_epoch: PositiveIJsonInteger;
+  }
+  export interface DispatchCommit {
+    committed_version: PositiveIJsonInteger;
+    coordinator_lease_id: Identifier;
+    coordinator_lease_epoch: PositiveIJsonInteger;
+    store_fence: StoreFence;
+    provider_attempt: null | ProviderAttempt;
+  }
+  export interface ProviderAttempt {
+    operation_id: Digest;
+    attempt_id: Identifier;
+    transport_id: Identifier;
+    transport_key_epoch: PositiveIJsonInteger;
   }
 }
 

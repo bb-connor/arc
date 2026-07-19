@@ -31935,6 +31935,892 @@ pub mod provenance_verdict_link {
         }
     }
 }
+pub mod receipt_admission_metadata {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioDurableAdmissionReceiptMetadata`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/admission-metadata.schema.json",
+    ///  "title": "Chio Durable Admission Receipt Metadata",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "compensation_status",
+    ///    "coordinator_lease_epoch",
+    ///    "coordinator_lease_id",
+    ///    "operation_id",
+    ///    "projected_dispatch_state",
+    ///    "projected_operation_version",
+    ///    "projected_state",
+    ///    "request_binding_hash",
+    ///    "request_id",
+    ///    "request_namespace_digest",
+    ///    "retained_dispatch_commit",
+    ///    "schema",
+    ///    "store_fence",
+    ///    "tool_outcome_id",
+    ///    "tool_outcome_version",
+    ///    "trusted_time_unix_ms"
+    ///  ],
+    ///  "properties": {
+    ///    "compensation_status": {
+    ///      "enum": [
+    ///        "not_compensated",
+    ///        "compensated_before_dispatch",
+    ///        "not_accepted_after_dispatch_commit"
+    ///      ]
+    ///    },
+    ///    "coordinator_lease_epoch": {
+    ///      "$ref": "#/$defs/positiveIJsonInteger"
+    ///    },
+    ///    "coordinator_lease_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "operation_id": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "projected_dispatch_state": {
+    ///      "enum": [
+    ///        "not_committed",
+    ///        "capture_pending",
+    ///        "committed",
+    ///        "finalizing",
+    ///        "terminal",
+    ///        "not_applicable"
+    ///      ]
+    ///    },
+    ///    "projected_operation_version": {
+    ///      "$ref": "#/$defs/positiveIJsonInteger"
+    ///    },
+    ///    "projected_state": {
+    ///      "enum": [
+    ///        "prepared",
+    ///        "broker_attempt_registered",
+    ///        "approval_required",
+    ///        "budget_authorized",
+    ///        "approval_reserved",
+    ///        "ready_to_dispatch",
+    ///        "capture_pending",
+    ///        "dispatch_committed",
+    ///        "finalizing",
+    ///        "completed",
+    ///        "compensated_before_dispatch",
+    ///        "not_accepted_after_dispatch_commit",
+    ///        "outcome_unknown_after_dispatch",
+    ///        "mutation_ready",
+    ///        "mutation_submitted",
+    ///        "economic_mutation_applied",
+    ///        "economic_mutation_not_applied"
+    ///      ]
+    ///    },
+    ///    "request_binding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "request_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "request_namespace_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "retained_dispatch_commit": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "$ref": "#/$defs/dispatchCommit"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.admission-receipt.v1"
+    ///    },
+    ///    "store_fence": {
+    ///      "$ref": "#/$defs/storeFence"
+    ///    },
+    ///    "tool_outcome_id": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "$ref": "#/$defs/digest"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "tool_outcome_version": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "$ref": "#/$defs/positiveIJsonInteger"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "trusted_time_unix_ms": {
+    ///      "$ref": "#/$defs/positiveIJsonInteger"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDurableAdmissionReceiptMetadata {
+        pub compensation_status: ChioDurableAdmissionReceiptMetadataCompensationStatus,
+        pub coordinator_lease_epoch: PositiveIJsonInteger,
+        pub coordinator_lease_id: Identifier,
+        pub operation_id: Digest,
+        pub projected_dispatch_state: ChioDurableAdmissionReceiptMetadataProjectedDispatchState,
+        pub projected_operation_version: PositiveIJsonInteger,
+        pub projected_state: ChioDurableAdmissionReceiptMetadataProjectedState,
+        pub request_binding_hash: Digest,
+        pub request_id: Identifier,
+        pub request_namespace_digest: Digest,
+        pub retained_dispatch_commit: ::std::option::Option<DispatchCommit>,
+        pub schema: ::serde_json::Value,
+        pub store_fence: StoreFence,
+        pub tool_outcome_id: ::std::option::Option<Digest>,
+        pub tool_outcome_version: ::std::option::Option<PositiveIJsonInteger>,
+        pub trusted_time_unix_ms: PositiveIJsonInteger,
+    }
+    impl ::std::convert::From<&ChioDurableAdmissionReceiptMetadata>
+        for ChioDurableAdmissionReceiptMetadata
+    {
+        fn from(value: &ChioDurableAdmissionReceiptMetadata) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDurableAdmissionReceiptMetadataCompensationStatus`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "not_compensated",
+    ///    "compensated_before_dispatch",
+    ///    "not_accepted_after_dispatch_commit"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDurableAdmissionReceiptMetadataCompensationStatus {
+        #[serde(rename = "not_compensated")]
+        NotCompensated,
+        #[serde(rename = "compensated_before_dispatch")]
+        CompensatedBeforeDispatch,
+        #[serde(rename = "not_accepted_after_dispatch_commit")]
+        NotAcceptedAfterDispatchCommit,
+    }
+    impl ::std::convert::From<&Self> for ChioDurableAdmissionReceiptMetadataCompensationStatus {
+        fn from(value: &ChioDurableAdmissionReceiptMetadataCompensationStatus) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDurableAdmissionReceiptMetadataCompensationStatus {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::NotCompensated => f.write_str("not_compensated"),
+                Self::CompensatedBeforeDispatch => f.write_str("compensated_before_dispatch"),
+                Self::NotAcceptedAfterDispatchCommit => {
+                    f.write_str("not_accepted_after_dispatch_commit")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDurableAdmissionReceiptMetadataCompensationStatus {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "not_compensated" => Ok(Self::NotCompensated),
+                "compensated_before_dispatch" => Ok(Self::CompensatedBeforeDispatch),
+                "not_accepted_after_dispatch_commit" => Ok(Self::NotAcceptedAfterDispatchCommit),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDurableAdmissionReceiptMetadataCompensationStatus {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDurableAdmissionReceiptMetadataCompensationStatus
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDurableAdmissionReceiptMetadataCompensationStatus
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioDurableAdmissionReceiptMetadataProjectedDispatchState`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "not_committed",
+    ///    "capture_pending",
+    ///    "committed",
+    ///    "finalizing",
+    ///    "terminal",
+    ///    "not_applicable"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDurableAdmissionReceiptMetadataProjectedDispatchState {
+        #[serde(rename = "not_committed")]
+        NotCommitted,
+        #[serde(rename = "capture_pending")]
+        CapturePending,
+        #[serde(rename = "committed")]
+        Committed,
+        #[serde(rename = "finalizing")]
+        Finalizing,
+        #[serde(rename = "terminal")]
+        Terminal,
+        #[serde(rename = "not_applicable")]
+        NotApplicable,
+    }
+    impl ::std::convert::From<&Self> for ChioDurableAdmissionReceiptMetadataProjectedDispatchState {
+        fn from(value: &ChioDurableAdmissionReceiptMetadataProjectedDispatchState) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDurableAdmissionReceiptMetadataProjectedDispatchState {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::NotCommitted => f.write_str("not_committed"),
+                Self::CapturePending => f.write_str("capture_pending"),
+                Self::Committed => f.write_str("committed"),
+                Self::Finalizing => f.write_str("finalizing"),
+                Self::Terminal => f.write_str("terminal"),
+                Self::NotApplicable => f.write_str("not_applicable"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDurableAdmissionReceiptMetadataProjectedDispatchState {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "not_committed" => Ok(Self::NotCommitted),
+                "capture_pending" => Ok(Self::CapturePending),
+                "committed" => Ok(Self::Committed),
+                "finalizing" => Ok(Self::Finalizing),
+                "terminal" => Ok(Self::Terminal),
+                "not_applicable" => Ok(Self::NotApplicable),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDurableAdmissionReceiptMetadataProjectedDispatchState {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDurableAdmissionReceiptMetadataProjectedDispatchState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDurableAdmissionReceiptMetadataProjectedDispatchState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioDurableAdmissionReceiptMetadataProjectedState`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "prepared",
+    ///    "broker_attempt_registered",
+    ///    "approval_required",
+    ///    "budget_authorized",
+    ///    "approval_reserved",
+    ///    "ready_to_dispatch",
+    ///    "capture_pending",
+    ///    "dispatch_committed",
+    ///    "finalizing",
+    ///    "completed",
+    ///    "compensated_before_dispatch",
+    ///    "not_accepted_after_dispatch_commit",
+    ///    "outcome_unknown_after_dispatch",
+    ///    "mutation_ready",
+    ///    "mutation_submitted",
+    ///    "economic_mutation_applied",
+    ///    "economic_mutation_not_applied"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDurableAdmissionReceiptMetadataProjectedState {
+        #[serde(rename = "prepared")]
+        Prepared,
+        #[serde(rename = "broker_attempt_registered")]
+        BrokerAttemptRegistered,
+        #[serde(rename = "approval_required")]
+        ApprovalRequired,
+        #[serde(rename = "budget_authorized")]
+        BudgetAuthorized,
+        #[serde(rename = "approval_reserved")]
+        ApprovalReserved,
+        #[serde(rename = "ready_to_dispatch")]
+        ReadyToDispatch,
+        #[serde(rename = "capture_pending")]
+        CapturePending,
+        #[serde(rename = "dispatch_committed")]
+        DispatchCommitted,
+        #[serde(rename = "finalizing")]
+        Finalizing,
+        #[serde(rename = "completed")]
+        Completed,
+        #[serde(rename = "compensated_before_dispatch")]
+        CompensatedBeforeDispatch,
+        #[serde(rename = "not_accepted_after_dispatch_commit")]
+        NotAcceptedAfterDispatchCommit,
+        #[serde(rename = "outcome_unknown_after_dispatch")]
+        OutcomeUnknownAfterDispatch,
+        #[serde(rename = "mutation_ready")]
+        MutationReady,
+        #[serde(rename = "mutation_submitted")]
+        MutationSubmitted,
+        #[serde(rename = "economic_mutation_applied")]
+        EconomicMutationApplied,
+        #[serde(rename = "economic_mutation_not_applied")]
+        EconomicMutationNotApplied,
+    }
+    impl ::std::convert::From<&Self> for ChioDurableAdmissionReceiptMetadataProjectedState {
+        fn from(value: &ChioDurableAdmissionReceiptMetadataProjectedState) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDurableAdmissionReceiptMetadataProjectedState {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Prepared => f.write_str("prepared"),
+                Self::BrokerAttemptRegistered => f.write_str("broker_attempt_registered"),
+                Self::ApprovalRequired => f.write_str("approval_required"),
+                Self::BudgetAuthorized => f.write_str("budget_authorized"),
+                Self::ApprovalReserved => f.write_str("approval_reserved"),
+                Self::ReadyToDispatch => f.write_str("ready_to_dispatch"),
+                Self::CapturePending => f.write_str("capture_pending"),
+                Self::DispatchCommitted => f.write_str("dispatch_committed"),
+                Self::Finalizing => f.write_str("finalizing"),
+                Self::Completed => f.write_str("completed"),
+                Self::CompensatedBeforeDispatch => f.write_str("compensated_before_dispatch"),
+                Self::NotAcceptedAfterDispatchCommit => {
+                    f.write_str("not_accepted_after_dispatch_commit")
+                }
+                Self::OutcomeUnknownAfterDispatch => f.write_str("outcome_unknown_after_dispatch"),
+                Self::MutationReady => f.write_str("mutation_ready"),
+                Self::MutationSubmitted => f.write_str("mutation_submitted"),
+                Self::EconomicMutationApplied => f.write_str("economic_mutation_applied"),
+                Self::EconomicMutationNotApplied => f.write_str("economic_mutation_not_applied"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDurableAdmissionReceiptMetadataProjectedState {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "prepared" => Ok(Self::Prepared),
+                "broker_attempt_registered" => Ok(Self::BrokerAttemptRegistered),
+                "approval_required" => Ok(Self::ApprovalRequired),
+                "budget_authorized" => Ok(Self::BudgetAuthorized),
+                "approval_reserved" => Ok(Self::ApprovalReserved),
+                "ready_to_dispatch" => Ok(Self::ReadyToDispatch),
+                "capture_pending" => Ok(Self::CapturePending),
+                "dispatch_committed" => Ok(Self::DispatchCommitted),
+                "finalizing" => Ok(Self::Finalizing),
+                "completed" => Ok(Self::Completed),
+                "compensated_before_dispatch" => Ok(Self::CompensatedBeforeDispatch),
+                "not_accepted_after_dispatch_commit" => Ok(Self::NotAcceptedAfterDispatchCommit),
+                "outcome_unknown_after_dispatch" => Ok(Self::OutcomeUnknownAfterDispatch),
+                "mutation_ready" => Ok(Self::MutationReady),
+                "mutation_submitted" => Ok(Self::MutationSubmitted),
+                "economic_mutation_applied" => Ok(Self::EconomicMutationApplied),
+                "economic_mutation_not_applied" => Ok(Self::EconomicMutationNotApplied),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDurableAdmissionReceiptMetadataProjectedState {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDurableAdmissionReceiptMetadataProjectedState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDurableAdmissionReceiptMetadataProjectedState
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Digest(::std::string::String);
+    impl ::std::ops::Deref for Digest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for ::std::string::String {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Digest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Digest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`DispatchCommit`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "committed_version",
+    ///    "coordinator_lease_epoch",
+    ///    "coordinator_lease_id",
+    ///    "provider_attempt",
+    ///    "store_fence"
+    ///  ],
+    ///  "properties": {
+    ///    "committed_version": {
+    ///      "$ref": "#/$defs/positiveIJsonInteger"
+    ///    },
+    ///    "coordinator_lease_epoch": {
+    ///      "$ref": "#/$defs/positiveIJsonInteger"
+    ///    },
+    ///    "coordinator_lease_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "provider_attempt": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "$ref": "#/$defs/providerAttempt"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "store_fence": {
+    ///      "$ref": "#/$defs/storeFence"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DispatchCommit {
+        pub committed_version: PositiveIJsonInteger,
+        pub coordinator_lease_epoch: PositiveIJsonInteger,
+        pub coordinator_lease_id: Identifier,
+        pub provider_attempt: ::std::option::Option<ProviderAttempt>,
+        pub store_fence: StoreFence,
+    }
+    impl ::std::convert::From<&DispatchCommit> for DispatchCommit {
+        fn from(value: &DispatchCommit) -> Self {
+            value.clone()
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PositiveIJsonInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PositiveIJsonInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PositiveIJsonInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PositiveIJsonInteger> for ::std::num::NonZeroU64 {
+        fn from(value: PositiveIJsonInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PositiveIJsonInteger> for PositiveIJsonInteger {
+        fn from(value: &PositiveIJsonInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PositiveIJsonInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PositiveIJsonInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PositiveIJsonInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PositiveIJsonInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PositiveIJsonInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PositiveIJsonInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`ProviderAttempt`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "attempt_id",
+    ///    "operation_id",
+    ///    "transport_id",
+    ///    "transport_key_epoch"
+    ///  ],
+    ///  "properties": {
+    ///    "attempt_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "operation_id": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "transport_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "transport_key_epoch": {
+    ///      "$ref": "#/$defs/positiveIJsonInteger"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ProviderAttempt {
+        pub attempt_id: Identifier,
+        pub operation_id: Digest,
+        pub transport_id: Identifier,
+        pub transport_key_epoch: PositiveIJsonInteger,
+    }
+    impl ::std::convert::From<&ProviderAttempt> for ProviderAttempt {
+        fn from(value: &ProviderAttempt) -> Self {
+            value.clone()
+        }
+    }
+    ///`StoreFence`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "lease_id",
+    ///    "owner_epoch",
+    ///    "store_uuid"
+    ///  ],
+    ///  "properties": {
+    ///    "lease_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "owner_epoch": {
+    ///      "$ref": "#/$defs/positiveIJsonInteger"
+    ///    },
+    ///    "store_uuid": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct StoreFence {
+        pub lease_id: Identifier,
+        pub owner_epoch: PositiveIJsonInteger,
+        pub store_uuid: Identifier,
+    }
+    impl ::std::convert::From<&StoreFence> for StoreFence {
+        fn from(value: &StoreFence) -> Self {
+            value.clone()
+        }
+    }
+}
 pub mod receipt_inclusion_proof {
     /// Error types.
     pub mod error {

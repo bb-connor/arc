@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: f305012a651f6390913e8c4d6eb8f9c74d517d9fababe9e6fd484213b4ef15da
+// Schema content SHA-256: 4ff5148b3a12744ad4d9a846c25199c074809d56a888edbc8f505f5c77bf73b8
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -474,6 +474,49 @@ const (
 // Defines values for ProvenanceVerdictLink3Verdict.
 const (
 	ProvenanceVerdictLink3VerdictIncomplete ProvenanceVerdictLink3Verdict = "incomplete"
+)
+
+// Defines values for ReceiptAdmissionMetadataCompensationStatus.
+const (
+	ReceiptAdmissionMetadataCompensationStatusCompensatedBeforeDispatch      ReceiptAdmissionMetadataCompensationStatus = "compensated_before_dispatch"
+	ReceiptAdmissionMetadataCompensationStatusNotAcceptedAfterDispatchCommit ReceiptAdmissionMetadataCompensationStatus = "not_accepted_after_dispatch_commit"
+	ReceiptAdmissionMetadataCompensationStatusNotCompensated                 ReceiptAdmissionMetadataCompensationStatus = "not_compensated"
+)
+
+// Defines values for ReceiptAdmissionMetadataProjectedDispatchState.
+const (
+	ReceiptAdmissionMetadataProjectedDispatchStateCapturePending ReceiptAdmissionMetadataProjectedDispatchState = "capture_pending"
+	ReceiptAdmissionMetadataProjectedDispatchStateCommitted      ReceiptAdmissionMetadataProjectedDispatchState = "committed"
+	ReceiptAdmissionMetadataProjectedDispatchStateFinalizing     ReceiptAdmissionMetadataProjectedDispatchState = "finalizing"
+	ReceiptAdmissionMetadataProjectedDispatchStateNotApplicable  ReceiptAdmissionMetadataProjectedDispatchState = "not_applicable"
+	ReceiptAdmissionMetadataProjectedDispatchStateNotCommitted   ReceiptAdmissionMetadataProjectedDispatchState = "not_committed"
+	ReceiptAdmissionMetadataProjectedDispatchStateTerminal       ReceiptAdmissionMetadataProjectedDispatchState = "terminal"
+)
+
+// Defines values for ReceiptAdmissionMetadataProjectedState.
+const (
+	ReceiptAdmissionMetadataProjectedStateApprovalRequired               ReceiptAdmissionMetadataProjectedState = "approval_required"
+	ReceiptAdmissionMetadataProjectedStateApprovalReserved               ReceiptAdmissionMetadataProjectedState = "approval_reserved"
+	ReceiptAdmissionMetadataProjectedStateBrokerAttemptRegistered        ReceiptAdmissionMetadataProjectedState = "broker_attempt_registered"
+	ReceiptAdmissionMetadataProjectedStateBudgetAuthorized               ReceiptAdmissionMetadataProjectedState = "budget_authorized"
+	ReceiptAdmissionMetadataProjectedStateCapturePending                 ReceiptAdmissionMetadataProjectedState = "capture_pending"
+	ReceiptAdmissionMetadataProjectedStateCompensatedBeforeDispatch      ReceiptAdmissionMetadataProjectedState = "compensated_before_dispatch"
+	ReceiptAdmissionMetadataProjectedStateCompleted                      ReceiptAdmissionMetadataProjectedState = "completed"
+	ReceiptAdmissionMetadataProjectedStateDispatchCommitted              ReceiptAdmissionMetadataProjectedState = "dispatch_committed"
+	ReceiptAdmissionMetadataProjectedStateEconomicMutationApplied        ReceiptAdmissionMetadataProjectedState = "economic_mutation_applied"
+	ReceiptAdmissionMetadataProjectedStateEconomicMutationNotApplied     ReceiptAdmissionMetadataProjectedState = "economic_mutation_not_applied"
+	ReceiptAdmissionMetadataProjectedStateFinalizing                     ReceiptAdmissionMetadataProjectedState = "finalizing"
+	ReceiptAdmissionMetadataProjectedStateMutationReady                  ReceiptAdmissionMetadataProjectedState = "mutation_ready"
+	ReceiptAdmissionMetadataProjectedStateMutationSubmitted              ReceiptAdmissionMetadataProjectedState = "mutation_submitted"
+	ReceiptAdmissionMetadataProjectedStateNotAcceptedAfterDispatchCommit ReceiptAdmissionMetadataProjectedState = "not_accepted_after_dispatch_commit"
+	ReceiptAdmissionMetadataProjectedStateOutcomeUnknownAfterDispatch    ReceiptAdmissionMetadataProjectedState = "outcome_unknown_after_dispatch"
+	ReceiptAdmissionMetadataProjectedStatePrepared                       ReceiptAdmissionMetadataProjectedState = "prepared"
+	ReceiptAdmissionMetadataProjectedStateReadyToDispatch                ReceiptAdmissionMetadataProjectedState = "ready_to_dispatch"
+)
+
+// Defines values for ReceiptAdmissionMetadataSchema.
+const (
+	ReceiptAdmissionMetadataSchemaChioAdmissionReceiptV1 ReceiptAdmissionMetadataSchema = "chio.admission-receipt.v1"
 )
 
 // Defines values for ReceiptLineageStatementEvidenceClass.
@@ -1936,6 +1979,71 @@ type ProvenanceVerdictLink3 struct {
 
 // ProvenanceVerdictLink3Verdict defines model for ProvenanceVerdictLink.3.Verdict.
 type ProvenanceVerdictLink3Verdict string
+
+// ReceiptAdmissionMetadata defines model for ReceiptAdmissionMetadata.
+type ReceiptAdmissionMetadata struct {
+	CompensationStatus        ReceiptAdmissionMetadataCompensationStatus     `json:"compensation_status"`
+	CoordinatorLeaseEpoch     ReceiptAdmissionMetadataPositiveIJsonInteger   `json:"coordinator_lease_epoch"`
+	CoordinatorLeaseId        ReceiptAdmissionMetadataIdentifier             `json:"coordinator_lease_id"`
+	OperationId               ReceiptAdmissionMetadataDigest                 `json:"operation_id"`
+	ProjectedDispatchState    ReceiptAdmissionMetadataProjectedDispatchState `json:"projected_dispatch_state"`
+	ProjectedOperationVersion ReceiptAdmissionMetadataPositiveIJsonInteger   `json:"projected_operation_version"`
+	ProjectedState            ReceiptAdmissionMetadataProjectedState         `json:"projected_state"`
+	RequestBindingHash        ReceiptAdmissionMetadataDigest                 `json:"request_binding_hash"`
+	RequestId                 ReceiptAdmissionMetadataIdentifier             `json:"request_id"`
+	RequestNamespaceDigest    ReceiptAdmissionMetadataDigest                 `json:"request_namespace_digest"`
+	RetainedDispatchCommit    ReceiptAdmissionMetadataDispatchCommit         `json:"retained_dispatch_commit"`
+	Schema                    ReceiptAdmissionMetadataSchema                 `json:"schema"`
+	StoreFence                ReceiptAdmissionMetadataStoreFence             `json:"store_fence"`
+	ToolOutcomeId             ReceiptAdmissionMetadataDigest                 `json:"tool_outcome_id"`
+	ToolOutcomeVersion        ReceiptAdmissionMetadataPositiveIJsonInteger   `json:"tool_outcome_version"`
+	TrustedTimeUnixMs         ReceiptAdmissionMetadataPositiveIJsonInteger   `json:"trusted_time_unix_ms"`
+}
+
+// ReceiptAdmissionMetadataCompensationStatus defines model for ReceiptAdmissionMetadata.CompensationStatus.
+type ReceiptAdmissionMetadataCompensationStatus string
+
+// ReceiptAdmissionMetadataProjectedDispatchState defines model for ReceiptAdmissionMetadata.ProjectedDispatchState.
+type ReceiptAdmissionMetadataProjectedDispatchState string
+
+// ReceiptAdmissionMetadataProjectedState defines model for ReceiptAdmissionMetadata.ProjectedState.
+type ReceiptAdmissionMetadataProjectedState string
+
+// ReceiptAdmissionMetadataSchema defines model for ReceiptAdmissionMetadata.Schema.
+type ReceiptAdmissionMetadataSchema string
+
+// ReceiptAdmissionMetadataDigest defines model for ReceiptAdmissionMetadataDigest.
+type ReceiptAdmissionMetadataDigest = string
+
+// ReceiptAdmissionMetadataDispatchCommit defines model for ReceiptAdmissionMetadataDispatchCommit.
+type ReceiptAdmissionMetadataDispatchCommit struct {
+	CommittedVersion      ReceiptAdmissionMetadataPositiveIJsonInteger `json:"committed_version"`
+	CoordinatorLeaseEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"coordinator_lease_epoch"`
+	CoordinatorLeaseId    ReceiptAdmissionMetadataIdentifier           `json:"coordinator_lease_id"`
+	ProviderAttempt       ReceiptAdmissionMetadataProviderAttempt      `json:"provider_attempt"`
+	StoreFence            ReceiptAdmissionMetadataStoreFence           `json:"store_fence"`
+}
+
+// ReceiptAdmissionMetadataIdentifier defines model for ReceiptAdmissionMetadataIdentifier.
+type ReceiptAdmissionMetadataIdentifier = string
+
+// ReceiptAdmissionMetadataPositiveIJsonInteger defines model for ReceiptAdmissionMetadataPositiveIJsonInteger.
+type ReceiptAdmissionMetadataPositiveIJsonInteger = int64
+
+// ReceiptAdmissionMetadataProviderAttempt defines model for ReceiptAdmissionMetadataProviderAttempt.
+type ReceiptAdmissionMetadataProviderAttempt struct {
+	AttemptId         ReceiptAdmissionMetadataIdentifier           `json:"attempt_id"`
+	OperationId       ReceiptAdmissionMetadataDigest               `json:"operation_id"`
+	TransportId       ReceiptAdmissionMetadataIdentifier           `json:"transport_id"`
+	TransportKeyEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"transport_key_epoch"`
+}
+
+// ReceiptAdmissionMetadataStoreFence defines model for ReceiptAdmissionMetadataStoreFence.
+type ReceiptAdmissionMetadataStoreFence struct {
+	LeaseId    ReceiptAdmissionMetadataIdentifier           `json:"lease_id"`
+	OwnerEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"owner_epoch"`
+	StoreUuid  ReceiptAdmissionMetadataIdentifier           `json:"store_uuid"`
+}
 
 // ReceiptInclusionProof Merkle inclusion proof for a single receipt leaf in a receipt-log Merkle tree. Mirrors the serde shape of `MerkleProof` in `crates/core/chio-core-types/src/merkle.rs`. The proof allows an auditor, holding only the published Merkle root and the original leaf bytes, to verify that the leaf was included in a tree of the given size at the given position. The audit path is the ordered list of sibling hashes encountered when walking from the leaf up to the root; siblings whose subtree was carried upward without pairing (the right-edge of an unbalanced level) are omitted. Deterministic-replay consumes this schema as the contract for golden-bundle inclusion artifacts under `tests/replay/goldens/<family>/<name>/`.
 type ReceiptInclusionProof struct {
