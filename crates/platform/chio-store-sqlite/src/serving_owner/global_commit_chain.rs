@@ -8,7 +8,7 @@ use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
-const CURRENT_PROJECTION_KINDS: &str = "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set'";
+const CURRENT_PROJECTION_KINDS: &str = "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal'";
 
 const GLOBAL_COMMIT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS authority_global_commit_meta (
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -199,6 +199,7 @@ pub(crate) fn initialize_global_commit_schema(
             return Ok(());
         }
         let supported_legacy = [
+            pre_fiscal_global_commit_schema(),
             pre_factor_assignment_global_commit_schema(),
             pre_channel_release_global_commit_schema(),
             pre_economic_global_commit_schema(),
@@ -220,6 +221,13 @@ pub(crate) fn initialize_global_commit_schema(
         connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
     }
     verify_global_commit_schema(connection)
+}
+
+fn pre_fiscal_global_commit_schema() -> String {
+    GLOBAL_COMMIT_SCHEMA.replace(
+        CURRENT_PROJECTION_KINDS,
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set'",
+    )
 }
 
 fn pre_factor_assignment_global_commit_schema() -> String {
@@ -847,6 +855,17 @@ fn projection_reference_digest(
         "factor_assignment_authority_set" => {
             factor_assignment_authority_set_reference_digest(connection, key, sequence)
         }
+        "fiscal" => connection
+            .query_row(
+                r#"
+                SELECT commit_digest FROM fiscal_projection_commits
+                WHERE projection_key = ?1 AND projection_sequence = ?2
+                "#,
+                params![key, sqlite_u64(sequence, "fiscal projection sequence")?],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| invalid("fiscal projection reference is absent")),
         _ => Err(invalid("unknown global authority projection kind")),
     }
 }
@@ -1532,6 +1551,15 @@ fn verify_global_projection_coverage(
                 ) <> 1
             )
             OR EXISTS(
+                SELECT 1 FROM fiscal_projection_commits AS local
+                WHERE (
+                    SELECT COUNT(*) FROM authority_global_commits AS global
+                    WHERE global.projection_kind = 'fiscal'
+                      AND global.projection_key = local.projection_key
+                      AND global.projection_sequence = local.projection_sequence
+                ) <> 1
+            )
+            OR EXISTS(
                 SELECT 1 FROM factor_assignment_authority_sets AS local
                 WHERE (
                     SELECT COUNT(*) FROM authority_global_commits AS global
@@ -1879,6 +1907,11 @@ mod tests {
                 store_uuid TEXT NOT NULL,
                 store_lease_id TEXT NOT NULL,
                 store_owner_epoch INTEGER NOT NULL
+            );
+            CREATE TABLE fiscal_projection_commits (
+                projection_key TEXT NOT NULL,
+                projection_sequence INTEGER NOT NULL,
+                commit_digest TEXT NOT NULL
             );
             CREATE TABLE authority_global_commits (
                 projection_kind TEXT NOT NULL,

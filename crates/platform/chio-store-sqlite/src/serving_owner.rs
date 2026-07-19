@@ -330,6 +330,10 @@ impl SqliteAuthorityStore {
                 crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
             ),
             (
+                "fiscal",
+                crate::fiscal_store::FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
                 "channel_lifecycle",
                 crate::channel_lifecycle_store::CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION,
             ),
@@ -503,6 +507,10 @@ impl SqliteAuthorityStore {
             (
                 "economic_state_cache",
                 crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
+                "fiscal",
+                crate::fiscal_store::FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
             ),
             (
                 "channel_lifecycle",
@@ -710,6 +718,14 @@ impl SqliteAuthorityStore {
     }
 
     #[must_use]
+    pub fn fiscal_store(&self) -> crate::fiscal_store::SqliteFiscalStore {
+        crate::fiscal_store::SqliteFiscalStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
+
+    #[must_use]
     pub fn channel_lifecycle_store(
         &self,
     ) -> crate::channel_lifecycle_store::SqliteChannelLifecycleStore {
@@ -767,6 +783,8 @@ fn initialize_offline_authority_schemas(
     crate::frost_store::initialize_frost_schema(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::economic_state_cache::initialize_economic_state_cache_schema(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::fiscal_store::initialize_fiscal_schema(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
 }
@@ -1408,6 +1426,8 @@ fn verify_authority_store_invariants(
     crate::frost_store::verify_frost_store_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::economic_state_cache::verify_cache_sql_invariants(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::fiscal_store::verify_fiscal_sql_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::channel_lifecycle_store::verify_channel_lifecycle_invariants(connection)?;
     crate::channel_release_publisher_store::verify_channel_release_publisher_invariants(

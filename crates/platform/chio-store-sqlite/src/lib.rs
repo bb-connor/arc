@@ -40,6 +40,7 @@ pub mod economic_state_cache;
 pub mod encrypted_blob;
 pub mod evidence_export;
 pub mod execution_nonce_store;
+pub mod fiscal_store;
 pub mod frost_store;
 pub mod iou_store;
 #[cfg(feature = "lineage")]

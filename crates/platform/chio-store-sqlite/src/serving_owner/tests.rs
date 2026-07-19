@@ -185,7 +185,7 @@ fn legacy_global_projection_constraint_migrates_without_rewriting_history() {
         )
         .expect("global commit table SQL");
     let legacy_table_sql = table_sql.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set'",
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal'",
         "'baseline', 'admission', 'budget', 'revocation'",
     );
     let transaction = connection
@@ -246,6 +246,7 @@ fn legacy_global_projection_constraint_migrates_without_rewriting_history() {
         )
         .expect("migrated global commit table SQL");
     assert!(migrated_sql.contains("'frost'"));
+    assert!(migrated_sql.contains("'fiscal'"));
 }
 
 #[test]

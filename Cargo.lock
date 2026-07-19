@@ -4492,6 +4492,7 @@ dependencies = [
  "chio-credit",
  "chio-federation",
  "chio-federation-authority",
+ "chio-fiscal",
  "chio-kernel",
  "chio-settle",
  "chio-supervisor",

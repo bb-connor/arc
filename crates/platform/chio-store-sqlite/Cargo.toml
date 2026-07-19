@@ -27,6 +27,7 @@ chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-credit = { workspace = true }
 chio-federation = { workspace = true }
 chio-federation-authority = { workspace = true }
+chio-fiscal = { workspace = true }
 chio-kernel = { workspace = true }
 chio-settle = { workspace = true }
 chio-supervisor = { workspace = true }
