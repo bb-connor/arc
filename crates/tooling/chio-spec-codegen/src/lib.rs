@@ -63,8 +63,9 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use typify::{TypeSpace, TypeSpaceSettings};
 
@@ -125,6 +126,8 @@ pub enum CodegenError {
     SchemaRef(PathBuf, String),
     /// The token stream emitted by typify did not parse as a `syn::File`.
     SynParse(syn::Error),
+    /// `rustfmt` could not format generated Rust source.
+    Rustfmt(PathBuf, String),
     /// The error registry YAML could not be loaded or validated.
     Registry(PathBuf, String),
     /// The schemas directory did not exist on disk.
@@ -146,6 +149,9 @@ impl fmt::Display for CodegenError {
                 write!(f, "schema reference error in {}: {msg}", path.display())
             }
             Self::SynParse(err) => write!(f, "generated tokens did not parse: {err}"),
+            Self::Rustfmt(path, msg) => {
+                write!(f, "rustfmt failed for {}: {msg}", path.display())
+            }
             Self::Registry(path, msg) => {
                 write!(
                     f,
@@ -203,7 +209,8 @@ pub fn codegen_rust(schemas_dir: &Path, out_dir: &Path) -> Result<()> {
     body.push_str(&pretty);
 
     let out_path = out_dir.join(CHIO_WIRE_V1_OUTPUT);
-    write_if_changed(&out_path, body.as_bytes())?;
+    let formatted = rustfmt_generated(&out_path, &body)?;
+    write_if_changed(&out_path, formatted.as_bytes())?;
 
     // Refresh mod.rs so the header check passes on a fresh clone.
     // mod.rs intentionally does not re-export `chio_wire_v1`; the generated
@@ -239,7 +246,40 @@ pub fn render_chio_wire_v1(schemas_dir: &Path) -> Result<String> {
     body.push_str(GENERATED_HEADER);
     body.push('\n');
     body.push_str(&pretty);
-    Ok(body)
+    rustfmt_generated(Path::new(CHIO_WIRE_V1_OUTPUT), &body)
+}
+
+pub(crate) fn rustfmt_generated(path: &Path, source: &str) -> Result<String> {
+    let mut child = Command::new("rustfmt")
+        .args(["--emit", "stdout", "--edition", "2021"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| CodegenError::Io(PathBuf::from("rustfmt"), err))?;
+
+    let Some(mut stdin) = child.stdin.take() else {
+        return Err(CodegenError::Rustfmt(
+            path.to_path_buf(),
+            "stdin unavailable".to_string(),
+        ));
+    };
+    stdin
+        .write_all(source.as_bytes())
+        .map_err(|err| CodegenError::Io(PathBuf::from("rustfmt stdin"), err))?;
+    drop(stdin);
+
+    let output = child
+        .wait_with_output()
+        .map_err(|err| CodegenError::Io(PathBuf::from("rustfmt"), err))?;
+    if !output.status.success() {
+        return Err(CodegenError::Rustfmt(
+            path.to_path_buf(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ));
+    }
+    String::from_utf8(output.stdout)
+        .map_err(|err| CodegenError::Rustfmt(path.to_path_buf(), err.to_string()))
 }
 
 fn render_schema_modules(
@@ -796,6 +836,11 @@ mod tests {
             rendered.matches("pub struct ChioReceiptRecord {\n").count(),
             1,
             "the referenced receipt root schema must be emitted once"
+        );
+        assert_eq!(
+            rustfmt_generated(Path::new(CHIO_WIRE_V1_OUTPUT), &rendered)?,
+            rendered,
+            "wire bindings must already match rustfmt output"
         );
         Ok(())
     }
