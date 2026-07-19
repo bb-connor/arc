@@ -5,8 +5,8 @@ use chio_core::{sha256_hex, StoreMutationFence};
 use chio_fiscal::{
     fee_schedule::SignedOpenMarketFeeSchedule, FiscalActivationTarget, FiscalAuthorityState,
     FiscalCharterRegistry, FiscalDomain, FiscalGenesisPolicy, FiscalParams,
-    FiscalProposalAdmissionState, FiscalProposalAdmissionStatus, FiscalScheduleHead,
-    FiscalStagedTransition, VerifiedFiscalActivation, VerifiedFiscalApproval,
+    FiscalProposalAdmissionState, FiscalProposalAdmissionStatus, FiscalRuntimeAdapterRegistry,
+    FiscalScheduleHead, FiscalStagedTransition, VerifiedFiscalActivation, VerifiedFiscalApproval,
     VerifiedFiscalCharter, VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint,
     VerifiedFiscalProposal, VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
 };
@@ -510,6 +510,87 @@ impl SqliteFiscalStore {
         )?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)
+    }
+
+    pub fn load_genesis_policy(&self) -> Result<FiscalGenesisPolicy, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let (policy_id, policy_digest, policy_json) = transaction
+            .query_row(
+                "SELECT policy_id, policy_digest, policy_json FROM fiscal_genesis_policies",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Vec<u8>>(2)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .ok_or(FiscalStoreError::NotFound)?;
+        let policy: FiscalGenesisPolicy =
+            serde_json::from_slice(&policy_json).map_err(|error| {
+                invariant(format!("stored fiscal genesis policy is invalid: {error}"))
+            })?;
+        if canonical_json_bytes(&policy).map_err(canonical_error)? != policy_json
+            || policy.policy_id != policy_id
+            || policy.digest()? != policy_digest
+        {
+            return Err(invariant("stored fiscal genesis policy binding is invalid"));
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(policy)
+    }
+
+    pub fn load_charter_registry(&self) -> Result<FiscalCharterRegistry, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let mut statement = transaction
+            .prepare("SELECT signed_json FROM fiscal_charters ORDER BY charter_sequence")
+            .map_err(sqlite_error)?;
+        let signed = statement
+            .query_map([], |row| row.get::<_, Vec<u8>>(0))
+            .map_err(sqlite_error)?
+            .map(|row| {
+                let bytes = row.map_err(sqlite_error)?;
+                Ok(VerifiedFiscalCharter::from_canonical_bytes(&bytes)?
+                    .signed()
+                    .clone())
+            })
+            .collect::<Result<Vec<_>, FiscalStoreError>>()?;
+        drop(statement);
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(FiscalCharterRegistry::new(signed)?)
+    }
+
+    pub fn load_runtime_readiness(
+        &self,
+        readiness_digest: &str,
+        policy: &FiscalGenesisPolicy,
+    ) -> Result<VerifiedFiscalRuntimeReadiness, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let (registry_json, signed_json) = transaction
+            .query_row(
+                "SELECT registry_json, signed_json FROM fiscal_runtime_readiness WHERE readiness_digest = ?1",
+                [readiness_digest],
+                |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?)),
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .ok_or(FiscalStoreError::NotFound)?;
+        let registry = FiscalRuntimeAdapterRegistry::from_canonical_bytes(&registry_json)?;
+        let readiness =
+            VerifiedFiscalRuntimeReadiness::from_canonical_bytes(&signed_json, policy, registry)?;
+        if readiness.digest() != readiness_digest {
+            return Err(invariant(
+                "stored fiscal runtime readiness digest is invalid",
+            ));
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(readiness)
     }
 
     pub fn persist_approval(

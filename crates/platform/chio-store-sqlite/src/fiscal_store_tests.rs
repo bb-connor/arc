@@ -657,9 +657,25 @@ fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
     drop(authority);
 
     let reopened = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let reopened_store = reopened.fiscal_store();
+    assert_eq!(reopened_store.load_authority_state()?, fixture.authority);
+    assert_eq!(reopened_store.load_genesis_policy()?, fixture.policy);
     assert_eq!(
-        reopened.fiscal_store().load_authority_state()?,
-        fixture.authority
+        reopened_store
+            .load_charter_registry()?
+            .resolve(
+                fixture.charter.body().charter_id.as_str(),
+                fixture.charter.digest()
+            )?
+            .signed(),
+        fixture.charter.signed()
+    );
+    let readiness =
+        reopened_store.load_runtime_readiness(fixture.readiness.digest(), &fixture.policy)?;
+    assert_eq!(readiness.digest(), fixture.readiness.digest());
+    assert_eq!(
+        readiness.runtime_registry(),
+        fixture.readiness.runtime_registry()
     );
     Ok(())
 }

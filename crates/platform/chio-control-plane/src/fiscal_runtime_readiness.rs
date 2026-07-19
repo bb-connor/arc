@@ -71,6 +71,22 @@ impl FiscalRuntimeAssembler {
         Ok(Self { integrations })
     }
 
+    pub fn self_test_and_build_registry(
+        &self,
+        build_id: impl Into<String>,
+        schema_version: impl Into<String>,
+    ) -> Result<FiscalRuntimeAdapterRegistry, FiscalRuntimeReadinessError> {
+        self.run_self_tests()?;
+        Ok(FiscalRuntimeAdapterRegistry::new(
+            build_id.into(),
+            schema_version.into(),
+            self.integrations
+                .iter()
+                .map(|integration| integration.descriptor.clone())
+                .collect(),
+        )?)
+    }
+
     pub fn self_test_and_sign(
         &self,
         policy: &FiscalGenesisPolicy,
@@ -80,20 +96,7 @@ impl FiscalRuntimeAssembler {
         build_id: impl Into<String>,
         schema_version: impl Into<String>,
     ) -> Result<VerifiedFiscalRuntimeReadiness, FiscalRuntimeReadinessError> {
-        for integration in &self.integrations {
-            (integration.self_test)().map_err(|detail| FiscalRuntimeReadinessError::SelfTest {
-                id: integration.descriptor.id.clone(),
-                detail,
-            })?;
-        }
-        let registry = FiscalRuntimeAdapterRegistry::new(
-            build_id.into(),
-            schema_version.into(),
-            self.integrations
-                .iter()
-                .map(|integration| integration.descriptor.clone())
-                .collect(),
-        )?;
+        let registry = self.self_test_and_build_registry(build_id, schema_version)?;
         let signed = FiscalRuntimeReadinessBuilder {
             readiness_sequence,
             runtime_registry: registry.clone(),
@@ -103,6 +106,16 @@ impl FiscalRuntimeAssembler {
         Ok(VerifiedFiscalRuntimeReadiness::verify(
             signed, policy, registry,
         )?)
+    }
+
+    fn run_self_tests(&self) -> Result<(), FiscalRuntimeReadinessError> {
+        for integration in &self.integrations {
+            (integration.self_test)().map_err(|detail| FiscalRuntimeReadinessError::SelfTest {
+                id: integration.descriptor.id.clone(),
+                detail,
+            })?;
+        }
+        Ok(())
     }
 }
 
@@ -130,6 +143,8 @@ mod tests {
     #[test]
     fn assembler_self_tests_all_seven_and_signs_the_exact_registry() -> TestResult {
         let assembler = FiscalRuntimeAssembler::new(integrations()?)?;
+        let assembled =
+            assembler.self_test_and_build_registry("build-1", "chio.fiscal.runtime.v1")?;
         let readiness = assembler.self_test_and_sign(
             &policy()?,
             &Keypair::from_seed(&[8; 32]),
@@ -146,6 +161,7 @@ mod tests {
             readiness.body().runtime_registry_digest,
             readiness.runtime_registry().digest()?
         );
+        assert_eq!(readiness.runtime_registry(), &assembled);
         Ok(())
     }
 
