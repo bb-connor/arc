@@ -66,6 +66,15 @@ CREATE TABLE IF NOT EXISTS fiscal_proposal_admissions (
     state_json BLOB NOT NULL CHECK (length(state_json) BETWEEN 1 AND 4194304)
 );
 
+CREATE TABLE IF NOT EXISTS fiscal_admission_sequence (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    current_sequence INTEGER NOT NULL CHECK (current_sequence >= 0)
+);
+
+INSERT OR IGNORE INTO fiscal_admission_sequence (singleton, current_sequence)
+SELECT 1, COALESCE(MAX(CAST(json_extract(state_json, '$.signedAdmission.body.admissionSequence') AS INTEGER)), 0)
+FROM fiscal_proposal_admissions;
+
 CREATE TABLE IF NOT EXISTS fiscal_approvals (
     approval_id TEXT PRIMARY KEY CHECK (
         length(approval_id) = 64 AND approval_id NOT GLOB '*[^0-9a-f]*'

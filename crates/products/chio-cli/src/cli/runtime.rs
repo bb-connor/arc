@@ -1265,6 +1265,9 @@ pub(crate) fn cmd_trust_serve(
     fiscal_genesis_policy: Option<&Path>,
     fiscal_anchor_url: Option<&str>,
     fiscal_anchor_token: Option<&str>,
+    fiscal_admission_authority_id: &str,
+    fiscal_admission_signer_key_epoch: u64,
+    fiscal_admission_signing_seed: Option<&Path>,
     fiscal_anchor_timeout_seconds: u64,
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
@@ -1301,19 +1304,23 @@ pub(crate) fn cmd_trust_serve(
         fiscal_genesis_policy,
         fiscal_anchor_url,
         fiscal_anchor_token,
+        fiscal_admission_signing_seed,
     ) {
-        (Some(policy), Some(anchor_url), Some(anchor_token)) => Some(
+        (Some(policy), Some(anchor_url), Some(anchor_token), Some(admission_seed)) => Some(
             trust_control::TrustFiscalRuntimeConfig::from_policy_file(
                 policy,
                 anchor_url.to_owned(),
                 anchor_token.to_owned(),
                 std::time::Duration::from_secs(fiscal_anchor_timeout_seconds),
+                fiscal_admission_authority_id.to_owned(),
+                fiscal_admission_signer_key_epoch,
+                admission_seed.to_path_buf(),
             )?,
         ),
-        (None, None, None) => None,
+        (None, None, None, None) => None,
         _ => {
             return Err(CliError::cli_other_error(
-                "fiscal runtime requires --fiscal-genesis-policy, --fiscal-anchor-url, and --fiscal-anchor-token together"
+                "fiscal runtime requires --fiscal-genesis-policy, --fiscal-anchor-url, --fiscal-anchor-token, and --fiscal-admission-signing-seed together"
                     .to_owned(),
             ));
         }

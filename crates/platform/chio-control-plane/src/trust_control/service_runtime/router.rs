@@ -171,6 +171,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         )
         .route(FISCAL_PROPOSALS_PATH, post(handle_fiscal_proposal_persist))
         .route(
+            FISCAL_PROPOSAL_ADMIT_PATH,
+            post(handle_fiscal_proposal_admit),
+        )
+        .route(FISCAL_APPROVALS_PATH, post(handle_fiscal_approval_persist))
+        .route(
             FISCAL_PROPOSAL_PREVIEW_PATH,
             post(handle_fiscal_proposal_preview),
         )

@@ -1,8 +1,11 @@
 use super::*;
+use chio_core::crypto::Keypair;
 use chio_fiscal::{
-    FiscalGenesisPolicy, FiscalProposalTarget, FiscalRuntimeAdapterRegistry, FiscalScheduleHead,
-    FiscalStateAnchor, SignedFiscalProposal, VerifiedFiscalCharter, VerifiedFiscalProposal,
-    VerifiedFiscalSchedule,
+    FiscalAdmissionAuthority, FiscalAdmissionTrustRegistry, FiscalGenesisPolicy,
+    FiscalProposalTarget, FiscalRuntimeAdapterRegistry, FiscalScheduleHead, FiscalStateAnchor,
+    SignedFiscalApproval, SignedFiscalProposal, SignedFiscalProposalAdmission,
+    VerifiedFiscalApproval, VerifiedFiscalCharter, VerifiedFiscalProposal,
+    VerifiedFiscalProposalAdmission, VerifiedFiscalSchedule,
 };
 use chio_kernel::admission_operation::StoreMutationFence;
 use chio_store_sqlite::fiscal_store::SqliteFiscalStore;
@@ -19,14 +22,17 @@ pub(crate) struct TrustFiscalRuntime {
     anchor: Arc<dyn FiscalStateAnchor>,
     policy: FiscalGenesisPolicy,
     registry: FiscalRuntimeAdapterRegistry,
+    admission_authority_id: String,
+    admission_signer_key_epoch: u64,
+    admission_signer: Keypair,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum TrustFiscalOperationError {
     #[error("{0}")]
     Startup(String),
-    #[error("invalid fiscal proposal: {0}")]
-    InvalidProposal(#[source] chio_fiscal::FiscalError),
+    #[error("invalid fiscal artifact: {0}")]
+    InvalidArtifact(#[source] chio_fiscal::FiscalError),
     #[error("fiscal persistence failed: {0}")]
     Store(#[source] chio_store_sqlite::fiscal_store::FiscalStoreError),
 }
@@ -80,7 +86,7 @@ impl TrustFiscalRuntime {
                             .load_verified_schedule(&head.schedule_id, &startup.charters)
                             .map_err(TrustFiscalOperationError::Store)?;
                         if FiscalScheduleHead::from_signed(predecessor.signed())
-                            .map_err(TrustFiscalOperationError::InvalidProposal)?
+                            .map_err(TrustFiscalOperationError::InvalidArtifact)?
                             != *head
                         {
                             return Err(TrustFiscalOperationError::Startup(
@@ -100,7 +106,7 @@ impl TrustFiscalRuntime {
             FiscalProposalTarget::CharterRotation { .. } => None,
         };
         VerifiedFiscalProposal::verify(signed, &charter, predecessor.as_ref())
-            .map_err(TrustFiscalOperationError::InvalidProposal)
+            .map_err(TrustFiscalOperationError::InvalidArtifact)
     }
 
     pub(crate) fn persist_proposal(
@@ -140,14 +146,14 @@ impl TrustFiscalRuntime {
                     &charter,
                     predecessor.as_ref(),
                 )
-                .map_err(TrustFiscalOperationError::InvalidProposal)?;
+                .map_err(TrustFiscalOperationError::InvalidArtifact)?;
                 self.store
                     .persist_schedule(&candidate, &self.fence)
                     .map_err(TrustFiscalOperationError::Store)?;
             }
             FiscalProposalTarget::CharterRotation { successor } => {
                 let successor = VerifiedFiscalCharter::verify(successor.as_ref().clone())
-                    .map_err(TrustFiscalOperationError::InvalidProposal)?;
+                    .map_err(TrustFiscalOperationError::InvalidArtifact)?;
                 self.store
                     .persist_charter(&successor, &self.fence)
                     .map_err(TrustFiscalOperationError::Store)?;
@@ -158,6 +164,105 @@ impl TrustFiscalRuntime {
             .map_err(TrustFiscalOperationError::Store)?;
         Ok(proposal)
     }
+
+    pub(crate) fn admit_proposal(
+        &self,
+        signed: SignedFiscalProposal,
+    ) -> Result<VerifiedFiscalProposalAdmission, TrustFiscalOperationError> {
+        let startup = self
+            .reconcile()
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let proposal = self.verify_proposal_at(signed, &startup)?;
+        let charter = current_charter(&startup)
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let admitted_at = trusted_now(&startup)?;
+        self.store
+            .admit_proposal(
+                &proposal,
+                &charter,
+                &self.admission_authority_id,
+                self.admission_signer_key_epoch,
+                &self.admission_signer,
+                admitted_at,
+                &self.fence,
+            )
+            .map_err(TrustFiscalOperationError::Store)
+    }
+
+    pub(crate) fn persist_approval(
+        &self,
+        signed_proposal: SignedFiscalProposal,
+        signed_admission: SignedFiscalProposalAdmission,
+        signed_approval: SignedFiscalApproval,
+    ) -> Result<VerifiedFiscalApproval, TrustFiscalOperationError> {
+        let startup = self
+            .reconcile()
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let proposal = self.verify_proposal_at(signed_proposal, &startup)?;
+        let charter = current_charter(&startup)
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let verify_at = trusted_now(&startup)?;
+        let trust = self.admission_trust(&charter)?;
+        let admission = VerifiedFiscalProposalAdmission::verify(
+            signed_admission,
+            &proposal,
+            &charter,
+            &trust,
+            verify_at,
+        )
+        .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+        let retained = self
+            .store
+            .load_admission_state(&admission.body().admission_id)
+            .map_err(TrustFiscalOperationError::Store)?;
+        if retained.signed_admission != *admission.signed()
+            || retained.admission_digest != admission.digest()
+            || retained.status != chio_fiscal::FiscalProposalAdmissionStatus::Admitted
+        {
+            return Err(TrustFiscalOperationError::Store(
+                chio_store_sqlite::fiscal_store::FiscalStoreError::Conflict,
+            ));
+        }
+        let approval = VerifiedFiscalApproval::verify(
+            signed_approval,
+            &proposal,
+            &admission,
+            &charter,
+            verify_at,
+        )
+        .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+        self.store
+            .persist_approval(&approval, &self.fence)
+            .map_err(TrustFiscalOperationError::Store)?;
+        Ok(approval)
+    }
+
+    fn admission_trust(
+        &self,
+        charter: &VerifiedFiscalCharter,
+    ) -> Result<FiscalAdmissionTrustRegistry, TrustFiscalOperationError> {
+        FiscalAdmissionTrustRegistry::new(vec![FiscalAdmissionAuthority::new(
+            charter.body().governing_operator_id.clone(),
+            self.admission_authority_id.clone(),
+            self.admission_signer_key_epoch,
+            self.admission_signer.public_key(),
+        )
+        .map_err(TrustFiscalOperationError::InvalidArtifact)?])
+        .map_err(TrustFiscalOperationError::InvalidArtifact)
+    }
+}
+
+fn trusted_now(startup: &FiscalRuntimeStartup) -> Result<u64, TrustFiscalOperationError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?
+        .as_secs();
+    if now < startup.checkpoint.body().trusted_clock_high_water {
+        return Err(TrustFiscalOperationError::Startup(
+            "system clock is below the anchored fiscal high-water mark".to_owned(),
+        ));
+    }
+    Ok(now)
 }
 
 fn current_charter(startup: &FiscalRuntimeStartup) -> Result<VerifiedFiscalCharter, CliError> {
@@ -210,6 +315,14 @@ fn compose_trust_fiscal_runtime_with_anchor(
             )
         })
         .map_err(fiscal_startup_error)?;
+    let seed_hex =
+        std::fs::read_to_string(&config.admission_signing_seed_path).map_err(|error| {
+            fiscal_startup_error(format!(
+                "failed to read fiscal admission signing seed {}: {error}",
+                config.admission_signing_seed_path.display()
+            ))
+        })?;
+    let admission_signer = Keypair::from_seed_hex(seed_hex.trim()).map_err(fiscal_startup_error)?;
     reconcile_fiscal_runtime_startup(
         &store,
         anchor.as_ref(),
@@ -224,6 +337,9 @@ fn compose_trust_fiscal_runtime_with_anchor(
         anchor,
         policy: config.genesis_policy.clone(),
         registry,
+        admission_authority_id: config.admission_authority_id.clone(),
+        admission_signer_key_epoch: config.admission_signer_key_epoch,
+        admission_signer,
     }))
 }
 
@@ -339,11 +455,19 @@ mod tests {
             &checkpoint,
             &authority.mutation_fence(),
         )?;
+        let admission_seed_path = temp.path().join("fiscal-admission.seed");
+        std::fs::write(
+            &admission_seed_path,
+            format!("{}\n", Keypair::from_seed(&[7; 32]).seed_hex()),
+        )?;
         let config = TrustFiscalRuntimeConfig {
             genesis_policy: policy,
             anchor_url: "https://fiscal-anchor.example".to_owned(),
             anchor_bearer_token: "fixture-token".to_owned(),
             anchor_timeout: Duration::from_secs(1),
+            admission_authority_id: "fiscal-admission".to_owned(),
+            admission_signer_key_epoch: 1,
+            admission_signing_seed_path: admission_seed_path,
         };
 
         let runtime = compose_trust_fiscal_runtime_with_anchor(

@@ -2,14 +2,16 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::{sha256_hex, StoreMutationFence};
+use chio_core::{sha256_hex, Keypair, StoreMutationFence};
 use chio_fiscal::{
-    fee_schedule::SignedOpenMarketFeeSchedule, FiscalActivationTarget, FiscalAuthorityState,
-    FiscalCharterRegistry, FiscalDomain, FiscalGenesisPolicy, FiscalParams,
+    fee_schedule::SignedOpenMarketFeeSchedule, FiscalActivationTarget, FiscalAdmissionAuthority,
+    FiscalAdmissionTrustRegistry, FiscalAuthorityState, FiscalCharterRegistry, FiscalDomain,
+    FiscalGenesisPolicy, FiscalParams, FiscalProposalAdmissionBuilder,
     FiscalProposalAdmissionState, FiscalProposalAdmissionStatus, FiscalRuntimeAdapterRegistry,
     FiscalScheduleHead, FiscalStagedTransition, VerifiedFiscalActivation, VerifiedFiscalApproval,
     VerifiedFiscalCharter, VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint,
-    VerifiedFiscalProposal, VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
+    VerifiedFiscalProposal, VerifiedFiscalProposalAdmission, VerifiedFiscalRuntimeReadiness,
+    VerifiedFiscalSchedule,
 };
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::Serialize;
@@ -17,7 +19,7 @@ use serde::Serialize;
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 const FISCAL_STORE_SCHEMA_KEY: &str = "fiscal";
-pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 5;
+pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 6;
 const FISCAL_STORE_SCHEMA: &str = include_str!("fiscal_store.sql");
 const FISCAL_GENESIS_PROJECTION_KEY: &str = "authority";
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -355,6 +357,124 @@ impl SqliteFiscalStore {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn admit_proposal(
+        &self,
+        proposal: &VerifiedFiscalProposal,
+        current_charter: &VerifiedFiscalCharter,
+        admission_authority_id: &str,
+        signer_key_epoch: u64,
+        signer: &Keypair,
+        admitted_at: u64,
+        fence: &StoreMutationFence,
+    ) -> Result<VerifiedFiscalProposalAdmission, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection, fence)?;
+        let proposal_present = transaction
+            .query_row(
+                "SELECT proposal_digest = ?1 AND signed_json = ?2 FROM fiscal_proposals WHERE proposal_id = ?3",
+                params![
+                    proposal.digest(),
+                    canonical_json_bytes(proposal.signed()).map_err(canonical_error)?,
+                    &proposal.body().proposal_id,
+                ],
+                |row| row.get::<_, bool>(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .unwrap_or(false);
+        let charter_present = transaction
+            .query_row(
+                "SELECT charter_digest = ?1 AND signed_json = ?2 AND lifecycle_state IN ('pinned', 'active') FROM fiscal_charters WHERE charter_id = ?3",
+                params![
+                    current_charter.digest(),
+                    current_charter.canonical_bytes()?,
+                    &current_charter.body().charter_id,
+                ],
+                |row| row.get::<_, bool>(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .unwrap_or(false);
+        let proposal_already_admitted = transaction
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM fiscal_proposal_admissions WHERE json_extract(state_json, '$.signedAdmission.body.proposalId') = ?1)",
+                [&proposal.body().proposal_id],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(sqlite_error)?;
+        if !proposal_present || !charter_present || proposal_already_admitted {
+            return Err(FiscalStoreError::Conflict);
+        }
+        let current_sequence = transaction
+            .query_row(
+                "SELECT current_sequence FROM fiscal_admission_sequence WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(sqlite_error)?;
+        let admission_sequence = u64::try_from(current_sequence)
+            .map_err(|_| invariant("fiscal admission sequence is negative"))?
+            .checked_add(1)
+            .ok_or_else(|| invariant("fiscal admission sequence overflow"))?;
+        let signed = FiscalProposalAdmissionBuilder {
+            admission_sequence,
+            admitted_at,
+            admission_authority_id: admission_authority_id.to_owned(),
+            signer_key_epoch,
+        }
+        .sign(proposal, current_charter, signer)?;
+        let trust = FiscalAdmissionTrustRegistry::new(vec![FiscalAdmissionAuthority::new(
+            current_charter.body().governing_operator_id.clone(),
+            admission_authority_id.to_owned(),
+            signer_key_epoch,
+            signer.public_key(),
+        )?])?;
+        let admission = VerifiedFiscalProposalAdmission::verify(
+            signed,
+            proposal,
+            current_charter,
+            &trust,
+            admitted_at,
+        )?;
+        let state = FiscalProposalAdmissionState::admitted(&admission);
+        let state_json = canonical_json_bytes(&state).map_err(canonical_error)?;
+        let sequence_updated = transaction
+            .execute(
+                "UPDATE fiscal_admission_sequence SET current_sequence = ?1 WHERE singleton = 1 AND current_sequence = ?2",
+                params![
+                    sqlite_i64(admission_sequence, "admission sequence")?,
+                    current_sequence,
+                ],
+            )
+            .map_err(sqlite_error)?;
+        let admission_inserted = transaction
+            .execute(
+                "INSERT INTO fiscal_proposal_admissions (admission_id, admission_digest, admitted_at, status, state_version, state_json) VALUES (?1, ?2, ?3, 'admitted', 1, ?4)",
+                params![
+                    &admission.body().admission_id,
+                    admission.digest(),
+                    sqlite_i64(admitted_at, "admitted_at")?,
+                    &state_json,
+                ],
+            )
+            .map_err(sqlite_error)?;
+        if sequence_updated != 1 || admission_inserted != 1 {
+            return Err(FiscalStoreError::Conflict);
+        }
+        append_projection_commit(
+            &transaction,
+            &self.serving_owner,
+            &format!("admission:{}", admission.body().admission_id),
+            1,
+            "admit_fiscal_proposal",
+            &sha256_hex(&state_json),
+        )?;
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        Ok(admission)
+    }
+
     pub fn persist_charter(
         &self,
         charter: &VerifiedFiscalCharter,
@@ -674,6 +794,48 @@ impl SqliteFiscalStore {
         )
     }
 
+    pub fn load_admission_state(
+        &self,
+        admission_id: &str,
+    ) -> Result<FiscalProposalAdmissionState, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let (digest, status, version, json) = transaction
+            .query_row(
+                "SELECT admission_digest, status, state_version, state_json FROM fiscal_proposal_admissions WHERE admission_id = ?1",
+                [admission_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, Vec<u8>>(3)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .ok_or(FiscalStoreError::NotFound)?;
+        let state: FiscalProposalAdmissionState =
+            serde_json::from_slice(&json).map_err(|error| {
+                invariant(format!("stored fiscal admission state is invalid: {error}"))
+            })?;
+        let expected_status = match state.status {
+            FiscalProposalAdmissionStatus::Admitted => "admitted",
+            FiscalProposalAdmissionStatus::Activated => "activated",
+        };
+        if canonical_json_bytes(&state).map_err(canonical_error)? != json
+            || state.signed_admission.body.admission_id != admission_id
+            || state.admission_digest != digest
+            || expected_status != status
+            || sqlite_i64(state.version, "admission state version")? != version
+        {
+            return Err(invariant("stored fiscal admission binding is invalid"));
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(state)
+    }
+
     pub fn persist_activation(
         &self,
         activation: &VerifiedFiscalActivation,
@@ -871,6 +1033,33 @@ impl SqliteFiscalStore {
         };
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, fence)?;
+        if expected_version.is_none() {
+            let current_sequence = transaction
+                .query_row(
+                    "SELECT current_sequence FROM fiscal_admission_sequence WHERE singleton = 1",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(sqlite_error)?;
+            let expected_sequence = u64::try_from(current_sequence)
+                .map_err(|_| invariant("fiscal admission sequence is negative"))?
+                .checked_add(1)
+                .ok_or_else(|| invariant("fiscal admission sequence overflow"))?;
+            if state.signed_admission.body.admission_sequence != expected_sequence
+                || transaction
+                    .execute(
+                        "UPDATE fiscal_admission_sequence SET current_sequence = ?1 WHERE singleton = 1 AND current_sequence = ?2",
+                        params![
+                            sqlite_i64(expected_sequence, "admission sequence")?,
+                            current_sequence,
+                        ],
+                    )
+                    .map_err(sqlite_error)?
+                    != 1
+            {
+                return Err(FiscalStoreError::Conflict);
+            }
+        }
         let changed = match expected_version {
             None => transaction.execute(
                 "INSERT INTO fiscal_proposal_admissions (admission_id, admission_digest, admitted_at, status, state_version, state_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",

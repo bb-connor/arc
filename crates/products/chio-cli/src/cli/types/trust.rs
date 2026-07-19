@@ -79,7 +79,14 @@ pub(crate) enum TrustCommands {
         certification_discovery_file: Option<PathBuf>,
 
         /// Pinned fiscal genesis policy JSON loaded before the service binds.
-        #[arg(long, requires_all = ["fiscal_anchor_url", "fiscal_anchor_token"])]
+        #[arg(
+            long,
+            requires_all = [
+                "fiscal_anchor_url",
+                "fiscal_anchor_token",
+                "fiscal_admission_signing_seed"
+            ]
+        )]
         fiscal_genesis_policy: Option<PathBuf>,
 
         /// Independent HTTPS fiscal continuity anchor base URL.
@@ -94,6 +101,25 @@ pub(crate) enum TrustCommands {
             requires_all = ["fiscal_genesis_policy", "fiscal_anchor_url"]
         )]
         fiscal_anchor_token: Option<String>,
+
+        /// Stable identifier for the local durable fiscal admission authority.
+        #[arg(long, default_value = "fiscal-admission")]
+        fiscal_admission_authority_id: String,
+
+        /// Monotonic key epoch for the fiscal admission signing key.
+        #[arg(long, default_value_t = 1)]
+        fiscal_admission_signer_key_epoch: u64,
+
+        /// Existing private seed file used to sign durable fiscal admissions.
+        #[arg(
+            long,
+            requires_all = [
+                "fiscal_genesis_policy",
+                "fiscal_anchor_url",
+                "fiscal_anchor_token"
+            ]
+        )]
+        fiscal_admission_signing_seed: Option<PathBuf>,
 
         /// Fiscal continuity anchor request timeout in seconds.
         #[arg(long, default_value_t = 5)]

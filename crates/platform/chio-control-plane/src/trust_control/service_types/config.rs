@@ -6,6 +6,9 @@ pub struct TrustFiscalRuntimeConfig {
     pub anchor_url: String,
     pub anchor_bearer_token: String,
     pub anchor_timeout: Duration,
+    pub admission_authority_id: String,
+    pub admission_signer_key_epoch: u64,
+    pub admission_signing_seed_path: PathBuf,
 }
 
 impl std::fmt::Debug for TrustFiscalRuntimeConfig {
@@ -16,6 +19,15 @@ impl std::fmt::Debug for TrustFiscalRuntimeConfig {
             .field("anchor_url", &self.anchor_url)
             .field("anchor_bearer_token", &"[REDACTED]")
             .field("anchor_timeout", &self.anchor_timeout)
+            .field("admission_authority_id", &self.admission_authority_id)
+            .field(
+                "admission_signer_key_epoch",
+                &self.admission_signer_key_epoch,
+            )
+            .field(
+                "admission_signing_seed_path",
+                &self.admission_signing_seed_path,
+            )
             .finish()
     }
 }
@@ -26,6 +38,9 @@ impl TrustFiscalRuntimeConfig {
         anchor_url: String,
         anchor_bearer_token: String,
         anchor_timeout: Duration,
+        admission_authority_id: String,
+        admission_signer_key_epoch: u64,
+        admission_signing_seed_path: PathBuf,
     ) -> Result<Self, CliError> {
         let bytes = std::fs::read(policy_path).map_err(|error| {
             CliError::cli_other_error(format!(
@@ -44,6 +59,9 @@ impl TrustFiscalRuntimeConfig {
             anchor_url,
             anchor_bearer_token,
             anchor_timeout,
+            admission_authority_id,
+            admission_signer_key_epoch,
+            admission_signing_seed_path,
         })
     }
 }
@@ -146,6 +164,14 @@ impl TrustServiceConfig {
                 ));
             }
             validate_control_secret(&fiscal.anchor_bearer_token, "fiscal anchor bearer token")?;
+            if fiscal.admission_authority_id.trim().is_empty()
+                || fiscal.admission_authority_id.trim() != fiscal.admission_authority_id
+                || fiscal.admission_signer_key_epoch == 0
+            {
+                return Err(CliError::cli_other_error(
+                    "fiscal admission authority configuration is invalid".to_string(),
+                ));
+            }
         }
         let mut database_paths = Vec::new();
         for (label, path) in [
@@ -242,6 +268,9 @@ mod service_config_tests {
             "https://fiscal-anchor.example".to_owned(),
             "fiscal-anchor-token".to_owned(),
             Duration::from_secs(5),
+            "fiscal-admission".to_owned(),
+            1,
+            PathBuf::from("fiscal-admission.seed"),
         )
         .test_expect("fiscal fixture config")
     }

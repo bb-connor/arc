@@ -630,6 +630,29 @@ fn fiscal_schema_migrates_atomic_charter_rotation_tables() -> TestResult {
 }
 
 #[test]
+fn fiscal_schema_migrates_durable_admission_sequence() -> TestResult {
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    initialize_fiscal_schema(&mut connection)?;
+    connection.execute(
+        "UPDATE chio_store_schema_versions SET version = 5 WHERE store_key = 'fiscal'",
+        [],
+    )?;
+    connection.execute("DROP TABLE fiscal_admission_sequence", [])?;
+
+    initialize_fiscal_schema(&mut connection)?;
+
+    assert_eq!(
+        connection.query_row(
+            "SELECT current_sequence FROM fiscal_admission_sequence WHERE singleton = 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?,
+        0
+    );
+    Ok(())
+}
+
+#[test]
 fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
@@ -677,6 +700,72 @@ fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
         readiness.runtime_registry(),
         fixture.readiness.runtime_registry()
     );
+    Ok(())
+}
+
+#[test]
+fn fiscal_admission_is_store_assigned_and_one_per_proposal() -> TestResult {
+    let files = store_fixture()?;
+    let fixture = fiscal_fixture()?;
+    let activation = fiscal_activation_fixture(&fixture)?;
+    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let fence = authority.mutation_fence();
+    let store = authority.fiscal_store();
+    store.initialize_genesis(
+        &fixture.policy,
+        &fixture.authority,
+        &fixture.charter,
+        &fixture.readiness,
+        &fixture.genesis,
+        &fence,
+    )?;
+    store.persist_schedule(&activation.schedule, &fence)?;
+    store.persist_proposal(&activation.proposal, &fence)?;
+
+    let admission = store.admit_proposal(
+        &activation.proposal,
+        &fixture.charter,
+        "local-admission",
+        1,
+        &key(7),
+        55,
+        &fence,
+    )?;
+
+    assert_eq!(admission.body().admission_sequence, 1);
+    assert_eq!(admission.signed(), &activation.admitted.signed_admission);
+    assert_eq!(
+        store
+            .load_admission_state(&admission.body().admission_id)?
+            .signed_admission,
+        *admission.signed()
+    );
+    assert!(matches!(
+        store.admit_proposal(
+            &activation.proposal,
+            &fixture.charter,
+            "local-admission",
+            1,
+            &key(7),
+            56,
+            &fence,
+        ),
+        Err(FiscalStoreError::Conflict)
+    ));
+    drop(store);
+    drop(authority);
+
+    let reopened = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let connection = rusqlite::Connection::open(&files.database)?;
+    assert_eq!(
+        connection.query_row(
+            "SELECT current_sequence FROM fiscal_admission_sequence WHERE singleton = 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?,
+        1
+    );
+    drop(reopened);
     Ok(())
 }
 
