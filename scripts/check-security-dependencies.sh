@@ -71,8 +71,18 @@ security_engines = {
     "chio-decoy",
     "chio-quarantine",
 }
+required_security_packages = security_engines | {"chio-security-types"}
 pure_engines = {"chio-flow", "chio-decoy", "chio-quarantine"}
 violations = set()
+
+for package_name in sorted(required_security_packages):
+    package_ids = ids_by_name.get(package_name, set())
+    if not package_ids:
+        violations.add(f"required security package is missing: {package_name}")
+    elif len(package_ids) != 1:
+        violations.add(
+            f"required security package is not unique: {package_name} ({len(package_ids)} copies)"
+        )
 
 for source_id, source_package in packages_by_id.items():
     source_name = source_package["name"]
@@ -86,12 +96,24 @@ for source_id, source_package in packages_by_id.items():
         forbidden = False
         if package_group(source_id) in {"kernel", "guards"}:
             forbidden = destination_name in security_engines
+        if source_name == "chio-core-types":
+            forbidden = forbidden or destination_name in security_engines
+            forbidden = forbidden or destination_group in {
+                "kernel",
+                "guards",
+                "platform",
+            }
         if source_name in pure_engines:
             forbidden = forbidden or destination_group in {"kernel", "guards", "platform"}
+        if source_name == "chio-quarantine":
+            forbidden = forbidden or destination_group == "trust"
         if source_name == "chio-security-kernel" and destination_id in edges[source_id]:
             forbidden = forbidden or destination_group in {"guards", "trust", "platform"}
         if source_name == "chio-security-types" and destination_id in edges[source_id]:
             forbidden = forbidden or destination_name.startswith("chio-")
+        if source_name == "chio-store-sqlite":
+            forbidden = forbidden or destination_name in security_engines
+            forbidden = forbidden or destination_name == "chio-security-kernel"
         if forbidden:
             violations.add(
                 f"{source_name} reaches forbidden dependency {destination_name}"

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "broker-destination-rebinding-001",
+  "class": "broker_destination_rebinding",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_destination_rebinding_detected",
+  "threat_id": "ssrf_via_http_substrate",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "destination_normalization_control",
+        "package": "chio-secret-broker",
+        "test_source": "crates/security/chio-secret-broker/tests/execution.rs",
+        "target_kind": "test",
+        "target": "execution",
+        "test_name": "destination_rejects_userinfo_before_valid_normalization"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_destination_rebinding",
+        "control_id": "destination_normalization_control",
+        "package": "chio-secret-broker",
+        "source": "crates/security/chio-secret-broker/src/protocol.rs",
+        "function": "BrokerDestination::parse",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "UnaryOperator",
+          "original": "!",
+          "replacement": ""
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_destination_rebinding/mutants.out/outcomes.json",
+          "sha256": "964670a151c9013ea74032448b1b50ee7f3615ccca8265ecb30286435f02539a",
+          "inputs_sha256": "483c4376ea88204e073aa377f3baf7149b33da39bcd94e0b10df807bbb72a54e"
+        }
+      }
+    ]
+  }
+}

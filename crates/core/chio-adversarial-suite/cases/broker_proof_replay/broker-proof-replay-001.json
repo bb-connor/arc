@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "broker-proof-replay-001",
+  "class": "broker_proof_replay",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_proof_replay_detected",
+  "threat_id": "native_channel_replay",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "nonce_replay_control",
+        "package": "chio-secret-broker",
+        "test_source": "crates/security/chio-secret-broker/tests/concurrency.rs",
+        "target_kind": "test",
+        "target": "concurrency",
+        "test_name": "deterministic_attempt_conflict_precedes_exact_retry_and_concurrent_replay"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_proof_replay",
+        "control_id": "nonce_replay_control",
+        "package": "chio-secret-broker",
+        "source": "crates/security/chio-secret-broker/src/sqlite.rs",
+        "function": "register_with_initial_state",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "!=",
+          "replacement": "=="
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_proof_replay/mutants.out/outcomes.json",
+          "sha256": "6d00af831849fb803a0d601e12c43fd0cbf5ce4eb09988dba077ac3a6b4e40bf",
+          "inputs_sha256": "95f682897d1a0e64ff3e4c3c82d2e3cfd9734b94d047fe1dba94abf939d09915"
+        }
+      }
+    ]
+  }
+}

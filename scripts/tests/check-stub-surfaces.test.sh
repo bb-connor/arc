@@ -158,4 +158,32 @@ assert_rc "$(run_checker "$sidecar_deny" "$work/sidecar-deny.out" "$work/sidecar
 grep -F "crates/products/chio-api-protect/src/proxy/sidecar.rs:1" "$work/sidecar-deny.err" >/dev/null
 grep -F "production stub-surface hit is not allowlisted" "$work/sidecar-deny.err" >/dev/null
 
+cargo_vet_package_name="$work/cargo-vet-package-name"
+init_case "$cargo_vet_package_name"
+write_file "$cargo_vet_package_name/supply-chain/config.toml" \
+  "[[exemptions.bollard-stubs]]" \
+  'version = "1.47.1"' \
+  'criteria = "safe-to-deploy"' \
+  "[[exemptions.proc-macro-hack]]" \
+  'version = "0.5.20+deprecated"' \
+  'criteria = "safe-to-deploy"' \
+  "[[exemptions.vendor-hack]]" \
+  'version = "1.0.0"' \
+  'criteria = "safe-to-deploy"'
+track_case "$cargo_vet_package_name"
+assert_rc "$(run_checker "$cargo_vet_package_name" "$work/cargo-vet-package-name.out" "$work/cargo-vet-package-name.err")" 0 \
+  "cargo-vet package identifiers are metadata"
+
+cargo_vet_prose="$work/cargo-vet-prose"
+init_case "$cargo_vet_prose"
+write_file "$cargo_vet_prose/supply-chain/config.toml" \
+  "[[exemptions.reviewed-package]]" \
+  'version = "1.0.0"' \
+  'notes = "temporary hack pending replacement"'
+track_case "$cargo_vet_prose"
+assert_rc "$(run_checker "$cargo_vet_prose" "$work/cargo-vet-prose.out" "$work/cargo-vet-prose.err")" 1 \
+  "cargo-vet prose remains subject to marker detection"
+grep -F "production stub-surface hit is not allowlisted" "$work/cargo-vet-prose.err" >/dev/null
+grep -F "supply-chain/config.toml:3" "$work/cargo-vet-prose.err" >/dev/null
+
 echo "check-stub-surfaces.test.sh: all assertions passed"

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-fd-or-env-leak-001",
+  "class": "sandbox_fd_or_env_leak",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_fd_or_env_leak_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "descriptor_closure_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/tests/linux_enforcement.rs",
+        "target_kind": "test",
+        "target": "linux_enforcement",
+        "features": [
+          "real-linux-enforcement"
+        ],
+        "required_target_os": "linux",
+        "test_name": "target_exec_has_no_leaked_control_or_resource_descriptors"
+      },
+      {
+        "id": "environment_allowlist_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/src/lib_parts/part_02.rs",
+        "target_kind": "lib",
+        "test_name": "tests::environment_is_minimal_and_credentials_fail_closed"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_fd_leak",
+        "control_id": "descriptor_closure_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc",
+        "function": "close_unnamed_descriptors",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_fd_leak/mutants.out/outcomes.json",
+          "sha256": "651a9f041dcad47963cb26eeb426b903aad9c513fbaaf09a9aeebff8f2decec6",
+          "inputs_sha256": "2c349f7d9cf3f414dd3aa44a4057b878e9a6a308932a2eb7033b7077039857b9"
+        }
+      },
+      {
+        "id": "sandbox_env_leak",
+        "control_id": "environment_allowlist_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/lib_parts/part_01.rs",
+        "function": "is_credential_or_injection_name",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "false"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_env_leak/mutants.out/outcomes.json",
+          "sha256": "b45fc33d0c81689e1e92f47e7f5f191d9e08fe9f007041d33fa6d2f744ba76de",
+          "inputs_sha256": "9b758d83193c493365affcf3d7f53d5f3c2d5763696f286badfc839935e3cf8b"
+        }
+      }
+    ]
+  }
+}

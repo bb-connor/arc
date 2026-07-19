@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "rotation-partial-commit-001",
+  "class": "rotation_partial_commit",
+  "expected_verdict": "DENY",
+  "expected_reason": "rotation_partial_commit_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "atomic_rotation_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/sqlite.rs",
+        "target_kind": "test",
+        "target": "sqlite",
+        "test_name": "write_and_signing_failures_leave_no_partial_event_checkpoint_or_state"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "rotation_partial_commit",
+        "control_id": "atomic_rotation_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/sqlite_parts/part_02.rs",
+        "function": "persist_state",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/rotation_partial_commit/mutants.out/outcomes.json",
+          "sha256": "7dfbbec6d63de2f4b9556def415703daf315408211cb93a7a409a0b2590710db",
+          "inputs_sha256": "b32c942b54d8a643e4fa53955acc4a478ce87647dcf551b0da068887df72fb03"
+        }
+      }
+    ]
+  }
+}

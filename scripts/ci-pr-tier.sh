@@ -35,6 +35,7 @@ bash scripts/tests/check-security-dependencies.test.sh
 ./scripts/check-http-egress-contract.sh
 bash scripts/tests/check-http-egress-contract.test.sh
 bash scripts/tests/check-protocol-primitives-concurrency.test.sh
+bash scripts/tests/check-protocol-peer-negotiation.test.sh
 
 ./scripts/check-anchor-batch-async-witness.sh
 
@@ -61,6 +62,7 @@ cargo clippy --workspace --lib --bins --examples -- -D warnings
 cargo build --workspace
 cargo test --workspace --exclude chio-wasm-guards
 ./scripts/check-protocol-primitives-concurrency.sh
+./scripts/check-protocol-peer-negotiation.sh
 cargo test -p chio-wasm-guards --lib
 
 RUSTFLAGS="${CHIO_CI_RUSTFLAGS} -C debuginfo=0 --cfg tokio_unstable" \

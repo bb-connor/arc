@@ -50,6 +50,14 @@ assert_rc "$(run_checker "$unknown_commit" "$work/unknown-commit.out" "$work/unk
   "an unreviewed source commit fails"
 grep -F 'reviewed source commit is missing' "$work/unknown-commit.err" >/dev/null
 
+zero_markers="$work/zero-markers"
+write_file "$zero_markers/docs/security/clawdstrike-active-defense-provenance.md" \
+  "Source commit: \`$SOURCE_COMMIT\`"
+assert_rc "$(run_checker "$zero_markers" "$work/zero-markers.out" "$work/zero-markers.err")" 1 \
+  "a provenance record without adaptation markers fails"
+grep -F 'security provenance scan found no adaptation markers' \
+  "$work/zero-markers.err" >/dev/null
+
 valid="$work/valid"
 write_file "$valid/crates/security/chio-decoy/src/lifecycle.rs" \
   '// Adapted from Clawdstrike'

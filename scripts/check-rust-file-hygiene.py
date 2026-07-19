@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail on oversized hand-maintained Rust files and malformed generated Rust."""
+"""Fail on oversized hand-maintained Rust sources and malformed generated Rust."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ ERRORS_GENERATED_PREFIX = "crates/core/chio-errors/src/_generated/"
 ERRORS_GENERATED_HEADER_SOURCE = "crates/tooling/chio-spec-codegen/src/errors_pass.rs"
 ERRORS_GENERATED_HEADER_CONST_MARKER = 'const ERROR_CODES_GENERATED_HEADER: &str = "\\\n'
 TEXT_HYGIENE_PREFIXES = ("crates/", "docs/", "sdks/", "scripts/", "spec/", "xtask/")
-TEXT_HYGIENE_SUFFIXES = (".rs", ".md")
-TEXT_HYGIENE_PATTERNS = ("*.rs", "*.md")
+TEXT_HYGIENE_SUFFIXES = (".rs", ".inc", ".md")
+TEXT_HYGIENE_PATTERNS = ("*.rs", "*.inc", "*.md")
 EM_DASH = "\u2014"
 
 
@@ -252,6 +252,7 @@ def discover_rust_files(root: Path) -> list[str]:
             "--others",
             "--exclude-standard",
             "*.rs",
+            "*.inc",
         ],
         check=True,
         stdout=subprocess.PIPE,

@@ -15,43 +15,34 @@
 #      testing gate): for each
 #      `covered` row, asserts the existence of an evidence file at
 #      `audits/evidence/threats/<id>.json` recording at least one
-#      caught mutant. Rows whose evidence is missing or zero-kills
-#      get a `WEAK: <id>` downgrade hint. Bootstrap placeholders
-#      (`needs_real_run: true`) are reported as informational and
-#      do not fail the build.
+#      caught mutant. Missing evidence, zero-kill evidence, and
+#      bootstrap placeholders (`needs_real_run: true`) fail this
+#      release gate. The non-release diagnostic mode may emit weak
+#      coverage hints, but this workflow never selects that mode.
 #
 # Pending vectors auto-promoted by the fuzz-seed promoter live in
 # the corpus, not the threat list, and are excluded from this gate
 # by construction.
 #
-# Required status check name: threat-model-coverage / coverage-gate
+# Standalone check name: threat-model-coverage / coverage-gate. Pull requests
+# and pushes are enforced transitively through CI's required Security contract.
 
 name: threat-model-coverage
 
 on:
-  pull_request:
-    paths:
-      - "spec/security/chio-threat-model.v1.json"
-      - "spec/security/chio-threat-model.schema.json"
-      - "crates/tooling/chio-conformance/tests/threats/**"
-      - "crates/tooling/chio-spec-codegen/src/threat_model.rs"
-      - "scripts/check-threat-coverage.sh"
-      - "scripts/check-threat-coverage-mutants.sh"
-      - "scripts/tests/check-threat-coverage.test.sh"
-      - "scripts/tests/check-threat-coverage-mutants.test.sh"
-      - "audits/evidence/threats/**"
-      - ".github/workflows/threat-model-coverage.yml"
-  push:
-    branches:
-      - main
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "1"
+
 concurrency:
-  group: threat-model-coverage-${{ github.ref }}
-  cancel-in-progress: true
+  group: threat-model-coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   coverage-gate:

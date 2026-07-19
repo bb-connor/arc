@@ -34,7 +34,35 @@
         "scope_superset",
         "revocation_rollback",
         "anchor_grafted",
-        "sigstore_bundle_payload_mismatch"
+        "sigstore_bundle_payload_mismatch",
+        "label_downgrade",
+        "canary_evasion",
+        "temporal_evasion",
+        "containment_rollback",
+        "key_log_omission",
+        "key_log_noncontiguous_sync",
+        "key_log_inconsistent_growth",
+        "key_log_split_view",
+        "rotation_partial_commit",
+        "rotation_unwitnessed_signing",
+        "old_key_backdating",
+        "broker_secret_boundary_crossing",
+        "broker_execution_overspend",
+        "broker_parent_double_charge",
+        "broker_orphan_hold",
+        "broker_proof_replay",
+        "broker_unbound_headers",
+        "broker_destination_rebinding",
+        "broker_revocation_race",
+        "broker_plaintext_custody",
+        "sandbox_unsigned_manifest",
+        "sandbox_partial_enforcement",
+        "sandbox_symlink_escape",
+        "sandbox_path_swap",
+        "sandbox_helper_substitution",
+        "sandbox_false_exec_success",
+        "sandbox_syscall_escape",
+        "sandbox_fd_or_env_leak"
       ]
     },
     "expected_verdict": {
@@ -66,6 +94,376 @@
         "minLength": 1
       },
       "default": []
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "class": {
+            "enum": [
+              "label_downgrade",
+              "canary_evasion",
+              "temporal_evasion",
+              "containment_rollback",
+              "key_log_omission",
+              "key_log_noncontiguous_sync",
+              "key_log_inconsistent_growth",
+              "key_log_split_view",
+              "rotation_partial_commit",
+              "rotation_unwitnessed_signing",
+              "old_key_backdating",
+              "broker_secret_boundary_crossing",
+              "broker_execution_overspend",
+              "broker_parent_double_charge",
+              "broker_orphan_hold",
+              "broker_proof_replay",
+              "broker_unbound_headers",
+              "broker_destination_rebinding",
+              "broker_revocation_race",
+              "broker_plaintext_custody",
+              "sandbox_unsigned_manifest",
+              "sandbox_partial_enforcement",
+              "sandbox_symlink_escape",
+              "sandbox_path_swap",
+              "sandbox_helper_substitution",
+              "sandbox_false_exec_success",
+              "sandbox_syscall_escape",
+              "sandbox_fd_or_env_leak"
+            ]
+          }
+        },
+        "required": [
+          "class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "artifact": {
+            "$ref": "#/$defs/mutationEvidence"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "packageName": {
+      "type": "string",
+      "maxLength": 96,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "rustPath": {
+      "type": "string",
+      "pattern": "^crates/(?:(?!(?:\\.{1,2})/)[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\\.(?:rs|inc)$"
+    },
+    "testName": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*$"
+    },
+    "functionSelector": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 192,
+      "pattern": "^[A-Za-z0-9_:<>,](?:[A-Za-z0-9_:<>, ]*[A-Za-z0-9_:<>,])?$"
+    },
+    "mutationControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "package",
+        "test_source",
+        "target_kind",
+        "test_name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/safeId"
+        },
+        "package": {
+          "$ref": "#/$defs/packageName"
+        },
+        "test_source": {
+          "$ref": "#/$defs/rustPath"
+        },
+        "target_kind": {
+          "type": "string",
+          "enum": [
+            "lib",
+            "test"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "maxLength": 96,
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "features": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/packageName"
+          }
+        },
+        "required_target_os": {
+          "type": "string",
+          "const": "linux"
+        },
+        "test_name": {
+          "$ref": "#/$defs/testName"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "target_kind": {
+                "const": "test"
+              }
+            },
+            "required": [
+              "target_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "target"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "target_kind": {
+                "const": "lib"
+              }
+            },
+            "required": [
+              "target_kind"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "target"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "mutationOutcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "dependentRequired": {
+        "sha256": [
+          "inputs_sha256"
+        ],
+        "inputs_sha256": [
+          "sha256"
+        ]
+      },
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^audits/evidence/mutants/security/[a-z][a-z0-9_]*/mutants\\.out/outcomes\\.json$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputs_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "mutationSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "genre",
+        "replacement"
+      ],
+      "properties": {
+        "genre": {
+          "type": "string",
+          "enum": [
+            "FnValue",
+            "BinaryOperator",
+            "UnaryOperator"
+          ]
+        },
+        "original": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 192,
+          "pattern": "^[ -~]+$"
+        },
+        "replacement": {
+          "type": "string",
+          "maxLength": 192,
+          "pattern": "^[ -~]*$"
+        },
+        "occurrence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 192,
+          "pattern": "^[ -~]+$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "genre": {
+                "const": "FnValue"
+              }
+            },
+            "required": [
+              "genre"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "original"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "original"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "genre": {
+                "const": "UnaryOperator"
+              }
+            },
+            "required": [
+              "genre"
+            ]
+          },
+          "then": {
+            "properties": {
+              "replacement": {
+                "const": ""
+              }
+            }
+          }
+        }
+      ]
+    },
+    "mutationCampaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "control_id",
+        "package",
+        "source",
+        "function",
+        "minimum_caught",
+        "outcomes"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/safeId"
+        },
+        "control_id": {
+          "$ref": "#/$defs/safeId"
+        },
+        "package": {
+          "$ref": "#/$defs/packageName"
+        },
+        "source": {
+          "$ref": "#/$defs/rustPath"
+        },
+        "function": {
+          "$ref": "#/$defs/functionSelector"
+        },
+        "minimum_caught": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "mutant": {
+          "$ref": "#/$defs/mutationSelector"
+        },
+        "outcomes": {
+          "$ref": "#/$defs/mutationOutcomes"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "mutant"
+          ]
+        },
+        {
+          "properties": {
+            "outcomes": {
+              "required": [
+                "sha256"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "mutationEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "controls",
+        "campaigns"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "const": "chio.adversarial-mutation-evidence.v1"
+        },
+        "controls": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/mutationControl"
+          }
+        },
+        "campaigns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/mutationCampaign"
+          }
+        }
+      }
     }
   }
 }

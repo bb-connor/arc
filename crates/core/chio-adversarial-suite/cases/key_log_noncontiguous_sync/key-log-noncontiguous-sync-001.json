@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "key-log-noncontiguous-sync-001",
+  "class": "key_log_noncontiguous_sync",
+  "expected_verdict": "DENY",
+  "expected_reason": "key_log_noncontiguous_sync_detected",
+  "threat_id": "native_channel_replay",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "sync_contiguity_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/src/sync.rs",
+        "target_kind": "lib",
+        "test_name": "sync::tests::synchronization_shape_rejects_mismatched_and_empty_ranges"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "key_log_noncontiguous_sync",
+        "control_id": "sync_contiguity_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/sync.rs",
+        "function": "synchronization_shape_is_valid",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/key_log_noncontiguous_sync/mutants.out/outcomes.json",
+          "sha256": "beeacbdfa12695d384822dcc73a3feee2bb421befb58636da5da6ef79ba4c238",
+          "inputs_sha256": "50b0da9970ffaa9a5a2cdb656ce545e6a7f6513a3fa0d1f6fe3ef0f961ffc06a"
+        }
+      }
+    ]
+  }
+}

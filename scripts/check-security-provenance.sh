@@ -15,14 +15,8 @@ if ! grep -Fq "\`$SOURCE_COMMIT\`" "$PROVENANCE"; then
   exit 1
 fi
 
-while IFS= read -r marked_file; do
-  [[ -n "$marked_file" ]] || continue
-  relative_path="${marked_file#"$ROOT"/}"
-  if ! grep -Fq "\`$relative_path\`" "$PROVENANCE"; then
-    printf 'missing provenance destination: %s\n' "$relative_path" >&2
-    exit 1
-  fi
-done < <(
+marked_output=""
+if marked_output="$(
   rg -l --hidden --fixed-strings 'Adapted from Clawdstrike' \
     --glob '!.git/**' \
     --glob '!target/**' \
@@ -30,7 +24,27 @@ done < <(
     --glob '!docs/security/clawdstrike-active-defense-provenance.md' \
     --glob '!scripts/check-security-provenance.sh' \
     --glob '!scripts/tests/check-security-provenance.test.sh' \
-    "$ROOT" || true
-)
+    "$ROOT"
+)"; then
+  :
+else
+  scan_status=$?
+  if [[ "$scan_status" -eq 1 ]]; then
+    printf 'security provenance scan found no adaptation markers\n' >&2
+  else
+    printf 'security provenance scan failed with status %s\n' "$scan_status" >&2
+    [[ -z "$marked_output" ]] || printf '%s\n' "$marked_output" >&2
+  fi
+  exit 1
+fi
+
+while IFS= read -r marked_file; do
+  [[ -n "$marked_file" ]] || continue
+  relative_path="${marked_file#"$ROOT"/}"
+  if ! grep -Fq "\`$relative_path\`" "$PROVENANCE"; then
+    printf 'missing provenance destination: %s\n' "$relative_path" >&2
+    exit 1
+  fi
+done <<<"$marked_output"
 
 printf 'security provenance check passed\n'

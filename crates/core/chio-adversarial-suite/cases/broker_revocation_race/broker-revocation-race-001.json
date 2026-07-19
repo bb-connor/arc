@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "broker-revocation-race-001",
+  "class": "broker_revocation_race",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_revocation_race_detected",
+  "threat_id": "capability_token_theft",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "revocation_capture_control",
+        "package": "chio-secret-broker",
+        "test_source": "crates/security/chio-secret-broker/src/budget.rs",
+        "target_kind": "lib",
+        "test_name": "budget::tests::capture_rejects_omitted_reordered_or_misbound_revocation_members"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_revocation_race",
+        "control_id": "revocation_capture_control",
+        "package": "chio-secret-broker",
+        "source": "crates/security/chio-secret-broker/src/budget.rs",
+        "function": "CaptureExecutionHoldRequest::validate",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_revocation_race/mutants.out/outcomes.json",
+          "sha256": "7958056afabf74054ba48a2e4b3ac033c6dfbdec1ec6ddbaa25a32bd7cd421cd",
+          "inputs_sha256": "500a4374dcd2b88974c2d16125780a35da2c5f5f632a5737a107900d31e42c82"
+        }
+      }
+    ]
+  }
+}

@@ -88,6 +88,14 @@ SLICES: tuple[ReviewSlice, ...] = (
         ),
     ),
     ReviewSlice(
+        "security-active-defense",
+        "security types, flow control, containment, cage, broker, and provenance",
+        (
+            "crates/security/**",
+            "third_party/provenance/**",
+        ),
+    ),
+    ReviewSlice(
         "adapters-edges",
         "protocol adapters, provider adapters, edges, bridges, integrations",
         (

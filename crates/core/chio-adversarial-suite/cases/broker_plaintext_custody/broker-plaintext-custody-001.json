@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "broker-plaintext-custody-001",
+  "class": "broker_plaintext_custody",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_plaintext_custody_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "sealed_key_control",
+        "package": "chio-secret-broker",
+        "test_source": "crates/security/chio-secret-broker/src/encrypted_blob_backend.rs",
+        "target_kind": "lib",
+        "required_target_os": "linux",
+        "test_name": "encrypted_blob_backend::tests::ordinary_or_unsealed_file_cannot_supply_startup_key"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_plaintext_custody",
+        "control_id": "sealed_key_control",
+        "package": "chio-secret-broker",
+        "source": "crates/security/chio-secret-broker/src/encrypted_blob_backend.rs",
+        "function": "read_sealed_32",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "UnaryOperator",
+          "original": "!",
+          "replacement": ""
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_plaintext_custody/mutants.out/outcomes.json",
+          "sha256": "d4fc24a26365b9a858c22958cd7eb26517d52954219b29e9efcbc5a1655565b5",
+          "inputs_sha256": "5626c8d7c545f04f7a547695d473c38895c3deb8ea2efbaacc606e0d20fc5fbd"
+        }
+      }
+    ]
+  }
+}

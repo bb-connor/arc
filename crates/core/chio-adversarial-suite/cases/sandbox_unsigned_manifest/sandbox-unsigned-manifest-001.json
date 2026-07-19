@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-unsigned-manifest-001",
+  "class": "sandbox_unsigned_manifest",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_unsigned_manifest_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "manifest_signature_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/src/lib_parts/part_02.rs",
+        "target_kind": "lib",
+        "test_name": "tests::signature_is_verified_before_permissions_are_read"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_unsigned_manifest",
+        "control_id": "manifest_signature_control",
+        "package": "chio-manifest",
+        "source": "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+        "function": "verify_manifest",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_unsigned_manifest/mutants.out/outcomes.json",
+          "sha256": "086801b99947573af93c710bbf2744382a69762095c4e267d75ec564dfbec1d0",
+          "inputs_sha256": "3ecac6e98338dd9eba1d8f196c0f4976820dcb80683779bec56957a6c1f75113"
+        }
+      }
+    ]
+  }
+}

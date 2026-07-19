@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "broker-orphan-hold-001",
+  "class": "broker_orphan_hold",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_orphan_hold_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "compensated_release_outbox_control",
+        "package": "chio-control-plane",
+        "test_source": "crates/platform/chio-control-plane/src/security/broker_parts/part_03.inc",
+        "target_kind": "lib",
+        "test_name": "security::broker::tests::compensated_release_outbox_survives_both_release_crash_windows"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_orphan_hold",
+        "control_id": "compensated_release_outbox_control",
+        "package": "chio-control-plane",
+        "source": "crates/platform/chio-control-plane/src/security/broker_parts/part_01.inc",
+        "function": "AuthoritativeBrokerExecutionAdapter::release_admission",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "!=",
+          "replacement": "==",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_orphan_hold/mutants.out/outcomes.json",
+          "sha256": "f202603d92bd288ccf2d8f06045132a76f2d741dd282b6203e582e1604d7b230",
+          "inputs_sha256": "8c516dd814a24c4f4facea24bde8cb1cea7e251ecae0b422eb781b40c637548d"
+        }
+      }
+    ]
+  }
+}

@@ -129,16 +129,17 @@ def check_temporal_workflow() -> None:
     )
 
 
-def check_safety_workflow_paths() -> None:
+def check_safety_workflow_entrypoint() -> None:
     text = read(".github/workflows/apalache-safety.yml")
+    ci = read(".github/workflows/ci.yml")
 
     require(
-        '- "scripts/check-apalache-formal-slice.py"' in text,
-        "apalache-safety paths must include scripts/check-apalache-formal-slice.py",
+        "workflow_call:" in text and "pull_request:" not in text,
+        "apalache-safety must be called by CI without a duplicate pull-request trigger",
     )
     require(
-        '- ".github/workflows/apalache-temporal.yml"' in text,
-        "apalache-safety paths must keep .github/workflows/apalache-temporal.yml",
+        "uses: ./.github/workflows/apalache-safety.yml" in ci,
+        "required CI must call the full Apalache safety workflow",
     )
     require(
         "formal/tla/MCRevocationPropagation.cfg|formal/tla/RevocationPropagation.tla"
@@ -201,18 +202,10 @@ def check_information_flow_lattice() -> None:
         and "The outcome is: Error" in workflow,
         "apalache-safety must require a semantic counterexample from the reader mutant",
     )
-    for watched_path in (
-        "crates/security/chio-flow/**",
-        "crates/security/chio-security-types/**",
-        "formal/MAPPING.md",
-        "formal/proof-manifest.toml",
-        "formal/theorem-inventory.json",
-        "spec/schemas/chio-wire/v1/security/**",
-    ):
-        require(
-            f'- "{watched_path}"' in workflow,
-            f"apalache-safety pull-request paths must include {watched_path}",
-        )
+    require(
+        "workflow_call:" in workflow and "pull_request:" not in workflow,
+        "Apalache safety must run through required CI without a duplicate PR trigger",
+    )
     for registry, text in (
         ("proof manifest", proof_manifest),
         ("theorem inventory", inventory),
@@ -230,7 +223,7 @@ def main() -> int:
         check_receipt_before_allow,
         check_revocation_cut,
         check_temporal_workflow,
-        check_safety_workflow_paths,
+        check_safety_workflow_entrypoint,
         check_information_flow_lattice,
     )
     failures: list[str] = []

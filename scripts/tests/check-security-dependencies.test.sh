@@ -14,12 +14,14 @@ write_metadata() {
 import json
 import sys
 
-path, *edges = sys.argv[1:]
-names = {
+path, *entries = sys.argv[1:]
+edges = [entry for entry in entries if "=" in entry]
+names = {entry for entry in entries if "=" not in entry}
+names.update(
     name
     for edge in edges
     for name in edge.split("=", maxsplit=1)
-}
+)
 packages = [{"name": name, "id": f"path+file:///{name}#0.1.0"} for name in sorted(names)]
 nodes = []
 for name in sorted(names):
@@ -34,6 +36,14 @@ with open(path, "w", encoding="utf-8") as output:
     json.dump({"packages": packages, "resolve": {"nodes": nodes}}, output)
 PY
 }
+
+required_packages=(
+  chio-security-types
+  chio-flow
+  chio-security-kernel
+  chio-decoy
+  chio-quarantine
+)
 
 run_checker() {
   local metadata="$1" stdout="$2" stderr="$3"
@@ -54,10 +64,30 @@ assert_rc() {
 assert_rejected_edge() {
   local source="$1" destination="$2" label="$3"
   local metadata="$work/${source}-${destination}.json"
-  write_metadata "$metadata" "$source=$destination"
+  write_metadata "$metadata" "${required_packages[@]}" "$source=$destination"
   assert_rc "$(run_checker "$metadata" "$metadata.out" "$metadata.err")" 1 "$label"
   grep -F "$source reaches forbidden dependency $destination" "$metadata.err" >/dev/null
 }
+
+zero_inventory="$work/zero-inventory.json"
+write_metadata "$zero_inventory"
+assert_rc "$(run_checker "$zero_inventory" "$work/zero-inventory.out" "$work/zero-inventory.err")" 1 \
+  "an empty security package inventory fails"
+for package_name in "${required_packages[@]}"; do
+  grep -F "required security package is missing: $package_name" \
+    "$work/zero-inventory.err" >/dev/null
+done
+
+omitted_inventory="$work/omitted-inventory.json"
+write_metadata "$omitted_inventory" \
+  chio-security-types \
+  chio-flow \
+  chio-security-kernel \
+  chio-decoy
+assert_rc "$(run_checker "$omitted_inventory" "$work/omitted-inventory.out" "$work/omitted-inventory.err")" 1 \
+  "an inventory omitting one required security package fails"
+grep -F 'required security package is missing: chio-quarantine' \
+  "$work/omitted-inventory.err" >/dev/null
 
 valid="$work/valid.json"
 write_metadata "$valid" \
@@ -93,13 +123,48 @@ assert_rejected_edge chio-security-kernel chio-store-sqlite \
   "the kernel adapter cannot reach platform"
 assert_rejected_edge chio-security-types chio-core-types \
   "portable security types cannot reach Chio crates"
+assert_rejected_edge chio-core-types chio-flow \
+  "core types cannot reach a security engine"
+assert_rejected_edge chio-core-types chio-kernel \
+  "core types cannot reach kernel"
+assert_rejected_edge chio-core-types chio-guards \
+  "core types cannot reach guards"
+assert_rejected_edge chio-core-types chio-store-sqlite \
+  "core types cannot reach platform"
+assert_rejected_edge chio-quarantine chio-did \
+  "containment cannot reach trust"
+assert_rejected_edge chio-store-sqlite chio-flow \
+  "the SQLite store cannot reach a security engine"
+assert_rejected_edge chio-store-sqlite chio-security-kernel \
+  "the SQLite store cannot reach the security kernel adapter"
 
 transitive="$work/transitive.json"
 write_metadata "$transitive" \
+  "${required_packages[@]}" \
   'chio-kernel=chio-core-types' \
   'chio-core-types=chio-flow'
 assert_rc "$(run_checker "$transitive" "$work/transitive.out" "$work/transitive.err")" 1 \
   "transitive reachability is rejected"
 grep -F 'chio-kernel reaches forbidden dependency chio-flow' "$work/transitive.err" >/dev/null
+
+core_transitive="$work/core-transitive.json"
+write_metadata "$core_transitive" \
+  "${required_packages[@]}" \
+  'chio-core-types=portable-helper' \
+  'portable-helper=chio-control-plane'
+assert_rc "$(run_checker "$core_transitive" "$work/core-transitive.out" "$work/core-transitive.err")" 1 \
+  "core-types transitive platform reachability is rejected"
+grep -F 'chio-core-types reaches forbidden dependency chio-control-plane' \
+  "$work/core-transitive.err" >/dev/null
+
+store_transitive="$work/store-transitive.json"
+write_metadata "$store_transitive" \
+  "${required_packages[@]}" \
+  'chio-store-sqlite=store-helper' \
+  'store-helper=chio-decoy'
+assert_rc "$(run_checker "$store_transitive" "$work/store-transitive.out" "$work/store-transitive.err")" 1 \
+  "the SQLite store cannot transitively reach a security engine"
+grep -F 'chio-store-sqlite reaches forbidden dependency chio-decoy' \
+  "$work/store-transitive.err" >/dev/null
 
 printf 'check-security-dependencies.test.sh: all assertions passed\n'

@@ -285,11 +285,14 @@
         }
       ],
       "residualRisk": "Regex-based pattern detection is incomplete, may false-positive in non-medical contexts, and does not scan image or binary response content.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
-        "crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs"
+        "crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs",
+        "crates/tooling/chio-conformance/tests/active_defense.rs",
+        "crates/security/chio-security-types/src/flow.rs",
+        "crates/security/chio-flow/src/lattice.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "response-pattern-and-binary-media-mutation-evidence"
     },
     {
       "id": "agent_velocity_abuse",

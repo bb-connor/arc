@@ -25,6 +25,8 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -45,6 +47,15 @@ native_outcome = root / (
     "audits/evidence/mutants/security/ingest_time_substitution/"
     "mutants.out/outcomes.json"
 )
+module_spec = importlib.util.spec_from_file_location(
+    "security_adversarial_evidence",
+    root / "scripts/check-security-adversarial-evidence.py",
+)
+if module_spec is None or module_spec.loader is None:
+    raise AssertionError("unable to load adversarial evidence checker")
+checker = importlib.util.module_from_spec(module_spec)
+sys.modules[module_spec.name] = checker
+module_spec.loader.exec_module(checker)
 
 
 def write_json(path: Path, body: object) -> None:
@@ -81,19 +92,38 @@ def expect_rejected(result: subprocess.CompletedProcess[str], needle: str) -> No
 
 
 with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") as raw:
-    temp = Path(raw)
+    temp = Path(raw).resolve()
 
     valid_cases = temp / "valid"
-    write_json(
-        valid_cases / "temporal_evasion/temporal-evasion-001.json",
-        json.loads(temporal.read_text(encoding="utf-8")),
+    valid_case_path = valid_cases / "temporal_evasion/temporal-evasion-001.json"
+    valid_case = json.loads(temporal.read_text(encoding="utf-8"))
+    write_json(valid_case_path, valid_case)
+    _valid_cases, valid_index = checker.load_cases(
+        root,
+        valid_cases,
+        False,
+        True,
+        refresh_campaign="ingest_time_substitution",
     )
+    _loaded_case, valid_campaign, valid_control = valid_index[
+        "ingest_time_substitution"
+    ]
+    valid_case["artifact"]["campaigns"][0]["outcomes"]["inputs_sha256"] = (
+        checker.campaign_input_digest(
+            root,
+            checker.package_roots(root),
+            valid_campaign,
+            valid_control,
+            valid_case_path,
+        )
+    )
+    write_json(valid_case_path, valid_case)
     valid = invoke(valid_cases)
     if valid.returncode != 0:
         raise AssertionError(valid.stdout)
 
     legacy_cases = temp / "legacy"
-    legacy = json.loads(temporal.read_text(encoding="utf-8"))
+    legacy = copy.deepcopy(valid_case)
     legacy["pending"] = True
     legacy["artifact"] = {
         "required_check": "temporal_evasion",
@@ -107,7 +137,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     expect_rejected(invoke(legacy_cases), "artifact: field mismatch")
 
     unknown_cases = temp / "unknown"
-    unknown = json.loads(temporal.read_text(encoding="utf-8"))
+    unknown = copy.deepcopy(valid_case)
     unknown["artifact"]["unexpectedField"] = True
     write_json(
         unknown_cases / "temporal_evasion/temporal-evasion-001.json",
@@ -116,7 +146,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     expect_rejected(invoke(unknown_cases), "unknown=['unexpectedField']")
 
     digest_cases = temp / "digest"
-    digest = json.loads(temporal.read_text(encoding="utf-8"))
+    digest = copy.deepcopy(valid_case)
     digest["artifact"]["campaigns"][0]["outcomes"]["sha256"] = "0" * 64
     write_json(
         digest_cases / "temporal_evasion/temporal-evasion-001.json",
@@ -125,7 +155,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     expect_rejected(invoke(digest_cases), "digest mismatch")
 
     unbound_inputs_cases = temp / "unbound-inputs"
-    unbound_inputs = json.loads(temporal.read_text(encoding="utf-8"))
+    unbound_inputs = copy.deepcopy(valid_case)
     unbound_inputs["artifact"]["campaigns"][0]["outcomes"].pop(
         "inputs_sha256"
     )
@@ -184,6 +214,280 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         "missed, timed out, unviable, or surviving mutant",
     )
 
+    single_open_outcome = temp / "single-open-outcomes.json"
+    single_open_source = temp / "single-open-source.rs"
+    single_open_source_text = (
+        "fn fixture_function() -> bool { true && false }\n"
+    )
+    single_open_source.write_text(single_open_source_text, encoding="utf-8")
+    operator_column = single_open_source_text.index("&&") + 1
+    single_open_mutant = {
+        "package": "fixture-package",
+        "file": "src/lib.rs",
+        "function": {
+            "function_name": "fixture_function",
+            "return_type": "-> bool",
+        },
+        "span": {
+            "start": {"line": 1, "column": operator_column},
+            "end": {"line": 1, "column": operator_column + 2},
+        },
+        "replacement": "||",
+        "genre": "BinaryOperator",
+    }
+    single_open_campaign = {
+        "id": "single_open_campaign",
+        "package": "fixture-package",
+        "source": "src/lib.rs",
+        "function": "fixture_function",
+        "minimum_caught": 1,
+        "mutant": {
+            "genre": "BinaryOperator",
+            "original": "&&",
+            "replacement": "||",
+        },
+    }
+    single_open_body = {
+        "caught": 1,
+        "missed": 0,
+        "timeout": 0,
+        "unviable": 0,
+        "success": 0,
+        "total_mutants": 1,
+        "outcomes": [
+            {"scenario": "Baseline", "summary": "Success"},
+            {
+                "scenario": {"Mutant": single_open_mutant},
+                "summary": "CaughtMutant",
+            },
+        ],
+    }
+    write_json(single_open_outcome, single_open_body)
+    single_open_outcome_payload = single_open_outcome.read_bytes()
+    hostile_outcome = copy.deepcopy(single_open_body)
+    hostile_outcome["caught"] = 0
+    hostile_outcome["missed"] = 1
+    hostile_outcome["outcomes"][1]["summary"] = "MissedMutant"
+    hostile_payloads = {
+        single_open_outcome: checker.canonical_json_bytes(hostile_outcome),
+        single_open_source: single_open_source_text.replace("&&", "||").encode(
+            "utf-8"
+        ),
+    }
+    hostile_captures = {path: 0 for path in hostile_payloads}
+    actual_no_follow_reader = checker.read_regular_file_no_follow
+    actual_path_read_bytes = Path.read_bytes
+
+    def replace_after_no_follow_capture(
+        path: Path,
+        label: str,
+        *,
+        root: Path | None = None,
+    ) -> bytes:
+        payload = actual_no_follow_reader(path, label, root=root)
+        resolved = path.resolve()
+        if resolved in hostile_payloads and hostile_captures[resolved] == 0:
+            hostile_captures[resolved] += 1
+            resolved.write_bytes(hostile_payloads[resolved])
+        return payload
+
+    def replace_after_legacy_read(path: Path) -> bytes:
+        payload = actual_path_read_bytes(path)
+        resolved = path.resolve()
+        if resolved == single_open_outcome and hostile_captures[resolved] == 0:
+            hostile_captures[resolved] += 1
+            resolved.write_bytes(hostile_payloads[resolved])
+        return payload
+
+    checker.read_regular_file_no_follow = replace_after_no_follow_capture
+    Path.read_bytes = replace_after_legacy_read
+    try:
+        observed_single_open_payload = checker.validate_outcomes(
+            single_open_outcome,
+            single_open_campaign,
+            hashlib.sha256(single_open_outcome_payload).hexdigest(),
+            single_open_source,
+        )
+    finally:
+        checker.read_regular_file_no_follow = actual_no_follow_reader
+        Path.read_bytes = actual_path_read_bytes
+    if observed_single_open_payload != single_open_outcome_payload:
+        raise AssertionError("outcome validation did not retain its captured payload")
+    if any(count != 1 for count in hostile_captures.values()):
+        raise AssertionError(
+            "source and outcome validation did not use one immutable capture each"
+        )
+
+    closure_root = temp / "repository-input-closure"
+    closure_package = closure_root / "crates/fixture-package"
+    closure_source = closure_package / "src/lib.rs"
+    closure_external = closure_root / "external-inputs"
+    closure_external.mkdir(parents=True)
+    (closure_root / "Cargo.toml").write_text(
+        (
+            "[workspace]\n"
+            "members = [\"crates/fixture-package\"]\n"
+            "resolver = \"2\"\n"
+        ),
+        encoding="utf-8",
+    )
+    (closure_root / "Cargo.lock").write_text("version = 3\n", encoding="utf-8")
+    closure_package.mkdir(parents=True)
+    (closure_package / "Cargo.toml").write_text(
+        (
+            "[package]\n"
+            "name = \"fixture-package\"\n"
+            "version = \"0.0.0\"\n"
+            "edition = \"2021\"\n"
+            "build = \"build.rs\"\n"
+        ),
+        encoding="utf-8",
+    )
+    closure_source.parent.mkdir()
+    closure_source.write_text(
+        (
+            "const EXTERNAL_TEXT: &str = "
+            "include_str!(\"../../../external-inputs/included.txt\");\n"
+            "include!(\"../../../external-inputs/generated.inc\");\n"
+            "fn fixture_function() -> bool { true }\n"
+            "#[test]\nfn fixture_test() {}\n"
+        ),
+        encoding="utf-8",
+    )
+    (closure_package / "build.rs").write_text(
+        (
+            "const BUILD_INPUT: &[u8] = "
+            "include_bytes!(\"../../external-inputs/build.txt\");\n"
+            "fn main() {\n"
+            "    println!(\"cargo:rerun-if-changed=../../external-inputs/build.txt\");\n"
+            "    let _ = BUILD_INPUT.len();\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+    external_include_str = closure_external / "included.txt"
+    external_include = closure_external / "generated.inc"
+    external_build_input = closure_external / "build.txt"
+    external_include_str.write_text("included text\n", encoding="utf-8")
+    external_include.write_text(
+        "const GENERATED_VALUE: bool = true;\n", encoding="utf-8"
+    )
+    external_build_input.write_text("build input\n", encoding="utf-8")
+    (closure_root / "crates/core/chio-adversarial-suite").mkdir(parents=True)
+    derived_mutation_root = closure_root / "audits/evidence/mutants/security"
+    derived_mutation_root.mkdir(parents=True)
+    (derived_mutation_root / ".gitignore").write_text("*\n!.gitignore\n", encoding="utf-8")
+    closure_campaign = {
+        "id": "fixture_campaign",
+        "control_id": "fixture_control",
+        "package": "fixture-package",
+        "source": "crates/fixture-package/src/lib.rs",
+        "function": "fixture_function",
+        "minimum_caught": 1,
+        "mutant": {"genre": "FnValue", "replacement": "false"},
+        "outcomes": {
+            "path": (
+                "audits/evidence/mutants/security/fixture_campaign/"
+                "mutants.out/outcomes.json"
+            )
+        },
+    }
+    closure_control = {
+        "id": "fixture_control",
+        "package": "fixture-package",
+        "test_source": "crates/fixture-package/src/lib.rs",
+        "target_kind": "lib",
+        "target": "",
+        "features": [],
+        "required_target_os": None,
+        "test_name": "fixture_test",
+    }
+    closure_packages = {"fixture-package": closure_package.resolve()}
+    closure_case_path = closure_root / (
+        "crates/core/chio-adversarial-suite/cases/fixture/fixture.json"
+    )
+
+    def closure_digest() -> str:
+        return checker.campaign_input_digest(
+            closure_root,
+            closure_packages,
+            closure_campaign,
+            closure_control,
+            closure_case_path,
+        )
+
+    base_closure_digest = closure_digest()
+    derived_artifacts = {
+        closure_case_path: b"{}\n",
+        closure_root / "crates/core/chio-adversarial-suite/manifest.json": b"{}\n",
+        derived_mutation_root
+        / "fixture_campaign/mutants.out/outcomes.json": b"{}\n",
+        closure_root / "audits/evidence/threats/fixture.json": b"{}\n",
+    }
+    for derived_path, derived_payload in derived_artifacts.items():
+        derived_path.parent.mkdir(parents=True, exist_ok=True)
+        derived_path.write_bytes(derived_payload)
+    if closure_digest() != base_closure_digest:
+        raise AssertionError("derived adversarial outputs invalidated the input closure")
+
+    generated_input = closure_root / "node_modules/generated/cache.js"
+    generated_input.parent.mkdir(parents=True)
+    generated_input.write_text("generated cache\n", encoding="utf-8")
+    if closure_digest() != base_closure_digest:
+        raise AssertionError("generated dependency state invalidated the input closure")
+
+    for external_path in (
+        external_include_str,
+        external_include,
+        external_build_input,
+    ):
+        original_payload = external_path.read_bytes()
+        external_path.write_bytes(original_payload + b"hostile drift\n")
+        if closure_digest() == base_closure_digest:
+            raise AssertionError(
+                f"out-of-package compile input drift was not bound: {external_path}"
+            )
+        external_path.write_bytes(original_payload)
+
+    closure_source_payload = closure_source.read_text(encoding="utf-8")
+    closure_source.write_text(
+        closure_source_payload
+        + (
+            "const EXCLUDED_OUTPUT: &str = include_str!(\"../../../audits/evidence/"
+            "mutants/security/fixture_campaign/mutants.out/outcomes.json\");\n"
+        ),
+        encoding="utf-8",
+    )
+    try:
+        closure_digest()
+    except checker.EvidenceError as error:
+        if "references excluded generated or derived input" not in str(error):
+            raise AssertionError(
+                f"unexpected excluded compile-input rejection: {error}"
+            ) from error
+    else:
+        raise AssertionError("participating source consumed an excluded output")
+    closure_source.write_text(closure_source_payload, encoding="utf-8")
+
+    closure_source.write_text(
+        closure_source_payload
+        + (
+            "const GENERATED_INPUT: &str = include_str!(\"../../../node_modules/"
+            "generated/cache.js\");\n"
+        ),
+        encoding="utf-8",
+    )
+    try:
+        closure_digest()
+    except checker.EvidenceError as error:
+        if "references excluded generated or derived input" not in str(error):
+            raise AssertionError(
+                f"unexpected generated compile-input rejection: {error}"
+            ) from error
+    else:
+        raise AssertionError("participating source consumed generated dependency state")
+    closure_source.write_text(closure_source_payload, encoding="utf-8")
+
     promotion_root = temp / "promotion-root"
     (promotion_root / "Cargo.toml").parent.mkdir(parents=True)
     (promotion_root / "Cargo.toml").write_text(
@@ -228,6 +532,15 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         ),
         encoding="utf-8",
     )
+    shared_input_root = promotion_root / "tests/shared-fixture-inputs"
+    shared_input_root.mkdir(parents=True)
+    shared_input_source = shared_input_root / "shared.rs"
+    shared_input_source.write_text(
+        "pub fn shared_input() -> bool { true }\n", encoding="utf-8"
+    )
+    shared_input_link = package_root / "tests/shared"
+    shared_input_link.parent.mkdir()
+    shared_input_link.symlink_to(shared_input_root, target_is_directory=True)
     dependency_root = promotion_root / "crates/fixture-dependency"
     dependency_root.mkdir(parents=True)
     (dependency_root / "Cargo.toml").write_text(
@@ -423,6 +736,53 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             "promoted evidence recursively invalidated its own input binding: "
             f"{stable_after_promotion.stdout}"
         )
+
+    original_shared_input = shared_input_source.read_text(encoding="utf-8")
+    shared_input_source.write_text(
+        original_shared_input + "// linked input drift\n", encoding="utf-8"
+    )
+    stale_linked_input = subprocess.run(
+        [
+            str(gate),
+            "--root",
+            str(promotion_root),
+            "--cases",
+            str(promotion_case_path.parents[1]),
+            "--fixture",
+        ],
+        cwd=promotion_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    expect_rejected(stale_linked_input, "stale mutation input binding")
+    shared_input_source.write_text(original_shared_input, encoding="utf-8")
+
+    escaped_input_root = temp / "escaped-fixture-inputs"
+    escaped_input_root.mkdir()
+    (escaped_input_root / "outside.rs").write_text(
+        "pub fn outside() -> bool { true }\n", encoding="utf-8"
+    )
+    escaped_input_link = package_root / "tests/escaped"
+    escaped_input_link.symlink_to(escaped_input_root, target_is_directory=True)
+    escaped_link = subprocess.run(
+        [
+            str(gate),
+            "--root",
+            str(promotion_root),
+            "--cases",
+            str(promotion_case_path.parents[1]),
+            "--fixture",
+        ],
+        cwd=promotion_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    expect_rejected(escaped_link, "Cargo input symlink escaped the repository")
+    escaped_input_link.unlink()
 
     original_dependency_source = dependency_source.read_text(encoding="utf-8")
     dependency_source.write_text(
@@ -665,15 +1025,104 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         elif observed_case["pending"] is not False or observed_manifest["case_count"] != 1:
             raise AssertionError("final campaign promotion did not complete the case")
 
-    module_spec = importlib.util.spec_from_file_location(
-        "security_adversarial_evidence",
-        root / "scripts/check-security-adversarial-evidence.py",
+    if checker.safe_rust_path(
+        "crates/fixture-package/src/generated_fragment.inc",
+        "valid included Rust fragment",
+    ) != "crates/fixture-package/src/generated_fragment.inc":
+        raise AssertionError("repository-owned Rust include path was not preserved")
+    for unsafe_rust_path in (
+        "crates/fixture-package/src/generated_fragment.toml",
+        "crates/fixture-package/src/generated_fragment.inc.txt",
+        "crates/fixture-package/src/../generated_fragment.inc",
+        "/crates/fixture-package/src/generated_fragment.inc",
+    ):
+        try:
+            checker.safe_rust_path(unsafe_rust_path, "unsafe Rust fragment")
+        except checker.EvidenceError:
+            pass
+        else:
+            raise AssertionError(f"unsafe Rust path passed: {unsafe_rust_path}")
+
+    legacy_broad_outcome = copy.deepcopy(promotion_outcome)
+    legacy_mutant = copy.deepcopy(fixture_mutant)
+    legacy_mutant["replacement"] = "true"
+    legacy_broad_outcome["caught"] = 2
+    legacy_broad_outcome["total_mutants"] = 2
+    legacy_broad_outcome["outcomes"].append(
+        {
+            "scenario": {"Mutant": legacy_mutant},
+            "summary": "CaughtMutant",
+        }
     )
-    if module_spec is None or module_spec.loader is None:
-        raise AssertionError("unable to load adversarial evidence checker")
-    checker = importlib.util.module_from_spec(module_spec)
-    sys.modules[module_spec.name] = checker
-    module_spec.loader.exec_module(checker)
+    legacy_broad_path = temp / "legacy-broad-outcomes.json"
+    write_json(legacy_broad_path, legacy_broad_outcome)
+    try:
+        checker.validate_outcomes(
+            legacy_broad_path,
+            promotion_campaign,
+            None,
+            fixture_source,
+        )
+    except checker.EvidenceError as error:
+        if "semantic campaign did not execute exactly one mutant" not in str(error):
+            raise AssertionError(
+                f"unexpected current semantic binding rejection: {error}"
+            ) from error
+    else:
+        raise AssertionError("current semantic binding accepted broad mutation evidence")
+    checker.validate_outcomes(
+        legacy_broad_path,
+        promotion_campaign,
+        None,
+        fixture_source,
+        bind_identity=False,
+    )
+
+    pending_release_cases = temp / "pending-release-cases"
+    pending_release_root = temp / "pending-release-root"
+    shutil.copytree(promotion_root, pending_release_root)
+    (
+        pending_release_root
+        / promotion_case["artifact"]["campaigns"][0]["outcomes"]["path"]
+    ).unlink(missing_ok=True)
+    pending_release_case = copy.deepcopy(promotion_case)
+    pending_release_case["pending"] = True
+    write_json(
+        pending_release_cases / "temporal_evasion/temporal-evasion-001.json",
+        pending_release_case,
+    )
+    checker.load_cases(
+        pending_release_root,
+        pending_release_cases,
+        False,
+        True,
+    )
+    actual_release_verification = checker.run_release_verification
+
+    def reject_release_execution(*_arguments: object) -> None:
+        raise AssertionError("release campaign execution started before completeness validation")
+
+    checker.run_release_verification = reject_release_execution
+    original_arguments = sys.argv
+    sys.argv = [
+        str(root / "scripts/check-security-adversarial-evidence.py"),
+        "--root",
+        str(pending_release_root),
+        "--cases",
+        str(pending_release_cases),
+        "--fixture",
+        "--release",
+    ]
+    try:
+        checker.main()
+    except checker.EvidenceError as error:
+        if "pending case cannot pass the release evidence gate" not in str(error):
+            raise AssertionError(f"unexpected pending release rejection: {error}") from error
+    else:
+        raise AssertionError("release accepted pending mutation evidence")
+    finally:
+        sys.argv = original_arguments
+        checker.run_release_verification = actual_release_verification
 
     refresh_root = temp / "refresh-root"
     shutil.copytree(promotion_root, refresh_root)
@@ -681,6 +1130,33 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     refresh_case_path = refresh_root / promotion_case_path.relative_to(promotion_root)
     refresh_manifest_path = refresh_root / manifest_path.relative_to(promotion_root)
     refresh_source = refresh_root / fixture_source.relative_to(promotion_root)
+    refresh_case_before = json.loads(refresh_case_path.read_text(encoding="utf-8"))
+    refresh_threat_path = (
+        refresh_root
+        / "audits/evidence/threats"
+        / f"{refresh_case_before['threat_id']}.json"
+    )
+    refresh_campaign_before = refresh_case_before["artifact"]["campaigns"][0]
+    write_json(
+        refresh_threat_path,
+        {
+            "caught": 99,
+            "mutation_case_path": refresh_case_path.relative_to(refresh_root).as_posix(),
+            "note": "stale count-bearing aggregate claimed 99 caught mutants",
+            "outcomes": [
+                {
+                    "id": refresh_campaign_before["id"],
+                    "path": refresh_campaign_before["outcomes"]["path"],
+                    "sha256": "0" * 64,
+                }
+            ],
+            "ran_at": "2000-01-01T00:00:00Z",
+            "reproduction_command": "stale command",
+            "survivors": [],
+            "timestamp_kind": "command-wall-clock",
+            "timestamp_note": "stale timestamp explanation",
+        },
+    )
     refresh_source.write_text(
         refresh_source.read_text(encoding="utf-8") + "// refreshed source contract\n",
         encoding="utf-8",
@@ -748,6 +1224,94 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         refreshed_case_bytes
     ).hexdigest():
         raise AssertionError("refresh did not bind the new canonical case bytes in the manifest")
+    refreshed_threat = json.loads(refresh_threat_path.read_text(encoding="utf-8"))
+    if refreshed_threat["caught"] != refreshed_outcome["caught"]:
+        raise AssertionError("refresh did not derive the threat aggregate caught count")
+    if refreshed_threat["outcomes"] != [
+        {
+            "id": refresh_campaign_before["id"],
+            "path": refresh_campaign_before["outcomes"]["path"],
+            "sha256": refreshed_digest,
+        }
+    ]:
+        raise AssertionError("refresh did not repair the threat aggregate child binding")
+    if "99" in refreshed_threat["note"] or "caught 1" not in refreshed_threat["note"]:
+        raise AssertionError("refresh retained stale count-bearing aggregate prose")
+    if refresh_campaign_before["id"] not in refreshed_threat["reproduction_command"]:
+        raise AssertionError("refresh did not derive the aggregate reproduction command")
+    if refreshed_threat["ran_at"] == "2000-01-01T00:00:00Z":
+        raise AssertionError("refresh retained the stale aggregate run timestamp")
+    if refreshed_threat["timestamp_kind"] != "command-wall-clock":
+        raise AssertionError("refresh wrote the wrong aggregate timestamp kind")
+    if "caught-only mutation rerun validation" not in refreshed_threat[
+        "timestamp_note"
+    ]:
+        raise AssertionError("refresh retained the stale aggregate timestamp explanation")
+
+    aggregate_snapshot = checker.snapshot_threat_aggregates(refresh_root)
+    aggregate_path = next(iter(aggregate_snapshot))
+    aggregate_body = json.loads(aggregate_snapshot[aggregate_path])
+
+    def require_aggregate_render_rejected(
+        body: object,
+        needle: str,
+        *,
+        path: Path = aggregate_path,
+    ) -> None:
+        try:
+            checker.render_threat_aggregate_replacements(
+                refresh_root,
+                refresh_record[0],
+                refresh_record[1],
+                refreshed_outcome_bytes,
+                {path: checker.canonical_json_bytes(body)},
+                "2026-07-17T00:00:00Z",
+            )
+        except checker.EvidenceError as error:
+            if needle not in str(error):
+                raise AssertionError(
+                    f"unexpected aggregate rejection, expected {needle!r}: {error}"
+                ) from error
+        else:
+            raise AssertionError("malformed threat aggregate passed refresh rendering")
+
+    missing_case_aggregate = copy.deepcopy(aggregate_body)
+    missing_case_aggregate.pop("mutation_case_path")
+    require_aggregate_render_rejected(
+        missing_case_aggregate,
+        "mutation_case_path: expected a repository-relative path",
+    )
+    for malformed_outcomes in ({}, [], ["not-an-outcome-record"]):
+        malformed_aggregate = copy.deepcopy(aggregate_body)
+        malformed_aggregate["outcomes"] = malformed_outcomes
+        require_aggregate_render_rejected(
+            malformed_aggregate,
+            (
+                "aggregate outcome must be an object"
+                if malformed_outcomes == ["not-an-outcome-record"]
+                else "aggregate outcomes must be a nonempty array"
+            ),
+        )
+    wrong_path_aggregate = copy.deepcopy(aggregate_body)
+    wrong_path_aggregate["outcomes"][0]["path"] = (
+        "audits/evidence/mutants/security/reader_subset_direction/"
+        "mutants.out/wrong.json"
+    )
+    require_aggregate_render_rejected(
+        wrong_path_aggregate,
+        "path differs from its mapped campaign outcome",
+    )
+    wrong_id_aggregate = copy.deepcopy(aggregate_body)
+    wrong_id_aggregate["outcomes"][0]["id"] = "unmapped_campaign"
+    require_aggregate_render_rejected(
+        wrong_id_aggregate,
+        "campaign is not mapped by the aggregate mutation case",
+    )
+    require_aggregate_render_rejected(
+        aggregate_body,
+        "refreshed campaign belongs to threat",
+        path=aggregate_path.with_name("wrong_threat.json"),
+    )
     checker.load_cases(refresh_root, refresh_cases_path, False, True)
 
     multi_refresh_root = temp / "multi-refresh-root"
@@ -760,6 +1324,33 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         multi_source.read_text(encoding="utf-8") + "// shared stale source contract\n",
         encoding="utf-8",
     )
+    multi_case_before = json.loads(multi_case_path.read_text(encoding="utf-8"))
+    multi_threat_path = (
+        multi_refresh_root
+        / "audits/evidence/threats"
+        / f"{multi_case_before['threat_id']}.json"
+    )
+    multi_campaigns = multi_case_before["artifact"]["campaigns"]
+    write_json(
+        multi_threat_path,
+        {
+            "caught": 200,
+            "mutation_case_path": multi_case_path.relative_to(
+                multi_refresh_root
+            ).as_posix(),
+            "note": "stale two-child aggregate",
+            "outcomes": [
+                {
+                    "id": campaign["id"],
+                    "path": campaign["outcomes"]["path"],
+                    "sha256": "0" * 64,
+                }
+                for campaign in multi_campaigns
+            ],
+            "reproduction_command": "stale command",
+            "survivors": [],
+        },
+    )
     _multi_cases, multi_index = checker.load_cases(
         multi_refresh_root,
         multi_cases_path,
@@ -771,14 +1362,56 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         multi_index["sandbox_env_leak"][1]["outcomes"]["path"]
     )
     untouched_outcome_bytes = untouched_outcome.read_bytes()
-    checker.refresh_outcome(
-        multi_refresh_root,
-        checker.package_roots(multi_refresh_root),
-        multi_index["sandbox_fd_leak"],
-        {},
+    real_atomic_replace_many = checker.atomic_replace_many
+    observed_read_guards: list[dict[Path, bytes]] = []
+
+    def capture_atomic_read_guards(
+        replacements: object,
+        originals: object,
+        guards: dict[Path, bytes] | None = None,
+        journal_root: Path | None = None,
+    ) -> None:
+        observed_read_guards.append(dict(guards or {}))
+        real_atomic_replace_many(replacements, originals, guards, journal_root)
+
+    checker.atomic_replace_many = capture_atomic_read_guards
+    try:
+        checker.refresh_outcome(
+            multi_refresh_root,
+            checker.package_roots(multi_refresh_root),
+            multi_index["sandbox_fd_leak"],
+            {},
+        )
+    finally:
+        checker.atomic_replace_many = real_atomic_replace_many
+    if len(observed_read_guards) != 1:
+        raise AssertionError("refresh did not capture one transaction read set")
+    captured_read_guards = observed_read_guards[0]
+    if captured_read_guards.get(
+        untouched_outcome
+    ) != checker.regular_file_guard_payload(untouched_outcome_bytes):
+        raise AssertionError("multi-child aggregate sibling was absent from the read set")
+    required_input_guards = (
+        multi_source,
+        multi_source.parent,
+        multi_refresh_root / ".cargo/config.toml",
     )
+    if any(path not in captured_read_guards for path in required_input_guards):
+        raise AssertionError("source/control input closure was absent from the read set")
+    if (
+        captured_read_guards[multi_refresh_root / ".cargo/config.toml"]
+        != checker.MISSING_GUARD_PAYLOAD
+    ):
+        raise AssertionError("absent optional Cargo config was not guarded as missing")
     if untouched_outcome.read_bytes() != untouched_outcome_bytes:
         raise AssertionError("targeted refresh changed a different stale campaign outcome")
+    multi_threat = json.loads(multi_threat_path.read_text(encoding="utf-8"))
+    if multi_threat["caught"] != 2 or len(multi_threat["outcomes"]) != 2:
+        raise AssertionError("multi-child aggregate was not derived from both outcomes")
+    for record in multi_threat["outcomes"]:
+        child = multi_refresh_root / record["path"]
+        if record["sha256"] != hashlib.sha256(child.read_bytes()).hexdigest():
+            raise AssertionError("multi-child aggregate retained a stale child digest")
     checker.load_cases(
         multi_refresh_root,
         multi_cases_path,
@@ -793,6 +1426,34 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             raise AssertionError(f"unexpected remaining-stale rejection: {error}") from error
     else:
         raise AssertionError("targeted refresh silently refreshed a different stale campaign")
+
+    no_threat_root = temp / "no-threat-refresh-root"
+    shutil.copytree(promotion_root, no_threat_root)
+    no_threat_root = no_threat_root.resolve()
+    no_threat_case = no_threat_root / promotion_case_path.relative_to(promotion_root)
+    no_threat_source = no_threat_root / fixture_source.relative_to(promotion_root)
+    no_threat_source.write_text(
+        no_threat_source.read_text(encoding="utf-8") + "// no aggregate refresh\n",
+        encoding="utf-8",
+    )
+    no_threat_dir = no_threat_root / "audits/evidence/threats"
+    if no_threat_dir.exists():
+        shutil.rmtree(no_threat_dir)
+    _no_threat_cases, no_threat_index = checker.load_cases(
+        no_threat_root,
+        no_threat_case.parents[1],
+        False,
+        True,
+        refresh_campaign="ingest_time_substitution",
+    )
+    checker.refresh_outcome(
+        no_threat_root,
+        checker.package_roots(no_threat_root),
+        no_threat_index["ingest_time_substitution"],
+        {},
+    )
+    if no_threat_dir.exists():
+        raise AssertionError("refresh without a citing aggregate created threat evidence")
 
     refresh_source.write_text(
         refresh_source.read_text(encoding="utf-8") + "// second source contract\n",
@@ -809,11 +1470,12 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         )
         return index["ingest_time_substitution"]
 
-    def refresh_artifact_snapshot() -> tuple[bytes, bytes, bytes]:
+    def refresh_artifact_snapshot() -> tuple[bytes, bytes, bytes, bytes]:
         return (
             refreshed_path.read_bytes(),
             refresh_case_path.read_bytes(),
             refresh_manifest_path.read_bytes(),
+            refresh_threat_path.read_bytes(),
         )
 
     def require_refresh_rejected_without_overwrite(
@@ -882,9 +1544,30 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         "rerun failed before verification",
     )
 
+    aggregate_before_unmapped = json.loads(
+        refresh_threat_path.read_text(encoding="utf-8")
+    )
+    unmapped_aggregate = copy.deepcopy(aggregate_before_unmapped)
+    unmapped_aggregate["outcomes"].append(
+        {
+            "id": "unmapped_campaign",
+            "path": (
+                "audits/evidence/mutants/security/unmapped_campaign/"
+                "mutants.out/outcomes.json"
+            ),
+            "sha256": "0" * 64,
+        }
+    )
+    write_json(refresh_threat_path, unmapped_aggregate)
+    require_refresh_rejected_without_overwrite(
+        successful_refresh_runner,
+        "campaign is not mapped by the aggregate mutation case",
+    )
+    write_json(refresh_threat_path, aggregate_before_unmapped)
+
     transaction_root = temp / "refresh-transaction"
     transaction_root.mkdir()
-    transaction_paths = [transaction_root / f"artifact-{index}" for index in range(3)]
+    transaction_paths = [transaction_root / f"artifact-{index}" for index in range(4)]
     transaction_originals = {
         path: f"original-{index}\n".encode()
         for index, path in enumerate(transaction_paths)
@@ -894,13 +1577,22 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     real_replace = checker.os.replace
     replace_calls = [0]
 
-    def fail_third_transaction_replace(source: object, destination: object) -> None:
-        replace_calls[0] += 1
-        if replace_calls[0] == 3:
-            raise OSError("fixture commit interruption")
-        real_replace(source, destination)
+    def is_prepared_publication(destination: object) -> bool:
+        return Path(str(destination)).name == "prepared"
 
-    checker.os.replace = fail_third_transaction_replace
+    def fail_fourth_transaction_replace(
+        source: object,
+        destination: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        if not is_prepared_publication(destination):
+            replace_calls[0] += 1
+            if replace_calls[0] == 4:
+                raise OSError("fixture commit interruption")
+        real_replace(source, destination, *args, **kwargs)
+
+    checker.os.replace = fail_fourth_transaction_replace
     try:
         checker.atomic_replace_many(
             [
@@ -908,6 +1600,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
                 for index, path in enumerate(transaction_paths)
             ],
             transaction_originals,
+            journal_root=transaction_root,
         )
     except checker.EvidenceError as error:
         if "refresh commit failed" not in str(error):
@@ -918,6 +1611,717 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         checker.os.replace = real_replace
     if any(path.read_bytes() != transaction_originals[path] for path in transaction_paths):
         raise AssertionError("interrupted refresh commit did not roll back every artifact")
+
+    root_guard_path = transaction_root / "root-guard-artifact"
+    root_guard_original = b"root-guard-original\n"
+    root_guard_replacement = b"root-guard-replacement\n"
+    root_guard_path.write_bytes(root_guard_original)
+    root_guard_snapshot = checker.read_guard_payload(
+        transaction_root,
+        str(transaction_root),
+    )
+    checker.atomic_replace_many(
+        [(root_guard_path, root_guard_replacement)],
+        {root_guard_path: root_guard_original},
+        {transaction_root: root_guard_snapshot},
+        transaction_root,
+    )
+    if root_guard_path.read_bytes() != root_guard_replacement:
+        raise AssertionError("repository-root read guard blocked a valid transaction")
+    if checker.transaction_directory(transaction_root).exists():
+        raise AssertionError("root-guard transaction retained a completed journal")
+
+    guard_path = transaction_root / "sibling-outcome"
+    guard_original = b"caught-only sibling\n"
+    guard_concurrent = b"concurrent sibling edit\n"
+    guard_path.write_bytes(guard_original)
+    guard_snapshot = checker.regular_file_guard_payload(guard_original)
+    replace_calls[0] = 0
+
+    def mutate_guard_during_first_replace(
+        source: object,
+        destination: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        if not is_prepared_publication(destination):
+            replace_calls[0] += 1
+            if replace_calls[0] == 1:
+                guard_path.write_bytes(guard_concurrent)
+        real_replace(source, destination, *args, **kwargs)
+
+    checker.os.replace = mutate_guard_during_first_replace
+    try:
+        checker.atomic_replace_many(
+            [
+                (path, f"guarded-replacement-{index}\n".encode())
+                for index, path in enumerate(transaction_paths)
+            ],
+            transaction_originals,
+            {guard_path: guard_snapshot},
+            transaction_root,
+        )
+    except checker.EvidenceError as error:
+        if "transaction read guard changed" not in str(error):
+            raise AssertionError(f"unexpected sibling race rejection: {error}") from error
+    else:
+        raise AssertionError("refresh committed after a sibling outcome changed")
+    finally:
+        checker.os.replace = real_replace
+    if any(path.read_bytes() != transaction_originals[path] for path in transaction_paths):
+        raise AssertionError("sibling race did not roll back every replaced destination")
+    if guard_path.read_bytes() != guard_concurrent:
+        raise AssertionError("sibling race rollback overwrote the concurrent child edit")
+
+    absent_guard_path = transaction_root / "absent-cargo-config"
+    absent_snapshot = checker.read_guard_payload(
+        absent_guard_path,
+        str(absent_guard_path),
+    )
+    absent_guard_path.write_bytes(absent_snapshot)
+    try:
+        checker.atomic_replace_many(
+            [(transaction_paths[0], b"sentinel-collision-replacement\n")],
+            {transaction_paths[0]: transaction_originals[transaction_paths[0]]},
+            {absent_guard_path: absent_snapshot},
+            transaction_root,
+        )
+    except checker.EvidenceError as error:
+        if "transaction read guard changed" not in str(error):
+            raise AssertionError(f"unexpected sentinel collision rejection: {error}") from error
+    else:
+        raise AssertionError("missing read guard collided with ordinary file bytes")
+    absent_guard_path.unlink()
+
+    unknown_destination_edit = b"unknown-concurrent-edit\n"
+    real_replace_below_root = checker.replace_below_root
+
+    def inject_destination_edit(
+        journal_root: Path,
+        source: Path,
+        destination: Path,
+        expected_destination: bytes,
+    ) -> None:
+        destination.write_bytes(unknown_destination_edit)
+        real_replace_below_root(
+            journal_root,
+            source,
+            destination,
+            expected_destination,
+        )
+
+    checker.replace_below_root = inject_destination_edit
+    try:
+        checker.atomic_replace_many(
+            [(transaction_paths[0], b"concurrent-check-replacement\n")],
+            {transaction_paths[0]: transaction_originals[transaction_paths[0]]},
+            journal_root=transaction_root,
+        )
+    except checker.EvidenceError as error:
+        if "changed immediately before replacement" not in str(error):
+            raise AssertionError(f"unexpected destination race rejection: {error}") from error
+    else:
+        raise AssertionError("transaction overwrote a final concurrent destination edit")
+    finally:
+        checker.replace_below_root = real_replace_below_root
+    if transaction_paths[0].read_bytes() != unknown_destination_edit:
+        raise AssertionError("destination race rejection overwrote the unknown edit")
+    transaction_paths[0].write_bytes(transaction_originals[transaction_paths[0]])
+
+    rollback_unknown_edit = b"unknown-edit-before-rollback\n"
+    real_fchmod = checker.os.fchmod
+    replacement_calls = [0]
+    rollback_stage_injected = [False]
+    rollback_started = [False]
+
+    def fail_second_destination(
+        journal_root: Path,
+        source: Path,
+        destination: Path,
+        expected_destination: bytes,
+    ) -> None:
+        replacement_calls[0] += 1
+        if replacement_calls[0] == 2:
+            rollback_started[0] = True
+            raise OSError("force rollback authentication probe")
+        real_replace_below_root(
+            journal_root,
+            source,
+            destination,
+            expected_destination,
+        )
+
+    def inject_during_rollback_stage(descriptor: int, mode: int) -> None:
+        if rollback_started[0] and not rollback_stage_injected[0]:
+            rollback_stage_injected[0] = True
+            transaction_paths[0].write_bytes(rollback_unknown_edit)
+        real_fchmod(descriptor, mode)
+
+    checker.replace_below_root = fail_second_destination
+    checker.os.fchmod = inject_during_rollback_stage
+    try:
+        checker.atomic_replace_many(
+            [
+                (transaction_paths[0], b"rollback-probe-first\n"),
+                (transaction_paths[1], b"rollback-probe-second\n"),
+            ],
+            {
+                transaction_paths[0]: transaction_originals[transaction_paths[0]],
+                transaction_paths[1]: transaction_originals[transaction_paths[1]],
+            },
+            journal_root=transaction_root,
+        )
+    except checker.EvidenceError as error:
+        if "rollback was incomplete" not in str(error):
+            raise AssertionError(f"unexpected rollback race rejection: {error}") from error
+    else:
+        raise AssertionError("rollback overwrote an unauthenticated destination edit")
+    finally:
+        checker.replace_below_root = real_replace_below_root
+        checker.os.fchmod = real_fchmod
+    if not rollback_stage_injected[0]:
+        raise AssertionError("rollback-stage race fixture did not inject its edit")
+    if transaction_paths[0].read_bytes() != rollback_unknown_edit:
+        raise AssertionError("authenticated rollback overwrote the unknown edit")
+    rollback_journal = checker.transaction_directory(transaction_root)
+    if not rollback_journal.is_dir():
+        raise AssertionError("incomplete rollback discarded its recovery journal")
+    try:
+        checker.recover_atomic_replace_journal(transaction_root)
+    except checker.EvidenceError as error:
+        if "differs from both journaled transaction states" not in str(error):
+            raise AssertionError(f"unexpected preserved-journal rejection: {error}") from error
+    else:
+        raise AssertionError("recovery overwrote an unknown post-replacement edit")
+    if not rollback_journal.is_dir():
+        raise AssertionError("failed recovery discarded the forensic journal")
+    shutil.rmtree(rollback_journal)
+    transaction_paths[0].write_bytes(transaction_originals[transaction_paths[0]])
+    transaction_paths[1].write_bytes(transaction_originals[transaction_paths[1]])
+
+    crash_paths = [transaction_root / f"crash-artifact-{index}" for index in range(4)]
+    crash_originals = {
+        path: f"crash-original-{index}\n".encode()
+        for index, path in enumerate(crash_paths)
+    }
+    for path, payload in crash_originals.items():
+        path.write_bytes(payload)
+    crash_program = r'''
+import importlib.util
+import os
+import signal
+import sys
+from pathlib import Path
+
+module_path = Path(sys.argv[1])
+root = Path(sys.argv[2])
+spec = importlib.util.spec_from_file_location("crash_refresh_checker", module_path)
+assert spec is not None and spec.loader is not None
+checker = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = checker
+spec.loader.exec_module(checker)
+paths = [root / f"crash-artifact-{index}" for index in range(4)]
+originals = {path: path.read_bytes() for path in paths}
+real_replace = checker.os.replace
+calls = 0
+
+def kill_after_first_replace(source, destination, *args, **kwargs):
+    global calls
+    real_replace(source, destination, *args, **kwargs)
+    if Path(str(destination)).name != "prepared":
+        calls += 1
+        if calls == 1:
+            os.kill(os.getpid(), signal.SIGKILL)
+
+checker.os.replace = kill_after_first_replace
+checker.atomic_replace_many(
+    [(path, f"crash-replacement-{index}\n".encode()) for index, path in enumerate(paths)],
+    originals,
+    {root: checker.read_guard_payload(root, str(root))},
+    journal_root=root,
+)
+'''
+    crashed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            crash_program,
+            str(root / "scripts/check-security-adversarial-evidence.py"),
+            str(transaction_root),
+        ],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    if crashed.returncode != -signal.SIGKILL:
+        raise AssertionError(
+            f"crash fixture did not die during commit: {crashed.returncode} {crashed.stdout}"
+        )
+    if not checker.transaction_directory(transaction_root).is_dir():
+        raise AssertionError("crash-interrupted refresh left no durable journal")
+    if checker.recover_atomic_replace_journal(transaction_root) != "rolled-back":
+        raise AssertionError("crash-interrupted refresh did not report rollback recovery")
+    if any(path.read_bytes() != crash_originals[path] for path in crash_paths):
+        raise AssertionError("crash recovery did not restore every original artifact")
+    if checker.transaction_directory(transaction_root).exists():
+        raise AssertionError("crash recovery retained a completed transaction journal")
+
+    marker_crash_path = transaction_root / "marker-crash-artifact"
+    marker_crash_path.write_bytes(b"marker-original\n")
+    marker_crash_program = r'''
+import importlib.util
+import os
+import signal
+import sys
+from pathlib import Path
+
+module_path = Path(sys.argv[1])
+root = Path(sys.argv[2])
+spec = importlib.util.spec_from_file_location("marker_crash_checker", module_path)
+assert spec is not None and spec.loader is not None
+checker = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = checker
+spec.loader.exec_module(checker)
+path = root / "marker-crash-artifact"
+real_replace = checker.os.replace
+
+def kill_before_prepared_publication(source, destination, *args, **kwargs):
+    if Path(str(destination)).name == "prepared":
+        os.kill(os.getpid(), signal.SIGKILL)
+    real_replace(source, destination, *args, **kwargs)
+
+checker.os.replace = kill_before_prepared_publication
+checker.atomic_replace_many(
+    [(path, b"marker-replacement\n")],
+    {path: path.read_bytes()},
+    journal_root=root,
+)
+'''
+    marker_crash = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            marker_crash_program,
+            str(root / "scripts/check-security-adversarial-evidence.py"),
+            str(transaction_root),
+        ],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    if marker_crash.returncode != -signal.SIGKILL:
+        raise AssertionError("prepared-marker fixture did not terminate before publication")
+    if checker.recover_atomic_replace_journal(transaction_root) != "discarded-unprepared":
+        raise AssertionError("partial prepared-marker state was not discarded as unprepared")
+    if marker_crash_path.read_bytes() != b"marker-original\n":
+        raise AssertionError("unprepared transaction changed its destination")
+
+    stale_lock_root = temp / "stale-refresh-lock"
+    stale_lock_root.mkdir()
+    stale_lock_program = r'''
+import importlib.util
+import os
+import signal
+import sys
+from pathlib import Path
+
+module_path = Path(sys.argv[1])
+root = Path(sys.argv[2])
+spec = importlib.util.spec_from_file_location("stale_lock_checker", module_path)
+assert spec is not None and spec.loader is not None
+checker = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = checker
+spec.loader.exec_module(checker)
+with checker.refresh_lock(root):
+    os.kill(os.getpid(), signal.SIGKILL)
+'''
+    stale_lock = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            stale_lock_program,
+            str(root / "scripts/check-security-adversarial-evidence.py"),
+            str(stale_lock_root),
+        ],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    if stale_lock.returncode != -signal.SIGKILL:
+        raise AssertionError("stale-lock fixture did not terminate while holding the lock")
+    with checker.refresh_lock(stale_lock_root):
+        pass
+    if (stale_lock_root / ".chio-security-adversarial-evidence.refresh.lock").exists():
+        raise AssertionError("dead-owner refresh lock was not reclaimed and released")
+
+    untrusted_journal_root = temp / "untrusted-in-root-journal"
+    untrusted_journal_root.mkdir()
+    untrusted_victim = untrusted_journal_root / "victim"
+    untrusted_victim.write_bytes(b"trusted victim\n")
+    untrusted_journal = (
+        untrusted_journal_root / checker.LEGACY_TRANSACTION_DIRECTORY
+    )
+    untrusted_journal.mkdir()
+    untrusted_sentinel = untrusted_journal / "manifest.json"
+    untrusted_sentinel.write_bytes(b"checkout-seeded journal\n")
+    untrusted_state = checker.trusted_state_path(untrusted_journal_root)
+    try:
+        checker.recover_atomic_replace_journal(untrusted_journal_root)
+    except checker.EvidenceError as error:
+        if "untrusted in-repository transaction state" not in str(error):
+            raise AssertionError(f"unexpected in-root journal rejection: {error}") from error
+    else:
+        raise AssertionError("checkout-seeded transaction journal was trusted")
+    if untrusted_victim.read_bytes() != b"trusted victim\n":
+        raise AssertionError("checkout-seeded journal changed a repository file")
+    if untrusted_sentinel.read_bytes() != b"checkout-seeded journal\n":
+        raise AssertionError("checkout-seeded journal was not preserved for inspection")
+    if untrusted_state.exists():
+        raise AssertionError("rejected checkout journal seeded external trusted state")
+
+    lock_symlink_root = temp / "lock-symlink-root"
+    lock_symlink_root.mkdir()
+    lock_symlink_outside = temp / "lock-symlink-outside"
+    lock_symlink_outside.mkdir()
+    lock_symlink_sentinel = lock_symlink_outside / "owner.json"
+    lock_symlink_sentinel.write_bytes(b"external sentinel\n")
+    with checker.open_trusted_state(lock_symlink_root, create=True):
+        pass
+    trusted_lock_symlink = checker.trusted_state_path(lock_symlink_root) / checker.LOCK_DIRECTORY
+    trusted_lock_symlink.symlink_to(lock_symlink_outside, target_is_directory=True)
+    try:
+        with checker.refresh_lock(lock_symlink_root):
+            pass
+    except checker.EvidenceError:
+        pass
+    else:
+        raise AssertionError("trusted-state lock symlink was followed")
+    if lock_symlink_sentinel.read_bytes() != b"external sentinel\n":
+        raise AssertionError("lock symlink handling changed an external sentinel")
+    trusted_lock_symlink.unlink()
+
+    owner_swap_root = temp / "lock-owner-swap"
+    owner_swap_root.mkdir()
+    real_read_owned_file_at = checker.read_owned_file_at
+    owner_swap_injected = [False]
+
+    def replace_owner_after_read(
+        directory_descriptor: int,
+        name: str,
+        label: str,
+        expected_mode: int,
+        **kwargs: object,
+    ) -> tuple[bytes, object]:
+        payload, metadata = real_read_owned_file_at(
+            directory_descriptor,
+            name,
+            label,
+            expected_mode,
+            **kwargs,
+        )
+        if name == "owner.json" and not owner_swap_injected[0]:
+            owner_swap_injected[0] = True
+            checker.os.unlink(name, dir_fd=directory_descriptor)
+            checker.write_new_fsynced_at(
+                directory_descriptor,
+                name,
+                payload,
+                0o600,
+                label,
+            )
+        return payload, metadata
+
+    try:
+        with checker.refresh_lock(owner_swap_root):
+            checker.read_owned_file_at = replace_owner_after_read
+    except checker.EvidenceError as error:
+        if "identity changed" not in str(error):
+            raise AssertionError(f"unexpected owner-swap rejection: {error}") from error
+    else:
+        raise AssertionError("refresh lock released after owner inode replacement")
+    finally:
+        checker.read_owned_file_at = real_read_owned_file_at
+    if not owner_swap_injected[0]:
+        raise AssertionError("owner replacement fixture did not run")
+    shutil.rmtree(checker.trusted_state_path(owner_swap_root) / checker.LOCK_DIRECTORY)
+
+    directory_swap_root = temp / "lock-directory-swap"
+    directory_swap_root.mkdir()
+    real_retire_owned_directory = checker.retire_owned_directory
+    directory_swap_injected = [False]
+
+    def replace_lock_directory_before_retirement(
+        state: object,
+        name: str,
+        descriptor: int,
+        identity: tuple[int, int],
+    ) -> None:
+        if name == checker.LOCK_DIRECTORY and not directory_swap_injected[0]:
+            directory_swap_injected[0] = True
+            checker.os.rename(
+                name,
+                f"{name}.moved",
+                src_dir_fd=state.descriptor,
+                dst_dir_fd=state.descriptor,
+            )
+            checker.os.mkdir(name, 0o700, dir_fd=state.descriptor)
+        real_retire_owned_directory(state, name, descriptor, identity)
+
+    try:
+        with checker.refresh_lock(directory_swap_root):
+            checker.retire_owned_directory = replace_lock_directory_before_retirement
+    except checker.EvidenceError as error:
+        if "identity changed" not in str(error):
+            raise AssertionError(f"unexpected directory-swap rejection: {error}") from error
+    else:
+        raise AssertionError("refresh lock deleted a replacement directory")
+    finally:
+        checker.retire_owned_directory = real_retire_owned_directory
+    if not directory_swap_injected[0]:
+        raise AssertionError("lock-directory replacement fixture did not run")
+    directory_state = checker.trusted_state_path(directory_swap_root)
+    if not (directory_state / checker.LOCK_DIRECTORY).is_dir():
+        raise AssertionError("replacement lock directory was deleted")
+    if not (directory_state / f"{checker.LOCK_DIRECTORY}.moved/owner.json").is_file():
+        raise AssertionError("original lock owner was not preserved after a path swap")
+    shutil.rmtree(directory_state / checker.LOCK_DIRECTORY)
+    shutil.rmtree(directory_state / f"{checker.LOCK_DIRECTORY}.moved")
+
+    promotion_crash_program = r'''
+import importlib.util
+import os
+import signal
+import sys
+from pathlib import Path
+
+module_path = Path(sys.argv[1])
+root = Path(sys.argv[2])
+kill_point = sys.argv[3]
+spec = importlib.util.spec_from_file_location("promotion_crash_checker", module_path)
+assert spec is not None and spec.loader is not None
+checker = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = checker
+spec.loader.exec_module(checker)
+outcome = root / "outcome.json"
+case = root / "case.json"
+manifest = root / "manifest.json"
+real_replace = checker.os.replace
+real_link = checker.os.link
+real_unlink = checker.os.unlink
+real_write_new_fsynced_at = checker.write_new_fsynced_at
+
+def kill_after_replace(source, destination, *args, **kwargs):
+    real_replace(source, destination, *args, **kwargs)
+    destination_name = Path(str(destination)).name
+    if (
+        destination_name == kill_point
+        or (
+            kill_point == "outcome.marker"
+            and destination_name == "published-0000.json"
+        )
+    ):
+        os.kill(os.getpid(), signal.SIGKILL)
+
+def kill_after_link(source, destination, *args, **kwargs):
+    real_link(source, destination, *args, **kwargs)
+    if kill_point == "outcome.link":
+        os.kill(os.getpid(), signal.SIGKILL)
+
+def kill_after_unlink(path, *args, **kwargs):
+    real_unlink(path, *args, **kwargs)
+    if (
+        kill_point == "outcome.stage-unlink"
+        and Path(str(path)).name == "replacement-0000.bin"
+    ):
+        os.kill(os.getpid(), signal.SIGKILL)
+
+def kill_after_trusted_write(
+    directory_descriptor, name, payload, mode, label
+):
+    real_write_new_fsynced_at(
+        directory_descriptor, name, payload, mode, label
+    )
+    if kill_point == "outcome.marker.tmp" and name == "published-0000.json.tmp":
+        os.kill(os.getpid(), signal.SIGKILL)
+
+checker.os.replace = kill_after_replace
+checker.os.link = kill_after_link
+checker.os.unlink = kill_after_unlink
+checker.write_new_fsynced_at = kill_after_trusted_write
+checker.atomic_replace_many(
+    [
+        (outcome, b"new outcome\n"),
+        (case, b"new case\n"),
+        (manifest, b"new manifest\n"),
+    ],
+    {
+        outcome: None,
+        case: b"old case\n",
+        manifest: b"old manifest\n",
+    },
+    journal_root=root,
+)
+'''
+    for kill_point in (
+        "prepared",
+        "outcome.link",
+        "outcome.marker.tmp",
+        "outcome.marker",
+        "outcome.stage-unlink",
+        "case.json",
+        "manifest.json",
+    ):
+        promotion_crash_root = temp / f"promotion-crash-{kill_point.replace('.', '-')}"
+        promotion_crash_root.mkdir()
+        promotion_case_path = promotion_crash_root / "case.json"
+        promotion_manifest_path = promotion_crash_root / "manifest.json"
+        promotion_outcome_path = promotion_crash_root / "outcome.json"
+        promotion_case_path.write_bytes(b"old case\n")
+        promotion_manifest_path.write_bytes(b"old manifest\n")
+        crashed = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                promotion_crash_program,
+                str(root / "scripts/check-security-adversarial-evidence.py"),
+                str(promotion_crash_root),
+                kill_point,
+            ],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        if crashed.returncode != -signal.SIGKILL:
+            raise AssertionError(
+                f"promotion crash point {kill_point} did not terminate: {crashed.stdout}"
+            )
+        with checker.refresh_lock(promotion_crash_root):
+            recovery = checker.recover_atomic_replace_journal(promotion_crash_root)
+        if kill_point == "manifest.json":
+            if recovery != "committed":
+                raise AssertionError(f"fully published promotion was not committed: {recovery}")
+            expected_case = b"new case\n"
+            expected_manifest = b"new manifest\n"
+            expected_outcome = b"new outcome\n"
+        else:
+            if recovery != "rolled-back":
+                raise AssertionError(f"partial promotion was not rolled back: {recovery}")
+            expected_case = b"old case\n"
+            expected_manifest = b"old manifest\n"
+            expected_outcome = None
+        if promotion_case_path.read_bytes() != expected_case:
+            raise AssertionError(f"case split after promotion crash at {kill_point}")
+        if promotion_manifest_path.read_bytes() != expected_manifest:
+            raise AssertionError(f"manifest split after promotion crash at {kill_point}")
+        if (
+            None if not promotion_outcome_path.exists() else promotion_outcome_path.read_bytes()
+        ) != expected_outcome:
+            raise AssertionError(f"outcome split after promotion crash at {kill_point}")
+
+    absent_unknown_root = temp / "promotion-unknown-edit"
+    absent_unknown_root.mkdir()
+    absent_unknown_outcome = absent_unknown_root / "outcome.json"
+    absent_unknown_case = absent_unknown_root / "case.json"
+    absent_unknown_case.write_bytes(b"old case\n")
+    real_replace_below_root = checker.replace_below_root
+    absent_publish_calls = [0]
+
+    def inject_unknown_new_destination(
+        journal_root: Path,
+        source: Path,
+        destination: Path,
+        expected_destination: bytes | None,
+    ) -> None:
+        absent_publish_calls[0] += 1
+        if absent_publish_calls[0] == 2:
+            absent_unknown_outcome.write_bytes(b"unknown concurrent outcome\n")
+            raise OSError("force absent-original rollback")
+        real_replace_below_root(journal_root, source, destination, expected_destination)
+
+    checker.replace_below_root = inject_unknown_new_destination
+    try:
+        checker.atomic_replace_many(
+            [
+                (absent_unknown_outcome, b"new outcome\n"),
+                (absent_unknown_case, b"new case\n"),
+            ],
+            {
+                absent_unknown_outcome: None,
+                absent_unknown_case: b"old case\n",
+            },
+            journal_root=absent_unknown_root,
+        )
+    except checker.EvidenceError as error:
+        if "rollback was incomplete" not in str(error):
+            raise AssertionError(f"unexpected absent rollback rejection: {error}") from error
+    else:
+        raise AssertionError("absent rollback overwrote an unknown edit")
+    finally:
+        checker.replace_below_root = real_replace_below_root
+    if absent_unknown_outcome.read_bytes() != b"unknown concurrent outcome\n":
+        raise AssertionError("absent rollback destroyed an unknown destination edit")
+    absent_unknown_journal = checker.transaction_directory(absent_unknown_root)
+    if not absent_unknown_journal.is_dir():
+        raise AssertionError("absent rollback discarded its forensic journal")
+    try:
+        checker.recover_atomic_replace_journal(absent_unknown_root)
+    except checker.EvidenceError as error:
+        if "differs from both journaled transaction states" not in str(error):
+            raise AssertionError(f"unexpected absent recovery rejection: {error}") from error
+    else:
+        raise AssertionError("recovery overwrote an unknown new-destination edit")
+    shutil.rmtree(absent_unknown_journal)
+
+    parent_swap_root = temp / "promotion-parent-swap"
+    parent_swap_root.mkdir()
+    parent_swap_destination_parent = parent_swap_root / "evidence"
+    parent_swap_destination_parent.mkdir()
+    parent_swap_destination = parent_swap_destination_parent / "outcome.json"
+    parent_swap_moved = parent_swap_root / "evidence-moved"
+    parent_swap_external = temp / "promotion-parent-swap-external"
+    parent_swap_external.mkdir()
+    parent_swap_sentinel = parent_swap_external / "sentinel"
+    parent_swap_sentinel.write_bytes(b"external path sentinel\n")
+    real_link = checker.os.link
+    parent_swap_injected = [False]
+
+    def replace_parent_during_link(*args: object, **kwargs: object) -> None:
+        if not parent_swap_injected[0]:
+            parent_swap_injected[0] = True
+            parent_swap_destination_parent.rename(parent_swap_moved)
+            parent_swap_destination_parent.symlink_to(
+                parent_swap_external, target_is_directory=True
+            )
+        real_link(*args, **kwargs)
+
+    checker.os.link = replace_parent_during_link
+    try:
+        checker.atomic_replace_many(
+            [(parent_swap_destination, b"transaction payload\n")],
+            {parent_swap_destination: None},
+            journal_root=parent_swap_root,
+        )
+    except checker.EvidenceError as error:
+        if "rollback was incomplete" not in str(error):
+            raise AssertionError(f"unexpected parent-swap rejection: {error}") from error
+    else:
+        raise AssertionError("transaction accepted a replaced destination parent")
+    finally:
+        checker.os.link = real_link
+    if parent_swap_sentinel.read_bytes() != b"external path sentinel\n":
+        raise AssertionError("destination-parent swap changed an external sentinel")
+    if (parent_swap_external / "outcome.json").exists():
+        raise AssertionError("destination-parent swap redirected publication outside root")
+    if not checker.transaction_directory(parent_swap_root).is_dir():
+        raise AssertionError("parent-swap failure discarded its forensic journal")
 
     checker.run_campaign = actual_run_campaign
 
@@ -1175,9 +2579,15 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     duplicate_native = copy.deepcopy(runner_native)
     duplicate_native["span"]["start"]["line"] = 2
     duplicate_native["span"]["end"]["line"] = 2
+    campaign_source_lines = checker.source_lines(
+        campaign_source.read_bytes(), campaign_source
+    )
     try:
         checker.select_native_mutant(
-            [runner_native, duplicate_native], runner_campaign, campaign_source
+            [runner_native, duplicate_native],
+            runner_campaign,
+            campaign_source_lines,
+            campaign_source,
         )
     except checker.EvidenceError as error:
         if "resolved to 2" not in str(error):
@@ -1188,7 +2598,10 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     ordinal_campaign = copy.deepcopy(runner_campaign)
     ordinal_campaign["mutant"]["occurrence"] = 2
     selected = checker.select_native_mutant(
-        [runner_native, duplicate_native], ordinal_campaign, campaign_source
+        [runner_native, duplicate_native],
+        ordinal_campaign,
+        campaign_source_lines,
+        campaign_source,
     )
     if selected.native != duplicate_native:
         raise AssertionError("semantic occurrence did not select source-ordered mutant")
@@ -1201,7 +2614,10 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         "-> Result<Digest32, StateMachineError>"
     )
     fallback = checker.select_native_mutant(
-        [fallback_native], fallback_campaign, campaign_source
+        [fallback_native],
+        fallback_campaign,
+        campaign_source_lines,
+        campaign_source,
     )
     try:
         checker.require_statically_viable_mutant(fallback, fallback_campaign)

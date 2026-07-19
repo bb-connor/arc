@@ -14,6 +14,8 @@ do
   fi
 done
 
+python3 scripts/check-kani-public-harnesses.py
+
 python3 - <<'PY'
 import sys
 from pathlib import Path

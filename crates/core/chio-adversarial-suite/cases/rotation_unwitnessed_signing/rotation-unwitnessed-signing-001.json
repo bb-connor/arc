@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "rotation-unwitnessed-signing-001",
+  "class": "rotation_unwitnessed_signing",
+  "expected_verdict": "DENY",
+  "expected_reason": "rotation_unwitnessed_signing_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "witnessed_activation_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/sqlite.rs",
+        "target_kind": "test",
+        "target": "sqlite",
+        "test_name": "append_checkpoint_witness_activation_and_reopen_are_transactional"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "rotation_unwitnessed_signing",
+        "control_id": "witnessed_activation_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/checkpoint.rs",
+        "function": "SignedKeyLogCheckpoint::verify_witnesses",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "<",
+          "replacement": ">"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/rotation_unwitnessed_signing/mutants.out/outcomes.json",
+          "sha256": "ef89c6d11301d7cecf13d9c248f50f5635f81a415d4ccc726c5971d8cbb43af6",
+          "inputs_sha256": "7da1bff752d89d2c9ddfb37d4c8e88186e2ab99fa00811c49c1333011d85ecd7"
+        }
+      }
+    ]
+  }
+}

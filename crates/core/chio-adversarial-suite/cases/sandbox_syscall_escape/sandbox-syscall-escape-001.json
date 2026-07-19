@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-syscall-escape-001",
+  "class": "sandbox_syscall_escape",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_syscall_escape_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "seccomp_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/src/launch/linux_parts/part_02.rs",
+        "target_kind": "lib",
+        "required_target_os": "linux",
+        "test_name": "launch::linux::tests::seccomp_control_rejects_forbidden_socket_before_default_deny"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_syscall_escape",
+        "control_id": "seccomp_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc",
+        "function": "seccomp_profile_is_fail_closed",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_syscall_escape/mutants.out/outcomes.json",
+          "sha256": "5ae51315192b04359051ed7f2d16c702af3d70c6e77fb6251810bdf64eff1d4e",
+          "inputs_sha256": "d402fba1c121f244160cc8847d2365d25b0a7fd1d8d745d2e520d16b5fb0540e"
+        }
+      }
+    ]
+  }
+}

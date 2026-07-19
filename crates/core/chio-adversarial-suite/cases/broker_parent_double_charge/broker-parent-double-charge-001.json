@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "broker-parent-double-charge-001",
+  "class": "broker_parent_double_charge",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_parent_double_charge_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "quota_identity_control",
+        "package": "chio-store-sqlite",
+        "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests_parts/part_01.rs",
+        "target_kind": "lib",
+        "test_name": "budget_store::tests::broker_logical_operation_charges_parent_and_broker_quotas_once"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_parent_double_charge",
+        "control_id": "quota_identity_control",
+        "package": "chio-store-sqlite",
+        "source": "crates/platform/chio-store-sqlite/src/budget_store/composite_parts/part_02.rs",
+        "function": "SqliteBudgetStore::authorize_composite_hold_in_transaction_unchecked",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "!=",
+          "replacement": "==",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_parent_double_charge/mutants.out/outcomes.json",
+          "sha256": "0d3e81552daafe967c564651e54879c9bf10c79f8a33fd7a11c75c29088fbecc",
+          "inputs_sha256": "dd535db61d854772d07f85083b3162c6241b79d297539e5e23782521d51b5216"
+        }
+      }
+    ]
+  }
+}

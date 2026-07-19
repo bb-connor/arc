@@ -266,13 +266,17 @@ mutants-fuzz-cocoverage:
 # ---------------------------------------------------------------------------
 
 docker-demo-up:
-	cd examples/docker && docker compose up -d --build
+	cd examples/docker && docker compose up -d --build --wait --wait-timeout 180
 
 docker-demo-down:
 	cd examples/docker && docker compose down -v
 
 docker-demo-smoke:
-	cd examples/docker && python3 smoke_client.py
+	cd examples/docker && \
+		CHIO_EDGE_TOKEN="$${CHIO_AUTH_TOKEN:?set a dedicated CHIO_AUTH_TOKEN}" \
+		CHIO_ADMIN_TOKEN="$${CHIO_ADMIN_TOKEN:?set a dedicated CHIO_ADMIN_TOKEN}" \
+		CHIO_DASHBOARD_READ_TOKEN="$${CHIO_DASHBOARD_READ_TOKEN:?set a dedicated CHIO_DASHBOARD_READ_TOKEN}" \
+		python3 smoke_client.py
 
 setup-merge-drivers:
 	./scripts/setup-git-merge-drivers.sh

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-symlink-escape-001",
+  "class": "sandbox_symlink_escape",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_symlink_escape_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "hard_link_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/tests/linux_compile.rs",
+        "target_kind": "test",
+        "target": "linux_compile",
+        "required_target_os": "linux",
+        "test_name": "forbidden_hard_link_alias_is_rejected_before_compilation"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_symlink_escape",
+        "control_id": "hard_link_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/linux.rs",
+        "function": "strict_resolution",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "0"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_symlink_escape/mutants.out/outcomes.json",
+          "sha256": "db7cd039d35f9bbb8a3a92072496c2a6fbcb758886567ac9bbba07e2e2404698",
+          "inputs_sha256": "fe6f021e008b5bc40b58550c2c850e38c2a18dd11181e512f2b3c2276c95904a"
+        }
+      }
+    ]
+  }
+}
