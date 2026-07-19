@@ -275,6 +275,20 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
     let subject_b = Keypair::generate();
 
     let parent_id = "cap-parent-w1.2";
+    let parent = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: parent_id.to_string(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: parent_scope.clone(),
+            issued_at: 100,
+            expires_at: 200,
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .expect("parent token signs");
 
     let mk_chain = |delegatee: chio_core::PublicKey| {
         let body = DelegationLinkBody {
@@ -325,12 +339,27 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
 
     // Build kernel using the issuer keypair as the kernel's primary so
     // the issuer is in the trusted set, register the trust root for
-    // the chain-binding rule, and seed the budget registry with the
-    // parent share.
-    let kernel = make_kernel(issuer.clone()).with_capability_trust_roots(vec![(
+    // the chain-binding rule, persist the signed parent, and seed the
+    // budget registry with the parent share.
+    let receipt_dir = tempfile::tempdir().expect("receipt tempdir");
+    let receipt_path = receipt_dir.path().join("receipts.sqlite3");
+    let receipt_store =
+        chio_store_sqlite::SqliteReceiptStore::open(&receipt_path).expect("receipt store opens");
+    receipt_store
+        .record_capability_snapshot(&parent, None)
+        .expect("parent snapshot records");
+    drop(receipt_store);
+
+    let mut kernel = make_kernel(issuer.clone()).with_capability_trust_roots(vec![(
         issuer.public_key(),
         scope_hash(&parent_scope).unwrap(),
     )]);
+    kernel
+        .set_receipt_store(Box::new(
+            chio_store_sqlite::SqliteReceiptStore::open(receipt_path)
+                .expect("receipt store reopens"),
+        ))
+        .expect("receipt store configures");
     kernel
         .register_budget_parent(parent_id.to_string(), 5_000)
         .expect("register parent");
