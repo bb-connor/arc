@@ -6,7 +6,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use chio_core::capability::{
-    attenuation::{DelegationLink, DelegationLinkBody},
+    attenuation::{scope_hash, DelegationLink, DelegationLinkBody},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -382,8 +382,8 @@ async fn full_flow_denied_expired_capability() {
     let (kernel, _ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
 
-    // TTL=0 means the capability expires at the same second it was issued.
-    let cap = issue_tool_cap(&kernel, &agent_kp.public_key(), "echo", 0);
+    let cap = issue_tool_cap(&kernel, &agent_kp.public_key(), "echo", 1);
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let req = make_request(
         "req-expired",
@@ -455,7 +455,7 @@ async fn full_flow_revocation_cascade() {
         delegatee: agent_b_kp.public_key(),
         attenuations: vec![],
         timestamp: now,
-        scope_hash: None,
+        scope_hash: Some(scope_hash(&cap_a.scope).expect("hash delegated parent scope")),
         aggregate_budget: None,
         cumulative_approval: None,
     };
