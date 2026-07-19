@@ -15,11 +15,15 @@ use crate::admission_operation::{
 };
 use crate::approval::{ApprovalSetReservationInput, ApprovalStore};
 use crate::budget_store::{
-    AuthorizedBudgetHold, BudgetAuthorizationCleanupSnapshot, BudgetAuthorizeHoldDecision,
-    BudgetCommitMetadata, BudgetGuaranteeLevel, BudgetInvocationReservationState,
+    AuthorizedBudgetHold, BudgetAdmissionOperationBinding, BudgetAuthorizationCleanupSnapshot,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCommitMetadata,
+    BudgetGuaranteeLevel, BudgetHoldDispositionView, BudgetInvocationReservationState,
     BudgetMonetaryHoldState, BudgetStore, DeniedBudgetHold,
 };
-use crate::payment::RailSettlementStatus;
+use crate::payment::{
+    PaymentJournalRecord, PaymentJournalState, PaymentSettleAction, PaymentSettleIntent,
+    RailSettlementState, RailSettlementStatus,
+};
 
 const CLEANUP_CLAIM_LEASE_MS: u64 = 30_000;
 const MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION: usize = 4_096;
@@ -131,7 +135,63 @@ struct BudgetCleanupDenialValidation<'a> {
     expected_revocation_set: Option<&'a crate::supplemental_quota::CanonicalRevocationSet>,
 }
 
+pub(super) struct CallerReservedAdmissionTerms {
+    pub(super) operation: AdmissionOperation,
+    pub(super) authorization: BudgetAuthorizeHoldRequest,
+}
+
 impl ChioKernel {
+    /// Resolve the exact caller-reserved operation named by a signed nonce.
+    /// The hold index is durable and unique; the returned authorization is
+    /// reconstructed from the operation's immutable cleanup journal rather than
+    /// from caller input or mutable hold metadata.
+    pub(super) fn resolve_caller_reserved_admission_for_nonce(
+        &self,
+        hold_id: &str,
+        bound_capability_id: &str,
+        reserving_request_id: &str,
+    ) -> Result<CallerReservedAdmissionTerms, KernelError> {
+        let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is unavailable".to_string())
+        })?;
+        let operation = operation_store
+            .load_by_budget_hold_id(hold_id)?
+            .ok_or_else(|| {
+                KernelError::Internal(format!(
+                    "reserved hold {hold_id} has no exact admission operation owner"
+                ))
+            })?;
+        if operation.kind() != AdmissionOperationKind::ToolDispatch
+            || operation.state() != AdmissionOperationState::CallerReserved
+            || operation.dispatch_state() != AdmissionDispatchState::Committed
+            || operation.budget_hold_id() != Some(hold_id)
+            || operation.capability_id() != bound_capability_id
+            || operation.request_id() != reserving_request_id
+        {
+            return Err(KernelError::Internal(format!(
+                "reserved hold {hold_id} does not match its signed caller reservation binding"
+            )));
+        }
+        let snapshot = self.load_recovery_budget_snapshot(operation_store.as_ref(), &operation)?;
+        let authorization = snapshot.authorization_request()?;
+        let expected_operation_binding = BudgetAdmissionOperationBinding::new(
+            operation.operation_id().to_string(),
+            operation.request_binding_hash().to_string(),
+        )?;
+        if authorization.hold_id.as_deref() != Some(hold_id)
+            || authorization.capability_id != bound_capability_id
+            || authorization.admission_operation.as_ref() != Some(&expected_operation_binding)
+        {
+            return Err(KernelError::Internal(format!(
+                "reserved hold {hold_id} changed its immutable cleanup authorization binding"
+            )));
+        }
+        Ok(CallerReservedAdmissionTerms {
+            operation,
+            authorization,
+        })
+    }
+
     pub(super) fn prepare_current_admission_authority_replacement(
         &self,
     ) -> Result<(), KernelError> {
@@ -637,6 +697,27 @@ impl ChioKernel {
             if operation.state() == AdmissionOperationState::OutcomeUnknownAfterDispatch {
                 continue;
             }
+            if operation.state() == AdmissionOperationState::CallerReserved {
+                match self.recover_caller_reserved_operation(
+                    operation_store,
+                    budget_store,
+                    &operation,
+                ) {
+                    Ok(true) => {
+                        recovered = recovered.checked_add(1).ok_or_else(|| {
+                            KernelError::Internal(
+                                "admission recovery count overflowed usize".to_string(),
+                            )
+                        })?;
+                    }
+                    Ok(false) => {}
+                    Err(error) => errors.push(format!(
+                        "operation {} caller reservation recovery failed: {error}",
+                        operation.operation_id()
+                    )),
+                }
+                continue;
+            }
             if operation.kind() == AdmissionOperationKind::GovernedActiveResponse
                 && matches!(
                     operation.state(),
@@ -780,6 +861,27 @@ impl ChioKernel {
                         "operation {} retained governed dispatch validation failed: {error}",
                         operation.operation_id()
                     ));
+                }
+                continue;
+            }
+            if operation.state() == AdmissionOperationState::CallerReserved {
+                match self.recover_caller_reserved_operation(
+                    operation_store,
+                    budget_store,
+                    &operation,
+                ) {
+                    Ok(false) => {}
+                    Ok(true) => {
+                        recovered = recovered.checked_add(1).ok_or_else(|| {
+                            KernelError::Internal(
+                                "admission recovery count overflowed usize".to_string(),
+                            )
+                        })?;
+                    }
+                    Err(error) => errors.push(format!(
+                        "operation {} retained caller reservation validation failed: {error}",
+                        operation.operation_id()
+                    )),
                 }
                 continue;
             }
@@ -1004,6 +1106,105 @@ impl ChioKernel {
         }
     }
 
+    /// Retain a durably issued caller reservation while its exact stamped hold
+    /// remains open. Only a TTL-reaped `Expired` hold proves the reaper won the
+    /// close race and may conservatively terminalize the operation. Other closed
+    /// states can be transiently visible while reconciliation commits its exact
+    /// terminal operation and outbox, so recovery leaves them untouched.
+    /// Returns true when this call terminalized the operation and false when the
+    /// live reservation remains intentionally unresolved.
+    fn recover_caller_reserved_operation(
+        &self,
+        operation_store: &dyn AdmissionOperationStore,
+        budget_store: &dyn BudgetStore,
+        operation: &AdmissionOperation,
+    ) -> Result<bool, KernelError> {
+        if operation.kind() != AdmissionOperationKind::ToolDispatch
+            || operation.state() != AdmissionOperationState::CallerReserved
+            || operation.dispatch_state() != AdmissionDispatchState::Committed
+        {
+            return Err(KernelError::Internal(format!(
+                "caller reservation recovery refused operation {} in {}",
+                operation.operation_id(),
+                operation.state().as_str()
+            )));
+        }
+        let hold_id = operation.budget_hold_id().ok_or_else(|| {
+            KernelError::Internal(format!(
+                "caller reservation operation {} has no budget hold",
+                operation.operation_id()
+            ))
+        })?;
+        let indexed_operation = operation_store
+            .load_by_budget_hold_id(hold_id)?
+            .ok_or_else(|| {
+                KernelError::Internal(format!(
+                    "caller reservation hold {hold_id} has no indexed admission operation"
+                ))
+            })?;
+        if indexed_operation.operation_id() != operation.operation_id()
+            || indexed_operation.request_binding_hash() != operation.request_binding_hash()
+            || indexed_operation.capability_id() != operation.capability_id()
+            || indexed_operation.budget_hold_id() != Some(hold_id)
+        {
+            return Err(KernelError::Internal(format!(
+                "caller reservation hold {hold_id} changed its exact operation index"
+            )));
+        }
+        let recovery_snapshot = self.load_recovery_budget_snapshot(operation_store, operation)?;
+        let authorization_request = recovery_snapshot.authorization_request()?;
+        if authorization_request.hold_id.as_deref() != Some(hold_id) {
+            return Err(KernelError::Internal(format!(
+                "caller reservation operation {} changed its cleanup hold binding",
+                operation.operation_id()
+            )));
+        }
+        let hold = budget_store.get_budget_hold(hold_id)?.ok_or_else(|| {
+            KernelError::Internal(format!(
+                "caller reservation operation {} lost its exact budget hold",
+                operation.operation_id()
+            ))
+        })?;
+        if hold.hold_id != hold_id
+            || hold.capability_id != operation.capability_id()
+            || hold.grant_index != authorization_request.grant_index
+            || hold.authorized_exposure_units != authorization_request.requested_exposure_units
+        {
+            return Err(KernelError::Internal(format!(
+                "caller reservation operation {} changed its hold binding",
+                operation.operation_id()
+            )));
+        }
+        if hold.disposition.is_open() {
+            if hold.reserved_until.is_none() {
+                return Err(KernelError::Internal(format!(
+                    "caller reservation operation {} has an unstamped open hold",
+                    operation.operation_id()
+                )));
+            }
+            return Ok(false);
+        }
+        if hold.disposition != BudgetHoldDispositionView::Expired {
+            return Ok(false);
+        }
+        let disposition = hold.disposition.as_str();
+        let reason = format!(
+            "cold recovery found caller reservation hold {hold_id} {disposition} without an exact terminal receipt"
+        );
+        self.finalize_caller_reservation_outcome_unknown_with_store(
+            operation_store,
+            operation,
+            &reason,
+            Some(serde_json::json!({
+                "caller_reservation_recovery": {
+                    "hold_id": hold_id,
+                    "hold_disposition": disposition,
+                }
+            })),
+        )?;
+        Ok(true)
+    }
+
     fn recover_claimed_admission_operation(
         &self,
         operation_store: &dyn AdmissionOperationStore,
@@ -1031,8 +1232,11 @@ impl ChioKernel {
                     )))
                 }
             }
-            (AdmissionOperationKind::ToolDispatch, AdmissionOperationState::CapturePending) => self
-                .recover_capture_pending_operation(
+            (
+                AdmissionOperationKind::ToolDispatch,
+                AdmissionOperationState::CapturePending
+                | AdmissionOperationState::CallerReservationCapturePending,
+            ) => self.recover_capture_pending_operation(
                     operation_store,
                     budget_store,
                     approval_store,
@@ -1115,8 +1319,15 @@ impl ChioKernel {
         approval_store: Option<&dyn ApprovalStore>,
         operation: &AdmissionOperation,
     ) -> Result<(), KernelError> {
+        let caller_reservation =
+            operation.state() == AdmissionOperationState::CallerReservationCapturePending;
         let snapshot = self.load_recovery_budget_snapshot(operation_store, operation)?;
-        self.commit_recovery_replay_reservations(operation_store, approval_store, operation)?;
+        if !caller_reservation
+            || operation.approval_set_hash().is_some()
+            || operation.execution_nonce_id().is_some()
+        {
+            self.commit_recovery_replay_reservations(operation_store, approval_store, operation)?;
+        }
         let _guard = match self.budget_store_lock.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -1205,6 +1416,16 @@ impl ChioKernel {
             })?;
             let decision = match capture_authority.query_admission_capture(&request)? {
                 Some(decision) => decision,
+                None if caller_reservation => {
+                    drop(_guard);
+                    return self.compensate_recovery_capture_denial(
+                        operation_store,
+                        budget_store,
+                        approval_store,
+                        operation,
+                        "caller reservation recovery proved combined capture was never committed",
+                    );
+                }
                 None => capture_authority.capture_admission(request)?,
             };
             match decision {
@@ -1223,6 +1444,16 @@ impl ChioKernel {
         } else {
             match budget_store.query_invocation_capture(&capture_request)? {
                 Some(captured) => captured,
+                None if caller_reservation => {
+                    drop(_guard);
+                    return self.compensate_recovery_capture_denial(
+                        operation_store,
+                        budget_store,
+                        approval_store,
+                        operation,
+                        "caller reservation recovery proved invocation capture was never committed",
+                    );
+                }
                 None => budget_store.capture_invocation_reservations(capture_request)?,
             }
         };
@@ -1236,6 +1467,16 @@ impl ChioKernel {
             expected_monetary_state,
         })?;
         drop(_guard);
+        if caller_reservation {
+            self.recovery_transition(
+                operation_store,
+                operation,
+                AdmissionOperationState::CallerReserved,
+                AdmissionDispatchState::Committed,
+                None,
+            )?;
+            return Ok(());
+        }
         let committed = self.recovery_transition(
             operation_store,
             operation,

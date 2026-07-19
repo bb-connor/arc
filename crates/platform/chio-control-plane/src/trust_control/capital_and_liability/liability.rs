@@ -1,5 +1,19 @@
 use super::*;
 
+/// Operator-supplied predeclared roster policy for liability adjudication.
+///
+/// `roster_anchor` is the id or hash of the signed roster artifact that
+/// `roster` was drawn from (for example a `chio-trust-market-context`
+/// `AdjudicationJurisdictionReceipt`). It is recorded on the adjudication so
+/// the audit trail shows which ex-ante roster was applied and the check is not
+/// per-adjudication fabricable.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RosterPolicy {
+    pub roster: Vec<String>,
+    pub allowed_decision_rules: Vec<String>,
+    pub roster_anchor: String,
+}
+
 pub fn issue_signed_liability_provider(
     receipt_db_path: &Path,
     authority_seed_path: Option<&Path>,
@@ -665,11 +679,12 @@ pub fn issue_signed_liability_claim_adjudication(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimAdjudicationIssueRequest,
+    policy: &RosterPolicy,
 ) -> Result<SignedLiabilityClaimAdjudication, CliError> {
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let issued_at = unix_timestamp_now();
-    let artifact = build_liability_claim_adjudication_artifact(request, issued_at)?;
+    let artifact = build_liability_claim_adjudication_artifact(request, issued_at, policy)?;
     let signed = SignedLiabilityClaimAdjudication::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to sign liability claim adjudication artifact: {error}"
@@ -686,11 +701,12 @@ pub fn issue_signed_liability_claim_payout_instruction(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimPayoutInstructionIssueRequest,
+    policy: &RosterPolicy,
 ) -> Result<SignedLiabilityClaimPayoutInstruction, CliError> {
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let issued_at = unix_timestamp_now();
-    let artifact = build_liability_claim_payout_instruction_artifact(request, issued_at)?;
+    let artifact = build_liability_claim_payout_instruction_artifact(request, issued_at, policy)?;
     let signed =
         SignedLiabilityClaimPayoutInstruction::sign(artifact, &keypair).map_err(|error| {
             CliError::cli_other_error(format!(
@@ -729,11 +745,13 @@ pub fn issue_signed_liability_claim_settlement_instruction(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimSettlementInstructionIssueRequest,
+    policy: &RosterPolicy,
 ) -> Result<SignedLiabilityClaimSettlementInstruction, CliError> {
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let issued_at = unix_timestamp_now();
-    let artifact = build_liability_claim_settlement_instruction_artifact(request, issued_at)?;
+    let artifact =
+        build_liability_claim_settlement_instruction_artifact(request, issued_at, policy)?;
     let signed =
         SignedLiabilityClaimSettlementInstruction::sign(artifact, &keypair).map_err(|error| {
             CliError::cli_other_error(format!(
@@ -1193,6 +1211,7 @@ fn build_liability_claim_dispute_artifact(
 fn build_liability_claim_adjudication_artifact(
     request: &LiabilityClaimAdjudicationIssueRequest,
     issued_at: u64,
+    policy: &RosterPolicy,
 ) -> Result<LiabilityClaimAdjudicationArtifact, CliError> {
     let evidence_refs = vec![LiabilityClaimEvidenceReference {
         kind: LiabilityClaimEvidenceKind::ClaimDispute,
@@ -1223,6 +1242,8 @@ fn build_liability_claim_adjudication_artifact(
                     request.outcome,
                     &request.awarded_amount,
                     &request.note,
+                    &request.decision_rule_ref,
+                    &policy.roster_anchor,
                 ))
                 .map_err(|error| CliError::cli_other_error(error.to_string()))?
             )
@@ -1233,9 +1254,18 @@ fn build_liability_claim_adjudication_artifact(
         outcome: request.outcome,
         awarded_amount: request.awarded_amount.clone(),
         note: request.note.clone(),
+        decision_rule_ref: request.decision_rule_ref.clone(),
+        roster_anchor_ref: Some(policy.roster_anchor.clone()),
         evidence_refs,
     };
     artifact.validate().map_err(CliError::cli_other_error)?;
+    artifact
+        .validate_against_roster(
+            &policy.roster,
+            &policy.allowed_decision_rules,
+            &policy.roster_anchor,
+        )
+        .map_err(CliError::cli_other_error)?;
     Ok(artifact)
 }
 
@@ -1261,7 +1291,17 @@ fn liability_claim_adjudication_awarded_amount(
 fn build_liability_claim_payout_instruction_artifact(
     request: &LiabilityClaimPayoutInstructionIssueRequest,
     issued_at: u64,
+    policy: &RosterPolicy,
 ) -> Result<LiabilityClaimPayoutInstructionArtifact, CliError> {
+    request
+        .adjudication
+        .body
+        .validate_against_roster(
+            &policy.roster,
+            &policy.allowed_decision_rules,
+            &policy.roster_anchor,
+        )
+        .map_err(CliError::cli_other_error)?;
     let payout_amount = liability_claim_adjudication_awarded_amount(&request.adjudication)?;
     let artifact = LiabilityClaimPayoutInstructionArtifact {
         schema: LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA.to_string(),
@@ -1324,7 +1364,21 @@ fn build_liability_claim_payout_receipt_artifact(
 fn build_liability_claim_settlement_instruction_artifact(
     request: &LiabilityClaimSettlementInstructionIssueRequest,
     issued_at: u64,
+    policy: &RosterPolicy,
 ) -> Result<LiabilityClaimSettlementInstructionArtifact, CliError> {
+    request
+        .payout_receipt
+        .body
+        .payout_instruction
+        .body
+        .adjudication
+        .body
+        .validate_against_roster(
+            &policy.roster,
+            &policy.allowed_decision_rules,
+            &policy.roster_anchor,
+        )
+        .map_err(CliError::cli_other_error)?;
     validate_capital_execution_envelope(
         &request.authority_chain,
         &request.execution_window,
@@ -1408,3 +1462,5 @@ fn build_liability_claim_settlement_receipt_artifact(
     artifact.validate().map_err(CliError::cli_other_error)?;
     Ok(artifact)
 }
+
+include!("tests/liability_roster_enforcement.rs");

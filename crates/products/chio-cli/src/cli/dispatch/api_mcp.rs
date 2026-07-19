@@ -6,7 +6,11 @@ use super::*;
 pub(crate) fn dispatch_api(
     command: ApiCommands,
     receipt_db: Option<PathBuf>,
+    revocation_db: Option<PathBuf>,
     authority_seed_file: Option<PathBuf>,
+    budget_db: Option<PathBuf>,
+    control_url: Option<String>,
+    control_token: Option<String>,
 ) -> Result<(), CliError> {
     match command {
         ApiCommands::Protect {
@@ -14,6 +18,7 @@ pub(crate) fn dispatch_api(
             spec,
             listen,
             receipt_store,
+            allow_ephemeral_receipts,
             upstream_timeout_secs,
         } => cmd_api_protect(
             &upstream,
@@ -21,6 +26,11 @@ pub(crate) fn dispatch_api(
             &listen,
             receipt_store.as_deref().or(receipt_db.as_deref()),
             authority_seed_file.as_deref(),
+            budget_db.as_deref(),
+            revocation_db.as_deref(),
+            control_url.as_deref(),
+            control_token.as_deref(),
+            allow_ephemeral_receipts,
             upstream_timeout_secs,
         ),
     }
@@ -64,6 +74,22 @@ pub(crate) fn dispatch_mcp(
                 ));
             }
             cmd_mcp_wrap(&args)
+        }
+        McpCommands::GovernedSim(args) => {
+            if keyring_config.is_some()
+                || broker_config.is_some()
+                || aggregate_invocation_admission
+                || admission_operation_db.is_some()
+                || approval_db.is_some()
+                || approver_directory.is_some()
+                || threshold_proposal_authority_public_key.is_some()
+            {
+                return Err(CliError::cli_other_error(
+                    "keyring, broker, and ordinary admission flags are not supported by the governed simulation"
+                        .to_string(),
+                ));
+            }
+            cmd_mcp_governed_sim(&args)
         }
         McpCommands::Serve {
             policy,

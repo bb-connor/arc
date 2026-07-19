@@ -25,10 +25,12 @@ lineage = []
 chacha20poly1305 = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-credit = { workspace = true }
+chio-keyring = { workspace = true }
 chio-kernel = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
 chio-settle = { workspace = true }
 hex = { workspace = true }
+chio-supervisor = { workspace = true }
 thiserror = { workspace = true }
 r2d2 = "0.8"
 r2d2_sqlite = "0.33.0"
@@ -39,9 +41,6 @@ rustix = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }
-
-[target.'cfg(target_vendor = "apple")'.dependencies]
-chio-keyring = { workspace = true }
 
 [dev-dependencies]
 chio-quarantine = { workspace = true }

@@ -249,6 +249,113 @@ pub trait BudgetStore: Send + Sync {
         BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual
     }
 
+    /// Open holds created at or before `older_than_unix_ms`, oldest first.
+    /// Default: empty (stores without hold rows have nothing to sweep).
+    fn list_open_holds_older_than(
+        &self,
+        _older_than_unix_ms: u64,
+        _limit: usize,
+    ) -> Result<Vec<OpenHoldSummary>, BudgetStoreError> {
+        Ok(Vec::new())
+    }
+
+    /// Release the remaining exposure of an open hold, mark it expired, and
+    /// append an expire event. Idempotent: a non-open hold returns
+    /// `Ok(false)`. Default: unsupported.
+    fn expire_open_hold(&self, _hold_id: &str) -> Result<bool, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "open-hold sweep is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Count of holds currently open, for the open-holds gauge. Default: 0.
+    fn open_hold_count(&self) -> Result<u64, BudgetStoreError> {
+        Ok(0)
+    }
+
+    /// Insert a fresh payment-journal row in `HoldPlaced`. Fails closed on
+    /// a reused request id. Default: unsupported.
+    fn record_payment_journal(
+        &self,
+        _entry: &crate::payment::PaymentJournalRecord,
+    ) -> Result<(), BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "payment journal is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Compare-and-set state advance. `expected` must match the current row
+    /// state or the call fails closed. When advancing to `Settling` the
+    /// caller MUST pass `settle` so the store stamps the committed action
+    /// and amount atomically with the state change; `settle` is invalid on
+    /// every other transition. Default: unsupported.
+    fn advance_payment_journal(
+        &self,
+        _request_id: &str,
+        _expected: crate::payment::PaymentJournalState,
+        _next: crate::payment::PaymentJournalState,
+        _authorization_id: Option<&str>,
+        _transaction_id: Option<&str>,
+        _settle: Option<crate::payment::PaymentSettleIntent>,
+    ) -> Result<(), BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "payment journal is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Move the row to `Closed`. Idempotent: an already-closed or absent
+    /// row returns `Ok(false)`. Default: unsupported.
+    fn close_payment_journal(&self, _request_id: &str) -> Result<bool, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "payment journal is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Rows in a non-terminal state created at or before
+    /// `older_than_unix_ms`, oldest first, for boot reconciliation.
+    /// Default: empty (stores without the journal have no orphans).
+    fn list_incomplete_payment_journal(
+        &self,
+        _older_than_unix_ms: u64,
+    ) -> Result<Vec<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        Ok(Vec::new())
+    }
+
+    /// Look up one incomplete payment-journal row by request id. Scoped
+    /// identically to [`Self::list_incomplete_payment_journal`]: a closed,
+    /// reconcile-failed, or absent row returns `Ok(None)`, never a stale
+    /// terminal record. Default: a linear scan over
+    /// `list_incomplete_payment_journal`, correct for any store but O(n) in
+    /// the number of open rows; a store expecting many concurrent monetary
+    /// orphans should override this with a keyed lookup.
+    fn get_payment_journal(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        Ok(self
+            .list_incomplete_payment_journal(u64::MAX)?
+            .into_iter()
+            .find(|row| row.request_id == request_id))
+    }
+
+    /// Rail recorded on `request_id`'s payment-journal row, if (and only if)
+    /// that row is currently `ReconcileFailed`: a durable operator incident
+    /// the money-path pass already gave up on. Distinct from
+    /// [`Self::get_payment_journal`], which never surfaces a reconcile-
+    /// failed row (see its doc) -- the monetary dispatch-intent reconciler
+    /// uses this targeted lookup so such a row is promoted into a
+    /// dead-letter instead of being reported as a clean resolution, keeping
+    /// the incident visible to RFC-0003's health-flipping dead-letter
+    /// surface. Default: `Ok(None)`, for stores without the journal or
+    /// without this targeted lookup (they report no incidents, matching
+    /// `list_incomplete_payment_journal`'s empty default).
+    fn payment_journal_reconcile_failed_rail(
+        &self,
+        _request_id: &str,
+    ) -> Result<Option<String>, BudgetStoreError> {
+        Ok(None)
+    }
+
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,
@@ -277,6 +384,45 @@ pub trait BudgetStore: Send + Sync {
             request.event_id.as_deref(),
             request.authority.as_ref(),
         )?;
+        // The recoverable money record exists only for a granted hold: a
+        // budget-denied request never touches the rail, so journaling it
+        // would leave an incomplete HoldPlaced row for reconciliation to
+        // raise as a false monetary incident. Stores that cannot co-commit
+        // the two writes persist the journal immediately after the grant; a
+        // store that cannot persist it revokes the hold it just granted and
+        // fails closed, so the money path never runs without its crash
+        // record. A crash between the grant and the journal write leaves an
+        // orphaned hold the sweeper expires, returning both its exposure
+        // and its invocation slot.
+        if allowed {
+            if let Some(journal) = request.payment_journal.as_ref() {
+                if let Err(error) = self.record_payment_journal(journal) {
+                    let rollback_event_id = request
+                        .event_id
+                        .as_deref()
+                        .map(|event_id| format!("{event_id}:journal-rollback"));
+                    if let Err(rollback_error) = self.reverse_charge_cost_with_ids_and_authority(
+                        &request.capability_id,
+                        request.grant_index,
+                        request.requested_exposure_units,
+                        request.hold_id.as_deref(),
+                        rollback_event_id.as_deref(),
+                        request.authority.as_ref(),
+                    ) {
+                        // The hold leaks until the sweeper expires it;
+                        // capacity is fail-closed under-spend meanwhile.
+                        tracing::warn!(
+                            capability_id = %request.capability_id,
+                            grant_index = request.grant_index,
+                            reason = %redacted!(&rollback_error.to_string()),
+                            "budget hold rollback failed after a journal write failure; the \
+                             hold sweeper will expire the orphaned hold"
+                        );
+                    }
+                    return Err(error);
+                }
+            }
+        }
         let usage = self.get_usage(&request.capability_id, request.grant_index)?;
         let committed_cost_units_after = usage
             .as_ref()
@@ -459,8 +605,177 @@ pub trait BudgetStore: Send + Sync {
             "invocation reservation capture query unavailable for this backend".to_string(),
         ))
     }
-}
 
+    /// Reverse any hold that is still `open` after a process restart, arbitrated
+    /// by the provided realized-spend map. Holds present in `realized_by_hold`
+    /// are reconciled to their recorded amount; holds absent from it (orphans)
+    /// are reversed. Stores that do not persist hold state return `Ok((0, 0))`
+    /// (the default). Returns `(reconciled, reversed)` counts.
+    ///
+    /// Callers must supply a realized-spend map built from the durable receipt
+    /// log (ADR-0013). Passing an empty map reverses all open holds, which
+    /// enables double-spend: a hold left open by a crash after the spend but
+    /// before reconcile represents real spent budget. Use `count_open_holds`
+    /// to log the hold count and leave holds reserved (fail-closed) when the
+    /// durable receipt log is not available at startup.
+    fn reap_orphaned_holds(
+        &self,
+        realized_by_hold: &std::collections::HashMap<String, u64>,
+    ) -> Result<(usize, usize), BudgetStoreError> {
+        let _ = realized_by_hold;
+        Ok((0, 0))
+    }
+
+    /// Return the number of holds still in the `open` state. Stores that do
+    /// not persist hold state return `Ok(0)` (the default). Use at startup to
+    /// log the number of holds that will remain reserved under the fail-closed
+    /// policy when the durable receipt log arbitration map is unavailable.
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
+        Ok(0)
+    }
+
+    /// Ids of holds that are still `open` and were stamped as a delegated
+    /// reserve-for-caller reservation: marked reserved (via
+    /// [`Self::mark_hold_reserved`] or [`Self::reserve_invocation_hold`]) with a
+    /// delegation depth of at least one. Such a hold keeps its delegated child's
+    /// sibling-sum share admitted against the parent for as long as it stays
+    /// open. A freshly built mediation kernel consults this after a restart: the
+    /// in-memory sibling-sum reservations were lost, and the durable hold record
+    /// carries neither the immediate parent capability id nor the child and
+    /// parent shares needed to rebuild them, so mediation denies delegated
+    /// admission fail-closed while any such hold from a prior process is still
+    /// open.
+    ///
+    /// `Ok(Some(ids))` enumerates those holds precisely. `Ok(None)` marks a store
+    /// that cannot enumerate them; the caller then falls back to
+    /// [`Self::count_open_holds`] and gates on the presence of any open hold. The
+    /// default is `Ok(None)` so a store that does not persist hold state is
+    /// treated as unable to enumerate rather than as having none.
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        Ok(None)
+    }
+
+    /// Whether any authorization hold id begins with the durable
+    /// `budget-hold:{request_id}:` prefix, regardless of the capability id and
+    /// grant index encoded after it.
+    ///
+    /// The mediated pre-execution gate derives each hold id from
+    /// (request_id, capability id, grant index), so a caller that replays one
+    /// request_id under a DIFFERENT capability token would slip past a
+    /// per-capability exact-id probe (its `budget-hold:{request_id}:{other_cap}:..`
+    /// row never matches) and win a second reservation after a restart cleared
+    /// the in-memory reuse window. Matching the prefix rejects the replay no
+    /// matter which capability presented it.
+    ///
+    /// `Ok(Some(true))` = at least one hold id begins with the prefix;
+    /// `Ok(Some(false))` = none does; `Ok(None)` marks a store that cannot
+    /// enumerate holds by prefix, so the caller falls back to the per-capability
+    /// exact probe. The default is `Ok(None)` so a store that does not persist
+    /// hold state is treated as unable to enumerate rather than as having none.
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        let _ = request_id;
+        Ok(None)
+    }
+
+    /// Project a single hold by id, or `None` when it is unknown. Stores that
+    /// do not persist hold state return `Ok(None)` (the default). Used by the
+    /// reconcile-by-nonce entry point to resolve the exact reserved hold a
+    /// signed execution nonce names.
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
+        let _ = hold_id;
+        Ok(None)
+    }
+
+    /// Stamp an open hold with the wall-clock unix second after which the TTL
+    /// reaper may settle it if it is still unreconciled, and record the currency
+    /// the grant was authorized in. Only the pre-execution
+    /// authorization-reserving path calls this, so a normal in-flight hold
+    /// (reconciled or reversed within one evaluation) is never marked and never
+    /// touched by the TTL reaper. The recorded currency lets reconcile-by-nonce
+    /// reject a caller-supplied realized currency that differs from the grant's.
+    /// `payment_reference` records the rail transaction id of a prepaid MustPrepay
+    /// reservation (`None` for a reserve with no prepayment) so reconcile-by-nonce
+    /// can stamp it onto the authoritative receipt. `envelope` records the grant
+    /// ceiling and delegation lineage so reconcile-by-nonce reports the grant's
+    /// budget total/remaining and true lineage instead of the reservation's own
+    /// exposure. Stores that do not persist hold state treat this as a no-op (the
+    /// default).
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+        payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        );
+        Ok(())
+    }
+
+    /// Adopt an already-debited invocation into a durable reserved hold that
+    /// carries zero monetary exposure, so a `max_invocations`-only reservation is
+    /// reversible and reapable by hold id exactly like a monetary reserve. The
+    /// invocation was already counted by [`Self::try_increment`]; this records the
+    /// hold WITHOUT touching the invocation count, marks it reserved with the TTL
+    /// deadline, and records no currency (there is no monetary envelope to
+    /// validate on reconcile). Reversing the hold returns the invocation;
+    /// reconciling or reaping it keeps the invocation consumed. `envelope` records
+    /// the delegation lineage so reconcile-by-nonce stamps the true depth/root
+    /// (its `budget_total` is `None`: an invocation reserve carries no monetary
+    /// ceiling). Stores that do not persist hold state treat this as a no-op (the
+    /// default).
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        );
+        Ok(())
+    }
+
+    /// Settle every reserved hold that is still `open` and whose `reserved_until`
+    /// is at or before `now_unix_secs` at its reserved worst-case, forfeiting the
+    /// reserved amount to realized spend. In the two-phase reserve/reconcile flow
+    /// the ONLY evidence a spend occurred is the caller's reconcile; an
+    /// expired-and-unreconciled hold may correspond to a call that DID execute and
+    /// spend. Releasing it (realized 0) would under-count real spend and fail open
+    /// for a cumulative spend cap, so an abandoning caller instead FORFEITS the
+    /// reserved worst-case (the grant's realized total advances by it) and must
+    /// reconcile the real cost before expiry to reclaim the difference.
+    /// Fail-closed and self-healing: it settles ONLY holds that were explicitly
+    /// marked reserved (via [`Self::mark_hold_reserved`]) and are past their
+    /// expiry; a not-yet-expired reserved hold and a reconciled/reversed/released
+    /// hold are never touched. Idempotent (a settled hold is no longer open).
+    /// Returns the number of holds settled. Stores that do not persist hold state
+    /// return `Ok(0)` (the default).
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        let _ = now_unix_secs;
+        Ok(0)
+    }
+}
 fn checked_committed_cost_units(
     total_cost_exposed: u64,
     total_cost_realized_spend: u64,
@@ -478,1325 +793,5 @@ pub use in_memory::InMemoryBudgetStore;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[test]
-    fn hard_invocation_guarantee_requires_a_matching_authoritative_topology() {
-        assert!(BudgetGuaranteeLevel::SingleNodeAtomic
-            .supports_hard_invocation_limit(BudgetStoreProfile::SingleNodeDurable, 1,));
-        assert!(!BudgetGuaranteeLevel::SingleNodeAtomic
-            .supports_hard_invocation_limit(BudgetStoreProfile::SharedLinearizable, 2,));
-        assert!(BudgetGuaranteeLevel::HaLinearizable
-            .supports_hard_invocation_limit(BudgetStoreProfile::SharedLinearizable, 2,));
-        assert!(!BudgetGuaranteeLevel::HaLinearizable
-            .supports_hard_invocation_limit(BudgetStoreProfile::SingleNodeDurable, 1,));
-        assert!(!BudgetGuaranteeLevel::PartitionEscrowed
-            .supports_hard_invocation_limit(BudgetStoreProfile::SharedLinearizable, 2,));
-        assert!(!BudgetGuaranteeLevel::AdvisoryPosthoc
-            .supports_hard_invocation_limit(BudgetStoreProfile::SharedLinearizable, 2,));
-    }
-
-    fn quota(
-        profile: BudgetQuotaProfile,
-        owner_id: &str,
-        grant_index: Option<u32>,
-        max_invocations: u32,
-    ) -> BudgetInvocationQuota {
-        BudgetInvocationQuota {
-            key: BudgetQuotaKey {
-                profile,
-                owner_id: owner_id.to_string(),
-                grant_index,
-            },
-            max_invocations,
-        }
-    }
-
-    fn composite_operation_binding(hold_id: &str) -> BudgetAdmissionOperationBinding {
-        BudgetAdmissionOperationBinding::new(
-            format!("operation-{hold_id}"),
-            "44".repeat(32),
-        )
-        .unwrap()
-    }
-
-    fn composite_request(
-        hold_id: &str,
-        event_id: &str,
-        quotas: Vec<BudgetInvocationQuota>,
-    ) -> BudgetAuthorizeHoldRequest {
-        let invocation_admission = VerifiedInvocationAdmission {
-            quotas,
-            revocation_set: CanonicalRevocationSet::new("cap-composite", &[], &[]).unwrap(),
-            aggregate_root_capability_id: None,
-            aggregate_binding_digest: None,
-            supplemental_binding: Some(SupplementalQuotaBinding {
-                artifact_digest: "11".repeat(32),
-                verifier_id: "test-verifier".to_string(),
-                request_binding_hash: "22".repeat(32),
-                negotiated_features_digest: "33".repeat(32),
-            }),
-        };
-        BudgetAuthorizeHoldRequest {
-            capability_id: "cap-composite".to_string(),
-            grant_index: 0,
-            max_invocations: None,
-            requested_exposure_units: 100,
-            max_cost_per_invocation: Some(100),
-            max_total_cost_units: Some(1_000),
-            hold_id: Some(hold_id.to_string()),
-            event_id: Some(event_id.to_string()),
-            authority: None,
-            admission_operation: Some(composite_operation_binding(hold_id)),
-            invocation_admission: Some(invocation_admission),
-        }
-    }
-
-    fn three_quotas(aggregate_max: u32) -> Vec<BudgetInvocationQuota> {
-        vec![
-            quota(
-                BudgetQuotaProfile::GrantInvocation,
-                "cap-composite",
-                Some(0),
-                2,
-            ),
-            quota(
-                BudgetQuotaProfile::AggregateCapabilityInvocation,
-                "cap-composite",
-                None,
-                aggregate_max,
-            ),
-            quota(
-                BudgetQuotaProfile::SupplementalBrokerExecution,
-                &"22".repeat(32),
-                None,
-                2,
-            ),
-        ]
-    }
-
-    #[test]
-    fn authorization_request_exposes_verified_admission_evidence_read_only() {
-        let mut quotas = three_quotas(3);
-        quotas[1].key.profile = BudgetQuotaProfile::AggregateFamilyInvocation;
-        quotas[1].key.owner_id = "55".repeat(32);
-        let mut request = composite_request("hold-evidence", "event-evidence", quotas);
-        let admission = request.invocation_admission.as_mut().unwrap();
-        admission.aggregate_root_capability_id = Some("family-root".to_string());
-        admission.aggregate_binding_digest = Some("44".repeat(32));
-
-        let evidence = request
-            .invocation_admission_evidence()
-            .expect("verified admission evidence");
-        assert_eq!(evidence.quotas(), request.invocation_quotas());
-        assert_eq!(
-            evidence.revocation_set().digest(),
-            request.revocation_set().unwrap().digest()
-        );
-        assert_eq!(
-            evidence.aggregate_binding_digest(),
-            Some("44".repeat(32).as_str())
-        );
-        assert_eq!(evidence.aggregate_root_capability_id(), Some("family-root"));
-        assert_eq!(
-            evidence.supplemental_artifact_digest(),
-            Some("11".repeat(32).as_str())
-        );
-        assert_eq!(evidence.supplemental_verifier_id(), Some("test-verifier"));
-        assert_eq!(
-            evidence.supplemental_request_binding_hash(),
-            Some("22".repeat(32).as_str())
-        );
-        assert_eq!(
-            evidence.supplemental_negotiated_features_digest(),
-            Some("33".repeat(32).as_str())
-        );
-    }
-
-    #[test]
-    fn persisted_quota_descriptors_revalidate_the_structured_key() {
-        let key = BudgetQuotaKey::from_persisted_parts(
-            BudgetQuotaProfile::GrantInvocation,
-            "cap-persisted".to_string(),
-            Some(7),
-        )
-        .unwrap();
-        let quota = BudgetInvocationQuota::from_persisted_parts(key, 11).unwrap();
-        assert_eq!(quota.key().profile(), BudgetQuotaProfile::GrantInvocation);
-        assert_eq!(quota.key().owner_id(), "cap-persisted");
-        assert_eq!(quota.key().grant_index(), Some(7));
-        assert_eq!(quota.max_invocations(), 11);
-
-        assert!(BudgetQuotaKey::from_persisted_parts(
-            BudgetQuotaProfile::AggregateFamilyInvocation,
-            "not-a-digest".to_string(),
-            None,
-        )
-        .is_err());
-        assert!(BudgetQuotaKey::from_persisted_parts(
-            BudgetQuotaProfile::AggregateCapabilityInvocation,
-            "cap-persisted".to_string(),
-            Some(7),
-        )
-        .is_err());
-    }
-
-    #[test]
-    fn persisted_quota_usage_revalidates_counters_and_states() {
-        let quota = BudgetInvocationQuota::from_persisted_parts(
-            BudgetQuotaKey::grant("cap-persisted", 0).unwrap(),
-            2,
-        )
-        .unwrap();
-        assert!(BudgetInvocationQuotaUsage {
-            quota: quota.clone(),
-            reserved_invocations_after: 1,
-            captured_invocations_after: 1,
-        }
-        .validate()
-        .is_ok());
-        assert!(BudgetInvocationQuotaUsage {
-            quota,
-            reserved_invocations_after: 2,
-            captured_invocations_after: 1,
-        }
-        .validate()
-        .is_err());
-
-        for state in [
-            BudgetInvocationReservationState::Absent,
-            BudgetInvocationReservationState::Authorized,
-            BudgetInvocationReservationState::Captured,
-            BudgetInvocationReservationState::Reversed,
-            BudgetInvocationReservationState::Denied,
-        ] {
-            assert_eq!(
-                BudgetInvocationReservationState::parse(state.as_str()),
-                Some(state)
-            );
-        }
-        assert_eq!(BudgetInvocationReservationState::parse("unknown"), None);
-
-        for state in [
-            BudgetMonetaryHoldState::None,
-            BudgetMonetaryHoldState::Exposed,
-            BudgetMonetaryHoldState::Released,
-            BudgetMonetaryHoldState::Reconciled,
-            BudgetMonetaryHoldState::Captured,
-            BudgetMonetaryHoldState::Reversed,
-        ] {
-            assert_eq!(BudgetMonetaryHoldState::parse(state.as_str()), Some(state));
-        }
-        assert_eq!(BudgetMonetaryHoldState::parse("unknown"), None);
-    }
-
-    #[test]
-    fn composite_hold_reserves_all_quotas_or_none() {
-        let store = InMemoryBudgetStore::new();
-        assert_eq!(
-            store.authority_profile(),
-            BudgetStoreProfile::EphemeralLocal
-        );
-        let first = store
-            .authorize_budget_hold(composite_request(
-                "hold-composite-1",
-                "event-composite-1",
-                three_quotas(1),
-            ))
-            .unwrap();
-        let BudgetAuthorizeHoldDecision::Authorized(first) = first else {
-            panic!("first composite hold should be authorized");
-        };
-        assert_eq!(first.invocation_counts_after.len(), 3);
-        assert!(first
-            .invocation_counts_after
-            .iter()
-            .all(|count| count.invocation_count_after().unwrap() == 1));
-        assert_eq!(
-            first.invocation_state,
-            BudgetInvocationReservationState::Authorized
-        );
-        assert_eq!(first.monetary_state, BudgetMonetaryHoldState::Exposed);
-
-        let second = store
-            .authorize_budget_hold(composite_request(
-                "hold-composite-2",
-                "event-composite-2",
-                three_quotas(1),
-            ))
-            .unwrap();
-        let BudgetAuthorizeHoldDecision::Denied(second) = second else {
-            panic!("exhausted aggregate quota should deny the whole hold");
-        };
-        assert_eq!(second.invocation_counts_after.len(), 3);
-        assert!(second
-            .invocation_counts_after
-            .iter()
-            .all(|count| count.invocation_count_after().unwrap() == 1));
-        assert_eq!(second.committed_cost_units_after, 100);
-    }
-
-    #[test]
-    fn composite_hold_rejects_duplicate_changed_maximum_and_nine_claims() {
-        let store = InMemoryBudgetStore::new();
-        let mut duplicate = three_quotas(2);
-        duplicate.push(duplicate[0].clone());
-        assert!(matches!(
-            store.authorize_budget_hold(composite_request(
-                "hold-duplicate",
-                "event-duplicate",
-                duplicate,
-            )),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        store
-            .authorize_budget_hold(composite_request(
-                "hold-max-1",
-                "event-max-1",
-                three_quotas(2),
-            ))
-            .unwrap();
-        let mut changed = three_quotas(2);
-        changed[0].max_invocations = 3;
-        assert!(matches!(
-            store.authorize_budget_hold(composite_request("hold-max-2", "event-max-2", changed,)),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let nine = (0..9)
-            .map(|index| {
-                quota(
-                    BudgetQuotaProfile::AggregateFamilyInvocation,
-                    &format!("family-{index}"),
-                    None,
-                    1,
-                )
-            })
-            .collect();
-        assert!(matches!(
-            store.authorize_budget_hold(composite_request("hold-nine", "event-nine", nine,)),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn denied_first_presentations_pin_immutable_maxima() {
-        let compatibility = InMemoryBudgetStore::new();
-        assert!(!compatibility
-            .try_increment("cap-denied-first", 0, Some(0))
-            .unwrap());
-        assert!(matches!(
-            compatibility.try_increment("cap-denied-first", 0, Some(1)),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let composite = InMemoryBudgetStore::new();
-        let denied = composite
-            .authorize_budget_hold(composite_request(
-                "hold-denied-first",
-                "event-denied-first",
-                three_quotas(0),
-            ))
-            .unwrap();
-        assert!(matches!(denied, BudgetAuthorizeHoldDecision::Denied(_)));
-        assert!(matches!(
-            composite.authorize_budget_hold(composite_request(
-                "hold-denied-first-raised",
-                "event-denied-first-raised",
-                three_quotas(1),
-            )),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn capture_and_reconcile_have_independent_substates() {
-        let store = InMemoryBudgetStore::new();
-        store
-            .authorize_budget_hold(composite_request(
-                "hold-independent",
-                "event-independent-authorize",
-                three_quotas(2),
-            ))
-            .unwrap();
-
-        let capture_request = BudgetCaptureInvocationRequest {
-            capability_id: "cap-composite".to_string(),
-            grant_index: 0,
-            hold_id: Some("hold-independent".to_string()),
-            event_id: Some("event-independent-capture".to_string()),
-            authority: None,
-            admission_operation: Some(composite_operation_binding("hold-independent")),
-        };
-        assert_eq!(
-            store.query_invocation_capture(&capture_request).unwrap(),
-            None
-        );
-        let captured = store
-            .capture_invocation_reservations(capture_request.clone())
-            .unwrap();
-        assert_eq!(
-            store.query_invocation_capture(&capture_request).unwrap(),
-            Some(captured.clone())
-        );
-        let mut rebound_capture = capture_request;
-        rebound_capture.capability_id = "different-capability".to_string();
-        assert!(matches!(
-            store.query_invocation_capture(&rebound_capture),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        assert_eq!(
-            captured.invocation_state,
-            BudgetInvocationReservationState::Captured
-        );
-        assert_eq!(captured.monetary_state, BudgetMonetaryHoldState::Exposed);
-        assert_eq!(captured.committed_cost_units_after, 100);
-
-        let reconciled = store
-            .reconcile_budget_hold(BudgetReconcileHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                exposed_cost_units: 100,
-                realized_spend_units: 60,
-                hold_id: Some("hold-independent".to_string()),
-                event_id: Some("event-independent-reconcile".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-independent")),
-            })
-            .unwrap();
-        assert_eq!(
-            reconciled.invocation_state,
-            BudgetInvocationReservationState::Captured
-        );
-        assert_eq!(
-            reconciled.monetary_state,
-            BudgetMonetaryHoldState::Reconciled
-        );
-        assert_eq!(reconciled.committed_cost_units_after, 60);
-        assert_eq!(
-            store
-                .get_usage("cap-composite", 0)
-                .unwrap()
-                .unwrap()
-                .total_cost_realized_spend,
-            60
-        );
-        assert!(reconciled
-            .invocation_counts_after
-            .iter()
-            .all(|count| count.invocation_count_after().unwrap() == 1));
-    }
-
-    #[test]
-    fn monetary_capture_preserves_and_then_allows_invocation_capture() {
-        let store = InMemoryBudgetStore::new();
-        store
-            .authorize_budget_hold(composite_request(
-                "hold-monetary-capture",
-                "event-monetary-capture-authorize",
-                three_quotas(2),
-            ))
-            .unwrap();
-        let captured_monetary = store
-            .capture_budget_hold(BudgetCaptureHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                exposed_cost_units: 100,
-                realized_spend_units: 60,
-                hold_id: Some("hold-monetary-capture".to_string()),
-                event_id: Some("event-monetary-capture".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-monetary-capture")),
-            })
-            .unwrap();
-        assert_eq!(
-            captured_monetary.invocation_state,
-            BudgetInvocationReservationState::Authorized
-        );
-        assert_eq!(
-            captured_monetary.monetary_state,
-            BudgetMonetaryHoldState::Captured
-        );
-
-        let captured_invocation = store
-            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                hold_id: Some("hold-monetary-capture".to_string()),
-                event_id: Some("event-invocation-after-monetary-capture".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-monetary-capture")),
-            })
-            .unwrap();
-        assert_eq!(
-            captured_invocation.invocation_state,
-            BudgetInvocationReservationState::Captured
-        );
-        assert_eq!(
-            captured_invocation.monetary_state,
-            BudgetMonetaryHoldState::Captured
-        );
-    }
-
-    #[test]
-    fn composite_authorize_event_retry_is_snapshot_stable() {
-        let store = InMemoryBudgetStore::new();
-        let request = composite_request("hold-retry", "event-retry-authorize", three_quotas(2));
-        let first = store.authorize_budget_hold(request.clone()).unwrap();
-        store
-            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                hold_id: Some("hold-retry".to_string()),
-                event_id: Some("event-retry-capture".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-retry")),
-            })
-            .unwrap();
-        assert_eq!(store.authorize_budget_hold(request).unwrap(), first);
-    }
-
-    #[test]
-    fn concurrent_composite_holds_admit_exactly_one_last_unit() {
-        use std::sync::{Arc, Barrier};
-
-        let store = Arc::new(InMemoryBudgetStore::new());
-        let barrier = Arc::new(Barrier::new(3));
-        let mut threads = Vec::new();
-        for index in 0..2 {
-            let store = Arc::clone(&store);
-            let barrier = Arc::clone(&barrier);
-            threads.push(std::thread::spawn(move || {
-                barrier.wait();
-                store
-                    .authorize_budget_hold(composite_request(
-                        &format!("hold-race-{index}"),
-                        &format!("event-race-{index}"),
-                        three_quotas(1),
-                    ))
-                    .unwrap()
-            }));
-        }
-        barrier.wait();
-        let authorized = threads
-            .into_iter()
-            .map(|thread| thread.join().unwrap())
-            .filter(BudgetAuthorizeHoldDecision::is_authorized)
-            .count();
-        assert_eq!(authorized, 1);
-    }
-
-    #[test]
-    fn composite_hold_rejects_ambiguous_unsorted_and_mismatched_retries() {
-        let store = InMemoryBudgetStore::new();
-
-        let mut ambiguous = composite_request("hold-ambiguous", "event-ambiguous", three_quotas(2));
-        ambiguous.max_invocations = Some(2);
-        assert!(matches!(
-            store.authorize_budget_hold(ambiguous),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let mut unsorted = three_quotas(2);
-        unsorted.swap(0, 1);
-        assert!(matches!(
-            store.authorize_budget_hold(composite_request(
-                "hold-unsorted",
-                "event-unsorted",
-                unsorted,
-            )),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let request = composite_request("hold-mismatch", "event-mismatch", three_quotas(2));
-        store.authorize_budget_hold(request.clone()).unwrap();
-        let mut changed_event = request.clone();
-        changed_event.requested_exposure_units = 99;
-        assert!(matches!(
-            store.authorize_budget_hold(changed_event),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        let mut changed_hold = request;
-        changed_hold.event_id = Some("event-mismatch-second".to_string());
-        assert!(matches!(
-            store.authorize_budget_hold(changed_hold),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn composite_predispatch_reverse_restores_every_quota_and_exposure() {
-        let store = InMemoryBudgetStore::new();
-        store
-            .authorize_budget_hold(composite_request(
-                "hold-reverse-1",
-                "event-reverse-1-authorize",
-                three_quotas(1),
-            ))
-            .unwrap();
-
-        let reversed = store
-            .reverse_budget_hold(BudgetReverseHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                reversed_exposure_units: 100,
-                hold_id: Some("hold-reverse-1".to_string()),
-                event_id: Some("event-reverse-1".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-reverse-1")),
-            })
-            .unwrap();
-        assert_eq!(
-            reversed.invocation_state,
-            BudgetInvocationReservationState::Reversed
-        );
-        assert_eq!(reversed.monetary_state, BudgetMonetaryHoldState::Reversed);
-        assert_eq!(reversed.committed_cost_units_after, 0);
-        assert!(reversed
-            .invocation_counts_after
-            .iter()
-            .all(|usage| usage.invocation_count_after().unwrap() == 0));
-
-        let second = store
-            .authorize_budget_hold(composite_request(
-                "hold-reverse-2",
-                "event-reverse-2-authorize",
-                three_quotas(1),
-            ))
-            .unwrap();
-        assert!(second.is_authorized());
-    }
-
-    #[test]
-    fn monetary_release_then_invocation_reverse_preserves_terminal_substate() {
-        let store = InMemoryBudgetStore::new();
-        store
-            .authorize_budget_hold(composite_request(
-                "hold-release-reverse",
-                "event-release-reverse-authorize",
-                three_quotas(1),
-            ))
-            .unwrap();
-        let released = store
-            .release_budget_hold(BudgetReleaseHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                released_exposure_units: 100,
-                hold_id: Some("hold-release-reverse".to_string()),
-                event_id: Some("event-release-reverse-release".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-release-reverse")),
-            })
-            .unwrap();
-        assert_eq!(released.monetary_state, BudgetMonetaryHoldState::Released);
-        assert_eq!(
-            released.invocation_state,
-            BudgetInvocationReservationState::Authorized
-        );
-
-        let reversed = store
-            .reverse_budget_hold(BudgetReverseHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                reversed_exposure_units: 0,
-                hold_id: Some("hold-release-reverse".to_string()),
-                event_id: Some("event-release-reverse-reverse".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-release-reverse")),
-            })
-            .unwrap();
-        assert_eq!(
-            reversed.invocation_state,
-            BudgetInvocationReservationState::Reversed
-        );
-        assert_eq!(reversed.monetary_state, BudgetMonetaryHoldState::Released);
-        assert!(reversed
-            .invocation_counts_after
-            .iter()
-            .all(|usage| usage.invocation_count_after().unwrap() == 0));
-        assert!(store
-            .authorize_budget_hold(composite_request(
-                "hold-release-reverse-next",
-                "event-release-reverse-next",
-                three_quotas(1),
-            ))
-            .unwrap()
-            .is_authorized());
-    }
-
-    #[test]
-    fn captured_invocations_are_terminal_while_monetary_exposure_remains_live() {
-        let store = InMemoryBudgetStore::new();
-        store
-            .authorize_budget_hold(composite_request(
-                "hold-captured-terminal",
-                "event-captured-terminal-authorize",
-                three_quotas(2),
-            ))
-            .unwrap();
-        store
-            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                hold_id: Some("hold-captured-terminal".to_string()),
-                event_id: Some("event-captured-terminal-capture".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-captured-terminal")),
-            })
-            .unwrap();
-
-        assert!(matches!(
-            store.reverse_budget_hold(BudgetReverseHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                reversed_exposure_units: 100,
-                hold_id: Some("hold-captured-terminal".to_string()),
-                event_id: Some("event-captured-terminal-reverse".to_string()),
-                authority: None,
-                admission_operation: Some(composite_operation_binding("hold-captured-terminal")),
-            }),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        let usage = store.get_usage("cap-composite", 0).unwrap().unwrap();
-        assert_eq!(usage.invocation_count, 1);
-        assert_eq!(usage.total_cost_exposed, 100);
-        assert!(matches!(
-            store.reverse_charge_cost("cap-composite", 0, 0),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        let usage = store.get_usage("cap-composite", 0).unwrap().unwrap();
-        assert_eq!(usage.invocation_count, 1);
-        assert_eq!(usage.total_cost_exposed, 100);
-    }
-
-    #[test]
-    fn compatibility_increment_pins_maximum_and_reverses_the_same_quota() {
-        let store = InMemoryBudgetStore::new();
-        assert!(store.try_increment("cap-compat", 0, Some(2)).unwrap());
-        assert!(store
-            .try_charge_cost("cap-compat", 0, Some(2), 1, None, None)
-            .unwrap());
-        assert!(matches!(
-            store.try_increment("cap-compat", 0, Some(3)),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        store.reverse_charge_cost("cap-compat", 0, 0).unwrap();
-        assert!(store.try_increment("cap-compat", 0, Some(2)).unwrap());
-
-        let events = store
-            .list_mutation_events(10, Some("cap-compat"), Some(0))
-            .unwrap();
-        assert_eq!(events.len(), 4);
-        assert_eq!(events[0].invocation_counts_after.len(), 1);
-        assert_eq!(
-            events[0].invocation_state,
-            BudgetInvocationReservationState::Captured
-        );
-    }
-
-    #[test]
-    fn compatibility_charge_uses_the_same_immutable_quota_authority() {
-        let store = InMemoryBudgetStore::new();
-        assert!(store
-            .try_charge_cost("cap-compat-charge", 0, Some(2), 1, None, None)
-            .unwrap());
-        assert!(matches!(
-            store.try_charge_cost("cap-compat-charge", 0, Some(3), 1, None, None),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let denied = InMemoryBudgetStore::new();
-        assert!(!denied
-            .try_charge_cost("cap-compat-charge-denied", 0, Some(2), 2, Some(1), None,)
-            .unwrap());
-        assert!(matches!(
-            denied.try_charge_cost("cap-compat-charge-denied", 0, Some(3), 1, Some(1), None,),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn multi_quota_authority_blocks_legacy_increment_and_charge_bypasses() {
-        let increment_store = InMemoryBudgetStore::new();
-        assert!(increment_store
-            .authorize_budget_hold(composite_request(
-                "hold-multi-authority-increment",
-                "event-multi-authority-increment",
-                three_quotas(1),
-            ))
-            .unwrap()
-            .is_authorized());
-        assert!(matches!(
-            increment_store.try_increment("cap-composite", 0, Some(2)),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let charge_store = InMemoryBudgetStore::new();
-        assert!(charge_store
-            .authorize_budget_hold(composite_request(
-                "hold-multi-authority-charge",
-                "event-multi-authority-charge",
-                three_quotas(1),
-            ))
-            .unwrap()
-            .is_authorized());
-        assert!(matches!(
-            charge_store.try_charge_cost("cap-composite", 0, Some(2), 0, None, None),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let hold_store = InMemoryBudgetStore::new();
-        assert!(hold_store
-            .authorize_budget_hold(composite_request(
-                "hold-multi-authority-structured",
-                "event-multi-authority-structured",
-                three_quotas(1),
-            ))
-            .unwrap()
-            .is_authorized());
-        assert!(matches!(
-            hold_store.authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
-                "cap-composite".to_string(),
-                0,
-                Some(2),
-                0,
-                None,
-                None,
-                Some("hold-multi-authority-legacy".to_string()),
-                Some("event-multi-authority-legacy".to_string()),
-                None,
-            )),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let denied_store = InMemoryBudgetStore::new();
-        assert!(matches!(
-            denied_store
-                .authorize_budget_hold(composite_request(
-                    "hold-multi-authority-denied",
-                    "event-multi-authority-denied",
-                    three_quotas(0),
-                ))
-                .unwrap(),
-            BudgetAuthorizeHoldDecision::Denied(_)
-        ));
-        assert!(matches!(
-            denied_store.authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
-                "cap-composite".to_string(),
-                0,
-                Some(2),
-                0,
-                None,
-                None,
-                Some("hold-multi-authority-after-denial".to_string()),
-                Some("event-multi-authority-after-denial".to_string()),
-                None,
-            )),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn legacy_hold_id_collision_rejects_even_when_second_authorization_would_deny() {
-        let store = InMemoryBudgetStore::new();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "cap-legacy-hold-collision",
-                0,
-                Some(1),
-                1,
-                None,
-                None,
-                Some("hold-legacy-collision"),
-                Some("event-legacy-collision-first"),
-            )
-            .unwrap());
-
-        assert!(matches!(
-            store.try_charge_cost_with_ids(
-                "cap-legacy-hold-collision",
-                0,
-                Some(1),
-                1,
-                None,
-                None,
-                Some("hold-legacy-collision"),
-                Some("event-legacy-collision-denied"),
-            ),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        assert_eq!(
-            store
-                .list_mutation_events(10, Some("cap-legacy-hold-collision"), Some(0))
-                .unwrap()
-                .len(),
-            1
-        );
-    }
-
-    #[test]
-    fn denied_legacy_authorization_permanently_claims_its_hold_id() {
-        let store = InMemoryBudgetStore::new();
-        assert!(!store
-            .try_charge_cost_with_ids(
-                "cap-denied-hold-claim",
-                0,
-                Some(2),
-                2,
-                Some(1),
-                Some(10),
-                Some("hold-denied-claim"),
-                Some("event-denied-claim-first"),
-            )
-            .unwrap());
-        assert!(!store
-            .try_charge_cost_with_ids(
-                "cap-denied-hold-claim",
-                0,
-                Some(2),
-                2,
-                Some(1),
-                Some(10),
-                Some("hold-denied-claim"),
-                Some("event-denied-claim-first"),
-            )
-            .unwrap());
-
-        assert!(matches!(
-            store.try_charge_cost_with_ids(
-                "cap-denied-hold-claim",
-                0,
-                Some(2),
-                1,
-                Some(1),
-                Some(10),
-                Some("hold-denied-claim"),
-                Some("event-denied-claim-second"),
-            ),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        assert!(store
-            .get_usage("cap-denied-hold-claim", 0)
-            .unwrap()
-            .is_none());
-        assert_eq!(
-            store
-                .list_mutation_events(10, Some("cap-denied-hold-claim"), Some(0))
-                .unwrap()
-                .len(),
-            1
-        );
-        assert!(matches!(
-            store.authorize_budget_hold(composite_request(
-                "hold-denied-claim",
-                "event-denied-claim-composite",
-                three_quotas(2),
-            )),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn legacy_reverse_retry_returns_the_frozen_decision() {
-        let store = InMemoryBudgetStore::new();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "cap-reverse-retry",
-                0,
-                Some(3),
-                100,
-                Some(100),
-                Some(1_000),
-                Some("hold-reverse-retry"),
-                Some("event-reverse-retry-authorize"),
-            )
-            .unwrap());
-        let request = BudgetReverseHoldRequest {
-            capability_id: "cap-reverse-retry".to_string(),
-            grant_index: 0,
-            reversed_exposure_units: 100,
-            hold_id: Some("hold-reverse-retry".to_string()),
-            event_id: Some("event-reverse-retry".to_string()),
-            authority: None,
-            admission_operation: None,
-        };
-        let first = store.reverse_budget_hold(request.clone()).unwrap();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "cap-reverse-retry",
-                0,
-                Some(3),
-                25,
-                Some(100),
-                Some(1_000),
-                Some("hold-reverse-retry-later"),
-                Some("event-reverse-retry-later"),
-            )
-            .unwrap());
-        assert_eq!(store.reverse_budget_hold(request).unwrap(), first);
-    }
-
-    #[test]
-    fn legacy_release_retry_returns_the_frozen_decision() {
-        let store = InMemoryBudgetStore::new();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "cap-release-retry",
-                0,
-                Some(3),
-                100,
-                Some(100),
-                Some(1_000),
-                Some("hold-release-retry"),
-                Some("event-release-retry-authorize"),
-            )
-            .unwrap());
-        let request = BudgetReleaseHoldRequest {
-            capability_id: "cap-release-retry".to_string(),
-            grant_index: 0,
-            released_exposure_units: 40,
-            hold_id: Some("hold-release-retry".to_string()),
-            event_id: Some("event-release-retry".to_string()),
-            authority: None,
-            admission_operation: None,
-        };
-        let first = store.release_budget_hold(request.clone()).unwrap();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "cap-release-retry",
-                0,
-                Some(3),
-                25,
-                Some(100),
-                Some(1_000),
-                Some("hold-release-retry-later"),
-                Some("event-release-retry-later"),
-            )
-            .unwrap());
-        assert_eq!(store.release_budget_hold(request).unwrap(), first);
-    }
-
-    #[test]
-    fn legacy_reconcile_retry_returns_the_frozen_decision() {
-        let store = InMemoryBudgetStore::new();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "cap-reconcile-retry",
-                0,
-                Some(3),
-                100,
-                Some(100),
-                Some(1_000),
-                Some("hold-reconcile-retry"),
-                Some("event-reconcile-retry-authorize"),
-            )
-            .unwrap());
-        let request = BudgetReconcileHoldRequest {
-            capability_id: "cap-reconcile-retry".to_string(),
-            grant_index: 0,
-            exposed_cost_units: 100,
-            realized_spend_units: 70,
-            hold_id: Some("hold-reconcile-retry".to_string()),
-            event_id: Some("event-reconcile-retry".to_string()),
-            authority: None,
-            admission_operation: None,
-        };
-        let first = store.reconcile_budget_hold(request.clone()).unwrap();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "cap-reconcile-retry",
-                0,
-                Some(3),
-                25,
-                Some(100),
-                Some(1_000),
-                Some("hold-reconcile-retry-later"),
-                Some("event-reconcile-retry-later"),
-            )
-            .unwrap());
-        assert_eq!(store.reconcile_budget_hold(request).unwrap(), first);
-    }
-
-    #[test]
-    fn legacy_hold_id_cannot_collide_with_composite_authorization() {
-        let store = InMemoryBudgetStore::new();
-        store
-            .authorize_budget_hold(composite_request(
-                "hold-namespace",
-                "event-namespace-authorize",
-                three_quotas(2),
-            ))
-            .unwrap();
-
-        assert!(matches!(
-            store.try_charge_cost_with_ids(
-                "legacy-capability",
-                0,
-                Some(2),
-                1,
-                None,
-                None,
-                Some("hold-namespace"),
-                Some("event-legacy-collision"),
-            ),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn event_ids_are_globally_unique_across_legacy_and_composite_mutations() {
-        let legacy_first = InMemoryBudgetStore::new();
-        assert!(legacy_first
-            .try_charge_cost_with_ids(
-                "legacy-event-capability",
-                0,
-                Some(2),
-                1,
-                None,
-                None,
-                Some("legacy-event-hold"),
-                Some("event-global-collision"),
-            )
-            .unwrap());
-        assert!(matches!(
-            legacy_first.authorize_budget_hold(composite_request(
-                "hold-global-collision",
-                "event-global-collision",
-                three_quotas(2),
-            )),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-
-        let composite_first = InMemoryBudgetStore::new();
-        composite_first
-            .authorize_budget_hold(composite_request(
-                "hold-global-collision",
-                "event-global-collision",
-                three_quotas(2),
-            ))
-            .unwrap();
-        assert!(matches!(
-            composite_first.try_charge_cost_with_ids(
-                "legacy-event-capability",
-                0,
-                Some(2),
-                1,
-                None,
-                None,
-                Some("legacy-event-hold"),
-                Some("event-global-collision"),
-            ),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-    }
-
-    #[test]
-    fn explicit_event_ids_cannot_enter_the_reserved_local_namespace() {
-        let store = InMemoryBudgetStore::new();
-        assert!(matches!(
-            store.try_charge_cost_with_ids(
-                "legacy-event-capability",
-                0,
-                Some(2),
-                1,
-                None,
-                None,
-                Some("legacy-event-hold"),
-                Some("local-budget-event-1"),
-            ),
-            Err(BudgetStoreError::Invariant(_))
-        ));
-        assert!(store
-            .get_usage("legacy-event-capability", 0)
-            .unwrap()
-            .is_none());
-    }
-
-    #[test]
-    fn legacy_monetary_capture_is_truthful_and_idempotent() {
-        let store = InMemoryBudgetStore::new();
-        assert!(store
-            .try_charge_cost_with_ids(
-                "legacy-capture-capability",
-                0,
-                Some(2),
-                100,
-                Some(100),
-                Some(1_000),
-                Some("legacy-capture-hold"),
-                Some("legacy-capture-authorize"),
-            )
-            .unwrap());
-        let request = BudgetCaptureHoldRequest {
-            capability_id: "legacy-capture-capability".to_string(),
-            grant_index: 0,
-            exposed_cost_units: 100,
-            realized_spend_units: 70,
-            hold_id: Some("legacy-capture-hold".to_string()),
-            event_id: Some("legacy-capture-event".to_string()),
-            authority: None,
-            admission_operation: None,
-        };
-        let captured = store.capture_budget_hold(request.clone()).unwrap();
-        assert_eq!(captured.monetary_state, BudgetMonetaryHoldState::Captured);
-        assert_eq!(captured.realized_spend_units, 70);
-        assert!(store
-            .try_charge_cost_with_ids(
-                "legacy-capture-capability",
-                0,
-                Some(2),
-                0,
-                Some(100),
-                Some(1_000),
-                Some("legacy-capture-later-hold"),
-                Some("legacy-capture-later-authorize"),
-            )
-            .unwrap());
-        assert_eq!(store.capture_budget_hold(request).unwrap(), captured);
-        let events = store
-            .list_mutation_events(10, Some("legacy-capture-capability"), Some(0))
-            .unwrap();
-        assert_eq!(events.len(), 3);
-        assert_eq!(events[1].kind, BudgetMutationKind::CaptureExposure);
-        assert_eq!(events[1].monetary_state, BudgetMonetaryHoldState::Captured);
-    }
-
-    #[test]
-    fn quota_profiles_use_normative_closed_identifiers() {
-        let profiles = [
-            BudgetQuotaProfile::GrantInvocation,
-            BudgetQuotaProfile::AggregateCapabilityInvocation,
-            BudgetQuotaProfile::AggregateFamilyInvocation,
-            BudgetQuotaProfile::SupplementalBrokerExecution,
-        ];
-        for profile in profiles {
-            assert_eq!(BudgetQuotaProfile::parse(profile.as_str()), Some(profile));
-        }
-        assert_eq!(BudgetQuotaProfile::parse("grant_invocation"), None);
-    }
-
-    #[test]
-    fn authorize_and_reconcile_hold_preserve_authority_metadata() {
-        let store = InMemoryBudgetStore::new();
-        let authority = BudgetEventAuthority {
-            authority_id: "kernel:test-authority".to_string(),
-            lease_id: "single-node".to_string(),
-            lease_epoch: 0,
-        };
-
-        let decision = store
-            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-                capability_id: "cap-budget-1".to_string(),
-                grant_index: 0,
-                max_invocations: Some(4),
-                requested_exposure_units: 100,
-                max_cost_per_invocation: Some(100),
-                max_total_cost_units: Some(1_000),
-                hold_id: Some("hold-budget-1".to_string()),
-                event_id: Some("hold-budget-1:authorize".to_string()),
-                authority: Some(authority.clone()),
-                admission_operation: None,
-                invocation_admission: None,
-            })
-            .unwrap();
-        let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
-            panic!("budget hold should be authorized");
-        };
-        assert_eq!(authorized.committed_cost_units_after, 100);
-        assert_eq!(
-            authorized.metadata.event_id.as_deref(),
-            Some("hold-budget-1:authorize")
-        );
-        assert_eq!(authorized.metadata.budget_commit_index, Some(1));
-        assert_eq!(
-            authorized.metadata.budget_term().as_deref(),
-            Some("kernel:test-authority:0")
-        );
-
-        let reconcile = store
-            .reconcile_budget_hold(BudgetReconcileHoldRequest {
-                capability_id: "cap-budget-1".to_string(),
-                grant_index: 0,
-                exposed_cost_units: 100,
-                realized_spend_units: 75,
-                hold_id: Some("hold-budget-1".to_string()),
-                event_id: Some("hold-budget-1:reconcile".to_string()),
-                authority: Some(authority.clone()),
-                admission_operation: None,
-            })
-            .unwrap();
-        assert_eq!(reconcile.committed_cost_units_after, 75);
-        assert_eq!(reconcile.realized_spend_units, 75);
-        assert_eq!(
-            reconcile.metadata.event_id.as_deref(),
-            Some("hold-budget-1:reconcile")
-        );
-        assert_eq!(reconcile.metadata.budget_commit_index, Some(2));
-        assert_eq!(reconcile.metadata.authority.as_ref(), Some(&authority));
-
-        let usage = store.get_usage("cap-budget-1", 0).unwrap().unwrap();
-        assert_eq!(usage.total_cost_exposed, 0);
-        assert_eq!(usage.total_cost_realized_spend, 75);
-        assert_eq!(usage.committed_cost_units().unwrap(), 75);
-
-        let events = store
-            .list_mutation_events(10, Some("cap-budget-1"), Some(0))
-            .unwrap();
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].kind, BudgetMutationKind::ReserveInvocations);
-        assert_eq!(events[0].authority.as_ref(), Some(&authority));
-        assert_eq!(events[1].kind, BudgetMutationKind::ReconcileSpend);
-        assert_eq!(events[1].authority.as_ref(), Some(&authority));
-        assert_eq!(events[1].realized_spend_units, 75);
-    }
-
-    #[test]
-    fn denied_authorize_hold_reports_guarantee_metadata_without_commit_index() {
-        let store = InMemoryBudgetStore::new();
-        let authority = BudgetEventAuthority {
-            authority_id: "kernel:test-authority".to_string(),
-            lease_id: "single-node".to_string(),
-            lease_epoch: 0,
-        };
-
-        let decision = store
-            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-                capability_id: "cap-budget-deny".to_string(),
-                grant_index: 0,
-                max_invocations: Some(1),
-                requested_exposure_units: 150,
-                max_cost_per_invocation: Some(100),
-                max_total_cost_units: Some(1_000),
-                hold_id: Some("hold-budget-deny".to_string()),
-                event_id: Some("hold-budget-deny:authorize".to_string()),
-                authority: Some(authority.clone()),
-                admission_operation: None,
-                invocation_admission: None,
-            })
-            .unwrap();
-        let BudgetAuthorizeHoldDecision::Denied(denied) = decision else {
-            panic!("budget hold should be denied");
-        };
-        assert_eq!(denied.committed_cost_units_after, 0);
-        assert_eq!(denied.invocation_count_after, 0);
-        assert_eq!(
-            denied.metadata.event_id.as_deref(),
-            Some("hold-budget-deny:authorize")
-        );
-        assert_eq!(denied.metadata.budget_commit_index, None);
-        assert_eq!(
-            denied.metadata.guarantee_level,
-            BudgetGuaranteeLevel::SingleNodeAtomic
-        );
-        assert_eq!(denied.metadata.authority.as_ref(), Some(&authority));
-
-        let events = store
-            .list_mutation_events(10, Some("cap-budget-deny"), Some(0))
-            .unwrap();
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].allowed, Some(false));
-        assert_eq!(events[0].authority.as_ref(), Some(&authority));
-        assert!(store.get_usage("cap-budget-deny", 0).unwrap().is_none());
-    }
+    include!("budget_store/tests.inc");
 }

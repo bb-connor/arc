@@ -109,7 +109,8 @@ pub(super) fn mutation_record_from_row(
         | BudgetMutationKind::CaptureExposure
         | BudgetMutationKind::ReverseExposure
         | BudgetMutationKind::ReleaseExposure
-        | BudgetMutationKind::ReconcileSpend => BudgetInvocationReservationState::Absent,
+        | BudgetMutationKind::ReconcileSpend
+        | BudgetMutationKind::ExpireHold => BudgetInvocationReservationState::Absent,
     };
     let monetary_state = match kind {
         BudgetMutationKind::AuthorizeExposure | BudgetMutationKind::ReserveInvocations
@@ -121,6 +122,7 @@ pub(super) fn mutation_record_from_row(
         BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
         BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
         BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,
+        BudgetMutationKind::ExpireHold => BudgetMonetaryHoldState::Released,
         BudgetMutationKind::IncrementInvocation
         | BudgetMutationKind::ReserveInvocations
         | BudgetMutationKind::CaptureInvocations

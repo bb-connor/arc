@@ -11,6 +11,9 @@ type SuppliedCompatibilityUsages = std::collections::BTreeMap<(String, u32), (u3
 const MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS: usize = 100_000;
 const SQLITE_LOCK_WAIT: Duration = Duration::from_secs(5);
 const SQLITE_WAL_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
+const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
 pub(super) fn retry_write_ahead_logging(
     mut enable: impl FnMut() -> rusqlite::Result<String>,
@@ -212,13 +215,18 @@ impl SqliteBudgetStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
         let path = path.as_ref();
         reject_volatile_database_path(path)?;
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(parent)?;
         }
 
         let connection = Connection::open(path)?;
+        crate::check_schema_version(
+            &connection,
+            BUDGET_STORE_SCHEMA_KEY,
+            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+            BUDGET_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
         Self::from_connection(connection, BudgetStoreProfile::SingleNodeDurable)
     }
 
@@ -282,6 +290,62 @@ impl SqliteBudgetStore {
 
             CREATE INDEX IF NOT EXISTS idx_budget_authorization_holds_capability
                 ON budget_authorization_holds(capability_id, grant_index);
+
+            CREATE TABLE IF NOT EXISTS payment_journal (
+                request_id          TEXT PRIMARY KEY,
+                capability_id       TEXT NOT NULL,
+                grant_index         INTEGER NOT NULL,
+                operation_id        TEXT,
+                request_binding_hash TEXT,
+                authority_id        TEXT,
+                lease_id            TEXT,
+                lease_epoch         INTEGER,
+                hold_id             TEXT,
+                rail                TEXT NOT NULL,
+                authorization_id    TEXT,
+                transaction_id      TEXT,
+                budget_exposure_units INTEGER NOT NULL,
+                amount_units        INTEGER NOT NULL,
+                settle_action       TEXT,
+                settle_amount_units INTEGER,
+                currency            TEXT NOT NULL,
+                state               TEXT NOT NULL,
+                created_at          INTEGER NOT NULL,
+                updated_at          INTEGER NOT NULL,
+                tenant_id           TEXT,
+                CHECK (
+                    (operation_id IS NULL AND request_binding_hash IS NULL)
+                    OR
+                    (operation_id IS NOT NULL AND request_binding_hash IS NOT NULL)
+                ),
+                CHECK (
+                    operation_id IS NULL
+                    OR (
+                        length(operation_id) BETWEEN 1 AND 512
+                        AND instr(operation_id, char(0)) = 0
+                    )
+                ),
+                CHECK (
+                    request_binding_hash IS NULL
+                    OR (
+                        length(request_binding_hash) = 64
+                        AND request_binding_hash NOT GLOB '*[^0-9a-f]*'
+                    )
+                ),
+                CHECK (
+                    (authority_id IS NULL AND lease_id IS NULL AND lease_epoch IS NULL)
+                    OR
+                    (
+                        authority_id IS NOT NULL
+                        AND lease_id IS NOT NULL
+                        AND lease_epoch IS NOT NULL
+                        AND lease_epoch >= 0
+                    )
+                )
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_payment_journal_state
+                ON payment_journal(state);
 
             -- A hold ID is an authorization-attempt namespace, including denied
             -- attempts. Keeping this separate from open holds prevents a denial
@@ -412,13 +476,24 @@ impl SqliteBudgetStore {
         ensure_budget_seq_column(&connection)?;
         ensure_split_budget_cost_columns(&connection)?;
         ensure_budget_hold_authority_columns(&connection)?;
+        ensure_budget_hold_reserved_until_column(&connection)?;
+        ensure_budget_hold_reserved_currency_column(&connection)?;
+        ensure_budget_hold_reserved_payment_reference_column(&connection)?;
+        ensure_budget_hold_reserved_envelope_columns(&connection)?;
         ensure_budget_mutation_event_authority_columns(&connection)?;
         ensure_budget_mutation_event_seq_column(&connection)?;
         ensure_composite_budget_schema(&connection)?;
         ensure_budget_admission_operation_columns(&connection)?;
+        ensure_payment_journal_operation_columns(&connection)?;
         ensure_budget_authorization_claims(&mut connection)?;
         ensure_composite_budget_namespace_guards(&connection)?;
         initialize_budget_replication_seq(&mut connection)?;
+        crate::stamp_schema_version(
+            &connection,
+            BUDGET_STORE_SCHEMA_KEY,
+            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
 
         Ok(Self {
             connection: Mutex::new(connection),

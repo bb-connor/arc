@@ -193,6 +193,61 @@ mod tests {
     }
 
     #[test]
+    fn delegated_bounded_snapshot_reads_parent_depth_inside_the_writer_job() {
+        // The parent-depth lookup for a delegated capability must run on the
+        // writer connection inside the bounded job, not on a reader-pool
+        // connection ahead of it. With every reader-pool connection checked
+        // out, a delegated bounded snapshot must still resolve the parent depth
+        // and persist quickly, proving the read no longer sits unbounded on the
+        // pre-dispatch hot path where an exhausted pool would stall it.
+        let path = unique_db_path("cl-bounded-parent-read");
+        let store = SqliteReceiptStore::open(&path).test_expect("test operation");
+
+        let kp_root = Keypair::generate();
+        let kp_child = Keypair::generate();
+        let root = make_token("cap-root-bounded", &kp_root, &kp_root, 1000, 9000);
+        let child = make_token("cap-child-bounded", &kp_child, &kp_root, 1100, 8000);
+
+        store
+            .record_capability_snapshot(&root, None)
+            .test_expect("test operation");
+
+        // Exhaust the reader pool: hold every reader connection so any
+        // reader-pool checkout on the hot path would block.
+        let mut held = Vec::new();
+        for _ in 0..crate::DEFAULT_READER_POOL_MAX_SIZE {
+            held.push(store.connection().test_expect("test operation"));
+        }
+
+        let start = std::time::Instant::now();
+        store
+            .record_capability_snapshot_with_timeout(
+                &child,
+                Some("cap-root-bounded"),
+                std::time::Duration::from_millis(500),
+            )
+            .test_expect("test operation");
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(2),
+            "delegated bounded snapshot must not wait on the exhausted reader pool"
+        );
+
+        // Release the reader pool so the read-back can observe the persisted row.
+        drop(held);
+
+        let snap = store
+            .get_lineage("cap-child-bounded")
+            .test_expect("test operation")
+            .test_expect("test operation");
+        assert_eq!(
+            snap.delegation_depth, 1,
+            "child depth must be resolved from the parent inside the bounded job"
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn record_capability_snapshot_is_idempotent() {
         let path = unique_db_path("cl-idempotent");
         let store = SqliteReceiptStore::open(&path).test_expect("test operation");

@@ -475,6 +475,25 @@ impl ChioKernel {
             .is_some_and(|cfg| cfg.require_nonce)
     }
 
+    /// Compute the nonce binding for a call from the request, capability, and
+    /// the canonical parameter hash. Used to mint the nonce before the receipt
+    /// is signed so the receipt can record the nonce id (hold <-> nonce
+    /// cross-binding).
+    pub(crate) fn nonce_binding_for(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        parameter_hash: &str,
+    ) -> crate::execution_nonce::NonceBinding {
+        crate::execution_nonce::NonceBinding {
+            subject_id: cap.subject.to_hex(),
+            capability_id: cap.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            parameter_hash: parameter_hash.to_string(),
+        }
+    }
+
     /// Mint a signed execution nonce for an allow verdict.
     ///
     /// Returns `Ok(None)` when no config is installed (nonces disabled) or
@@ -489,6 +508,21 @@ impl ChioKernel {
         cap: &CapabilityToken,
         receipt: &ChioReceipt,
     ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
+        self.mint_execution_nonce_for_allow_reserving(request, cap, receipt, None)
+    }
+
+    /// Mint an allow-verdict nonce that, when `reserved_hold_id` is `Some`,
+    /// additionally binds the reserved budget hold and the reserving request id
+    /// into the signed body. Only the pre-execution authorization-reserving path
+    /// supplies a hold id; every other allow path passes `None` and mints a
+    /// backward-compatible nonce carrying no hold identity.
+    pub(crate) fn mint_execution_nonce_for_allow_reserving(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        receipt: &ChioReceipt,
+        reserved_hold_id: Option<&str>,
+    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
         if request.execution_nonce.is_some() {
             return Ok(None);
         }
@@ -496,16 +530,16 @@ impl ChioKernel {
             return Ok(None);
         };
         let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        let binding = crate::execution_nonce::NonceBinding {
-            subject_id: cap.subject.to_hex(),
-            capability_id: cap.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash: receipt.action.parameter_hash.clone(),
+        let binding = self.nonce_binding_for(request, cap, &receipt.action.parameter_hash);
+        let (reserved_hold_id, reserving_request_id) = match reserved_hold_id {
+            Some(hold_id) => (Some(hold_id.to_string()), Some(request.request_id.clone())),
+            None => (None, None),
         };
-        let signed = crate::execution_nonce::mint_execution_nonce_with_backend(
+        let signed = crate::execution_nonce::mint_execution_nonce_with_backend_and_reservation(
             self.authority_signing_backend.as_ref(),
             binding,
+            reserved_hold_id,
+            reserving_request_id,
             config,
             now,
         )?;
@@ -769,7 +803,8 @@ impl ChioKernel {
         if self.has_atomic_security_runtime_publication() {
             return;
         }
-        self.guards.push(guard);
+        // Guard registration remains copy-on-write for the async offload path.
+        std::sync::Arc::make_mut(&mut self.guards).push(std::sync::Arc::from(guard));
     }
 
     /// Install a product-specific runtime admission hook. The hook runs after
@@ -831,13 +866,13 @@ impl ChioKernel {
                 }
                 std::collections::hash_map::Entry::Vacant(route) => {
                     info!(server_id = %route.key(), "registering tool server");
-                    route.insert(connection);
+                    route.insert(Arc::from(connection));
                 }
             }
             return;
         }
         info!(server_id = %id, "registering tool server");
-        self.tool_servers.insert(id, connection);
+        self.tool_servers.insert(id, Arc::from(connection));
     }
 
     /// Register a resource provider.

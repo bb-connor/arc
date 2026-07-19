@@ -425,9 +425,12 @@ where
         max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: kernel_policy.require_web3_evidence,
         allow_ephemeral_receipt_log: kernel_policy.allow_ephemeral_receipt_log,
+        allow_ephemeral_revocation_store: kernel_policy.allow_ephemeral_revocation_store,
         checkpoint_batch_size: kernel_policy.checkpoint_batch_size,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: kernel_policy.dispatch_intent_journal,
     };
 
     let mut kernel = match authority_signing_runtime {

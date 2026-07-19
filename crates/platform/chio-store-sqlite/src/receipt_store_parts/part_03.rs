@@ -2,6 +2,41 @@
 mod receipt_commit_actor_tests {
     use super::*;
 
+    #[test]
+    fn writer_health_starts_with_a_poisoned_head_until_seeding_clears_it() {
+        // The commit writer seeds its verified head asynchronously on the actor
+        // thread. Until that seed succeeds, durable persistence is unproven, so a
+        // freshly constructed health mirror must report a poisoned head. Starting
+        // open would let a corrupt or still-attaching store pass
+        // `writer_serving_closed` and execute a tool before its first append can
+        // reject, which is exactly the fail-open window the pre-dispatch gate
+        // exists to prevent.
+        let health = ReceiptCommitWriterHealth::default();
+        assert!(
+            health.head_poisoned.load(Ordering::SeqCst),
+            "writer health must start head-poisoned (serving closed) until a seeded head clears it"
+        );
+    }
+
+    fn idle_writer() -> SupervisedThread {
+        SupervisedThread::spawn(
+            SupervisorConfig {
+                name: "test-idle-writer",
+                tcb_critical: true,
+                trip_after: 1,
+                max_restarts: 1,
+                base_backoff: Duration::from_millis(1),
+                max_backoff: Duration::from_millis(1),
+            },
+            |shutdown| {
+                while !shutdown.load(Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                SupervisedOutcome::Shutdown
+            },
+        )
+    }
+
     fn actor_test_receipt() -> Result<ChioReceipt, ReceiptStoreError> {
         let keypair = chio_core::crypto::Keypair::generate();
         ChioReceipt::sign(
@@ -66,6 +101,7 @@ mod receipt_commit_actor_tests {
         let actor = ReceiptCommitActor {
             sender,
             health,
+            writer: idle_writer(),
             database_identity_file: None,
         };
 
@@ -86,6 +122,7 @@ mod receipt_commit_actor_tests {
         let actor = ReceiptCommitActor {
             sender,
             health,
+            writer: idle_writer(),
             database_identity_file: None,
         };
 
@@ -105,6 +142,348 @@ mod receipt_commit_actor_tests {
                 );
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn append_with_timeout_maps_to_timeout_and_keeps_inflight_elevated(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A commit actor whose worker never drains: try_send queues the command,
+        // but no reply ever arrives, so the bounded wait elapses.
+        let (sender, _receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let actor = ReceiptCommitActor {
+            sender,
+            health,
+            writer: idle_writer(),
+            database_identity_file: None,
+        };
+        let inflight_before = actor.health.inflight.load(Ordering::SeqCst);
+
+        let start = std::time::Instant::now();
+        let error = actor.append_with_timeout(
+            actor_test_receipt()?,
+            "{}".to_string(),
+            false,
+            Duration::from_millis(250),
+        );
+        assert!(start.elapsed() < Duration::from_secs(2));
+
+        match error.err().ok_or("expected append timeout error")? {
+            ReceiptStoreError::Timeout { operation, .. } => {
+                assert_eq!(operation, "sqlite receipt commit append");
+            }
+            other => {
+                return Err(
+                    std::io::Error::other(format!("expected timeout error, got {other}")).into(),
+                );
+            }
+        }
+        // The timeout side must not decrement inflight; ownership stays with the
+        // actor, so a genuinely wedged writer keeps inflight elevated.
+        assert_eq!(
+            actor.health.inflight.load(Ordering::SeqCst),
+            inflight_before + 1
+        );
+        assert!(actor.health.failed_total.load(Ordering::SeqCst) >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn enqueue_on_a_disconnected_actor_records_writer_dead(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // The commit actor has exited, so its receiver is gone and `try_send`
+        // fails Disconnected before any response channel exists. That enqueue
+        // path must record the writer death, or the next liveness sample keeps
+        // reporting the writer Healthy and admits a tool side effect whose
+        // receipt can never be persisted.
+        let (sender, receiver) = receipt_commit_channel();
+        drop(receiver);
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let actor = ReceiptCommitActor {
+            sender,
+            health,
+            writer: idle_writer(),
+            database_identity_file: None,
+        };
+
+        let error = actor.append_with_timeout(
+            actor_test_receipt()?,
+            "{}".to_string(),
+            false,
+            Duration::from_millis(250),
+        );
+        assert!(error
+            .err()
+            .ok_or("expected writer-unavailable error")?
+            .to_string()
+            .contains("unavailable"));
+
+        let counters = actor.writer_counters();
+        assert!(
+            counters
+                .last_error
+                .as_deref()
+                .is_some_and(|error| error.contains("unavailable")),
+            "the disconnected enqueue must record the writer death"
+        );
+        assert_eq!(
+            classify_writer_liveness(
+                &counters,
+                10_000,
+                RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+                None,
+                1_000_000,
+            ),
+            chio_kernel::ReceiptWriterLiveness::Dead,
+            "a disconnected writer must classify as Dead so admission stops"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn note_accept_restamps_backlog_start_only_on_a_fresh_backlog() {
+        let health = ReceiptCommitWriterHealth::default();
+
+        // 0 -> 1 begins a backlog and stamps a real start time.
+        health.note_accept(0);
+        assert_ne!(
+            health.backlog_started_unix_ms.load(Ordering::SeqCst),
+            0,
+            "the first enqueue of a backlog must stamp its start"
+        );
+
+        // 1 -> 2 grows an ongoing backlog and must NOT move its start.
+        health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
+        health.note_accept(1);
+        assert_eq!(
+            health.backlog_started_unix_ms.load(Ordering::SeqCst),
+            1,
+            "a growing backlog must keep its original start"
+        );
+
+        // 0 -> 1 after the writer drained begins a NEW backlog and restamps.
+        health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
+        health.note_accept(0);
+        assert_ne!(
+            health.backlog_started_unix_ms.load(Ordering::SeqCst),
+            1,
+            "a fresh backlog after draining must restamp the start"
+        );
+    }
+
+    #[test]
+    fn committed_write_clears_a_stale_bounded_timeout_marker() {
+        let health = ReceiptCommitWriterHealth::default();
+        // An earlier bounded writer-routed op timed out and left the marker set
+        // while its work was still in flight.
+        if let Ok(mut last_error) = health.last_error.lock() {
+            *last_error = Some("sqlite receipt commit write timed out".to_string());
+        }
+        // The writer catches up and a later write commits.
+        record_write_job_outcome(&health, true);
+        let cleared = match health.last_error.lock() {
+            Ok(guard) => guard.is_none(),
+            Err(_) => false,
+        };
+        assert!(
+            cleared,
+            "a committed write must clear the stale timeout marker so a later merely in-flight write is not misclassified Wedged"
+        );
+        assert_eq!(health.committed_total.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn committed_write_preserves_a_genuine_writer_error() {
+        let health = ReceiptCommitWriterHealth::default();
+        // A poisoned-head / checkpoint fault is not a stall marker and must
+        // survive a later commit so the store keeps reporting the real fault.
+        if let Ok(mut last_error) = health.last_error.lock() {
+            *last_error = Some("receipt store verified head is unavailable".to_string());
+        }
+        record_write_job_outcome(&health, true);
+        let preserved = match health.last_error.lock() {
+            Ok(guard) => guard.as_deref() == Some("receipt store verified head is unavailable"),
+            Err(_) => false,
+        };
+        assert!(
+            preserved,
+            "a committed write must not clear an unrelated writer error"
+        );
+    }
+
+    #[test]
+    fn run_write_receipt_with_timeout_fails_closed_when_writer_never_drains(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Child receipts persist through `run_write_receipt`. Its bounded variant
+        // must fail closed on a wedged writer instead of blocking the caller (and
+        // the kernel-wide receipt write lock it holds) forever.
+        let (sender, _receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let handle = WriterHandle {
+            sender,
+            health: Arc::clone(&health),
+            database_identity_file: None,
+        };
+        let inflight_before = health.inflight.load(Ordering::SeqCst);
+
+        let start = std::time::Instant::now();
+        let error =
+            handle.run_write_receipt_with_timeout(|_connection| Ok(()), Duration::from_millis(250));
+        assert!(start.elapsed() < Duration::from_secs(2));
+
+        match error.err().ok_or("expected write timeout error")? {
+            ReceiptStoreError::Timeout { operation, .. } => {
+                assert_eq!(operation, "sqlite receipt commit write");
+            }
+            other => {
+                return Err(
+                    std::io::Error::other(format!("expected timeout error, got {other}")).into(),
+                );
+            }
+        }
+        // Ownership of the queued job stays with the actor, so the timeout side
+        // must leave inflight elevated (the honest wedged-writer signal).
+        assert_eq!(health.inflight.load(Ordering::SeqCst), inflight_before + 1);
+        assert!(health.failed_total.load(Ordering::SeqCst) >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn run_write_with_timeout_fails_closed_when_writer_never_drains(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // The hot-path capability snapshot persists through `run_write_with_timeout`.
+        // Its bounded metadata variant must fail closed on a wedged writer instead
+        // of blocking the caller forever.
+        let (sender, _receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let handle = WriterHandle {
+            sender,
+            health: Arc::clone(&health),
+            database_identity_file: None,
+        };
+        let inflight_before = health.inflight.load(Ordering::SeqCst);
+
+        let start = std::time::Instant::now();
+        let error = handle.run_write_with_timeout(|_connection| Ok(()), Duration::from_millis(250));
+        assert!(start.elapsed() < Duration::from_secs(2));
+
+        match error.err().ok_or("expected write timeout error")? {
+            ReceiptStoreError::Timeout { operation, .. } => {
+                assert_eq!(operation, "sqlite receipt commit write");
+            }
+            other => {
+                return Err(
+                    std::io::Error::other(format!("expected timeout error, got {other}")).into(),
+                );
+            }
+        }
+        // Ownership of the queued job stays with the actor, so the timeout side
+        // must leave inflight elevated (the honest wedged-writer signal).
+        assert_eq!(health.inflight.load(Ordering::SeqCst), inflight_before + 1);
+        assert!(health.failed_total.load(Ordering::SeqCst) >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn disconnected_bounded_write_records_writer_death_for_liveness(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // The commit actor accepts a bounded child-receipt write, then dies
+        // without responding, disconnecting the caller's response channel. The
+        // write must record the writer death so the next pre-dispatch liveness
+        // sample reports the writer Dead and denies admission, instead of
+        // sampling Healthy once inflight is compensated and failed_total matches
+        // accepted_total.
+        let (sender, receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let handle = WriterHandle {
+            sender,
+            health: Arc::clone(&health),
+            database_identity_file: None,
+        };
+        // Actor thread: take the one queued command and drop it (die mid-flight),
+        // which drops the deferred responder and disconnects the caller.
+        let actor = std::thread::spawn(move || {
+            if let Ok(command) = receiver.recv() {
+                drop(command);
+            }
+            drop(receiver);
+        });
+
+        let error =
+            handle.run_write_receipt_with_timeout(|_connection| Ok(()), Duration::from_secs(5));
+        actor.join().map_err(|_| "actor thread panicked")?;
+        assert!(error.is_err(), "a disconnected writer must fail closed");
+
+        let counters = ReceiptCommitActor {
+            sender: receipt_commit_channel().0,
+            health: Arc::clone(&health),
+            writer: idle_writer(),
+            database_identity_file: None,
+        }
+        .writer_counters();
+        assert!(
+            counters
+                .last_error
+                .as_deref()
+                .is_some_and(|reason| reason.contains("unavailable")),
+            "writer death must be recorded for the liveness probe"
+        );
+        assert_eq!(
+            classify_writer_liveness(
+                &counters,
+                10_000,
+                RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+                None,
+                current_unix_ms(),
+            ),
+            chio_kernel::ReceiptWriterLiveness::Dead
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn disconnected_reseed_flips_writer_liveness_dead_immediately(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A disconnected admin send (reseed after the commit actor has already
+        // exited) is the first observation that the writer is gone. It must flip
+        // liveness to Dead now, so the pre-dispatch gate denies admission before
+        // a later append reconfirms the death.
+        let path = std::env::temp_dir().join(format!(
+            "chio-reseed-dead-{}-{}.sqlite3",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let mut store = SqliteReceiptStore::open(&path)?;
+
+        // Replace the live commit actor with one whose receiver is dropped, so
+        // the next admin send observes a dead actor. Overwriting the field drops
+        // the original sender, letting the original actor thread exit cleanly.
+        let (sender, receiver) = receipt_commit_channel();
+        drop(receiver);
+        store.receipt_commit_actor = ReceiptCommitActor {
+            sender,
+            health: Arc::new(ReceiptCommitWriterHealth::default()),
+            writer: idle_writer(),
+            database_identity_file: None,
+        };
+
+        let error = match store.reseed_verified_head() {
+            Ok(()) => return Err("reseed against a dead actor must fail closed".into()),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("unavailable"));
+
+        assert_eq!(
+            store.writer_liveness(Duration::from_secs(60)),
+            chio_kernel::ReceiptWriterLiveness::Dead,
+            "a disconnected reseed must flip writer liveness to Dead immediately"
+        );
+
+        let _ = std::fs::remove_file(&path);
         Ok(())
     }
 

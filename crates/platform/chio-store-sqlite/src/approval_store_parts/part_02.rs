@@ -1063,6 +1063,28 @@ mod tests {
     use super::*;
     use chio_core::crypto::Keypair;
 
+    #[test]
+    fn open_colocated_creates_parent_dirs_for_a_file_uri_with_query() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time before epoch")
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!("chio-approval-uri-{nonce}"));
+        let db = base.join("nested").join("receipts.db");
+        let parent = db.parent().expect("db path has a parent");
+        assert!(!parent.exists());
+
+        let uri = format!("file:{}?mode=rwc", db.display());
+        let store = SqliteApprovalStore::open_colocated_with_receipt_store(uri.as_str())
+            .expect("open colocated approval store from a file URI");
+        store
+            .store_pending(&sample_request("uri-1", "hash-uri"))
+            .expect("store a pending approval");
+
+        assert!(parent.exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
     fn operation_id(hex_pair: &str) -> String {
         hex_pair.repeat(32)
     }
@@ -1145,6 +1167,65 @@ mod tests {
 
         let fetched = store.get_pending("dup-1").unwrap().unwrap();
         assert_eq!(fetched.parameter_hash, "hash-a");
+    }
+
+    #[test]
+    fn standalone_open_refuses_a_receipt_sidecar_that_colocated_open_adopts() {
+        // `chio api protect` keeps the approval store in the same file as its
+        // receipt and revocation sidecar tables, and opens the receipt store
+        // first so it owns the shared file's provenance anchor; the approval store
+        // then co-locates onto it. A database carrying only receipt (and
+        // revocation) tables and no approval anchor therefore belongs to the
+        // receipt store. The standalone approval open must refuse it rather than
+        // write HITL tables into a receipt store's file, while the dedicated
+        // co-located open adopts it as its sibling.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sidecar.sqlite3");
+        {
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE http_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
+                 CREATE TABLE tool_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
+                 CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY);",
+            )
+            .unwrap();
+            let app_id: i32 = conn
+                .query_row("PRAGMA application_id", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(
+                app_id, 0,
+                "fixture must be unstamped like a legacy database"
+            );
+        }
+
+        assert!(
+            SqliteApprovalStore::open(&path).is_err(),
+            "standalone approval open must refuse a receipt-only sidecar file"
+        );
+
+        let store = SqliteApprovalStore::open_colocated_with_receipt_store(&path)
+            .expect("co-located open must adopt the receipt sidecar file");
+        store
+            .store_pending(&sample_request("adopt-1", "hash-adopt"))
+            .unwrap();
+        assert!(store.get_pending("adopt-1").unwrap().is_some());
+    }
+
+    #[test]
+    fn standalone_open_reopens_a_genuine_approval_database() {
+        // A real approval database carries the approval anchor, so the standalone
+        // open reopens it across restarts without co-location.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("approval.sqlite3");
+        {
+            let store = SqliteApprovalStore::open(&path).unwrap();
+            store
+                .store_pending(&sample_request("reopen-1", "hash-reopen"))
+                .unwrap();
+        }
+        let store = SqliteApprovalStore::open(&path)
+            .expect("a genuine approval database must reopen standalone");
+        assert!(store.get_pending("reopen-1").unwrap().is_some());
     }
 
     #[test]

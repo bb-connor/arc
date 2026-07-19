@@ -1,5 +1,22 @@
 use super::*;
 
+pub(crate) fn load_roster_policy(
+    path: &Path,
+) -> Result<trust_control::RosterPolicy, CliError> {
+    let bytes = std::fs::read(path).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to read roster policy file `{}`: {error}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_slice(&bytes).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to parse roster policy file `{}`: {error}",
+            path.display()
+        ))
+    })
+}
+
 fn load_authority_workload_public_key(
     path: &Path,
     description: &str,
@@ -64,6 +81,7 @@ pub(crate) fn cmd_trust_serve(
     certification_public_metadata_ttl_seconds: u64,
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
+    roster_policy_file: Option<&Path>,
 ) -> Result<(), CliError> {
     if service_token.trim().is_empty() {
         return Err(CliError::cli_other_error(
@@ -136,6 +154,7 @@ pub(crate) fn cmd_trust_serve(
     let (issuance_policy, runtime_assurance_policy) = loaded_policy
         .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
         .unwrap_or((None, None));
+    let roster_policy = roster_policy_file.map(load_roster_policy).transpose()?;
     let cluster_members = parse_cluster_members(cluster_members)?;
     trust_control::serve(trust_control::TrustServiceConfig {
         listen,
@@ -172,6 +191,7 @@ pub(crate) fn cmd_trust_serve(
         cluster_replay_db_path: cluster_replay_db_path.map(Path::to_path_buf),
         cluster_members,
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
+        roster_policy,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     })
 }

@@ -7,6 +7,37 @@ struct FailingMonetaryServer {
     id: String,
 }
 
+/// A monetary tool server that dispatches a pass-through but reports that it
+/// does not measure realized cost, mirroring the sidecar mediated route's
+/// pre-execution authorization gate.
+struct UnmeasuredCostServer {
+    id: String,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for UnmeasuredCostServer {
+    fn server_id(&self) -> &str {
+        &self.id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["compute".to_string()]
+    }
+
+    fn measures_realized_cost(&self) -> bool {
+        false
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Ok(serde_json::json!({ "upstream": "https://example.test" }))
+    }
+}
+
 struct CountingMonetaryServer {
     id: String,
     invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
@@ -402,9 +433,12 @@ fn make_monetary_config() -> KernelConfig {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: crate::MemoryBudgetConfig::defaults(),
+        deadlines: crate::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -1221,6 +1255,7 @@ fn install_durable_legacy_governed_admission_authorities(kernel: &mut ChioKernel
 #[derive(Clone)]
 struct TrackingPaymentAdapter {
     authorized: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    captured: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     refunded: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -1229,6 +1264,7 @@ impl TrackingPaymentAdapter {
     fn new() -> Self {
         Self {
             authorized: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            captured: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             released: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             refunded: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
@@ -1256,6 +1292,8 @@ impl PaymentAdapter for TrackingPaymentAdapter {
         _currency: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.captured
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Settled,
@@ -1299,7 +1337,7 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
     let started = std::sync::Arc::new(tokio::sync::Notify::new());
     let payment = TrackingPaymentAdapter::new();
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(PendingMonetaryServer {
         id: "cost-srv".to_string(),
         started: std::sync::Arc::clone(&started),
@@ -1405,7 +1443,9 @@ async fn assert_post_dispatch_drop_cleanup_fault(
     let mut kernel = make_kernel(make_monetary_config());
     match source {
         DropCleanupFailureSource::Payment => {
-            kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+            kernel
+                .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
+                .expect("install payment adapter");
         }
         DropCleanupFailureSource::BudgetStore => {
             kernel
@@ -1530,9 +1570,12 @@ fn make_dpop_kernel_and_cap(
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: crate::MemoryBudgetConfig::defaults(),
+        deadlines: crate::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
     };
     let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
@@ -1575,4 +1618,101 @@ fn make_dpop_proof(
         agent_key: agent_kp.public_key(),
     };
     dpop::DpopProof::sign(body, agent_kp).expect("DPoP sign failed")
+}
+
+/// A budget store spy that authorizes holds normally but returns `Err` on every
+/// reverse. Used to exercise the drop-guard pending-reversal escalation path.
+struct ReverseFailingBudgetStore {
+    inner: InMemoryBudgetStore,
+}
+
+impl ReverseFailingBudgetStore {
+    fn new() -> Self {
+        Self {
+            inner: InMemoryBudgetStore::new(),
+        }
+    }
+}
+
+impl BudgetStore for ReverseFailingBudgetStore {
+    fn try_increment(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner
+            .try_increment(capability_id, grant_index, max_invocations)
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner.try_charge_cost(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+        )
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "reverse store unreachable".to_string(),
+        ))
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner
+            .reduce_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn settle_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.settle_charge_cost(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+        )
+    }
+
+    fn list_usages(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.list_usages(limit, capability_id)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.get_usage(capability_id, grant_index)
+    }
 }

@@ -51,6 +51,41 @@ impl SqliteBudgetStore {
         Ok(decision)
     }
 
+    pub(super) fn authorize_composite_hold_with_journal(
+        &self,
+        request: SqliteCompositeAuthorizeInput,
+        aggregate_family_evidence: Option<SqliteAggregateFamilyEvidence>,
+        journal: Option<&chio_kernel::payment::PaymentJournalRecord>,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        let admission_operation = BudgetAdmissionOperationBinding::new(
+            request.operation_id.clone(),
+            request.request_binding_hash.clone(),
+        )?;
+        validate_payment_journal_authorization_binding(
+            journal,
+            Some(&admission_operation),
+            request.authority.as_ref(),
+            &request.capability_id,
+            request.grant_index,
+            Some(&request.hold_id),
+            request.requested_exposure_units,
+        )?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let decision = Self::authorize_composite_hold_in_transaction_with_optional_family_evidence(
+            &transaction,
+            request,
+            aggregate_family_evidence,
+        )?;
+        if matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)) {
+            if let Some(journal) = journal {
+                insert_payment_journal_tx(&transaction, journal, true)?;
+            }
+        }
+        transaction.commit()?;
+        Ok(decision)
+    }
+
     pub fn authorize_composite_hold_in_transaction(
         transaction: &rusqlite::Transaction<'_>,
         request: SqliteCompositeAuthorizeInput,

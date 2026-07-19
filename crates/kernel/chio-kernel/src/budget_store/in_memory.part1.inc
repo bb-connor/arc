@@ -11,12 +11,13 @@ use super::{
     AuthorizedBudgetHold, BudgetAuthorityProfile, BudgetAuthorizeHoldDecision,
     BudgetAuthorizeHoldRequest, BudgetCaptureHoldDecision, BudgetCaptureHoldRequest,
     BudgetCaptureInvocationRequest, BudgetCommitMetadata, BudgetEventAuthority,
-    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationQuota,
-    BudgetInvocationQuotaUsage, BudgetInvocationReservationState, BudgetMeteringProfile,
-    BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey,
-    BudgetQuotaProfile, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
-    BudgetReverseHoldRequest, BudgetStore, BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
+    BudgetGuaranteeLevel, BudgetHoldDispositionView, BudgetHoldMutationDecision,
+    BudgetHoldSnapshot, BudgetInvocationQuota, BudgetInvocationQuotaUsage,
+    BudgetInvocationReservationState, BudgetMeteringProfile, BudgetMonetaryHoldState,
+    BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest, BudgetReleaseHoldDecision,
+    BudgetReleaseHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest, BudgetStore,
+    BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold, ReservedHoldEnvelope,
     VerifiedInvocationAdmission,
 };
 
@@ -31,6 +32,16 @@ enum BudgetHoldDisposition {
     Captured,
 }
 
+impl BudgetHoldDisposition {
+    fn view(&self) -> BudgetHoldDispositionView {
+        match self {
+            Self::Open => BudgetHoldDispositionView::Open,
+            Self::Released => BudgetHoldDispositionView::Released,
+            Self::Reversed => BudgetHoldDispositionView::Reversed,
+            Self::Reconciled => BudgetHoldDispositionView::Reconciled,
+        }
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BudgetHoldState {
     capability_id: String,
@@ -40,6 +51,23 @@ struct BudgetHoldState {
     invocation_count_debited: bool,
     disposition: BudgetHoldDisposition,
     authority: Option<BudgetEventAuthority>,
+    /// Set only when the reserving path marks this hold reserved; drives the
+    /// TTL reaper. `None` for normal in-flight holds.
+    reserved_until: Option<i64>,
+    /// Currency the grant was authorized in, recorded alongside `reserved_until`
+    /// by the reserving path. `None` for normal in-flight holds.
+    reserved_currency: Option<String>,
+    /// Rail transaction id that funded a prepaid MustPrepay reservation, recorded
+    /// alongside `reserved_until` by the reserving path. `None` when the reserve
+    /// carried no prepayment.
+    reserved_payment_reference: Option<String>,
+    /// Grant ceiling and delegation lineage recorded alongside `reserved_until` by
+    /// the reserving path, so reconcile-by-nonce reports the grant's budget and
+    /// true lineage rather than the reservation exposure. `None` for holds never
+    /// marked reserved.
+    reserved_budget_total: Option<u64>,
+    reserved_delegation_depth: Option<u32>,
+    reserved_root_budget_holder: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -757,6 +785,12 @@ impl InMemoryBudgetStoreInner {
                         invocation_count_debited: true,
                         disposition: BudgetHoldDisposition::Open,
                         authority: authority.cloned(),
+                        reserved_until: None,
+                        reserved_currency: None,
+                        reserved_payment_reference: None,
+                        reserved_budget_total: None,
+                        reserved_delegation_depth: None,
+                        reserved_root_budget_holder: None,
                     },
                 );
             }

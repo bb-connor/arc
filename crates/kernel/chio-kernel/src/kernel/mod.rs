@@ -19,11 +19,14 @@ mod admission_cleanup;
 mod admission_coordinator;
 mod admission_terminal_receipt;
 mod approval_cleanup;
+mod budget_sweep;
+mod dispatch_intent;
 mod error;
 mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
 mod ordinary_admission;
+mod payment_reconcile;
 mod security_runtime;
 
 pub use active_response_admission::{
@@ -65,11 +68,21 @@ pub use active_response_policy::{
     ActiveResponsePolicyRequest, ActiveResponsePolicyResolutionError, ActiveResponseRequirement,
     ActiveResponseRequirementResolver,
 };
-pub use error::{KernelError, OverloadResource, StructuredErrorReport};
+pub use budget_sweep::{
+    BudgetHoldSweepHandle, DEFAULT_HOLD_EXPIRY_HORIZON_SECS, DEFAULT_HOLD_SWEEP_INTERVAL_SECS,
+};
+pub use construction::KernelBuildError;
+pub use dispatch_intent::DefaultDispatchIntentReconciler;
+pub use error::{HotPathStage, KernelError, OverloadResource, StructuredErrorReport};
 pub use kernel_struct::{
-    ChioKernel, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
+    ChioKernel, HotPathDeadlineConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RECEIPT_APPEND_BUDGET_MS,
+    DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
+    MIN_RECEIPT_APPEND_BUDGET_MS,
+};
+pub use payment_reconcile::{
+    MonetaryDispatchIntentReconciler, PaymentReconcileOutcome, PaymentReconcileReport,
 };
 pub use security_runtime::{GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus};
 
@@ -77,10 +90,12 @@ pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptC
 pub(crate) use kernel_scopes::{
     current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,
     extract_tenant_id_from_auth_context, scope_receipt_federation_admission,
-    scope_receipt_tenant_id, ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
-    ScopedKernelReceiptTenantId,
+    scope_receipt_tenant_id, ReceiptFederationAdmission, ScopedKernelDispatchIntent,
+    ScopedKernelReceiptFederationAdmission, ScopedKernelReceiptTenantId,
 };
-pub(crate) use kernel_struct::{capability_crypto_floor, receipt_crypto_floor};
+pub(crate) use kernel_struct::{
+    capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare, RestartReservedHoldGate,
+};
 pub(crate) use ordinary_admission::OrdinaryAdmissionMutation;
 
 pub type AgentId = String;
@@ -1587,6 +1602,9 @@ mod evaluation;
 // Capability and budget validation.
 #[path = "validation.rs"]
 mod validation;
+// Reconcile-by-nonce and reserved-hold TTL primitives (mediated spend path).
+#[path = "reconciliation.rs"]
+mod reconciliation;
 // Governed-admission validation and call-chain receipt evidence.
 #[path = "governed_validation.rs"]
 mod governed_validation;
@@ -1609,6 +1627,10 @@ pub mod settlement_observer;
 // signing leaves the synchronous critical path.
 #[path = "signing_task.rs"]
 pub(crate) mod signing_task;
+// Receipt-writer liveness watchdog. Publishes the latest verdict the
+// pre-dispatch readiness gate reads.
+#[path = "receipt_writer_watchdog.rs"]
+mod receipt_writer_watchdog;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

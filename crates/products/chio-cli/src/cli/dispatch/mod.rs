@@ -2,6 +2,7 @@ use super::*;
 
 mod api_mcp;
 mod attest;
+mod budget;
 mod certify_cert;
 mod did_passport;
 mod federation;
@@ -20,9 +21,12 @@ mod settle_arena;
 mod trust_cmd;
 mod workflow;
 
-#[cfg(test)]
-pub(crate) use self::attest::cmd_chio_attest_runtime_quote_verify;
-pub(crate) use self::attest::dispatch_chio_attest_command;
+#[allow(unused_imports)]
+pub(crate) use self::attest::{
+    cmd_chio_attest_runtime_quote_verify, cmd_chio_attest_supply_chain_verify, decode_fixed_hex,
+    dispatch_chio_attest_command, dispatch_chio_buyer_command, verify_runtime_quote_with_backend,
+    write_chio_attest_report, RuntimeQuoteBackendReport,
+};
 #[cfg(feature = "tee-quotes")]
 pub(crate) use self::attest::{
     collateral_required_str, collateral_required_u32, decode_hex_required, decode_hex_vec_required,
@@ -34,6 +38,7 @@ pub(crate) use self::market_cmd::{cmd_market_info, cmd_market_install, cmd_marke
 pub(crate) use self::pheromone::dispatch_chio_pheromone_command;
 pub(crate) use self::runtime::dispatch_chio_runtime_command;
 use api_mcp::{dispatch_api, dispatch_mcp};
+use budget::dispatch_budget;
 use certify_cert::{dispatch_cert, dispatch_certify};
 use did_passport::{dispatch_did, dispatch_passport};
 pub(crate) use output::write_cli_error;
@@ -151,6 +156,7 @@ pub(crate) fn run() {
     let broker_config = cli.broker_config.clone();
     let authority_db = cli.authority_db.clone();
     let budget_db = cli.budget_db.clone();
+    let settlement_driver = cli.settlement_driver.clone();
     let aggregate_invocation_admission = cli.aggregate_invocation_admission;
     let admission_operation_db = cli.admission_operation_db.clone();
     let approval_db = cli.approval_db.clone();
@@ -262,7 +268,15 @@ pub(crate) fn run() {
                 &control_authority_trusted_public_keys,
             ),
             Commands::Init { path } => scaffold::cmd_init(&path),
-            Commands::Api { command } => dispatch_api(command, receipt_db, authority_seed_file),
+            Commands::Api { command } => dispatch_api(
+                command,
+                receipt_db,
+                revocation_db,
+                authority_seed_file,
+                budget_db,
+                control_url,
+                control_token,
+            ),
             Commands::Mcp { command } => dispatch_mcp(
                 command,
                 receipt_db,
@@ -367,7 +381,10 @@ pub(crate) fn run() {
             Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
             Commands::Replay(args) => cmd_replay(&args),
             Commands::Lineage { command } => dispatch_lineage(command, json_output),
-            Commands::Settle { command } => dispatch_settle(command, json_output, receipt_db),
+            Commands::Settle { command } => {
+                dispatch_settle(command, json_output, receipt_db, &settlement_driver)
+            }
+            Commands::Budget { command } => dispatch_budget(command, json_output, budget_db),
             Commands::Doctor(args) => cmd_doctor(&args, json_output),
             Commands::Arena { command } => dispatch_arena(command, json_output),
             Commands::Bind {
@@ -389,11 +406,17 @@ pub(crate) fn run() {
             Commands::Start {
                 listen,
                 receipt_store,
+                allow_ephemeral_receipts,
                 print_config,
             } => cmd_start(
                 &listen,
                 receipt_store.as_deref().or(receipt_db.as_deref()),
                 authority_seed_file.as_deref(),
+                budget_db.as_deref(),
+                revocation_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                allow_ephemeral_receipts,
                 print_config,
             ),
         }

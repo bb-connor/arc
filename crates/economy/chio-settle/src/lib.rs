@@ -62,25 +62,28 @@ pub use observe::{
     SettlementFinalityStatus, SettlementRecoveryAction,
 };
 pub use ops::{
-    classify_settlement_lane, ensure_settlement_operation_allowed, SettlementAlertSeverity,
-    SettlementControlChangeRecord, SettlementControlState, SettlementEmergencyControls,
-    SettlementEmergencyMode, SettlementIncidentAlert, SettlementIndexerCursor,
-    SettlementIndexerCursorInput, SettlementIndexerStatus, SettlementLaneRuntimeStatus,
-    SettlementLaneRuntimeStatusInput, SettlementOperationKind, SettlementRecoveryRecord,
-    SettlementRuntimeReport, SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
+    classify_settlement_lane, ensure_settlement_operation_allowed, OpsSettlementHook,
+    SettlementAlertSeverity, SettlementControlChangeRecord, SettlementControlState,
+    SettlementDriveStep, SettlementEmergencyControls, SettlementEmergencyMode,
+    SettlementIncidentAlert, SettlementIndexerCursor, SettlementIndexerCursorInput,
+    SettlementIndexerStatus, SettlementLaneRuntimeStatus, SettlementLaneRuntimeStatusInput,
+    SettlementOperationKind, SettlementRecoveryRecord, SettlementRuntime, SettlementRuntimeReport,
+    SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
 pub use payments::{
-    build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,
-    prepare_transfer_with_authorization, ApprovalBinding, CircleNanopaymentPolicy, Eip3009Domain,
+    approval_binding_from_governed, build_x402_payment_requirements, evaluate_circle_nanopayment,
+    prepare_paymaster_compatibility, prepare_transfer_with_authorization,
+    validate_offchain_settlement_receipt, ApprovalBinding, CircleNanopaymentPolicy, Eip3009Domain,
     Eip3009NonceStore, Erc4337PaymasterPolicy, InMemoryEip3009NonceStore, NonceOutcome,
-    PreparedCircleNanopayment, PreparedPaymasterCompatibility, PreparedTransferWithAuthorization,
-    TransferWithAuthorizationInput, X402PaymentRequirements, X402SettlementMode,
+    OffchainSettlementReceiptArtifact, PreparedCircleNanopayment, PreparedPaymasterCompatibility,
+    PreparedTransferWithAuthorization, RailBinding, TransferWithAuthorizationInput,
+    X402PaymentRequirements, X402SettlementMode, CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA,
     DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
-    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, DEFAULT_BACKOFF_CAP_MS,
-    DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS, DEFAULT_MAX_RETRIES,
-    SETTLE_DEAD_LETTER_SCHEMA,
+    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, RetryPolicyError,
+    DEFAULT_BACKOFF_CAP_MS, DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS,
+    DEFAULT_MAX_RETRIES, SETTLE_DEAD_LETTER_SCHEMA,
 };
 pub use solana::{
     compare_commitments, prepare_solana_settlement, verify_solana_binding_and_receipt,

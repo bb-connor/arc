@@ -45,7 +45,6 @@ Options:
 
       --budget-db <BUDGET_DB>
           Optional SQLite database path for durable shared capability budget state
-
       --aggregate-invocation-admission
           Enable durable aggregate invocation admission for ordinary tool calls
 
@@ -63,6 +62,8 @@ Options:
 
           [env: CHIO_THRESHOLD_PROPOSAL_AUTHORITY_PUBLIC_KEY=]
 
+      --settlement-driver <SETTLEMENT_DRIVER>
+          Settlement driver: `none` (default; the settle drive is inert) or `ops` (run the reference settlement hook when driving due attempts) [default: none]
       --session-db <SESSION_DB>
           Optional SQLite database path for durable remote MCP session tombstones
 

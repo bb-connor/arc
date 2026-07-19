@@ -111,6 +111,9 @@ mod tests {
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         })
     }
 
@@ -243,6 +246,38 @@ mod tests {
         kernel.validate_web3_evidence_prerequisites().unwrap();
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn configure_receipt_store_refuses_in_memory_sqlite_paths() {
+        for path in [
+            ":memory:",
+            "file::memory:",
+            "file:receipts.db?mode=memory",
+            "file:receipts.db?cache=shared&mode=memory",
+        ] {
+            let mut kernel = make_kernel(false);
+            let error = expect_receipt_configuration_error(configure_receipt_store(
+                &mut kernel,
+                Some(Path::new(path)),
+                None,
+                None,
+                None,
+                &[],
+            ));
+            assert!(
+                error.to_string().contains("in-memory receipt database"),
+                "{path} must be refused as a non-durable receipt store, got: {error}"
+            );
+        }
+
+        let durable = unique_receipt_db_path("chio-control-plane-durable-receipts");
+        let mut kernel = make_kernel(false);
+        assert!(
+            configure_receipt_store(&mut kernel, Some(&durable), None, None, None, &[]).is_ok(),
+            "durable filesystem receipt path must be accepted"
+        );
+        let _ = std::fs::remove_file(durable);
     }
 
     #[test]

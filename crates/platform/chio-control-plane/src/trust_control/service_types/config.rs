@@ -350,6 +350,7 @@ pub struct TrustServiceConfig {
     pub cluster_replay_db_path: Option<PathBuf>,
     pub cluster_members: Vec<ClusterMemberIdentity>,
     pub cluster_sync_interval: Duration,
+    pub roster_policy: Option<RosterPolicy>,
     /// Process memory budget for the trust control service. Its
     /// `admission_key_cap` bounds the federation admission rate limiter, so
     /// lowering it here actually tightens that guard rather than being silently
@@ -1005,6 +1006,7 @@ mod service_config_tests {
             cluster_replay_db_path: None,
             cluster_members: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         }
     }

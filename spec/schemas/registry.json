@@ -1980,6 +1980,12 @@
       "introducedBy": "manifest-v2",
       "schemaFile": "spec/schemas/chio-wire/v1/security/signed-tool-manifest-v2.schema.json",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json"
+    },
+    {
+      "schema": "chio.comptroller.surface-report.v1",
+      "artifactKind": "chio_comptroller_surface_report",
+      "introducedBy": "chio-comptroller-surface/v1",
+      "schemaFile": "spec/schemas/chio-comptroller/v1/surface-report.schema.json"
     }
   ]
 }

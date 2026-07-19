@@ -52,6 +52,7 @@ chio-conformance = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-risk-comptroller = { workspace = true }
+chio-settle = { workspace = true }
 chio-transaction-passport = { workspace = true }
 chio-trust-market-context = { workspace = true }
 serde = { workspace = true }
@@ -99,7 +100,6 @@ chio-anchor = { workspace = true }
 chio-link = { workspace = true }
 chio-mcp-edge = { workspace = true }
 chio-test-support = { workspace = true }
-chio-settle = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }

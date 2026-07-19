@@ -34,9 +34,12 @@ fn test_kernel_config() -> KernelConfig {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -547,6 +550,23 @@ fn registry_bound_mcp_export_rejects_local_topology_sidecar() {
             tool_name
         } if server_id == "petstore-bridge" && tool_name == "listPets"
     ));
+}
+
+#[test]
+fn bridge_tool_servers_report_read_only_from_operation_annotations() {
+    use chio_kernel::ToolServerConnection;
+
+    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
+    let server = bridge.as_tool_server();
+    assert!(server.tool_is_read_only("listPets"));
+    assert!(server.tool_is_read_only("getPet"));
+    assert!(!server.tool_is_read_only("createPet"));
+    assert!(!server.tool_is_read_only("deletePet"));
+    assert!(!server.tool_is_read_only("unknownTool"));
+
+    let owned = OwnedBridgeToolServer::from_bridge(bridge);
+    assert!(owned.tool_is_read_only("listPets"));
+    assert!(!owned.tool_is_read_only("createPet"));
 }
 
 #[test]

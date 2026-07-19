@@ -1,5 +1,15 @@
 use super::*;
 
+/// Flatten a capability-lineage error into the receipt-store error the
+/// `ReceiptStore` trait surface speaks.
+fn capability_lineage_store_error(error: chio_kernel::CapabilityLineageError) -> ReceiptStoreError {
+    match error {
+        chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+        chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+        chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+    }
+}
+
 impl SqliteReceiptStore {
     pub fn record_session_anchor_record(
         &self,
@@ -147,10 +157,39 @@ impl SqliteReceiptStore {
         receipt: &ChildRequestReceipt,
     ) -> Result<u64, ReceiptStoreError> {
         ensure_child_receipt_verified(receipt)?;
+        let job = Self::build_child_receipt_write_job(receipt)?;
+        self.writer_handle().run_write_receipt(job)
+    }
+
+    /// Deadline-bounded variant of [`append_child_receipt_record`]. Fails closed
+    /// with `ReceiptStoreError::Timeout` if the commit round trip exceeds
+    /// `budget`, so a wedged writer cannot pin the kernel-wide receipt write lock
+    /// while nested-flow child receipts drain.
+    pub fn append_child_receipt_record_with_timeout(
+        &self,
+        receipt: &ChildRequestReceipt,
+        budget: std::time::Duration,
+    ) -> Result<u64, ReceiptStoreError> {
+        ensure_child_receipt_verified(receipt)?;
+        let job = Self::build_child_receipt_write_job(receipt)?;
+        self.writer_handle()
+            .run_write_receipt_with_timeout(job, budget)
+    }
+
+    /// Build the single-writer transaction that inserts one child receipt and
+    /// its request-lineage row, returning the assigned claim-log entry seq. The
+    /// job owns cloned receipt data so it can run bounded or unbounded on the
+    /// commit actor.
+    fn build_child_receipt_write_job(
+        receipt: &ChildRequestReceipt,
+    ) -> Result<
+        impl FnOnce(&mut SqliteStoreConnection) -> Result<u64, ReceiptStoreError> + Send + 'static,
+        ReceiptStoreError,
+    > {
         let raw_json = serde_json::to_string(receipt)?;
         let lineage_json = child_receipt_request_lineage_json(receipt)?;
         let receipt = receipt.clone();
-        self.writer_handle().run_write_receipt(move |connection| {
+        Ok(move |connection: &mut SqliteStoreConnection| {
             ensure_checkpoint_transparency_guards(connection)?;
             let tx =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -307,12 +346,141 @@ impl ReceiptStore for SqliteReceiptStore {
         Ok(Some(seq))
     }
 
+    fn append_chio_receipt_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        let raw_json = serde_json::to_string(receipt)?;
+        let seq = self
+            .append_verified_chio_receipt_record_with_timeout(receipt, &raw_json, true, budget)?;
+        Ok(Some(seq))
+    }
+
+    fn writer_liveness(
+        &self,
+        stall_threshold: std::time::Duration,
+    ) -> chio_kernel::ReceiptWriterLiveness {
+        SqliteReceiptStore::writer_liveness(self, stall_threshold)
+    }
+
     fn append_chio_receipt_consuming_authorization(
         &self,
         receipt: &ChioReceipt,
         consumption: &AuthorizationReceiptConsumption,
     ) -> Result<(), ReceiptStoreError> {
         SqliteReceiptStore::append_chio_receipt_consuming_authorization(self, receipt, consumption)
+    }
+
+    fn record_dispatch_intent(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_dispatch_intent(self, intent)
+    }
+
+    fn record_dispatch_intent_with_timeout(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_dispatch_intent_with_timeout(self, intent, budget)
+    }
+
+    fn attach_dispatch_intent_rail_ref(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        rail_authorization_id: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::attach_dispatch_intent_rail_ref(
+            self,
+            request_id,
+            tenant_id,
+            rail_authorization_id,
+        )
+    }
+
+    fn attach_dispatch_intent_rail_ref_with_timeout(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        rail_authorization_id: &str,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::attach_dispatch_intent_rail_ref_with_timeout(
+            self,
+            request_id,
+            tenant_id,
+            rail_authorization_id,
+            budget,
+        )
+    }
+
+    fn clear_dispatch_intent(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::clear_dispatch_intent(self, key)
+    }
+
+    fn clear_dispatch_intent_with_timeout(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::clear_dispatch_intent_with_timeout(self, key, budget)
+    }
+
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        receipt: &ChioReceipt,
+        intent: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_consuming_intent(self, receipt, intent)
+    }
+
+    fn append_chio_receipt_consuming_intent_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        intent: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_consuming_intent_with_timeout(
+            self, receipt, intent, budget,
+        )
+    }
+
+    fn reconcile_dispatch_intents(
+        &self,
+        reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
+    ) -> Result<chio_kernel::receipt_store::DispatchIntentReconcileReport, ReceiptStoreError> {
+        SqliteReceiptStore::reconcile_dispatch_intents(self, reconciler)
+    }
+
+    fn supports_dispatch_intent_recovery(&self) -> bool {
+        SqliteReceiptStore::supports_dispatch_intent_recovery(self)
+    }
+
+    fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        SqliteReceiptStore::supports_durable_dispatch_intent_journal(self)
+    }
+
+    fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::open_dispatch_intent_count(self)
+    }
+
+    fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::dead_letter_dispatch_intent_count(self)
+    }
+
+    fn resolve_dead_letter_dispatch_intent(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        note: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::resolve_dead_letter_dispatch_intent(self, request_id, tenant_id, note)
     }
 
     fn receipts_canonical_bytes_range(
@@ -336,6 +504,10 @@ impl ReceiptStore for SqliteReceiptStore {
 
     fn receipt_store_health(&self) -> Result<ReceiptStoreHealthReport, ReceiptStoreError> {
         SqliteReceiptStore::receipt_store_health(self)
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        SqliteReceiptStore::writer_serving_closed(self)
     }
 
     fn latest_committed_entry_seq(&self) -> Result<u64, ReceiptStoreError> {
@@ -404,20 +576,40 @@ impl ReceiptStore for SqliteReceiptStore {
         .map(|()| true)
     }
 
+    fn supports_retention(&self) -> bool {
+        true
+    }
+
+    fn rotate_receipts(&self, config: &RetentionConfig) -> Result<u64, ReceiptStoreError> {
+        self.rotate_if_needed(config)
+    }
+
+    fn record_retention_rotation_outcome(&self, failure: Option<&str>) {
+        SqliteReceiptStore::record_retention_rotation_outcome(self, failure)
+    }
+
     fn record_capability_snapshot(
         &self,
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
-        SqliteReceiptStore::record_capability_snapshot(self, token, parent_capability_id).map_err(
-            |error| match error {
-                chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
-                chio_kernel::CapabilityLineageError::Sqlite(error) => {
-                    ReceiptStoreError::Sqlite(error)
-                }
-                chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-            },
+        SqliteReceiptStore::record_capability_snapshot(self, token, parent_capability_id)
+            .map_err(capability_lineage_store_error)
+    }
+
+    fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_capability_snapshot_with_timeout(
+            self,
+            token,
+            parent_capability_id,
+            budget,
         )
+        .map_err(capability_lineage_store_error)
     }
 
     fn record_capability_snapshot_with_issuance_admission(
@@ -594,6 +786,15 @@ impl ReceiptStore for SqliteReceiptStore {
         receipt: &ChildRequestReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         SqliteReceiptStore::append_child_receipt_record(self, receipt).map(Some)
+    }
+
+    fn append_child_receipt_with_timeout(
+        &self,
+        receipt: &ChildRequestReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_child_receipt_record_with_timeout(self, receipt, budget)
+            .map(Some)
     }
 }
 

@@ -486,7 +486,8 @@ fn write_chio_evidence_package(
     denied_access_record: &ChioWallDeniedAccessRecord,
     policy_snapshot: &ChioWallPolicySnapshot,
 ) -> Result<(), CliError> {
-    let receipt_db_path = output.join(".chio-wall-receipts.sqlite3");
+    let receipt_staging = tempfile::tempdir()?;
+    let receipt_db_path = receipt_staging.path().join("chio-wall-receipts.sqlite3");
     let chio_evidence_dir = output.join("chio-evidence");
 
     create_chio_wall_receipt_db(

@@ -17,7 +17,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, Transact
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::receipt_store::SqliteReceiptStore;
+use crate::receipt_store::{SqliteReceiptStore, SqliteStoreConnection};
 
 const CAUSAL_LINEAGE_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS causal_lineage_heads (
@@ -849,31 +849,46 @@ impl SqliteReceiptStore {
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), CapabilityLineageError> {
+        self.record_capability_snapshot_bounded(token, parent_capability_id, None)
+    }
+
+    /// Record a snapshot while bounding the writer round trip to `budget`.
+    pub fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: std::time::Duration,
+    ) -> Result<(), CapabilityLineageError> {
+        self.record_capability_snapshot_bounded(token, parent_capability_id, Some(budget))
+    }
+
+    fn record_capability_snapshot_bounded(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: Option<std::time::Duration>,
+    ) -> Result<(), CapabilityLineageError> {
         let grants_json = serde_json::to_string(&token.scope)?;
         let subject_key = token.subject.to_hex();
         let issuer_key = token.issuer.to_hex();
-
-        // Compute delegation depth from parent if present.
-        let delegation_depth: u64 = if let Some(parent_id) = parent_capability_id {
-            let parent_depth: Option<u64> = self
-                .connection()?
-                .query_row(
-                    "SELECT delegation_depth FROM capability_lineage WHERE capability_id = ?1",
-                    params![parent_id],
-                    |row: &Row<'_>| non_negative_u64_from_column(row, 0, "delegation_depth"),
-                )
-                .optional()?;
-
-            parent_depth.map(|d| d.saturating_add(1)).unwrap_or(1)
-        } else {
-            0
-        };
 
         let capability_id = token.id.clone();
         let issued_at = token.issued_at;
         let expires_at = token.expires_at;
         let parent_capability_id = parent_capability_id.map(ToString::to_string);
-        self.writer_handle().run_write(move |connection| {
+        let job = move |connection: &mut SqliteStoreConnection| {
+            let delegation_depth: u64 = if let Some(parent_id) = parent_capability_id.as_deref() {
+                let parent_depth: Option<u64> = connection
+                    .query_row(
+                        "SELECT delegation_depth FROM capability_lineage WHERE capability_id = ?1",
+                        params![parent_id],
+                        |row: &Row<'_>| non_negative_u64_from_column(row, 0, "delegation_depth"),
+                    )
+                    .optional()?;
+                parent_depth.map(|depth| depth.saturating_add(1)).unwrap_or(1)
+            } else {
+                0
+            };
             connection.execute(
                 r#"
                 INSERT OR IGNORE INTO capability_lineage (
@@ -899,7 +914,11 @@ impl SqliteReceiptStore {
                 ],
             )?;
             Ok(())
-        })?;
+        };
+        match budget {
+            Some(budget) => self.writer_handle().run_write_with_timeout(job, budget)?,
+            None => self.writer_handle().run_write(job)?,
+        }
 
         Ok(())
     }

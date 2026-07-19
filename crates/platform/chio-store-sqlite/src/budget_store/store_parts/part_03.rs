@@ -133,7 +133,7 @@ impl SqliteBudgetStore {
         }))
     }
 
-    fn sqlite_like_prefix_pattern(prefix: &str) -> String {
+    pub(super) fn sqlite_like_prefix_pattern(prefix: &str) -> String {
         let mut pattern = String::with_capacity(prefix.len() + 1);
         for ch in prefix.chars() {
             match ch {

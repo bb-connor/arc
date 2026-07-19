@@ -111,7 +111,10 @@ fn metrics_kernel_with_web3_evidence(
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
     };
     let mut kernel = chio_kernel::ChioKernel::new(config);
     kernel.register_tool_server(Box::new(MetricsToolServer));
@@ -462,7 +465,9 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         "mcp edge kernel error path must advance receipt write error"
     );
 
-    let body = chio_mcp_edge::render_mcp_edge_metrics_prometheus();
+    let body = chio_mcp_edge::render_mcp_edge_metrics_prometheus(
+        chio_kernel::ReceiptWriterLiveness::Unknown,
+    );
     assert!(body.contains(CHIO_RECEIPT_WRITE_TOTAL));
     assert!(body.contains("outcome=\"allow\""));
     assert!(body.contains("outcome=\"pending_approval\""));
@@ -574,7 +579,9 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         "acp edge orchestrator error path must advance receipt write error"
     );
 
-    let body = chio_acp_edge::render_acp_edge_metrics_prometheus();
+    let body = chio_acp_edge::render_acp_edge_metrics_prometheus(
+        chio_kernel::ReceiptWriterLiveness::Unknown,
+    );
     assert!(body.contains(CHIO_RECEIPT_WRITE_TOTAL));
     assert!(body.contains("outcome=\"allow\""));
     assert!(body.contains("outcome=\"pending_approval\""));
@@ -691,7 +698,9 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         "a2a edge orchestrator error path must advance receipt write error"
     );
 
-    let body = chio_a2a_edge::render_a2a_edge_metrics_prometheus();
+    let body = chio_a2a_edge::render_a2a_edge_metrics_prometheus(
+        chio_kernel::ReceiptWriterLiveness::Unknown,
+    );
     assert!(body.contains(CHIO_RECEIPT_WRITE_TOTAL));
     assert!(body.contains("outcome=\"allow\""));
     assert!(body.contains("outcome=\"pending_approval\""));
@@ -713,7 +722,7 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
 fn http_core_emits_kernel_decision_latency_and_guard_evaluations() -> Result<(), Box<dyn Error>> {
     let before_count = chio_http_core::decision_latency_count();
     let before_allow = chio_http_core::guard_evaluations_total(chio_http_core::GUARD_OUTCOME_ALLOW);
-    let authority = chio_http_core::HttpAuthority::new(
+    let authority = chio_http_core::HttpAuthority::new_ephemeral(
         Keypair::generate(),
         "metrics-registry-test-policy".to_string(),
     );
@@ -1479,7 +1488,7 @@ fn drive_and_render(name: &str) -> Result<Option<String>, Box<dyn Error>> {
 /// no driver here.
 fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
     if name == CHIO_KERNEL_DECISION_LATENCY_SECONDS {
-        let authority = chio_http_core::HttpAuthority::new(
+        let authority = chio_http_core::HttpAuthority::new_ephemeral(
             Keypair::generate(),
             "emission-gate-policy".to_string(),
         );
@@ -1561,7 +1570,9 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
             "emission-gate-mcp-1",
             false,
         )?;
-        return Ok(Some(chio_mcp_edge::render_mcp_edge_metrics_prometheus()));
+        return Ok(Some(chio_mcp_edge::render_mcp_edge_metrics_prometheus(
+            chio_kernel::ReceiptWriterLiveness::Unknown,
+        )));
     }
     Ok(None)
 }

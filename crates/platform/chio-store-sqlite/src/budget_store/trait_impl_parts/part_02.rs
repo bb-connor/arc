@@ -672,6 +672,16 @@ impl BudgetStore for SqliteBudgetStore {
         &self,
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        validate_payment_journal_authorization_binding(
+            request.payment_journal.as_ref(),
+            request.admission_operation.as_ref(),
+            request.authority.as_ref(),
+            &request.capability_id,
+            request.grant_index,
+            request.hold_id.as_deref(),
+            request.requested_exposure_units,
+        )?;
+        let payment_journal = request.payment_journal.clone();
         if !request.invocation_quotas().is_empty() || request.revocation_set().is_some() {
             if request.max_invocations.is_some() {
                 return Err(BudgetStoreError::Invariant(
@@ -739,16 +749,17 @@ impl BudgetStore for SqliteBudgetStore {
                 revocation_set,
                 authorization_artifact_digests,
             };
-            return match aggregate_family_evidence {
-                Some(evidence) => self.authorize_aggregate_family_composite_hold(input, evidence),
-                None => self.authorize_composite_hold(input),
-            };
+            return self.authorize_composite_hold_with_journal(
+                input,
+                aggregate_family_evidence,
+                payment_journal.as_ref(),
+            );
         }
         let event_id = effective_hold_event_id(
             request.event_id.as_deref(),
             BudgetMutationKind::AuthorizeExposure,
         );
-        self.try_charge_cost_with_ids_and_authority(
+        self.try_charge_cost_with_ids_authority_and_journal_outcome(
             &request.capability_id,
             request.grant_index,
             request.max_invocations,
@@ -758,6 +769,7 @@ impl BudgetStore for SqliteBudgetStore {
             request.hold_id.as_deref(),
             Some(&event_id),
             request.authority.as_ref(),
+            payment_journal.as_ref(),
         )?;
         load_authorize_decision_for_event(self, &event_id)
     }
@@ -1177,7 +1189,11 @@ impl BudgetStore for SqliteBudgetStore {
         )?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
+
+    include!("main_extensions.inc");
 }
+
+include!("main_extension_helpers.inc");
 
 fn effective_hold_event_id(requested: Option<&str>, kind: BudgetMutationKind) -> String {
     requested.map_or_else(

@@ -427,6 +427,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(COST_ATTRIBUTION_PATH, get(handle_cost_attribution_report))
         .route(OPERATOR_REPORT_PATH, get(handle_operator_report))
         .route(
+            COMPTROLLER_SURFACE_PATH,
+            get(handle_comptroller_surface_report),
+        )
+        .route(
             RUNTIME_ATTESTATION_APPRAISAL_PATH,
             post(handle_runtime_attestation_appraisal_report),
         )
@@ -767,6 +771,7 @@ mod tests {
             cluster_replay_db_path: None,
             cluster_members: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         };
         TrustServiceState {

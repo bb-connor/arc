@@ -144,15 +144,50 @@ pub(crate) fn build_cluster_state(
     if peers.is_empty() {
         return Ok(None);
     }
+    let (persisted_term, persisted_leader_url) =
+        if let Some(path) = config.authority_db_path.as_deref() {
+            load_persisted_authority_fence(path, &self_url, &peers)?
+        } else {
+            (0, None)
+        };
     Ok(Some(Arc::new(Mutex::new(ClusterRuntimeState {
         self_url,
         peers,
-        election_term: 0,
-        last_leader_url: None,
+        election_term: persisted_term,
+        last_leader_url: persisted_leader_url,
         term_started_at: None,
         lease_expires_at: None,
         lease_ttl_ms: authority_lease_ttl(config.cluster_sync_interval).as_millis() as u64,
     }))))
+}
+
+pub(crate) fn load_persisted_authority_fence(
+    authority_db_path: &Path,
+    self_url: &str,
+    peers: &HashMap<String, PeerSyncState>,
+) -> Result<(u64, Option<String>), CliError> {
+    let authority = SqliteCapabilityAuthority::open_existing(authority_db_path)?;
+    let status = authority.status()?;
+    let fence = authority.cluster_fence()?;
+    if fence.authority_generation == status.generation
+        && fence.authority_rotated_at == status.rotated_at
+    {
+        let leader_url = fence
+            .leader_url
+            .and_then(|leader_url| normalize_cluster_url(&leader_url).ok())
+            .filter(|leader_url| leader_url == self_url || peers.contains_key(leader_url));
+        return Ok((fence.election_term, leader_url));
+    }
+    if fence.election_term > 0 || fence.leader_url.is_some() {
+        warn!(
+            fence_generation = fence.authority_generation,
+            authority_generation = status.generation,
+            fence_rotated_at = fence.authority_rotated_at,
+            authority_rotated_at = status.rotated_at,
+            "discarding stale persisted authority fence after authority rotation"
+        );
+    }
+    Ok((0, None))
 }
 
 pub(crate) fn cluster_self_url(state: &TrustServiceState) -> Option<String> {

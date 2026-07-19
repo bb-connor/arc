@@ -12,7 +12,6 @@ publish = false
 name = "chio_cross_protocol"
 
 [dependencies]
-async-trait = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-kernel = { workspace = true }
 chio-manifest = { workspace = true }
@@ -26,6 +25,7 @@ tokio = { workspace = true }
 chio-security-types = { workspace = true }
 chio-store-sqlite = { workspace = true }
 tempfile = { workspace = true }
+async-trait = { workspace = true }
 
 [lints]
 workspace = true

@@ -72,7 +72,10 @@ struct IncompleteStreamAfterSideEffectServer {
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
-// A registered server whose connector returns ToolNotRegistered after entry.
+// A registered tool server that returns `ToolNotRegistered` only after the
+// connector has been entered. The kernel cannot trust that connector-returned
+// label as proof that no side effect occurred, so these tests require
+// outcome-unknown retention rather than pre-dispatch cleanup.
 struct ToolNotRegisteredDispatchServer {
     id: String,
     tools: Vec<String>,
@@ -674,7 +677,6 @@ fn assert_package_valid_allow_receipt(
     );
     Ok(())
 }
-
 #[test]
 fn chio_runtime_admission_hook_denies_before_tool_dispatch_and_records_metadata(
 ) -> Result<(), Box<dyn std::error::Error>> {

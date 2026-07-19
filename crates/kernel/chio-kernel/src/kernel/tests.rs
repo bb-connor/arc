@@ -5,6 +5,7 @@ include!("tests/support_delegation_plain.rs");
 include!("tests/support_monetary.rs");
 include!("tests/capability_validation.rs");
 include!("tests/guard_pipeline.rs");
+include!("tests/hot_path_deadlines.rs");
 include!("tests/receipts.rs");
 include!("tests/session.rs");
 mod budget {
@@ -18,6 +19,7 @@ mod budget_governed_call_chain {
 
     include!("tests/budget_governed_call_chain.rs");
 }
+include!("tests/settlement_routing.rs");
 include!("tests/budget_governed_assurance.rs");
 include!("tests/emergency.rs");
 include!("tests/constraint_variants.rs");
@@ -28,14 +30,18 @@ mod approval_flow {
     include!("tests/approval_flow.rs");
 }
 include!("tests/admission_saga.rs");
+include!("tests/admission_payment_cleanup.rs");
 include!("tests/execution_nonce.rs");
 include!("tests/threshold_approval.rs");
 include!("tests/threshold_coordinator.rs");
+include!("tests/threshold_caller_reservation.rs");
 include!("tests/authority_composition.rs");
 include!("tests/compliance_score.rs");
 include!("tests/multi_tenant_receipt.rs");
+include!("tests/dispatch_intent_wiring.rs");
 include!("tests/memory_provenance.rs");
 include!("tests/federation_cosign.rs");
+include!("tests/revocation_durability.rs");
 include!("tests/chio_runtime.rs");
 include!("tests/drop_guard_proptest.rs");
 include!("tests/formal_closure.rs");
@@ -47,3 +53,4 @@ mod active_response_admission;
 
 #[path = "tests/automatic_active_response_fence.rs"]
 mod automatic_active_response_fence;
+include!("tests/sim_payment.rs");

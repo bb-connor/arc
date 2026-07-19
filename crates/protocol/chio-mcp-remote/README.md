@@ -15,15 +15,19 @@ over HTTP. It handles:
 - Enterprise federation: pluggable identity providers (OIDC, SAML-like, custom)
   resolved through `EnterpriseProviderRegistry`.
 - Per-client rate limiting (600 requests per 60-second window, 4096 tracked
-  keys) enforced before session work begins.
-- Admin routes (`/admin/health`, `/admin/authority`, `/admin/rotate`) for
-  operator keypair management.
+  keys) and an 8 MiB POST body cap enforced before session work begins.
+- Admin routes for health, authority rotation, receipts, revocations, budgets,
+  session trust, drain and shutdown, and Prometheus metrics, protected by a
+  constant-time bearer check.
 - Receipt-bearing kernel dispatch: every tool invocation passes through
   `chio-kernel` and produces a signed `ChioReceipt`.
 
 The public surface re-exports `CliError` and `JwtProviderProfile` from
 `chio-control-plane` and exposes the HTTP service entrypoint via
 `serve_http(RemoteServeHttpConfig)`.
+
+`enforce_oidc_egress_contract` exposes the production OIDC-discovery network
+gate for negative conformance tests without starting the server.
 
 ## Durable resume integrity
 

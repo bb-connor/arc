@@ -4,6 +4,7 @@ use chio_core::capability::aggregate_budget::{
 use serde::{Deserialize, Serialize};
 
 use crate::supplemental_quota::{CanonicalRevocationSet, VerifiedSupplementalQuota};
+use chio_log_redact::redacted;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BudgetStoreError {
@@ -598,6 +599,7 @@ pub enum BudgetMutationKind {
     ReverseExposure,
     ReleaseExposure,
     ReconcileSpend,
+    ExpireHold,
 }
 
 impl BudgetMutationKind {
@@ -612,6 +614,7 @@ impl BudgetMutationKind {
             Self::ReverseExposure => "reverse_exposure",
             Self::ReleaseExposure => "release_exposure",
             Self::ReconcileSpend => "reconcile_spend",
+            Self::ExpireHold => "expire_hold",
         }
     }
 
@@ -626,6 +629,7 @@ impl BudgetMutationKind {
             "reverse_exposure" => Some(Self::ReverseExposure),
             "release_exposure" => Some(Self::ReleaseExposure),
             "reconcile_spend" => Some(Self::ReconcileSpend),
+            "expire_hold" => Some(Self::ExpireHold),
             _ => None,
         }
     }
@@ -638,10 +642,29 @@ pub struct BudgetEventAuthority {
     pub lease_epoch: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BudgetAdmissionOperationBinding {
     operation_id: String,
     request_binding_hash: String,
+}
+
+impl<'de> Deserialize<'de> for BudgetAdmissionOperationBinding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct PersistedBinding {
+            operation_id: String,
+            request_binding_hash: String,
+        }
+
+        let persisted = PersistedBinding::deserialize(deserializer)?;
+        Self::new(persisted.operation_id, persisted.request_binding_hash)
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl BudgetAdmissionOperationBinding {
@@ -812,7 +835,10 @@ impl BudgetCommitMetadata {
     }
 }
 
-fn budget_commit_metadata<T: BudgetStore + ?Sized>(
+/// Assemble the commit metadata a hold decision carries, stamped with the
+/// store's guarantee and metering profiles. Public so store implementations
+/// that override the defaulted hold methods can produce identical metadata.
+pub fn budget_commit_metadata<T: BudgetStore + ?Sized>(
     store: &T,
     authority: Option<BudgetEventAuthority>,
     budget_commit_index: Option<u64>,
@@ -845,6 +871,7 @@ fn budget_commit_metadata<T: BudgetStore + ?Sized>(
 ///     authority: None,
 ///     admission_operation: None,
 ///     invocation_admission: None,
+///     payment_journal: None,
 /// };
 /// ```
 pub struct BudgetAuthorizeHoldRequest {
@@ -859,6 +886,22 @@ pub struct BudgetAuthorizeHoldRequest {
     pub authority: Option<BudgetEventAuthority>,
     pub admission_operation: Option<BudgetAdmissionOperationBinding>,
     invocation_admission: Option<VerifiedInvocationAdmission>,
+    /// Optional payment-journal row committed in the SAME transaction as
+    /// the hold write, so the money path's recoverable record is durable
+    /// before the rail is touched. `None` for non-monetary calls and for
+    /// stores without the journal.
+    pub payment_journal: Option<crate::payment::PaymentJournalRecord>,
+}
+
+/// Read model of an open budget hold, for the orphaned-hold sweeper and the
+/// operator CLI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenHoldSummary {
+    pub hold_id: String,
+    pub capability_id: String,
+    pub grant_index: u32,
+    pub remaining_exposure_units: u64,
+    pub created_at_unix_ms: u64,
 }
 
 /// Durable, operation-bound input for authorize-then-reverse recovery.
@@ -985,6 +1028,7 @@ impl BudgetAuthorizationCleanupSnapshot {
                 aggregate_binding_digest: self.aggregate_binding_digest.clone(),
                 supplemental_binding,
             }),
+            payment_journal: None,
         })
     }
 
@@ -1112,6 +1156,7 @@ impl BudgetAuthorizeHoldRequest {
             authority,
             admission_operation: None,
             invocation_admission: None,
+            payment_journal: None,
         }
     }
 
@@ -1318,3 +1363,94 @@ pub type BudgetReleaseHoldDecision = BudgetHoldMutationDecision;
 pub type BudgetReverseHoldDecision = BudgetHoldMutationDecision;
 pub type BudgetReconcileHoldDecision = BudgetHoldMutationDecision;
 pub type BudgetCaptureHoldDecision = BudgetHoldMutationDecision;
+
+/// Terminal state of an authorization hold, projected for callers that need to
+/// inspect a hold by id without depending on a store's private disposition type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BudgetHoldDispositionView {
+    Open,
+    Released,
+    Reversed,
+    Reconciled,
+    Captured,
+    Expired,
+}
+
+impl BudgetHoldDispositionView {
+    #[must_use]
+    pub fn is_open(self) -> bool {
+        matches!(self, Self::Open)
+    }
+
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::Released => "released",
+            Self::Reversed => "reversed",
+            Self::Reconciled => "reconciled",
+            Self::Captured => "captured",
+            Self::Expired => "expired",
+        }
+    }
+}
+
+/// Grant-level financial envelope recorded on a reserved hold at reserve time so
+/// reconcile-by-nonce can stamp the originating grant's total/remaining budget and
+/// delegation lineage onto the authoritative receipt, rather than the
+/// reservation's own exposure and a lost lineage. Persisted alongside
+/// `reserved_until` by the reserve-for-caller path.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReservedHoldEnvelope {
+    /// Grant ceiling (`max_total_cost`) in currency minor units. `None` for a
+    /// zero-exposure invocation reserve, which carries no monetary ceiling.
+    pub budget_total: Option<u64>,
+    /// Delegation depth of the reserving capability's chain.
+    pub delegation_depth: u32,
+    /// Root budget holder of the reserving capability's delegation chain.
+    pub root_budget_holder: String,
+}
+
+/// Read-only projection of a single authorization hold, used by the
+/// reconcile-by-nonce entry point to look up the exact reserved hold a signed
+/// execution nonce names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetHoldSnapshot {
+    pub hold_id: String,
+    pub capability_id: String,
+    pub grant_index: usize,
+    pub authorized_exposure_units: u64,
+    pub remaining_exposure_units: u64,
+    pub disposition: BudgetHoldDispositionView,
+    /// Wall-clock unix seconds after which an unreconciled reserved hold is
+    /// eligible for the TTL reaper. `None` for holds that were never marked
+    /// reserved (they are reclaimed by the crash reaper, not the TTL reaper).
+    pub reserved_until: Option<i64>,
+    /// Currency the grant was authorized in, recorded when the reserve-for-caller
+    /// path stamps the hold. `None` for holds that were never marked reserved.
+    /// Reconcile-by-nonce validates the caller-supplied realized currency against
+    /// this before settling or signing, so an unchecked currency is never stamped
+    /// onto a signed authoritative receipt.
+    pub reserved_currency: Option<String>,
+    /// Rail transaction id that funded a prepaid MustPrepay reservation, recorded
+    /// when the reserve-for-caller path stamps the hold. `None` for holds that
+    /// carried no prepayment (an ordinary mediated reserve billed at reconcile
+    /// time downstream). Reconcile-by-nonce stamps it as the authoritative
+    /// receipt's `payment_reference` so operators can tie the reconciled spend to
+    /// the transaction that paid for it, and it survives a fresh-kernel reconcile.
+    pub reserved_payment_reference: Option<String>,
+    /// Grant ceiling (`max_total_cost`) recorded when the reserve-for-caller path
+    /// stamps a monetary hold, so reconcile-by-nonce reports the grant's total
+    /// budget rather than the reservation's exposure. `None` for holds never
+    /// marked reserved and for zero-exposure invocation reserves.
+    pub reserved_budget_total: Option<u64>,
+    /// Delegation depth of the reserving capability, recorded at reserve time so
+    /// reconcile-by-nonce stamps the true lineage depth rather than zero. `None`
+    /// for holds never marked reserved.
+    pub reserved_delegation_depth: Option<u32>,
+    /// Root budget holder of the reserving capability's delegation chain, recorded
+    /// at reserve time so reconcile-by-nonce stamps the true lineage root rather
+    /// than the nonce subject. `None` for holds never marked reserved.
+    pub reserved_root_budget_holder: Option<String>,
+    pub authority: Option<BudgetEventAuthority>,
+}

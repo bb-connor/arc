@@ -248,8 +248,11 @@ impl SqliteKeyLogStore {
         let path = path.as_ref();
         crate::require_existing_durable_sqlite_path(path)?;
         let storage_file = crate::open_durable_sqlite_file(path, false, false)?;
-        let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        storage_file.validate_path_binding(path)?;
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
+        storage_file.validate_live_connection(&connection)?;
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.execute_batch("PRAGMA foreign_keys = ON; PRAGMA query_only = ON;")?;
         let durable_state_exists = durable_state_exists(&connection)?;
@@ -289,9 +292,11 @@ impl SqliteKeyLogStore {
         let selector_lock = acquire_selector_writer_lock(path)?;
         let connection = Connection::open_with_flags(
             path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )?;
-        storage_file.validate_path_binding(path)?;
+        storage_file.validate_live_connection(&connection)?;
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.execute_batch(
             "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",

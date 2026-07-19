@@ -383,6 +383,14 @@ pub trait ToolServerConnection: Send + Sync {
     /// List the tool names available on this server.
     fn tool_names(&self) -> Vec<String>;
 
+    /// Whether the named tool is annotated read-only (no external side
+    /// effect). Default `false` fails safe: an unannotated or unknown tool is
+    /// treated as side-effecting and gets a durable dispatch intent before it
+    /// runs. Connections that know their tool annotations override this.
+    fn tool_is_read_only(&self, _tool_name: &str) -> bool {
+        false
+    }
+
     /// Invoke a tool on this server. The kernel has already validated the
     /// capability and run guards before calling this.
     async fn invoke(
@@ -408,6 +416,25 @@ pub trait ToolServerConnection: Send + Sync {
             .invoke(tool_name, arguments, nested_flow_bridge)
             .await?;
         Ok((value, None))
+    }
+
+    /// Whether this server measures the realized cost of an invocation it
+    /// dispatches.
+    ///
+    /// The default is `true`: a server that returns `None` cost from
+    /// `invoke_with_cost` is asserting that the realized cost equals the
+    /// authorized ceiling, and the kernel reconciles and settles that as a
+    /// completed spend.
+    ///
+    /// A server that returns `false` does not execute the target tool and
+    /// cannot measure a realized cost (for example a pre-execution
+    /// authorization gate that dispatches a pass-through while the real tool
+    /// runs elsewhere). For such a server the kernel reverses the
+    /// pre-execution hold and signs a provisional, unreconciled receipt
+    /// instead of a settled authoritative spend, since no cost was realized on
+    /// this path. Real reconciliation happens at the execution site.
+    fn measures_realized_cost(&self) -> bool {
+        true
     }
 
     /// Invoke a tool that can emit multiple streamed chunks before its final terminal state.

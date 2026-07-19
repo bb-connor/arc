@@ -193,9 +193,19 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
+        // This SSRF guard test exercises the proxy without a durable store; opt
+        // into ephemeral receipts explicitly so the durable-by-default boot gate
+        // does not refuse to start.
+        allow_ephemeral_receipts: true,
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        revocation_db: None,
+        require_nonce: false,
+        allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
@@ -244,9 +254,19 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
+        // This SSRF guard test exercises the proxy without a durable store; opt
+        // into ephemeral receipts explicitly so the durable-by-default boot gate
+        // does not refuse to start.
+        allow_ephemeral_receipts: true,
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        revocation_db: None,
+        require_nonce: false,
+        allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
@@ -299,9 +319,19 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
+        // This SSRF guard test exercises the proxy without a durable store; opt
+        // into ephemeral receipts explicitly so the durable-by-default boot gate
+        // does not refuse to start.
+        allow_ephemeral_receipts: true,
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        revocation_db: None,
+        require_nonce: false,
+        allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });

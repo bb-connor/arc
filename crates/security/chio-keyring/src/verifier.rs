@@ -98,9 +98,11 @@ impl SqlitePinnedKeyLogVerifier {
         let storage_file = crate::open_durable_sqlite_file(path, false, true)?;
         let connection = Connection::open_with_flags(
             path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )?;
-        storage_file.validate_path_binding(path)?;
+        storage_file.validate_live_connection(&connection)?;
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.execute_batch(
             "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",

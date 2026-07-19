@@ -2501,15 +2501,11 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
- "chio-metrics-spec",
  "chio-security-types",
  "chio-test-support",
- "futures",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -2524,15 +2520,11 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
- "chio-metrics-spec",
  "chio-security-types",
  "chio-test-support",
- "futures",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -2604,7 +2596,6 @@ dependencies = [
  "chio-kernel",
  "chio-metrics-spec",
  "chio-test-support",
- "chio-web3",
  "chio-web3-bindings",
  "hex",
  "opentimestamps",
@@ -2637,7 +2628,9 @@ dependencies = [
 name = "chio-api-protect"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum 0.8.8",
+ "chio-control-plane",
  "chio-core-types",
  "chio-http-core",
  "chio-http-serve",
@@ -2655,6 +2648,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "subtle",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.5.3",
@@ -3002,6 +2996,8 @@ name = "chio-config"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "chio-core",
+ "chio-kernel",
  "regex",
  "serde",
  "serde_yml",
@@ -3717,6 +3713,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-metrics-spec",
+ "chio-store-sqlite",
  "chio-test-support",
  "chrono",
  "hex",
@@ -3724,6 +3721,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "uuid",
@@ -3779,6 +3777,7 @@ dependencies = [
  "chio-security-types",
  "chio-settle",
  "chio-store-sqlite",
+ "chio-supervisor",
  "chio-test-support",
  "chio-tool-call-fabric",
  "chio-underwriting",
@@ -3788,6 +3787,7 @@ dependencies = [
  "dashmap 6.1.0",
  "dhat",
  "futures",
+ "jsonschema",
  "libc",
  "loom",
  "lru 0.16.3",
@@ -3952,6 +3952,7 @@ dependencies = [
  "chio-credit",
  "chio-underwriting",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 
@@ -4006,7 +4007,6 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -4644,6 +4644,7 @@ dependencies = [
  "chio-quarantine",
  "chio-security-types",
  "chio-settle",
+ "chio-supervisor",
  "chio-test-support",
  "criterion",
  "hex",
@@ -4660,6 +4661,17 @@ dependencies = [
  "tracing",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "chio-supervisor"
+version = "0.1.0"
+dependencies = [
+ "loom",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -4751,6 +4763,7 @@ dependencies = [
  "chio-http-core",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-store-sqlite",
  "chrono",
  "hex",
  "http 1.4.0",
@@ -4760,6 +4773,7 @@ dependencies = [
  "hyper-util",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.5.3",
@@ -4833,6 +4847,7 @@ dependencies = [
  "clap 4.6.0",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 

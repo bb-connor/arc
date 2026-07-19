@@ -198,6 +198,7 @@ impl RuntimeAdmissionHook for OperationAwareThresholdRuntimeHook {
 #[derive(Clone)]
 struct OperationAwareThresholdPaymentAdapter {
     calls: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String)>>>,
+    refunds: std::sync::Arc<std::sync::Mutex<Vec<(String, u64, String)>>>,
     lose_authorize_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
     lose_capture_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
     lose_release_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -209,6 +210,7 @@ impl OperationAwareThresholdPaymentAdapter {
     fn new() -> Self {
         Self {
             calls: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+            refunds: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
             lose_authorize_ack: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             lose_capture_ack: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             lose_release_ack: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -243,6 +245,10 @@ impl OperationAwareThresholdPaymentAdapter {
 
     fn calls(&self) -> Vec<(String, String, String)> {
         self.calls.lock().expect("payment calls").clone()
+    }
+
+    fn refunds(&self) -> Vec<(String, u64, String)> {
+        self.refunds.lock().expect("payment refunds").clone()
     }
 
     fn record(&self, phase: &str, operation_id: &str, request_binding_hash: &str) {
@@ -433,9 +439,19 @@ impl PaymentAdapter for OperationAwareThresholdPaymentAdapter {
         let OperationPaymentRefundRequest {
             operation_id,
             request_binding_hash,
-            ..
+            transaction_id,
+            amount_units,
+            currency,
+            reference: _,
         } = request;
         self.record("refund", operation_id, request_binding_hash);
+        self.refunds.lock().map_err(|_| {
+            PaymentError::RailError("payment refund trace poisoned".to_string())
+        })?.push((
+            transaction_id.to_string(),
+            amount_units,
+            currency.to_string(),
+        ));
         Ok(PaymentResult {
             transaction_id: format!("refund:{operation_id}"),
             settlement_status: RailSettlementStatus::Refunded,

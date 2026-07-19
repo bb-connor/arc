@@ -96,6 +96,14 @@ impl DurableSqliteFile {
     pub(crate) fn validate(&self) -> Result<()> {
         self.validate_path_binding(&self.path)
     }
+
+    pub(crate) fn validate_live_connection(
+        &self,
+        connection: &rusqlite::Connection,
+    ) -> Result<()> {
+        self.validate()?;
+        validate_sqlite_main_database_live_path_binding(connection)
+    }
 }
 
 pub(crate) fn open_durable_sqlite_file(
@@ -596,6 +604,45 @@ fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
 #[cfg(target_vendor = "apple")]
 pub fn darwin_descriptor_grants_extended_acl_authority(file: &std::fs::File) -> Result<bool> {
     trusted_file_has_extended_acl(file)
+}
+
+/// Verify that SQLite's live main-database handle still names the file at the
+/// path SQLite opened. This is the narrow FFI boundary for persistence crates
+/// that otherwise forbid unsafe code.
+///
+/// The caller must separately retain and validate its expected file descriptor.
+/// This check closes the gap where a different file occupies the database path
+/// only while `sqlite3_open_v2` runs and the expected file is restored before a
+/// subsequent path-based identity check.
+pub fn validate_sqlite_main_database_live_path_binding(
+    connection: &rusqlite::Connection,
+) -> Result<()> {
+    let mut has_moved = 0_i32;
+    // SAFETY: `connection` remains borrowed for the complete synchronous call,
+    // so its SQLite handle is live. The schema name is a static NUL-terminated
+    // string and `has_moved` is writable storage of the exact integer type
+    // required by SQLITE_FCNTL_HAS_MOVED. The call does not retain either
+    // pointer after returning.
+    let result = unsafe {
+        rusqlite::ffi::sqlite3_file_control(
+            connection.handle(),
+            c"main".as_ptr(),
+            rusqlite::ffi::SQLITE_FCNTL_HAS_MOVED,
+            (&raw mut has_moved).cast(),
+        )
+    };
+    if result != rusqlite::ffi::SQLITE_OK {
+        return Err(KeyringError::Storage(format!(
+            "SQLITE_FCNTL_HAS_MOVED failed: {}",
+            rusqlite::ffi::Error::new(result)
+        )));
+    }
+    if has_moved != 0 {
+        return Err(KeyringError::StateInvariant(
+            "SQLite main database handle is no longer bound to its opened path",
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(target_vendor = "apple")]

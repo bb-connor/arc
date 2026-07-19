@@ -714,7 +714,9 @@ impl ChioKernel {
         payload: &TerminalReceiptOutboxPayload,
     ) -> Result<(), KernelError> {
         self.validate_terminal_receipt_payload_with_store(store, operation, payload)?;
-        self.record_chio_receipt(&payload.receipt)?;
+        let request_id =
+            receipt_metadata_string(&payload.receipt, "/receipt_context/request_id");
+        self.record_chio_receipt_consuming_optional_intent(&payload.receipt, request_id)?;
         if operation.state() == AdmissionOperationState::Completed
             && operation.broker_attempt_id().is_some()
         {

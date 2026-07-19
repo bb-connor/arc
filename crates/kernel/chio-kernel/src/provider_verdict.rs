@@ -884,9 +884,12 @@ mod tests {
             max_stream_total_bytes: crate::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: crate::DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
             memory_budget: crate::MemoryBudgetConfig::defaults(),
+            deadlines: crate::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
         });
         kernel.register_tool_server(Box::new(CountingProviderServer {
             invocations: std::sync::Arc::clone(&invocations),
@@ -984,9 +987,12 @@ mod tests {
             max_stream_total_bytes: crate::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: crate::DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
             memory_budget: crate::MemoryBudgetConfig::defaults(),
+            deadlines: crate::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
         });
 
         let error = kernel

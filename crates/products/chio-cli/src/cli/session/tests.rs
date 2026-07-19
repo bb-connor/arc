@@ -62,6 +62,7 @@ fn build_kernel_with_receipt_store(
     let receipt_db_path = unique_db_path("chio-cli-session-receipts");
     configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None, None, &[])
         .expect("configure receipt store for session test");
+    crate::runtime_cli::opt_in_ephemeral_revocation_for_local_session(&mut kernel, None, None);
     kernel
 }
 
@@ -136,6 +137,7 @@ capabilities:
 "#;
     let policy = policy::parse_policy(yaml).unwrap();
     let revocation_db_path = unique_db_path("chio-cli-revocations");
+    let receipt_db_path = unique_db_path("chio-cli-revocation-receipts");
     let kp = Keypair::generate();
 
     let agent_kp = Keypair::generate();
@@ -154,6 +156,15 @@ capabilities:
 
     let mut restarted = build_kernel(load_test_policy_runtime(&policy), &kp)
         .expect("build restarted session test kernel");
+    configure_receipt_store(
+        &mut restarted,
+        Some(&receipt_db_path),
+        None,
+        None,
+        None,
+        &[],
+    )
+    .unwrap();
     configure_revocation_store(&mut restarted, Some(&revocation_db_path), None, None).unwrap();
     restarted.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
@@ -183,6 +194,7 @@ capabilities:
     assert!(response.reason.as_deref().unwrap_or("").contains("revoked"));
 
     let _ = std::fs::remove_file(revocation_db_path);
+    let _ = std::fs::remove_file(receipt_db_path);
 }
 
 #[test]
@@ -410,6 +422,100 @@ capabilities:
 
     let response = kernel.evaluate_tool_call(&request).await.unwrap();
     assert_eq!(response.verdict, chio_kernel::Verdict::Deny);
+}
+
+fn mcp_edge_kernel(policy: &policy::ChioPolicy, kernel_kp: &Keypair) -> (ChioKernel, PathBuf) {
+    let receipt_db_path = unique_db_path("chio-cli-mcp-edge-receipts");
+    let mut kernel = build_kernel(load_test_policy_runtime(policy), kernel_kp)
+        .expect("build MCP edge test kernel");
+    configure_receipt_store(
+        &mut kernel,
+        Some(&receipt_db_path),
+        None,
+        None,
+        None,
+        &[],
+    )
+    .expect("configure MCP edge receipt store");
+    (kernel, receipt_db_path)
+}
+
+fn mcp_edge_tool_call(
+    agent_kp: &Keypair,
+    cap: chio_core::capability::token::CapabilityToken,
+) -> KernelToolCallRequest {
+    KernelToolCallRequest {
+        request_id: "mcp-edge-dispatch".to_string(),
+        capability: cap,
+        tool_name: "read_file".to_string(),
+        server_id: "*".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        supplemental_authorization: None,
+        declassification_grant: None,
+    }
+}
+
+const MCP_EDGE_TOOL_POLICY: &str = r#"
+capabilities:
+  default:
+    tools:
+      - server: "*"
+        tool: "*"
+        operations: [invoke]
+        ttl: 300
+"#;
+
+#[tokio::test]
+async fn mcp_edge_denies_dispatch_without_durable_or_opted_in_revocation() {
+    let yaml = format!(
+        "kernel:\n  max_capability_ttl: 3600\n  allow_ephemeral_revocation_store: false\n{MCP_EDGE_TOOL_POLICY}"
+    );
+    let policy = policy::parse_policy(&yaml).unwrap();
+    let kp = Keypair::generate();
+    let (mut kernel, receipt_db_path) = mcp_edge_kernel(&policy, &kp);
+    kernel.register_tool_server(Box::new(StubToolServer {
+        id: "*".to_string(),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let cap = first_default_capability(&kernel, &policy, &agent_kp);
+    let response = kernel
+        .evaluate_tool_call(&mcp_edge_tool_call(&agent_kp, cap))
+        .await
+        .unwrap();
+    assert_eq!(response.verdict, chio_kernel::Verdict::Deny);
+    let _ = std::fs::remove_file(receipt_db_path);
+}
+
+#[tokio::test]
+async fn mcp_edge_allows_dispatch_with_policy_opted_in_ephemeral_revocation() {
+    let yaml = format!(
+        "kernel:\n  max_capability_ttl: 3600\n  allow_ephemeral_revocation_store: true\n{MCP_EDGE_TOOL_POLICY}"
+    );
+    let policy = policy::parse_policy(&yaml).unwrap();
+    let kp = Keypair::generate();
+    let (mut kernel, receipt_db_path) = mcp_edge_kernel(&policy, &kp);
+    kernel.register_tool_server(Box::new(StubToolServer {
+        id: "*".to_string(),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let cap = first_default_capability(&kernel, &policy, &agent_kp);
+    let response = kernel
+        .evaluate_tool_call(&mcp_edge_tool_call(&agent_kp, cap))
+        .await
+        .unwrap();
+    assert_eq!(response.verdict, chio_kernel::Verdict::Allow);
+    let _ = std::fs::remove_file(receipt_db_path);
 }
 
 #[test]

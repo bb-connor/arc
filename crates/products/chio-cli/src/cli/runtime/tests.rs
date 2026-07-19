@@ -267,6 +267,101 @@ fn remote_mcp_auth_contract_permits_explicit_loopback_auth_url() {
 }
 
 #[test]
+fn in_memory_receipt_store_is_refused_without_ephemeral_optin() {
+    for sentinel in [
+        ":memory:",
+        "file::memory:",
+        "file:audit?mode=memory&cache=shared",
+    ] {
+        let error = must_err(
+            require_durable_or_ephemeral_optin(Some(Path::new(sentinel)), false, None),
+            "an in-memory receipt store must fail closed without the opt-in",
+        );
+        assert!(error.to_string().contains("without durable receipts"));
+    }
+}
+
+#[test]
+fn in_memory_receipt_store_boots_only_with_the_ephemeral_optin() {
+    assert!(
+        require_durable_or_ephemeral_optin(Some(Path::new(":memory:")), true, None).is_ok()
+    );
+}
+
+#[test]
+fn durable_receipt_path_boots_without_the_ephemeral_optin() {
+    assert!(
+        require_durable_or_ephemeral_optin(
+            Some(Path::new("/var/lib/chio/receipts.db")),
+            false,
+            None,
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn in_memory_receipt_store_is_not_carried_through_as_durable() {
+    for sentinel in [
+        ":memory:",
+        "file::memory:",
+        "file:audit?mode=memory&cache=shared",
+    ] {
+        assert!(durable_receipt_db_path(Some(Path::new(sentinel))).is_none());
+    }
+    assert!(durable_receipt_db_path(None).is_none());
+    assert_eq!(
+        durable_receipt_db_path(Some(Path::new("/var/lib/chio/receipts.db"))),
+        Some(Path::new("/var/lib/chio/receipts.db"))
+    );
+}
+
+#[test]
+fn sidecar_payment_adapter_threads_configured_rail_and_fails_closed() {
+    let configured = sidecar_payment_adapter_from_config(Some(PaymentAdapterConfig::HttpX402 {
+        base_url: "https://facilitator.example".to_string(),
+        bearer_token: Some("token".to_string()),
+    }));
+    assert!(matches!(configured, Ok(Some(_))));
+
+    let default = sidecar_payment_adapter_from_config(None);
+    assert!(matches!(default, Ok(None)));
+
+    let rejected = sidecar_payment_adapter_from_config(Some(PaymentAdapterConfig::HttpAcp {
+        base_url: "   ".to_string(),
+        bearer_token: None,
+    }));
+    assert!(rejected.is_err());
+}
+
+#[test]
+fn start_banner_advertises_evaluate_only_when_mediation_is_available() {
+    let with_store = start_sidecar_route_banner(true);
+    assert_eq!(with_store.len(), 1);
+    assert!(with_store[0].contains(", /v1/evaluate,"));
+
+    let without_store = start_sidecar_route_banner(false);
+    assert!(!without_store[0].contains("/v1/evaluate"));
+    assert!(without_store.iter().any(|line| {
+        line.contains("mediated /v1/evaluate is disabled")
+            && line.contains("--budget-db")
+            && line.contains("CHIO_SIDECAR_CONTROL_TOKEN")
+    }));
+}
+
+#[test]
+fn mediation_advertised_only_with_hold_capable_store_and_control_token() {
+    let budget = Path::new("/var/lib/chio/budget.sqlite");
+    assert!(sidecar_mediation_available(
+        Some(budget),
+        Some("control-token")
+    ));
+    assert!(!sidecar_mediation_available(None, Some("control-token")));
+    assert!(!sidecar_mediation_available(Some(budget), None));
+    assert!(!sidecar_mediation_available(None, None));
+}
+
+#[test]
 fn cli_product_constructor_preserves_aggregate_exhaustion_across_restart_without_broker() {
     use chio_core::capability::aggregate_budget::{
         AggregateInvocationBudget, AggregateInvocationScope,

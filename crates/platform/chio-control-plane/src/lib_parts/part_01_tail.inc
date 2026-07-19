@@ -185,6 +185,18 @@ fn configure_receipt_store_inner(
             ));
         }
         (Some(path), None) => {
+            if path
+                .to_str()
+                .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+            {
+                return Err(CliError::cli_other_error(
+                    "refusing to attach an in-memory receipt database as a durable store: an \
+                     in-memory SQLite path loses every receipt on restart. Point --receipt-db at \
+                     a filesystem path for durable receipts, or omit it and set \
+                     allow_ephemeral_receipt_log in policy to run with an in-memory receipt log."
+                        .to_string(),
+                ));
+            }
             kernel.validate_web3_evidence_receipt_store(true)?;
             let store = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(path)?);
             let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = store.clone();

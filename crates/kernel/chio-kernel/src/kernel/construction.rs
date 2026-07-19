@@ -13,5 +13,20 @@ use dashmap::DashMap;
 
 use super::*;
 
+/// Fail-closed kernel build error. Lets deadline config be validated at
+/// construction time without making the infallible `ChioKernel::new` fallible.
+#[derive(Debug, thiserror::Error)]
+pub enum KernelBuildError {
+    #[error("invalid hot-path deadline config: {0}")]
+    InvalidDeadlineConfig(String),
+    #[error(
+        "settlement observer requires a durable settlement retry store: call \
+         set_settlement_retry_store before set_settlement_observer, so every retryable or \
+         permanent settlement outcome lands a settle_attempts or settle_dead_letters row \
+         instead of a warn-only log"
+    )]
+    MissingSettlementRetryStore,
+}
+
 include!("construction.part1.inc");
 include!("construction.part2.inc");

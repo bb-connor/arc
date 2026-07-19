@@ -66,6 +66,7 @@ fn composite_property_request(hold_index: u8, maxima: [u32; 3]) -> BudgetAuthori
                 negotiated_features_digest: "33".repeat(32),
             }),
         }),
+        payment_journal: None,
     }
 }
 

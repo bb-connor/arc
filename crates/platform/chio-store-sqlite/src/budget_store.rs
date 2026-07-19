@@ -5,13 +5,15 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::{
     AuthorizedBudgetHold, BudgetAdmissionOperationBinding, BudgetAuthorityProfile,
-    BudgetAuthorizeHoldDecision, BudgetCaptureHoldDecision, BudgetCaptureHoldRequest,
-    BudgetCaptureInvocationRequest, BudgetCommitMetadata, BudgetEventAuthority,
-    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationQuota,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureHoldDecision,
+    BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest, BudgetCommitMetadata,
+    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldDispositionView,
+    BudgetHoldMutationDecision, BudgetHoldSnapshot, BudgetInvocationQuota,
     BudgetInvocationQuotaUsage, BudgetInvocationReservationState, BudgetMeteringProfile,
     BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey,
     BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
-    BudgetReverseHoldRequest, DeniedBudgetHold, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
+    BudgetReverseHoldRequest, DeniedBudgetHold, ReservedHoldEnvelope,
+    MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{
@@ -22,6 +24,7 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 mod composite;
 mod model;
+mod reaper;
 mod replication;
 mod rows;
 mod schema;
@@ -37,6 +40,8 @@ use model::{HoldDisposition, SqliteBudgetHold};
 use replication::*;
 use rows::*;
 use schema::*;
+
+pub use reaper::ReapSummary;
 
 pub struct SqliteBudgetStore {
     connection: Mutex<Connection>,

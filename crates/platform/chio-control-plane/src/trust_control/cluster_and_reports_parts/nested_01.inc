@@ -48,6 +48,7 @@
             cluster_replay_db_path: None,
             cluster_members: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         }
     }

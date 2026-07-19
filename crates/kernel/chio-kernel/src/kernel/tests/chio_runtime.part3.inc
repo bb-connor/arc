@@ -67,7 +67,6 @@ fn incomplete_stream_output_marks_reservations_retained() -> Result<(), Box<dyn 
     );
     Ok(())
 }
-
 #[test]
 fn post_invocation_block_marks_reservations_retained() -> Result<(), Box<dyn std::error::Error>> {
     // A runtime-admitted call dispatches successfully (a destructive side
@@ -1070,7 +1069,7 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
         vec!["compute"],
         std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter)).expect("install payment adapter");
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -1118,7 +1117,9 @@ fn url_elicitation_cleanup_failure_rejects_forged_budget_authority(
         vec!["compute"],
         std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+    kernel
+        .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
+        .expect("payment adapter");
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -1171,7 +1172,7 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
         vec!["compute"],
         std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter)).expect("install payment adapter");
 
     let agent_kp = make_keypair();
     let cap = make_capability(

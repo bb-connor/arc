@@ -87,8 +87,15 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_async_with_session_context(request, None, None, None, None)
-            .await
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            None,
+            None,
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
     }
 
     pub async fn evaluate_tool_call_with_metadata(
@@ -103,6 +110,7 @@ impl ChioKernel {
             extra_metadata,
             None,
             None,
+            PreflightHoldDisposition::ReverseForRetry,
         )
         .await
     }
@@ -120,6 +128,7 @@ impl ChioKernel {
             None,
             None,
             Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
         )
         .await
     }
@@ -139,6 +148,7 @@ impl ChioKernel {
             extra_metadata,
             None,
             Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
         )
         .await
     }

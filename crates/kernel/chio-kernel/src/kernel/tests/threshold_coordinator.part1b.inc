@@ -514,7 +514,9 @@ async fn top_level_threshold_payment_capture_ack_loss_retries_the_operation_bind
         .set_budget_store_handle(budget)
         .expect("budget store");
     kernel.set_runtime_admission_hook(std::sync::Arc::new(runtime.clone()));
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("payment adapter");
     kernel
         .enable_threshold_governed_approvals()
         .expect("threshold activation");

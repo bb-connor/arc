@@ -1452,6 +1452,7 @@ kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
 capabilities:
   default:
     tools:
@@ -1472,6 +1473,7 @@ kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
 capabilities:
   default:
     tools:
@@ -1500,6 +1502,7 @@ kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
 capabilities:
   default:
     tools:
@@ -1532,6 +1535,7 @@ kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
 capabilities:
   default:
     resources:
@@ -1554,6 +1558,7 @@ kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
 capabilities:
   default:
     tools:
@@ -1576,6 +1581,7 @@ kernel:
   allow_sampling: true
   allow_elicitation: true
   allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
 capabilities:
   default:
     tools:

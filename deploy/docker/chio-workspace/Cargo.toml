@@ -15,6 +15,7 @@ repository = "https://github.com/backbay-labs/chio"
 [workspace.metadata.chio]
 rust_public_entrypoints = [
     "chio-api-protect",
+    "chio-cage",
     "chio-cli",
     "chio-conformance",
     "chio-control-plane",
@@ -191,6 +192,7 @@ chio-bedrock-converse-adapter = { path = "crates/protocol/chio-bedrock-converse-
 chio-binding-helpers = { path = "crates/sdk/chio-binding-helpers" }
 chio-bounded = { path = "crates/core/chio-bounded" }
 chio-cage = { path = "crates/security/chio-cage" }
+chio-supervisor = { path = "crates/core/chio-supervisor" }
 chio-cohere-tools-adapter = { path = "crates/protocol/chio-cohere-tools-adapter" }
 chio-config = { path = "crates/platform/chio-config" }
 chio-conformance = { path = "crates/tooling/chio-conformance" }

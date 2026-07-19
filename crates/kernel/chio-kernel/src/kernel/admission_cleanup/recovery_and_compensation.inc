@@ -634,12 +634,107 @@ impl ChioKernel {
         let Some(authorization) = authorization else {
             return Ok(());
         };
-        let release = || {
-            if authorization.settled {
+        let journal = self.payment_cleanup_journal(&payload.reference)?;
+        if journal.is_none() {
+            return Err(KernelError::Internal(
+                "operation-owned payment cleanup is missing its durable payment journal"
+                    .to_string(),
+            ));
+        }
+        if let Some(record) = journal.as_ref() {
+            self.validate_payment_cleanup_journal(
+                operation,
+                &payload,
+                adapter.rail_id(),
+                &authorization,
+                record,
+            )?;
+        }
+        let action = payment_cleanup_action(&authorization, journal.as_ref());
+        if journal
+            .as_ref()
+            .is_some_and(|record| {
+                payment_cleanup_is_completed(
+                    record,
+                    &authorization,
+                    action,
+                    payload.amount_units,
+                )
+            })
+        {
+            return Ok(());
+        }
+        let transaction_id = if action == PaymentSettleAction::Refund {
+            Some(self.resolve_payment_cleanup_transaction_id(
+                operation,
+                &payload,
+                &authorization,
+                journal.as_ref(),
+                adapter.as_ref(),
+            )?)
+        } else {
+            None
+        };
+        let settle = PaymentSettleIntent {
+            action,
+            amount_units: (action == PaymentSettleAction::Refund)
+                .then_some(payload.amount_units),
+        };
+        let staged = journal.as_ref().is_some_and(|record| {
+            payment_cleanup_is_staged(
+                record,
+                &authorization,
+                settle,
+                transaction_id.as_deref(),
+            )
+        });
+        if !staged {
+            let expected = journal
+                .as_ref()
+                .map(|record| record.state)
+                .unwrap_or(PaymentJournalState::Authorized);
+            let stageable = matches!(
+                expected,
+                PaymentJournalState::HoldPlaced | PaymentJournalState::Authorized
+            ) || (expected == PaymentJournalState::Settled
+                && action == PaymentSettleAction::Refund);
+            if journal.is_some() && !stageable {
+                return Err(KernelError::Internal(
+                    "payment cleanup journal has an incompatible in-flight settlement"
+                        .to_string(),
+                ));
+            }
+            let stage = self.advance_payment_cleanup_journal(
+                journal.is_some(),
+                &payload.reference,
+                expected,
+                PaymentJournalState::Settling,
+                Some(&authorization.authorization_id),
+                transaction_id.as_deref(),
+                Some(settle),
+            );
+            if let Err(error) = stage {
+                let readback = self.payment_cleanup_journal(&payload.reference)?;
+                if !readback.as_ref().is_some_and(|record| {
+                    payment_cleanup_is_staged(
+                        record,
+                        &authorization,
+                        settle,
+                        transaction_id.as_deref(),
+                    )
+                }) {
+                    return Err(KernelError::Internal(format!(
+                        "payment cleanup intent persistence failed: {error}"
+                    )));
+                }
+            }
+        }
+        let cleanup = || {
+            if let Some(transaction_id) = transaction_id.as_deref() {
                 adapter.refund_for_operation(OperationPaymentRefundRequest {
                     operation_id: operation.operation_id(),
                     request_binding_hash: operation.request_binding_hash(),
-                    transaction_id: &authorization.authorization_id,
+                    transaction_id,
                     amount_units: payload.amount_units,
                     currency: &payload.currency,
                     reference: &payload.reference,
@@ -653,20 +748,175 @@ impl ChioKernel {
                 )
             }
         };
-        let result = release()
-            .or_else(|_| release())
+        let result = cleanup()
+            .or_else(|_| cleanup())
             .map_err(|error| KernelError::Internal(format!("payment cleanup failed: {error}")))?;
-        let expected = if authorization.settled {
+        let expected_status = if action == PaymentSettleAction::Refund {
             RailSettlementStatus::Refunded
         } else {
             RailSettlementStatus::Released
         };
-        if result.settlement_status != expected {
+        if result.settlement_status != expected_status
+            || result.transaction_id.is_empty()
+            || result.transaction_id.bytes().any(|byte| byte == 0)
+        {
             return Err(KernelError::Internal(
-                "payment cleanup acknowledgement has the wrong settlement state".to_string(),
+                "payment cleanup acknowledgement has an invalid result or settlement state"
+                    .to_string(),
+            ));
+        }
+        let completed = self.advance_payment_cleanup_journal(
+            journal.is_some(),
+            &payload.reference,
+            PaymentJournalState::Settling,
+            PaymentJournalState::Settled,
+            None,
+            Some(&result.transaction_id),
+            None,
+        );
+        if let Err(error) = completed {
+            let readback = self.payment_cleanup_journal(&payload.reference)?;
+            if !readback.as_ref().is_some_and(|record| {
+                payment_cleanup_is_completed(
+                    record,
+                    &authorization,
+                    action,
+                    payload.amount_units,
+                )
+                    && record.transaction_id.as_deref() == Some(result.transaction_id.as_str())
+            }) {
+                return Err(KernelError::Internal(format!(
+                    "payment cleanup result persistence failed: {error}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn execute_reserved_payment_cleanup(
+        &self,
+        operation: &AdmissionOperation,
+        amount_units: u64,
+        currency: String,
+        reference: String,
+    ) -> Result<(), KernelError> {
+        self.execute_payment_cleanup(
+            operation,
+            PaymentCleanupPayload {
+                schema: PAYMENT_CLEANUP_SCHEMA.to_string(),
+                operation_id: operation.operation_id().to_string(),
+                request_binding_hash: operation.request_binding_hash().to_string(),
+                amount_units,
+                currency,
+                reference,
+            },
+        )
+    }
+
+    fn payment_cleanup_journal(
+        &self,
+        reference: &str,
+    ) -> Result<Option<PaymentJournalRecord>, KernelError> {
+        self.with_budget_store(|store| {
+            store
+                .get_payment_journal(reference)
+                .map_err(KernelError::from)
+        })
+    }
+
+    fn advance_payment_cleanup_journal(
+        &self,
+        journaled: bool,
+        reference: &str,
+        expected: PaymentJournalState,
+        next: PaymentJournalState,
+        authorization_id: Option<&str>,
+        transaction_id: Option<&str>,
+        settle: Option<PaymentSettleIntent>,
+    ) -> Result<(), KernelError> {
+        if !journaled {
+            return Ok(());
+        }
+        self.with_budget_store(|store| {
+            store
+                .advance_payment_journal(
+                    reference,
+                    expected,
+                    next,
+                    authorization_id,
+                    transaction_id,
+                    settle,
+                )
+                .map_err(KernelError::from)
+        })
+    }
+
+    fn validate_payment_cleanup_journal(
+        &self,
+        operation: &AdmissionOperation,
+        payload: &PaymentCleanupPayload,
+        rail_id: &str,
+        authorization: &PaymentAuthorization,
+        record: &PaymentJournalRecord,
+    ) -> Result<(), KernelError> {
+        let binding = BudgetAdmissionOperationBinding::new(
+            operation.operation_id().to_string(),
+            operation.request_binding_hash().to_string(),
+        )?;
+        if record.request_id != payload.reference
+            || record.capability_id != operation.capability_id()
+            || record.admission_operation.as_ref() != Some(&binding)
+            || record.hold_id.as_deref() != operation.budget_hold_id()
+            || record.rail != rail_id
+            || record.amount_units != payload.amount_units
+            || record.currency != payload.currency
+            || record.authorization_id.as_deref().is_some_and(|authorization_id| {
+                authorization_id != authorization.authorization_id.as_str()
+            })
+        {
+            return Err(KernelError::Internal(
+                "payment cleanup journal does not match its operation and authorization"
+                    .to_string(),
             ));
         }
         Ok(())
+    }
+
+    fn resolve_payment_cleanup_transaction_id(
+        &self,
+        operation: &AdmissionOperation,
+        payload: &PaymentCleanupPayload,
+        authorization: &PaymentAuthorization,
+        journal: Option<&PaymentJournalRecord>,
+        adapter: &dyn PaymentAdapter,
+    ) -> Result<String, KernelError> {
+        if let Some(transaction_id) = journal
+            .and_then(|record| record.transaction_id.as_deref())
+            .filter(|transaction_id| !transaction_id.is_empty())
+        {
+            return Ok(transaction_id.to_string());
+        }
+        match adapter.settlement_state_for_operation(
+            operation.operation_id(),
+            operation.request_binding_hash(),
+            &payload.reference,
+            Some(&authorization.authorization_id),
+        ) {
+            Ok(RailSettlementState::Settled {
+                authorization_id,
+                result,
+            }) if authorization_id == authorization.authorization_id
+                && !result.transaction_id.is_empty() =>
+            {
+                Ok(result.transaction_id)
+            }
+            Ok(_) => Err(KernelError::Internal(
+                "settled payment cleanup has no exact transaction reference".to_string(),
+            )),
+            Err(error) => Err(KernelError::Internal(format!(
+                "payment cleanup settlement lookup failed: {error}"
+            ))),
+        }
     }
 
     fn execute_delegated_budget_cleanup(
@@ -805,4 +1055,58 @@ impl ChioKernel {
             .or_else(|_| registrar.release_admission(operation.operation_id()))
             .map_err(|error| KernelError::Internal(format!("broker cleanup failed: {error}")))
     }
+}
+
+fn payment_cleanup_action(
+    authorization: &PaymentAuthorization,
+    journal: Option<&PaymentJournalRecord>,
+) -> PaymentSettleAction {
+    match journal.and_then(|record| record.settle_action) {
+        Some(PaymentSettleAction::Refund) => PaymentSettleAction::Refund,
+        Some(PaymentSettleAction::Release) => PaymentSettleAction::Release,
+        Some(PaymentSettleAction::Capture) | None
+            if authorization.settled
+                || journal.is_some_and(|record| record.state == PaymentJournalState::Settled) =>
+        {
+            PaymentSettleAction::Refund
+        }
+        Some(PaymentSettleAction::Capture) | None => PaymentSettleAction::Release,
+    }
+}
+
+fn payment_cleanup_is_staged(
+    record: &PaymentJournalRecord,
+    authorization: &PaymentAuthorization,
+    settle: PaymentSettleIntent,
+    transaction_id: Option<&str>,
+) -> bool {
+    record.state == PaymentJournalState::Settling
+        && record.authorization_id.as_deref() == Some(authorization.authorization_id.as_str())
+        && record.settle_action == Some(settle.action)
+        && record.settle_amount_units == settle.amount_units
+        && match settle.action {
+            PaymentSettleAction::Refund => record.transaction_id.as_deref() == transaction_id,
+            PaymentSettleAction::Release => record.transaction_id.is_none(),
+            PaymentSettleAction::Capture => false,
+        }
+}
+
+fn payment_cleanup_is_completed(
+    record: &PaymentJournalRecord,
+    authorization: &PaymentAuthorization,
+    action: PaymentSettleAction,
+    amount_units: u64,
+) -> bool {
+    record.state == PaymentJournalState::Settled
+        && record.authorization_id.as_deref() == Some(authorization.authorization_id.as_str())
+        && record.settle_action == Some(action)
+        && record
+            .transaction_id
+            .as_deref()
+            .is_some_and(|transaction_id| !transaction_id.is_empty())
+        && match action {
+            PaymentSettleAction::Refund => record.settle_amount_units == Some(amount_units),
+            PaymentSettleAction::Release => record.settle_amount_units.is_none(),
+            PaymentSettleAction::Capture => false,
+        }
 }

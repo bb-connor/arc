@@ -5,7 +5,7 @@ use super::report_rendering::{
     stored_tool_receipt_views,
 };
 use super::report_validation::{
-    normalize_cluster_config_url, validate_cluster_peer_empty_request,
+    normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_empty_request,
     validate_cluster_peer_json_request,
 };
 use super::*;
@@ -65,7 +65,9 @@ pub(crate) use snapshots::{
 };
 
 #[cfg(test)]
-pub(crate) use consensus::{authority_lease_ttl, cluster_authority_lease_view_locked};
+pub(crate) use consensus::{
+    authority_lease_ttl, cluster_authority_lease_view_locked, load_persisted_authority_fence,
+};
 
 #[cfg(test)]
 pub(crate) use deltas::{

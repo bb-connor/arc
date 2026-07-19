@@ -668,6 +668,88 @@ pub(super) fn ensure_budget_admission_operation_columns(
     Ok(())
 }
 
+pub(super) fn ensure_payment_journal_operation_columns(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(payment_journal)")?;
+    let existing = statement
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+    for column in [
+        "operation_id",
+        "request_binding_hash",
+        "authority_id",
+        "lease_id",
+        "lease_epoch",
+        "budget_exposure_units",
+    ] {
+        if !existing.iter().any(|existing| existing.as_str() == column) {
+            let column_type = if matches!(column, "lease_epoch" | "budget_exposure_units") {
+                "INTEGER"
+            } else {
+                "TEXT"
+            };
+            connection.execute(
+                &format!("ALTER TABLE payment_journal ADD COLUMN {column} {column_type}"),
+                [],
+            )?;
+        }
+    }
+    connection.execute(
+        "UPDATE payment_journal SET budget_exposure_units = amount_units \
+         WHERE budget_exposure_units IS NULL",
+        [],
+    )?;
+    let unsafe_rows = connection.query_row(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM payment_journal
+            WHERE (operation_id IS NULL) != (request_binding_hash IS NULL)
+               OR (operation_id IS NOT NULL AND (
+                    length(operation_id) < 1
+                    OR length(operation_id) > 512
+                    OR instr(operation_id, char(0)) != 0
+               ))
+               OR (request_binding_hash IS NOT NULL AND (
+                    length(request_binding_hash) != 64
+                    OR request_binding_hash GLOB '*[^0-9a-f]*'
+               ))
+               OR (authority_id IS NULL) != (lease_id IS NULL)
+               OR (authority_id IS NULL) != (lease_epoch IS NULL)
+               OR lease_epoch < 0
+               OR budget_exposure_units IS NULL
+               OR budget_exposure_units < 0
+        )
+        "#,
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if unsafe_rows != 0 {
+        return Err(BudgetStoreError::Invariant(
+            "payment journal contains an incomplete or invalid operation binding".to_string(),
+        ));
+    }
+    connection.execute_batch(
+        r#"
+        CREATE TRIGGER IF NOT EXISTS payment_journal_recovery_binding_immutable
+        BEFORE UPDATE OF operation_id, request_binding_hash, authority_id, lease_id, lease_epoch,
+                         budget_exposure_units
+        ON payment_journal
+        WHEN OLD.operation_id IS NOT NEW.operation_id
+          OR OLD.request_binding_hash IS NOT NEW.request_binding_hash
+          OR OLD.authority_id IS NOT NEW.authority_id
+          OR OLD.lease_id IS NOT NEW.lease_id
+          OR OLD.lease_epoch IS NOT NEW.lease_epoch
+          OR OLD.budget_exposure_units IS NOT NEW.budget_exposure_units
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable payment journal recovery binding');
+        END;
+        "#,
+    )?;
+    Ok(())
+}
+
 pub(super) fn ensure_budget_seq_column(connection: &Connection) -> Result<(), BudgetStoreError> {
     let mut statement = connection.prepare("PRAGMA table_info(capability_grant_budgets)")?;
     let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
@@ -725,6 +807,95 @@ pub(super) fn ensure_budget_hold_authority_columns(
     if !columns.iter().any(|column| column == "lease_epoch") {
         connection.execute(
             "ALTER TABLE budget_authorization_holds ADD COLUMN lease_epoch INTEGER",
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+pub(super) fn ensure_budget_hold_reserved_until_column(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = columns.collect::<Result<Vec<_>, _>>()?;
+    if !columns.iter().any(|column| column == "reserved_until") {
+        connection.execute(
+            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_until INTEGER",
+            [],
+        )?;
+    }
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_budget_authorization_holds_reserved_until \
+         ON budget_authorization_holds(disposition, reserved_until)",
+        [],
+    )?;
+    Ok(())
+}
+
+pub(super) fn ensure_budget_hold_reserved_currency_column(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = columns.collect::<Result<Vec<_>, _>>()?;
+    if !columns.iter().any(|column| column == "reserved_currency") {
+        connection.execute(
+            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_currency TEXT",
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+pub(super) fn ensure_budget_hold_reserved_payment_reference_column(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = columns.collect::<Result<Vec<_>, _>>()?;
+    if !columns
+        .iter()
+        .any(|column| column == "reserved_payment_reference")
+    {
+        connection.execute(
+            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_payment_reference TEXT",
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+pub(super) fn ensure_budget_hold_reserved_envelope_columns(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = columns.collect::<Result<Vec<_>, _>>()?;
+    if !columns
+        .iter()
+        .any(|column| column == "reserved_budget_total")
+    {
+        connection.execute(
+            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_budget_total INTEGER",
+            [],
+        )?;
+    }
+    if !columns
+        .iter()
+        .any(|column| column == "reserved_delegation_depth")
+    {
+        connection.execute(
+            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_delegation_depth INTEGER",
+            [],
+        )?;
+    }
+    if !columns
+        .iter()
+        .any(|column| column == "reserved_root_budget_holder")
+    {
+        connection.execute(
+            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_root_budget_holder TEXT",
             [],
         )?;
     }

@@ -7,6 +7,7 @@ pub(super) enum HoldDisposition {
     Released,
     Reversed,
     Reconciled,
+    Expired,
 }
 
 impl HoldDisposition {
@@ -17,6 +18,7 @@ impl HoldDisposition {
             Self::Released => "released",
             Self::Reversed => "reversed",
             Self::Reconciled => "reconciled",
+            Self::Expired => "expired",
         }
     }
 
@@ -27,6 +29,7 @@ impl HoldDisposition {
             "released" => Some(Self::Released),
             "reversed" => Some(Self::Reversed),
             "reconciled" => Some(Self::Reconciled),
+            "expired" => Some(Self::Expired),
             _ => None,
         }
     }

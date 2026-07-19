@@ -30,6 +30,52 @@ use crate::supplemental_quota::{
 
 const ORDINARY_COORDINATOR_LEASE_EPOCH: u64 = 1;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OrdinaryProtocolCaptureMode {
+    InlineDispatch,
+    ThresholdDispatch,
+    CallerReservationOrdinary,
+    CallerReservationThreshold,
+}
+
+impl OrdinaryProtocolCaptureMode {
+    fn pending_state(self) -> AdmissionOperationState {
+        match self {
+            Self::InlineDispatch | Self::ThresholdDispatch => {
+                AdmissionOperationState::CapturePending
+            }
+            Self::CallerReservationOrdinary | Self::CallerReservationThreshold => {
+                AdmissionOperationState::CallerReservationCapturePending
+            }
+        }
+    }
+
+    fn prepares_supplemental_dispatch(self) -> bool {
+        !matches!(
+            self,
+            Self::ThresholdDispatch | Self::CallerReservationThreshold
+        )
+    }
+
+    fn commits_presented_replay_reservations(self) -> bool {
+        matches!(
+            self,
+            Self::InlineDispatch
+                | Self::CallerReservationOrdinary
+                | Self::CallerReservationThreshold
+        )
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::InlineDispatch => "ordinary",
+            Self::ThresholdDispatch => "threshold",
+            Self::CallerReservationOrdinary => "caller reservation",
+            Self::CallerReservationThreshold => "threshold caller reservation",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BudgetInvocationCaptureReceiptProjection {
@@ -115,6 +161,7 @@ impl BudgetInvocationCaptureReceiptProjection {
 
 pub(crate) struct OrdinaryAdmissionMutation {
     pub(super) operation_id: String,
+    pub(super) admission_operation: BudgetAdmissionOperationBinding,
     pub(super) grant_index: usize,
     pub(super) hold_id: String,
     pub(super) reverse_event_id: String,
@@ -138,6 +185,10 @@ impl OrdinaryAdmissionMutation {
 
     pub(crate) fn operation_id(&self) -> &str {
         &self.operation_id
+    }
+
+    pub(crate) fn admission_operation(&self) -> &BudgetAdmissionOperationBinding {
+        &self.admission_operation
     }
 }
 
@@ -335,6 +386,43 @@ impl ChioKernel {
             prepared.request_binding_hash().to_string(),
         )?;
         authorization.admission_operation = Some(budget_operation.clone());
+        if self.payment_journal_active() {
+            let payment_terms = Self::mustprepay_quoted_amount(request)
+                .or_else(|| self.ordinary_payment_charge_terms(grant));
+            if let Some((amount_units, currency)) = payment_terms {
+                let created_at_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_millis().min(u64::MAX as u128) as u64)
+                    .unwrap_or(0);
+                let rail = self
+                    .payment_adapter
+                    .as_ref()
+                    .map(|adapter| adapter.rail_id().to_string())
+                    .unwrap_or_default();
+                let tenant_id = self
+                    .receipt_tenant_id_for_request(Some(&request.request_id))
+                    .unwrap_or_else(current_scoped_receipt_tenant_id);
+                authorization.payment_journal = Some(crate::payment::PaymentJournalRecord {
+                    request_id: request.request_id.clone(),
+                    capability_id: cap.id.clone(),
+                    grant_index: grant_index as u32,
+                    admission_operation: Some(budget_operation.clone()),
+                    authority: Some(authority.clone()),
+                    hold_id: Some(hold_id.clone()),
+                    rail,
+                    authorization_id: None,
+                    transaction_id: None,
+                    budget_exposure_units: cost_units,
+                    amount_units,
+                    settle_action: None,
+                    settle_amount_units: None,
+                    currency,
+                    state: crate::payment::PaymentJournalState::HoldPlaced,
+                    created_at_unix_ms,
+                    tenant_id,
+                });
+            }
+        }
         let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
             KernelError::Internal("durable admission operation store is unavailable".to_string())
         })?;
@@ -496,14 +584,18 @@ impl ChioKernel {
             grant,
             &hold_id,
             &authorized,
-            budget_operation,
+            budget_operation.clone(),
         );
         if self.payment_adapter.is_some() {
-            if let Some(charge) = charge.as_ref() {
+            let payment_terms = charge
+                .as_ref()
+                .map(|charge| (charge.cost_charged, charge.currency.clone()))
+                .or_else(|| Self::mustprepay_quoted_amount(request));
+            if let Some((amount_units, currency)) = payment_terms {
                 self.journal_payment_cleanup(
                     &operation,
-                    charge.cost_charged,
-                    charge.currency.clone(),
+                    amount_units,
+                    currency,
                     request.request_id.clone(),
                 )?;
             }
@@ -511,6 +603,7 @@ impl ChioKernel {
         let authorization_artifact_digests = supplemental_digest.into_iter().collect();
         let mutation = OrdinaryAdmissionMutation {
             operation_id: operation.operation_id().to_string(),
+            admission_operation: budget_operation,
             grant_index,
             hold_id,
             reverse_event_id,
@@ -688,7 +781,7 @@ impl ChioKernel {
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
     ) -> Result<serde_json::Value, KernelError> {
-        self.commit_protocol_dispatch(cap, mutation, false, true)
+        self.commit_protocol_capture(cap, mutation, OrdinaryProtocolCaptureMode::InlineDispatch)
     }
 
     pub(super) fn commit_threshold_protocol_dispatch(
@@ -696,15 +789,47 @@ impl ChioKernel {
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
     ) -> Result<serde_json::Value, KernelError> {
-        self.commit_protocol_dispatch(cap, mutation, true, false)
+        self.commit_protocol_capture(
+            cap,
+            mutation,
+            OrdinaryProtocolCaptureMode::ThresholdDispatch,
+        )
     }
 
-    fn commit_protocol_dispatch(
+    /// Capture an operation-owned composite admission for a caller-mediated
+    /// execution. The caller must keep the exact hold stamped and the signed
+    /// execution nonce private until this returns: `CallerReserved` is the
+    /// durable handoff boundary after which startup recovery may not compensate
+    /// the captured invocation reservations.
+    pub(super) fn commit_ordinary_protocol_caller_reservation(
         &self,
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
-        strict_dispatch_claim: bool,
-        commit_dispatch: bool,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.commit_protocol_capture(
+            cap,
+            mutation,
+            OrdinaryProtocolCaptureMode::CallerReservationOrdinary,
+        )
+    }
+
+    pub(super) fn commit_threshold_protocol_caller_reservation(
+        &self,
+        cap: &CapabilityToken,
+        mutation: &OrdinaryAdmissionMutation,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.commit_protocol_capture(
+            cap,
+            mutation,
+            OrdinaryProtocolCaptureMode::CallerReservationThreshold,
+        )
+    }
+
+    fn commit_protocol_capture(
+        &self,
+        cap: &CapabilityToken,
+        mutation: &OrdinaryAdmissionMutation,
+        mode: OrdinaryProtocolCaptureMode,
     ) -> Result<serde_json::Value, KernelError> {
         let mut operation = self.load_ordinary_admission(mutation.operation_id())?;
         if operation.state() == AdmissionOperationState::BudgetAuthorized {
@@ -716,7 +841,7 @@ impl ChioKernel {
             )?;
         }
         if operation.state() == AdmissionOperationState::ReadyToDispatch {
-            if mutation.supplemental && !strict_dispatch_claim {
+            if mutation.supplemental && mode.prepares_supplemental_dispatch() {
                 let registrar =
                     self.supplemental_admission_registrar
                         .as_ref()
@@ -733,19 +858,39 @@ impl ChioKernel {
             }
             operation = self.ordinary_admission_transition(
                 &operation,
-                AdmissionOperationState::CapturePending,
+                mode.pending_state(),
                 AdmissionDispatchState::NotStarted,
                 None,
             )?;
         }
-        if operation.state() != AdmissionOperationState::CapturePending {
+        if operation.state() != mode.pending_state() {
             return Err(KernelError::GuardDenied(format!(
                 "admission operation {} cannot capture from {}",
                 operation.operation_id(),
                 operation.state().as_str()
             )));
         }
-        if !strict_dispatch_claim {
+        if matches!(
+            mode,
+            OrdinaryProtocolCaptureMode::CallerReservationOrdinary
+                | OrdinaryProtocolCaptureMode::CallerReservationThreshold
+        )
+            && operation.approval_set_hash().is_some()
+        {
+            if let Err(error) = self.commit_threshold_approval(operation.operation_id()) {
+                self.reverse_ordinary_protocol_admission_from_capture_pending(
+                    cap,
+                    mutation,
+                    &error.to_string(),
+                )?;
+                return Err(error);
+            }
+            self.discharge_admission_cleanup_action(
+                &operation,
+                crate::admission_operation::AdmissionCleanupActionKind::Approval,
+            )?;
+        }
+        if mode.commits_presented_replay_reservations() {
             let replay_commit = self
                 .commit_admission_execution_nonce(&operation)
                 .and_then(|()| {
@@ -817,8 +962,9 @@ impl ChioKernel {
                         "combined capture",
                     ) {
                         // Captured reservations cannot be reversed truthfully.
-                        // Leave the durable operation CapturePending so an
-                        // exact retry can re-query and validate without effect.
+                        // Leave the durable operation in its capture-pending
+                        // state so an exact retry can re-query and validate
+                        // without a second effect.
                         return Err(KernelError::BudgetCaptureRecoveryRequired(
                             error.to_string(),
                         ));
@@ -879,7 +1025,8 @@ impl ChioKernel {
                 "capture",
             ) {
                 // Captured reservations cannot be reversed truthfully. Keep
-                // CapturePending for idempotent authority recovery.
+                // the mode-specific pending state for idempotent authority
+                // recovery.
                 return Err(KernelError::BudgetCaptureRecoveryRequired(
                     error.to_string(),
                 ));
@@ -895,18 +1042,26 @@ impl ChioKernel {
                 ))
             })?
         };
-        if commit_dispatch {
-            operation = self.commit_tool_dispatch_once(&operation)?.ok_or_else(|| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "{} admission operation {} was committed by another coordinator",
-                    if strict_dispatch_claim {
-                        "threshold"
-                    } else {
-                        "ordinary"
-                    },
-                    operation.operation_id()
-                ))
-            })?;
+        match mode {
+            OrdinaryProtocolCaptureMode::InlineDispatch => {
+                operation = self.commit_tool_dispatch_once(&operation)?.ok_or_else(|| {
+                    KernelError::GovernedTransactionDenied(format!(
+                        "{} admission operation {} was committed by another coordinator",
+                        mode.label(),
+                        operation.operation_id()
+                    ))
+                })?;
+            }
+            OrdinaryProtocolCaptureMode::ThresholdDispatch => {}
+            OrdinaryProtocolCaptureMode::CallerReservationOrdinary
+            | OrdinaryProtocolCaptureMode::CallerReservationThreshold => {
+                operation = self.ordinary_admission_transition(
+                    &operation,
+                    AdmissionOperationState::CallerReserved,
+                    AdmissionDispatchState::Committed,
+                    None,
+                )?;
+            }
         }
         Ok(self.ordinary_admission_receipt_metadata(mutation, &operation, capture_metadata))
     }
@@ -1298,12 +1453,16 @@ impl ChioKernel {
             })?;
             return Ok(Some(terminal));
         }
-        // CapturePending is an uncertainty boundary. A capture may already
-        // be committed while its acknowledgement is in flight, so generic
-        // cleanup cannot claim it. Only a caller that has not entered the
-        // capture authority yet, or an exact authority-returned Denied
-        // decision, may cross this boundary into compensation.
-        if current.state() == AdmissionOperationState::CapturePending
+        // Both capture-pending states are uncertainty boundaries. A capture
+        // may already be committed while its acknowledgement is in flight, so
+        // generic cleanup cannot claim either one. Only a caller that has not
+        // entered the capture authority yet, or an exact authority-returned
+        // Denied decision, may cross this boundary into compensation.
+        if matches!(
+            current.state(),
+            AdmissionOperationState::CapturePending
+                | AdmissionOperationState::CallerReservationCapturePending
+        )
             && !capture_cannot_have_committed
         {
             return Ok(None);
@@ -1312,6 +1471,7 @@ impl ChioKernel {
             || matches!(
                 current.state(),
                 AdmissionOperationState::DispatchCommitted
+                    | AdmissionOperationState::CallerReserved
                     | AdmissionOperationState::Completed
                     | AdmissionOperationState::OutcomeUnknownAfterDispatch
             )

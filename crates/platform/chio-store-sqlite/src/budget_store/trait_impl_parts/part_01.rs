@@ -30,6 +30,35 @@ impl SqliteBudgetStore {
             hold_id,
             event_id,
             SqliteBudgetAuthorizationAuthorityMode::CallerPinned(authority.cloned()),
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn try_charge_cost_with_ids_authority_and_journal_outcome(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+        journal: Option<&chio_kernel::payment::PaymentJournalRecord>,
+    ) -> Result<SqliteBudgetAuthorizationOutcome, BudgetStoreError> {
+        self.try_charge_cost_with_ids_and_authority_mode_outcome(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+            SqliteBudgetAuthorizationAuthorityMode::CallerPinned(authority.cloned()),
+            journal,
         )
     }
 
@@ -56,6 +85,7 @@ impl SqliteBudgetStore {
             hold_id,
             event_id,
             SqliteBudgetAuthorizationAuthorityMode::ServerCurrent(current_authority),
+            None,
         )
     }
 
@@ -71,6 +101,7 @@ impl SqliteBudgetStore {
         hold_id: Option<&str>,
         event_id: Option<&str>,
         authority_mode: SqliteBudgetAuthorizationAuthorityMode,
+        journal: Option<&chio_kernel::payment::PaymentJournalRecord>,
     ) -> Result<SqliteBudgetAuthorizationOutcome, BudgetStoreError> {
         let effective_event_id = match event_id {
             Some(event_id) => Some(event_id.to_string()),
@@ -214,6 +245,11 @@ impl SqliteBudgetStore {
                     "persisted budget authorization conflicts with its durable claim".to_string(),
                 ));
             }
+            if existing_allowed {
+                if let Some(journal) = journal {
+                    insert_payment_journal_tx(&transaction, journal, true)?;
+                }
+            }
             transaction.commit()?;
             return Ok(SqliteBudgetAuthorizationOutcome {
                 allowed: existing_allowed,
@@ -335,6 +371,9 @@ impl SqliteBudgetStore {
                             invocation_count_after,
                             event_seq,
                         )?;
+                        if let Some(journal) = journal {
+                            insert_payment_journal_tx(&transaction, journal, true)?;
+                        }
                         transaction.commit()?;
                         return Ok(SqliteBudgetAuthorizationOutcome {
                             allowed: true,
@@ -491,6 +530,9 @@ impl SqliteBudgetStore {
                                     invocation_count_after,
                                     event_seq,
                                 )?;
+                                if let Some(journal) = journal {
+                                    insert_payment_journal_tx(&transaction, journal, true)?;
+                                }
                                 transaction.commit()?;
                                 return Ok(SqliteBudgetAuthorizationOutcome {
                                     allowed: true,
@@ -572,6 +614,9 @@ impl SqliteBudgetStore {
                                 invocation_count_after,
                                 seq,
                             )?;
+                            if let Some(journal) = journal {
+                                insert_payment_journal_tx(&transaction, journal, true)?;
+                            }
                             transaction.commit()?;
                             return Ok(SqliteBudgetAuthorizationOutcome {
                                 allowed: true,
@@ -675,6 +720,11 @@ impl SqliteBudgetStore {
             invocation_count_after,
             event_seq,
         )?;
+        if allowed {
+            if let Some(journal) = journal {
+                insert_payment_journal_tx(&transaction, journal, true)?;
+            }
+        }
         transaction.commit()?;
         Ok(SqliteBudgetAuthorizationOutcome {
             allowed,

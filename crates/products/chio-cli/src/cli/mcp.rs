@@ -114,16 +114,21 @@ mod emit_config;
 mod ide;
 #[path = "mcp/manifest.rs"]
 mod manifest;
+#[path = "mcp/payment_config.rs"]
+pub mod payment_config;
 #[path = "mcp/provision.rs"]
 mod provision;
 #[path = "mcp/scope.rs"]
 mod scope;
 #[path = "mcp/wrap.rs"]
 mod wrap;
+#[path = "mcp/governed_sim.rs"]
+mod governed_sim;
 
 pub(crate) use attestation::{attach_chio_verified_header, build_chio_verified_header};
 pub(crate) use cage_policy::{load_native_mcp_launch, SignedCagePolicyLaunchFactory};
 pub(crate) use emit_config::cmd_mcp_emit_config;
+pub(crate) use governed_sim::{cmd_mcp_governed_sim, GovernedSimArgs};
 pub(crate) use manifest::cmd_mcp_print_scopes;
 pub(crate) use provision::cmd_provision_native_mcp_demo;
 pub(crate) use wrap::{cmd_mcp_wrap_e2e_fixture, cmd_mcp_wrap_run, McpWrapArgs};

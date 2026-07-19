@@ -23,6 +23,12 @@ use chio_core::capability::aggregate_budget::{
 
 const THRESHOLD_COORDINATOR_LEASE_EPOCH: u64 = 1;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ThresholdPaymentMode {
+    Dispatch,
+    CallerReservation,
+}
+
 pub(super) struct ThresholdProtocolPreparation {
     capability_digest: String,
     arguments_digest: String,
@@ -42,6 +48,7 @@ pub(super) struct ThresholdToolAdmissionContext<'a> {
     pub(super) grant_index: usize,
     pub(super) grant: &'a ToolGrant,
     pub(super) now: u64,
+    pub(super) payment_mode: ThresholdPaymentMode,
 }
 
 impl ThresholdProtocolPreparation {
@@ -161,6 +168,7 @@ impl ChioKernel {
                 grant_index,
                 grant,
                 now,
+                payment_mode: ThresholdPaymentMode::Dispatch,
             },
             prepared,
             protocol,
@@ -294,6 +302,7 @@ impl ChioKernel {
             grant_index,
             grant,
             now: _,
+            payment_mode,
         } = context;
 
         let (prepared_operation, approval_set) = prepared.into_parts();
@@ -327,7 +336,9 @@ impl ChioKernel {
             )?;
         }
         if self.payment_adapter.is_some() {
-            if let Some((amount_units, currency)) = self.ordinary_payment_charge_terms(grant) {
+            let payment_terms = Self::mustprepay_quoted_amount(request)
+                .or_else(|| self.ordinary_payment_charge_terms(grant));
+            if let Some((amount_units, currency)) = payment_terms {
                 self.journal_payment_cleanup(
                     &operation,
                     amount_units,
@@ -483,11 +494,16 @@ impl ChioKernel {
                     | AdmissionOperationState::ApprovalReserved
                     | AdmissionOperationState::ReadyToDispatch
                     | AdmissionOperationState::CapturePending
+                    | AdmissionOperationState::CallerReservationCapturePending
             ) {
                 match self.reserve_threshold_delegated_budget(cap, &operation) {
                     Ok(acquired) => delegated_budget_lease_acquired = acquired,
                     Err(error) => {
-                        if operation.state() != AdmissionOperationState::CapturePending {
+                        if !matches!(
+                            operation.state(),
+                            AdmissionOperationState::CapturePending
+                                | AdmissionOperationState::CallerReservationCapturePending
+                        ) {
                             self.compensate_threshold_before_dispatch(
                                 ThresholdPreDispatchCompensation {
                                     request,
@@ -511,12 +527,21 @@ impl ChioKernel {
                     | AdmissionOperationState::ApprovalReserved
                     | AdmissionOperationState::ReadyToDispatch
                     | AdmissionOperationState::CapturePending
+                    | AdmissionOperationState::CallerReservationCapturePending
             ) && payment_authorization.is_none()
             {
-                match self.authorize_threshold_payment_with_recovery(request, &budget_mutation) {
+                match self.authorize_threshold_payment_with_recovery(
+                    request,
+                    &budget_mutation,
+                    payment_mode,
+                ) {
                     Ok(authorization) => payment_authorization = authorization,
                     Err(error) => {
-                        if operation.state() != AdmissionOperationState::CapturePending {
+                        if !matches!(
+                            operation.state(),
+                            AdmissionOperationState::CapturePending
+                                | AdmissionOperationState::CallerReservationCapturePending
+                        ) {
                             self.compensate_threshold_before_dispatch(
                                 ThresholdPreDispatchCompensation {
                                     request,
@@ -563,9 +588,11 @@ impl ChioKernel {
                     )?
                 }
                 AdmissionOperationState::DelegatedBudgetReserved => {
-                    payment_authorization = match self
-                        .authorize_threshold_payment_with_recovery(request, &budget_mutation)
-                    {
+                    payment_authorization = match self.authorize_threshold_payment_with_recovery(
+                        request,
+                        &budget_mutation,
+                        payment_mode,
+                    ) {
                         Ok(authorization) => authorization,
                         Err(error) => {
                             self.compensate_threshold_before_dispatch(
@@ -676,7 +703,8 @@ impl ChioKernel {
                         budget_mutation,
                     ));
                 }
-                AdmissionOperationState::CapturePending => {
+                AdmissionOperationState::CapturePending
+                | AdmissionOperationState::CallerReservationCapturePending => {
                     return Ok((
                         ThresholdDispatchPermit {
                             operation,
@@ -687,6 +715,7 @@ impl ChioKernel {
                     ));
                 }
                 AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::CallerReserved
                 | AdmissionOperationState::Completed
                 | AdmissionOperationState::CompensationPending
                 | AdmissionOperationState::CompensatedBeforeDispatch
@@ -1032,6 +1061,7 @@ impl ChioKernel {
             grant_index,
             grant,
             now,
+            payment_mode: _,
         } = *context;
         let negotiation = self
             .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
@@ -1114,6 +1144,43 @@ impl ChioKernel {
             operation.operation_id().to_string(),
             operation.request_binding_hash().to_string(),
         )?);
+        if self.payment_journal_active() {
+            let payment_terms = Self::mustprepay_quoted_amount(request)
+                .or_else(|| self.ordinary_payment_charge_terms(grant));
+            if let Some((amount_units, currency)) = payment_terms {
+                let created_at_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_millis().min(u64::MAX as u128) as u64)
+                    .unwrap_or(0);
+                let rail = self
+                    .payment_adapter
+                    .as_ref()
+                    .map(|adapter| adapter.rail_id().to_string())
+                    .unwrap_or_default();
+                let tenant_id = self
+                    .receipt_tenant_id_for_request(Some(&request.request_id))
+                    .unwrap_or_else(current_scoped_receipt_tenant_id);
+                authorization.payment_journal = Some(crate::payment::PaymentJournalRecord {
+                    request_id: request.request_id.clone(),
+                    capability_id: cap.id.clone(),
+                    grant_index: grant_index as u32,
+                    admission_operation: authorization.admission_operation.clone(),
+                    authority: authorization.authority.clone(),
+                    hold_id: Some(protocol.hold_id.clone()),
+                    rail,
+                    authorization_id: None,
+                    transaction_id: None,
+                    amount_units,
+                    budget_exposure_units: cost_units,
+                    settle_action: None,
+                    settle_amount_units: None,
+                    currency,
+                    state: crate::payment::PaymentJournalState::HoldPlaced,
+                    created_at_unix_ms,
+                    tenant_id,
+                });
+            }
+        }
         authorization
             .install_verified_invocation_admission(invocation_admission)
             .map_err(KernelError::from)?;
@@ -1170,18 +1237,20 @@ impl ChioKernel {
         let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
             return Err(KernelError::BudgetExhausted(cap.id.clone()));
         };
+        let admission_operation = BudgetAdmissionOperationBinding::new(
+            operation.operation_id().to_string(),
+            operation.request_binding_hash().to_string(),
+        )?;
         let charge = self.ordinary_budget_charge(
             grant_index,
             grant,
             &protocol.hold_id,
             &authorized,
-            BudgetAdmissionOperationBinding::new(
-                operation.operation_id().to_string(),
-                operation.request_binding_hash().to_string(),
-            )?,
+            admission_operation.clone(),
         );
         let mutation = OrdinaryAdmissionMutation {
             operation_id: operation.operation_id().to_string(),
+            admission_operation,
             grant_index,
             hold_id: protocol.hold_id.clone(),
             reverse_event_id: protocol.reverse_event_id.clone(),
@@ -1283,7 +1352,7 @@ impl ChioKernel {
         }
     }
 
-    fn commit_threshold_approval(&self, operation_id: &str) -> Result<(), KernelError> {
+    pub(super) fn commit_threshold_approval(&self, operation_id: &str) -> Result<(), KernelError> {
         let store = self.approval_store.as_ref().ok_or_else(|| {
             KernelError::Internal("durable approval store is not installed".to_string())
         })?;
@@ -1344,46 +1413,28 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         budget_mutation: &PreExecutionBudgetMutation,
+        payment_mode: ThresholdPaymentMode,
     ) -> Result<Option<PaymentAuthorization>, KernelError> {
-        let Some(charge) = budget_mutation.charge_result() else {
+        if payment_mode == ThresholdPaymentMode::CallerReservation
+            && !Self::is_governed_mustprepay_request(request)
+        {
             return Ok(None);
-        };
-        let Some(adapter) = self.payment_adapter.as_ref() else {
+        }
+        let charge = budget_mutation.charge_result();
+        if Self::mustprepay_quoted_amount(request).is_none() && charge.is_none() {
             return Ok(None);
-        };
-        let binding = charge.admission_operation.as_ref().ok_or_else(|| {
+        }
+        let binding = budget_mutation.admission_operation_binding().ok_or_else(|| {
             KernelError::Internal(
                 "threshold payment recovery omitted its admission operation".to_string(),
             )
         })?;
-        let lookup = || {
-            adapter.lookup_authorization_for_operation(
-                binding.operation_id(),
-                binding.request_binding_hash(),
-            )
-        };
-        match lookup() {
-            Ok(Some(authorization)) => return Ok(Some(authorization)),
-            Ok(None) => {}
-            Err(error) => {
-                return Err(KernelError::GovernedTransactionDenied(format!(
-                    "threshold payment authorization lookup failed: {error}"
-                )))
-            }
-        }
-
-        match self.authorize_payment_if_needed(request, Some(charge)) {
-            Ok(authorization) => Ok(authorization),
-            Err(authorize_error) => match lookup() {
-                Ok(Some(authorization)) => Ok(Some(authorization)),
-                Ok(None) => Err(KernelError::GovernedTransactionDenied(format!(
-                    "threshold payment authorization failed without a committed operation result: {authorize_error}"
-                ))),
-                Err(lookup_error) => Err(KernelError::GovernedTransactionDenied(format!(
-                    "threshold payment authorization outcome is unknown after failure ({authorize_error}); recovery lookup failed: {lookup_error}"
-                ))),
-            },
-        }
+        self.authorize_payment_if_needed(request, charge, Some(binding))
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "threshold payment authorization failed: {error}"
+                ))
+            })
     }
 
     fn compensate_threshold_before_dispatch(
@@ -1463,29 +1514,45 @@ impl ChioKernel {
         budget_mutation: &PreExecutionBudgetMutation,
         authorization: &PaymentAuthorization,
     ) -> Result<(), KernelError> {
-        let charge = budget_mutation.charge_result().ok_or_else(|| {
-            KernelError::Internal(
-                "threshold payment authorization omitted its budget charge".to_string(),
-            )
-        })?;
-        let binding = charge.admission_operation.as_ref().ok_or_else(|| {
+        let binding = budget_mutation.admission_operation_binding().ok_or_else(|| {
             KernelError::Internal(
                 "threshold payment authorization omitted its admission operation".to_string(),
             )
         })?;
+        let (amount_units, currency) = Self::mustprepay_quoted_amount(request)
+            .or_else(|| {
+                budget_mutation
+                    .charge_result()
+                    .map(|charge| (charge.cost_charged, charge.currency.clone()))
+            })
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "threshold payment authorization omitted its payment amount".to_string(),
+                )
+            })?;
         let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
             KernelError::Internal(
                 "threshold payment authorization present without configured adapter".to_string(),
             )
         })?;
+        let transaction_id = if authorization.settled {
+            Some(self.threshold_refund_transaction_reference(
+                request,
+                binding,
+                authorization,
+                adapter.as_ref(),
+            )?)
+        } else {
+            None
+        };
         let release = || {
-            if authorization.settled {
+            if let Some(transaction_id) = transaction_id.as_deref() {
                 adapter.refund_for_operation(OperationPaymentRefundRequest {
                     operation_id: binding.operation_id(),
                     request_binding_hash: binding.request_binding_hash(),
-                    transaction_id: &authorization.authorization_id,
-                    amount_units: charge.cost_charged,
-                    currency: &charge.currency,
+                    transaction_id,
+                    amount_units,
+                    currency: &currency,
                     reference: &request.request_id,
                 })
             } else {
@@ -1505,6 +1572,72 @@ impl ChioKernel {
                     "failed to release threshold payment authorization: {error}"
                 ))
             })
+    }
+
+    fn threshold_refund_transaction_reference(
+        &self,
+        request: &ToolCallRequest,
+        binding: &BudgetAdmissionOperationBinding,
+        authorization: &PaymentAuthorization,
+        adapter: &dyn PaymentAdapter,
+    ) -> Result<String, KernelError> {
+        let journal = self.with_budget_store(|store| {
+            store
+                .get_payment_journal(&request.request_id)
+                .map_err(KernelError::from)
+        })?;
+        let durable_transaction_id = match journal.as_ref() {
+            Some(record) => {
+                if record.admission_operation.as_ref() != Some(binding)
+                    || record.authorization_id.as_deref()
+                        != Some(authorization.authorization_id.as_str())
+                {
+                    return Err(KernelError::Internal(
+                        "threshold payment journal does not match its refund authorization"
+                            .to_string(),
+                    ));
+                }
+                record.transaction_id.as_deref().filter(|value| !value.is_empty())
+            }
+            None => None,
+        };
+        let metadata_transaction_id =
+            Self::payment_authorization_transaction_reference(authorization);
+        if let (Some(durable), Some(metadata)) =
+            (durable_transaction_id, metadata_transaction_id)
+        {
+            if durable != metadata {
+                return Err(KernelError::Internal(
+                    "threshold payment transaction references disagree".to_string(),
+                ));
+            }
+        }
+        if let Some(transaction_id) = durable_transaction_id.or(metadata_transaction_id) {
+            return Ok(transaction_id.to_string());
+        }
+
+        match adapter.settlement_state_for_operation(
+            binding.operation_id(),
+            binding.request_binding_hash(),
+            &request.request_id,
+            Some(&authorization.authorization_id),
+        ) {
+            Ok(crate::payment::RailSettlementState::Settled {
+                authorization_id,
+                result,
+            }) if authorization_id == authorization.authorization_id
+                && !result.transaction_id.is_empty() =>
+            {
+                Ok(result.transaction_id)
+            }
+            Ok(_) => Err(KernelError::Internal(
+                "settled threshold authorization has no matching transaction reference"
+                    .to_string(),
+            )),
+            Err(error) => Err(KernelError::Internal(format!(
+                "failed to resolve settled threshold payment transaction reference: {error}"
+            ))),
+        }
     }
 
     pub(super) fn cancel_threshold_approval_if_reserved(

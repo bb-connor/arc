@@ -118,7 +118,7 @@ fn scaffolded_demo_runs_governed_hello_flow() {
         .arg("--bin")
         .arg("demo")
         .arg("--")
-        .arg("Codex")
+        .arg("Ada")
         .env("CHIO_BIN", env!("CARGO_BIN_EXE_chio"))
         .env("CHIO_DEMO_SERVER", &security.target_command)
         .env("CHIO_SIGNED_MANIFEST", &security.signed_manifest_path)
@@ -139,7 +139,7 @@ fn scaffolded_demo_runs_governed_hello_flow() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Hello, Codex! This call was mediated by Chio."));
+    assert!(stdout.contains("Hello, Ada! This call was mediated by Chio."));
     assert!(stdout.contains("latest receipt:"));
     assert!(project_dir.join(".chio/receipts.db").exists());
     assert!(security.target_args.is_empty());

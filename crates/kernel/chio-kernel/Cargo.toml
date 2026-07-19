@@ -44,6 +44,7 @@ delegation = ["chio-core-types/delegation"]
 chio-appraisal = { workspace = true }
 chio-bounded = { workspace = true }
 chio-core = { workspace = true }
+chio-supervisor = { workspace = true }
 chio-core-types = { workspace = true }
 # The workspace declares chio-custody-hw with `default-features = false` so
 # mobile/conformance consumers can drop the passkey graph; the kernel needs the
@@ -95,6 +96,8 @@ chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 criterion = { workspace = true }
 dhat = { workspace = true }
+jsonschema = { workspace = true }
+loom = { workspace = true }
 # proptest = "1.10" (via workspace.dependencies). Used by:
 # - tests/property_budget_store.rs
 # - tests/replay_proptest.rs (replay-invariance suite)

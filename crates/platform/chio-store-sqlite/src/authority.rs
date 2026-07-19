@@ -27,6 +27,15 @@ enum AuthorityOpenMode {
     ExistingOnly,
 }
 
+/// Authority-store schema revision. Bump on every schema-affecting change.
+const AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table, distinct from any co-located store's key.
+const AUTHORITY_STORE_SCHEMA_KEY: &str = "authority";
+/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
+/// authority database rather than reject it as foreign.
+const AUTHORITY_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["authority_state"];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorityClusterFence {
     pub leader_url: Option<String>,
@@ -52,7 +61,7 @@ impl SqliteCapabilityAuthority {
     ) -> Result<Self, AuthorityStoreError> {
         let path = path.as_ref().to_path_buf();
         if matches!(open_mode, AuthorityOpenMode::CreateOrMigrate) {
-            if let Some(parent) = path.parent() {
+            if let Some(parent) = crate::sqlite_parent_dir_to_create(&path) {
                 fs::create_dir_all(parent)?;
             }
         }
@@ -394,6 +403,13 @@ impl SqliteCapabilityAuthority {
             )?;
             return Ok(connection);
         }
+        crate::check_schema_version(
+            &connection,
+            AUTHORITY_STORE_SCHEMA_KEY,
+            AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION,
+            AUTHORITY_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
         connection.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -454,6 +470,12 @@ impl SqliteCapabilityAuthority {
                 [],
             )?;
         }
+        crate::stamp_schema_version(
+            &connection,
+            AUTHORITY_STORE_SCHEMA_KEY,
+            AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
         Ok(connection)
     }
 

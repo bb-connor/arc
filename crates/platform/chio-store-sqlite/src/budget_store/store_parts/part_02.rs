@@ -423,7 +423,8 @@ impl SqliteBudgetStore {
             | BudgetMutationKind::CaptureExposure
             | BudgetMutationKind::ReverseExposure
             | BudgetMutationKind::ReleaseExposure
-            | BudgetMutationKind::ReconcileSpend => BudgetInvocationReservationState::Absent,
+            | BudgetMutationKind::ReconcileSpend
+            | BudgetMutationKind::ExpireHold => BudgetInvocationReservationState::Absent,
             BudgetMutationKind::ReserveInvocations
             | BudgetMutationKind::CaptureInvocations
             | BudgetMutationKind::ReverseInvocations => {
@@ -442,6 +443,7 @@ impl SqliteBudgetStore {
             BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
             BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
             BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,
+            BudgetMutationKind::ExpireHold => BudgetMonetaryHoldState::Released,
             BudgetMutationKind::IncrementInvocation | BudgetMutationKind::AuthorizeExposure => {
                 BudgetMonetaryHoldState::None
             }
@@ -1488,6 +1490,32 @@ impl SqliteBudgetStore {
                         authorized_exposure_units,
                         remaining_exposure_units: 0,
                         disposition: HoldDisposition::Captured,
+                        authority: record
+                            .authority
+                            .as_ref()
+                            .or_else(|| existing.as_ref().and_then(|hold| hold.authority.as_ref())),
+                        admission_operation: record
+                            .admission_operation
+                            .as_ref()
+                            .map(BudgetAdmissionOperationParts::from_binding),
+                    },
+                )
+            }
+            BudgetMutationKind::ExpireHold => {
+                let existing = Self::load_hold(transaction, hold_id)?;
+                let authorized_exposure_units = existing
+                    .as_ref()
+                    .map(|hold| hold.authorized_exposure_units)
+                    .unwrap_or(record.exposure_units);
+                Self::upsert_hold_with_admission_operation(
+                    transaction,
+                    BudgetHoldUpsertInput {
+                        hold_id,
+                        capability_id: &record.capability_id,
+                        grant_index: record.grant_index as usize,
+                        authorized_exposure_units,
+                        remaining_exposure_units: 0,
+                        disposition: HoldDisposition::Expired,
                         authority: record
                             .authority
                             .as_ref()

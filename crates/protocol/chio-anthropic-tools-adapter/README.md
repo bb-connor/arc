@@ -1,7 +1,7 @@
 # chio-anthropic-tools-adapter
 
-Provider-native adapter that mediates Anthropic Messages API tool-use
-traffic through the Chio kernel. Implements the
+Provider-native adapter that translates Anthropic Messages API tool-use
+traffic into Chio's provider-agnostic fabric. Implements the
 [`chio-tool-call-fabric`](../chio-tool-call-fabric/) `ProviderAdapter`
 trait so a single Chio policy file enforces uniformly across OpenAI
 Responses, Anthropic Messages, and Bedrock Converse.
@@ -10,9 +10,9 @@ Responses, Anthropic Messages, and Bedrock Converse.
 
 The adapter is a mediation gateway, not a validate-only shim. It forwards a
 native `messages.create` request to `https://api.anthropic.com/v1/messages`
-over the shared `chio-provider-adapter-core` HTTP transport, lifts the
-`tool_use` content blocks out of the response, runs the kernel verdict, and
-lowers the verdict back into a `tool_result` block for the next turn.
+over the shared `chio-provider-adapter-core` HTTP transport and lifts the
+`tool_use` content blocks out of the response. The caller supplies the verdict
+between lift and lower; this crate has no direct kernel dependency.
 
 - `AnthropicAdapter::send_messages` posts a batch request and lifts the
   response.
@@ -37,6 +37,30 @@ offline and deterministic.
 
 Bumping the pin is a deliberate PR with a fixture re-record; CI never
 auto-bumps.
+
+## Public API
+
+- `AnthropicAdapter` owns batch and streaming lift/lower entrypoints.
+- `AnthropicAdapterConfig::new` pins `api_version` to `ANTHROPIC_VERSION`.
+- `ProviderAdapter` and `Provider` implementations expose fabric translation
+  and provider identity.
+- `AnthropicServerToolGate` enforces the feature plus manifest dual gate.
+- `ToolUseBlock`, `ToolResultBlock`, `GatedSseStream`, and the transport
+  constructors expose the native wire and HTTP boundary.
+
+```rust
+use std::sync::Arc;
+use chio_anthropic_tools_adapter::{
+    anthropic_transport_from_env, AnthropicAdapter, AnthropicAdapterConfig,
+};
+
+let config = AnthropicAdapterConfig::new(
+    "anthropic-1", "Anthropic Messages", "0.1.0", public_key_hex, "wks_prod",
+);
+let transport = anthropic_transport_from_env()?;
+let adapter = AnthropicAdapter::new(config, Arc::new(transport));
+let invocations = adapter.send_messages(request_body).await?;
+```
 
 ## Cargo features
 

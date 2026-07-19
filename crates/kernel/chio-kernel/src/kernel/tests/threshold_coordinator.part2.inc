@@ -244,7 +244,9 @@ async fn threshold_security_pre_dispatch_denial_reverses_the_composite_hold() {
         .set_budget_store_handle(budget.clone())
         .expect("budget store");
     kernel.set_runtime_admission_hook(std::sync::Arc::new(runtime.clone()));
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("payment adapter");
     kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
     kernel.set_security_pre_dispatch_hook(capture.hook);
     kernel
@@ -602,7 +604,9 @@ fn threshold_coordinator_accepts_operation_owned_runtime_and_payment_participant
     let runtime = OperationAwareThresholdRuntimeHook::allowing();
     let payment = OperationAwareThresholdPaymentAdapter::new();
     kernel.set_runtime_admission_hook(std::sync::Arc::new(runtime.clone()));
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("payment adapter");
 
     let (permit, _) = kernel
         .coordinate_threshold_tool_admission(&request, &capability, 0, &grant, prepared)
@@ -757,7 +761,9 @@ fn threshold_rejects_legacy_non_idempotent_payment_without_calling_authorize() {
         &[("approval-a", "55"), ("approval-b", "66")],
     );
     let payment = LegacyThresholdPaymentAdapter::default();
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("payment adapter");
 
     let error = match kernel.coordinate_threshold_tool_admission(
         &request,
@@ -817,7 +823,9 @@ fn threshold_payment_authorization_ack_loss_recovers_by_operation_lookup() {
     let operation_id = prepared.operation().operation_id().to_string();
     let request_binding_hash = prepared.operation().request_binding_hash().to_string();
     let payment = OperationAwareThresholdPaymentAdapter::with_authorize_ack_loss();
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("payment adapter");
 
     let (permit, _) = kernel
         .coordinate_threshold_tool_admission(&request, &capability, 0, &grant, prepared)
@@ -855,6 +863,126 @@ fn threshold_payment_authorization_ack_loss_recovers_by_operation_lookup() {
             .filter(|state| **state == AdmissionOperationState::PaymentAuthorized)
             .count(),
         1
+    );
+}
+
+#[test]
+fn threshold_no_ceiling_mustprepay_ack_loss_recovers_by_operation_lookup() {
+    let (mut kernel, capability, mut grant, _intent, mut request, _now) =
+        threshold_test_fixture();
+    grant.max_cost_per_invocation = None;
+    grant.max_total_cost = None;
+    request.governed_intent = Some(make_mustprepay_intent(
+        "threshold-no-ceiling-prepay",
+        "payments",
+        "transfer",
+        100,
+        "USD",
+    ));
+    let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
+    kernel
+        .set_admission_operation_store_handle(operations.clone())
+        .expect("operation store");
+    kernel
+        .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
+        .expect("approval store");
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .expect("budget store");
+    let prepared = prepared_threshold_coordinator_admission(
+        &request.request_id,
+        &capability.id,
+        "22",
+        "44",
+        &[("approval-a", "55"), ("approval-b", "66")],
+    );
+    let operation_id = prepared.operation().operation_id().to_string();
+    let request_binding_hash = prepared.operation().request_binding_hash().to_string();
+    let payment = OperationAwareThresholdPaymentAdapter::with_authorize_ack_loss();
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("payment adapter");
+
+    let (permit, mutation) = kernel
+        .coordinate_threshold_tool_admission(&request, &capability, 0, &grant, prepared)
+        .expect("no-ceiling prepayment authorization acknowledgement recovery");
+
+    assert!(mutation.charge_result().is_none());
+    assert!(mutation.admission_operation_binding().is_some());
+    assert!(permit.payment_authorization().is_some());
+    assert_eq!(
+        payment.calls(),
+        vec![
+            (
+                "lookup_authorization".to_string(),
+                operation_id.clone(),
+                request_binding_hash.clone(),
+            ),
+            (
+                "authorize".to_string(),
+                operation_id.clone(),
+                request_binding_hash.clone(),
+            ),
+            (
+                "lookup_authorization".to_string(),
+                operation_id,
+                request_binding_hash,
+            ),
+        ]
+    );
+    assert_eq!(payment.authorization_mutations(), 1);
+}
+
+#[test]
+fn threshold_settled_mustprepay_refunds_captured_transaction_and_quote() {
+    let (mut kernel, _capability, _grant, _intent, mut request, _now) = threshold_test_fixture();
+    request.governed_intent = Some(make_mustprepay_intent(
+        "threshold-settled-refund",
+        "payments",
+        "transfer",
+        100,
+        "USD",
+    ));
+    let payment = OperationAwareThresholdPaymentAdapter::new();
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("payment adapter");
+    let binding = BudgetAdmissionOperationBinding::new(
+        "threshold-refund-operation".to_string(),
+        "ab".repeat(32),
+    )
+    .expect("valid refund operation binding");
+    let mut charge = make_provisional_charge(10, "EUR");
+    charge.admission_operation = Some(binding.clone());
+    let mutation = PreExecutionBudgetMutation::Charge(Box::new(charge));
+    let authorization = PaymentAuthorization {
+        authorization_id: "authorization-hold-reference".to_string(),
+        settled: true,
+        metadata: serde_json::json!({
+            "transaction_id": "captured-transaction-reference"
+        }),
+    };
+
+    kernel
+        .release_threshold_payment_authorization(&request, &mutation, &authorization)
+        .expect("refund settled threshold prepayment");
+
+    assert_eq!(
+        payment.refunds(),
+        vec![(
+            "captured-transaction-reference".to_string(),
+            100,
+            "USD".to_string(),
+        )],
+        "refund must name the captured transaction and use the prepaid quote"
+    );
+    assert_eq!(
+        payment.calls(),
+        vec![(
+            "refund".to_string(),
+            binding.operation_id().to_string(),
+            binding.request_binding_hash().to_string(),
+        )]
     );
 }
 

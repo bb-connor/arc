@@ -1680,7 +1680,9 @@ async fn security_dispatch_outcome_persistence_failure_preserves_primary_when_te
 async fn security_dispatch_outcome_persistence_failure_releases_ordinary_payment_and_budget() {
     let payment = TrackingPaymentAdapter::new();
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect("install payment adapter");
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(
         "cost-srv",
@@ -1788,7 +1790,9 @@ async fn security_dispatch_outcome_persistence_failure_retains_runtime_and_deleg
 #[tokio::test]
 async fn security_dispatch_outcome_persistence_failure_aggregates_monetary_cleanup_failure() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+    kernel
+        .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
+        .expect("install payment adapter");
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(
         "cost-srv",

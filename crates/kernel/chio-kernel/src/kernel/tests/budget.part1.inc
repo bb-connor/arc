@@ -527,7 +527,7 @@ fn kernel_accepts_optional_payment_adapter_installation() {
     let mut kernel = make_kernel(make_monetary_config());
     assert!(kernel.payment_adapter.is_none());
 
-    kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
+    kernel.set_payment_adapter(Box::new(StubPaymentAdapter)).expect("install payment adapter");
 
     assert!(kernel.payment_adapter.is_some());
 }
@@ -536,7 +536,7 @@ fn kernel_accepts_optional_payment_adapter_installation() {
 fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocation() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
+    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter)).expect("install payment adapter");
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "cost-srv".to_string(),
         invocations: invocations.clone(),
@@ -591,7 +591,7 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
 #[test]
 fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(PrepaidSettledPaymentAdapter));
+    kernel.set_payment_adapter(Box::new(PrepaidSettledPaymentAdapter)).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
 
     let agent_kp = Keypair::generate();
@@ -1025,7 +1025,7 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
 fn payment_authorization_denial_releases_delegated_sibling_budget() {
     let fixture = make_sibling_sum_monetary_fixture("delegated-payment-deny-budget");
     let mut kernel = fixture.kernel;
-    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
+    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter)).expect("install payment adapter");
 
     let denied_response = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
@@ -1053,7 +1053,7 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
         .as_deref()
         .is_some_and(|reason| reason.contains("payment authorization failed")));
 
-    kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
+    kernel.set_payment_adapter(Box::new(StubPaymentAdapter)).expect("install payment adapter");
     let allowed_sibling = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-delegated-payment-deny-b".to_string(),
@@ -1088,10 +1088,8 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
 fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
     let fixture = make_sibling_sum_monetary_fixture("nested-delegated-payment-deny-budget");
     let mut kernel = fixture.kernel;
-    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
-    let session_id = kernel
-        .open_session("nested-parent-agent".to_string(), Vec::new())
-        .unwrap();
+    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter)).expect("install payment adapter");
+    let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new()).unwrap();
     kernel.activate_session(&session_id).unwrap();
     let parent_context = make_operation_context(
         &session_id,
@@ -1148,7 +1146,7 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
         .as_deref()
         .is_some_and(|reason| reason.contains("payment authorization failed")));
 
-    kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
+    kernel.set_payment_adapter(Box::new(StubPaymentAdapter)).expect("install payment adapter");
     let allowed_sibling = kernel
         .evaluate_tool_call_with_nested_flow_client(
             &parent_context,
@@ -1395,6 +1393,158 @@ fn monetary_dispatch_failure_keeps_invocation_consumed() {
         .as_deref()
         .is_some_and(|reason| reason.contains("budget")));
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+fn unmeasured_cost_server_reverses_hold_and_signs_provisional_receipt() {
+    // A tool server that does not measure realized cost (a pre-execution
+    // authorization gate that dispatches a pass-through while the real tool
+    // runs elsewhere) must not yield a settled, reconciled authoritative spend.
+    // The kernel reverses the pre-execution hold and signs a provisional,
+    // unreconciled receipt: settlement is pending, the terminal disposition is
+    // "reversed", and no committed cost is moved.
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(UnmeasuredCostServer {
+        id: "gate-srv".to_string(),
+    }));
+
+    let grant = make_monetary_grant("gate-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let resp = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-unmeasured".to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "gate-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            supplemental_authorization: None,
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+            declassification_grant: None,
+        })
+        .unwrap();
+
+    assert_eq!(resp.verdict, Verdict::Allow);
+    let metadata = resp
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("should have metadata");
+    let financial = metadata
+        .get("financial")
+        .expect("should have 'financial' key");
+    // No realized cost measured: nothing charged and settlement stays pending.
+    assert_eq!(financial["cost_charged"].as_u64().unwrap(), 0);
+    assert_eq!(financial["settlement_status"], "pending");
+
+    let budget_authority = metadata
+        .get("budget_authority")
+        .expect("should have 'budget_authority' key");
+    assert_eq!(budget_authority["terminal"]["disposition"], "reversed");
+    assert_ne!(budget_authority["terminal"]["disposition"], "reconciled");
+
+    // The hold is reversed, so no committed cost is moved.
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+}
+
+#[test]
+fn unmeasured_cost_provisional_allow_emits_no_execution_nonce() {
+    // The provisional unmeasured-cost allow path reverses the pre-execution
+    // budget hold and does not execute the target tool at the kernel. On a
+    // nonce-enabled kernel it must emit no execution nonce: there is no reserved
+    // hold to reconcile and nothing to authorize downstream. A minted nonce here
+    // would carry no reserved hold, so a gate deployment could execute against a
+    // hold that was already refunded, spending outside the cumulative cap and
+    // leaving the spend unreconcilable. The measured-cost allow path on the same
+    // kernel must still mint a nonce, guarding against over-suppression.
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(UnmeasuredCostServer {
+        id: "gate-srv".to_string(),
+    }));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 50, "USD")));
+
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: false,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+
+    let scope = make_scope(vec![
+        make_monetary_grant("gate-srv", "compute", 100, 1000, "USD"),
+        make_monetary_grant("cost-srv", "compute", 100, 1000, "USD"),
+    ]);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), scope, 3600)
+        .unwrap();
+
+    // Provisional unmeasured-cost Value path: allow, but no execution nonce.
+    let provisional = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-unmeasured-nonce".to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "gate-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            supplemental_authorization: None,
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+            declassification_grant: None,
+        })
+        .unwrap();
+    assert_eq!(provisional.verdict, Verdict::Allow);
+    assert!(
+        provisional.execution_nonce.is_none(),
+        "provisional unmeasured allow reversed its hold; it must not mint a spendable nonce"
+    );
+
+    // Measured-cost Value path on the same nonce-enabled kernel: allow, and a
+    // nonce is minted so a real reserved spend can be authorized downstream.
+    let measured = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-measured-nonce".to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            supplemental_authorization: None,
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+            declassification_grant: None,
+        })
+        .unwrap();
+    assert_eq!(measured.verdict, Verdict::Allow);
+    assert!(
+        measured.execution_nonce.is_some(),
+        "measured-cost allow must still mint an execution nonce"
+    );
 }
 
 #[test]

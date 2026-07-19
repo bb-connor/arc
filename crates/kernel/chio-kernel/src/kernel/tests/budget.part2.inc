@@ -178,7 +178,9 @@ fn assert_post_dispatch_cleanup_failure_projection(
     let mut kernel = make_kernel(make_monetary_config());
     match source {
         CleanupFailureSource::Payment => {
-            kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+            kernel
+                .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
+                .expect("payment adapter");
         }
         CleanupFailureSource::BudgetStore => {
             kernel
@@ -275,7 +277,9 @@ fn assert_post_dispatch_cleanup_failure_projection(
 fn post_dispatch_cleanup_failure_rejects_forged_budget_authority() {
     let entries = std::sync::Arc::new(AtomicU64::new(0));
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+    kernel
+        .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
+        .expect("payment adapter");
     kernel.register_tool_server(Box::new(FailingAfterSideEffectServer::new(
         "cost-srv",
         vec!["compute"],

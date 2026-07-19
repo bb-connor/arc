@@ -103,6 +103,250 @@ impl GuardRunError {
     }
 }
 
+/// Owned copy of a guard invocation, so the sequential guard core can run inside
+/// `spawn_blocking` (which requires a `'static` closure) without borrowing from
+/// the async evaluate future.
+struct OwnedGuardInvocation {
+    request: ToolCallRequest,
+    scope: ChioScope,
+    session_filesystem_roots: Option<Vec<String>>,
+    matched_grant_index: Option<usize>,
+    security_context: Option<SecurityInvocationContext>,
+}
+
+/// Synchronous fail-closed guard loop. Shared by the inline path and the
+/// offloaded (`spawn_blocking`) path so the two can never diverge. Any deny,
+/// unsupported approval verdict, or guard error short-circuits fail-closed.
+fn evaluate_guards_sequential(
+    guards: &[Arc<dyn Guard>],
+    ctx: &GuardContext,
+) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+    let mut evidence = Vec::new();
+    for guard in guards {
+        match guard.evaluate(ctx) {
+            Ok(decision) => {
+                evidence.extend(decision.evidence);
+                match decision.verdict {
+                    Verdict::Allow => {
+                        debug!(guard = guard.name(), "guard passed");
+                    }
+                    Verdict::Deny => {
+                        return Err(GuardRunError::new(
+                            KernelError::GuardDenied(format!(
+                                "guard \"{}\" denied the request",
+                                guard.name()
+                            )),
+                            evidence,
+                        ));
+                    }
+                    Verdict::PendingApproval => {
+                        // The `Guard` trait does not carry the HITL approval flow; that runs via
+                        // `ApprovalGuard::evaluate`. A `Guard` returning `PendingApproval` is an
+                        // unsupported state, so fail closed.
+                        return Err(GuardRunError::new(
+                            KernelError::GuardDenied(format!(
+                                "guard \"{}\" returned an unsupported approval verdict",
+                                guard.name()
+                            )),
+                            evidence,
+                        ));
+                    }
+                }
+            }
+            Err(e) => {
+                // Fail closed: guard errors are treated as denials.
+                return Err(GuardRunError::new(
+                    KernelError::GuardDenied(format!(
+                        "guard \"{}\" error (fail-closed): {e}",
+                        guard.name()
+                    )),
+                    evidence,
+                ));
+            }
+        }
+    }
+    Ok(evidence)
+}
+
+/// Run the guard loop over an owned invocation, rebuilding the borrowed
+/// `GuardContext` from the owned fields. Used by the blocking offload.
+fn run_guards_owned(
+    guards: &[Arc<dyn Guard>],
+    owned: &OwnedGuardInvocation,
+) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+    let ctx = GuardContext {
+        request: &owned.request,
+        scope: &owned.scope,
+        agent_id: &owned.request.agent_id,
+        server_id: &owned.request.server_id,
+        session_filesystem_roots: owned.session_filesystem_roots.as_deref(),
+        matched_grant_index: owned.matched_grant_index,
+        security_context: owned.security_context.as_ref(),
+    };
+    evaluate_guards_sequential(guards, &ctx)
+}
+
+fn budget_ms_saturating(budget: std::time::Duration) -> u64 {
+    budget.as_millis().min(u128::from(u64::MAX)) as u64
+}
+
+/// The fail-closed error returned when a tool-server call outruns its dispatch
+/// budget. Shared by every dispatch path (top-level and nested-flow) so the
+/// timeout verdict is byte-identical wherever the deadline fires.
+fn dispatch_deadline_exceeded(budget: std::time::Duration) -> KernelError {
+    KernelError::HotPathDeadlineExceeded {
+        stage: HotPathStage::Dispatch,
+        budget_ms: budget_ms_saturating(budget),
+    }
+}
+
+/// Aborts an offloaded `spawn_blocking` task when the awaiting future is
+/// dropped, whether because its deadline fired or because the caller was
+/// cancelled. Dropping a bare `JoinHandle` only *detaches* the task: one still
+/// queued on a saturated blocking pool would then start and run the tool call
+/// (or guard) after the kernel has already emitted a timed-out response and
+/// unwound its charges. Aborting cancels a not-yet-started task so it cannot
+/// execute side effects past the deadline; a task already running its blocking
+/// body cannot be interrupted, but its own inner deadline still frees it, and a
+/// task that already finished is aborted as a harmless no-op.
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+thread_local! {
+    /// Cached probe of whether the currently entered Tokio runtime has a timer
+    /// driver, keyed by that runtime's id. Timer availability is a property of the
+    /// entered runtime, not the OS thread, so caching a bare verdict per thread
+    /// would let a timerless verdict leak into a later timer-enabled runtime on
+    /// the same thread (skipping deadlines) or a timer-enabled verdict leak into a
+    /// later timerless one (panicking on timer construction). The key is the
+    /// runtime id (`None` for "no runtime entered"); the verdict is re-probed
+    /// whenever the entered runtime changes. Within a single runtime the cache
+    /// keeps the panic-hook swap off the steady-state hot path.
+    static DISPATCH_TIMER_AVAILABLE: std::cell::Cell<Option<(Option<tokio::runtime::Id>, bool)>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Serializes the panic-hook swap in [`dispatch_timer_available`] so concurrent
+/// first-probes on different worker threads cannot interleave their
+/// take/set-hook pairs and leave the silencing hook installed process-wide.
+static TIMER_PROBE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Whether `tokio::time::timeout` can run in the current context without
+/// panicking, i.e. a Tokio runtime is entered and its time driver is enabled.
+///
+/// `Handle::try_current()` only proves a runtime is entered, not that timers are
+/// enabled; a host runtime built without `enable_time` panics when a timer is
+/// constructed. Tokio exposes no query for the driver, so this probes by
+/// constructing one zero-duration timer under a caught unwind. The panic is
+/// synchronous at construction, and the panic hook is silenced for the probe so
+/// a timerless host does not emit a spurious backtrace. The swap is serialized
+/// so the real hook is always restored, and the result is cached per runtime per
+/// thread; callers fall back to running the guarded work inline when it is false.
+pub(crate) fn dispatch_timer_available() -> bool {
+    let current_runtime = tokio::runtime::Handle::try_current()
+        .ok()
+        .map(|handle| handle.id());
+    DISPATCH_TIMER_AVAILABLE.with(|cached| {
+        if let Some((probed_runtime, available)) = cached.get() {
+            if probed_runtime == current_runtime {
+                return available;
+            }
+        }
+        let available = {
+            let _serialized = TIMER_PROBE_LOCK
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let previous_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(|_| {}));
+            let result = std::panic::catch_unwind(|| {
+                drop(tokio::time::timeout(
+                    std::time::Duration::ZERO,
+                    std::future::ready(()),
+                ));
+            })
+            .is_ok();
+            std::panic::set_hook(previous_hook);
+            result
+        };
+        cached.set(Some((current_runtime, available)));
+        available
+    })
+}
+
+/// Whether a Tokio runtime is entered in the current context. `spawn_blocking`,
+/// used to offload a blocking guard, requires one; a synchronous host driving
+/// dispatch through `futures::executor::block_on` has none, so the offload must
+/// degrade to running the guards inline rather than panicking.
+pub(crate) fn dispatch_runtime_available() -> bool {
+    tokio::runtime::Handle::try_current().is_ok()
+}
+
+/// Bound a nested-flow tool-server call by its dispatch `budget`.
+///
+/// The top-level dispatch path moves a budgeted call onto `spawn_blocking` so a
+/// connection that blocks synchronously before its first `.await` cannot pin an
+/// async worker. A nested-flow call cannot use that mechanism: its future
+/// borrows the nested-flow bridge (the caller's `&mut` client, the session map,
+/// and the child-receipt buffer), so it is neither `Send` nor `'static`; it can
+/// be moved to no other thread, nor detached after a deadline without leaving
+/// those borrows dangling.
+///
+/// On a multi-thread runtime the call is therefore driven under
+/// [`tokio::task::block_in_place`], which requires neither bound: Tokio promotes
+/// a replacement worker while this thread blocks, so a nested connection that
+/// blocks synchronously before its first `.await` no longer starves the async
+/// worker pool, and the inner timeout still fails a *cooperating* call closed at
+/// the budget. A call wedged in a synchronous poll cannot be interrupted (the
+/// timer cannot be polled on the blocked thread); with a borrowed bridge that
+/// cannot be handed to a detachable task this is inherent, and it stays confined
+/// to the one blocked thread rather than the whole pool.
+///
+/// On a current-thread runtime there is no spare worker to promote, and with no
+/// timer driver the timeout wrapper would panic, so the call runs inline: under
+/// the timeout when a timer is present, and directly otherwise.
+pub(crate) async fn dispatch_nested_call_within_budget<F>(
+    call: F,
+    budget: std::time::Duration,
+) -> Result<ToolServerOutput, KernelError>
+where
+    F: std::future::Future<Output = Result<ToolServerOutput, KernelError>>,
+{
+    async fn bounded<F>(
+        call: F,
+        budget: std::time::Duration,
+        timer_available: bool,
+    ) -> Result<ToolServerOutput, KernelError>
+    where
+        F: std::future::Future<Output = Result<ToolServerOutput, KernelError>>,
+    {
+        if timer_available {
+            match tokio::time::timeout(budget, call).await {
+                Ok(result) => result,
+                Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
+            }
+        } else {
+            call.await
+        }
+    }
+
+    let timer_available = dispatch_timer_available();
+    let multi_thread = matches!(
+        tokio::runtime::Handle::try_current().map(|handle| handle.runtime_flavor()),
+        Ok(tokio::runtime::RuntimeFlavor::MultiThread)
+    );
+    if multi_thread {
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::block_in_place(|| handle.block_on(bounded(call, budget, timer_available)))
+    } else {
+        bounded(call, budget, timer_available).await
+    }
+}
+
 impl ChioKernel {
     /// Bind trusted-host security state to the request that will cross the
     /// connector boundary. This validation must run before receipt scoping,
@@ -451,41 +695,47 @@ impl ChioKernel {
         // operation and must not be released while dispatch can still win.
         let reversed = self.reverse_pre_execution_budget_mutation(cap, budget_mutation)?;
 
-        if let (Some(charge), Some(authorization)) = (charge, payment_authorization) {
+        if let Some(authorization) = payment_authorization {
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                 KernelError::Internal(
                     "payment authorization present without configured adapter".to_string(),
                 )
             })?;
-            let unwind = || match (authorization.settled, charge.admission_operation.as_ref()) {
-                (true, Some(binding)) => {
+            let quoted = Self::mustprepay_quoted_amount(request);
+            let refund = quoted
+                .as_ref()
+                .map(|(amount, currency)| (*amount, currency.as_str()))
+                .or_else(|| charge.map(|charge| (charge.cost_charged, charge.currency.as_str())));
+            let binding = charge.and_then(|charge| charge.admission_operation.as_ref());
+            let unwind = || match (authorization.settled, binding, refund) {
+                (true, Some(binding), Some((amount_units, currency))) => {
                     adapter.refund_for_operation(OperationPaymentRefundRequest {
                         operation_id: binding.operation_id(),
                         request_binding_hash: binding.request_binding_hash(),
                         transaction_id: &authorization.authorization_id,
-                        amount_units: charge.cost_charged,
-                        currency: &charge.currency,
+                        amount_units,
+                        currency,
                         reference: &request.request_id,
                     })
                 }
-                (true, None) => adapter.refund(
+                (true, None, Some((amount_units, currency))) => adapter.refund(
                     &authorization.authorization_id,
-                    charge.cost_charged,
-                    &charge.currency,
+                    amount_units,
+                    currency,
                     &request.request_id,
                 ),
-                (false, Some(binding)) => adapter.release_for_operation(
+                (false, Some(binding), _) => adapter.release_for_operation(
                     binding.operation_id(),
                     binding.request_binding_hash(),
                     &authorization.authorization_id,
                     &request.request_id,
                 ),
-                (false, None) => {
+                (false, None, _) | (true, _, None) => {
                     adapter.release(&authorization.authorization_id, &request.request_id)
                 }
             };
             let unwind_result = unwind();
-            let unwind_result = if charge.admission_operation.is_some() {
+            let unwind_result = if binding.is_some() {
                 unwind_result.or_else(|_| unwind())
             } else {
                 unwind_result
@@ -511,19 +761,21 @@ impl ChioKernel {
         if retain_operation_owned_budget {
             return Ok(None);
         }
-        let Some(charge) = charge_result else {
-            return Ok(None);
-        };
-
         let failure = |step: &'static str, reason: String| {
-            let mut hold_ids = vec![cap.id.clone(), charge.budget_hold_id.clone()];
+            let mut hold_ids = vec![cap.id.clone()];
+            if let Some(charge) = charge_result {
+                hold_ids.push(charge.budget_hold_id.clone());
+            }
             if let Some(authorization) = payment_authorization {
                 hold_ids.push(authorization.authorization_id.clone());
             }
             PostDispatchCleanupFailure {
                 step,
                 reason,
-                attempted_release_event_id: charge.release_event_id(),
+                attempted_release_event_id: charge_result.map_or_else(
+                    || format!("{}:payment-release", request.request_id),
+                    BudgetChargeResult::release_event_id,
+                ),
                 hold_ids,
             }
         };
@@ -540,36 +792,43 @@ impl ChioKernel {
             } else {
                 "payment_release"
             };
-            let release_payment =
-                || match (authorization.settled, charge.admission_operation.as_ref()) {
-                    (true, Some(binding)) => {
+            let quoted = Self::mustprepay_quoted_amount(request);
+            let refund = quoted
+                .as_ref()
+                .map(|(amount, currency)| (*amount, currency.as_str()))
+                .or_else(|| {
+                    charge_result.map(|charge| (charge.cost_charged, charge.currency.as_str()))
+                });
+            let binding = charge_result.and_then(|charge| charge.admission_operation.as_ref());
+            let release_payment = || match (authorization.settled, binding, refund) {
+                    (true, Some(binding), Some((amount_units, currency))) => {
                         adapter.refund_for_operation(OperationPaymentRefundRequest {
                             operation_id: binding.operation_id(),
                             request_binding_hash: binding.request_binding_hash(),
                             transaction_id: &authorization.authorization_id,
-                            amount_units: charge.cost_charged,
-                            currency: &charge.currency,
+                            amount_units,
+                            currency,
                             reference: &request.request_id,
                         })
                     }
-                    (true, None) => adapter.refund(
+                    (true, None, Some((amount_units, currency))) => adapter.refund(
                         &authorization.authorization_id,
-                        charge.cost_charged,
-                        &charge.currency,
+                        amount_units,
+                        currency,
                         &request.request_id,
                     ),
-                    (false, Some(binding)) => adapter.release_for_operation(
+                    (false, Some(binding), _) => adapter.release_for_operation(
                         binding.operation_id(),
                         binding.request_binding_hash(),
                         &authorization.authorization_id,
                         &request.request_id,
                     ),
-                    (false, None) => {
+                    (false, None, _) | (true, _, None) => {
                         adapter.release(&authorization.authorization_id, &request.request_id)
                     }
                 };
             let release_result = release_payment();
-            let release_result = if charge.admission_operation.is_some() {
+            let release_result = if binding.is_some() {
                 release_result.or_else(|_| release_payment())
             } else {
                 release_result
@@ -579,9 +838,13 @@ impl ChioKernel {
             }
         }
 
-        self.release_budget_charge(&cap.id, charge)
-            .map(Some)
-            .map_err(|error| failure("budget_hold_release", redacted!(&error).to_string()))
+        match charge_result {
+            Some(charge) => self
+                .release_budget_charge(&cap.id, charge)
+                .map(Some)
+                .map_err(|error| failure("budget_hold_release", redacted!(&error).to_string())),
+            None => Ok(None),
+        }
     }
 
     pub(crate) fn post_dispatch_cleanup_receipt_metadata(
@@ -604,8 +867,17 @@ impl ChioKernel {
                     base,
                     self.budget_execution_receipt_metadata(charge, None),
                 );
-                merge_metadata_objects(
+                let pending = merge_metadata_objects(
                     authorized,
+                    Some(serde_json::json!({
+                        "budget_authority": super::kernel_drop_guard::pending_reversal_marker(
+                            &charge.budget_hold_id,
+                            &failure.reason,
+                        )
+                    })),
+                );
+                merge_metadata_objects(
+                    pending,
                     Some(serde_json::json!({
                         "chio_runtime": {
                             "post_dispatch_cleanup_failed": true,
@@ -619,6 +891,20 @@ impl ChioKernel {
                     })),
                 )
             }
+            (None, Err(failure)) => merge_metadata_objects(
+                base,
+                Some(serde_json::json!({
+                    "chio_runtime": {
+                        "post_dispatch_cleanup_failed": true,
+                        "post_dispatch_cleanup_faults": [{
+                            "step": failure.step,
+                            "reason": failure.reason,
+                            "attempted_release_event_id": failure.attempted_release_event_id,
+                            "hold_ids": failure.hold_ids,
+                        }],
+                    }
+                })),
+            ),
             _ => base,
         }
     }
@@ -637,8 +923,17 @@ impl ChioKernel {
             .delegation_chain
             .last()
             .map(|link| link.capability_id.as_str());
+        // Bound the snapshot write by the receipt append budget. The
+        // pre-dispatch liveness gate denies an already-wedged writer, but a
+        // writer that passes the check and then stalls on this write must fail
+        // closed within budget rather than hang the request before dispatch.
+        let budget = self.config.deadlines.receipt_append_budget();
         let _ = self.with_receipt_store(|store| {
-            Ok(store.record_capability_snapshot(capability, parent_capability_id)?)
+            Ok(store.record_capability_snapshot_with_timeout(
+                capability,
+                parent_capability_id,
+                budget,
+            )?)
         })?;
         Ok(())
     }
@@ -833,52 +1128,189 @@ impl ChioKernel {
             matched_grant_index,
             security_context,
         };
+        evaluate_guards_sequential(self.guards.as_slice(), &ctx)
+    }
 
+    /// Async wrapper deciding how to run the synchronous guard pipeline. When a
+    /// pipeline budget, a per-guard override, or `always_offload_guards` applies,
+    /// the sync core runs under `spawn_blocking` (wrapped in `tokio::time::timeout`
+    /// only when the runtime has a timer driver), so a blocking guard can no longer
+    /// pin an async worker and a hung guard fails closed as
+    /// `HotPathDeadlineExceeded`. A budget with no timer driver degrades to inline
+    /// because the timeout wrapper would panic; `always_offload_guards` still
+    /// offloads in that case and simply skips the unenforceable timeout. With no
+    /// Tokio runtime at all `spawn_blocking` is unavailable, so the guards run
+    /// inline.
+    ///
+    /// `tokio::time::timeout` drops the `JoinHandle` on expiry, which detaches
+    /// (does not kill) the blocking thread: a runaway guard runs to completion
+    /// on the blocking pool with its result discarded, while the async worker is
+    /// freed and the request fails fast. The blast radius is contained in the
+    /// blocking pool instead of starving the async worker pool.
+    pub(crate) async fn run_guards_within_budget(
+        &self,
+        request: &ToolCallRequest,
+        scope: &ChioScope,
+        session_filesystem_roots: Option<&[String]>,
+        matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+        let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
+        let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
+        let needs_timer = pipeline_budget.is_some() || has_per_guard;
+        let always_offload = self.config.deadlines.always_offload_guards;
+        let want_offload = needs_timer || always_offload;
+
+        // Offloading needs an entered Tokio runtime, since `spawn_blocking` panics
+        // without one; a synchronous host bridging dispatch through
+        // `futures::executor::block_on` has no runtime, so the offload degrades to
+        // inline there.
+        if !want_offload || !dispatch_runtime_available() {
+            return self.run_guards(
+                request,
+                scope,
+                session_filesystem_roots,
+                matched_grant_index,
+                security_context,
+            );
+        }
+
+        // A budget is only enforceable with a Tokio time driver: the timeout
+        // wrapper panics without one. A budget-only configuration therefore
+        // degrades to inline when no timer is present. `always_offload_guards` is
+        // different: it asks to keep a blocking guard off the async worker
+        // regardless of budgets, so it still offloads onto `spawn_blocking` here
+        // and only skips the (unenforceable) timeout.
+        let timer_available = dispatch_timer_available();
+        if needs_timer && !timer_available && !always_offload {
+            return self.run_guards(
+                request,
+                scope,
+                session_filesystem_roots,
+                matched_grant_index,
+                security_context,
+            );
+        }
+
+        let owned = Arc::new(OwnedGuardInvocation {
+            request: request.clone(),
+            scope: scope.clone(),
+            session_filesystem_roots: session_filesystem_roots.map(<[String]>::to_vec),
+            matched_grant_index,
+            security_context: security_context.cloned(),
+        });
+
+        // Per-guard budgets require a per-guard timeout, so this path only runs
+        // with a timer driver. Without one (reached only because
+        // `always_offload_guards` forced the offload past the missing timer),
+        // fall through to a single whole-pipeline `spawn_blocking` with no
+        // enforceable timeout.
+        if has_per_guard && timer_available {
+            // Per-guard budgets bound each guard individually, but the whole
+            // loop must still honor the pipeline budget: without an outer
+            // deadline a chain of guards, each within its own budget, can run
+            // far past the configured pipeline wall-clock limit. Keep the
+            // pipeline deadline around the loop so total guard time stays bounded.
+            let per_guard = self.run_guards_per_guard_offloaded(&owned);
+            return match pipeline_budget {
+                Some(budget) => match tokio::time::timeout(budget, per_guard).await {
+                    Ok(result) => result,
+                    Err(_elapsed) => Err(GuardRunError::new(
+                        KernelError::HotPathDeadlineExceeded {
+                            stage: HotPathStage::GuardPipeline,
+                            budget_ms: budget_ms_saturating(budget),
+                        },
+                        Vec::new(),
+                    )),
+                },
+                None => per_guard.await,
+            };
+        }
+
+        let guards = Arc::clone(&self.guards);
+        let owned_for_task = Arc::clone(&owned);
+        let join = tokio::task::spawn_blocking(move || run_guards_owned(&guards, &owned_for_task));
+        // Abort the offloaded guard loop if the pipeline deadline fires or this
+        // future is cancelled, so a task still queued on a saturated blocking
+        // pool cannot run the (side-effecting) guards after the request has
+        // already failed closed.
+        let _abort_on_drop = AbortOnDrop(join.abort_handle());
+        match pipeline_budget.filter(|_| timer_available) {
+            Some(budget) => match tokio::time::timeout(budget, join).await {
+                Ok(Ok(result)) => result,
+                Ok(Err(join_err)) => Err(GuardRunError::new(
+                    KernelError::Internal(format!("guard task join failed: {join_err}")),
+                    Vec::new(),
+                )),
+                Err(_elapsed) => Err(GuardRunError::new(
+                    KernelError::HotPathDeadlineExceeded {
+                        stage: HotPathStage::GuardPipeline,
+                        budget_ms: budget_ms_saturating(budget),
+                    },
+                    Vec::new(),
+                )),
+            },
+            None => match join.await {
+                Ok(result) => result,
+                Err(join_err) => Err(GuardRunError::new(
+                    KernelError::Internal(format!("guard task join failed: {join_err}")),
+                    Vec::new(),
+                )),
+            },
+        }
+    }
+
+    /// Enforce each guard against its own effective budget, so one wedged guard
+    /// is bounded to its own budget while the rest still run. One blocking
+    /// handoff per guard; used only when per-guard budgets are configured.
+    async fn run_guards_per_guard_offloaded(
+        &self,
+        owned: &Arc<OwnedGuardInvocation>,
+    ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let mut evidence = Vec::new();
-        for guard in &self.guards {
-            match guard.evaluate(&ctx) {
-                Ok(decision) => {
-                    evidence.extend(decision.evidence);
-                    match decision.verdict {
-                        Verdict::Allow => {
-                            debug!(guard = guard.name(), "guard passed");
-                        }
-                        Verdict::Deny => {
-                            return Err(GuardRunError::new(
-                                KernelError::GuardDenied(format!(
-                                    "guard \"{}\" denied the request",
-                                    guard.name()
-                                )),
-                                evidence,
-                            ));
-                        }
-                        Verdict::PendingApproval => {
-                            // The `Guard` trait does not carry the HITL approval flow; that runs via
-                            // `ApprovalGuard::evaluate`. A `Guard` returning `PendingApproval` is an
-                            // unsupported state, so fail closed.
-                            return Err(GuardRunError::new(
-                                KernelError::GuardDenied(format!(
-                                    "guard \"{}\" returned an unsupported approval verdict",
-                                    guard.name()
-                                )),
-                                evidence,
-                            ));
-                        }
+        for guard in self.guards.iter() {
+            let budget = self.config.deadlines.guard_budget_for(guard.name());
+            let guard = Arc::clone(guard);
+            let owned = Arc::clone(owned);
+            let run_one = tokio::task::spawn_blocking(move || {
+                run_guards_owned(std::slice::from_ref(&guard), &owned)
+            });
+            // Abort this guard's offloaded task if its own budget fires or the
+            // enclosing pipeline deadline drops this future, so a task still
+            // queued on a saturated blocking pool cannot run the guard after the
+            // request has already failed closed.
+            let _abort_on_drop = AbortOnDrop(run_one.abort_handle());
+            let outcome = match budget {
+                Some(budget) => match tokio::time::timeout(budget, run_one).await {
+                    Ok(joined) => joined,
+                    Err(_elapsed) => {
+                        return Err(GuardRunError::new(
+                            KernelError::HotPathDeadlineExceeded {
+                                stage: HotPathStage::GuardPipeline,
+                                budget_ms: budget_ms_saturating(budget),
+                            },
+                            std::mem::take(&mut evidence),
+                        ));
                     }
+                },
+                None => run_one.await,
+            };
+            match outcome {
+                Ok(Ok(mut guard_evidence)) => evidence.append(&mut guard_evidence),
+                Ok(Err(mut guard_error)) => {
+                    // Preserve the evidence accumulated from earlier guards ahead
+                    // of the failing guard's own evidence.
+                    guard_error.evidence.splice(0..0, evidence);
+                    return Err(guard_error);
                 }
-                Err(e) => {
-                    // Fail closed: guard errors are treated as denials.
+                Err(join_err) => {
                     return Err(GuardRunError::new(
-                        KernelError::GuardDenied(format!(
-                            "guard \"{}\" error (fail-closed): {e}",
-                            guard.name()
-                        )),
-                        evidence,
+                        KernelError::Internal(format!("guard task join failed: {join_err}")),
+                        std::mem::take(&mut evidence),
                     ));
                 }
             }
         }
-
         Ok(evidence)
     }
 
@@ -1147,7 +1579,11 @@ impl ChioKernel {
         )
     }
 
-    /// Forward the validated request and optionally report actual invocation cost.
+    /// Forward the validated request and optionally report actual invocation
+    /// cost, enforcing the configured dispatch budget. This is the phase-level
+    /// dispatch entry point (`ToolEvaluator::dispatch`), so a custom evaluator or
+    /// phase-level caller cannot bypass the deadline and hang indefinitely on a
+    /// wedged tool server; it matches the budget the full evaluate path enforces.
     pub(crate) async fn dispatch_tool_call_with_cost(
         &self,
         request: &ToolCallRequest,
@@ -1163,8 +1599,125 @@ impl ChioKernel {
         let _security_dispatch_outcome = self
             .run_security_pre_dispatch_hook(request, None)
             .map_err(|denial| KernelError::GuardDenied(denial.reason.to_string()))?;
-        self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant)
+        self.dispatch_within_budget(request, has_monetary_grant)
             .await
+    }
+
+    /// Bound the tool-server call by the per-server (or default) dispatch
+    /// budget. On expiry the call fails closed with `HotPathDeadlineExceeded`,
+    /// which the evaluate core unwinds like a cancellation.
+    ///
+    /// Wrapping the call future in `timeout` only bounds it if the connection
+    /// yields to Tokio; a connection that does synchronous blocking work before
+    /// its first `.await` would pin the polling worker and the timer would never
+    /// fire. So on a multi-thread runtime a budgeted call is driven on a
+    /// `spawn_blocking` thread (like the guard pipeline) and only its join handle
+    /// is awaited under the deadline, keeping a blocking connection off the async
+    /// worker pool. With no budget the call runs inline. On a current-thread
+    /// runtime the call also runs inline under the timeout: there is no spare
+    /// worker to isolate a blocking poll onto, and driving the call on a second
+    /// thread would contend for the sole scheduler (so a blocking connection can
+    /// still pin the only worker there, an inherent single-threaded-runtime
+    /// limit). With no runtime at all it runs inline without a timeout (there is
+    /// no async transport to hang on, and the timeout wrapper would panic without
+    /// a timer driver).
+    pub(crate) async fn dispatch_within_budget(
+        &self,
+        request: &ToolCallRequest,
+        has_monetary_grant: bool,
+    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
+        let Some(budget) = self
+            .config
+            .deadlines
+            .dispatch_budget_for(&request.server_id)
+        else {
+            return self
+                .dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant)
+                .await;
+        };
+
+        let timer_available = dispatch_timer_available();
+        let multi_thread = matches!(
+            tokio::runtime::Handle::try_current().map(|handle| handle.runtime_flavor()),
+            Ok(tokio::runtime::RuntimeFlavor::MultiThread)
+        );
+        if !multi_thread {
+            let call =
+                self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant);
+            if timer_available {
+                return match tokio::time::timeout(budget, call).await {
+                    Ok(result) => result,
+                    Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
+                };
+            }
+            return call.await;
+        }
+
+        let server = match self.tool_servers.get(&request.server_id) {
+            Some(server) => Arc::clone(server),
+            None => {
+                return Err(KernelError::ToolNotRegistered(format!(
+                    "server \"{}\" / tool \"{}\"",
+                    request.server_id, request.tool_name
+                )));
+            }
+        };
+        let tool_name = request.tool_name.clone();
+        let arguments = request.arguments.clone();
+        let handle = tokio::runtime::Handle::current();
+        // Drive the connection call to completion on the blocking pool via
+        // `Handle::block_on`. `spawn_blocking` threads carry the runtime handle
+        // without being marked as "inside" it, so `block_on` does not panic there,
+        // and a blocking first poll stays on the blocking pool rather than the
+        // async worker.
+        //
+        // The inner timeout matters for a *cooperating* connection that never
+        // completes (it yields but never resolves): `block_on` cannot be
+        // cancelled by dropping the join handle, so without it that blocking
+        // thread would be pinned forever. The inner timeout lets `block_on` return
+        // at the budget, freeing the blocking thread. It cannot fire for a
+        // connection still stuck in a synchronous blocking poll (the timer cannot
+        // be polled either); that thread frees when the blocking work finally
+        // returns, bounded by Tokio's blocking-pool ceiling rather than growing
+        // without limit. Either way the outer timeout frees the async worker at
+        // the budget, so the per-eval wall clock holds.
+        let join = tokio::task::spawn_blocking(move || {
+            let call =
+                Self::invoke_resolved_server(server, tool_name, arguments, has_monetary_grant);
+            if timer_available {
+                handle.block_on(async move {
+                    match tokio::time::timeout(budget, call).await {
+                        Ok(result) => result,
+                        Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
+                    }
+                })
+            } else {
+                handle.block_on(call)
+            }
+        });
+        // Cancel the offloaded call if the outer deadline fires before the
+        // blocking pool even starts it. Dropping the join handle alone detaches
+        // the task, so a call still queued on a saturated pool could later run
+        // the tool after this eval has already returned a timed-out response and
+        // unwound its charges.
+        let _abort_on_drop = AbortOnDrop(join.abort_handle());
+
+        if timer_available {
+            match tokio::time::timeout(budget, join).await {
+                Ok(Ok(result)) => result,
+                Ok(Err(join_error)) => Err(KernelError::Internal(format!(
+                    "dispatch task join failed: {join_error}"
+                ))),
+                Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
+            }
+        } else {
+            match join.await {
+                Ok(result) => result,
+                Err(join_error) => Err(KernelError::Internal(format!(
+                    "dispatch task join failed: {join_error}"
+                ))),
+            }
+        }
     }
 
     pub(crate) async fn dispatch_tool_call_with_cost_after_nonce_check(
@@ -1178,7 +1731,26 @@ impl ChioKernel {
                 request.server_id, request.tool_name
             ))
         })?;
+        Self::invoke_resolved_server(
+            Arc::clone(server),
+            request.tool_name.clone(),
+            request.arguments.clone(),
+            has_monetary_grant,
+        )
+        .await
+    }
 
+    /// Drive one already-resolved tool-server invocation to completion. Taken
+    /// over owned inputs and free of any `&self` borrow so the dispatch deadline
+    /// path can move it onto a `spawn_blocking` thread (`'static`), isolating a
+    /// connection that blocks synchronously before its first `.await` from the
+    /// async worker.
+    async fn invoke_resolved_server(
+        server: Arc<dyn ToolServerConnection>,
+        tool_name: String,
+        arguments: serde_json::Value,
+        has_monetary_grant: bool,
+    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         // Try streaming first regardless of monetary mode.
         //
         // Why the kernel cannot bound stream memory "as chunks arrive" at THIS
@@ -1218,40 +1790,44 @@ impl ChioKernel {
         //     the monetary charge for an already-executed stream, so this seam
         //     does not hard-deny.
         if let Some(stream) = server
-            .invoke_stream(&request.tool_name, request.arguments.clone(), None)
+            .invoke_stream(&tool_name, arguments.clone(), None)
             .await?
         {
             return Ok((ToolServerOutput::Stream(stream), None));
         }
 
         if has_monetary_grant {
-            let (value, cost) = server
-                .invoke_with_cost(&request.tool_name, request.arguments.clone(), None)
-                .await?;
+            let (value, cost) = server.invoke_with_cost(&tool_name, arguments, None).await?;
             Ok((ToolServerOutput::Value(value), cost))
         } else {
-            let value = server
-                .invoke(&request.tool_name, request.arguments.clone(), None)
-                .await?;
+            let value = server.invoke(&tool_name, arguments, None).await?;
             Ok((ToolServerOutput::Value(value), None))
         }
     }
 
-    /// Build a denial response, including FinancialReceiptMetadata when the
-    pub(crate) fn record_child_receipts(
+    /// Persist a single already-signed child receipt: a commit-bounded durable
+    /// append under the kernel-wide receipt write lock, then the in-process log.
+    /// Child receipts hold that lock, so an unbounded wait would let a wedged
+    /// writer pin every subsequent receipt write; the bounded append fails
+    /// closed on timeout. The in-process log is appended only after the durable
+    /// append succeeds, so a failed append never records a child receipt that is
+    /// absent from the durable log.
+    pub(crate) fn record_child_receipt(
         &self,
-        receipts: Vec<ChildRequestReceipt>,
+        receipt: &ChildRequestReceipt,
     ) -> Result<(), KernelError> {
-        for receipt in receipts {
-            let receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
-                KernelError::Internal("receipt store write lock poisoned".to_string())
-            })?;
-            self.with_receipt_store(|store| {
-                Ok(store.append_child_receipt_returning_seq(&receipt)?)
-            })?;
-            drop(receipt_store_write);
-            self.append_child_receipt_to_local_log(receipt);
-        }
+        let receipt_store_write = self
+            .receipt_store_write_lock
+            .lock()
+            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
+        self.with_receipt_store(|store| {
+            Ok(store.append_child_receipt_with_timeout(
+                receipt,
+                self.config.deadlines.receipt_append_budget(),
+            )?)
+        })?;
+        drop(receipt_store_write);
+        self.append_child_receipt_to_local_log(receipt.clone());
         Ok(())
     }
 
@@ -1272,5 +1848,80 @@ impl ChioKernel {
             Ok(mut log) => log.append(receipt),
             Err(poisoned) => poisoned.into_inner().append(receipt),
         }
+    }
+}
+
+#[cfg(test)]
+mod timer_probe_tests {
+    use super::dispatch_timer_available;
+
+    // The probe verdict is keyed by runtime id, so each runtime is probed under
+    // its own key. `re_probes_when_the_entered_runtime_changes_on_one_thread`
+    // exercises two runtimes on one thread directly; the two single-runtime tests
+    // below pin the per-runtime verdicts in isolation.
+
+    #[test]
+    fn re_probes_when_the_entered_runtime_changes_on_one_thread(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A timerless runtime, then a timer-enabled one, both entered from this
+        // same OS thread. A per-thread-only cache would reuse the timerless
+        // verdict and wrongly report no timer in the second runtime; keying on the
+        // runtime id re-probes when the entered runtime changes.
+        let timerless = tokio::runtime::Builder::new_current_thread().build()?;
+        timerless.block_on(async {
+            assert!(!dispatch_timer_available());
+        });
+        let timed = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()?;
+        timed.block_on(async {
+            assert!(dispatch_timer_available());
+            let elapsed = tokio::time::timeout(
+                std::time::Duration::from_millis(1),
+                std::future::pending::<()>(),
+            )
+            .await;
+            assert!(elapsed.is_err(), "the timer must actually fire here");
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn reports_false_in_a_runtime_without_a_time_driver() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        runtime.block_on(async {
+            assert!(!dispatch_timer_available());
+            // Mirror the hot-path guard: only wrap work in a timer when the probe
+            // allows it, so a timerless runtime degrades to inline instead of
+            // panicking on timer construction.
+            let ran_inline = if dispatch_timer_available() {
+                tokio::time::timeout(std::time::Duration::from_millis(1), std::future::ready(()))
+                    .await
+                    .is_ok()
+            } else {
+                std::future::ready(()).await;
+                true
+            };
+            assert!(ran_inline);
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn reports_true_in_a_runtime_with_a_time_driver() -> Result<(), Box<dyn std::error::Error>> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()?;
+        runtime.block_on(async {
+            assert!(dispatch_timer_available());
+            let elapsed = tokio::time::timeout(
+                std::time::Duration::from_millis(1),
+                std::future::pending::<()>(),
+            )
+            .await;
+            assert!(elapsed.is_err(), "the timer must actually fire here");
+        });
+        Ok(())
     }
 }

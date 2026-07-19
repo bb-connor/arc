@@ -1,4 +1,6 @@
-use super::evaluation_helpers::{PreDispatchCleanupDeny, SecurityDispatchOutcomeRecovery};
+use super::evaluation_helpers::{
+    ExecutionNonceReservingResponse, PreDispatchCleanupDeny, SecurityDispatchOutcomeRecovery,
+};
 use super::*;
 use crate::kernel::admission_coordinator::{
     ThresholdDispatchPermit, ThresholdToolAdmissionContext,
@@ -12,6 +14,7 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
         security_context: Option<&SecurityInvocationContext>,
+        preflight_disposition: PreflightHoldDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
         request.validate()?;
         self.validate_security_invocation_context_binding(request, security_context, session_id)?;
@@ -117,6 +120,75 @@ impl ChioKernel {
             server = %request.server_id,
             "evaluating tool call"
         );
+
+        // Confirm durable persistence is healthy before any path that records a
+        // receipt. Both the capability-rejection denials below and the
+        // capability-lineage write persist through the receipt writer; against a
+        // serving-closed writer that append fails and would surface its own error
+        // (or a 500) instead of a clean signed fail-closed Deny. Gating here means
+        // a degraded writer always produces the dedicated persistence Deny first.
+        if let Err(error) = self.ensure_federated_receipt_persistence_ready(
+            request.federated_origin_kernel_id.as_deref(),
+        ) {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "federated receipt persistence unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_tcb_locks_healthy() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "tcb lock poisoned pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_receipt_persistence_ready() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "receipt persistence unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_revocation_durability_ready() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "revocation durability unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
 
         let cap = &request.capability;
 
@@ -231,16 +303,28 @@ impl ChioKernel {
             }
         }
 
-        if let Err(e) = self.ensure_registered_tool_target(request) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
-            return self.build_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
+        // The reserve-for-caller authorization path never dispatches a tool on
+        // this kernel, so it must not require the caller's tool server to be
+        // registered; the sidecar can then avoid registering caller-arbitrary
+        // server ids (unbounded growth). Every other path, including a
+        // ReserveForCaller request that falls through to dispatch because no nonce
+        // preflight is required, still requires registration exactly as before.
+        let reserving_preflight = matches!(
+            preflight_disposition,
+            PreflightHoldDisposition::ReserveForCaller
+        ) && self.execution_nonce_preflight_required(request);
+        if !reserving_preflight {
+            if let Err(e) = self.ensure_registered_tool_target(request) {
+                let msg = e.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                );
+            }
         }
 
         if let Err(error) =
@@ -354,13 +438,16 @@ impl ChioKernel {
         let _governed_call_chain_receipt_evidence_scope =
             scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
 
-        let pre_invocation_guard_evidence = match self.run_guards(
-            request,
-            &cap.scope,
-            session_filesystem_roots,
-            Some(matched_grant_index),
-            security_context,
-        ) {
+        let pre_invocation_guard_evidence = match self
+            .run_guards_within_budget(
+                request,
+                &cap.scope,
+                session_filesystem_roots,
+                Some(matched_grant_index),
+                security_context,
+            )
+            .await
+        {
             Ok(evidence) => evidence,
             Err(e) => {
                 let msg = e.error.to_string();
@@ -397,6 +484,7 @@ impl ChioKernel {
             });
         }
 
+        let mut _threshold_dispatch_intent_scope = None;
         let (mut extra_metadata, budget_mutation, mut threshold_dispatch_permit) = if let Some(
             verified_approval,
         ) =
@@ -462,6 +550,55 @@ impl ChioKernel {
                         )
                     },
                 );
+            }
+            // Threshold admission may authorize payment while it reserves the
+            // coordinated operation, so its durable dispatch intent must exist
+            // before entering that coordinator. Keep the request-scoped handle
+            // alive across every terminal response below so the first committed
+            // receipt consumes it.
+            let threshold_has_monetary = self
+                .ordinary_payment_charge_terms(matched_grant)
+                .is_some()
+                || Self::is_governed_mustprepay_request(request);
+            match self.record_dispatch_intent_if_side_effecting(
+                request,
+                threshold_has_monetary,
+                now_unix_ms,
+            ) {
+                Ok(Some(handle)) => {
+                    _threshold_dispatch_intent_scope = Some(
+                        self.scope_dispatch_intent_for_request(
+                            &request.request_id,
+                            Some(handle),
+                        ),
+                    );
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    let msg = error.to_string();
+                    let deny_metadata = self
+                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            threshold_runtime_metadata,
+                        );
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&msg),
+                        "dispatch intent write failed; denying before threshold admission"
+                    );
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_runtime_admission_monetary_deny_response_with_metadata(
+                                request,
+                                &msg,
+                                now,
+                                std::slice::from_ref(&matched),
+                                cap,
+                                deny_metadata,
+                            )
+                        },
+                    );
+                }
             }
             let prepared_operation = prepared.operation().clone();
             let reserved = self.reserve_threshold_tool_admission(
@@ -630,20 +767,148 @@ impl ChioKernel {
 
         if self.execution_nonce_preflight_required(request) {
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_execution_nonce_preflight_allow_response_after_cleanup(
-                    request,
-                    now,
-                    matched_grant_index,
-                    cap,
-                    &budget_mutation,
-                    threshold_dispatch_permit
-                        .as_ref()
-                        .and_then(ThresholdDispatchPermit::payment_authorization),
-                    extra_metadata,
-                    budget_lease_acquired,
-                )
+                match preflight_disposition {
+                    PreflightHoldDisposition::ReverseForRetry => self
+                        .build_execution_nonce_preflight_allow_response_after_cleanup(
+                            request,
+                            now,
+                            matched_grant_index,
+                            cap,
+                            &budget_mutation,
+                            threshold_dispatch_permit
+                                .as_ref()
+                                .and_then(ThresholdDispatchPermit::payment_authorization),
+                            extra_metadata,
+                            budget_lease_acquired,
+                        ),
+                    PreflightHoldDisposition::ReserveForCaller => {
+                        // A governed MustPrepay intent must have prepaid before a
+                        // reserved nonce is minted: this kernel never dispatches the
+                        // tool on the reserve path, so there is no later point to
+                        // settle the payment. Deny fail-closed (reversing the hold and
+                        // releasing the admitted share) when the prepayment cannot be
+                        // authorized or settled, so no nonce is handed out unpaid.
+                        let settled_prepayment =
+                            match self.ensure_reserved_mustprepay_prepaid(request) {
+                                Ok(settled_prepayment) => settled_prepayment,
+                                Err(error) => {
+                                    let msg = error.to_string();
+                                    warn!(
+                                        request_id = %request.request_id,
+                                        reason = %redacted!(&msg),
+                                        "reserve-for-caller prepayment gate denied"
+                                    );
+                                    return self.build_pre_dispatch_cleanup_deny_response(
+                                        PreDispatchCleanupDeny {
+                                            request,
+                                            reason: &msg,
+                                            timestamp: now,
+                                            matched_grant_index,
+                                            cap,
+                                            budget_mutation: &budget_mutation,
+                                            payment_authorization: None,
+                                            runtime_admission_metadata: extra_metadata,
+                                            budget_lease_acquired,
+                                        },
+                                    );
+                                }
+                            };
+                        // A settled MustPrepay prepayment is captured before the
+                        // reservation is minted. Carry its rail reference onto the
+                        // reserved hold so the downstream reconcile receipt can name
+                        // the transaction that funded the spend. If minting the nonce,
+                        // stamping the reserved hold, or persisting the reserved
+                        // receipt fails, the hold is reversed but the captured
+                        // prepayment would otherwise stay charged for a reservation the
+                        // caller never received. Refund it on that tear-down so a
+                        // denied reservation leaves the payer net-unbilled; a
+                        // non-MustPrepay reserve has no captured prepayment and nothing
+                        // to carry or refund.
+                        let reserved_payment_reference = settled_prepayment
+                            .as_ref()
+                            .and_then(|prepayment| prepayment.payment_reference.clone());
+                        match self.build_execution_nonce_authorization_reserving_response(
+                            ExecutionNonceReservingResponse {
+                                request,
+                                timestamp: now,
+                                matched_grant_index,
+                                budget_mutation: &budget_mutation,
+                                runtime_admission_metadata: extra_metadata,
+                                reserved_payment_reference,
+                                budget_lease_acquired,
+                            },
+                        ) {
+                            Ok(response) => Ok(response),
+                            Err(error) => {
+                                if let Some(prepayment) = settled_prepayment.as_ref() {
+                                    self.refund_reserved_mustprepay_prepayment(
+                                        request,
+                                        cap,
+                                        &prepayment.authorization,
+                                    );
+                                }
+                                Err(error)
+                            }
+                        }
+                    }
+                }
             });
         }
+
+        // For a side-effecting or monetary call, durably journal a dispatch
+        // intent BEFORE the earliest possible effect (the prepaid authorize
+        // below, or tool dispatch), so a crash in the effect-to-receipt window
+        // leaves a durable trace to reconcile at the next boot. On failure,
+        // reverse every pre-execution hold through the same pre-dispatch
+        // unwind the admission and authorize arms use, then deny before any
+        // effect. Read-only calls return None here and pay nothing.
+        let has_monetary = budget_mutation.charge_result().is_some()
+            || Self::is_governed_mustprepay_request(request);
+        // Threshold admission installed its intent before entering the
+        // coordinator because that coordinator can authorize payment. Ordinary
+        // admission reaches its first external effect here, after preflight.
+        let _ordinary_dispatch_intent_scope = if threshold_dispatch_permit.is_none() {
+            let dispatch_intent =
+                match self.record_dispatch_intent_if_side_effecting(
+                    request,
+                    has_monetary,
+                    now_unix_ms,
+                ) {
+                    Ok(handle) => handle,
+                    Err(error) => {
+                        let msg = error.to_string();
+                        warn!(
+                            request_id = %request.request_id,
+                            reason = %redacted!(&msg),
+                            "dispatch intent write failed; denying before dispatch"
+                        );
+                        return self.with_pre_invocation_guard_evidence(
+                            &pre_invocation_guard_evidence,
+                            || {
+                                self.build_pre_dispatch_cleanup_deny_response(
+                                    PreDispatchCleanupDeny {
+                                        request,
+                                        reason: &msg,
+                                        timestamp: now,
+                                        matched_grant_index,
+                                        cap,
+                                        budget_mutation: &budget_mutation,
+                                        payment_authorization: None,
+                                        runtime_admission_metadata: extra_metadata.clone(),
+                                        budget_lease_acquired,
+                                    },
+                                )
+                            },
+                        );
+                    }
+                };
+            Some(self.scope_dispatch_intent_for_request(
+                &request.request_id,
+                dispatch_intent,
+            ))
+        } else {
+            None
+        };
 
         let payment_authorization = if let Some(permit) = threshold_dispatch_permit.as_ref() {
             permit.payment_authorization().cloned()
@@ -664,7 +929,7 @@ impl ChioKernel {
                                 cap,
                                 budget_mutation: &budget_mutation,
                                 payment_authorization: None,
-                                runtime_admission_metadata: extra_metadata,
+                                runtime_admission_metadata: extra_metadata.clone(),
                                 budget_lease_acquired,
                             })
                         },
@@ -672,6 +937,28 @@ impl ChioKernel {
                 }
             }
         };
+
+        // Bind the rail authorization to the open intent so a crash orphan
+        // identifies the exact external transaction an operator must reconcile.
+        if let Some(authorization) = payment_authorization.as_ref() {
+            if let Some(handle) = self.dispatch_intent_for_request(Some(&request.request_id)) {
+                let budget = self.config.deadlines.receipt_append_budget();
+                if let Err(error) = self.with_receipt_store(|store| {
+                    Ok(store.attach_dispatch_intent_rail_ref_with_timeout(
+                        &handle.request_id,
+                        handle.tenant_id.as_deref(),
+                        &authorization.authorization_id,
+                        budget,
+                    )?)
+                }) {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&error.to_string()),
+                        "dispatch intent rail-ref attach failed"
+                    );
+                }
+            }
+        }
 
         if threshold_dispatch_permit.is_none() {
             let nonce_result = match budget_mutation.ordinary_admission() {
@@ -696,7 +983,7 @@ impl ChioKernel {
                             cap,
                             budget_mutation: &budget_mutation,
                             payment_authorization: payment_authorization.as_ref(),
-                            runtime_admission_metadata: extra_metadata,
+                            runtime_admission_metadata: extra_metadata.clone(),
                             budget_lease_acquired,
                         })
                     },
@@ -723,7 +1010,7 @@ impl ChioKernel {
                     cap,
                     budget_mutation: &budget_mutation,
                     payment_authorization: payment_authorization.as_ref(),
-                    runtime_admission_metadata: extra_metadata,
+                    runtime_admission_metadata: extra_metadata.clone(),
                     budget_lease_acquired,
                 })
             });
@@ -850,7 +1137,6 @@ impl ChioKernel {
         }
 
         let tool_started_at = Instant::now();
-        let has_monetary = budget_mutation.charge_result().is_some();
         let mut post_admission_drop_guard = PostAdmissionDropGuard::new(
             self,
             request,
@@ -869,9 +1155,7 @@ impl ChioKernel {
         }
         post_admission_drop_guard.bind_security_dispatch_outcome(security_dispatch_outcome.take());
         post_admission_drop_guard.mark_dispatch_started();
-        let dispatch_result = self
-            .dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary)
-            .await;
+        let dispatch_result = self.dispatch_within_budget(request, has_monetary).await;
         security_dispatch_outcome = post_admission_drop_guard.take_security_dispatch_outcome();
         post_admission_drop_guard.disarm();
         drop(post_admission_drop_guard);
@@ -1010,8 +1294,48 @@ impl ChioKernel {
                                 cleanup_metadata.clone(),
                             ),
                         )
-                    });
+                    },
+                );
                 return response;
+            }
+            Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
+                let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
+                let cleanup = self.release_post_dispatch_monetary_invocation(
+                    request,
+                    cap,
+                    budget_mutation.charge_result(),
+                    payment_authorization.as_ref(),
+                    threshold_dispatch_permit.is_some(),
+                );
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    extra_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                );
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&reason),
+                    "tool call deadline expired"
+                );
+                // A timed-out dispatch may already have applied its side effect,
+                // so the runtime-admission reservation is NOT released; it is
+                // retained and marked auditable, exactly as the cancellation arm
+                // does. Releasing here would be fail-open: a single-use
+                // destructive lease could be replayed after the destructive
+                // action already executed.
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_cancelled_response_with_metadata(
+                            request,
+                            &reason,
+                            now,
+                            Some(matched_grant_index),
+                            self.mark_runtime_admission_reservations_retained_fail_closed(
+                                cleanup_metadata.clone(),
+                            ),
+                        )
+                    });
             }
             Err(KernelError::RequestIncomplete(reason)) => {
                 let cleanup = self.release_post_dispatch_monetary_invocation(

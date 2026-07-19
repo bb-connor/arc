@@ -358,6 +358,13 @@ fn seed_cluster_authority_from_snapshot(
     }
 
     let snapshot_leader = authority_lease.map(|lease| lease.leader_url.clone());
+    if let Some(path) = state.config.authority_db_path.as_deref() {
+        let authority = SqliteCapabilityAuthority::open_existing(path)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        authority
+            .seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    }
     let seed_guard = |guard: &mut ClusterRuntimeState| {
         let conflicting_same_term_self_leader = snapshot_term == guard.election_term
             && guard

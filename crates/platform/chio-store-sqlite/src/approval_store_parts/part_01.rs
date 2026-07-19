@@ -22,6 +22,15 @@ use serde::{de::DeserializeOwned, Serialize};
 
 const MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES: usize = 262_144;
 const MAX_THRESHOLD_COLLECTOR_ARTIFACT_BYTES: usize = 262_144;
+const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const APPROVAL_STORE_SCHEMA_KEY: &str = "approval";
+const APPROVAL_STORE_OWN_ANCHOR_TABLES: &[&str] = &["chio_hitl_pending"];
+const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] = &[
+    "chio_hitl_pending",
+    "http_receipts",
+    "tool_receipts",
+    "chio_tool_receipts",
+];
 
 /// SQLite-backed `ApprovalStore`.
 ///
@@ -36,13 +45,25 @@ impl SqliteApprovalStore {
     /// Open the store at the given path. Creates the parent directory
     /// if needed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ApprovalStoreError> {
+        Self::open_with_anchor_tables(path, APPROVAL_STORE_OWN_ANCHOR_TABLES)
+    }
+
+    /// Open an approval store in the receipt store's shared sidecar database.
+    pub fn open_colocated_with_receipt_store(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, ApprovalStoreError> {
+        Self::open_with_anchor_tables(path, APPROVAL_STORE_COLOCATED_ANCHOR_TABLES)
+    }
+
+    fn open_with_anchor_tables(
+        path: impl AsRef<Path>,
+        anchor_tables: &[&str],
+    ) -> Result<Self, ApprovalStoreError> {
         let path = path.as_ref();
         reject_volatile_database_path(path)?;
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
-            }
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(parent)
+                .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
         }
         let manager = SqliteConnectionManager::file(path);
         let pool = Pool::builder()
@@ -53,7 +74,7 @@ impl SqliteApprovalStore {
             pool,
             authority_profile: ApprovalStoreProfile::SingleNodeDurable,
         };
-        store.run_migrations()?;
+        store.run_migrations(anchor_tables)?;
         Ok(store)
     }
 
@@ -68,15 +89,22 @@ impl SqliteApprovalStore {
             pool,
             authority_profile: ApprovalStoreProfile::EphemeralLocal,
         };
-        store.run_migrations()?;
+        store.run_migrations(APPROVAL_STORE_OWN_ANCHOR_TABLES)?;
         Ok(store)
     }
 
-    fn run_migrations(&self) -> Result<(), ApprovalStoreError> {
+    fn run_migrations(&self, anchor_tables: &[&str]) -> Result<(), ApprovalStoreError> {
         let conn = self
             .pool
             .get()
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+        crate::check_schema_version(
+            &conn,
+            APPROVAL_STORE_SCHEMA_KEY,
+            APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
+            anchor_tables,
+        )
+        .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
@@ -480,6 +508,12 @@ impl SqliteApprovalStore {
                     .to_string(),
             ));
         }
+        crate::stamp_schema_version(
+            &conn,
+            APPROVAL_STORE_SCHEMA_KEY,
+            APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         Ok(())
     }
 

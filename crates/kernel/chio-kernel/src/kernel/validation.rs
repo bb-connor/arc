@@ -7,7 +7,8 @@
 use chio_log_redact::redacted;
 
 use self::responses::{
-    FinalizeToolOutputCostContext, FinalizeToolOutputRequest, PostInvocationHandling,
+    AllowResponseNonce, FinalizeToolOutputCostContext, FinalizeToolOutputRequest,
+    PostInvocationHandling,
 };
 use super::kernel_struct::OperationOwnedDelegatedBudgetLease;
 use super::*;
@@ -25,6 +26,20 @@ struct IssuedCapabilityPostconditions<'a> {
     authority_key: &'a chio_core::PublicKey,
     security_context: Option<&'a crate::CapabilityIssuanceContext>,
     now: u64,
+}
+
+/// A settled MustPrepay prepayment captured before a reserve-for-caller execution
+/// nonce is minted, paired with the rail reference that funded it.
+///
+/// The `authorization` is retained so a reservation tear-down can refund the
+/// capture (the payer must not stay charged for a reservation that was denied).
+/// The `payment_reference` is the rail transaction id of the capture (or the
+/// authorization id when the rail settled at authorize time); it is carried onto
+/// the reserved budget hold so the downstream `/v1/reconcile` receipt can name
+/// the transaction that paid for the spend.
+pub(crate) struct ReservedPrepayment {
+    pub(crate) authorization: PaymentAuthorization,
+    pub(crate) payment_reference: Option<String>,
 }
 
 impl ChioKernel {
@@ -260,6 +275,16 @@ impl ChioKernel {
         info!(capability_id = %capability_id, "revoking capability");
         let _ = self.with_revocation_store(|store| Ok(store.revoke(capability_id)?))?;
         Ok(())
+    }
+
+    /// Whether a capability id is present in the installed revocation store.
+    ///
+    /// Callers that authorize a token minted outside the kernel (an HTTP
+    /// authority projecting a presented capability, for example) use this to
+    /// check the caller's token against revocations, since the kernel's own
+    /// revocation check runs against the internal capability it evaluates.
+    pub fn is_capability_revoked(&self, capability_id: &str) -> Result<bool, KernelError> {
+        self.with_revocation_store(|store| Ok(store.is_revoked(capability_id)?))
     }
 
     /// Read-only access to the receipt log.
@@ -731,12 +756,24 @@ impl ChioKernel {
     pub(crate) fn admit_capability_budget(&self, cap: &CapabilityToken) -> Result<bool, String> {
         if let Some(parent_link) = cap.delegation_chain.last() {
             use chio_kernel_core::BudgetRegistry;
+            // A delegated reserve-for-caller hold left open by a prior process
+            // still consumes its parent's sibling-sum share, but that admission
+            // was lost when this kernel rebuilt its in-memory registry. Deny this
+            // delegated admission fail-closed until every such hold has closed, so
+            // a sibling is never admitted against the parent as if the still-open
+            // reservation consumed nothing.
+            self.enforce_restart_reserved_hold_gate()?;
             let proposed_share = cap
                 .budget_share_bps
                 .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
             let mut budgets = match self.budget_registry.lock() {
                 Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
+                Err(_poisoned) => {
+                    // Fail closed on a poisoned monetary lock: a half-mutated
+                    // budget registry must never admit a child on a lucky recovery.
+                    self.record_tcb_lock_poison("budget_registry");
+                    return Err("budget registry lock poisoned; failing closed".to_string());
+                }
             };
             budgets
                 .try_admit_child(
@@ -764,7 +801,10 @@ impl ChioKernel {
                 .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
             let mut budgets = match self.budget_registry.lock() {
                 Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
+                Err(_poisoned) => {
+                    self.record_tcb_lock_poison("budget_registry");
+                    return Err("budget registry lock poisoned; failing closed".to_string());
+                }
             };
             budgets
                 .release_child(
@@ -919,6 +959,186 @@ impl ChioKernel {
         Ok(operation.approval_set_hash().is_some().then_some(operation))
     }
 
+    fn lock_reserved_sibling_shares(
+        &self,
+    ) -> std::sync::MutexGuard<'_, HashMap<String, ReservedSiblingShare>> {
+        match self.reserved_sibling_shares.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    /// Budget hold ids that currently hold a reserve-for-caller sibling share
+    /// open. The TTL reaper uses this to release the parent's headroom for the
+    /// exact holds it settles.
+    pub(crate) fn tracked_reserved_sibling_hold_ids(&self) -> Vec<String> {
+        self.lock_reserved_sibling_shares()
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Record that a reserve-for-caller hold keeps `cap`'s sibling-sum share
+    /// admitted until the hold closes, keyed by the hold id. Roots hold no
+    /// sibling share (empty delegation chain) and record nothing.
+    pub(crate) fn record_reserved_sibling_share(&self, hold_id: &str, cap: &CapabilityToken) {
+        let Some(parent_link) = cap.delegation_chain.last() else {
+            return;
+        };
+        let share_bps = cap
+            .budget_share_bps
+            .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
+        self.lock_reserved_sibling_shares().insert(
+            hold_id.to_string(),
+            ReservedSiblingShare {
+                parent_token_id: parent_link.capability_id.clone(),
+                child_token_id: cap.id.clone(),
+                share_bps,
+            },
+        );
+    }
+
+    /// Release the sibling-sum share a reserve-for-caller hold kept admitted,
+    /// once the hold has closed (reconciled by nonce or reaped). Idempotent: an
+    /// unknown hold id is a no-op. A registry release error is logged rather
+    /// than propagated so hold settlement is never blocked by admission
+    /// bookkeeping (release cannot mismatch because the exact admitted share was
+    /// recorded).
+    pub(crate) fn release_reserved_sibling_share_for_hold(&self, hold_id: &str) {
+        let Some(entry) = self.lock_reserved_sibling_shares().remove(hold_id) else {
+            return;
+        };
+        use chio_kernel_core::BudgetRegistry;
+        let mut budgets = match self.budget_registry.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Err(error) = budgets.release_child(
+            &entry.parent_token_id,
+            &entry.child_token_id,
+            entry.share_bps,
+        ) {
+            warn!(
+                hold_id = %hold_id,
+                reason = %redacted!(&error),
+                "failed to release reserved sibling share for a closed hold"
+            );
+        }
+    }
+
+    fn lock_restart_reserved_hold_gate(
+        &self,
+    ) -> std::sync::MutexGuard<'_, crate::kernel::RestartReservedHoldGate> {
+        match self.restart_reserved_hold_gate.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    /// Rebuild the delegated reserve-for-caller accounting from the durable
+    /// budget store after a restart, arming the fail-closed gate consulted on
+    /// every delegated admission.
+    ///
+    /// A delegated reservation keeps its child's sibling-sum share admitted
+    /// against the parent while its durable hold stays open, but that admission
+    /// lives only in this process's in-memory registry. A mediation kernel built
+    /// fresh over a populated budget store therefore starts with an empty
+    /// sibling-sum map even though open delegated reservations from the prior
+    /// process are still consuming their parents' budget. The durable hold record
+    /// carries neither the immediate parent capability id nor the child and
+    /// parent shares, so the in-memory reservation cannot be reconstructed. Rather
+    /// than admit a sibling against an unaccounted reservation, the kernel gates
+    /// delegated admission fail-closed until every such open hold has closed.
+    ///
+    /// Fail-closed: a store read error aborts here so kernel startup can refuse to
+    /// serve mediation over a store it could not inspect. When the store reports
+    /// no open holds the gate stays clear; when it can enumerate its reserved
+    /// holds the gate tracks exactly those still open; when it cannot enumerate
+    /// them yet reports open holds the gate denies until the open-hold count
+    /// drains to zero.
+    pub fn arm_restart_reserved_hold_gate(&self) -> Result<(), KernelError> {
+        let gate = match self
+            .with_budget_store(|store| Ok(store.list_open_delegated_reserved_hold_ids()?))?
+        {
+            Some(hold_ids) => {
+                let pending: std::collections::HashSet<String> = hold_ids.into_iter().collect();
+                if pending.is_empty() {
+                    crate::kernel::RestartReservedHoldGate::Clear
+                } else {
+                    crate::kernel::RestartReservedHoldGate::PendingHolds(pending)
+                }
+            }
+            None => {
+                let open = self.with_budget_store(|store| Ok(store.count_open_holds()?))?;
+                if open == 0 {
+                    crate::kernel::RestartReservedHoldGate::Clear
+                } else {
+                    crate::kernel::RestartReservedHoldGate::PendingOpaqueCount
+                }
+            }
+        };
+        *self.lock_restart_reserved_hold_gate() = gate;
+        Ok(())
+    }
+
+    /// Deny a delegated admission fail-closed while a delegated reserve-for-caller
+    /// hold from a prior process is still open and unaccounted (see
+    /// [`Self::arm_restart_reserved_hold_gate`]). Returns `Ok(())` once the gate is
+    /// clear so the admission proceeds. Idempotently drains holds that have since
+    /// closed, clearing the gate exactly when the last one settles so mediation
+    /// resumes without a restart. Fail-closed on a store read error and on any
+    /// hold that stays open.
+    fn enforce_restart_reserved_hold_gate(&self) -> Result<(), String> {
+        let mut gate = self.lock_restart_reserved_hold_gate();
+        match &*gate {
+            crate::kernel::RestartReservedHoldGate::Clear => Ok(()),
+            crate::kernel::RestartReservedHoldGate::PendingHolds(pending) => {
+                let mut still_open = std::collections::HashSet::new();
+                for hold_id in pending {
+                    let open = self
+                        .with_budget_store(|store| {
+                            Ok(match store.get_budget_hold(hold_id)? {
+                                Some(hold) => hold.disposition.is_open(),
+                                None => false,
+                            })
+                        })
+                        .map_err(|error| error.to_string())?;
+                    if open {
+                        still_open.insert(hold_id.clone());
+                    }
+                }
+                if still_open.is_empty() {
+                    *gate = crate::kernel::RestartReservedHoldGate::Clear;
+                    Ok(())
+                } else {
+                    let count = still_open.len();
+                    *gate = crate::kernel::RestartReservedHoldGate::PendingHolds(still_open);
+                    Err(format!(
+                        "delegated reserve-for-caller hold(s) from a prior process remain open \
+                         ({count}); a sibling cannot be admitted until they are reconciled or \
+                         reaped, because their sibling-sum share cannot be rebuilt from the \
+                         durable record"
+                    ))
+                }
+            }
+            crate::kernel::RestartReservedHoldGate::PendingOpaqueCount => {
+                let open = self
+                    .with_budget_store(|store| Ok(store.count_open_holds()?))
+                    .map_err(|error| error.to_string())?;
+                if open == 0 {
+                    *gate = crate::kernel::RestartReservedHoldGate::Clear;
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "open budget hold(s) from a prior process remain ({open}) and the store \
+                         cannot enumerate reserved holds; a delegated sibling cannot be admitted \
+                         until they are reconciled or reaped"
+                    ))
+                }
+            }
+        }
+    }
+
     /// Run the portable pure-compute verdict path provided by
     /// `chio-kernel-core`.
     ///
@@ -980,7 +1200,18 @@ impl ChioKernel {
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
+            Err(_poisoned) => {
+                // The monetary lock is poisoned: a panic left the registry in an
+                // unknown state. Deny fail-closed and trip the degraded flag so
+                // later evaluations are denied at the pre-dispatch gate too.
+                self.record_tcb_lock_poison("budget_registry");
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some("budget registry lock poisoned; denying fail-closed".to_string()),
+                    matched_grant_index: None,
+                    verified: None,
+                };
+            }
         };
         chio_kernel_core::evaluate_with_full_floor(
             chio_kernel_core::EvaluateInput {
@@ -1006,7 +1237,12 @@ impl ChioKernel {
         use chio_kernel_core::BudgetRegistry;
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
+            Err(poisoned) => {
+                // Recovering the guard keeps setup working, but tripping the flag
+                // means the next evaluation is denied at the pre-dispatch gate.
+                self.record_tcb_lock_poison("budget_registry");
+                poisoned.into_inner()
+            }
         };
         budgets.register_parent(parent_token_id, parent_share_bps)
     }
@@ -1015,7 +1251,10 @@ impl ChioKernel {
         use chio_kernel_core::BudgetRegistry;
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
+            Err(poisoned) => {
+                self.record_tcb_lock_poison("budget_registry");
+                poisoned.into_inner()
+            }
         };
         budgets.evict_parent(parent_token_id);
     }
@@ -1205,324 +1444,7 @@ impl ChioKernel {
 
         Ok(())
     }
-
-    pub(crate) fn local_budget_event_authority(&self) -> BudgetEventAuthority {
-        BudgetEventAuthority {
-            authority_id: format!("kernel:{}", self.public_key().to_hex()),
-            lease_id: "single-node".to_string(),
-            lease_epoch: 0,
-        }
-    }
-
-    pub(crate) fn budget_backend_receipt_metadata(&self) -> Result<serde_json::Value, KernelError> {
-        let (guarantee_level, authority_profile, metering_profile) =
-            self.with_budget_store(|store| {
-                Ok((
-                    store.budget_guarantee_level().as_str().to_string(),
-                    store.budget_authority_profile().as_str().to_string(),
-                    store.budget_metering_profile().as_str().to_string(),
-                ))
-            })?;
-        Ok(serde_json::json!({
-            "budget_authority": {
-                "guarantee_level": guarantee_level,
-                "authority_profile": authority_profile,
-                "metering_profile": metering_profile,
-            }
-        }))
-    }
-
-    pub(crate) fn budget_execution_receipt_metadata(
-        &self,
-        charge: &BudgetChargeResult,
-        terminal_event: Option<(&str, &BudgetHoldMutationDecision)>,
-    ) -> serde_json::Value {
-        let mut budget_authority = serde_json::Map::new();
-        budget_authority.insert(
-            "guarantee_level".to_string(),
-            serde_json::json!(charge.authorize_metadata.guarantee_level.as_str()),
-        );
-        budget_authority.insert(
-            "authority_profile".to_string(),
-            serde_json::json!(charge.authorize_metadata.budget_profile.as_str()),
-        );
-        budget_authority.insert(
-            "metering_profile".to_string(),
-            serde_json::json!(charge.authorize_metadata.metering_profile.as_str()),
-        );
-        budget_authority.insert(
-            "hold_id".to_string(),
-            serde_json::json!(&charge.budget_hold_id),
-        );
-        if let Some(budget_term) = charge.authorize_metadata.budget_term() {
-            budget_authority.insert("budget_term".to_string(), serde_json::json!(budget_term));
-        }
-        if let Some(authority) = charge.authorize_metadata.authority.as_ref() {
-            budget_authority.insert(
-                "authority".to_string(),
-                serde_json::json!({
-                    "authority_id": &authority.authority_id,
-                    "lease_id": &authority.lease_id,
-                    "lease_epoch": authority.lease_epoch,
-                }),
-            );
-        }
-
-        let mut authorize = serde_json::Map::new();
-        if let Some(event_id) = charge.authorize_metadata.event_id.as_ref() {
-            authorize.insert("event_id".to_string(), serde_json::json!(event_id));
-        }
-        if let Some(commit_index) = charge.authorize_metadata.budget_commit_index {
-            authorize.insert(
-                "budget_commit_index".to_string(),
-                serde_json::json!(commit_index),
-            );
-        }
-        authorize.insert(
-            "exposure_units".to_string(),
-            serde_json::json!(charge.cost_charged),
-        );
-        authorize.insert(
-            "committed_cost_units_after".to_string(),
-            serde_json::json!(charge.new_committed_cost_units),
-        );
-        budget_authority.insert(
-            "authorize".to_string(),
-            serde_json::Value::Object(authorize),
-        );
-
-        if let Some((disposition, terminal_event)) = terminal_event {
-            let mut terminal = serde_json::Map::new();
-            terminal.insert("disposition".to_string(), serde_json::json!(disposition));
-            if let Some(event_id) = terminal_event.metadata.event_id.as_ref() {
-                terminal.insert("event_id".to_string(), serde_json::json!(event_id));
-            }
-            if let Some(commit_index) = terminal_event.metadata.budget_commit_index {
-                terminal.insert(
-                    "budget_commit_index".to_string(),
-                    serde_json::json!(commit_index),
-                );
-            }
-            terminal.insert(
-                "exposure_units".to_string(),
-                serde_json::json!(terminal_event.exposure_units),
-            );
-            terminal.insert(
-                "realized_spend_units".to_string(),
-                serde_json::json!(terminal_event.realized_spend_units),
-            );
-            terminal.insert(
-                "committed_cost_units_after".to_string(),
-                serde_json::json!(terminal_event.committed_cost_units_after),
-            );
-            budget_authority.insert("terminal".to_string(), serde_json::Value::Object(terminal));
-        }
-
-        serde_json::json!({ "budget_authority": budget_authority })
-    }
-
-    pub(crate) fn merge_budget_receipt_metadata(
-        &self,
-        extra_metadata: Option<serde_json::Value>,
-        budget_metadata: serde_json::Value,
-    ) -> Option<serde_json::Value> {
-        let mut merged = match extra_metadata {
-            Some(serde_json::Value::Object(mut metadata)) => {
-                // budget_authority is a kernel-reserved namespace. Discard the
-                // entire caller-supplied block before inserting verified store
-                // and kernel state so omitted authoritative fields cannot be
-                // inherited from untrusted metadata.
-                metadata.remove("budget_authority");
-                metadata
-            }
-            _ => serde_json::Map::new(),
-        };
-
-        if let serde_json::Value::Object(authoritative) = budget_metadata {
-            for (key, value) in authoritative {
-                merged.insert(key, value);
-            }
-        }
-
-        Some(serde_json::Value::Object(merged))
-    }
-
-    /// Check and decrement the invocation budget for a capability.
-    ///
-    /// Returns the matched grant index and the exact pre-execution budget mutation.
-    pub(crate) fn check_and_increment_budget(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-        matching_grants: &[MatchingGrant<'_>],
-    ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
-        let mut saw_exhausted_budget = false;
-
-        for matching in matching_grants {
-            let grant = matching.grant;
-            if cap.aggregate_invocation_budget.is_some()
-                || request.supplemental_authorization.is_some()
-            {
-                let mutation = self.coordinate_ordinary_protocol_admission(
-                    request,
-                    cap,
-                    matching.index,
-                    grant,
-                    current_unix_timestamp(),
-                )?;
-                return Ok((matching.index, mutation));
-            }
-            let has_monetary =
-                grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
-
-            if has_monetary {
-                // Use worst-case max_cost_per_invocation as the pre-execution debit.
-                let cost_units = grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .map(|m| m.units)
-                    .unwrap_or(0);
-                let currency = grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .map(|m| m.currency.clone())
-                    .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
-                    .unwrap_or_else(|| "USD".to_string());
-                let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
-                let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
-                let budget_total = max_total.unwrap_or(u64::MAX);
-                let budget_hold_id = format!(
-                    "budget-hold:{}:{}:{}",
-                    request.request_id, cap.id, matching.index
-                );
-                let authorize_event_id = format!("{budget_hold_id}:authorize");
-                let authority = self.local_budget_event_authority();
-
-                let decision = self.with_budget_store(|store| {
-                    Ok(
-                        store.authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
-                            cap.id.clone(),
-                            matching.index,
-                            grant.max_invocations,
-                            cost_units,
-                            max_per,
-                            max_total,
-                            Some(budget_hold_id.clone()),
-                            Some(authorize_event_id),
-                            Some(authority.clone()),
-                        ))?,
-                    )
-                })?;
-                match decision {
-                    BudgetAuthorizeHoldDecision::Authorized(authorized) => {
-                        let charge = BudgetChargeResult {
-                            grant_index: matching.index,
-                            cost_charged: cost_units,
-                            currency,
-                            budget_total,
-                            new_committed_cost_units: authorized.committed_cost_units_after,
-                            budget_hold_id: authorized
-                                .hold_id
-                                .unwrap_or_else(|| budget_hold_id.clone()),
-                            authorize_metadata: authorized.metadata,
-                            admission_operation: None,
-                        };
-                        return Ok((
-                            matching.index,
-                            PreExecutionBudgetMutation::Charge(Box::new(charge)),
-                        ));
-                    }
-                    BudgetAuthorizeHoldDecision::Denied(_) => {
-                        saw_exhausted_budget = true;
-                    }
-                }
-            } else {
-                if grant.max_invocations.is_none() {
-                    return Ok((matching.index, PreExecutionBudgetMutation::None));
-                }
-
-                if self.with_budget_store(|store| {
-                    Ok(store.try_increment(&cap.id, matching.index, grant.max_invocations)?)
-                })? {
-                    return Ok((
-                        matching.index,
-                        PreExecutionBudgetMutation::Invocation {
-                            grant_index: matching.index,
-                        },
-                    ));
-                }
-                saw_exhausted_budget = true;
-            }
-        }
-
-        if saw_exhausted_budget {
-            Err(KernelError::BudgetExhausted(cap.id.clone()))
-        } else {
-            // No matching grant had any limit -- allow with the first grant's index.
-            let first_index = matching_grants.first().map(|m| m.index).unwrap_or(0);
-            Ok((first_index, PreExecutionBudgetMutation::None))
-        }
-    }
-
-    pub(crate) fn reverse_budget_charge(
-        &self,
-        capability_id: &str,
-        charge: &BudgetChargeResult,
-    ) -> Result<BudgetReverseHoldDecision, KernelError> {
-        let authority = charge.authorize_metadata.authority.clone();
-        self.with_budget_store(|store| {
-            Ok(store.reverse_budget_hold(BudgetReverseHoldRequest {
-                capability_id: capability_id.to_string(),
-                grant_index: charge.grant_index,
-                reversed_exposure_units: charge.cost_charged,
-                hold_id: Some(charge.budget_hold_id.clone()),
-                event_id: Some(charge.reverse_event_id()),
-                authority,
-                admission_operation: charge.admission_operation.clone(),
-            })?)
-        })
-    }
-
-    pub(crate) fn release_budget_charge(
-        &self,
-        capability_id: &str,
-        charge: &BudgetChargeResult,
-    ) -> Result<BudgetReleaseHoldDecision, KernelError> {
-        let authority = charge.authorize_metadata.authority.clone();
-        self.with_budget_store(|store| {
-            Ok(store.release_budget_hold(BudgetReleaseHoldRequest {
-                capability_id: capability_id.to_string(),
-                grant_index: charge.grant_index,
-                released_exposure_units: charge.cost_charged,
-                hold_id: Some(charge.budget_hold_id.clone()),
-                event_id: Some(charge.release_event_id()),
-                authority,
-                admission_operation: charge.admission_operation.clone(),
-            })?)
-        })
-    }
-
-    pub(crate) fn reverse_pre_execution_budget_mutation(
-        &self,
-        cap: &CapabilityToken,
-        budget_mutation: &PreExecutionBudgetMutation,
-    ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
-        match budget_mutation {
-            PreExecutionBudgetMutation::Charge(charge) => {
-                self.reverse_budget_charge(&cap.id, charge).map(Some)
-            }
-            PreExecutionBudgetMutation::Invocation { grant_index } => {
-                self.with_budget_store(|store| {
-                    Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
-                })?;
-                Ok(None)
-            }
-            PreExecutionBudgetMutation::Admission(admission) => self
-                .reverse_ordinary_protocol_admission(cap, admission.as_ref())
-                .map(Some),
-            PreExecutionBudgetMutation::None => Ok(None),
-        }
-    }
 }
 
+include!("validation_budget_and_payment.inc");
 include!("validation_finalize_and_payment.inc");

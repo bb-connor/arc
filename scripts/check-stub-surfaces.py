@@ -234,6 +234,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "schema explicitly rejects proof schema identifiers ending in .stub",
         "2026-12-31",
     ),
+    "crates/kernel/chio-kernel/src/receipt_store.rs": allow(
+        "comment documents the fail-closed retention default",
+        "2026-12-31",
+    ),
 }
 
 ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
@@ -423,6 +427,9 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "spec/schemas/chio-attest/v1/selective-disclosure-proof.schema.json": (
         r'"schema": \{ "pattern": "\\\\.stub\$" \}',
+    ),
+    "crates/kernel/chio-kernel/src/receipt_store.rs": (
+        r"fail-closed stub",
     ),
 }
 

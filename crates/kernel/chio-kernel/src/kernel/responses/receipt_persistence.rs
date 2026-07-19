@@ -1,4 +1,67 @@
+use chio_core::receipt::kinds::TrustLevel;
+
 use super::*;
+
+/// A cost-bearing receipt may claim `TrustLevel::Mediated` only when it carries a
+/// reconciled budget-authority hold. This is the sign-site fail-closed invariant
+/// that turns `Mediated` from a stamp into earned proof.
+pub(crate) fn require_earned_mediated_trust_level(
+    metadata: Option<&serde_json::Value>,
+    trust_level: TrustLevel,
+) -> Result<(), KernelError> {
+    if trust_level != TrustLevel::Mediated {
+        return Ok(());
+    }
+    let Some(metadata) = metadata else {
+        return Ok(());
+    };
+    let cost_bearing = metadata
+        .get("financial")
+        .and_then(|financial| financial.get("cost_charged"))
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|cost| cost > 0);
+    if !cost_bearing {
+        return Ok(());
+    }
+    let reconciled = metadata
+        .get("budget_authority")
+        .and_then(|block| block.get("terminal"))
+        .and_then(|terminal| terminal.get("disposition"))
+        .and_then(serde_json::Value::as_str)
+        == Some("reconciled");
+    // A prepaid spend under a grant with no budget ceiling carries no reconciled
+    // budget hold: its cost is earned by an external settlement, not a mediated
+    // hold, and such a receipt carries NO `budget_authority` block (the budget
+    // layer took no charge). A fully settled prepayment (a `settled` status
+    // carrying a payment reference) in that no-hold context is therefore earned
+    // cost-bearing status. When a `budget_authority` (monetary-hold) context IS
+    // present, the cost must be earned by that hold's `reconciled` terminal above,
+    // not two free-form financial strings, so the carve-out is gated on the
+    // absence of the hold context to keep this sign-site a structural proof. The
+    // `financial` block is kernel-constructed, and on every Mediated-signing path
+    // it is the winning side of the metadata merge, so caller- or route-supplied
+    // `extra_metadata` cannot override the `settlement_status`/`payment_reference`
+    // this carve-out reads. Still fail closed when neither a reconciled hold nor a
+    // settled no-ceiling prepayment backs the cost.
+    let settled_prepayment = metadata.get("budget_authority").is_none()
+        && metadata.get("financial").is_some_and(|financial| {
+            financial
+                .get("settlement_status")
+                .and_then(serde_json::Value::as_str)
+                == Some("settled")
+                && financial
+                    .get("payment_reference")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some()
+        });
+    if reconciled || settled_prepayment {
+        Ok(())
+    } else {
+        Err(KernelError::ReceiptSigningFailed(
+            "refusing to sign TrustLevel::Mediated for a cost-bearing receipt without a reconciled budget-authority hold or a settled prepayment".to_string(),
+        ))
+    }
+}
 
 impl ChioKernel {
     /// Build and sign a receipt from a `ReceiptParams` descriptor.
@@ -18,17 +81,24 @@ impl ChioKernel {
         // Precedence:
         //   1. An explicit override on `ReceiptParams` (currently unused).
         //   2. The request-keyed tenant context set by the evaluate path.
+        //      A present entry is authoritative even when it resolves to
+        //      no tenant: falling through to the thread-local scope from a
+        //      known-tenantless request would adopt whatever tenant a
+        //      concurrent sibling task's scope guard left on the resuming
+        //      worker thread.
         //   3. The active scoped tenant context set by the evaluate path
-        //      from `session.auth_context().enterprise_identity.tenant_id`.
+        //      from `session.auth_context().enterprise_identity.tenant_id`,
+        //      for receipts built outside any request-scoped evaluation.
         //
         // Tenant_id is never taken from a caller-provided field on the
         // request: allowing caller choice would defeat the isolation the
         // store-level WHERE clause enforces.
-        let tenant_id = params
-            .tenant_id
-            .clone()
-            .or_else(|| self.receipt_tenant_id_for_request(params.request_id))
-            .or_else(current_scoped_receipt_tenant_id);
+        let tenant_id = match params.tenant_id.clone() {
+            Some(tenant_id) => Some(tenant_id),
+            None => self
+                .receipt_tenant_id_for_request(params.request_id)
+                .unwrap_or_else(current_scoped_receipt_tenant_id),
+        };
 
         let request_metadata = params.request_id.map(|request_id| {
             serde_json::json!({
@@ -38,6 +108,7 @@ impl ChioKernel {
             })
         });
         let metadata = merge_metadata_objects(params.metadata, request_metadata);
+        require_earned_mediated_trust_level(metadata.as_ref(), params.trust_level)?;
 
         let mut evidence = current_pre_invocation_guard_evidence();
         evidence.extend(current_post_invocation_guard_evidence());
@@ -150,7 +221,7 @@ impl ChioKernel {
         });
         let scoped_admission = request_admission.as_ref().or(thread_admission);
         if !self.record_scoped_threshold_terminal_receipt(request, receipt)? {
-            self.record_chio_receipt(receipt)?;
+            self.record_chio_receipt_consuming_optional_intent(receipt, Some(&request.request_id))?;
         }
         self.apply_federation_cosign(
             request,
@@ -189,11 +260,26 @@ impl ChioKernel {
         if self.record_scoped_threshold_terminal_receipt(request, receipt)? {
             Ok(())
         } else {
-            self.record_chio_receipt(receipt)
+            self.record_chio_receipt_consuming_optional_intent(receipt, Some(&request.request_id))
         }
     }
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
+        self.record_chio_receipt_consuming_optional_intent(receipt, None)
+    }
+
+    /// Persist a terminal receipt and, when the request journaled a dispatch
+    /// intent, consume that intent in the SAME transaction as the receipt
+    /// insert. Request-id-less callers pass `None` and get the plain append.
+    /// The request-aware sinks pass the request id, so allow, post-dispatch
+    /// deny, cancelled, and incomplete receipts all consume the intent and an
+    /// effecting call that ends in any terminal receipt leaves no false
+    /// orphan behind.
+    pub(crate) fn record_chio_receipt_consuming_optional_intent(
+        &self,
+        receipt: &ChioReceipt,
+        request_id: Option<&str>,
+    ) -> Result<(), KernelError> {
         // Scope the receipt-store write lock so it is released before the
         // settlement observer runs. Holding the mutex across
         // `run_settlement_observer` would serialize all concurrent receipt
@@ -205,10 +291,216 @@ impl ChioKernel {
             let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
             })?;
-            self.with_receipt_store(|store| Ok(store.append_chio_receipt_returning_seq(receipt)?))?;
+            // Resolve the request's intent handle only under the write lock.
+            // A request can persist more than one receipt concurrently (a
+            // cleanup-fault receipt racing the terminal outcome), and the
+            // first to commit consumes the durable row and drops the handle
+            // below. A lookup before the lock would hand both callers the
+            // handle and send the loser into the consuming append against
+            // the already-deleted row; under the lock the loser observes the
+            // removal and appends plainly.
+            let intent = self.dispatch_intent_for_request(request_id);
+            // Bound the commit round trip so a wedged writer cannot pin the
+            // kernel-wide receipt write lock (and thus every subsequent tool
+            // call) indefinitely. On timeout this fails closed with
+            // ReceiptPersistence(Timeout); no allow response is signed until the
+            // append succeeds.
+            let budget = self.config.deadlines.receipt_append_budget();
+            match intent {
+                Some(intent) => {
+                    // The key binds the consume to the exact attested call:
+                    // request id from the pre-dispatch handle, parameter hash
+                    // and tenant from the receipt itself. Any disagreement
+                    // aborts the transaction with the receipt unpersisted.
+                    let key = crate::receipt_store::DispatchIntentKey {
+                        request_id: intent.request_id,
+                        parameter_hash: receipt.action.parameter_hash.clone(),
+                        tenant_id: receipt.tenant_id.clone(),
+                    };
+                    let append = self.with_receipt_store(|store| {
+                        Ok(store.append_chio_receipt_consuming_intent_with_timeout(
+                            receipt, &key, budget,
+                        ))
+                    })?;
+                    if let Some(append) = append {
+                        match append {
+                            Ok(_) => {
+                                // The consuming append deleted the durable
+                                // row; drop the request-scoped handle under
+                                // the same write lock so any later receipt
+                                // for this request appends plainly instead of
+                                // retrying the consume against the missing
+                                // row.
+                                self.mark_dispatch_intent_consumed(&key.request_id);
+                            }
+                            Err(error) => {
+                                // A timeout is an UNCERTAIN consume: the job
+                                // is still queued on the single writer and
+                                // may commit after this wait expired, so a
+                                // retained handle could send a later receipt
+                                // for the request back through the consume
+                                // and reject it against a row the late commit
+                                // already deleted. Drop the handle so later
+                                // receipts append plainly; if the queued job
+                                // never lands, the still-open row surfaces at
+                                // the next boot instead of costing an audit
+                                // record now. A definitive refusal (the row
+                                // is provably still present) keeps the handle
+                                // so the next receipt can consume it. This
+                                // receipt's own error propagates unchanged
+                                // either way.
+                                if matches!(
+                                    error,
+                                    crate::receipt_store::ReceiptStoreError::Timeout { .. }
+                                ) {
+                                    self.mark_dispatch_intent_consumed(&key.request_id);
+                                }
+                                return Err(error.into());
+                            }
+                        }
+                    }
+                }
+                None => {
+                    self.with_receipt_store(|store| {
+                        Ok(store.append_chio_receipt_with_timeout(receipt, budget)?)
+                    })?;
+                }
+            }
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
-        let _settlement_status = self.run_settlement_observer(receipt);
+        // The terminal receipt is durable: the money path's journal row (if
+        // any) has served its purpose and closes. A crash before this close
+        // leaves a row boot reconciliation closes against this receipt. The
+        // close is state-aware: a row still in Settling belongs to a failed
+        // or unconfirmed rail call and survives for boot reconciliation to
+        // replay (see close_payment_journal_best_effort).
+        if let Some(request_id) = request_id {
+            self.close_payment_journal_best_effort(
+                request_id,
+                matches!(receipt.decision.as_ref(), Some(Decision::Allow)),
+            );
+        }
+        let settlement_status = self.run_settlement_observer(receipt);
+        self.route_settlement_observer_status(receipt, &settlement_status);
         Ok(())
+    }
+
+    /// Whether a durable receipt store is configured but no longer serving (its
+    /// commit writer has died or its verified head is poisoned). This is exactly
+    /// the condition the pre-dispatch persistence gate denies on, so the deny it
+    /// produces must not try to append to the same store.
+    fn receipt_store_serving_closed(&self) -> bool {
+        matches!(
+            self.with_receipt_store(|store| Ok(store.writer_serving_closed())),
+            Ok(Some(true))
+        )
+    }
+
+    /// Persist a fail-closed deny receipt, tolerating a serving-closed durable
+    /// store. Several pre-dispatch gates deny precisely because the durable
+    /// receipt writer can no longer persist; appending this deny receipt to that
+    /// same closed store would fail and mask a clean signed Deny as an opaque
+    /// error. A deny executes no tool, so nothing is admitted without a durable
+    /// receipt: when the store is serving-closed, record the signed deny in the
+    /// in-memory log for local audit and surface the verdict instead of failing.
+    /// When the store is serving, persist durably as usual.
+    pub(crate) fn record_failclosed_deny_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        if self.receipt_store_serving_closed() {
+            self.append_chio_receipt_to_local_log(receipt.clone());
+            return Ok(());
+        }
+        self.record_chio_receipt(receipt)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use chio_core::receipt::kinds::TrustLevel;
+
+    use super::*;
+
+    #[test]
+    fn signing_mediated_for_cost_bearing_grant_without_reconciled_hold_fails_closed() {
+        // Refuse to stamp Mediated on a cost-bearing receipt that carries a
+        // financial charge but no reconciled budget-authority hold.
+        let metadata = serde_json::json!({
+            "financial": { "cost_charged": 50, "grant_index": 0, "currency": "USD" }
+            // no budget_authority.terminal.disposition == "reconciled"
+        });
+        let result = require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated);
+        assert!(matches!(result, Err(KernelError::ReceiptSigningFailed(_))));
+    }
+
+    #[test]
+    fn signing_mediated_for_cost_bearing_settled_prepayment_is_allowed() {
+        // A prepaid spend with no budget ceiling carries no reconciled hold, but a
+        // settled prepayment (settled status + payment reference) earns cost-bearing
+        // Mediated status.
+        let metadata = serde_json::json!({
+            "financial": {
+                "cost_charged": 100,
+                "grant_index": 0,
+                "currency": "USD",
+                "settlement_status": "settled",
+                "payment_reference": "sim-abc123"
+            }
+        });
+        assert!(require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated).is_ok());
+    }
+
+    #[test]
+    fn signing_mediated_settled_strings_under_a_hold_context_fails_closed() {
+        // The settled-prepayment carve-out is only for a genuine no-monetary-ceiling
+        // MustPrepay spend, which carries NO budget_authority block. A cost-bearing
+        // receipt that DOES carry a budget-authority (monetary-hold) context must
+        // earn Mediated through that hold's `reconciled` terminal, not two free-form
+        // financial strings; a non-reconciled hold with settled strings fails closed.
+        let metadata = serde_json::json!({
+            "financial": {
+                "cost_charged": 100,
+                "grant_index": 0,
+                "currency": "USD",
+                "settlement_status": "settled",
+                "payment_reference": "sim-abc123"
+            },
+            "budget_authority": { "terminal": { "disposition": "reversed" } }
+        });
+        let result = require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated);
+        assert!(matches!(result, Err(KernelError::ReceiptSigningFailed(_))));
+    }
+
+    #[test]
+    fn signing_mediated_for_cost_bearing_pending_prepayment_fails_closed() {
+        // A cost-bearing Mediated receipt with neither a reconciled hold nor a
+        // settled prepayment still fails closed.
+        let metadata = serde_json::json!({
+            "financial": {
+                "cost_charged": 100,
+                "grant_index": 0,
+                "currency": "USD",
+                "settlement_status": "pending",
+                "payment_reference": "sim-abc123"
+            }
+        });
+        let result = require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated);
+        assert!(matches!(result, Err(KernelError::ReceiptSigningFailed(_))));
+    }
+
+    #[test]
+    fn signing_mediated_with_reconciled_hold_is_allowed() {
+        let metadata = serde_json::json!({
+            "financial": { "cost_charged": 50, "grant_index": 0, "currency": "USD" },
+            "budget_authority": { "terminal": { "disposition": "reconciled" } }
+        });
+        assert!(require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated).is_ok());
+    }
+
+    #[test]
+    fn advisory_trust_level_never_requires_a_hold() {
+        assert!(require_earned_mediated_trust_level(None, TrustLevel::Advisory).is_ok());
     }
 }

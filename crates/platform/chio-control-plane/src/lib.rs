@@ -11,6 +11,7 @@ pub mod policy;
 pub mod reputation;
 pub mod scim_lifecycle;
 pub mod security;
+pub mod seller_rail;
 pub mod transaction_passport_risk;
 pub mod trust_control;
 

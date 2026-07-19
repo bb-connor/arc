@@ -14,6 +14,22 @@
 - `remote_mcp/session_store.rs` owns SQLite-backed active session rows, authenticated terminal tombstones, retained terminal generation fences, atomic terminalization, monotonic resume generations, replay-safe loading, tombstone purging, and persisted capability freshness checks.
 - `remote_mcp/admin.rs` owns operator-only health, authority, receipt, revocation, budget, session, and trust-control routes.
 
+## Runtime Lifecycle
+
+1. `serve_http` creates the async runtime, resolves the selected auth mode and
+   OAuth metadata, validates the dedicated resume keyring when persistence is
+   enabled, and restores eligible sessions before accepting connections.
+2. Every `/mcp` request passes origin validation and request authentication,
+   producing a `SessionAuthContext` before session lookup or creation.
+3. Initialize loads policy, builds or reuses the adapted upstream, constructs a
+   per-session kernel with durable stores, issues capabilities, and starts the
+   edge worker. Any partial construction failure aborts the session.
+4. Established requests revalidate session id, protocol version, and auth
+   context. Responses and notifications use SSE with bounded event replay.
+5. Ready sessions persist authenticated resume state. The reaper expires idle
+   sessions, completes drains, and purges diagnostic tombstones without
+   removing the monotonic terminal-generation fence.
+
 ## Admission Boundaries
 
 `MCP-Session-Id` has an internal admission boundary with explicit missing,
@@ -58,6 +74,10 @@ capability bound to the prior process cannot authorize the replacement.
 - Static bearer and admin tokens must be validated before constructing
   `RemoteAuthMode` or admin route state.
 - Preserve receipt, revocation, budget, capability, session lifecycle, resumability, shared hosted owner, and admin route behavior.
+- OIDC discovery, JWKS, and introspection require an explicit HTTP egress
+  contract and fail before connection when the target is not authorized.
+- Admin routes require same-origin or localhost origin checks plus a
+  constant-time bearer comparison; an unset admin token denies every request.
 - Keep changes scoped to `chio-mcp-remote` unless dependent tests prove a compatibility update is required.
 
 ## Dependents
