@@ -175,9 +175,12 @@ jobs:
             # Any higher status means the tool itself failed on the input,
             # which is not a compatibility verdict and must not be counted
             # as one. We capture the JSON report regardless of exit status.
+            # The runner invokes this step as `bash -e`, so the call must not
+            # be left bare: a non-zero status would abort the step before it
+            # could be classified.
+            diff_status=0
             json-schema-diff "${base_blob}" "${head_path}" \
-              > "${report}" 2> "${report}.stderr"
-            diff_status=$?
+              > "${report}" 2> "${report}.stderr" || diff_status=$?
             if [ "${diff_status}" -eq 0 ]; then
               echo "ok ${head_path}: no breaking change"
             elif [ "${diff_status}" -ne 1 ]; then
