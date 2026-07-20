@@ -415,7 +415,7 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         .iter()
         .map(|effect| make_grant(ACTIVE_RESPONSE_SERVER_ID, effect.tool_name()))
         .collect();
-    let now = current_unix_timestamp();
+    let now = current_unix_timestamp().saturating_add(60);
     let fixture = ActiveResponseFixture {
         kernel: &kernel,
         requirement: &requirement,
