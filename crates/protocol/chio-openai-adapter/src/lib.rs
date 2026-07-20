@@ -301,10 +301,15 @@ impl ChioOpenAiAdapter {
                 "Error: singular and threshold approval tokens must not be mixed".to_string(),
             );
         }
-        if execution.approval_tokens.len() > 32 {
+        if execution.approval_tokens.len()
+            > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+        {
             return denied_tool_call_result(
                 tool_call,
-                "Error: threshold approval set exceeds 32 tokens".to_string(),
+                format!(
+                    "Error: threshold approval set exceeds {} tokens",
+                    chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+                ),
             );
         }
         if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
@@ -413,6 +418,20 @@ impl ChioOpenAiAdapter {
         kernel: &ChioKernel,
         execution: &OpenAiExecutionContext,
     ) -> Vec<ToolCallResult> {
+        if tool_calls.len() > 1
+            && (!execution.approval_tokens.is_empty()
+                || execution.threshold_approval_proposal.is_some())
+        {
+            return tool_calls
+                .iter()
+                .map(|tool_call| {
+                    denied_tool_call_result(
+                        tool_call,
+                        "Error: threshold approvals require a single OpenAI tool call".to_string(),
+                    )
+                })
+                .collect();
+        }
         tool_calls
             .iter()
             .map(|tc| self.execute_tool_call(tc, kernel, execution))

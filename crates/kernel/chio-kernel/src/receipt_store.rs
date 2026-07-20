@@ -937,12 +937,15 @@ impl ThresholdApprovalReplayReservationV1 {
     ) -> Result<Self, crate::admission_operation::AdmissionOperationStoreError> {
         use std::collections::HashSet;
 
-        if tokens.is_empty() || tokens.len() > 32 {
+        if tokens.is_empty()
+            || tokens.len()
+                > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+        {
             return Err(
-                crate::admission_operation::AdmissionOperationStoreError::Invariant(
-                    "threshold approval replay reservation must contain between 1 and 32 tokens"
-                        .to_owned(),
-                ),
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(format!(
+                    "threshold approval replay reservation must contain between 1 and {} tokens",
+                    chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+                )),
             );
         }
         if !proposal.verify_signature().map_err(|error| {

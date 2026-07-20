@@ -10,6 +10,7 @@ use crate::crypto::{sha256_hex, PublicKey};
 const ELIGIBLE_SET_DOMAIN: &[u8] = b"chio.approver-set.v1\0";
 pub const DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS: u64 = 900;
 pub const MAX_THRESHOLD_APPROVAL_TIMEOUT_SECONDS: u64 = 3_600;
+pub const MAX_THRESHOLD_APPROVAL_TOKENS: usize = 32;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -66,6 +67,11 @@ impl ThresholdApprovalRequirement {
             .any(|pair| pair[0].identifier == pair[1].identifier)
         {
             return Err("threshold approval identifiers must be unique".to_string());
+        }
+        if eligible_approvers.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+            return Err(format!(
+                "threshold approval eligible set exceeds {MAX_THRESHOLD_APPROVAL_TOKENS} approvers"
+            ));
         }
         let mut key_fingerprints = eligible_approvers
             .iter()
@@ -176,5 +182,26 @@ mod tests {
             DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS,
         )
         .is_err());
+    }
+
+    #[test]
+    fn oversized_eligible_set_rejects() {
+        let approvers = (0..=MAX_THRESHOLD_APPROVAL_TOKENS)
+            .map(|index| {
+                let keypair = Keypair::generate();
+                approver(&format!("approver-{index}"), &keypair)
+            })
+            .collect();
+
+        let error = ThresholdApprovalRequirement::new(
+            "c".repeat(64),
+            1,
+            approvers,
+            "directory-v1".to_string(),
+            DEFAULT_THRESHOLD_APPROVAL_TIMEOUT_SECONDS,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("exceeds 32 approvers"));
     }
 }

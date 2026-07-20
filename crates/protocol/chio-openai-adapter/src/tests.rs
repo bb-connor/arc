@@ -1,6 +1,9 @@
 use super::*;
 use chio_core::capability::{
-    governance::GovernedTransactionIntent,
+    governance::{
+        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        GovernedTransactionIntent,
+    },
     scope::{ChioScope, Constraint, ModelSafetyTier, MonetaryAmount, Operation, ToolGrant},
 };
 use chio_core::crypto::Keypair;
@@ -658,6 +661,50 @@ fn execute_tool_calls_batch() {
     assert!(!results[1].denied);
     assert!(!results[0].preflight);
     assert!(!results[1].preflight);
+}
+
+#[test]
+fn execute_tool_calls_rejects_shared_threshold_approvals() {
+    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let kernel = ChioKernel::new(test_kernel_config());
+    let agent = Keypair::generate();
+    let approver = Keypair::generate();
+    let mut execution = test_execution_context(&kernel, &agent, "test-srv", "*");
+    execution.approval_tokens.push(
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: "approval-openai-batch".to_string(),
+                approver: approver.public_key(),
+                subject: agent.public_key(),
+                governed_intent_hash: "a".repeat(64),
+                request_id: "openai-call-weather".to_string(),
+                threshold_proposal_hash: Some("b".repeat(64)),
+                issued_at: 1,
+                expires_at: 2,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            &approver,
+        )
+        .unwrap(),
+    );
+    let calls = vec![
+        weather_tool_call(),
+        OpenAiToolCall {
+            id: "call_search".to_string(),
+            call_type: "function".to_string(),
+            function: OpenAiFunctionCall {
+                name: "search".to_string(),
+                arguments: r#"{"query": "test"}"#.to_string(),
+            },
+        },
+    ];
+
+    let results = adapter.execute_tool_calls(&calls, &kernel, &execution);
+
+    assert!(results.iter().all(|result| result.denied));
+    assert!(results
+        .iter()
+        .all(|result| result.content.contains("single OpenAI tool call")));
 }
 
 #[test]

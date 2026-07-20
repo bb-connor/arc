@@ -571,7 +571,7 @@ mod tests {
             DiscoveryProtocol::Native,
             AcpRequestIds {
                 origin_request_id: "acp-auth-set".to_string(),
-                kernel_request_id: "acp-kernel-auth-set".to_string(),
+                kernel_request_id: "acp-auth-set".to_string(),
             },
         )
         .test_expect("ACP request should project");
@@ -579,6 +579,36 @@ mod tests {
         assert_eq!(projected.approval_tokens, approvals);
         assert_eq!(projected.threshold_approval_proposal, Some(proposal));
         assert_eq!(projected.supplemental_authorization, Some(supplemental));
+        assert_eq!(projected.kernel_request_id, "acp-auth-set");
+    }
+
+    #[test]
+    fn generated_request_id_rejects_threshold_approvals() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = capability_for_tool(&issuer, &subject, "srv", "run");
+        let (approvals, proposal) = threshold_artifacts(&subject, "acp-auth-set");
+        let execution = AcpKernelExecutionContext {
+            capability,
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: approvals,
+            threshold_approval_proposal: Some(proposal),
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()])
+            .test_expect("ACP edge should construct");
+        let kernel = ChioKernel::new(test_kernel_config());
+
+        let error = edge
+            .invoke("run", serde_json::json!({}), &kernel, &execution)
+            .test_expect_err("generated request IDs must reject threshold approvals");
+
+        assert!(error.to_string().contains("invoke_with_request_id"));
     }
 
     fn dpop_proof_for_request(

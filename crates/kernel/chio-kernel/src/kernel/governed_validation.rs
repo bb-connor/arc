@@ -414,7 +414,8 @@ impl ChioKernel {
     ) -> Result<VerifiedThresholdApprovalSet, KernelError> {
         use std::collections::HashSet;
 
-        const MAX_APPROVAL_TOKENS: usize = 32;
+        const MAX_APPROVAL_TOKENS: usize =
+            chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
         if request.approval_tokens.is_empty() || request.approval_tokens.len() > MAX_APPROVAL_TOKENS
         {
             return Err(KernelError::GovernedTransactionDenied(format!(

@@ -38,9 +38,14 @@ fn validate_execution_context(execution: &AcpKernelExecutionContext) -> Result<(
             "ACP execution must not mix singular and threshold approval tokens".to_string(),
         ));
     }
-    if execution.approval_tokens.len() > 32 {
+    if execution.approval_tokens.len()
+        > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+    {
         return Err(AcpEdgeError::InvalidRequest(
-            "ACP threshold approval set exceeds 32 tokens".to_string(),
+            format!(
+                "ACP threshold approval set exceeds {} tokens",
+                chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+            ),
         ));
     }
     if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
@@ -68,6 +73,17 @@ fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
         ));
     }
     Ok(())
+}
+
+fn reject_threshold_approvals_without_stable_request_id(
+    execution: &AcpKernelExecutionContext,
+) -> Result<(), AcpEdgeError> {
+    if execution.approval_tokens.is_empty() {
+        return Ok(());
+    }
+    Err(AcpEdgeError::InvalidRequest(
+        "ACP threshold approvals require invoke_with_request_id".to_string(),
+    ))
 }
 
 impl ChioAcpEdge {
@@ -382,6 +398,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
         validate_execution_context(execution)?;
+        reject_threshold_approvals_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = Self::build_execution_request(
@@ -393,6 +410,32 @@ impl ChioAcpEdge {
             AcpRequestIds {
                 origin_request_id: format!("acp-request-{capability_id}-{request_suffix}"),
                 kernel_request_id: format!("acp-{capability_id}-{request_suffix}"),
+            },
+        )?;
+        let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
+        Ok(acp_invocation_result_from_orchestrated(orchestrated))
+    }
+
+    /// Invoke a capability with the stable request ID bound into threshold approvals.
+    pub fn invoke_with_request_id(
+        &self,
+        request_id: &str,
+        capability_id: &str,
+        arguments: Value,
+        kernel: &ChioKernel,
+        execution: &AcpKernelExecutionContext,
+    ) -> Result<AcpInvocationResult, AcpEdgeError> {
+        validate_execution_context(execution)?;
+        let binding = self.capability_binding(capability_id)?;
+        let request = Self::build_execution_request(
+            capability_id,
+            arguments,
+            execution,
+            &binding,
+            binding.target_protocol,
+            AcpRequestIds {
+                origin_request_id: format!("acp-request-{request_id}"),
+                kernel_request_id: request_id.to_string(),
             },
         )?;
         let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
@@ -414,6 +457,7 @@ impl ChioAcpEdge {
         reason: impl Into<String>,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
         validate_execution_context(execution)?;
+        reject_threshold_approvals_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = Self::build_execution_request(
@@ -449,6 +493,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
         validate_execution_context(execution)?;
+        reject_threshold_approvals_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = Self::build_execution_request(
@@ -848,6 +893,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
         validate_execution_context(execution)?;
+        reject_threshold_approvals_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();

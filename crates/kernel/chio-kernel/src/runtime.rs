@@ -120,10 +120,13 @@ impl ToolCallRequest {
                 ))
             };
         }
-        if self.approval_tokens.len() > 32 {
-            return Err(chio_core::Error::CanonicalJson(
-                "threshold approval set exceeds 32 tokens".to_string(),
-            ));
+        if self.approval_tokens.len()
+            > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+        {
+            return Err(chio_core::Error::CanonicalJson(format!(
+                "threshold approval set exceeds {} tokens",
+                chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+            )));
         }
         let proposal = self.threshold_approval_proposal.as_ref().ok_or_else(|| {
             chio_core::Error::CanonicalJson(
