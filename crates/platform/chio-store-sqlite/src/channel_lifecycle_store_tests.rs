@@ -40,6 +40,12 @@ fn fixture() -> TestResult<Fixture> {
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
     let store = authority.channel_lifecycle_store();

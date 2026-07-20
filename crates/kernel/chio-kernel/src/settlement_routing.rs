@@ -246,6 +246,21 @@ pub(crate) fn record_unresolved_claim_failure(receipt_id: &str, error: &Settleme
     );
 }
 
+/// Record an attempt row that this transaction seeded but could not then observe.
+///
+/// The row stays due for a later claim, so this is not a failure of the receipt
+/// write; it is work that no worker has picked up yet.
+pub(crate) fn record_unresolved_claim_missed(receipt_id: &str) {
+    record_unresolved_claim_missed_with_metrics(receipt_id, &RuntimeSettlementRoutingMetrics);
+}
+
+fn record_unresolved_claim_missed_with_metrics(
+    receipt_id: &str,
+    metrics: &dyn SettlementRoutingMetrics,
+) {
+    record_unresolved(receipt_id, "claim", "claim_missed", metrics);
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{
@@ -767,6 +782,15 @@ mod tests {
         let claim_metrics = FakeRoutingMetrics::default();
         record_unresolved("receipt-1", "claim", "backend_error", &claim_metrics);
         assert_eq!(claim_metrics.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn an_unclaimed_attempt_row_is_reported_as_unresolved() {
+        let metrics = FakeRoutingMetrics::default();
+
+        record_unresolved_claim_missed_with_metrics("receipt-1", &metrics);
+
+        assert_eq!(metrics.calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]

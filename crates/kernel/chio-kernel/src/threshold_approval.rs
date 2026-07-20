@@ -329,6 +329,24 @@ impl ThresholdApprovalCollector {
                 "threshold approval proposal is stale for the active policy".to_string(),
             ));
         }
+        // A token may expire well before the proposal deadline, so the set that was
+        // quorate at submission is not necessarily quorate now. Re-check every token
+        // and the quorum count rather than delivering a set the kernel will reject.
+        for token in &record.tokens {
+            token.validate_time(now).map_err(|error| {
+                ThresholdApprovalCollectorStoreError::Conflict(error.to_string())
+            })?;
+        }
+        let threshold = usize::try_from(record.requirement.threshold).map_err(|_| {
+            ThresholdApprovalCollectorStoreError::Conflict(
+                "threshold approval quorum does not fit this platform".to_string(),
+            )
+        })?;
+        if record.tokens.len() < threshold {
+            return Err(ThresholdApprovalCollectorStoreError::Conflict(
+                "threshold approval quorum is no longer satisfied".to_string(),
+            ));
+        }
         let delivered = self.store.transition(
             proposal_id,
             record.version,
@@ -558,6 +576,15 @@ mod tests {
         approver: &Keypair,
         token_id: &str,
     ) -> GovernedApprovalToken {
+        token_expiring_at(proposal, approver, token_id, 199)
+    }
+
+    fn token_expiring_at(
+        proposal: &ThresholdApprovalProposal,
+        approver: &Keypair,
+        token_id: &str,
+        expires_at: u64,
+    ) -> GovernedApprovalToken {
         GovernedApprovalToken::sign(
             GovernedApprovalTokenBody {
                 id: token_id.to_string(),
@@ -567,7 +594,7 @@ mod tests {
                 request_id: proposal.body.request_id.clone(),
                 threshold_proposal_hash: Some(proposal.artifact_digest().unwrap()),
                 issued_at: 101,
-                expires_at: 199,
+                expires_at,
                 decision: GovernedApprovalDecision::Approved,
             },
             approver,
@@ -694,5 +721,51 @@ mod tests {
                 112,
             )
             .is_err());
+    }
+
+    // Token expiry is bounded above by the proposal deadline but not below, so a
+    // set that was quorate at submission can hold expired tokens by delivery time
+    // while the proposal itself is still valid.
+    #[test]
+    fn delivery_rejects_a_quorum_whose_tokens_expired_after_submission() {
+        let fixture = fixture();
+        let proposal = proposal(&fixture, "expiring");
+        fixture
+            .collector
+            .create_proposal(
+                proposal.clone(),
+                fixture.requirement.clone(),
+                None,
+                false,
+                100,
+            )
+            .unwrap();
+
+        fixture
+            .collector
+            .submit_token(
+                "expiring",
+                token_expiring_at(&proposal, &fixture.alice, "token-alice", 120),
+                110,
+            )
+            .unwrap();
+        let ready = fixture
+            .collector
+            .submit_token(
+                "expiring",
+                token_expiring_at(&proposal, &fixture.bob, "token-bob", 120),
+                110,
+            )
+            .unwrap();
+        assert_eq!(ready.state, ThresholdApprovalCollectorState::Ready);
+
+        // The proposal deadline is 200, so only the tokens have lapsed here.
+        let expired = fixture.collector.deliver("expiring", 150).unwrap_err();
+        assert!(
+            expired.to_string().contains("capability expired"),
+            "delivery must reject lapsed tokens; got: {expired}"
+        );
+        let stored = fixture.collector.get_proposal("expiring").unwrap().unwrap();
+        assert_eq!(stored.state, ThresholdApprovalCollectorState::Ready);
     }
 }

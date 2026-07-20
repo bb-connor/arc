@@ -1,7 +1,9 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
+use chio_log_redact::redacted;
 use serde::Serialize;
+use tracing::warn;
 
 #[path = "admission_coordinator/terminal.rs"]
 mod terminal;
@@ -367,6 +369,11 @@ impl ChioKernel {
         };
         let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
         let mut reconciled = 0_usize;
+        // An operation that cannot be reconciled is recorded and skipped rather
+        // than abandoning the sweep, so one wedged operation cannot hold up every
+        // other recoverable operation. The first failure is still returned once
+        // the sweep finishes, so callers keep failing closed on it.
+        let mut deferred_failure: Option<KernelError> = None;
         loop {
             let recoverable = runtime
                 .store
@@ -384,44 +391,18 @@ impl ChioKernel {
             for operation in recoverable {
                 match operation.state() {
                     AdmissionOperationState::DispatchCommitted => {
-                        let _mutation_guard = runtime.lock_mutations()?;
-                        if runtime
-                            .outcome_store
-                            .lookup_by_operation(operation.binding().operation_id())
-                            .map_err(durable_outcome_store_error)?
-                            .is_some()
-                        {
-                            return Err(KernelError::DurableAdmission(
-                                "dispatch-committed admission already has a durable tool outcome"
-                                    .to_owned(),
-                            ));
-                        }
-                        let lease =
-                            self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
-                        let context = AdmissionProjectionContext {
-                            operation_id: operation.binding().operation_id().clone(),
-                            request_id: operation.binding().request_id().clone(),
-                            expected_operation_version: operation.version(),
-                            trusted_time_unix_ms: trusted_now_unix_ms,
-                            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-                            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-                            store_fence: runtime.fence.clone(),
-                        };
-                        let projection = verified_outcome_unknown_after_dispatch_projection(
-                            &operation, context,
-                        )?;
-                        let terminal = runtime
-                            .store
-                            .commit_admission_projection(&projection)
-                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                        if terminal.operation_id != *operation.binding().operation_id()
-                            || terminal.state
-                                != AdmissionOperationState::OutcomeUnknownAfterDispatch
-                        {
-                            return Err(KernelError::DurableAdmission(
-                                "admission recovery committed a different terminal operation"
-                                    .to_owned(),
-                            ));
+                        if let Err(error) = self.terminalize_dispatch_committed_admission(
+                            &operation,
+                            trusted_now_unix_ms,
+                        ) {
+                            warn!(
+                                operation_id = %operation.binding().operation_id().as_str(),
+                                reason = %redacted!(&error),
+                                audit_fault = "admission_recovery_terminalization_unresolved",
+                                "failed to terminalize a dispatch-committed admission"
+                            );
+                            deferred_failure.get_or_insert(error);
+                            continue;
                         }
                         reconciled = reconciled.checked_add(1).ok_or_else(|| {
                             KernelError::DurableAdmission(
@@ -435,14 +416,26 @@ impl ChioKernel {
                     | AdmissionOperationState::ApprovalReserved
                     | AdmissionOperationState::ReadyToDispatch
                     | AdmissionOperationState::CapturePending => {
-                        self.compensate_durable_admission_before_dispatch(
+                        // One operation that cannot be compensated must not abandon
+                        // the rest of the page: it stays recoverable for a later
+                        // sweep, and the remaining operations still reconcile.
+                        if let Err(error) = self.compensate_durable_admission_before_dispatch(
                             &operation,
                             serde_json::json!({
                                 "authority": "startup-recovery",
                                 "cause": "no-authoritative-budget-participant"
                             }),
                             trusted_now_unix_ms,
-                        )?;
+                        ) {
+                            warn!(
+                                operation_id = %operation.binding().operation_id().as_str(),
+                                reason = %redacted!(&error),
+                                audit_fault = "admission_recovery_compensation_unresolved",
+                                "failed to compensate a recoverable admission"
+                            );
+                            deferred_failure.get_or_insert(error);
+                            continue;
+                        }
                         reconciled = reconciled.checked_add(1).ok_or_else(|| {
                             KernelError::DurableAdmission(
                                 "admission recovery count overflow".to_owned(),
@@ -466,7 +459,20 @@ impl ChioKernel {
                             )?;
                             continue;
                         };
-                        self.finalize_durable_tool_return(&mut admission, &request, &tool_return)?;
+                        if let Err(error) = self.finalize_durable_tool_return(
+                            &mut admission,
+                            &request,
+                            &tool_return,
+                        ) {
+                            warn!(
+                                operation_id = %admission.operation.binding().operation_id().as_str(),
+                                reason = %redacted!(&error),
+                                audit_fault = "admission_recovery_finalization_unresolved",
+                                "failed to finalize a recoverable admission"
+                            );
+                            deferred_failure.get_or_insert(error);
+                            continue;
+                        }
                         reconciled = reconciled.checked_add(1).ok_or_else(|| {
                             KernelError::DurableAdmission(
                                 "admission recovery count overflow".to_owned(),
@@ -482,7 +488,59 @@ impl ChioKernel {
                 break;
             }
         }
+        if let Some(error) = deferred_failure {
+            return Err(error);
+        }
         Ok(reconciled)
+    }
+
+    /// Terminalize a dispatch-committed admission whose outcome is unknown.
+    ///
+    /// Refuses when a durable tool outcome already exists, so this is a no-op on
+    /// an operation whose return did land. Used both by startup recovery and by
+    /// the post-dispatch drop path, where the evaluation future was cancelled
+    /// after the dispatch commit and would otherwise strand the operation until
+    /// the next process restart.
+    pub(crate) fn terminalize_dispatch_committed_admission(
+        &self,
+        operation: &AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        if runtime
+            .outcome_store
+            .lookup_by_operation(operation.binding().operation_id())
+            .map_err(durable_outcome_store_error)?
+            .is_some()
+        {
+            return Err(KernelError::DurableAdmission(
+                "dispatch-committed admission already has a durable tool outcome".to_owned(),
+            ));
+        }
+        let lease = self.claim_admission_recovery(operation, trusted_now_unix_ms)?;
+        let context = AdmissionProjectionContext {
+            operation_id: operation.binding().operation_id().clone(),
+            request_id: operation.binding().request_id().clone(),
+            expected_operation_version: operation.version(),
+            trusted_time_unix_ms: trusted_now_unix_ms,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            store_fence: runtime.fence.clone(),
+        };
+        let projection = verified_outcome_unknown_after_dispatch_projection(operation, context)?;
+        let terminal = runtime
+            .store
+            .commit_admission_projection(&projection)
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        if terminal.operation_id != *operation.binding().operation_id()
+            || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
+        {
+            return Err(KernelError::DurableAdmission(
+                "admission recovery committed a different terminal operation".to_owned(),
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn begin_durable_tool_admission(

@@ -320,6 +320,16 @@ impl ChioKernel {
         Ok(())
     }
 
+    /// Resolve the signed root token that the negotiated family-budget verifiers
+    /// require for a delegated capability.
+    ///
+    /// Migration prerequisite: once a peer negotiates either family budget feature,
+    /// every delegated capability from that peer needs a receipt-store snapshot
+    /// carrying `signed_capability` for its root. Snapshots written before signed
+    /// token retention carry no signed token, so enabling a feature against a store
+    /// that still holds them denies those capabilities with "has no signed token
+    /// evidence", which is distinct from the missing-row and tamper reasons.
+    /// Backfill signed root snapshots before turning either feature on.
     pub(crate) fn negotiated_capability_root(
         &self,
         cap: &CapabilityToken,

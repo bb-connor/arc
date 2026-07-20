@@ -1405,6 +1405,15 @@ impl ChioKernel {
 
         let mustprepay_prepaid_units = Self::mustprepay_prepaid_units(intent);
         if let Some(prepaid_units) = mustprepay_prepaid_units {
+            // The pre-execution budget debit is the per-invocation ceiling, so a grant that
+            // declares only a cumulative ceiling debits nothing and never advances its own
+            // total. Prepayment against that shape cannot be accounted across calls.
+            if grant.max_cost_per_invocation.is_none() && grant.max_total_cost.is_some() {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "MustPrepay against a cumulative-only grant cannot be accounted; declare max_cost_per_invocation"
+                        .to_string(),
+                ));
+            }
             for (limit_name, limit) in [
                 ("per-invocation", grant.max_cost_per_invocation.as_ref()),
                 ("cumulative", grant.max_total_cost.as_ref()),

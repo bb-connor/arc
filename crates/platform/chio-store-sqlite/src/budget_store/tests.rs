@@ -1458,6 +1458,12 @@ fn sqlite_store_reports_truthful_single_node_guarantee_level() {
     use chio_kernel::budget_store::{BudgetGuaranteeLevel, BudgetStore};
     let dir = std::env::temp_dir().join(format!("chio-glevel-{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&dir).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     let store = SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap();
     assert_eq!(
         store.budget_guarantee_level(),
@@ -1477,6 +1483,12 @@ fn reap_orphaned_holds_is_reachable_through_budget_store_trait() {
 
     let dir = std::env::temp_dir().join(format!("chio-reap-trait-{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&dir).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     let store = SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap();
 
     // Authorize a hold so there is an open hold to reap.
@@ -1531,6 +1543,12 @@ fn open_hold_stays_reserved_without_reap() {
 
     let dir = std::env::temp_dir().join(format!("chio-noreap-{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&dir).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     let store: Arc<dyn BudgetStore> =
         Arc::new(SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap());
 

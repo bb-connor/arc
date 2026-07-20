@@ -73,6 +73,10 @@ pub trait ToolEvaluator: Send + Sync {
     /// Direct phase dispatch is unavailable because it cannot retain the
     /// admission operation, compensation, outcome, and receipt as one durable
     /// lifecycle. Use [`ToolEvaluator::evaluate`] instead.
+    ///
+    /// This default denies every direct dispatch, not only monetary ones.
+    /// Implementors that override `dispatch` are unaffected; those that relied on
+    /// the default should read `docs/migrations/kernel-embedder-surface.md`.
     async fn dispatch(
         &self,
         kernel: &ChioKernel,

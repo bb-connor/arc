@@ -219,6 +219,12 @@ impl ChioKernel {
                             self.config.deadlines.receipt_append_budget(),
                         )?,
                     )
+                })
+                .inspect_err(|_| {
+                    // The critical write is inflight-preserving on expiry, so the
+                    // attempt row may still commit after this caller gives up.
+                    // Surface it as due work instead of losing it on the timeout.
+                    crate::settlement_routing::record_unresolved_claim_missed(&receipt.id);
                 })?;
             } else {
                 // Bound the commit round trip so a wedged writer cannot pin
@@ -243,7 +249,13 @@ impl ChioKernel {
         let claim_now_ms = current_unix_timestamp_ms().max(next_visible_at_ms);
         let claim = match runtime.claim_receipt(&receipt.id, receipt.timestamp, claim_now_ms) {
             Ok(Some(claim)) => claim,
-            Ok(None) => return Ok(()),
+            Ok(None) => {
+                // The attempt row this transaction seeded is already leased or in
+                // an unexpected state. It stays due for a later claim, so surface
+                // the miss rather than dropping it silently.
+                crate::settlement_routing::record_unresolved_claim_missed(&receipt.id);
+                return Ok(());
+            }
             Err(error) => {
                 crate::settlement_routing::record_unresolved_claim_failure(&receipt.id, &error);
                 return Ok(());

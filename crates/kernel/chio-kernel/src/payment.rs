@@ -77,6 +77,14 @@ impl PaymentJournalState {
                 PaymentRailMode::ReversibleHold,
                 Self::Settling,
                 Self::Settled | Self::ReconcileFailed
+            ) | (
+                // A reconciliation failure records that the rail rejected the
+                // settlement intent, not that the intent is abandoned. The journal
+                // retains its settle action and authorization, so a later pass can
+                // re-drive the same intent to completion.
+                PaymentRailMode::ReversibleHold,
+                Self::ReconcileFailed,
+                Self::Settled
             ) | (_, Self::Settled, Self::Closed)
                 | (_, Self::HoldPlaced, Self::Closed)
                 | (
@@ -376,9 +384,13 @@ impl PaymentJournalRecord {
                 PaymentJournalState::Settling
             }
             PaymentJournalTransition::SettlementCompleted { transaction_id } => {
-                if self.state != PaymentJournalState::Settling {
+                if !matches!(
+                    self.state,
+                    PaymentJournalState::Settling | PaymentJournalState::ReconcileFailed
+                ) {
                     return Err(PaymentJournalError(
-                        "settlement completion requires a settling journal".to_owned(),
+                        "settlement completion requires a settling or reconcile_failed journal"
+                            .to_owned(),
                     ));
                 }
                 next.transaction_id = Some(transaction_id.clone());
@@ -1305,6 +1317,56 @@ mod tests {
             .can_advance_to(PaymentJournalState::Closed, PaymentRailMode::ReversibleHold));
         assert!(!PaymentJournalState::Authorized
             .can_advance_to(PaymentJournalState::Closed, PaymentRailMode::ReversibleHold));
+    }
+
+    #[test]
+    fn payment_journal_reconcile_failure_replays_its_settlement_intent() {
+        let settling = hold_placed_payment_journal()
+            .apply_transition(&PaymentJournalTransition::AuthorizationHeld {
+                authorization_id: "authorization-1".to_owned(),
+            })
+            .expect("record held authorization")
+            .apply_transition(&PaymentJournalTransition::BeginCapture { amount_units: 75 })
+            .expect("record capture intent");
+        let failed = settling
+            .apply_transition(&PaymentJournalTransition::ReconcileFailed)
+            .expect("record reconciliation failure");
+
+        // The intent survives the seal, so a later pass has everything it needs.
+        assert_eq!(failed.state, PaymentJournalState::ReconcileFailed);
+        assert_eq!(failed.settle_action, Some(PaymentSettleAction::Capture));
+        assert_eq!(failed.settle_amount_units, Some(75));
+        assert_eq!(failed.authorization_id.as_deref(), Some("authorization-1"));
+        assert_eq!(failed.validate(), Ok(()));
+
+        let settled = failed
+            .apply_transition(&PaymentJournalTransition::SettlementCompleted {
+                transaction_id: "transaction-1".to_owned(),
+            })
+            .expect("retry a reconcile_failed settlement");
+
+        assert_eq!(settled.state, PaymentJournalState::Settled);
+        assert_eq!(settled.transaction_id.as_deref(), Some("transaction-1"));
+        assert_eq!(settled.validate(), Ok(()));
+    }
+
+    #[test]
+    fn payment_journal_reconcile_failure_stays_sealed_for_final_prepayment() {
+        let mut record = hold_placed_payment_journal();
+        record.rail = "x402".to_owned();
+        record.rail_mode = PaymentRailMode::PrepaidFinal;
+        let failed = record
+            .apply_transition(&PaymentJournalTransition::ReconcileFailed)
+            .expect("record reconciliation failure");
+
+        // A final prepayment carries no replayable settle intent, so the seal holds.
+        assert!(!PaymentJournalState::ReconcileFailed
+            .can_advance_to(PaymentJournalState::Settled, PaymentRailMode::PrepaidFinal));
+        assert!(failed
+            .apply_transition(&PaymentJournalTransition::SettlementCompleted {
+                transaction_id: "transaction-1".to_owned(),
+            })
+            .is_err());
     }
 
     #[test]

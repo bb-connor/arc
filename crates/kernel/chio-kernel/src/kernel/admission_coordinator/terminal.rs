@@ -986,8 +986,15 @@ impl ChioKernel {
         if journal.state == crate::payment::PaymentJournalState::Settled {
             return Ok(Some(journal));
         }
+        // A journal sealed as reconcile_failed still carries its settle action and
+        // authorization, so the same intent is re-driven against the rail rather
+        // than leaving the operation non-terminal with its hold already reconciled.
         if journal.rail_mode != crate::payment::PaymentRailMode::ReversibleHold
-            || journal.state != crate::payment::PaymentJournalState::Settling
+            || !matches!(
+                journal.state,
+                crate::payment::PaymentJournalState::Settling
+                    | crate::payment::PaymentJournalState::ReconcileFailed
+            )
         {
             return Err(KernelError::DurableAdmission(
                 "payment journal has no replayable settlement intent".to_owned(),
@@ -1059,19 +1066,21 @@ impl ChioKernel {
         if result.settlement_status == crate::payment::RailSettlementStatus::Pending {
             return Ok(None);
         }
-        let transition = crate::payment::PaymentJournalTransition::ReconcileFailed;
-        runtime
-            .store
-            .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                operation,
-                recovery_lease: lease,
-                expected: &journal,
-                transition: &transition,
-                release_evidence: None,
-                active_fence: &runtime.fence,
-                trusted_now_unix_ms,
-            })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        if journal.state != crate::payment::PaymentJournalState::ReconcileFailed {
+            let transition = crate::payment::PaymentJournalTransition::ReconcileFailed;
+            runtime
+                .store
+                .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
+                    operation,
+                    recovery_lease: lease,
+                    expected: &journal,
+                    transition: &transition,
+                    release_evidence: None,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        }
         Err(KernelError::DurableAdmission(
             "payment rail returned an incompatible settlement status".to_owned(),
         ))

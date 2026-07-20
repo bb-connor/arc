@@ -541,6 +541,12 @@ fn store_fixture() -> TestResult<StoreFixture> {
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     Ok(StoreFixture {
         _temp: temp,

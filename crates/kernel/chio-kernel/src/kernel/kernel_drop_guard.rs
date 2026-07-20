@@ -6,8 +6,9 @@ use crate::admission_operation::AdmissionOperationV1;
 use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCallRequest};
 
 use super::{
-    current_unix_timestamp, merge_metadata_objects, scope_pre_invocation_guard_evidence,
-    ChioKernel, KernelError, PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
+    current_unix_timestamp, current_unix_timestamp_ms, merge_metadata_objects,
+    scope_pre_invocation_guard_evidence, ChioKernel, KernelError, PreExecutionBudgetMutation,
+    VerifiedGovernedPayeeBinding,
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
@@ -456,6 +457,24 @@ impl Drop for PostAdmissionDropGuard<'_> {
                 audit_fault = "post_admission_drop_receipt_unrecorded",
                 "failed to record cancellation receipt for dropped post-admission invocation"
             );
+        }
+
+        // The dispatch commit landed but the return never did, so the operation
+        // would stay non-terminal and reject every replay of this request id
+        // until the next startup sweep. Terminalizing here refuses if a durable
+        // outcome exists, so it cannot overwrite a return that did complete.
+        if let Some(operation) = self.durable_operation {
+            if let Err(error) = self
+                .kernel
+                .terminalize_dispatch_committed_admission(operation, current_unix_timestamp_ms())
+            {
+                warn!(
+                    request_id = %self.request.request_id,
+                    reason = %redacted!(&error),
+                    audit_fault = "post_admission_drop_admission_unterminalized",
+                    "failed to terminalize dropped post-dispatch admission"
+                );
+            }
         }
     }
 }

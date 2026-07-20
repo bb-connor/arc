@@ -3258,6 +3258,12 @@ fn read_only_health_floors_committed_at_watermark() -> Result<(), Box<dyn std::e
 fn rotation_records_absolute_archive_path() -> Result<(), Box<dyn std::error::Error>> {
     let dir = unique_db_path("abs-archive-dir");
     std::fs::create_dir_all(&dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     let real_archive = dir.join("archive.sqlite3");
     let link = dir.join("dirlink");
     std::os::unix::fs::symlink(&dir, &link)?;

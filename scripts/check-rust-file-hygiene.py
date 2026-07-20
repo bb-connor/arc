@@ -219,7 +219,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs": allow(
         "2026-07-31",
         "receipt retention regression suite; capped to current size until split",
-        max_lines=4_582,
+        max_lines=4_588,
     ),
     "crates/trust/chio-federation-transport-iroh/src/lanes/pheromone.rs": allow(
         "2026-07-31",

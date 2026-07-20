@@ -174,11 +174,20 @@ fn owned<T: AuthorityBoundRequest>(store: &SqliteBudgetStore, mut request: T) ->
     request
 }
 
+fn secure_create_dir_all(path: &Path, context: &'static str) {
+    fs::create_dir_all(path).expect(context);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("secure directory");
+    }
+}
+
 fn reopen(path: &Path) -> SqliteBudgetStore {
-    fs::create_dir_all(path).expect("create authority root");
+    secure_create_dir_all(path, "create authority root");
     let database = path.join("authority.sqlite3");
     let lock_root = path.join("locks");
-    fs::create_dir_all(&lock_root).expect("create lock root");
+    secure_create_dir_all(&lock_root, "create lock root");
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     SqliteAuthorityStore::open_serving(&database, &lock_root)
         .expect("open serving authority")
@@ -479,7 +488,7 @@ fn every_quota_participant_exhausts_atomically_and_maximum_is_immutable() {
 #[test]
 fn provision_refuses_populated_legacy_budget_state() {
     let path = unique_db_path("chio-composite-legacy-quota");
-    fs::create_dir_all(&path).expect("create legacy authority root");
+    secure_create_dir_all(&path, "create legacy authority root");
     let database = path.join("authority.sqlite3");
     {
         let legacy = SqliteBudgetStore::open(&database).expect("open legacy store");
@@ -490,7 +499,7 @@ fn provision_refuses_populated_legacy_budget_state() {
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
         .expect("secure legacy database mode");
     let lock_root = path.join("locks");
-    fs::create_dir_all(&lock_root).expect("create lock root");
+    secure_create_dir_all(&lock_root, "create lock root");
 
     let error = SqliteAuthorityStore::provision(&database, &lock_root)
         .expect_err("populated legacy safety state must not acquire an unproven baseline");

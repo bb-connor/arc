@@ -1093,6 +1093,11 @@ impl ChioKernel {
                 verified_payee_binding: verified_governed_payee_binding.clone(),
             },
             budget_lease_acquired,
+        )
+        .with_durable_operation(
+            durable_admission
+                .as_ref()
+                .map(DurableToolAdmission::operation),
         );
         post_admission_drop_guard.mark_dispatch_started();
         let dispatch_result = self

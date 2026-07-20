@@ -881,6 +881,12 @@ impl ChioKernel {
     /// seed pending settlement work within the configured receipt-append
     /// deadline. The store and runtime may be configured in either order;
     /// attaching an incompatible store fails without replacing the active one.
+    ///
+    /// The returned error must not be discarded: swallowing it leaves the kernel
+    /// dispatching charges with settlement uninstalled. Embedders porting from
+    /// `set_settlement_observer` should read
+    /// `docs/migrations/kernel-embedder-surface.md`, which lists the receipt-store
+    /// capabilities this requires and the configuration failure modes.
     pub fn set_settlement_observer_runtime(
         &mut self,
         hook: Arc<dyn chio_settle::SettlementHook>,

@@ -972,6 +972,11 @@ impl ChioKernel {
                 verified_payee_binding: verified_governed_payee_binding.clone(),
             },
             budget_lease_acquired,
+        )
+        .with_durable_operation(
+            durable_admission
+                .as_ref()
+                .map(DurableToolAdmission::operation),
         );
         // Mark dispatch started before lending the child-receipt buffer to the
         // bridge: the bridge borrows the guard for the whole dispatch block, so

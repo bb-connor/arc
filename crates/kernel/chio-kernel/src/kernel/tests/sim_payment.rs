@@ -157,6 +157,94 @@ fn governed_mustprepay_without_adapter_is_denied_end_to_end() {
     );
 }
 
+// A quote above the grant's per-invocation ceiling must deny before the rail is
+// touched: the pre-execution hold debits that ceiling, so a larger prepayment
+// would move more money than the budget layer ever accounts for.
+#[test]
+fn governed_mustprepay_quote_above_per_invocation_ceiling_is_denied() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-over-per-call", "cost-srv", "compute", 500, "USD");
+    let request = mustprepay_tool_call("req-over-per-call", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("exceeds the grant per-invocation cost limit"),
+        "denial must name the per-invocation ceiling; got: {reason}"
+    );
+}
+
+// The cumulative ceiling bounds the quote too, even where the per-invocation
+// ceiling admits it.
+#[test]
+fn governed_mustprepay_quote_above_cumulative_ceiling_is_denied() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    // The quote matches the per-invocation ceiling exactly, so only the
+    // cumulative ceiling can reject it.
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 500, 100, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-over-total", "cost-srv", "compute", 500, "USD");
+    let request = mustprepay_tool_call("req-over-total", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("exceeds the grant cumulative cost limit"),
+        "denial must name the cumulative ceiling; got: {reason}"
+    );
+}
+
+// A grant declaring only a cumulative ceiling debits nothing per call, so its
+// stated total authority would never bind across repeated prepayments.
+#[test]
+fn governed_mustprepay_against_cumulative_only_grant_is_denied() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let mut grant = make_no_ceiling_mustprepay_grant();
+    grant.max_total_cost = Some(MonetaryAmount { units: 1000, currency: "USD".to_string() });
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-total-only", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-total-only", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("cumulative-only grant cannot be accounted"),
+        "denial must name the unaccountable cumulative-only shape; got: {reason}"
+    );
+}
+
 // The server reports zero actual cost after MustPrepay captured the quoted amount.
 // The receipt retains that final prepayment rather than claiming a release after
 // dispatch may already have occurred.

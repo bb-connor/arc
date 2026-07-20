@@ -40,6 +40,12 @@ fn fixture() -> Fixture {
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root).expect("create lock root");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
         SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
@@ -982,6 +988,12 @@ fn operation_bound_stage_expiry_is_durable_and_ijson_bounded() -> TestResult {
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))
+            .expect("secure directory");
+    }
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();

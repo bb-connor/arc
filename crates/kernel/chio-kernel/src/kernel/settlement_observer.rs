@@ -197,6 +197,12 @@ pub fn build_observation(
             "positive cost_charged requires a currency",
         );
     };
+    // ISO 4217 alphabetic codes are the money path's invariant, enforced identically
+    // on the charge path, payment journal, cumulative approval, receipt query, and
+    // channel and EVM settlement. A code that does not conform is malformed metadata
+    // rather than a new denomination, so classifying it permanent is correct. A
+    // backfill that enrolls receipts written before this rule must revisit this
+    // classification first, since those receipts were accepted without a format check.
     if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
         return permanent(
             SettlementFailureCode::MalformedFinancialMetadata,
