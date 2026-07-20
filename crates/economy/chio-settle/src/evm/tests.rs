@@ -1612,10 +1612,10 @@ async fn prepare_merkle_release_and_dual_sign_release_cover_full_and_partial_pat
         &dual_config,
         &dual_dispatch,
         &receipt,
-        &DualSignReleaseInput {
-            operator_private_key_hex: operator_private_key.to_string(),
-            observed_amount: dual_dispatch.settlement_amount.clone(),
-        },
+        &DualSignReleaseInput::new(
+            operator_private_key,
+            dual_dispatch.settlement_amount.clone(),
+        ),
     )
     .await
     .test_expect("dual-sign release should prepare");
@@ -1694,10 +1694,10 @@ async fn dual_sign_release_rejects_identity_registry_key_hash_mismatch() {
         &config,
         &dual_dispatch,
         &receipt,
-        &DualSignReleaseInput {
-            operator_private_key_hex: operator_private_key.to_string(),
-            observed_amount: dual_dispatch.settlement_amount.clone(),
-        },
+        &DualSignReleaseInput::new(
+            operator_private_key,
+            dual_dispatch.settlement_amount.clone(),
+        ),
     )
     .await
     .test_expect_err("registry key hash mismatch should block dual-sign prep");
@@ -1727,10 +1727,10 @@ async fn dual_sign_release_rejects_unpinned_registry_block() {
         &config,
         &dual_dispatch,
         &receipt,
-        &DualSignReleaseInput {
-            operator_private_key_hex: operator_private_key.to_string(),
-            observed_amount: dual_dispatch.settlement_amount.clone(),
-        },
+        &DualSignReleaseInput::new(
+            operator_private_key,
+            dual_dispatch.settlement_amount.clone(),
+        ),
     )
     .await
     .test_expect_err("missing registry block hash should block dual-sign prep");

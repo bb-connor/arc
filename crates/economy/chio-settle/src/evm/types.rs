@@ -148,11 +148,53 @@ pub struct EvmSignature {
     pub s: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct DualSignReleaseInput {
-    pub operator_private_key_hex: String,
+    pub(super) operator_private_key_hex: zeroize::Zeroizing<String>,
     pub observed_amount: MonetaryAmount,
+}
+
+impl DualSignReleaseInput {
+    #[must_use]
+    pub fn new(
+        operator_private_key_hex: impl Into<String>,
+        observed_amount: MonetaryAmount,
+    ) -> Self {
+        Self {
+            operator_private_key_hex: zeroize::Zeroizing::new(operator_private_key_hex.into()),
+            observed_amount,
+        }
+    }
+}
+
+impl std::fmt::Debug for DualSignReleaseInput {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DualSignReleaseInput")
+            .field("operator_private_key_hex", &"[REDACTED]")
+            .field("observed_amount", &self.observed_amount)
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod dual_sign_release_input_tests {
+    use super::*;
+
+    #[test]
+    fn debug_redacts_operator_private_key() {
+        let input = DualSignReleaseInput::new(
+            "private-key-material",
+            MonetaryAmount {
+                units: 1,
+                currency: "USD".to_string(),
+            },
+        );
+
+        let debug = format!("{input:?}");
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("private-key-material"));
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

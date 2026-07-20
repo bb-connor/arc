@@ -116,7 +116,14 @@ impl SettlementObserverRuntime {
                 Ok(SettlementRoute::NoAction)
             )
         );
-        if !clean {
+        let benign_conflict = matches!(route, Err(SettlementRouteError::Conflict { .. }));
+        if benign_conflict {
+            tracing::debug!(
+                receipt_id = claim.receipt_id.as_str(),
+                outcome_class,
+                "settlement outcome lost a claim race"
+            );
+        } else if !clean {
             record_unresolved(
                 &claim.receipt_id,
                 outcome_class,
@@ -269,6 +276,7 @@ mod tests {
         fn observe(
             &self,
             _observation: &SettlementObservation,
+            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             Ok(SettlementOutcome::accepted("noop"))
         }
@@ -736,7 +744,7 @@ mod tests {
                 Err(SettlementRouteError::Conflict {
                     detail: "stale lease".to_string(),
                 }),
-                1,
+                0,
                 1,
             ),
         ];

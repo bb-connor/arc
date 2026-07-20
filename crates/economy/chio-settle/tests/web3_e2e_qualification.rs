@@ -841,10 +841,7 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
         &config,
         &dual_dispatch.dispatch,
         &dual_receipt,
-        &DualSignReleaseInput {
-            operator_private_key_hex: OPERATOR_PRIVATE_KEY.to_string(),
-            observed_amount: dual_amount.clone(),
-        },
+        &DualSignReleaseInput::new(OPERATOR_PRIVATE_KEY, dual_amount.clone()),
     )
     .await?;
     assert_eq!(

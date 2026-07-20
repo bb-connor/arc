@@ -936,6 +936,7 @@ impl ChioKernel {
     pub fn run_settlement_observer(
         &self,
         receipt: &chio_core::receipt::body::ChioReceipt,
+        idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> settlement_observer::SettlementObserverStatus {
         settlement_observer::run_observer(
             self.settlement_observer
@@ -943,6 +944,7 @@ impl ChioKernel {
                 .map(crate::settlement_routing::SettlementObserverRuntime::hook_ref),
             receipt,
             &[self.public_key()],
+            idempotency_key,
         )
     }
 

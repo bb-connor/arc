@@ -15,7 +15,8 @@ use chio_core::crypto::PublicKey;
 use chio_core::receipt::{body::ChioReceipt, economics::ChannelReceiptMetadataV1};
 use chio_settle::{
     SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementHook,
-    SettlementHookError, SettlementObservation, SettlementOutcome, SettlementSkipReason,
+    SettlementHookError, SettlementIdempotencyKey, SettlementObservation, SettlementOutcome,
+    SettlementSkipReason,
 };
 
 /// Schema string emitted on the wire for settlement-observer status frames.
@@ -237,6 +238,7 @@ pub fn run_observer(
     hook: Option<&Arc<dyn SettlementHook>>,
     receipt: &ChioReceipt,
     trusted_kernel_keys: &[PublicKey],
+    idempotency_key: &SettlementIdempotencyKey,
 ) -> SettlementObserverStatus {
     let Some(hook) = hook else {
         return SettlementObserverStatus::NotRegistered;
@@ -255,7 +257,13 @@ pub fn run_observer(
         }
     };
 
-    match hook.observe(&observation) {
+    if idempotency_key.receipt_id != observation.receipt_id || idempotency_key.row_version == 0 {
+        return SettlementObserverStatus::hook_failed(&SettlementHookError::InvalidObservation(
+            "settlement idempotency key does not match the claimed receipt".to_string(),
+        ));
+    }
+
+    match hook.observe(&observation, idempotency_key) {
         Ok(outcome) => SettlementObserverStatus::Observed { outcome },
         Err(error) => SettlementObserverStatus::hook_failed(&error),
     }
@@ -327,12 +335,22 @@ mod tests {
         })
     }
 
+    fn idempotency_key(receipt: &ChioReceipt) -> SettlementIdempotencyKey {
+        SettlementIdempotencyKey {
+            receipt_id: receipt.id.clone(),
+            row_version: 1,
+        }
+    }
+
     struct AcceptingHook;
     impl SettlementHook for AcceptingHook {
         fn observe(
             &self,
             observation: &SettlementObservation,
+            idempotency_key: &SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
+            assert_eq!(idempotency_key.receipt_id, observation.receipt_id);
+            assert_eq!(idempotency_key.row_version, 1);
             Ok(SettlementOutcome::accepted(format!(
                 "ts-{}",
                 observation.receipt_id
@@ -345,6 +363,7 @@ mod tests {
         fn observe(
             &self,
             _observation: &SettlementObservation,
+            _idempotency_key: &SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             Err(SettlementHookError::Transient("rpc lag".to_string()))
         }
@@ -624,7 +643,12 @@ mod tests {
             }),
             Decision::Allow,
         );
-        let status = run_observer(None, &receipt, std::slice::from_ref(&receipt.kernel_key));
+        let status = run_observer(
+            None,
+            &receipt,
+            std::slice::from_ref(&receipt.kernel_key),
+            &idempotency_key(&receipt),
+        );
         assert!(matches!(status, SettlementObserverStatus::NotRegistered));
     }
 
@@ -641,6 +665,7 @@ mod tests {
             Some(&hook),
             &receipt,
             std::slice::from_ref(&receipt.kernel_key),
+            &idempotency_key(&receipt),
         );
         match status {
             SettlementObserverStatus::Observed {
@@ -663,6 +688,7 @@ mod tests {
             Some(&hook),
             &receipt,
             std::slice::from_ref(&receipt.kernel_key),
+            &idempotency_key(&receipt),
         );
         assert!(matches!(
             status,
@@ -733,6 +759,7 @@ mod tests {
             Some(&hook),
             &receipt,
             std::slice::from_ref(&receipt.kernel_key),
+            &idempotency_key(&receipt),
         );
         assert!(matches!(
             status,

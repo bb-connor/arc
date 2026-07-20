@@ -75,6 +75,11 @@ pub enum BudgetViolation {
 ///
 /// Thread-safe usage requires external synchronization (the kernel already
 /// serializes guard evaluation per-request).
+///
+/// WARNING: counters are process-local and reset to zero on restart, reopening
+/// the full budget. Use the kernel's durable `BudgetStore` for cross-restart
+/// continuity.
+#[deprecated(note = "process-local counters reset on restart; use chio-kernel BudgetStore")]
 #[derive(Debug, Clone)]
 pub struct BudgetEnforcer {
     policy: BudgetPolicy,
@@ -88,6 +93,7 @@ pub struct BudgetEnforcer {
     tool_spent: HashMap<String, u64>,
 }
 
+#[allow(deprecated)]
 impl BudgetEnforcer {
     /// Create a new budget enforcer with the given policy.
     pub fn new(policy: BudgetPolicy) -> Self {
@@ -200,6 +206,7 @@ impl BudgetEnforcer {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::cost::CostMetadata;

@@ -126,6 +126,8 @@ pub enum KernelCoreError {
     OutOfScope { tool: String, server: String },
     /// Portable scope matching failed closed on an unsupported constraint.
     ConstraintError { reason: String },
+    /// The capability requires stateful enforcement unavailable in this runtime.
+    UnsupportedCapabilityFeature { feature: String },
     /// A guard returned a fail-closed error.
     GuardError { guard: String, reason: String },
     /// A guard denied the request outright.
@@ -185,6 +187,11 @@ impl KernelCoreError {
             KernelCoreError::ConstraintError { reason } => {
                 let mut out = String::from("constraint evaluation failed: ");
                 out.push_str(reason);
+                out
+            }
+            KernelCoreError::UnsupportedCapabilityFeature { feature } => {
+                let mut out = String::from("capability feature unsupported on this runtime: ");
+                out.push_str(feature);
                 out
             }
             KernelCoreError::GuardError { guard, reason } => {
@@ -364,18 +371,18 @@ pub fn evaluate_with_full_floor_and_root(
     };
     if input.capability.aggregate_invocation_budget.is_some() {
         return deny(
-            KernelCoreError::InvalidCapability(CapabilityError::AttenuationViolation(
-                "aggregate invocation enforcement is unavailable".to_string(),
-            )),
+            KernelCoreError::UnsupportedCapabilityFeature {
+                feature: "aggregate invocation enforcement".to_string(),
+            },
             None,
             Some(verified),
         );
     }
     if input.capability.scope.has_cumulative_approval() {
         return deny(
-            KernelCoreError::InvalidCapability(CapabilityError::AttenuationViolation(
-                "cumulative approval enforcement is unavailable".to_string(),
-            )),
+            KernelCoreError::UnsupportedCapabilityFeature {
+                feature: "cumulative approval enforcement".to_string(),
+            },
             None,
             Some(verified),
         );
@@ -717,8 +724,7 @@ mod tests {
         );
 
         assert!(verdict.is_deny());
-        assert!(verdict.reason.as_deref().is_some_and(
-            |reason| reason.contains("aggregate invocation enforcement is unavailable")
-        ));
+        assert!(verdict.reason.as_deref().is_some_and(|reason| reason
+            .contains("unsupported on this runtime: aggregate invocation enforcement")));
     }
 }

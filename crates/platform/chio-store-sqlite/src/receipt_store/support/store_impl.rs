@@ -294,6 +294,19 @@ impl SqliteReceiptStore {
                     receipt.timestamp,
                     next_visible_at_ms,
                 )?;
+            } else {
+                let settlement_obligation_exists = tx.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM settle_attempts WHERE receipt_id = ?1 \
+                     UNION ALL SELECT 1 FROM settle_dead_letters WHERE receipt_id = ?1)",
+                    [receipt.id.as_str()],
+                    |row| row.get::<_, bool>(0),
+                )?;
+                if !settlement_obligation_exists {
+                    return Err(ReceiptStoreError::Conflict(format!(
+                        "receipt `{}` exists without a settlement obligation",
+                        receipt.id
+                    )));
+                }
             }
             tx.commit()?;
             Ok(seq)

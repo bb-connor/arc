@@ -106,6 +106,15 @@ pub struct SettlementObservation {
     pub policy_hash: String,
 }
 
+/// Durable identity and claim fence for one at-least-once hook invocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SettlementIdempotencyKey {
+    /// Stable effect identity. Hooks must deduplicate durable effects by this id.
+    pub receipt_id: String,
+    /// Store row version claimed for this invocation.
+    pub row_version: u64,
+}
+
 impl SettlementObservation {
     /// Construct a fresh observation, stamping the canonical schema tag.
     #[must_use]
@@ -529,6 +538,8 @@ impl SettlementHookError {
 ///   durable local write, not unbounded network I/O.
 /// - Make durable effects idempotent by receipt id. Lease recovery may replay
 ///   an observation after a process exits or an invocation exceeds its lease.
+///   The supplied key makes the receipt identity and claim version explicit;
+///   hooks MUST deduplicate effects by `receipt_id` across row versions.
 pub trait SettlementHook: Send + Sync {
     /// Observe a finalized receipt and route it through the settlement
     /// pipeline. See the trait-level docs for ordering and failure
@@ -536,6 +547,7 @@ pub trait SettlementHook: Send + Sync {
     fn observe(
         &self,
         observation: &SettlementObservation,
+        idempotency_key: &SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError>;
 }
 
@@ -687,6 +699,7 @@ mod tests {
             fn observe(
                 &self,
                 observation: &SettlementObservation,
+                _idempotency_key: &SettlementIdempotencyKey,
             ) -> Result<SettlementOutcome, SettlementHookError> {
                 if observation.amount.units == 0 {
                     return Ok(SettlementOutcome::skipped(SettlementSkipReason::ZeroCharge));
@@ -708,7 +721,16 @@ mod tests {
             "ch",
             "ph",
         );
-        let outcome = require_ok(hook.observe(&observation), "hook returns observed outcome");
+        let outcome = require_ok(
+            hook.observe(
+                &observation,
+                &SettlementIdempotencyKey {
+                    receipt_id: observation.receipt_id.clone(),
+                    row_version: 1,
+                },
+            ),
+            "hook returns observed outcome",
+        );
         assert!(matches!(outcome, SettlementOutcome::Accepted { .. }));
     }
 

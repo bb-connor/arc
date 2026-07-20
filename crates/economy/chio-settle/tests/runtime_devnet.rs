@@ -904,13 +904,13 @@ async fn runtime_devnet_executes_merkle_refund_and_dual_sign_paths(
         &config,
         &dual_dispatch.dispatch,
         &dual_receipt,
-        &DualSignReleaseInput {
-            operator_private_key_hex: OPERATOR_PRIVATE_KEY.to_string(),
-            observed_amount: MonetaryAmount {
+        &DualSignReleaseInput::new(
+            OPERATOR_PRIVATE_KEY,
+            MonetaryAmount {
                 units: 15_000,
                 currency: "USD".to_string(),
             },
-        },
+        ),
     )
     .await?;
     assert_eq!(

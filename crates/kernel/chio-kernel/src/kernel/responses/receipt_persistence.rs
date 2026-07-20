@@ -249,7 +249,11 @@ impl ChioKernel {
                 return Ok(());
             }
         };
-        let status = self.run_settlement_observer(receipt);
+        let idempotency_key = chio_settle::SettlementIdempotencyKey {
+            receipt_id: claim.receipt_id.clone(),
+            row_version: claim.row_version,
+        };
+        let status = self.run_settlement_observer(receipt, &idempotency_key);
         runtime.record_claimed_status(
             &claim,
             &status,

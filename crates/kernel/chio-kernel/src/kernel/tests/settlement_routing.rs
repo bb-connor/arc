@@ -308,6 +308,7 @@ mod settlement_routing_tests {
         fn observe(
             &self,
             observation: &SettlementObservation,
+            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.store.note_hook_query(&observation.receipt_id);
@@ -347,6 +348,7 @@ mod settlement_routing_tests {
         fn observe(
             &self,
             observation: &SettlementObservation,
+            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.store.note_hook_query(&observation.receipt_id);

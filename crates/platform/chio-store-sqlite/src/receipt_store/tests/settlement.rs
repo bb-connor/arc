@@ -268,18 +268,8 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
     );
     drop(connection);
 
-    store.writer_handle().run_write({
-        let receipt_id = receipt.id.clone();
-        move |connection| {
-            connection.execute(
-                "DELETE FROM settle_attempts WHERE receipt_id = ?1",
-                [receipt_id],
-            )?;
-            Ok(())
-        }
-    })?;
     ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
-    assert_eq!(attempt_count(&store, &receipt.id)?, 0);
+    assert_eq!(attempt_count(&store, &receipt.id)?, 1);
 
     let conflicting = sample_receipt_with_id("rcpt-settlement-attempt-conflict");
     store.writer_handle().run_write({
@@ -308,6 +298,38 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
     );
     assert!(overflow_result.is_err());
     assert!(store.load_chio_receipt(&overflow.id)?.is_none());
+
+    drop(store);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn duplicate_receipt_without_settlement_obligation_fails_closed(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-settlement-missing-obligation");
+    let store = SqliteReceiptStore::open(&path)?;
+    let receipt = sample_receipt_with_id("rcpt-settlement-missing-obligation");
+    let pending = chio_kernel::PendingSettlementObservation {
+        next_visible_at_ms: 9_001,
+    };
+
+    ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
+    store.writer_handle().run_write({
+        let receipt_id = receipt.id.clone();
+        move |connection| {
+            connection.execute(
+                "DELETE FROM settle_attempts WHERE receipt_id = ?1",
+                [receipt_id],
+            )?;
+            Ok(())
+        }
+    })?;
+
+    let result =
+        ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending);
+    assert!(matches!(result, Err(ReceiptStoreError::Conflict(_))));
+    assert_eq!(attempt_count(&store, &receipt.id)?, 0);
 
     drop(store);
     let _ = fs::remove_file(path);

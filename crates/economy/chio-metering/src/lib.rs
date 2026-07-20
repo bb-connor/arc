@@ -22,6 +22,7 @@ pub mod cost;
 pub mod export;
 pub mod query;
 
+#[allow(deprecated)]
 pub use budget::{BudgetEnforcer, BudgetPolicy, BudgetViolation};
 pub use budget_hierarchy::{
     AggregateSpend, BudgetDecision, BudgetDenyReason, BudgetError, BudgetLimits, BudgetNode,

@@ -56,21 +56,31 @@ impl ChioKernel {
         // only, for the holds the store actually forfeits. The predicate mirrors
         // the store reaper's contract (open + reserved_until <= now).
         let tracked = self.tracked_reserved_sibling_hold_ids();
-        let expiring = self.with_budget_store(|store| {
+        let (expiring, already_closed) = self.with_budget_store(|store| {
             let mut expiring = Vec::new();
+            let mut already_closed = Vec::new();
             for hold_id in &tracked {
-                if let Some(hold) = store.get_budget_hold(hold_id)? {
-                    if hold.disposition.is_open()
-                        && hold
-                            .reserved_until
-                            .is_some_and(|until| until <= now_unix_secs)
+                match store.get_budget_hold(hold_id)? {
+                    Some(hold)
+                        if hold.disposition.is_open()
+                            && hold
+                                .reserved_until
+                                .is_some_and(|until| until <= now_unix_secs) =>
                     {
                         expiring.push(hold_id.clone());
                     }
+                    Some(hold) if !hold.disposition.is_open() => {
+                        already_closed.push(hold_id.clone());
+                    }
+                    None => already_closed.push(hold_id.clone()),
+                    Some(_) => {}
                 }
             }
-            Ok(expiring)
+            Ok((expiring, already_closed))
         })?;
+        for hold_id in already_closed {
+            self.release_reserved_sibling_share_for_hold(&hold_id);
+        }
         // Run the store reap but do NOT propagate its error yet. If the store
         // settled some holds before failing partway through the sweep, those
         // closed holds' sibling shares must still be released, or a closed hold's

@@ -2944,6 +2944,7 @@ struct PartialReapBudgetStore {
         std::collections::HashMap<String, crate::budget_store::BudgetHoldDispositionView>,
     >,
     close_on_reap: String,
+    fail_next_closed_lookup: AtomicBool,
 }
 
 impl PartialReapBudgetStore {
@@ -2960,7 +2961,14 @@ impl PartialReapBudgetStore {
         Self {
             holds: std::sync::Mutex::new(holds),
             close_on_reap: close_on_reap.to_string(),
+            fail_next_closed_lookup: AtomicBool::new(false),
         }
+    }
+
+    fn with_post_reap_read_failure(close_on_reap: &str) -> Self {
+        let store = Self::new(close_on_reap);
+        store.fail_next_closed_lookup.store(true, Ordering::SeqCst);
+        store
     }
 
     fn lock(
@@ -3050,16 +3058,22 @@ impl BudgetStore for PartialReapBudgetStore {
         &self,
         hold_id: &str,
     ) -> Result<Option<crate::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
-        Ok(self
-            .lock()
-            .get(hold_id)
-            .map(|disposition| crate::budget_store::BudgetHoldSnapshot {
+        let disposition = self.lock().get(hold_id).copied();
+        if disposition.is_some_and(|value| !value.is_open())
+            && self.fail_next_closed_lookup.swap(false, Ordering::SeqCst)
+        {
+            return Err(BudgetStoreError::Invariant(
+                "transient post-reap read failure".to_string(),
+            ));
+        }
+        Ok(
+            disposition.map(|disposition| crate::budget_store::BudgetHoldSnapshot {
                 hold_id: hold_id.to_string(),
                 capability_id: "cap".to_string(),
                 grant_index: 0,
                 authorized_exposure_units: 100,
                 remaining_exposure_units: 100,
-                disposition: *disposition,
+                disposition,
                 reserved_until: Some(0),
                 reserved_currency: Some("USD".to_string()),
                 reserved_payment_reference: None,
@@ -3067,7 +3081,8 @@ impl BudgetStore for PartialReapBudgetStore {
                 reserved_delegation_depth: Some(1),
                 reserved_root_budget_holder: Some("root".to_string()),
                 authority: None,
-            }))
+            }),
+        )
     }
 
     fn reap_expired_reserved_holds(&self, _now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
@@ -3085,7 +3100,9 @@ impl BudgetStore for PartialReapBudgetStore {
 #[test]
 fn reaper_releases_shares_for_holds_closed_before_a_store_error() {
     let mut kernel = make_kernel(make_config());
-    kernel.set_budget_store(Box::new(PartialReapBudgetStore::new("h1")));
+    kernel.set_budget_store(Box::new(
+        PartialReapBudgetStore::with_post_reap_read_failure("h1"),
+    ));
     {
         let mut shares = match kernel.reserved_sibling_shares.lock() {
             Ok(guard) => guard,
@@ -3109,12 +3126,16 @@ fn reaper_releases_shares_for_holds_closed_before_a_store_error() {
         );
     }
 
-    // The store closes h1 then errors on the rest of the sweep. h1's sibling
-    // share must be released (its hold is now closed) while h2's is retained
-    // (its hold is still open), and the store error must still propagate.
+    // The store closes h1, errors on the sweep, then transiently fails the
+    // post-reap read. The share stays held fail-closed on that first pass.
     let result = kernel.reap_expired_reserved_budget_holds(1_000);
     assert!(result.is_err(), "the store reap error must still propagate");
+    let mut remaining = kernel.tracked_reserved_sibling_hold_ids();
+    remaining.sort();
+    assert_eq!(remaining, vec!["h1".to_string(), "h2".to_string()]);
 
+    // The next sweep notices h1 is already closed and releases its share.
+    assert!(kernel.reap_expired_reserved_budget_holds(1_000).is_err());
     let mut remaining = kernel.tracked_reserved_sibling_hold_ids();
     remaining.sort();
     assert_eq!(

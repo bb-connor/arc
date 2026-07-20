@@ -18,8 +18,9 @@ pub struct ReapSummary {
 type ExpiredReservedHold = (String, String, u32, u64, Option<BudgetEventAuthority>);
 
 /// A hold still `open` at startup:
-/// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
-type OpenHold = (String, String, u32, u64, Option<BudgetEventAuthority>);
+/// `(hold_id, capability_id, grant_index, remaining_exposure_units,
+/// invocation_captured, authority)`.
+type OpenHold = (String, String, u32, u64, bool, Option<BudgetEventAuthority>);
 
 impl SqliteBudgetStore {
     fn sqlite_like_prefix_pattern(prefix: &str) -> String {
@@ -53,22 +54,25 @@ impl SqliteBudgetStore {
             reconciled: 0,
             reversed: 0,
         };
-        for (hold_id, capability_id, grant_index, exposure, authority) in open_holds {
+        let mut first_error = None;
+        for (hold_id, capability_id, grant_index, exposure, captured, authority) in open_holds {
             // Kernel-authored holds carry a BudgetEventAuthority lease that the
             // reconcile/reverse authority check enforces. Present each hold's stored
             // authority so orphaned kernel holds are reclaimed rather than rejected;
             // a hold whose authority columns cannot be loaded fails closed in
             // `list_open_holds` rather than silently reaping with no authority.
-            match realized_by_hold.get(&hold_id) {
+            let result = (|| match realized_by_hold.get(&hold_id) {
                 Some(&realized) => {
-                    self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-                        capability_id: capability_id.clone(),
-                        grant_index: grant_index as usize,
-                        hold_id: hold_id.clone(),
-                        event_id: format!("{hold_id}:reap-capture-invocation"),
-                        trusted_time: None,
-                        authority: authority.clone(),
-                    })?;
+                    if !captured {
+                        self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                            capability_id: capability_id.clone(),
+                            grant_index: grant_index as usize,
+                            hold_id: hold_id.clone(),
+                            event_id: format!("{hold_id}:reap-capture-invocation"),
+                            trusted_time: None,
+                            authority: authority.clone(),
+                        })?;
+                    }
                     if exposure > 0 {
                         self.reconcile_budget_hold(BudgetReconcileHoldRequest {
                             capability_id: capability_id.clone(),
@@ -80,7 +84,21 @@ impl SqliteBudgetStore {
                             authority,
                         })?;
                     }
-                    summary.reconciled += 1;
+                    Ok(true)
+                }
+                None if captured => {
+                    if exposure > 0 {
+                        self.reconcile_budget_hold(BudgetReconcileHoldRequest {
+                            capability_id: capability_id.clone(),
+                            grant_index: grant_index as usize,
+                            exposed_cost_units: exposure,
+                            realized_spend_units: exposure,
+                            hold_id: Some(hold_id.clone()),
+                            event_id: Some(format!("{hold_id}:reap-unknown-outcome")),
+                            authority,
+                        })?;
+                    }
+                    Ok(true)
                 }
                 None => {
                     self.reverse_budget_hold(BudgetReverseHoldRequest {
@@ -92,11 +110,25 @@ impl SqliteBudgetStore {
                         authority,
                         expected_cumulative_approval_state: None,
                     })?;
-                    summary.reversed += 1;
+                    Ok(false)
+                }
+            })();
+            match result {
+                Ok(true) => summary.reconciled += 1,
+                Ok(false) => summary.reversed += 1,
+                Err(error) => {
+                    tracing::warn!(
+                        hold_id,
+                        error = %error,
+                        "orphan budget hold cleanup failed"
+                    );
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
                 }
             }
         }
-        Ok(summary)
+        first_error.map_or(Ok(summary), Err)
     }
 
     /// Settle every reserved hold that is still `open` and whose `reserved_until`
@@ -143,7 +175,8 @@ impl SqliteBudgetStore {
     }
 
     /// Open reserved holds past their expiry:
-    /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
+    /// `(hold_id, capability_id, grant_index, remaining_exposure_units,
+    /// invocation_captured, authority)`.
     fn list_expired_reserved_holds(
         &self,
         now_unix_secs: i64,
@@ -396,16 +429,17 @@ impl SqliteBudgetStore {
             .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
         let mut statement = connection.prepare(
             "SELECT hold_id, capability_id, grant_index, remaining_exposure_units, \
-             authority_id, lease_id, lease_epoch \
+             invocation_captured, authority_id, lease_id, lease_epoch \
              FROM budget_authorization_holds WHERE disposition = 'open'",
         )?;
         let rows = statement.query_map([], |row| {
-            let authority = sqlite_budget_event_authority(row.get(4)?, row.get(5)?, row.get(6)?)?;
+            let authority = sqlite_budget_event_authority(row.get(5)?, row.get(6)?, row.get(7)?)?;
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, i64>(2)? as u32,
                 row.get::<_, i64>(3)? as u64,
+                row.get::<_, i64>(4)? != 0,
                 authority,
             ))
         })?;
@@ -422,7 +456,8 @@ impl SqliteBudgetStore {
 mod tests {
     use super::*;
     use chio_kernel::budget_store::{
-        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetStore,
+        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetHoldDispositionView,
+        BudgetStore,
     };
     use std::collections::HashMap;
 
@@ -745,6 +780,35 @@ mod tests {
                 .committed_cost_units()
                 .unwrap(),
             0
+        );
+    }
+
+    #[test]
+    fn reaper_forfeits_captured_orphan_at_worst_case() {
+        let store = open_temp_store();
+        authorize(&store, "hold-captured", "cap-captured");
+        capture_invocation(&store, "hold-captured", "cap-captured");
+
+        let summary = store.reap_holds_by_map(&HashMap::new()).unwrap();
+
+        assert_eq!(summary.reconciled, 1);
+        assert_eq!(summary.reversed, 0);
+        assert_eq!(
+            store
+                .get_usage("cap-captured", 0)
+                .unwrap()
+                .unwrap()
+                .committed_cost_units()
+                .unwrap(),
+            100
+        );
+        assert_eq!(
+            store
+                .budget_hold_snapshot("hold-captured")
+                .unwrap()
+                .unwrap()
+                .disposition,
+            BudgetHoldDispositionView::Reconciled
         );
     }
 

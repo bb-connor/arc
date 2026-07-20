@@ -141,6 +141,7 @@ impl SettlementHook for AcceptingHook {
     fn observe(
         &self,
         _observation: &SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(SettlementOutcome::accepted("accepted"))
@@ -257,6 +258,10 @@ fn recover_accepted(
         Some(&hook_handle),
         receipt,
         std::slice::from_ref(&receipt.kernel_key),
+        &chio_settle::SettlementIdempotencyKey {
+            receipt_id: claim.receipt_id.clone(),
+            row_version: claim.row_version,
+        },
     );
     assert!(matches!(
         status,

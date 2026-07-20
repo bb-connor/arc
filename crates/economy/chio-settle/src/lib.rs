@@ -58,8 +58,8 @@ pub use evm::{
 };
 pub use hook::{
     SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
-    SettlementFailureReason, SettlementHook, SettlementHookError, SettlementObservation,
-    SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
+    SettlementFailureReason, SettlementHook, SettlementHookError, SettlementIdempotencyKey,
+    SettlementObservation, SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
     SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{

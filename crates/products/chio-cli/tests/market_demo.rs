@@ -62,6 +62,7 @@ impl SettlementHook for CountingSettlementHook {
     fn observe(
         &self,
         observation: &SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         if observation.amount.units == 0 {
             return Ok(SettlementOutcome::skipped(SettlementSkipReason::ZeroCharge));
