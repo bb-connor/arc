@@ -1482,7 +1482,7 @@ impl SqliteFiscalStore {
             .map_err(sqlite_error)?;
         let authority_updated = transaction
             .execute(
-                "UPDATE fiscal_authority_state SET state_json = ?1, finalized_checkpoint_digest = ?2, state_version = state_version + 1 WHERE singleton = 1 AND finalized_checkpoint_digest = ?3",
+                "UPDATE fiscal_authority_state SET state_json = ?1, finalized_checkpoint_digest = ?2, state_version = state_version + 1 WHERE singleton = 1 AND finalized_checkpoint_digest = ?3 AND state_version < 9223372036854775807",
                 params![
                     &authority_json,
                     acknowledged.digest(),

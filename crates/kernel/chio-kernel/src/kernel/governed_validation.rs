@@ -1404,6 +1404,18 @@ impl ChioKernel {
         }
 
         let mustprepay_prepaid_units = Self::mustprepay_prepaid_units(intent);
+        if let Some(prepaid_units) = mustprepay_prepaid_units {
+            for (limit_name, limit) in [
+                ("per-invocation", grant.max_cost_per_invocation.as_ref()),
+                ("cumulative", grant.max_total_cost.as_ref()),
+            ] {
+                if limit.is_some_and(|amount| prepaid_units > amount.units) {
+                    return Err(KernelError::GovernedTransactionDenied(format!(
+                        "MustPrepay quoted cost exceeds the grant {limit_name} cost limit"
+                    )));
+                }
+            }
+        }
         if let (Some(intent_amount), Some(prepaid_units)) =
             (intent.max_amount.as_ref(), mustprepay_prepaid_units)
         {

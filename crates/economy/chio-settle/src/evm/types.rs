@@ -365,9 +365,6 @@ prepared_evm_submission!(
     PreparedErc20Approval,
     PreparedEscrowCreate,
     PreparedBondLock,
-    PreparedBondRelease,
-    PreparedBondImpair,
-    PreparedBondExpiry,
 );
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

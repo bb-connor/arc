@@ -49,6 +49,9 @@ assert_not_prepared_evm_submission!(PreparedRootPublication);
 assert_not_prepared_evm_submission!(PreparedMerkleRelease);
 assert_not_prepared_evm_submission!(PreparedDualSignRelease);
 assert_not_prepared_evm_submission!(PreparedEscrowRefund);
+assert_not_prepared_evm_submission!(PreparedBondRelease);
+assert_not_prepared_evm_submission!(PreparedBondImpair);
+assert_not_prepared_evm_submission!(PreparedBondExpiry);
 
 fn sample_config() -> SettlementChainConfig {
     sample_config_with_rpc_url("http://127.0.0.1:8545".to_string())
@@ -939,6 +942,9 @@ async fn submit_call_rejects_money_exit_selectors_before_rpc() {
         IChioEscrow::partialReleaseWithProofDetailedCall::SELECTOR,
         IChioEscrow::releaseWithSignatureCall::SELECTOR,
         IChioEscrow::refundCall::SELECTOR,
+        IChioBondVault::releaseBondDetailedCall::SELECTOR,
+        IChioBondVault::impairBondDetailedCall::SELECTOR,
+        IChioBondVault::expireReleaseCall::SELECTOR,
     ];
 
     for selector in selectors {

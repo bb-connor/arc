@@ -1105,6 +1105,12 @@ fn threshold_approval_proposal_and_set_bind_complete_artifacts() {
 
     assert_eq!(proposal.body.proposal_deadline, 1_500);
     assert!(proposal.verify_signature().unwrap());
+    let mut proposal_json = serde_json::to_value(&proposal).unwrap();
+    proposal_json
+        .as_object_mut()
+        .unwrap()
+        .insert("unexpected".to_string(), serde_json::json!(true));
+    assert!(serde_json::from_value::<ThresholdApprovalProposal>(proposal_json).is_err());
     proposal.validate_at(1_499).unwrap();
     assert!(proposal.validate_at(1_500).is_err());
 
@@ -1113,6 +1119,7 @@ fn threshold_approval_proposal_and_set_bind_complete_artifacts() {
         &proposal,
     )
     .unwrap();
+    assert!(VerifiedApprovalSetBody::new(vec![sha256_hex(b"token-a")], &proposal).is_err());
     let second = VerifiedApprovalSetBody::new(
         vec![sha256_hex(b"token-a"), sha256_hex(b"token-b")],
         &proposal,

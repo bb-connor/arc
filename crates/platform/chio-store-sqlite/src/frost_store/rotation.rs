@@ -470,6 +470,13 @@ impl SqliteFrostStore {
         let burn: FrostSessionBurnSummaryV1 =
             serde_json::from_slice(&stored.burn_summary_json).map_err(canonical_error)?;
         verify_local_burn_summary(&transaction, &burn)?;
+        let predecessor_key_epoch =
+            target
+                .key_epoch
+                .checked_sub(1)
+                .ok_or(FrostStoreError::Conflict(
+                    "target roster key epoch has no predecessor",
+                ))?;
         insert_roster_history(
             &transaction,
             &target,
@@ -502,7 +509,7 @@ impl SqliteFrostStore {
                     &fence.lease_id,
                     sqlite_u64(fence.owner_epoch, "source owner epoch")?,
                     &target.scope_id,
-                    sqlite_u64(target.key_epoch - 1, "predecessor key epoch")?,
+                    sqlite_u64(predecessor_key_epoch, "predecessor key epoch")?,
                     &stored.predecessor_checkpoint_digest,
                 ],
             )

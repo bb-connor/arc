@@ -100,15 +100,24 @@ async fn fiscal_marketplace_consumers_require_auth_and_a_runtime() {
     let disabled = handle_fiscal_marketplace_credit_limit(
         State(state),
         headers,
-        Json(chio_underwriting::MarketplaceCreditLimitRequest {
+        Json(FiscalMarketplaceCreditLimitRequest {
             tenant_id: "tenant-a".to_owned(),
-            reputation_tier: chio_underwriting::MarketplaceLimitTier::Tier1,
             currency: "USD".to_owned(),
-            publisher_revoked: false,
         }),
     )
     .await;
     assert_eq!(disabled.status(), StatusCode::CONFLICT);
+}
+
+#[test]
+fn fiscal_marketplace_credit_limit_rejects_client_trust_claims() {
+    let request = serde_json::json!({
+        "tenant_id": "tenant-a",
+        "currency": "USD",
+        "reputation_tier": "tier3",
+        "publisher_revoked": false,
+    });
+    assert!(serde_json::from_value::<FiscalMarketplaceCreditLimitRequest>(request).is_err());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

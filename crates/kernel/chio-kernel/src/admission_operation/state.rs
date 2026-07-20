@@ -402,7 +402,14 @@ pub(super) fn validate_state_requirements(
             | AdmissionOperationState::MutationSubmitted
             | AdmissionOperationState::EconomicMutationApplied
             | AdmissionOperationState::EconomicMutationNotApplied => false,
-            _ => true,
+            AdmissionOperationState::Prepared
+            | AdmissionOperationState::ReadyToDispatch
+            | AdmissionOperationState::DispatchCommitted
+            | AdmissionOperationState::Finalizing
+            | AdmissionOperationState::Completed
+            | AdmissionOperationState::CompensatedBeforeDispatch
+            | AdmissionOperationState::NotAcceptedAfterDispatchCommit
+            | AdmissionOperationState::OutcomeUnknownAfterDispatch => true,
         }
     };
     if valid {

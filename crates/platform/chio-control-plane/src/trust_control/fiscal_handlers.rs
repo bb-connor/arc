@@ -7,7 +7,9 @@ use chio_fiscal::{
 use chio_store_sqlite::fiscal_store::FiscalStoreError;
 
 use crate::fiscal_state_recovery::FiscalStartupRecoveryAction;
-use crate::trust_control::report_validation::validate_service_auth;
+use crate::trust_control::report_validation::{
+    resolve_control_read_principal, validate_service_auth, ResolvedControlReadPrincipal,
+};
 
 pub(crate) async fn handle_fiscal_runtime_status(
     State(state): State<TrustServiceState>,
@@ -250,16 +252,77 @@ pub(crate) async fn handle_fiscal_marketplace_price(
 pub(crate) async fn handle_fiscal_marketplace_credit_limit(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(request): Json<chio_underwriting::MarketplaceCreditLimitRequest>,
+    Json(request): Json<FiscalMarketplaceCreditLimitRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
+    let principal = match resolve_control_read_principal(&headers, &state.config) {
+        Ok(principal) => principal,
+        Err(response) => return response,
+    };
+    if matches!(
+        &principal,
+        ResolvedControlReadPrincipal::TenantRead { tenant_id }
+            if tenant_id != &request.tenant_id
+    ) {
+        return plain_http_error(
+            StatusCode::FORBIDDEN,
+            "tenant read token cannot request another tenant's credit limit",
+        );
     }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
         return fiscal_runtime_not_configured();
     };
+    let revocation_store = match state.revocation_store() {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    let publisher_revoked = match revocation_store.is_revoked(&request.tenant_id) {
+        Ok(revoked) => revoked,
+        Err(error) => {
+            return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string());
+        }
+    };
+    let Some(receipt_db_path) = state.config.receipt_db_path.as_deref() else {
+        return plain_http_error(
+            StatusCode::CONFLICT,
+            "trust control service requires --receipt-db for marketplace credit limits",
+        );
+    };
+    let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
+        Ok(keys) => keys.unwrap_or_default(),
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    let inspection = match issuance::inspect_local_reputation_with_read_context(
+        &request.tenant_id,
+        Some(receipt_db_path),
+        state.config.budget_db_path.as_deref(),
+        None,
+        None,
+        state.config.issuance_policy.as_ref(),
+        &trusted_kernel_keys,
+        &principal.receipt_read_context(),
+    ) {
+        Ok(inspection) => inspection,
+        Err(error) => {
+            return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string());
+        }
+    };
+    let reputation_tier = if inspection.effective_score >= chio_reputation::TIER_2_THRESHOLD {
+        chio_underwriting::MarketplaceLimitTier::Tier2
+    } else if inspection.effective_score >= chio_reputation::TIER_1_THRESHOLD {
+        chio_underwriting::MarketplaceLimitTier::Tier1
+    } else {
+        chio_underwriting::MarketplaceLimitTier::Tier0
+    };
+    let authoritative_request = chio_underwriting::MarketplaceCreditLimitRequest {
+        tenant_id: request.tenant_id,
+        reputation_tier,
+        currency: request.currency,
+        publisher_revoked,
+    };
     match runtime.with_resolver(|resolver| {
-        chio_underwriting::compute_fiscal_marketplace_credit_limit(&request, resolver)
+        chio_underwriting::compute_fiscal_marketplace_credit_limit(&authoritative_request, resolver)
     }) {
         Ok(Ok(decision)) => Json(decision).into_response(),
         Ok(Err(reason)) => plain_http_error(
@@ -268,6 +331,13 @@ pub(crate) async fn handle_fiscal_marketplace_credit_limit(
         ),
         Err(error) => fiscal_operation_error(error),
     }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FiscalMarketplaceCreditLimitRequest {
+    pub(crate) tenant_id: String,
+    pub(crate) currency: String,
 }
 
 fn fiscal_runtime_not_configured() -> Response {

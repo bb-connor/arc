@@ -127,18 +127,7 @@ impl PostInvocationHook for SanitizerHook {
     }
 
     fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
-        if self
-            .sanitizer
-            .config()
-            .redaction_strategies
-            .values()
-            .any(|strategy| {
-                matches!(
-                    strategy,
-                    crate::response_sanitization::RedactionStrategy::Tokenize
-                )
-            })
-        {
+        if self.sanitizer.uses_tokenization().map_err(str::to_owned)? {
             return Err(
                 "output sanitizer tokenize redaction strategy is not deterministic".to_string(),
             );

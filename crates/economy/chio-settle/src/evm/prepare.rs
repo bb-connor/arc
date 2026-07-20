@@ -1601,7 +1601,7 @@ pub async fn submit_call<T: PreparedEvmSubmission + ?Sized>(
 }
 
 fn reject_guarded_money_exit_selector(call: &PreparedEvmCall) -> Result<(), SettlementError> {
-    const GUARDED_SELECTORS: [[u8; 4]; 8] = [
+    const GUARDED_SELECTORS: [[u8; 4]; 11] = [
         IChioRootRegistry::publishRootCall::SELECTOR,
         IChioRootRegistry::publishRootBatchCall::SELECTOR,
         IChioEscrow::releaseWithProofCall::SELECTOR,
@@ -1610,6 +1610,9 @@ fn reject_guarded_money_exit_selector(call: &PreparedEvmCall) -> Result<(), Sett
         IChioEscrow::partialReleaseWithProofDetailedCall::SELECTOR,
         IChioEscrow::releaseWithSignatureCall::SELECTOR,
         IChioEscrow::refundCall::SELECTOR,
+        IChioBondVault::releaseBondDetailedCall::SELECTOR,
+        IChioBondVault::impairBondDetailedCall::SELECTOR,
+        IChioBondVault::expireReleaseCall::SELECTOR,
     ];
     let data = decode_hex_bytes(&call.data)?;
     if data
@@ -1617,7 +1620,7 @@ fn reject_guarded_money_exit_selector(call: &PreparedEvmCall) -> Result<(), Sett
         .is_some_and(|selector| GUARDED_SELECTORS.iter().any(|guarded| selector == guarded))
     {
         return Err(SettlementError::Unsupported(
-            "root publication, escrow release, and escrow refund require a durable publisher"
+            "root publication, escrow release, escrow refund, and bond exits require a durable publisher"
                 .to_owned(),
         ));
     }

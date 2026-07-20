@@ -628,25 +628,21 @@ fn mustprepay_request_without_token(
     }
 }
 
-// The amount actually authorized and prepaid for a MustPrepay intent is the
-// quote, so a small provisional budget charge must not understate the approval
-// gate: a quote above RequireApprovalAbove is denied without an approval token
-// even when a charge is present, and admitted with one.
+// A MustPrepay quote is an actual spend boundary, so it must not exceed the
+// grant's per-invocation ceiling even when an approval token could authorize the
+// governed action.
 #[test]
-fn governed_mustprepay_with_charge_gates_on_quote_not_charge() {
+fn governed_mustprepay_rejects_quote_above_grant_ceiling() {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
 
     let agent_kp = Keypair::generate();
-    // Provisional charge = max_cost_per_invocation = 10, below the 50 threshold.
     let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    // Quote 100 > threshold 50, no declared ceiling: only the prepaid quote can
-    // raise the gate above the 10-unit provisional charge.
     let mut intent =
         make_mustprepay_intent("intent-charge-quote-gate", "cost-srv", "compute", 100, "USD");
     intent.max_amount = None;
@@ -657,22 +653,12 @@ fn governed_mustprepay_with_charge_gates_on_quote_not_charge() {
     assert_eq!(
         denied.verdict,
         Verdict::Deny,
-        "a MustPrepay quote above the approval threshold must be denied without an approval token, \
-         even when a smaller provisional charge is present"
+        "a MustPrepay quote above the grant ceiling must be denied"
     );
     let reason = denied.reason.as_deref().unwrap_or("");
     assert!(
-        reason.contains("approval token required"),
-        "denial must cite the missing approval token; got: {reason}"
-    );
-
-    let with_token =
-        mustprepay_tool_call("req-charge-quote-allow", &cap, &agent_kp, intent, &kernel);
-    let allowed = kernel.evaluate_tool_call_blocking(&with_token).unwrap();
-    assert_eq!(
-        allowed.verdict,
-        Verdict::Allow,
-        "a valid approval token must admit the prepaid MustPrepay quote with a charge present"
+        reason.contains("grant per-invocation cost limit"),
+        "denial must cite the grant ceiling; got: {reason}"
     );
 }
 
@@ -685,7 +671,7 @@ fn governed_mustprepay_with_charge_below_threshold_passes_without_token() {
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
 
     let agent_kp = Keypair::generate();
-    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 40, 1000, "USD", 50);
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();

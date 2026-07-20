@@ -1202,7 +1202,7 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
     }
     let impair_tx = e2e_step(
         "submit bond impair",
-        submit_call(&config, &impair_call).await,
+        submit_devnet_call(&config, impair_call.call()).await,
     )?;
     e2e_step(
         "confirm bond impair",
@@ -1282,7 +1282,7 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
     let expiry_call = prepare_bond_expiry(&config, &expiry_lock.vault_id, &accounts.outsider)?;
     let expiry_tx = e2e_step(
         "submit bond expiry",
-        submit_call(&config, &expiry_call).await,
+        submit_devnet_call(&config, expiry_call.call()).await,
     )?;
     e2e_step(
         "confirm bond expiry",

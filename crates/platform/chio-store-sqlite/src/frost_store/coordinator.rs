@@ -459,6 +459,11 @@ impl SqliteFrostStore {
             return stored_authorization(&stored);
         }
         if stored.state == FrostCoordinatorSessionState::PackageReady {
+            if stored.shares.len() < usize::from(request.active_roster.roster().threshold) {
+                return Err(FrostStoreError::Conflict(
+                    "coordinator signature shares do not satisfy the active roster threshold",
+                ));
+            }
             let package = stored
                 .signing_package
                 .as_deref()

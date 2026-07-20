@@ -20,7 +20,13 @@ impl TrustControlClient {
         &self,
         request: &chio_underwriting::MarketplaceCreditLimitRequest,
     ) -> Result<chio_underwriting::MarketplaceCreditLimitDecision, CliError> {
-        self.post_json(FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH, request)
+        self.post_json(
+            FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH,
+            &json!({
+                "tenant_id": request.tenant_id,
+                "currency": request.currency,
+            }),
+        )
     }
 
     pub fn authority_status(&self) -> Result<TrustAuthorityStatus, CliError> {

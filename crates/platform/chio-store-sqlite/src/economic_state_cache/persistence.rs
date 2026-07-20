@@ -7,6 +7,10 @@ pub(crate) fn update_stage(
     reason: Option<&str>,
     expected_status: EconomicStateStageStatus,
 ) -> Result<(), EconomicStateCacheError> {
+    let expected_version = record
+        .version
+        .checked_sub(1)
+        .ok_or_else(|| invariant("economic stage version underflowed"))?;
     let changed = transaction
         .execute(
             r#"
@@ -25,7 +29,7 @@ pub(crate) fn update_stage(
                 sqlite_i64(record.updated_at_unix_ms, "updated_at_unix_ms")?,
                 &record.batch.batch_id,
                 expected_status.as_str(),
-                sqlite_i64(record.version - 1, "expected_stage_version")?,
+                sqlite_i64(expected_version, "expected_stage_version")?,
             ],
         )
         .map_err(sqlite_error)?;
@@ -308,6 +312,10 @@ pub(crate) fn append_stage_commit(
     let previous = if record.version == 1 {
         GENESIS_STAGE_COMMIT_DIGEST.to_owned()
     } else {
+        let previous_version = record
+            .version
+            .checked_sub(1)
+            .ok_or_else(|| invariant("economic stage version underflowed"))?;
         transaction
             .query_row(
                 r#"
@@ -316,7 +324,7 @@ pub(crate) fn append_stage_commit(
                 "#,
                 params![
                     &record.batch.batch_id,
-                    sqlite_i64(record.version - 1, "previous_stage_version")?,
+                    sqlite_i64(previous_version, "previous_stage_version")?,
                 ],
                 |row| row.get::<_, String>(0),
             )

@@ -1120,18 +1120,21 @@ fn transition_credit_exposure_tx(
     {
         return Err(AdmissionOperationStoreError::Fenced);
     }
+    let released_reserved_units = account
+        .reserved_units
+        .checked_sub(current.amount().units)
+        .ok_or_else(|| invariant("credit exposure reserved units underflowed"))?;
     let (next_open_units, next_reserved_units) = match expected_state {
         CreditExposureReservationStateV1::Committed => (
             account
                 .open_units
                 .checked_add(current.amount().units)
                 .ok_or_else(|| invariant("credit exposure open units overflowed"))?,
-            account.reserved_units - current.amount().units,
+            released_reserved_units,
         ),
-        CreditExposureReservationStateV1::ReleasedBeforeDispatch => (
-            account.open_units,
-            account.reserved_units - current.amount().units,
-        ),
+        CreditExposureReservationStateV1::ReleasedBeforeDispatch => {
+            (account.open_units, released_reserved_units)
+        }
         CreditExposureReservationStateV1::OutcomeUnknown => {
             (account.open_units, account.reserved_units)
         }

@@ -430,7 +430,11 @@ impl ChioKernel {
                         })?;
                     }
                     AdmissionOperationState::Prepared
-                    | AdmissionOperationState::BrokerAttemptRegistered => {
+                    | AdmissionOperationState::BrokerAttemptRegistered
+                    | AdmissionOperationState::BudgetAuthorized
+                    | AdmissionOperationState::ApprovalReserved
+                    | AdmissionOperationState::ReadyToDispatch
+                    | AdmissionOperationState::CapturePending => {
                         self.compensate_durable_admission_before_dispatch(
                             &operation,
                             serde_json::json!({

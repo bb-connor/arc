@@ -1224,14 +1224,60 @@ impl ThresholdApprovalProposalBody {
 }
 
 /// Signed threshold proposal issued by the active policy authority.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ThresholdApprovalProposal {
     #[serde(flatten)]
     pub body: ThresholdApprovalProposalBody,
     #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
     pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ThresholdApprovalProposalWire {
+    schema: String,
+    proposal_id: String,
+    request_id: String,
+    governed_intent_hash: String,
+    subject: PublicKey,
+    authorizing_capability_digest: String,
+    policy_hash: String,
+    threshold: u32,
+    eligible_set_digest: String,
+    proposal_created_at: u64,
+    proposal_deadline: u64,
+    policy_authority: PublicKey,
+    #[serde(default)]
+    algorithm: Option<SigningAlgorithm>,
+    signature: Signature,
+}
+
+impl<'de> Deserialize<'de> for ThresholdApprovalProposal {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = ThresholdApprovalProposalWire::deserialize(deserializer)?;
+        Ok(Self {
+            body: ThresholdApprovalProposalBody {
+                schema: wire.schema,
+                proposal_id: wire.proposal_id,
+                request_id: wire.request_id,
+                governed_intent_hash: wire.governed_intent_hash,
+                subject: wire.subject,
+                authorizing_capability_digest: wire.authorizing_capability_digest,
+                policy_hash: wire.policy_hash,
+                threshold: wire.threshold,
+                eligible_set_digest: wire.eligible_set_digest,
+                proposal_created_at: wire.proposal_created_at,
+                proposal_deadline: wire.proposal_deadline,
+                policy_authority: wire.policy_authority,
+            },
+            algorithm: wire.algorithm,
+            signature: wire.signature,
+        })
+    }
 }
 
 impl ThresholdApprovalProposal {
@@ -1327,6 +1373,13 @@ impl VerifiedApprovalSetBody {
         {
             return Err(Error::CanonicalJson(
                 "verified approval token digests must be distinct SHA-256 values".into(),
+            ));
+        }
+        if u32::try_from(token_digests.len())
+            .map_or(true, |digest_count| digest_count < proposal.body.threshold)
+        {
+            return Err(Error::CanonicalJson(
+                "verified approval token digests do not satisfy the proposal threshold".into(),
             ));
         }
         let body = &proposal.body;
