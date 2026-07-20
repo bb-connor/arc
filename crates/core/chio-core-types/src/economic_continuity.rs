@@ -1222,8 +1222,12 @@ impl EconomicStateBatchV1 {
                 .ok_or(EconomicContinuityError::BindingMismatch(
                     "prepared_effect_owner",
                 ))?;
+            let binds_resource_head = owner_transition.next_head.digest()?
+                == slot.resource_head_digest
+                || owner_transition.expected_head_digest.as_deref()
+                    == Some(slot.resource_head_digest.as_str());
             if owner_transition.resource_key != slot.resource_key
-                || owner_transition.next_head.digest()? != slot.resource_head_digest
+                || !binds_resource_head
                 || owner_transition.next_head.operation_id.as_deref()
                     != Some(slot.operation_id.as_str())
                 || owner_transition.next_head.effect_idempotency_key.as_deref()

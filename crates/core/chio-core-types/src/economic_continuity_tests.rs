@@ -299,6 +299,54 @@ fn batch_binds_prepared_effect_slot_and_request_replay() -> Result<(), Box<dyn c
     batch.seal(&keypair)?;
     batch.verify_signature(&keypair.public_key())?;
 
+    let mut predecessor_bound = batch.clone();
+    let predecessor_digest = digest("prepared-effect-predecessor");
+    predecessor_bound.effect_slots[0].resource_head_digest = predecessor_digest.clone();
+    let predecessor_slot = predecessor_bound.effect_slots[0].clone();
+    let predecessor_slot_digest = predecessor_slot.digest()?;
+    let owner_transition = predecessor_bound
+        .transitions
+        .iter_mut()
+        .find(|transition| transition.prepared_effect.is_some())
+        .ok_or("prepared effect owner is missing")?;
+    owner_transition.expected_head_digest = Some(predecessor_digest.clone());
+    owner_transition.next_head.head_version = 2;
+    owner_transition.next_head.predecessor_digest = Some(predecessor_digest);
+    owner_transition
+        .prepared_effect
+        .as_mut()
+        .ok_or("prepared effect is missing")?
+        .effect_slot_digest = predecessor_slot_digest;
+    let slot_transition = predecessor_bound
+        .transitions
+        .iter_mut()
+        .find(|transition| transition.resource_key == predecessor_slot.resource_head_key())
+        .ok_or("effect slot transition is missing")?;
+    let slot_content = inline_content(serde_json::to_value(&predecessor_slot)?);
+    slot_transition.next_head.state_digest = slot_content.digest()?;
+    slot_transition.next_head.state = slot_content;
+    predecessor_bound.seal(&keypair)?;
+    predecessor_bound.verify_signature(&keypair.public_key())?;
+
+    let mut unrelated_bound = predecessor_bound.clone();
+    unrelated_bound.effect_slots[0].resource_head_digest = digest("unrelated-resource-head");
+    let unrelated_slot = unrelated_bound.effect_slots[0].clone();
+    unrelated_bound
+        .transitions
+        .iter_mut()
+        .find_map(|transition| transition.prepared_effect.as_mut())
+        .ok_or("prepared effect is missing")?
+        .effect_slot_digest = unrelated_slot.digest()?;
+    let slot_transition = unrelated_bound
+        .transitions
+        .iter_mut()
+        .find(|transition| transition.resource_key == unrelated_slot.resource_head_key())
+        .ok_or("effect slot transition is missing")?;
+    let slot_content = inline_content(serde_json::to_value(&unrelated_slot)?);
+    slot_transition.next_head.state_digest = slot_content.digest()?;
+    slot_transition.next_head.state = slot_content;
+    assert!(unrelated_bound.seal(&keypair).is_err());
+
     let mut already_dispatched = batch.clone();
     already_dispatched.effect_slots[0].state = EconomicEffectStateV1::DispatchCommitted;
     let dispatched_slot = already_dispatched.effect_slots[0].clone();
