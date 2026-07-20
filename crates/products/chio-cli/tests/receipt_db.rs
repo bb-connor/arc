@@ -8,14 +8,6 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::Client;
 use rusqlite::Connection;
 
-fn unique_receipt_db_path(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
-
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
@@ -92,8 +84,9 @@ fn wait_for_trust_service(client: &Client, base_url: &str) {
 
 #[test]
 fn check_command_persists_receipt_to_sqlite() {
-    let db_path = unique_receipt_db_path("chio-cli-check-receipts");
-    let session_db_path = unique_receipt_db_path("chio-cli-check-sessions");
+    let dir = tempfile::tempdir().expect("private store directory");
+    let db_path = dir.path().join("receipts.sqlite3");
+    let session_db_path = dir.path().join("sessions.sqlite3");
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
