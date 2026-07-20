@@ -1033,3 +1033,25 @@ fn bridge_delete_operation_has_side_effects() {
         .expect("deletePet tool");
     assert!(delete_pet.has_side_effects);
 }
+
+#[test]
+fn bridge_tool_server_reports_read_only_classification() {
+    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
+    let server = bridge.as_tool_server();
+    assert!(server.tool_is_read_only("listPets"));
+    assert!(!server.tool_is_read_only("createPet"));
+    assert!(!server.tool_is_read_only("deletePet"));
+    // Unknown tools stay side-effecting so an unmatched name cannot skip
+    // durable side-effect admission.
+    assert!(!server.tool_is_read_only("unknownTool"));
+}
+
+#[test]
+fn owned_bridge_tool_server_reports_read_only_classification() {
+    let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
+    let server = OwnedBridgeToolServer::from_bridge(bridge);
+    assert!(server.tool_is_read_only("listPets"));
+    assert!(!server.tool_is_read_only("createPet"));
+    assert!(!server.tool_is_read_only("deletePet"));
+    assert!(!server.tool_is_read_only("unknownTool"));
+}

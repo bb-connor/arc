@@ -75,14 +75,15 @@ fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
     Ok(())
 }
 
-fn reject_threshold_approvals_without_stable_request_id(
+fn reject_request_bound_artifacts_without_stable_request_id(
     execution: &AcpKernelExecutionContext,
 ) -> Result<(), AcpEdgeError> {
-    if execution.approval_tokens.is_empty() {
+    if execution.approval_tokens.is_empty() && execution.supplemental_authorization.is_none() {
         return Ok(());
     }
     Err(AcpEdgeError::InvalidRequest(
-        "ACP threshold approvals require invoke_with_request_id".to_string(),
+        "ACP threshold approvals and supplemental authorization require invoke_with_request_id"
+            .to_string(),
     ))
 }
 
@@ -398,7 +399,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
         validate_execution_context(execution)?;
-        reject_threshold_approvals_without_stable_request_id(execution)?;
+        reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = Self::build_execution_request(
@@ -457,7 +458,7 @@ impl ChioAcpEdge {
         reason: impl Into<String>,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
         validate_execution_context(execution)?;
-        reject_threshold_approvals_without_stable_request_id(execution)?;
+        reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = Self::build_execution_request(
@@ -493,7 +494,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
         validate_execution_context(execution)?;
-        reject_threshold_approvals_without_stable_request_id(execution)?;
+        reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = Self::build_execution_request(
@@ -893,7 +894,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
         validate_execution_context(execution)?;
-        reject_threshold_approvals_without_stable_request_id(execution)?;
+        reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();

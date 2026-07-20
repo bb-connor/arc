@@ -152,6 +152,11 @@ impl SqliteBudgetStore {
                     "supplemental invocation capture requires trusted time".to_string(),
                 )
             })?;
+            if expires_at > MAX_SUPPLEMENTAL_AUTHORIZATION_EXPIRES_AT_SECONDS {
+                return Err(BudgetStoreError::Invariant(
+                    "supplemental authorization expiry is not expressed in seconds".to_string(),
+                ));
+            }
             if trusted_time >= expires_at {
                 return Err(BudgetStoreError::Invariant(
                     "supplemental authorization expired before invocation capture".to_string(),

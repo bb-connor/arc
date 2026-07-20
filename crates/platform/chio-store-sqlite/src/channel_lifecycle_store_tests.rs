@@ -36,6 +36,7 @@ struct Fixture {
 
 fn fixture() -> TestResult<Fixture> {
     let temp = tempfile::tempdir()?;
+    secure_temp_directory(temp.path());
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root)?;
@@ -565,4 +566,15 @@ fn second_serving_owner_is_denied() -> TestResult {
         Err(SqliteServingOwnerError::AlreadyServing(_))
     ));
     Ok(())
+}
+
+fn secure_temp_directory(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+            .expect("secure temp directory");
+    }
+    #[cfg(not(unix))]
+    let _ = path;
 }

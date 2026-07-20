@@ -708,6 +708,37 @@ fn execute_tool_calls_rejects_shared_threshold_approvals() {
 }
 
 #[test]
+fn execute_tool_calls_rejects_shared_supplemental_authorization() {
+    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let kernel = ChioKernel::new(test_kernel_config());
+    let agent = Keypair::generate();
+    let mut execution = test_execution_context(&kernel, &agent, "test-srv", "*");
+    execution.supplemental_authorization = Some(
+        chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
+            signed_extension: "opaque-batch-extension".to_string(),
+        },
+    );
+    let calls = vec![
+        weather_tool_call(),
+        OpenAiToolCall {
+            id: "call_search".to_string(),
+            call_type: "function".to_string(),
+            function: OpenAiFunctionCall {
+                name: "search".to_string(),
+                arguments: r#"{"query": "test"}"#.to_string(),
+            },
+        },
+    ];
+
+    let results = adapter.execute_tool_calls(&calls, &kernel, &execution);
+
+    assert!(results.iter().all(|result| result.denied));
+    assert!(results
+        .iter()
+        .all(|result| result.content.contains("single OpenAI tool call")));
+}
+
+#[test]
 fn execute_tool_calls_uses_per_call_execution_nonces() {
     let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());

@@ -250,3 +250,126 @@ fn threshold_replay_state_commits_when_dispatch_commits() {
         .expect("replay state");
     assert_eq!(state, "committed");
 }
+
+fn prepared_approval_and_budget_operation(
+    fence: &StoreMutationFence,
+    request_id: &str,
+    capability_id: &str,
+) -> AdmissionOperationV1 {
+    let namespace = AuthenticatedRequestNamespace::for_local_system(identifier(
+        "coordinator_authority_id",
+        "local-test-authority",
+    ))
+    .expect("namespace");
+    let requirements = AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        approval: true,
+        ..AdmissionParticipantRequirements::NONE
+    };
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::ToolDispatch,
+        namespace,
+        request_id: identifier("request_id", request_id),
+        capability_id: identifier("capability_id", capability_id),
+        authorization_capability_hash: digest("authorization_capability_hash", 'a'),
+        request_binding: AdmissionRequestBindingV1::new(
+            digest("immutable_request_hash", 'b'),
+            requirements,
+        )
+        .expect("request binding"),
+        policy_hash: digest("policy_hash", 'c'),
+        effect_class: SideEffectClass::SideEffecting,
+    })
+    .expect("binding");
+    AdmissionOperationV1::prepare(binding, fence.owner_epoch).expect("prepared operation")
+}
+
+#[test]
+fn an_operation_needing_budget_and_approval_persists_the_approval_required_state() {
+    let fixture = fixture();
+    let now = now_ms();
+    let created_at = now / 1_000;
+    let operation = prepared_approval_and_budget_operation(
+        &fixture.fence,
+        "approval-required-request",
+        "approval-required-capability",
+    );
+    fixture
+        .store
+        .begin(&operation, &fixture.fence, now)
+        .expect("begin operation");
+
+    let lease = claim(&fixture, &operation, "approval-required-worker", now + 1);
+    let registered = fixture
+        .store
+        .compare_and_swap(
+            &AdmissionOperationCommand::new(
+                operation.binding().operation_id().clone(),
+                operation.version(),
+                lease,
+                vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+                    &operation,
+                    "approval-required-attempt",
+                ))],
+                Some(AdmissionOperationState::BrokerAttemptRegistered),
+                None,
+                None,
+            )
+            .expect("broker attempt command"),
+            now + 2,
+        )
+        .expect("register broker attempt")
+        .into_operation();
+
+    let reservation = replay_reservation(
+        "approval-required-proposal",
+        "approval-required-request",
+        ["approval-required-token-a", "approval-required-token-b"],
+        created_at,
+    );
+    let proposal_hash = reservation
+        .proposal()
+        .artifact_digest()
+        .expect("proposal hash");
+    let lease = claim(&fixture, &registered, "approval-required-worker", now + 3);
+    let command = AdmissionOperationCommand::new(
+        registered.binding().operation_id().clone(),
+        registered.version(),
+        lease,
+        vec![
+            AdmissionAttachment::ThresholdProposalHash(
+                AdmissionDigest::try_new("threshold_proposal_hash", proposal_hash)
+                    .expect("proposal digest"),
+            ),
+            AdmissionAttachment::ThresholdProposal(Box::new(reservation.proposal().clone())),
+            AdmissionAttachment::BudgetHoldId(identifier(
+                "budget_hold_id",
+                "approval-required-hold",
+            )),
+        ],
+        Some(AdmissionOperationState::ApprovalRequired),
+        None,
+        None,
+    )
+    .expect("approval-required command");
+
+    // The generic compare-and-swap is the path that writes this state, so the SQL
+    // state CHECK has to admit it or the transition can never be persisted.
+    let advanced = fixture
+        .store
+        .compare_and_swap(&command, now + 4)
+        .expect("advance to approval_required")
+        .into_operation();
+    assert_eq!(advanced.state(), AdmissionOperationState::ApprovalRequired);
+
+    let connection = fixture.store.connection().expect("connection");
+    let state: String = connection
+        .query_row(
+            "SELECT state FROM admission_operations WHERE operation_id = ?1",
+            [operation.binding().operation_id().as_str()],
+            |row| row.get(0),
+        )
+        .expect("persisted state");
+    assert_eq!(state, "approval_required");
+}

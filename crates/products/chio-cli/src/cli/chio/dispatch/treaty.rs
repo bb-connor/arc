@@ -399,6 +399,7 @@ mod tests {
             mode: "receipt_backed".to_string(),
             consistency_model: bilateral.consistency_model.clone(),
             co_sign: "bilateral_required".to_string(),
+            co_sign_quorum: None,
             required_evidence: vec![
                 "receipt_lineage".to_string(),
                 "bilateral_invocation".to_string(),

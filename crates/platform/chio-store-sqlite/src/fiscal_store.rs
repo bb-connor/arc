@@ -2833,10 +2833,13 @@ fn append_projection_commit(
     let previous = if projection_sequence == 1 {
         ZERO_DIGEST.to_owned()
     } else {
+        let previous_sequence = projection_sequence
+            .checked_sub(1)
+            .ok_or_else(|| invariant("fiscal projection sequence underflowed"))?;
         transaction
             .query_row(
                 "SELECT commit_digest FROM fiscal_projection_commits WHERE projection_key = ?1 AND projection_sequence = ?2",
-                params![projection_key, sqlite_i64(projection_sequence - 1, "previous fiscal projection sequence")?],
+                params![projection_key, sqlite_i64(previous_sequence, "previous fiscal projection sequence")?],
                 |row| row.get::<_, String>(0),
             )
             .optional()

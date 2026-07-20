@@ -95,9 +95,10 @@ fn stale_owner_fences_reads_and_mutations() {
 #[test]
 fn a_new_serving_epoch_reclaims_an_unexpired_stale_owner_lease() {
     let temp = tempfile::tempdir().expect("tempdir");
+    secure_directory(temp.path());
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
-    fs::create_dir(&lock_root).expect("create lock root");
+    create_lock_root(&lock_root);
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
     let first = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("first owner");
     let first_fence = first.mutation_fence();

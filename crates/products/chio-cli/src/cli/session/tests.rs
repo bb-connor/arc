@@ -748,7 +748,12 @@ capabilities:
             capability_token: Box::new(cap),
             server_id: "srv-b".to_string(),
             tool: "read_file".to_string(),
-            params: serde_json::json!({"path": "/app/src/main.rs"}),
+            params: Box::new(serde_json::json!({"path": "/app/src/main.rs"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -808,7 +813,12 @@ capabilities:
             capability_token: Box::new(stolen_capability),
             server_id: "srv-a".to_string(),
             tool: "read_file".to_string(),
-            params: serde_json::json!({"path": "/app/src/main.rs"}),
+            params: Box::new(serde_json::json!({"path": "/app/src/main.rs"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -859,7 +869,12 @@ capabilities:
             capability_token: Box::new(allowed_cap),
             server_id: "*".to_string(),
             tool: "read_file".to_string(),
-            params: serde_json::json!({"path": "/workspace/README.md"}),
+            params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -867,7 +882,12 @@ capabilities:
             capability_token: Box::new(caps[0].clone()),
             server_id: "*".to_string(),
             tool: "write_file".to_string(),
-            params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
+            params: Box::new(serde_json::json!({"path": "/workspace/README.md", "content": "nope"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -978,10 +998,15 @@ extensions:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "read_file".to_string(),
-            params: serde_json::json!({
+            params: Box::new(serde_json::json!({
                 "path": "/workspace/README.md",
                 "embedding": [1.0, 0.0, 0.0]
-            }),
+            })),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1049,7 +1074,12 @@ guards:
             capability_token: Box::new(allowed_cap),
             server_id: "*".to_string(),
             tool: "read_file".to_string(),
-            params: serde_json::json!({"path": "/workspace/README.md"}),
+            params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -1057,7 +1087,12 @@ guards:
             capability_token: Box::new(caps[0].clone()),
             server_id: "*".to_string(),
             tool: "write_file".to_string(),
-            params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
+            params: Box::new(serde_json::json!({"path": "/workspace/README.md", "content": "nope"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1120,7 +1155,12 @@ capabilities:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "stream_file".to_string(),
-            params: serde_json::json!({"path": "/workspace/README.md"}),
+            params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1176,7 +1216,12 @@ capabilities:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "stream_file".to_string(),
-            params: serde_json::json!({"path": "/workspace/README.md"}),
+            params: Box::new(serde_json::json!({"path": "/workspace/README.md"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1230,7 +1275,12 @@ capabilities:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "bash".to_string(),
-            params: serde_json::json!({"command": "rm -rf /"}),
+            params: Box::new(serde_json::json!({"command": "rm -rf /"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1296,7 +1346,12 @@ guards:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "sql".to_string(),
-            params: serde_json::json!({"database": "postgres", "query": "DELETE FROM orders"}),
+            params: Box::new(serde_json::json!({"database": "postgres", "query": "DELETE FROM orders"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1364,7 +1419,12 @@ guards:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "sql".to_string(),
-            params: serde_json::json!({"database": "postgres", "query": "SELECT email FROM orders"}),
+            params: Box::new(serde_json::json!({"database": "postgres", "query": "SELECT email FROM orders"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1438,7 +1498,12 @@ guards:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "slack_send_message".to_string(),
-            params: serde_json::json!({"text": "classified incident details"}),
+            params: Box::new(serde_json::json!({"text": "classified incident details"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1530,7 +1595,12 @@ guards:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "slack_send_message".to_string(),
-            params: serde_json::json!({"text": "violent escalation details"}),
+            params: Box::new(serde_json::json!({"text": "violent escalation details"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1625,7 +1695,12 @@ guards:
             capability_token: Box::new(cap),
             server_id: "*".to_string(),
             tool: "fetch_url".to_string(),
-            params: serde_json::json!({"url": "https://malicious.example/bad"}),
+            params: Box::new(serde_json::json!({"url": "https://malicious.example/bad"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let mut stats = SessionStats::default();

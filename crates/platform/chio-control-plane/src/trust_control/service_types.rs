@@ -161,9 +161,9 @@ pub use self::responses::{
 };
 pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
-    AuthorityKeyCache, BudgetCursor, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
-    ClusterRuntimeState, FederationAdmissionRateLimiter, PeerHealth, PeerSyncState,
-    RemoteBudgetStore, RemoteCapabilityAuthority, RemoteReceiptStore, RemoteRevocationStore,
-    RevocationCursor, TrustServiceState,
+    AuthorityKeyCache, BudgetCursor, CachedBudgetUsage, ClusterConsensusView,
+    ClusterPeerClientAuth, ClusterProgress, ClusterRuntimeState, FederationAdmissionRateLimiter,
+    PeerHealth, PeerSyncState, RemoteBudgetStore, RemoteCapabilityAuthority, RemoteReceiptStore,
+    RemoteRevocationStore, RevocationCursor, TrustServiceState,
 };
 pub(crate) use self::structured_budget::*;

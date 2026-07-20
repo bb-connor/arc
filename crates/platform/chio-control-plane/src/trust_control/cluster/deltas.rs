@@ -1417,11 +1417,11 @@ pub(crate) fn collect_budget_mutation_event_views_after_seq(
     after_seq: u64,
     limit: usize,
 ) -> Result<Vec<BudgetMutationEventView>, CliError> {
-    Ok(store
+    store
         .list_mutation_events_after_seq(limit, after_seq)?
         .into_iter()
         .map(budget_mutation_event_view)
-        .collect())
+        .collect()
 }
 
 fn collect_budget_projection_views_for_events(
@@ -1449,9 +1449,30 @@ fn collect_budget_projection_views_for_events(
     Ok(latest.into_values().collect())
 }
 
-pub(crate) fn budget_mutation_event_view(record: BudgetMutationRecord) -> BudgetMutationEventView {
+/// `BudgetMutationEventView` has no fields for the structured projection, so
+/// lowering a composite event into one would drop the quota and cumulative-approval
+/// state that admission enforcement and audit depend on. Peers cannot detect the
+/// loss either, because the rebuilt record reports no composite state at all.
+fn carries_composite_projection(record: &BudgetMutationRecord) -> bool {
+    record.admission_binding.is_some()
+        || !record.invocation_quota_usages.is_empty()
+        || !record.invocation_quota_mutations.is_empty()
+        || record.cumulative_approval.is_some()
+        || record.cumulative_approval_mutation.is_some()
+        || record.cumulative_approval_set_digest.is_some()
+}
+
+pub(crate) fn budget_mutation_event_view(
+    record: BudgetMutationRecord,
+) -> Result<BudgetMutationEventView, CliError> {
+    if carries_composite_projection(&record) {
+        return Err(CliError::cli_other_error(format!(
+            "budget mutation event `{}` carries composite projection state that cluster replication cannot represent",
+            record.event_id
+        )));
+    }
     let lifecycle = BudgetMutationLifecycleView::from_record(&record);
-    BudgetMutationEventView {
+    Ok(BudgetMutationEventView {
         event_id: record.event_id,
         hold_id: record.hold_id,
         capability_id: record.capability_id,
@@ -1477,7 +1498,7 @@ pub(crate) fn budget_mutation_event_view(record: BudgetMutationRecord) -> Budget
                 lease_id: authority.lease_id,
                 lease_epoch: authority.lease_epoch,
             }),
-    }
+    })
 }
 
 pub(crate) fn budget_usage_record_from_view(

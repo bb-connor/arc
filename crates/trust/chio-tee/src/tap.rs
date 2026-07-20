@@ -181,7 +181,12 @@ mod tests {
             capability_token: Box::new(fake_capability(kp, id)),
             server_id: "srv-1".to_string(),
             tool: "noop".to_string(),
-            params: serde_json::Value::Null,
+            params: Box::new(serde_json::Value::Null),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         }
     }
 

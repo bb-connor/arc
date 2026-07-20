@@ -7,6 +7,7 @@ use chio_fiscal::{
 use chio_store_sqlite::fiscal_store::FiscalStoreError;
 
 use crate::fiscal_state_recovery::FiscalStartupRecoveryAction;
+use crate::trust_control::report_rendering::forward_post_to_leader;
 use crate::trust_control::report_validation::{
     resolve_control_read_principal, validate_service_auth, ResolvedControlReadPrincipal,
 };
@@ -66,6 +67,11 @@ pub(crate) async fn handle_fiscal_proposal_persist(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    match forward_post_to_leader(&state, FISCAL_PROPOSALS_PATH, &proposal).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
         return fiscal_runtime_not_configured();
     };
@@ -88,6 +94,11 @@ pub(crate) async fn handle_fiscal_proposal_admit(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    match forward_post_to_leader(&state, FISCAL_PROPOSAL_ADMIT_PATH, &proposal).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
         return fiscal_runtime_not_configured();
     };
@@ -102,7 +113,7 @@ pub(crate) async fn handle_fiscal_proposal_admit(
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct FiscalApprovalPersistRequest {
     proposal: SignedFiscalProposal,
@@ -118,6 +129,11 @@ pub(crate) async fn handle_fiscal_approval_persist(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    match forward_post_to_leader(&state, FISCAL_APPROVALS_PATH, &request).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
         return fiscal_runtime_not_configured();
     };
@@ -132,7 +148,7 @@ pub(crate) async fn handle_fiscal_approval_persist(
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct FiscalActivationCommitRequest {
     proposal: SignedFiscalProposal,
@@ -148,6 +164,11 @@ pub(crate) async fn handle_fiscal_activation_commit(
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
+    }
+    match forward_post_to_leader(&state, FISCAL_ACTIVATIONS_PATH, &request).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
     }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
         return fiscal_runtime_not_configured();

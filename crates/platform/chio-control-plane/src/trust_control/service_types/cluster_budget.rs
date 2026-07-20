@@ -98,6 +98,7 @@ pub(crate) struct ClusterStateSnapshotResponse {
     /// wrong value.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_abandoned_seq_ranges: Vec<AbandonedSeqRange>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_origin_ack_heads: Vec<BudgetOriginAck>,
 }
 

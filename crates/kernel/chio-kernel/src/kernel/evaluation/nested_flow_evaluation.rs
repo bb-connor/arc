@@ -309,6 +309,7 @@ impl ChioKernel {
         let mut budget_error = None;
         let mut budget_error_metadata = None;
         let mut governed_error = None;
+        let mut guard_denial = None;
         let mut selected = None;
         for matching in &matching_grants {
             if durable_admission
@@ -385,24 +386,8 @@ impl ChioKernel {
                 Err(error) => {
                     let msg = error.error.to_string();
                     warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied (nested flow)");
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        None,
-                        None,
-                    )?;
-                    let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
-                    return self.with_pre_invocation_guard_evidence(&error.evidence, || {
-                        self.build_monetary_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            &matching_grants,
-                            cap,
-                            receipt_metadata,
-                        )
-                    });
+                    guard_denial.get_or_insert(error);
+                    continue;
                 }
             };
             let runtime_admission = self.run_runtime_admission_hook(
@@ -565,6 +550,33 @@ impl ChioKernel {
             runtime_admission_metadata,
         )) = selected
         else {
+            // Guards are evaluated per grant, so a denial on one candidate only
+            // decides the request once every later candidate has also failed.
+            // A recorded budget denial still wins, since it carries the
+            // stuck-reservation evidence the loop broke out to preserve.
+            if budget_error.is_none() {
+                if let Some(denial) = guard_denial {
+                    let msg = denial.error.to_string();
+                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                        durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
+                        None,
+                        None,
+                    )?;
+                    let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
+                    return self.with_pre_invocation_guard_evidence(&denial.evidence, || {
+                        self.build_monetary_deny_response_with_metadata(
+                            request,
+                            &msg,
+                            now,
+                            &matching_grants,
+                            cap,
+                            receipt_metadata,
+                        )
+                    });
+                }
+            }
             let error = budget_error.or(governed_error).unwrap_or_else(|| {
                 KernelError::DurableAdmission(
                     "retained budget hold does not identify a matching grant".to_string(),

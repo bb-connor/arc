@@ -8,8 +8,6 @@ use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
-const CURRENT_PROJECTION_KINDS: &str = "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal'";
-
 const GLOBAL_COMMIT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS authority_global_commit_meta (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -193,48 +191,10 @@ pub(crate) fn initialize_global_commit_schema(
         [],
         |row| row.get::<_, bool>(0),
     )?;
-    if table_exists {
-        let actual = global_schema_catalog(connection)?;
-        if actual == expected_global_schema_catalog(GLOBAL_COMMIT_SCHEMA)? {
-            return Ok(());
-        }
-        let supported_legacy = [
-            pre_fiscal_global_commit_schema(),
-            pre_factor_assignment_global_commit_schema(),
-            pre_channel_release_global_commit_schema(),
-            pre_economic_global_commit_schema(),
-            pre_payment_global_commit_schema(),
-            legacy_global_commit_schema(),
-        ];
-        if !supported_legacy
-            .iter()
-            .map(|schema| expected_global_schema_catalog(schema))
-            .collect::<Result<Vec<_>, _>>()?
-            .contains(&actual)
-        {
-            return Err(invalid(
-                "global authority commit schema is neither current nor a supported legacy definition",
-            ));
-        }
-        migrate_legacy_global_commit_schema(connection)?;
-    } else {
+    if !table_exists {
         connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
     }
     verify_global_commit_schema(connection)
-}
-
-fn pre_fiscal_global_commit_schema() -> String {
-    GLOBAL_COMMIT_SCHEMA.replace(
-        CURRENT_PROJECTION_KINDS,
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set'",
-    )
-}
-
-fn pre_factor_assignment_global_commit_schema() -> String {
-    GLOBAL_COMMIT_SCHEMA.replace(
-        CURRENT_PROJECTION_KINDS,
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication'",
-    )
 }
 
 pub(crate) fn verify_global_commit_schema(
@@ -245,91 +205,6 @@ pub(crate) fn verify_global_commit_schema(
     if global_schema_catalog(connection)? != global_schema_catalog(&expected)? {
         return Err(invalid("global authority commit schema is not canonical"));
     }
-    Ok(())
-}
-
-fn legacy_global_commit_schema() -> String {
-    GLOBAL_COMMIT_SCHEMA.replace(
-        CURRENT_PROJECTION_KINDS,
-        "'baseline', 'admission', 'budget', 'revocation'",
-    )
-}
-
-fn pre_payment_global_commit_schema() -> String {
-    GLOBAL_COMMIT_SCHEMA.replace(
-        CURRENT_PROJECTION_KINDS,
-        "'baseline', 'admission', 'budget', 'revocation', 'frost'",
-    )
-}
-
-fn pre_economic_global_commit_schema() -> String {
-    GLOBAL_COMMIT_SCHEMA.replace(
-        CURRENT_PROJECTION_KINDS,
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
-    )
-}
-
-fn pre_channel_release_global_commit_schema() -> String {
-    GLOBAL_COMMIT_SCHEMA.replace(
-        CURRENT_PROJECTION_KINDS,
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
-    )
-}
-
-fn expected_global_schema_catalog(
-    schema: &str,
-) -> Result<Vec<SchemaCatalogEntry>, SqliteServingOwnerError> {
-    let expected = Connection::open_in_memory()?;
-    expected.execute_batch(schema)?;
-    global_schema_catalog(&expected)
-}
-
-fn migrate_legacy_global_commit_schema(
-    connection: &Connection,
-) -> Result<(), SqliteServingOwnerError> {
-    let transaction = connection.unchecked_transaction()?;
-    let expected_rows =
-        transaction.query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
-            row.get::<_, i64>(0)
-        })?;
-    transaction.execute_batch(
-        r#"
-        DROP TRIGGER authority_global_commits_immutable;
-        DROP TRIGGER authority_global_commits_no_delete;
-        DROP INDEX authority_global_commits_projection;
-        ALTER TABLE authority_global_commits
-            RENAME TO authority_global_commits_legacy;
-        "#,
-    )?;
-    transaction.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
-    transaction.execute(
-        r#"
-        INSERT INTO authority_global_commits (
-            commit_sequence, mutation_kind, projection_kind, projection_key,
-            projection_sequence, projection_reference_digest,
-            authority_projection_digest, previous_chain_digest, chain_digest,
-            store_uuid, store_lease_id, store_owner_epoch
-        )
-        SELECT commit_sequence, mutation_kind, projection_kind, projection_key,
-               projection_sequence, projection_reference_digest,
-               authority_projection_digest, previous_chain_digest, chain_digest,
-               store_uuid, store_lease_id, store_owner_epoch
-        FROM authority_global_commits_legacy
-        ORDER BY commit_sequence
-        "#,
-        [],
-    )?;
-    let migrated_rows =
-        transaction.query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
-            row.get::<_, i64>(0)
-        })?;
-    if migrated_rows != expected_rows {
-        return Err(invalid(
-            "legacy global authority commit migration changed the row count",
-        ));
-    }
-    transaction.execute("DROP TABLE authority_global_commits_legacy", [])?;
-    transaction.commit()?;
     Ok(())
 }
 
@@ -1184,7 +1059,12 @@ fn baseline_projection_digest(connection: &Connection) -> Result<String, SqliteS
     baseline_projection_digest_for_tables(connection, table_names(connection, false)?)
 }
 
-fn verify_pristine_baseline(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
+/// Refuses any authority table that already carries rows, which a global baseline
+/// cannot adopt. Enumerated from `sqlite_schema`, so tables that do not exist yet
+/// are simply absent and provisioning can run this before it creates anything.
+pub(crate) fn verify_pristine_authority_tables(
+    connection: &Connection,
+) -> Result<(), SqliteServingOwnerError> {
     for table in table_names(connection, false)? {
         if matches!(
             table.as_str(),
@@ -1209,6 +1089,11 @@ fn verify_pristine_baseline(connection: &Connection) -> Result<(), SqliteServing
             )));
         }
     }
+    Ok(())
+}
+
+fn verify_pristine_baseline(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
+    verify_pristine_authority_tables(connection)?;
 
     let canonical_seeds = connection.query_row(
         r#"
@@ -1310,15 +1195,6 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     {
         return Ok(());
     }
-    if factor_assignment_empty
-        && channel_release_projection_is_empty(connection)?
-        && payment_projection_is_empty(connection)?
-        && frost_projection_is_empty(connection)?
-        && channel_projection_is_empty(connection)?
-        && committed == legacy_baseline_projection_digest(connection)?
-    {
-        return Ok(());
-    }
     Err(invalid(
         "global authority baseline does not match its live projection",
     ))
@@ -1382,42 +1258,6 @@ fn pre_channel_pre_payment_baseline_projection_digest(
             })
             .collect(),
     )
-}
-
-fn legacy_baseline_projection_digest(
-    connection: &Connection,
-) -> Result<String, SqliteServingOwnerError> {
-    let mut statement = connection.prepare(
-        r#"
-        SELECT name FROM sqlite_schema
-        WHERE type = 'table'
-          AND (
-              name = 'capability_grant_budgets'
-              OR name = 'revoked_capabilities'
-              OR name = 'chio_authority_migrations'
-              OR name GLOB 'admission_operation*'
-              OR name GLOB 'admission_authority_*'
-              OR name GLOB 'budget_*'
-          )
-          AND name NOT IN ('budget_ack_head_watermark', 'budget_origin_ack_heads')
-        ORDER BY name
-        "#,
-    )?;
-    let tables = statement
-        .query_map([], |row| row.get::<_, String>(0))?
-        .collect::<Result<Vec<_>, _>>()?;
-    let mut snapshots = Vec::with_capacity(tables.len());
-    for table in tables {
-        snapshots.push(table_snapshot(connection, &table, None)?);
-    }
-    digest(&AuthoritySnapshot {
-        format: "chio.sqlite-authority-projection.v1",
-        tables: snapshots,
-    })
-}
-
-fn frost_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {
-    projection_is_empty(connection, "frost_")
 }
 
 fn payment_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {

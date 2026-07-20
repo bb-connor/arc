@@ -356,7 +356,12 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
         capability_token: Box::new(token.clone()),
         server_id: "srv".to_string(),
         tool: "echo".to_string(),
-        params: json!({"message": "hello"}),
+        params: Box::new(json!({"message": "hello"})),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
     };
 
     let result_ok = ToolCallResult::Ok {

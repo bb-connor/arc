@@ -10,6 +10,10 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+use crate::capability::governance::{
+    GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal,
+};
+use crate::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use crate::capability::token::CapabilityToken;
 use crate::receipt::body::ChioReceipt;
 
@@ -28,12 +32,57 @@ pub enum AgentMessage {
         /// Name of the tool to invoke (must be in the token's scope).
         tool: String,
         /// Tool input parameters.
-        params: serde_json::Value,
+        params: Box<serde_json::Value>,
+        /// Governed transaction the agent is asking the kernel to authorize.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        governed_intent: Option<Box<GovernedTransactionIntent>>,
+        /// Single approval covering the governed intent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        approval_token: Option<Box<GovernedApprovalToken>>,
+        /// Approvals collected for a threshold proposal.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        approval_tokens: Vec<GovernedApprovalToken>,
+        /// Threshold policy the collected approvals are counted against.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        threshold_approval_proposal: Option<Box<ThresholdApprovalProposal>>,
+        /// Opaque authorization extension carried through to the kernel.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        supplemental_authorization: Option<Box<OpaqueSupplementalAuthorization>>,
     },
     /// Request a listing of the agent's current capabilities.
     ListCapabilities,
     /// Liveness probe.
     Heartbeat,
+}
+
+impl AgentMessage {
+    /// Reports why the message's authorization fields cannot be honoured together,
+    /// or `None` when the combination is admissible.
+    ///
+    /// The wire schema states these rules, but a peer that ignores the schema must
+    /// still be refused rather than evaluated against a partial authorization set.
+    #[must_use]
+    pub fn authorization_conflict(&self) -> Option<&'static str> {
+        let Self::ToolCallRequest {
+            approval_token,
+            approval_tokens,
+            threshold_approval_proposal,
+            ..
+        } = self
+        else {
+            return None;
+        };
+        if approval_token.is_some() && !approval_tokens.is_empty() {
+            return Some("approval_token and approval_tokens are mutually exclusive");
+        }
+        if threshold_approval_proposal.is_some() && approval_tokens.is_empty() {
+            return Some("threshold_approval_proposal requires at least one approval token");
+        }
+        if !approval_tokens.is_empty() && threshold_approval_proposal.is_none() {
+            return Some("approval_tokens require a threshold_approval_proposal");
+        }
+        None
+    }
 }
 
 /// Messages sent from the Kernel to the Agent.
@@ -203,6 +252,102 @@ mod tests {
         ChioReceipt::sign(body, kp).unwrap()
     }
 
+    fn make_approval(kp: &Keypair) -> GovernedApprovalToken {
+        use crate::capability::governance::{GovernedApprovalDecision, GovernedApprovalTokenBody};
+
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: "approval-msg-001".to_string(),
+                approver: kp.public_key(),
+                subject: kp.public_key(),
+                governed_intent_hash: crate::sha256_hex(b"intent"),
+                request_id: "req-001".to_string(),
+                threshold_proposal_hash: None,
+                issued_at: 1000,
+                expires_at: 2000,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            kp,
+        )
+        .unwrap()
+    }
+
+    fn governed_request(
+        kp: &Keypair,
+        approval_token: Option<Box<GovernedApprovalToken>>,
+        approval_tokens: Vec<GovernedApprovalToken>,
+        threshold_approval_proposal: Option<Box<ThresholdApprovalProposal>>,
+    ) -> AgentMessage {
+        AgentMessage::ToolCallRequest {
+            id: "req-001".to_string(),
+            capability_token: Box::new(make_token(kp)),
+            server_id: "srv".to_string(),
+            tool: "echo".to_string(),
+            params: Box::new(serde_json::json!({"text": "hello"})),
+            governed_intent: None,
+            approval_token,
+            approval_tokens,
+            threshold_approval_proposal,
+            supplemental_authorization: None,
+        }
+    }
+
+    #[test]
+    fn authorization_conflict_rejects_incompatible_approval_sets() {
+        let kp = Keypair::generate();
+
+        assert!(governed_request(&kp, None, Vec::new(), None)
+            .authorization_conflict()
+            .is_none());
+        assert!(
+            governed_request(&kp, Some(Box::new(make_approval(&kp))), Vec::new(), None)
+                .authorization_conflict()
+                .is_none()
+        );
+        assert!(governed_request(
+            &kp,
+            Some(Box::new(make_approval(&kp))),
+            vec![make_approval(&kp)],
+            None,
+        )
+        .authorization_conflict()
+        .is_some());
+        assert!(governed_request(&kp, None, vec![make_approval(&kp)], None)
+            .authorization_conflict()
+            .is_some());
+        assert!(AgentMessage::Heartbeat.authorization_conflict().is_none());
+    }
+
+    #[test]
+    fn agent_message_tool_call_authorization_fields_are_optional_on_the_wire() {
+        let kp = Keypair::generate();
+        let legacy = serde_json::json!({
+            "type": "tool_call_request",
+            "id": "req-001",
+            "capability_token": make_token(&kp),
+            "server_id": "srv",
+            "tool": "echo",
+            "params": {"text": "hello"},
+        });
+        let restored: AgentMessage = serde_json::from_value(legacy).unwrap();
+        match &restored {
+            AgentMessage::ToolCallRequest {
+                approval_tokens,
+                approval_token,
+                ..
+            } => {
+                assert!(approval_token.is_none());
+                assert!(approval_tokens.is_empty());
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert!(restored.authorization_conflict().is_none());
+
+        let reencoded = serde_json::to_value(&restored).unwrap();
+        assert!(reencoded.get("approval_tokens").is_none());
+        assert!(reencoded.get("governed_intent").is_none());
+    }
+
     #[test]
     fn agent_message_tool_call_serde_roundtrip() {
         let kp = Keypair::generate();
@@ -211,7 +356,12 @@ mod tests {
             capability_token: Box::new(make_token(&kp)),
             server_id: "srv".to_string(),
             tool: "echo".to_string(),
-            params: serde_json::json!({"text": "hello"}),
+            params: Box::new(serde_json::json!({"text": "hello"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         let json = serde_json::to_string_pretty(&msg).unwrap();

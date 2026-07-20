@@ -49,6 +49,19 @@ fn convert_tool_definition(tool: chio_core::ToolDefinition) -> chio_manifest::To
     }
 }
 
+/// Report whether a generated tool is read-only.
+///
+/// `has_side_effects` is derived from the OpenAPI operation's read-only
+/// annotation, so safe GET/HEAD routes stay exempt from durable side-effect
+/// admission while mutating routes remain side-effecting. An unknown tool name
+/// reports side-effecting, matching the fail-closed trait default.
+fn manifest_tool_is_read_only(manifest: &ToolManifest, tool_name: &str) -> bool {
+    manifest
+        .tools
+        .iter()
+        .any(|tool| tool.name == tool_name && !tool.has_side_effects)
+}
+
 /// Errors produced by the OpenAPI-MCP bridge.
 #[derive(Debug, thiserror::Error)]
 pub enum BridgeError {
@@ -292,6 +305,10 @@ impl ToolServerConnection for BridgeToolServer<'_> {
         self.bridge.tool_names()
     }
 
+    fn tool_is_read_only(&self, tool_name: &str) -> bool {
+        manifest_tool_is_read_only(&self.bridge.manifest, tool_name)
+    }
+
     async fn invoke(
         &self,
         tool_name: &str,
@@ -361,6 +378,10 @@ impl ToolServerConnection for OwnedBridgeToolServer {
 
     fn tool_names(&self) -> Vec<String> {
         self.manifest.tools.iter().map(|t| t.name.clone()).collect()
+    }
+
+    fn tool_is_read_only(&self, tool_name: &str) -> bool {
+        manifest_tool_is_read_only(&self.manifest, tool_name)
     }
 
     async fn invoke(

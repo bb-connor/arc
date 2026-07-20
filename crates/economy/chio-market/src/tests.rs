@@ -1605,6 +1605,26 @@ fn sample_evidence_fixture(
             observation: EvidenceObservationV1::GuardDecision { denied: false },
         },
     ];
+    evidence_fixture_from_members(
+        &members,
+        1..3,
+        12,
+        window,
+        anchor_epoch,
+        signer_key_epoch,
+        signer,
+    )
+}
+
+fn evidence_fixture_from_members(
+    members: &[EvidenceIndexMemberV1],
+    selected: std::ops::Range<usize>,
+    source_prefix_cutoff: u64,
+    window: &ParametricTriggerWindow,
+    anchor_epoch: u64,
+    signer_key_epoch: u64,
+    signer: &crate::crypto::Keypair,
+) -> ParametricEvidenceFixture {
     let leaves = members
         .iter()
         .map(|member| {
@@ -1641,7 +1661,7 @@ fn sample_evidence_fixture(
         signer_key_epoch,
         checkpoint_id: format!("checkpoint-{anchor_epoch}-{signer_key_epoch}"),
         checkpoint_at: window.end_at + 10,
-        source_prefix_cutoff: 12,
+        source_prefix_cutoff,
         query_tree_size: u64::try_from(tree.leaf_count())
             .unwrap_or_else(|error| panic!("convert leaf count: {error:?}")),
         query_index_root: tree.root().to_hex(),
@@ -1650,12 +1670,15 @@ fn sample_evidence_fixture(
         SignedEvidenceSourceCheckpointV1::sign(checkpoint, signer),
         "sign evidence checkpoint",
     );
+    let predecessor = selected.start.checked_sub(1).map(&proven);
+    let successor = (selected.end < members.len()).then(|| proven(selected.end));
+    let selected_members = (selected.start..selected.end).map(&proven).collect();
     let range = require_ok(
         EvidenceSourceRangeProofV1::new(
             signed_checkpoint,
-            vec![proven(1), proven(2)],
-            Some(proven(0)),
-            Some(proven(3)),
+            selected_members,
+            predecessor,
+            successor,
         ),
         "build evidence range",
     );
@@ -2148,6 +2171,104 @@ fn parametric_evidence_verification_rejects_incomplete_and_tampered_range_proofs
     assert_eq!(
         evidence_verification_error(&verified, &window, count_tamper, &evidence.registry),
         ParametricContractError::BindingMismatch("corpus.selected_count")
+    );
+}
+
+fn interleaved_evidence_fixture(
+    window: &ParametricTriggerWindow,
+    selected_sequences: [u64; 2],
+    signer: &crate::crypto::Keypair,
+) -> ParametricEvidenceFixture {
+    let members = [
+        EvidenceIndexMemberV1 {
+            sequence: 1,
+            subject_key: "subject-1".to_string(),
+            observed_at: window.start_at - 1,
+            artifact_digest: "39".repeat(32),
+            observation: EvidenceObservationV1::GuardDecision { denied: false },
+        },
+        EvidenceIndexMemberV1 {
+            sequence: selected_sequences[0],
+            subject_key: "subject-1".to_string(),
+            observed_at: window.start_at + 10,
+            artifact_digest: "40".repeat(32),
+            observation: EvidenceObservationV1::GuardDecision { denied: true },
+        },
+        EvidenceIndexMemberV1 {
+            sequence: selected_sequences[1],
+            subject_key: "subject-1".to_string(),
+            observed_at: window.start_at + 20,
+            artifact_digest: "41".repeat(32),
+            observation: EvidenceObservationV1::GuardDecision { denied: false },
+        },
+        EvidenceIndexMemberV1 {
+            sequence: 7,
+            subject_key: "subject-1".to_string(),
+            observed_at: window.end_at,
+            artifact_digest: "42".repeat(32),
+            observation: EvidenceObservationV1::GuardDecision { denied: false },
+        },
+        EvidenceIndexMemberV1 {
+            sequence: 2,
+            subject_key: "subject-2".to_string(),
+            observed_at: window.start_at + 5,
+            artifact_digest: "43".repeat(32),
+            observation: EvidenceObservationV1::GuardDecision { denied: true },
+        },
+        EvidenceIndexMemberV1 {
+            sequence: 4,
+            subject_key: "subject-2".to_string(),
+            observed_at: window.start_at + 15,
+            artifact_digest: "44".repeat(32),
+            observation: EvidenceObservationV1::GuardDecision { denied: true },
+        },
+    ];
+    evidence_fixture_from_members(&members, 1..3, 7, window, 1, 7, signer)
+}
+
+#[test]
+fn parametric_evidence_accepts_gapped_sequences_from_a_multi_subject_source() {
+    let fixture = sample_parametric_fixture();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify parametric policy",
+    );
+    let window = require_ok(
+        verified.body().window_at(1_700_010_500),
+        "derive policy window",
+    );
+    let signer = crate::crypto::Keypair::from_seed(&[51; 32]);
+    let evidence = interleaved_evidence_fixture(&window, [3, 5], &signer);
+    let corpus = verify_sample_corpus(&verified, &window, &evidence);
+    match require_ok(verified.evaluate_trigger(&corpus), "evaluate trigger") {
+        VerifiedTriggerVerdictV1::Fired(_) => {}
+        VerifiedTriggerVerdictV1::NotFired => panic!("gapped corpus did not fire"),
+    }
+}
+
+#[test]
+fn parametric_evidence_rejects_duplicate_and_descending_source_sequences() {
+    let fixture = sample_parametric_fixture();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify parametric policy",
+    );
+    let window = require_ok(
+        verified.body().window_at(1_700_010_500),
+        "derive policy window",
+    );
+    let signer = crate::crypto::Keypair::from_seed(&[51; 32]);
+
+    let duplicate = interleaved_evidence_fixture(&window, [3, 3], &signer);
+    assert_eq!(
+        evidence_verification_error(&verified, &window, duplicate.proof, &duplicate.registry),
+        ParametricContractError::IncompleteEvidenceBoundaries
+    );
+
+    let descending = interleaved_evidence_fixture(&window, [5, 3], &signer);
+    assert_eq!(
+        evidence_verification_error(&verified, &window, descending.proof, &descending.registry),
+        ParametricContractError::IncompleteEvidenceBoundaries
     );
 }
 

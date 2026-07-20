@@ -145,6 +145,7 @@ pub fn validate_governance_ladder_manifest(
         let action_rank = ladder_mode_rank(&action.mode)?;
         let consistency_model = bilateral_dsse_consistency_model(&action.consistency_model)?;
         validate_co_sign_mode(&action.co_sign)?;
+        validate_co_sign_quorum(&action.co_sign, action.co_sign_quorum.as_ref())?;
         if action.destructive && action_rank < destructive_floor_rank {
             return rejected(
                 "chio_ladder_destructive_below_floor",
@@ -324,6 +325,7 @@ pub fn compute_ladder_intersection(
         let mut destructive = false;
         let mut consistency_model: Option<String> = None;
         let mut co_sign = "none".to_string();
+        let mut co_sign_quorum: Option<GovernanceLadderQuorum> = None;
         let mut evidence_required = BTreeSet::new();
         for participant in &treaty_scope.participant_kernel_ids {
             let Some(manifest) = by_kernel.get(participant.as_str()) else {
@@ -357,8 +359,9 @@ pub fn compute_ladder_intersection(
                 consistency_model = Some(action_consistency_model.to_owned());
             }
             if co_sign_requirement_rank(&action.co_sign)? > co_sign_requirement_rank(&co_sign)? {
-                co_sign = action.co_sign.clone();
+                co_sign = ladder_co_sign_mode(&action.co_sign)?.to_string();
             }
+            merge_quorum(&mut co_sign_quorum, action.co_sign_quorum.as_ref())?;
             for item in &action.evidence_required {
                 evidence_required.insert(item.clone());
             }
@@ -382,6 +385,7 @@ pub fn compute_ladder_intersection(
             destructive,
             consistency_model: consistency_model.unwrap_or_else(|| "totally-ordered".to_string()),
             co_sign,
+            co_sign_quorum,
             evidence_required: evidence_required.into_iter().collect(),
             participant_modes,
         });
@@ -446,6 +450,7 @@ pub fn validate_ladder_intersection(
         ladder_mode_rank(&action.mode)?;
         let consistency_model = bilateral_dsse_consistency_model(&action.consistency_model)?;
         validate_co_sign_mode(&action.co_sign)?;
+        validate_co_sign_quorum(&action.co_sign, action.co_sign_quorum.as_ref())?;
         if action.destructive
             && ladder_mode_rank(&action.mode)? < ladder_mode_rank("receipt_backed")?
         {
@@ -572,6 +577,7 @@ pub fn evaluate_cross_boundary_admission(
             mode: action.mode.clone(),
             consistency_model: action.consistency_model.clone(),
             co_sign: action.co_sign.clone(),
+            co_sign_quorum: action.co_sign_quorum.clone(),
             required_evidence,
             present_evidence: input.present_evidence,
             verified_evidence: input.verified_evidence,
@@ -596,6 +602,7 @@ pub fn evaluate_cross_boundary_admission(
             mode: action.mode.clone(),
             consistency_model: action.consistency_model.clone(),
             co_sign: action.co_sign.clone(),
+            co_sign_quorum: action.co_sign_quorum.clone(),
             required_evidence,
             present_evidence: input.present_evidence,
             verified_evidence: input.verified_evidence,
@@ -616,6 +623,7 @@ pub fn evaluate_cross_boundary_admission(
         mode: action.mode.clone(),
         consistency_model: action.consistency_model.clone(),
         co_sign: action.co_sign.clone(),
+        co_sign_quorum: action.co_sign_quorum.clone(),
         required_evidence,
         present_evidence: input.present_evidence,
         verified_evidence: input.verified_evidence,
@@ -627,14 +635,15 @@ pub fn evaluate_cross_boundary_admission(
 }
 fn required_evidence_for_action(action: &LadderIntersectionActionClass) -> Vec<String> {
     let mut required = action.evidence_required.clone();
-    if action.co_sign == "bilateral_required"
+    let co_sign = ladder_co_sign_mode(&action.co_sign).ok();
+    if co_sign == Some("bilateral_required")
         && !required
             .iter()
             .any(|evidence| evidence == "bilateral_invocation")
     {
         required.push("bilateral_invocation".to_string());
     }
-    if action.co_sign == "quorum_required"
+    if co_sign == Some("n_of_m")
         && !required
             .iter()
             .any(|evidence| evidence == "quorum_signature")
@@ -660,6 +669,7 @@ pub fn validate_cross_boundary_admission_report(
     ladder_mode_rank(&report.mode)?;
     validate_consistency_model(&report.consistency_model)?;
     validate_co_sign_mode(&report.co_sign)?;
+    validate_co_sign_quorum(&report.co_sign, report.co_sign_quorum.as_ref())?;
     ensure_sha256_hash(
         &report.treaty_scope_sha256,
         "cross_boundary_admission_invalid_treaty_hash",
@@ -734,7 +744,7 @@ fn ladder_mode_rank(mode: &str) -> Result<u8, ChioRuntimeError> {
         "guarded" => Ok(1),
         "receipt_backed" => Ok(2),
         "partition_contingency" => Ok(3),
-        "quorum_required" => Ok(4),
+        "maintenance" | "quorum_required" => Ok(4),
         _ => rejected(
             "chio_ladder_invalid_mode",
             "governance ladder mode is not supported",
@@ -756,25 +766,80 @@ pub fn bilateral_dsse_consistency_model(model: &str) -> Result<&'static str, Chi
 fn validate_consistency_model(model: &str) -> Result<(), ChioRuntimeError> {
     bilateral_dsse_consistency_model(model).map(|_| ())
 }
-fn validate_co_sign_mode(mode: &str) -> Result<(), ChioRuntimeError> {
+pub fn ladder_co_sign_mode(mode: &str) -> Result<&'static str, ChioRuntimeError> {
     match mode {
-        "none" | "bilateral_required" | "quorum_required" => Ok(()),
+        "none" => Ok("none"),
+        "bilateral_if_cross_org" => Ok("bilateral_if_cross_org"),
+        "bilateral_required" => Ok("bilateral_required"),
+        "n_of_m" | "quorum_required" => Ok("n_of_m"),
         _ => rejected(
             "chio_ladder_invalid_cosign_mode",
             "governance ladder co-sign mode is not supported",
         ),
     }
 }
+fn validate_co_sign_mode(mode: &str) -> Result<(), ChioRuntimeError> {
+    ladder_co_sign_mode(mode).map(|_| ())
+}
 fn co_sign_requirement_rank(mode: &str) -> Result<u8, ChioRuntimeError> {
-    match mode {
+    match ladder_co_sign_mode(mode)? {
         "none" => Ok(0),
-        "bilateral_required" => Ok(1),
-        "quorum_required" => Ok(2),
-        _ => rejected(
-            "chio_ladder_invalid_cosign_mode",
-            "governance ladder co-sign mode is not supported",
-        ),
+        "bilateral_if_cross_org" => Ok(1),
+        "bilateral_required" => Ok(2),
+        _ => Ok(3),
     }
+}
+fn validate_co_sign_quorum(
+    mode: &str,
+    quorum: Option<&GovernanceLadderQuorum>,
+) -> Result<(), ChioRuntimeError> {
+    match (ladder_co_sign_mode(mode)?, quorum) {
+        ("n_of_m", Some(quorum)) => {
+            if quorum.n < 2 || quorum.m < 2 || quorum.n > quorum.m {
+                return rejected(
+                    "chio_ladder_quorum_misdeclared",
+                    "n_of_m quorum requires 2 <= n <= m",
+                );
+            }
+            if !matches!(quorum.scope.as_str(), "treaty" | "kernel" | "operator") {
+                return rejected(
+                    "chio_ladder_quorum_misdeclared",
+                    "n_of_m quorum scope is unsupported",
+                );
+            }
+            Ok(())
+        }
+        ("n_of_m", None) => rejected(
+            "chio_ladder_quorum_misdeclared",
+            "n_of_m co-sign mode requires quorum metadata",
+        ),
+        (_, Some(_)) => rejected(
+            "chio_ladder_quorum_misdeclared",
+            "quorum metadata is only valid for n_of_m co-sign mode",
+        ),
+        (_, None) => Ok(()),
+    }
+}
+fn merge_quorum(
+    current: &mut Option<GovernanceLadderQuorum>,
+    candidate: Option<&GovernanceLadderQuorum>,
+) -> Result<(), ChioRuntimeError> {
+    let Some(candidate) = candidate else {
+        return Ok(());
+    };
+    match current {
+        Some(existing) => {
+            if existing.m != candidate.m || existing.scope != candidate.scope {
+                return rejected(
+                    "chio_ladder_quorum_misdeclared",
+                    "participant quorum counts or scopes do not intersect",
+                );
+            }
+            existing.n = existing.n.max(candidate.n);
+        }
+        None => *current = Some(candidate.clone()),
+    }
+    Ok(())
 }
 fn find_ladder_action<'a>(
     manifest: &'a GovernanceLadderManifest,
@@ -801,6 +866,7 @@ fn cross_boundary_rejection_report(
         mode: "observation".to_string(),
         consistency_model: "totally-ordered".to_string(),
         co_sign: "none".to_string(),
+        co_sign_quorum: None,
         required_evidence: Vec::new(),
         present_evidence: input.present_evidence,
         verified_evidence: input.verified_evidence,

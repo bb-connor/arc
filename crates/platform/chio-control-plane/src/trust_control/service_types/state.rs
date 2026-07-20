@@ -99,7 +99,17 @@ pub(crate) struct RemoteReceiptStore {
 
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
-    pub(crate) cached_usage: Mutex<HashMap<(String, usize), BudgetUsageRecord>>,
+    pub(crate) cached_usage: Mutex<HashMap<(String, usize), CachedBudgetUsage>>,
+}
+
+/// A cached usage projection together with whether its monetary totals were actually
+/// observed. Partial responses such as `try_increment` carry only the invocation
+/// count, so their entries default the cost fields to zero; serving one as real usage
+/// would report no spend for a grant that has some.
+#[derive(Clone)]
+pub(crate) struct CachedBudgetUsage {
+    pub(crate) record: BudgetUsageRecord,
+    pub(crate) cost_authoritative: bool,
 }
 
 impl TrustServiceState {

@@ -71,6 +71,7 @@ fn buyer_packet_without_hydrated_dsse_is_unresolved() -> Result<(), Box<dyn std:
         mode: "receipt_backed".to_string(),
         consistency_model: bilateral.consistency_model.clone(),
         co_sign: "bilateral_required".to_string(),
+        co_sign_quorum: None,
         required_evidence: vec![
             "receipt_lineage".to_string(),
             "bilateral_invocation".to_string(),
@@ -196,6 +197,7 @@ fn chio_buyer_packet_schema_emits_chio_report_schema() -> Result<(), Box<dyn std
         mode: "receipt_backed".to_string(),
         consistency_model: bilateral.consistency_model.clone(),
         co_sign: "bilateral_required".to_string(),
+        co_sign_quorum: None,
         required_evidence: vec![
             "receipt_lineage".to_string(),
             "bilateral_invocation".to_string(),

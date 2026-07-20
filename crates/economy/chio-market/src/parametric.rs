@@ -700,14 +700,14 @@ impl EvidenceSourceRangeV1 {
                         "corpus.sequence_range",
                     ));
                 }
-                let count = sequence
+                let span = sequence
                     .last
                     .checked_sub(sequence.first)
                     .and_then(|difference| difference.checked_add(1))
                     .ok_or(ParametricContractError::InvalidField(
                         "corpus.expected_count",
                     ))?;
-                if count != self.expected_count {
+                if self.expected_count == 0 || self.expected_count > span {
                     return Err(ParametricContractError::InvalidField(
                         "corpus.expected_count",
                     ));

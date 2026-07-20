@@ -33,6 +33,53 @@ async fn mediated_authorization_forwards_supplemental_authorization_fail_closed(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn mediated_authorization_forwards_threshold_approval_set() {
+    let signer = Keypair::generate();
+    let agent = Keypair::generate();
+    let approver = Keypair::generate();
+    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+    let cap =
+        issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let approval_token = GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: "approval-mediated".to_string(),
+            approver: approver.public_key(),
+            subject: agent.public_key(),
+            governed_intent_hash: "a".repeat(64),
+            request_id: "mediated-threshold-request".to_string(),
+            threshold_proposal_hash: Some("b".repeat(64)),
+            issued_at: 1,
+            expires_at: 2,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &approver,
+    )
+    .unwrap();
+    // The token set is sent without its signed proposal. The kernel rejects that
+    // pairing, so a denial naming the missing proposal proves the set reached the
+    // kernel instead of being dropped at the sidecar boundary.
+    let body = serde_json::json!({
+        "capability": cap,
+        "tool_server": "cost-srv",
+        "tool_name": "compute",
+        "request_id": "mediated-threshold-request",
+        "parameters": { "invoice": "inv-threshold" },
+        "approval_tokens": [approval_token]
+    });
+
+    let (_, json) = post_evaluate(Arc::clone(&state), &body).await;
+
+    assert_ne!(json["status"], "authorized", "{json}");
+    let rendered = json.to_string();
+    assert!(
+        rendered.contains("threshold approval tokens have no signed proposal"),
+        "{json}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mediated_presented_execution_nonce_is_rejected() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();

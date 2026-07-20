@@ -548,7 +548,12 @@ mod tests {
             capability_token: Box::new(capability(kp, id)),
             server_id: "srv-1".to_string(),
             tool: "send_email".to_string(),
-            params,
+            params: Box::new(params),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         }
     }
 

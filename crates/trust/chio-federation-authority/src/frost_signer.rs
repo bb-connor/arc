@@ -80,6 +80,12 @@ impl FrostSignerPreparation {
         &self.nonce_secret
     }
 
+    /// Takes ownership of the nonce secret so it can be spent on one signature share.
+    #[must_use]
+    pub fn into_nonce_secret(self) -> FrostSignerNonceSecret {
+        self.nonce_secret
+    }
+
     #[must_use]
     pub fn signer_identifier_bytes(&self) -> &[u8] {
         &self.signer_identifier_bytes
@@ -146,9 +152,14 @@ pub fn inspect_frost_signer_key(
     })
 }
 
+/// Produces this signer's share for exactly one authorized message.
+///
+/// The nonce secret is consumed. A FROST nonce that signs two different messages
+/// discloses the signing share, so a retry must obtain a fresh nonce from
+/// [`prepare_frost_signer`] rather than replaying this one.
 pub fn create_frost_signature_share(
     key_package_secret: &FrostCeremonySecret,
-    nonce_secret: &FrostSignerNonceSecret,
+    nonce_secret: FrostSignerNonceSecret,
     signing_package_bytes: &[u8],
     expected_message_digest: &str,
     expected_commitment_bytes: &[u8],

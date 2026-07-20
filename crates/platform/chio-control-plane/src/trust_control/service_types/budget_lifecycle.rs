@@ -655,7 +655,7 @@ mod tests {
     fn every_mutation_kind_round_trips_complete_lifecycle() {
         for (index, case) in lifecycle_cases().into_iter().enumerate() {
             let original = mutation_record(case, u64::try_from(index + 1).test_unwrap());
-            let view = budget_mutation_event_view(original.clone());
+            let view = budget_mutation_event_view(original.clone()).test_unwrap();
             let round_trip = budget_mutation_record_from_view(&view).test_unwrap();
             assert_lifecycle_equal(&original, &round_trip);
         }
@@ -664,7 +664,7 @@ mod tests {
     #[test]
     fn delta_and_snapshot_envelopes_preserve_lifecycle_fields() {
         let original = mutation_record(lifecycle_cases()[9], 1);
-        let view = budget_mutation_event_view(original.clone());
+        let view = budget_mutation_event_view(original.clone()).test_unwrap();
         let delta = BudgetDeltaResponse {
             records: Vec::new(),
             mutation_events: vec![view.clone()],
@@ -696,6 +696,20 @@ mod tests {
         let from_snapshot =
             budget_mutation_record_from_view(&snapshot.budget_mutation_events[0]).test_unwrap();
         assert_lifecycle_equal(&original, &from_snapshot);
+    }
+
+    #[test]
+    fn composite_projection_state_is_refused_rather_than_exported() {
+        // `capture_invocation` is absent from the store-side unsupported-kind list, so
+        // a lossy export of one is accepted by peers and silently strips the composite
+        // state instead of failing the import.
+        let mut record = mutation_record(lifecycle_cases()[9], 1);
+        record.kind = BudgetMutationKind::CaptureInvocation;
+        record.cumulative_approval_set_digest = Some("approval-set-digest".to_string());
+        match budget_mutation_event_view(record) {
+            Ok(_) => panic!("composite projection state must not lower into a cluster view"),
+            Err(error) => assert!(error.to_string().contains("composite projection state")),
+        }
     }
 
     #[test]

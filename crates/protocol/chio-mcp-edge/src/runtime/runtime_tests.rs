@@ -4280,6 +4280,7 @@ fn external_request_identity_is_stable_and_session_scoped() {
         &json!(41),
         SessionId::new("stable-session-a"),
         "agent",
+        "tools/call",
         &json!({}),
     )
     .unwrap();
@@ -4287,6 +4288,7 @@ fn external_request_identity_is_stable_and_session_scoped() {
         &json!(41),
         SessionId::new("stable-session-a"),
         "agent",
+        "tools/call",
         &json!({}),
     )
     .unwrap();
@@ -4294,6 +4296,7 @@ fn external_request_identity_is_stable_and_session_scoped() {
         &json!(41),
         SessionId::new("stable-session-b"),
         "agent",
+        "tools/call",
         &json!({}),
     )
     .unwrap();
@@ -4301,6 +4304,7 @@ fn external_request_identity_is_stable_and_session_scoped() {
         &json!(42),
         SessionId::new("stable-session-a"),
         "agent",
+        "tools/call",
         &json!({}),
     )
     .unwrap();
@@ -4309,6 +4313,66 @@ fn external_request_identity_is_stable_and_session_scoped() {
     assert_ne!(first.request_id, other_session.request_id);
     assert_ne!(first.request_id, other_request.request_id);
     assert!(first.request_id.as_str().starts_with("mcp-edge-req-"));
+}
+
+#[test]
+fn external_request_identity_separates_reused_jsonrpc_ids() {
+    let session_id = SessionId::new("reuse-session");
+    let tool_call = build_operation_context(
+        &json!(1),
+        session_id.clone(),
+        "agent",
+        "tools/call",
+        &json!({ "name": "read_file" }),
+    )
+    .unwrap();
+    let other_method = build_operation_context(
+        &json!(1),
+        session_id.clone(),
+        "agent",
+        "resources/read",
+        &json!({ "name": "read_file" }),
+    )
+    .unwrap();
+    let other_params = build_operation_context(
+        &json!(1),
+        session_id.clone(),
+        "agent",
+        "tools/call",
+        &json!({ "name": "write_file" }),
+    )
+    .unwrap();
+
+    assert_ne!(tool_call.request_id, other_method.request_id);
+    assert_ne!(tool_call.request_id, other_params.request_id);
+    assert_ne!(other_method.request_id, other_params.request_id);
+}
+
+#[test]
+fn external_request_identity_ignores_per_attempt_meta() {
+    let session_id = SessionId::new("nonce-retry-session");
+    let preflight = build_operation_context(
+        &json!(7),
+        session_id.clone(),
+        "agent",
+        "tools/call",
+        &json!({ "name": "read_file", "arguments": { "path": "/tmp/demo.txt" } }),
+    )
+    .unwrap();
+    let retry = build_operation_context(
+        &json!(7),
+        session_id.clone(),
+        "agent",
+        "tools/call",
+        &json!({
+            "name": "read_file",
+            "arguments": { "path": "/tmp/demo.txt" },
+            "_meta": { "chioExecutionNonce": { "nonce": "opaque" } }
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(preflight.request_id, retry.request_id);
 }
 
 #[test]

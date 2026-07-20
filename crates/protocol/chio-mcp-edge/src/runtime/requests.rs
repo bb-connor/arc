@@ -304,7 +304,13 @@ impl ChioMcpEdge {
             Err(response) => return response,
         };
 
-        let context = match build_operation_context(&id, session_id, &self.agent_id, &params) {
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "resources/list",
+            &params,
+        ) {
             Ok(context) => context,
             Err(response) => return response,
         };
@@ -347,7 +353,13 @@ impl ChioMcpEdge {
             Err(response) => return response,
         };
 
-        let context = match build_operation_context(&id, session_id, &self.agent_id, &params) {
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "resources/templates/list",
+            &params,
+        ) {
             Ok(context) => context,
             Err(response) => return response,
         };
@@ -408,7 +420,13 @@ impl ChioMcpEdge {
             }
         };
 
-        let context = match build_operation_context(&id, session_id, &self.agent_id, &params) {
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "resources/read",
+            &params,
+        ) {
             Ok(context) => context,
             Err(response) => return response,
         };
@@ -565,10 +583,12 @@ impl ChioMcpEdge {
             Err(response) => return response,
         };
 
-        let context = match build_operation_context(&id, session_id, &self.agent_id, &params) {
-            Ok(context) => context,
-            Err(response) => return response,
-        };
+        let context =
+            match build_operation_context(&id, session_id, &self.agent_id, "prompts/list", &params)
+            {
+                Ok(context) => context,
+                Err(response) => return response,
+            };
         let response = match self
             .kernel
             .evaluate_session_operation(&context, &SessionOperation::ListPrompts)
@@ -633,7 +653,13 @@ impl ChioMcpEdge {
             }
         };
 
-        let context = match build_operation_context(&id, session_id, &self.agent_id, &params) {
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "prompts/get",
+            &params,
+        ) {
             Ok(context) => context,
             Err(response) => return response,
         };
@@ -716,7 +742,13 @@ impl ChioMcpEdge {
             );
         };
 
-        let context = match build_operation_context(&id, session_id, &self.agent_id, &params) {
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "completion/complete",
+            &params,
+        ) {
             Ok(context) => context,
             Err(response) => return response,
         };

@@ -607,6 +607,11 @@ mod tests {
     #[test]
     fn durable_evaluator_reports_durable_backends() -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
+        }
         let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
             chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
         );
@@ -615,7 +620,13 @@ mod tests {
         );
         let authority_database = dir.path().join("authority.db");
         let authority_locks = dir.path().join("authority-locks");
-        std::fs::create_dir(&authority_locks)?;
+        let mut lock_root_builder = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            lock_root_builder.mode(0o700);
+        }
+        lock_root_builder.create(&authority_locks)?;
         chio_store_sqlite::SqliteAuthorityStore::provision(&authority_database, &authority_locks)?;
         let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving(
             &authority_database,

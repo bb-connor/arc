@@ -1,6 +1,8 @@
 use super::*;
 
-use chio_core_types::capability::governance::GovernedTransactionIntent;
+use chio_core_types::capability::governance::{
+    GovernedTransactionIntent, ThresholdApprovalProposal,
+};
 use chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof};
@@ -254,6 +256,13 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// alongside `governed_intent` so an approval-gated grant can be authorized.
     #[serde(default)]
     approval_token: Option<GovernedApprovalToken>,
+    /// Optional threshold approval token set and the signed proposal binding it.
+    /// Both are forwarded together; the kernel requires every token and the
+    /// proposal to name this exact `request_id`.
+    #[serde(default)]
+    approval_tokens: Vec<GovernedApprovalToken>,
+    #[serde(default)]
+    threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional DPoP proof-of-possession. Forwarded so a grant carrying
     /// `dpop_required` can verify the proof instead of denying fail-closed.
     #[serde(default)]
@@ -501,8 +510,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         execution_nonce: None,
         governed_intent: parsed.governed_intent,
         approval_token: parsed.approval_token,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
+        approval_tokens: parsed.approval_tokens,
+        threshold_approval_proposal: parsed.threshold_approval_proposal,
         supplemental_authorization: parsed.supplemental_authorization,
         model_metadata: None,
         federated_origin_kernel_id: None,

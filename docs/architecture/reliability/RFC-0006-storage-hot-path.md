@@ -658,9 +658,10 @@ CREATE TABLE IF NOT EXISTS chio_serving_owner (
 );
 ```
 
-This database-scoped owner amendment is pending implementation and is an entry
-gate for corrected RFC-0003 and WS1 Phase 2; the earlier RFC-0006 hot-path work
-being present on `main` does not make this amendment landed.
+This database-scoped owner amendment is implemented under
+`crates/platform/chio-store-sqlite/src/serving_owner/` (path identity, lease
+history, global commit chain and rollback anchor) and is an entry gate for
+corrected RFC-0003 and WS1 Phase 2.
 
 Production databases have an explicit privileged provisioning step. `chio store
 provision`, running through the configured trusted lock broker, creates the

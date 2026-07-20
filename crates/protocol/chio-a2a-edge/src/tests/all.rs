@@ -1053,6 +1053,129 @@ mod tests {
     }
 
     #[test]
+    fn send_message_rejects_supplemental_authorization_without_stable_request_id() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: Some(
+                chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
+                    signed_extension: "opaque-extension".to_string(),
+                },
+            ),
+            model_metadata: None,
+        };
+
+        let error = edge
+            .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
+            .test_expect_err("supplemental authorization must require a stable request id");
+
+        assert_eq!(
+            error.to_string(),
+            "invalid request: A2A threshold approvals and supplemental authorization require \
+             handle_send_message_with_request_id"
+        );
+    }
+
+    #[test]
+    fn send_message_with_request_id_accepts_request_bound_artifacts() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: Some(
+                chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
+                    signed_extension: "opaque-extension".to_string(),
+                },
+            ),
+            model_metadata: None,
+        };
+
+        edge.handle_send_message_with_request_id(
+            "caller-chosen-request",
+            "echo",
+            &text_message("hello"),
+            &kernel,
+            &execution,
+        )
+        .test_expect("stable request id path must accept request-bound artifacts");
+    }
+
+    #[test]
+    fn execution_context_rejects_oversized_threshold_approval_set() {
+        let subject = Keypair::generate();
+        let approver = Keypair::generate();
+        let token = GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: "approval-oversize".to_string(),
+                approver: approver.public_key(),
+                subject: subject.public_key(),
+                governed_intent_hash: "a".repeat(64),
+                request_id: "a2a-request".to_string(),
+                threshold_proposal_hash: Some("b".repeat(64)),
+                issued_at: 1,
+                expires_at: 2,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            &approver,
+        )
+        .test_unwrap();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&Keypair::generate(), &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: vec![
+                token;
+                chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+                    + 1
+            ],
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+
+        let error = validate_execution_context(&execution)
+            .test_expect_err("oversized A2A threshold approval set must fail");
+
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "invalid request: A2A threshold approval set exceeds {} tokens",
+                chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+            )
+        );
+    }
+
+    #[test]
     fn execution_context_rejects_control_character_agent_id() {
         let subject = Keypair::generate();
         let execution = A2aKernelExecutionContext {

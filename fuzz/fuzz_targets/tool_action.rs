@@ -2,6 +2,7 @@
 
 use arbitrary::{Arbitrary, Unstructured};
 use chio_core::capability::{
+    aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -33,6 +34,7 @@ struct ToolActionInput {
     subject_seed: [u8; 32],
     tool_selector: u8,
     argument_selector: u8,
+    budget_selector: u8,
     text: String,
     port: u16,
 }
@@ -189,7 +191,25 @@ fn generated_case(input: &ToolActionInput) -> GeneratedToolAction {
     }
 }
 
-fn capability(issuer: &Keypair, subject: &Keypair, tool_name: &str) -> CapabilityToken {
+fn aggregate_budget(selector: u8) -> Option<AggregateInvocationBudget> {
+    let scope = match selector % 3 {
+        0 => return None,
+        1 => AggregateInvocationScope::Capability,
+        _ => AggregateInvocationScope::DelegationFamily,
+    };
+    Some(AggregateInvocationBudget {
+        scope,
+        max_invocations: u32::from(selector),
+        root_binding: None,
+    })
+}
+
+fn capability(
+    issuer: &Keypair,
+    subject: &Keypair,
+    tool_name: &str,
+    budget_selector: u8,
+) -> CapabilityToken {
     let scope = ChioScope {
         grants: vec![ToolGrant {
             server_id: "srv-fuzz".to_string(),
@@ -211,7 +231,7 @@ fn capability(issuer: &Keypair, subject: &Keypair, tool_name: &str) -> Capabilit
         issued_at: 0,
         expires_at: 60,
         delegation_chain: Vec::new(),
-        aggregate_invocation_budget: None,
+        aggregate_invocation_budget: aggregate_budget(budget_selector),
     };
     match CapabilityToken::sign(body, issuer) {
         Ok(token) => token,
@@ -224,9 +244,10 @@ fn with_guard_context(
     args: serde_json::Value,
     issuer: &Keypair,
     subject: &Keypair,
+    budget_selector: u8,
     f: impl FnOnce(&GuardContext<'_>),
 ) {
-    let token = capability(issuer, subject, tool_name);
+    let token = capability(issuer, subject, tool_name, budget_selector);
     let scope = token.scope.clone();
     let agent_id = "agent-fuzz".to_string();
     let server_id = "srv-fuzz".to_string();
@@ -365,12 +386,20 @@ fn exercise_tool_action(
     args: serde_json::Value,
     issuer: &Keypair,
     subject: &Keypair,
+    budget_selector: u8,
     expected_action: Option<ExpectedAction>,
     expected_verdict: Option<ExpectedVerdict>,
 ) {
-    with_guard_context(tool_name, args.clone(), issuer, subject, |ctx| {
-        assert_action_contract(tool_name, &args, ctx, expected_action, expected_verdict);
-    });
+    with_guard_context(
+        tool_name,
+        args.clone(),
+        issuer,
+        subject,
+        budget_selector,
+        |ctx| {
+            assert_action_contract(tool_name, &args, ctx, expected_action, expected_verdict);
+        },
+    );
 }
 
 fn exercise_raw(data: &[u8], issuer: &Keypair, subject: &Keypair) {
@@ -409,6 +438,7 @@ fn exercise_raw(data: &[u8], issuer: &Keypair, subject: &Keypair) {
         args,
         issuer,
         subject,
+        data.first().copied().unwrap_or(0),
         expected_action,
         expected_verdict,
     );
@@ -423,6 +453,7 @@ fn exercise_generated(input: ToolActionInput) {
         generated.args,
         &issuer,
         &subject,
+        input.budget_selector,
         Some(generated.expected_action),
         generated.expected_verdict,
     );

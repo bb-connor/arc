@@ -40,10 +40,13 @@ fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(
             "A2A execution must not mix singular and threshold approval tokens".to_string(),
         ));
     }
-    if execution.approval_tokens.len() > 32 {
-        return Err(A2aEdgeError::InvalidRequest(
-            "A2A threshold approval set exceeds 32 tokens".to_string(),
-        ));
+    if execution.approval_tokens.len()
+        > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+    {
+        return Err(A2aEdgeError::InvalidRequest(format!(
+            "A2A threshold approval set exceeds {} tokens",
+            chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+        )));
     }
     if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
         return Err(A2aEdgeError::InvalidRequest(
@@ -70,6 +73,19 @@ fn validate_execution_agent_id(agent_id: &str) -> Result<(), A2aEdgeError> {
         ));
     }
     Ok(())
+}
+
+fn reject_request_bound_artifacts_without_stable_request_id(
+    execution: &A2aKernelExecutionContext,
+) -> Result<(), A2aEdgeError> {
+    if execution.approval_tokens.is_empty() && execution.supplemental_authorization.is_none() {
+        return Ok(());
+    }
+    Err(A2aEdgeError::InvalidRequest(
+        "A2A threshold approvals and supplemental authorization require \
+         handle_send_message_with_request_id"
+            .to_string(),
+    ))
 }
 
 impl ChioA2aEdge {
@@ -349,6 +365,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
         validate_execution_context(execution)?;
+        reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
         let arguments = extract_arguments_from_message(&request.message)?;
@@ -363,6 +380,38 @@ impl ChioA2aEdge {
             format!("a2a-{task_id}"),
         )?;
         let orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        Ok(task_response_from_orchestrated(task_id, orchestrated))
+    }
+
+    /// Handle a SendMessage request under the caller's stable request ID.
+    ///
+    /// `SendMessageRequest` carries no identifier of its own, so request-bound
+    /// authorization artifacts (threshold approval sets and supplemental
+    /// authorization) can only be pre-minted when the caller supplies the ID the
+    /// kernel will check them against.
+    pub fn handle_send_message_with_request_id(
+        &mut self,
+        request_id: &str,
+        skill_id: &str,
+        request: &SendMessageRequest,
+        kernel: &ChioKernel,
+        execution: &A2aKernelExecutionContext,
+    ) -> Result<TaskResponse, A2aEdgeError> {
+        validate_execution_context(execution)?;
+        let binding = self.resolve_skill_binding(skill_id)?;
+
+        let arguments = extract_arguments_from_message(&request.message)?;
+        let task_id = self.next_task_id();
+        let execution_request = Self::build_execution_request(
+            binding,
+            skill_id,
+            request,
+            arguments,
+            execution,
+            task_id.clone(),
+            request_id.to_string(),
+        )?;
+        let orchestrated = execute_orchestrated_a2a_request(kernel, execution_request)?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -381,6 +430,7 @@ impl ChioA2aEdge {
         reason: impl Into<String>,
     ) -> Result<TaskResponse, A2aEdgeError> {
         validate_execution_context(execution)?;
+        reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
         let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
@@ -410,6 +460,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
         validate_execution_context(execution)?;
+        reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();

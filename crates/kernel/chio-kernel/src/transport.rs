@@ -223,7 +223,12 @@ mod tests {
             capability_token: Box::new(make_token(&kp)),
             server_id: "srv".to_string(),
             tool: "echo".to_string(),
-            params: serde_json::json!({"text": "hello"}),
+            params: Box::new(serde_json::json!({"text": "hello"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
         };
 
         // Serialize to a buffer (using canonical JSON, same as KernelMessage path).

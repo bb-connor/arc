@@ -364,7 +364,7 @@ impl SqliteFrostStore {
         let key_package = self.load_signer_key_package(request, custody, fence)?;
         let share = match create_frost_signature_share(
             &key_package,
-            &nonce_secret,
+            nonce_secret,
             signing_package_bytes,
             &stored.signing_message_digest,
             &stored.commitment_bytes,

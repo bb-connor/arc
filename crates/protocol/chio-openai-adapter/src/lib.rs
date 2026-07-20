@@ -420,14 +420,16 @@ impl ChioOpenAiAdapter {
     ) -> Vec<ToolCallResult> {
         if tool_calls.len() > 1
             && (!execution.approval_tokens.is_empty()
-                || execution.threshold_approval_proposal.is_some())
+                || execution.threshold_approval_proposal.is_some()
+                || execution.supplemental_authorization.is_some())
         {
             return tool_calls
                 .iter()
                 .map(|tool_call| {
                     denied_tool_call_result(
                         tool_call,
-                        "Error: threshold approvals require a single OpenAI tool call".to_string(),
+                        "Error: request-bound authorization artifacts require a single OpenAI tool call"
+                            .to_string(),
                     )
                 })
                 .collect();

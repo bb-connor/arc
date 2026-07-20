@@ -36,6 +36,7 @@ struct Fixture {
 
 fn fixture() -> Fixture {
     let temp = tempfile::tempdir().expect("tempdir");
+    secure_temp_directory(temp.path());
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root).expect("create lock root");
@@ -977,6 +978,7 @@ fn operation_bound_stage_requires_the_exact_current_recovery_claim() -> TestResu
 #[test]
 fn operation_bound_stage_expiry_is_durable_and_ijson_bounded() -> TestResult {
     let temp = tempfile::tempdir()?;
+    secure_temp_directory(temp.path());
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root)?;
@@ -1205,4 +1207,15 @@ fn operation_version_race_fences_stage_before_any_resource_is_visible() -> TestR
     ));
     assert!(fixture.cache.load_finalized_head(&key())?.is_none());
     Ok(())
+}
+
+fn secure_temp_directory(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+            .expect("secure temp directory");
+    }
+    #[cfg(not(unix))]
+    let _ = path;
 }

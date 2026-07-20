@@ -42,19 +42,6 @@ struct AnchorRecord {
     global_commit_chain_digest: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyAnchorRecord {
-    format: String,
-    generation: u64,
-    store_uuid: String,
-    owner_epoch: u64,
-    serving_lease_id: Option<String>,
-    admission_commit_head: u64,
-    admission_commit_chain_digest: String,
-    trusted_time_high_water_unix_ms: u64,
-}
-
 struct DatabaseState {
     store_uuid: String,
     owner_epoch: u64,
@@ -378,11 +365,7 @@ impl DatabaseState {
 
 impl AnchorRecord {
     fn validate(&self) -> Result<(), SqliteServingOwnerError> {
-        if !matches!(
-            self.format.as_str(),
-            "chio.sqlite-authority-rollback-anchor.v1"
-                | "chio.sqlite-authority-rollback-anchor-global.v1"
-        ) || self.generation == 0
+        if self.format != "chio.sqlite-authority-rollback-anchor-global.v1" || self.generation == 0
         {
             return Err(invalid("serving rollback anchor version is invalid"));
         }
@@ -399,8 +382,6 @@ impl AnchorRecord {
         if !is_digest(&self.global_commit_chain_digest)
             || (self.global_commit_head == 0
                 && self.global_commit_chain_digest != GLOBAL_GENESIS_DIGEST)
-            || (self.format == "chio.sqlite-authority-rollback-anchor.v1"
-                && self.global_commit_head != 0)
         {
             return Err(invalid("serving rollback anchor global head is invalid"));
         }
@@ -467,8 +448,6 @@ fn record_extends(current: &AnchorRecord, prior: &AnchorRecord) -> bool {
         && current.global_commit_head >= prior.global_commit_head
         && (current.global_commit_head != prior.global_commit_head
             || current.global_commit_chain_digest == prior.global_commit_chain_digest)
-        && !(current.format == "chio.sqlite-authority-rollback-anchor.v1"
-            && prior.format == "chio.sqlite-authority-rollback-anchor-global.v1")
 }
 
 fn decode_slot(slot: &[u8; SLOT_SIZE]) -> Result<AnchorRecord, SqliteServingOwnerError> {
@@ -490,44 +469,14 @@ fn decode_slot(slot: &[u8; SLOT_SIZE]) -> Result<AnchorRecord, SqliteServingOwne
     if slot[CHECKSUM_OFFSET..PAYLOAD_OFFSET] != sha256_hex(payload).as_bytes()[..] {
         return Err(invalid("serving rollback anchor checksum is invalid"));
     }
-    let format = serde_json::from_slice::<serde_json::Value>(payload)
-        .ok()
-        .and_then(|value| value.get("format")?.as_str().map(ToOwned::to_owned))
-        .ok_or_else(|| invalid("serving rollback anchor is invalid JSON"))?;
-    let record = if format == "chio.sqlite-authority-rollback-anchor.v1" {
-        let legacy: LegacyAnchorRecord = serde_json::from_slice(payload).map_err(|error| {
-            invalid(format!("serving rollback anchor is invalid JSON: {error}"))
-        })?;
-        if canonical_json_bytes(&legacy)
-            .map_err(|error| invalid(format!("rollback anchor encoding failed: {error}")))?
-            != payload
-        {
-            return Err(invalid("serving rollback anchor is not canonical JSON"));
-        }
-        AnchorRecord {
-            format: legacy.format,
-            generation: legacy.generation,
-            store_uuid: legacy.store_uuid,
-            owner_epoch: legacy.owner_epoch,
-            serving_lease_id: legacy.serving_lease_id,
-            admission_commit_head: legacy.admission_commit_head,
-            admission_commit_chain_digest: legacy.admission_commit_chain_digest,
-            trusted_time_high_water_unix_ms: legacy.trusted_time_high_water_unix_ms,
-            global_commit_head: 0,
-            global_commit_chain_digest: GLOBAL_GENESIS_DIGEST.to_string(),
-        }
-    } else {
-        let record: AnchorRecord = serde_json::from_slice(payload).map_err(|error| {
-            invalid(format!("serving rollback anchor is invalid JSON: {error}"))
-        })?;
-        if canonical_json_bytes(&record)
-            .map_err(|error| invalid(format!("rollback anchor encoding failed: {error}")))?
-            != payload
-        {
-            return Err(invalid("serving rollback anchor is not canonical JSON"));
-        }
-        record
-    };
+    let record: AnchorRecord = serde_json::from_slice(payload)
+        .map_err(|error| invalid(format!("serving rollback anchor is invalid JSON: {error}")))?;
+    if canonical_json_bytes(&record)
+        .map_err(|error| invalid(format!("rollback anchor encoding failed: {error}")))?
+        != payload
+    {
+        return Err(invalid("serving rollback anchor is not canonical JSON"));
+    }
     record.validate()?;
     Ok(record)
 }
@@ -730,9 +679,10 @@ mod tests {
 
     fn fixture() -> Fixture {
         let temp = tempfile::tempdir().expect("tempdir");
+        super::super::tests::secure_directory(temp.path());
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
-        fs::create_dir(&lock_root).expect("lock root");
+        super::super::tests::create_lock_root(&lock_root);
         SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
         let authority =
             SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving");

@@ -670,31 +670,33 @@ describe("chioTool: allow path invokes underlying execute", () => {
     expect(result).toEqual({ doubled: 42 });
   });
 
-  it("preserves governed approval sets and opaque authorization extensions", async () => {
+  it("carries no governed authorization extensions on the sidecar route", async () => {
+    // The HTTP substrate projection behind `/chio/evaluate` rejects governed
+    // authorization fields, so this client must never advertise or emit them.
+    // Governed flows belong to the kernel-mediated `/v1/evaluate` route.
     const { fetch, calls } = fakeFetch([sidecarAllowEvaluateResponse()]);
     const client = new ChioClient({ fetch });
-    const approvalTokens = [{ id: "approval-a" }, { id: "approval-b" }];
-    const proposal = { proposal_id: "proposal-1" };
-    const governedIntent = { id: "intent-1" };
-    const supplementalAuthorization = { signed_extension: "b3BhcXVl" };
 
     await client.evaluateToolCall({
       capability_id: "cap-1",
       tool_server: "math",
       tool_name: "double",
       parameters: { n: 21 },
-      governed_intent: governedIntent,
-      approval_tokens: approvalTokens,
-      threshold_approval_proposal: proposal,
-      supplemental_authorization: supplementalAuthorization,
     });
 
-    expect(calls[0]?.body).toMatchObject({
-      governed_intent: governedIntent,
-      approval_tokens: approvalTokens,
-      threshold_approval_proposal: proposal,
-      supplemental_authorization: supplementalAuthorization,
-    });
+    expect(calls[0]?.url).toContain("/chio/evaluate");
+    const body = calls[0]?.body as Record<string, unknown>;
+    for (
+      const field of [
+        "governed_intent",
+        "approval_token",
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "supplemental_authorization",
+      ]
+    ) {
+      expect(body).not.toHaveProperty(field);
+    }
   });
 
   it("rejects advisory evaluation wrappers as execution authorization", async () => {

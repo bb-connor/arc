@@ -107,6 +107,7 @@ pub(in crate::runtime) fn build_operation_context(
     id: &Value,
     session_id: SessionId,
     agent_id: &str,
+    method: &str,
     params: &Value,
 ) -> Result<OperationContext, Value> {
     #[derive(Serialize)]
@@ -114,12 +115,26 @@ pub(in crate::runtime) fn build_operation_context(
         domain: &'static str,
         session_id: &'a str,
         jsonrpc_id: &'a Value,
+        method: &'a str,
+        params: &'a Value,
     }
 
+    // JSON-RPC only requires an id to be unique among a client's in-flight
+    // requests, so a client may legally reuse one after the earlier request has
+    // settled. The method and params are folded in so two distinct operations do
+    // not collide on the same session lineage record. `_meta` is excluded because
+    // it carries per-attempt transport data (execution nonce, progress token),
+    // which keeps a strict-nonce retry on its preflight's request id.
+    let mut identity_params = params.clone();
+    if let Some(object) = identity_params.as_object_mut() {
+        object.remove("_meta");
+    }
     let identity = ExternalRequestIdentity {
-        domain: "CHIO-MCP-EXTERNAL-REQUEST-ID-V1",
+        domain: "CHIO-MCP-EXTERNAL-REQUEST-ID-V2",
         session_id: session_id.as_str(),
         jsonrpc_id: id,
+        method,
+        params: &identity_params,
     };
     let canonical = canonical_json_bytes(&identity).map_err(|error| {
         jsonrpc_error(

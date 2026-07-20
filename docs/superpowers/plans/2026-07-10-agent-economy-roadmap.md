@@ -71,8 +71,10 @@ hides the dependencies that govern release.
 ### Track A: release gates
 
 - RFC-0006 base hot-path work is on `main`; its database-scoped serving-owner
-  amendment is pending. Protocol-primitives Task 6 owns that amendment and
-  corrected RFC-0003, and both must
+  amendment lands in this program, under
+  `crates/platform/chio-store-sqlite/src/serving_owner/` (path identity, lease
+  history, global commit chain and rollback anchor). Protocol-primitives Task 6
+  owns that amendment and corrected RFC-0003, and corrected RFC-0003 must
   land before WS1 Phase 2. Its retained operation, composable receipt projection,
   shared dispatch boundary, serving fence and boot recovery are not replaceable
   by a standalone payment reconciler.

@@ -727,7 +727,7 @@ impl RemoteBudgetStore {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
-        if let Some(existing) = cached_usage.get(&key) {
+        if let Some(existing) = cached_usage.get(&key).map(|entry| &entry.record) {
             if existing.seq > record.seq {
                 return Ok(());
             }
@@ -741,7 +741,14 @@ impl RemoteBudgetStore {
             }
         }
         record.committed_cost_units()?;
-        cached_usage.insert(key, record);
+        // Structured usage views carry both monetary totals.
+        cached_usage.insert(
+            key,
+            CachedBudgetUsage {
+                record,
+                cost_authoritative: true,
+            },
+        );
         Ok(())
     }
 }

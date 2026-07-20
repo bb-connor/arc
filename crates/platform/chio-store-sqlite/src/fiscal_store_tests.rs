@@ -537,6 +537,7 @@ struct StoreFixture {
 
 fn store_fixture() -> TestResult<StoreFixture> {
     let temp = tempfile::tempdir()?;
+    secure_temp_directory(temp.path());
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     fs::create_dir(&lock_root)?;
@@ -1157,4 +1158,15 @@ fn unanchored_fiscal_stage_can_be_discarded_without_advancing_authority() -> Tes
     assert_eq!(store.load_authority_state()?, fixture.authority);
     assert_eq!(sha256_hex(&discarded.proof_json), staged.transition_id);
     Ok(())
+}
+
+fn secure_temp_directory(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+            .expect("secure temp directory");
+    }
+    #[cfg(not(unix))]
+    let _ = path;
 }

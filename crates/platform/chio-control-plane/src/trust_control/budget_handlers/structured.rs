@@ -79,6 +79,11 @@ pub(crate) async fn handle_structured_budget_authorize(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    match forward_post_to_leader(&state, STRUCTURED_BUDGET_AUTHORIZE_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     let (store, authority) = match structured_budget_store(&state) {
         Ok(authority) => authority,
         Err(response) => return response,
@@ -169,6 +174,17 @@ pub(crate) async fn handle_structured_budget_authorize_cumulative(
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
+    }
+    match forward_post_to_leader(
+        &state,
+        STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH,
+        &payload,
+    )
+    .await
+    {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
     }
     let (store, authority) = match structured_budget_store(&state) {
         Ok(authority) => authority,
@@ -285,6 +301,11 @@ pub(crate) async fn handle_structured_budget_cancel_captured(
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
+    match forward_post_to_leader(&state, STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     let (store, authority) = match structured_lifecycle_budget_store(&state, &payload.hold_id) {
         Ok(authority) => authority,
         Err(response) => return response,
@@ -333,6 +354,12 @@ pub(crate) async fn handle_structured_budget_capture_invocation(
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
+    }
+    match forward_post_to_leader(&state, STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH, &payload).await
+    {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
     }
     let (store, authority) = match structured_lifecycle_budget_store(&state, &payload.hold_id) {
         Ok(authority) => authority,
@@ -385,6 +412,11 @@ pub(crate) async fn handle_structured_budget_reverse(
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
+    match forward_post_to_leader(&state, STRUCTURED_BUDGET_FENCED_REVERSE_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     let (store, authority) = match structured_lifecycle_budget_store(&state, &payload.hold_id) {
         Ok(authority) => authority,
         Err(response) => return response,
@@ -433,6 +465,11 @@ pub(crate) async fn handle_structured_budget_release(
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
+    match forward_post_to_leader(&state, STRUCTURED_BUDGET_RELEASE_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     let (store, authority) = match structured_lifecycle_budget_store(&state, &payload.hold_id) {
         Ok(authority) => authority,
         Err(response) => return response,
@@ -477,6 +514,11 @@ pub(crate) async fn handle_structured_budget_reconcile(
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
+    }
+    match forward_post_to_leader(&state, STRUCTURED_BUDGET_RECONCILE_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
     }
     let (store, authority) = match structured_lifecycle_budget_store(&state, &payload.hold_id) {
         Ok(authority) => authority,
@@ -523,6 +565,11 @@ pub(crate) async fn handle_structured_budget_capture_spend(
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
+    }
+    match forward_post_to_leader(&state, STRUCTURED_BUDGET_CAPTURE_SPEND_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
     }
     let (store, authority) = match structured_lifecycle_budget_store(&state, &payload.hold_id) {
         Ok(authority) => authority,

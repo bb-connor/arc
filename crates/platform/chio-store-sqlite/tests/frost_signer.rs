@@ -1085,12 +1085,13 @@ fn frost_restart_after_external_completion_replays_share_and_erases_nonce() {
     let local_share = frost
         .publish_signer_share(&request, &custody(), &authority.mutation_fence(), 4_003)
         .unwrap_or_else(|error| panic!("publish local share: {error}"));
+    let peer_commitment_bytes = peer_preparation.commitment_bytes().to_vec();
     let peer_share = create_frost_signature_share(
         &completion.peer_key_package,
-        peer_preparation.nonce_secret(),
+        peer_preparation.into_nonce_secret(),
         &signing_package_bytes,
         &sha256_hex(&message),
-        peer_preparation.commitment_bytes(),
+        &peer_commitment_bytes,
     )
     .unwrap_or_else(|error| panic!("create peer share: {error}"));
     let mut shares = BTreeMap::new();

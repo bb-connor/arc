@@ -299,7 +299,7 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     "rcpt-revoked-001",
                     &capability_token.id,
                     tool,
-                    params.clone(),
+                    params.as_ref().clone(),
                     Decision::Deny {
                         reason: "capability revoked".to_string(),
                         guard: "revocation_store".to_string(),
@@ -348,7 +348,7 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     "rcpt-governed-001",
                     &capability_token.id,
                     tool,
-                    params.clone(),
+                    params.as_ref().clone(),
                     Decision::Allow,
                     metadata,
                 )),
@@ -374,7 +374,7 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     "rcpt-ok-001",
                     &capability_token.id,
                     tool,
-                    params.clone(),
+                    params.as_ref().clone(),
                     Decision::Allow,
                     None,
                 )),
@@ -1262,11 +1262,16 @@ fn build_governed_request() -> AgentMessage {
         )),
         server_id: "conformance".to_string(),
         tool: "governed_transfer".to_string(),
-        params: serde_json::json!({
+        params: Box::new(serde_json::json!({
             "amount": 1250,
             "currency": "USD",
             "seller": "supplier-001"
-        }),
+        })),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
     }
 }
 
@@ -1281,7 +1286,12 @@ fn build_revoked_request() -> AgentMessage {
         )),
         server_id: "conformance".to_string(),
         tool: "echo".to_string(),
-        params: serde_json::json!({"text": "hello"}),
+        params: Box::new(serde_json::json!({"text": "hello"})),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
     }
 }
 

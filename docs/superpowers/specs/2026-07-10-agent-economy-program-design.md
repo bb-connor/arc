@@ -76,7 +76,8 @@ Wave 3 (advanced rails): WS2/WS4 production  WS5 Channels  WS7 Insurance  WS9 in
 Hard edges (blocking):
 
 - RFC-0006's earlier hot-path work is on `main`; its new database-scoped
-  serving-owner amendment is pending and owned by protocol-primitives Task 6.
+  serving-owner amendment is owned by protocol-primitives Task 6 and lands with
+  it, under `crates/platform/chio-store-sqlite/src/serving_owner/`.
   That task also owns the generic retained
   `AdmissionOperation`, composable receipt projection, top-level/nested dispatch
   parity, and SQLite serving fencing described by corrected RFC-0003. It must

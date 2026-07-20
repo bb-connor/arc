@@ -932,3 +932,75 @@ fn approval_vs_reversal_and_last_unit_admission_are_serialized() {
     );
     let _ = fs::remove_file(last_path);
 }
+
+fn supplemental_admission(
+    operation_id: &str,
+    capability_id: &str,
+    expires_at: u64,
+) -> BudgetAdmissionBinding {
+    let mut binding = admission(operation_id, capability_id);
+    binding.last_observed_revocation = Some(RevocationCommitMetadata {
+        authority: BudgetEventAuthority {
+            authority_id: "revocation-authority".to_string(),
+            lease_id: "revocation-lease".to_string(),
+            lease_epoch: 1,
+        },
+        guarantee_level: BudgetGuaranteeLevel::SingleNodeAtomic,
+        commit_index: 1,
+    });
+    binding.supplemental_verifier_id = Some("supplemental-verifier".to_string());
+    binding.supplemental_verifier_config_digest = Some("b".repeat(64));
+    binding.supplemental_authorization_artifact_digest = Some("a".repeat(64));
+    binding.supplemental_authorization_expires_at = Some(expires_at);
+    binding
+}
+
+fn supplemental_request(id: &str, expires_at: u64) -> BudgetAuthorizeHoldRequest {
+    let capability_id = "cap-composite";
+    let mut request = authorize_request(id, 10, 2);
+    request.admission_binding = Some(supplemental_admission(
+        &format!("operation-{id}"),
+        capability_id,
+        expires_at,
+    ));
+    request.invocation_quotas.push(BudgetInvocationQuota {
+        key: BudgetQuotaKey {
+            profile: BudgetQuotaProfile::SupplementalBrokerCapabilityExecution,
+            owner_id: capability_id.to_string(),
+            grant_index: None,
+        },
+        max_invocations: 2,
+    });
+    request
+        .invocation_quotas
+        .sort_by(|left, right| left.key.cmp(&right.key));
+    request
+}
+
+#[test]
+fn millisecond_shaped_supplemental_expiry_is_rejected() {
+    let path = unique_db_path("chio-composite-supplemental-expiry-unit");
+    let store = reopen(&path);
+
+    let request = supplemental_request("ms-expiry", 1_767_225_600_000);
+    let error = store
+        .authorize_budget_hold(owned(&store, request))
+        .expect_err("a millisecond expiry cannot be compared against a seconds clock");
+    assert!(
+        error.to_string().contains("not expressed in seconds"),
+        "unexpected error: {error}"
+    );
+
+    // The same binding with a seconds-shaped expiry clears the unit gate and is
+    // carried on to the remaining admission checks.
+    let request = supplemental_request("seconds-expiry", 1_767_225_600);
+    let error = store
+        .authorize_budget_hold(owned(&store, request))
+        .expect_err("this fixture carries no live revocation head");
+    assert!(
+        !error.to_string().contains("not expressed in seconds"),
+        "a seconds expiry must not be rejected as a unit error: {error}"
+    );
+
+    let _ = fs::remove_dir_all(path);
+}

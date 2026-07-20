@@ -216,8 +216,12 @@ fn install_priced_guard_run_call_one_iou_one_settlement() {
         receipt.policy_hash.clone(),
     )
     .with_tenant("tenant-a");
+    let idempotency_key = chio_settle::SettlementIdempotencyKey {
+        receipt_id: receipt.id.clone(),
+        row_version: 1,
+    };
     let outcome = hook
-        .observe(&observation)
+        .observe(&observation, &idempotency_key)
         .expect("settlement hook accepts priced observation");
     assert!(matches!(outcome, SettlementOutcome::Accepted { .. }));
 

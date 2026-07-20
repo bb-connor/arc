@@ -82,9 +82,10 @@ struct Fixture {
 
 fn fixture() -> Fixture {
     let temp = tempfile::tempdir().expect("tempdir");
+    secure_directory(temp.path());
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
-    fs::create_dir(&lock_root).expect("create lock root");
+    create_lock_root(&lock_root);
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
         SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
@@ -98,6 +99,29 @@ fn fixture() -> Fixture {
         store,
         fence,
     }
+}
+
+/// Tightens a fixture directory to owner-only access. Both `tempfile::tempdir` and
+/// `fs::create_dir` inherit the process umask, and `validate_secure_directory`
+/// refuses anything group or world writable.
+fn secure_directory(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("secure directory");
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+}
+
+fn create_lock_root(lock_root: &std::path::Path) {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(lock_root).expect("create lock root");
 }
 
 fn identifier(field: &'static str, value: &str) -> AdmissionIdentifier {

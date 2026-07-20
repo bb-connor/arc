@@ -21,10 +21,31 @@ type AdmissionProjection = (i64, Vec<(String, i64)>, Vec<(i64, String)>);
 
 fn fixture() -> (TempDir, PathBuf, PathBuf) {
     let temp = tempfile::tempdir().expect("tempdir");
+    secure_directory(temp.path());
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
-    fs::create_dir(&lock_root).expect("create lock root");
+    create_lock_root(&lock_root);
     (temp, database, lock_root)
+}
+
+/// Tightens a fixture directory to owner-only access. Both `tempfile::tempdir` and
+/// `fs::create_dir` inherit the process umask, and `validate_secure_directory`
+/// refuses anything group or world writable.
+pub(crate) fn secure_directory(path: &Path) {
+    #[cfg(unix)]
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("secure directory");
+    #[cfg(not(unix))]
+    let _ = path;
+}
+
+pub(crate) fn create_lock_root(lock_root: &Path) {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(lock_root).expect("create lock root");
 }
 
 fn database_snapshot(authority: &SqliteAuthorityStore, database: &Path, target: &Path) {
@@ -168,15 +189,10 @@ fn joint_store_owns_budget_and_revocation_with_one_fence() {
 }
 
 #[test]
-fn legacy_global_projection_constraint_migrates_without_rewriting_history() {
+fn a_legacy_global_projection_constraint_is_rejected_rather_than_migrated() {
     let (_temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
     let connection = Connection::open(&database).expect("open authority database");
-    let original_rows = connection
-        .query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
-            row.get::<_, i64>(0)
-        })
-        .expect("global commit count");
     let table_sql = connection
         .query_row(
             "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'authority_global_commits'",
@@ -190,7 +206,7 @@ fn legacy_global_projection_constraint_migrates_without_rewriting_history() {
     );
     let transaction = connection
         .unchecked_transaction()
-        .expect("begin migration fixture");
+        .expect("begin legacy fixture");
     transaction
         .execute_batch(
             r#"
@@ -228,25 +244,17 @@ fn legacy_global_projection_constraint_migrates_without_rewriting_history() {
         .expect("populate legacy global commit table");
     transaction.commit().expect("commit legacy fixture");
 
-    super::global_commit_chain::initialize_global_commit_schema(&connection)
-        .expect("migrate supported legacy schema");
-    super::global_commit_chain::verify_global_commit_chain(&connection)
-        .expect("verify migrated global history");
-    let migrated_rows = connection
-        .query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
-            row.get::<_, i64>(0)
-        })
-        .expect("migrated global commit count");
-    assert_eq!(migrated_rows, original_rows);
-    let migrated_sql = connection
-        .query_row(
-            "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'authority_global_commits'",
-            [],
-            |row| row.get::<_, String>(0),
-        )
-        .expect("migrated global commit table SQL");
-    assert!(migrated_sql.contains("'frost'"));
-    assert!(migrated_sql.contains("'fiscal'"));
+    // Only the canonical schema is accepted; a non-canonical catalog is refused
+    // instead of being adapted in place.
+    assert!(matches!(
+        super::global_commit_chain::initialize_global_commit_schema(&connection),
+        Err(SqliteServingOwnerError::Invalid(_))
+    ));
+    drop(connection);
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(_))
+    ));
 }
 
 #[test]
@@ -360,6 +368,74 @@ fn initial_provision_refuses_nonempty_legacy_authority_state() {
         ),
         "unexpected error: {error}"
     );
+
+    let connection = Connection::open(&database).expect("reopen refused database");
+    assert!(
+        !owner_table_exists(&connection).expect("owner table probe"),
+        "a refused provision must not leave an owner table behind"
+    );
+    drop(connection);
+    assert_eq!(
+        fs::read_dir(&lock_root).expect("read lock root").count(),
+        0,
+        "a refused provision must not leave a lock file behind"
+    );
+
+    let legacy = SqliteBudgetStore::open(&database).expect("legacy budget store still opens");
+    assert!(!legacy
+        .try_increment("legacy-capability", 0, Some(1))
+        .expect("legacy usage survives the refusal"));
+    drop(legacy);
+    fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
+        .expect("secure database mode");
+
+    let repeated = SqliteAuthorityStore::provision(&database, &lock_root)
+        .expect_err("a refused provision must stay refused rather than wedge");
+    assert!(
+        matches!(
+            &repeated,
+            SqliteServingOwnerError::Invalid(message)
+                if message.contains("baseline refuses nonempty safety table")
+        ),
+        "unexpected error: {repeated}"
+    );
+}
+
+#[test]
+fn a_failed_provision_cleans_up_only_what_it_created() {
+    let (_temp, database, lock_root) = fixture();
+    const STORE_UUID: &str = "018bcfe5-6800-7000-8000-0000000000a1";
+    let lock_path = lock_root.join(format!("{STORE_UUID}.lock"));
+
+    let error = {
+        let _scope = scope_fixed_authority_ids_for_current_thread(STORE_UUID, Vec::<String>::new())
+            .expect("fixed identity scope");
+        fs::write(&lock_path, b"occupied").expect("occupy the lock path");
+        SqliteAuthorityStore::provision(&database, &lock_root)
+            .expect_err("provisioning must fail on an occupied lock path")
+    };
+    assert!(
+        !matches!(error, SqliteServingOwnerError::OutcomeUnknown(_)),
+        "unexpected error: {error}"
+    );
+    assert_eq!(
+        fs::read(&lock_path).expect("occupied lock file survives"),
+        b"occupied",
+        "a failed provision must not remove a lock file it did not create"
+    );
+
+    let connection = Connection::open(&database).expect("reopen database");
+    assert!(
+        !owner_table_exists(&connection).expect("owner table probe"),
+        "a failed provision must not leave an owner table behind"
+    );
+    drop(connection);
+
+    // Nothing was left behind, so the store provisions normally once the
+    // occupied path is cleared instead of wedging as a partial provision.
+    fs::remove_file(&lock_path).expect("clear the occupied lock path");
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("reprovision");
+    SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving");
 }
 
 #[test]

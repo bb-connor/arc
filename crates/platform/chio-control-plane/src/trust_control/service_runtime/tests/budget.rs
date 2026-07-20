@@ -881,6 +881,48 @@ fn remote_budget_list_cannot_regress_or_conflict_with_newer_cached_usage(
 }
 
 #[test]
+fn remote_budget_get_reloads_costs_seeded_by_a_partial_response(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = serde_json::json!({
+        "configured": true,
+        "backend": "sqlite",
+        "capabilityId": "cap-budget",
+        "count": 1,
+        "usages": [{
+            "capabilityId": "cap-budget",
+            "grantIndex": 0,
+            "invocationCount": 3,
+            "totalExposureCharged": 300,
+            "totalRealizedSpend": 120,
+            "updatedAt": 9,
+            "seq": 9
+        }]
+    })
+    .to_string();
+    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+    let store = RemoteBudgetStore {
+        client: build_client(&server.url, "secret")?,
+        cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+    };
+    // try_increment carries only the invocation count, so the entry it seeds defaults
+    // both monetary totals to zero at the same sequence the list will report.
+    store.cache_usage("cap-budget", 0, Some(9), Some(3), None, None)?;
+
+    let usage = store
+        .get_usage("cap-budget", 0)?
+        .ok_or_else(|| std::io::Error::other("usage missing"))?;
+    assert_eq!(usage.total_cost_exposed, 300);
+    assert_eq!(usage.total_cost_realized_spend, 120);
+
+    let cached = store
+        .cached_usage("cap-budget", 0)
+        .ok_or_else(|| std::io::Error::other("reloaded cache missing"))?;
+    assert_eq!(cached.total_cost_exposed, 300);
+    assert_eq!(cached.total_cost_realized_spend, 120);
+    Ok(())
+}
+
+#[test]
 fn remote_budget_get_rejects_substituted_capability_without_partial_cache_update(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = serde_json::json!({

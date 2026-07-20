@@ -151,7 +151,7 @@ pub(crate) fn build_cluster_state_snapshot(
                 .mutation_events
                 .into_iter()
                 .map(budget_mutation_event_view)
-                .collect(),
+                .collect::<Result<Vec<_>, CliError>>()?,
             snapshot
                 .abandoned_seq_ranges
                 .into_iter()

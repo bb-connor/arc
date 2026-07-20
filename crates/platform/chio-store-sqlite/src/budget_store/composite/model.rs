@@ -1,6 +1,12 @@
 use super::*;
 use rusqlite::{params, OptionalExtension, Transaction};
 
+/// Upper bound for a supplemental authorization expiry, in seconds since the Unix
+/// epoch (2100-01-01T00:00:00Z). Capture compares the expiry against SQLite's
+/// `unixepoch()`, which is also seconds, so a millisecond-shaped value would never
+/// expire against that clock. Such values are rejected rather than accepted.
+pub(super) const MAX_SUPPLEMENTAL_AUTHORIZATION_EXPIRES_AT_SECONDS: u64 = 4_102_444_800;
+
 #[derive(Clone)]
 pub(super) struct QuotaState {
     pub(super) quota: BudgetInvocationQuota,
@@ -108,6 +114,16 @@ pub(super) fn validate_composite_sqlite_range(
         if binding.supplemental_authorization_expires_at == Some(0) {
             return Err(BudgetStoreError::Invariant(
                 "supplemental authorization expiry must be positive".to_string(),
+            ));
+        }
+        if binding
+            .supplemental_authorization_expires_at
+            .is_some_and(|expires_at| {
+                expires_at > MAX_SUPPLEMENTAL_AUTHORIZATION_EXPIRES_AT_SECONDS
+            })
+        {
+            return Err(BudgetStoreError::Invariant(
+                "supplemental authorization expiry is not expressed in seconds".to_string(),
             ));
         }
     }

@@ -531,7 +531,12 @@ impl SqliteBudgetStore {
         let Some(binding) = binding else {
             return Ok(None);
         };
-        if !matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)) {
+        // A denied authorization reserves nothing, so its operation is untouched. An
+        // approval-required authorization does reserve budget, so its binding is still
+        // validated against the operation before the joint transaction commits.
+        let approval_required =
+            matches!(decision, BudgetAuthorizeHoldDecision::ApprovalRequired(_));
+        if !matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)) && !approval_required {
             return Ok(Some(binding.operation.clone()));
         }
         let admission = request.admission_binding.as_ref().ok_or_else(|| {
@@ -577,6 +582,14 @@ impl SqliteBudgetStore {
                 "combined authorization credit exposure participant does not match operation requirements"
                     .to_owned(),
             ));
+        }
+        if approval_required {
+            // Monetary participants attach only once approval clears, and the move to
+            // `ApprovalRequired` carries a kernel-signed threshold proposal this store
+            // cannot mint, so the kernel performs that transition after the reservation
+            // commits. Until it does, the reserved hold stays `authorized` and the
+            // startup reaper reverses it.
+            return Ok(Some(binding.operation.clone()));
         }
         if let Some(journal) = binding.payment_journal {
             let grant_index = u32::try_from(request.grant_index).map_err(|_| {

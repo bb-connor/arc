@@ -2,6 +2,7 @@
 //! the public certification discovery/marketplace network, and the generic
 //! trust-activation, governance, and open-market artifact endpoints.
 
+use super::report_rendering::forward_post_to_leader;
 use super::report_validation::validate_service_auth;
 use super::*;
 
@@ -234,6 +235,16 @@ pub(crate) async fn handle_issue_open_market_fee_schedule(
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
+    }
+    // Governed issuance binds the legacy schedule under the local fiscal fence, so
+    // it has to run on the leader. Ungoverned issuance stays local and keeps signing
+    // with this node's authority key.
+    if state.fiscal_runtime.is_some() {
+        match forward_post_to_leader(&state, OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH, &request).await {
+            Ok(Some(response)) => return response,
+            Ok(None) => {}
+            Err(response) => return response,
+        }
     }
     match service_runtime::issuance::issue_signed_open_market_fee_schedule(
         &state.config,

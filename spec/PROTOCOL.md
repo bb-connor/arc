@@ -1031,9 +1031,13 @@ it satisfies the structural conjunction of the `chio.mediated_spend.v1` profile:
   against the agent's cost-bearing capability and reconciled down to realized
   spend (`authorize` then `terminal.disposition = reconciled`).
 - A `chio.execution_nonce.v1` nonce, signed by the same admitted kernel key, is
-  bound to the same `capability_id`, `tool_server`, `tool_name`, and
-  `parameter_hash`, and the receipt records that nonce id
-  (`budget_authority.execution_nonce_id`).
+  bound to the same `subject_id`, `request_id`, `capability_id`, `tool_server`,
+  `tool_name`, and `parameter_hash`, and the receipt records that nonce id
+  (`budget_authority.execution_nonce_id`). The `request_id` binding is required.
+  A binding that omits it (a v1 body minted before request binding) still
+  decodes, so a rolling upgrade does not fail at parse time, but it is denied at
+  verification. That prevents a nonce from being presented for a different
+  request that shares the other five fields.
 
 Advisory (`advisory_evaluation`) records and label-only receipts are never
 authorization. A guarantee level (`single_node_atomic`, `ha_linearizable`,

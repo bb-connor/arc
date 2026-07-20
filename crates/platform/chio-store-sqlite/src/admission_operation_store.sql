@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS admission_operations (
     request_id TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 512),
     operation_json BLOB NOT NULL CHECK (length(operation_json) BETWEEN 1 AND 262144),
     state TEXT NOT NULL CHECK (state IN (
-        'prepared', 'broker_attempt_registered', 'budget_authorized',
-        'approval_reserved', 'ready_to_dispatch', 'capture_pending',
-        'dispatch_committed', 'finalizing', 'completed',
+        'prepared', 'broker_attempt_registered', 'approval_required',
+        'budget_authorized', 'approval_reserved', 'ready_to_dispatch',
+        'capture_pending', 'dispatch_committed', 'finalizing', 'completed',
         'compensated_before_dispatch', 'not_accepted_after_dispatch_commit',
         'outcome_unknown_after_dispatch', 'mutation_ready', 'mutation_submitted',
         'economic_mutation_applied', 'economic_mutation_not_applied'

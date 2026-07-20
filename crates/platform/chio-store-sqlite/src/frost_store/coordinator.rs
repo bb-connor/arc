@@ -1115,8 +1115,14 @@ fn lease_expiry(now: u64, ttl: u64) -> Result<u64, FrostStoreError> {
         .ok_or_else(|| invalid("coordinator lease expiry overflow"))
 }
 
+/// Rejects the same reasons the signer store rejects, so a reason durably burned
+/// on the coordinator is always acceptable to the signer burn fanout that follows.
 fn validate_burn_reason(reason: &str) -> Result<(), FrostStoreError> {
-    if reason.is_empty() || reason.len() > MAX_BURN_REASON_BYTES || reason.trim() != reason {
+    if reason.is_empty()
+        || reason.len() > MAX_BURN_REASON_BYTES
+        || reason.trim() != reason
+        || reason.bytes().any(|byte| byte.is_ascii_control())
+    {
         Err(FrostStoreError::Conflict(
             "coordinator burn reason is invalid",
         ))
@@ -1150,4 +1156,38 @@ fn anchor_error(error: impl std::fmt::Display) -> FrostStoreError {
 
 fn invalid(detail: impl Into<String>) -> FrostStoreError {
     FrostStoreError::InvalidState(detail.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_burn_reason, MAX_BURN_REASON_BYTES};
+
+    #[test]
+    fn burn_reasons_reject_control_characters() {
+        for reason in [
+            "operator\tabort",
+            "operator\nabort",
+            "operator\rabort",
+            "operator\u{0}abort",
+        ] {
+            assert!(
+                validate_burn_reason(reason).is_err(),
+                "control character accepted in {reason:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn burn_reasons_accept_plain_text() {
+        assert!(validate_burn_reason("operator abort").is_ok());
+        assert!(validate_burn_reason(&"a".repeat(MAX_BURN_REASON_BYTES)).is_ok());
+    }
+
+    #[test]
+    fn burn_reasons_reject_empty_padded_and_oversized() {
+        assert!(validate_burn_reason("").is_err());
+        assert!(validate_burn_reason(" operator abort").is_err());
+        assert!(validate_burn_reason("operator abort ").is_err());
+        assert!(validate_burn_reason(&"a".repeat(MAX_BURN_REASON_BYTES + 1)).is_err());
+    }
 }

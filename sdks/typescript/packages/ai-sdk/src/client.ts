@@ -9,6 +9,17 @@
  * `ChioReceipt` API, while staying deliberately small so the Vercel AI SDK
  * wrapper does not pull in the full HTTP-substrate package.
  *
+ * Governed authorization extensions (governed intent, approval tokens,
+ * threshold proposals, opaque supplemental authorization) are deliberately not
+ * part of this request shape. The HTTP substrate projection behind
+ * `/chio/evaluate` rejects them outright, so a caller that populated them would
+ * be denied before the kernel ever saw the intent. Those extensions belong to
+ * the kernel-mediated `POST /v1/evaluate` route, which takes a full signed
+ * capability, reserves a budget hold and returns a minted execution nonce that
+ * the caller must settle through `/v1/reconcile`. That is a different request
+ * and response contract than this client exposes; see the Python SDK's
+ * `evaluate_tool_call_mediated` for the mediated shape.
+ *
  * Transport uses `globalThis.fetch` (Node >= 20 ships it natively) and
  * supports a pluggable `fetch` override for testing.
  */
@@ -50,16 +61,6 @@ export interface ChioEvaluateToolCallRequest {
   arguments?: unknown;
   parameters?: unknown;
   capability?: unknown;
-  /** Typed Chio governed intent carried unchanged to the kernel boundary. */
-  governed_intent?: unknown;
-  /** Singular approval compatibility field. Do not combine with `approval_tokens`. */
-  approval_token?: unknown;
-  /** Complete threshold approval set. The client never selects one member. */
-  approval_tokens?: readonly unknown[];
-  /** Signed proposal binding `approval_tokens`. */
-  threshold_approval_proposal?: unknown;
-  /** Opaque authenticated extension. The SDK does not interpret its bytes. */
-  supplemental_authorization?: { signed_extension: string };
   model_metadata?:
     | {
       model_id: string;
@@ -154,6 +155,11 @@ export class ChioClientError extends Error {
  * client, which evaluates inbound HTTP requests rather than outbound tool
  * calls. Consumers who need the HTTP substrate should import that package
  * directly; this client is scoped to the Vercel AI SDK tool-call shape.
+ *
+ * This route carries no governed authorization extensions. Callers who need
+ * governed intent, approval tokens, threshold proposals or supplemental
+ * authorization must use the kernel-mediated `/v1/evaluate` route, which this
+ * client does not implement.
  */
 export class ChioClient {
   private readonly baseUrl: string;

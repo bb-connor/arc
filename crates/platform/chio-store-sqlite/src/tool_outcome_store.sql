@@ -6,8 +6,11 @@ CREATE TABLE IF NOT EXISTS tool_outcome_blobs (
     blob_size_bytes INTEGER NOT NULL CHECK (
         blob_size_bytes BETWEEN 1 AND 269484032
     ),
-    canonical_bytes BLOB NOT NULL CHECK (
-        length(canonical_bytes) = blob_size_bytes
+    -- Nullable so a terminal operation's raw payload can be compacted away while
+    -- the digest and size stay behind for verification. Inserts still require it.
+    canonical_bytes BLOB CHECK (
+        canonical_bytes IS NULL
+        OR length(canonical_bytes) = blob_size_bytes
     ),
     recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms > 0),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
@@ -30,10 +33,49 @@ BEGIN
     SELECT RAISE(ABORT, 'tool outcome blob has no exact serving lease');
 END;
 
+CREATE TRIGGER IF NOT EXISTS tool_outcome_blobs_require_payload
+BEFORE INSERT ON tool_outcome_blobs
+WHEN NEW.canonical_bytes IS NULL
+BEGIN
+    SELECT RAISE(ABORT, 'tool outcome blob requires a payload');
+END;
+
+-- The only permitted update is compaction: clearing the payload of an already
+-- recorded blob. Identity, size and provenance stay immutable, and a payload can
+-- never be restored or rewritten once cleared.
 CREATE TRIGGER IF NOT EXISTS tool_outcome_blobs_immutable
 BEFORE UPDATE ON tool_outcome_blobs
+WHEN NEW.digest <> OLD.digest
+  OR NEW.blob_size_bytes <> OLD.blob_size_bytes
+  OR NEW.recorded_at_unix_ms <> OLD.recorded_at_unix_ms
+  OR NEW.store_uuid <> OLD.store_uuid
+  OR NEW.store_lease_id <> OLD.store_lease_id
+  OR NEW.store_owner_epoch <> OLD.store_owner_epoch
+  OR OLD.canonical_bytes IS NULL
+  OR NEW.canonical_bytes IS NOT NULL
 BEGIN
     SELECT RAISE(ABORT, 'tool outcome blob is immutable');
+END;
+
+-- Compaction is only in scope once every operation owning the blob is terminal,
+-- so a live invocation can never lose the payload it is still working from.
+CREATE TRIGGER IF NOT EXISTS tool_outcome_blobs_compaction_requires_terminal
+BEFORE UPDATE OF canonical_bytes ON tool_outcome_blobs
+WHEN NEW.canonical_bytes IS NULL
+  AND (
+      NOT EXISTS (
+          SELECT 1 FROM tool_outcomes
+          WHERE raw_output_digest = OLD.digest
+      )
+      OR EXISTS (
+          SELECT 1 FROM tool_outcomes o
+          JOIN admission_operations a ON a.operation_id = o.operation_id
+          WHERE o.raw_output_digest = OLD.digest
+            AND a.terminal = 0
+      )
+  )
+BEGIN
+    SELECT RAISE(ABORT, 'tool outcome blob is retained while an owning operation is live');
 END;
 
 CREATE TRIGGER IF NOT EXISTS tool_outcome_blobs_no_delete

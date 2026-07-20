@@ -27,7 +27,7 @@ mod rollback_anchor;
 
 use global_commit_chain::{
     append_global_commit, initialize_global_commit_schema, reset_derived_budget_ack_cache,
-    seed_global_baseline, verify_global_commit_schema,
+    seed_global_baseline, verify_global_commit_schema, verify_pristine_authority_tables,
 };
 use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
 use rollback_anchor::RollbackAnchor;
@@ -351,30 +351,30 @@ impl SqliteAuthorityStore {
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         }
         connection.execute_batch("PRAGMA foreign_keys = ON;")?;
-        connection.execute_batch(SERVING_OWNER_SCHEMA)?;
-        verify_serving_owner_schema(&connection)?;
-        initialize_serving_lease_schema(&connection)?;
-        crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
-        crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
-        crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
-            &mut connection,
-        )?;
-        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+        // Refuse a store the global baseline cannot adopt before anything is created,
+        // so a refused provision leaves the pre-existing database exactly as it was.
+        verify_pristine_authority_tables(&connection)?;
 
         let store_uuid = next_store_uuid();
         let lock_path = lock_root.join(format!("{store_uuid}.lock"));
-        let lock_file = create_lock_file(&lock_path)?;
-        let lock_metadata = lock_file.metadata()?;
-        validate_lock_metadata(&lock_root, &lock_metadata)?;
-        lock_file.sync_all()?;
-        File::open(&lock_root)?.sync_all()?;
-        validate_database_identity(&database_path, &expected_database)?;
-        let database_metadata = fs::metadata(&database_path)?;
-        validate_database_metadata(&database_metadata)?;
-        let owner_insert = (|| -> Result<(), SqliteServingOwnerError> {
+        // The owner table and its row are created in a single transaction so a
+        // failure rolls the table back with the row. Nothing that depends on the
+        // owner table is created before that transaction commits, which leaves an
+        // interrupted provision recoverable rather than wedged half way.
+        let mut lock_file_created = false;
+        let provision_owner = (|| -> Result<(File, fs::Metadata), SqliteServingOwnerError> {
+            let lock_file = create_lock_file(&lock_path)?;
+            lock_file_created = true;
+            let lock_metadata = lock_file.metadata()?;
+            validate_lock_metadata(&lock_root, &lock_metadata)?;
+            lock_file.sync_all()?;
+            File::open(&lock_root)?.sync_all()?;
+            validate_database_identity(&database_path, &expected_database)?;
+            let database_metadata = fs::metadata(&database_path)?;
+            validate_database_metadata(&database_metadata)?;
             let transaction =
                 connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            transaction.execute_batch(SERVING_OWNER_SCHEMA)?;
             let changed = transaction.execute(
                 r#"
                 INSERT INTO chio_serving_owner (
@@ -403,16 +403,29 @@ impl SqliteAuthorityStore {
                     "sqlite authority provisioning commit outcome is unknown: {error}"
                 ))
             })?;
-            Ok(())
+            Ok((lock_file, lock_metadata))
         })();
-        if let Err(error) = owner_insert {
-            if !matches!(error, SqliteServingOwnerError::OutcomeUnknown(_)) {
-                drop(lock_file);
-                let _ = fs::remove_file(&lock_path);
-                let _ = File::open(&lock_root).and_then(|directory| directory.sync_all());
+        let (lock_file, lock_metadata) = match provision_owner {
+            Ok(artifacts) => artifacts,
+            Err(error) => {
+                // An unknown commit outcome stays untouched for manual inspection.
+                if !matches!(error, SqliteServingOwnerError::OutcomeUnknown(_)) && lock_file_created
+                {
+                    let _ = fs::remove_file(&lock_path);
+                    let _ = File::open(&lock_root).and_then(|directory| directory.sync_all());
+                }
+                return Err(error);
             }
-            return Err(error);
-        }
+        };
+        verify_serving_owner_schema(&connection)?;
+        initialize_serving_lease_schema(&connection)?;
+        crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
+        crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
+        crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
+            &mut connection,
+        )?;
+        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         initialize_global_commit_schema(&connection)?;
         seed_global_baseline(&mut connection)?;
         reset_derived_budget_ack_cache(&connection)?;
@@ -1221,13 +1234,16 @@ fn create_database_file(path: &Path) -> Result<File, SqliteServingOwnerError> {
 }
 
 fn open_existing_database(path: &Path) -> Result<Connection, SqliteServingOwnerError> {
-    Connection::open_with_flags(
+    let connection = Connection::open_with_flags(
         path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .map_err(Into::into)
+    )?;
+    // Provisioning writes before `open_serving` sets its own pragmas, so the busy
+    // timeout has to be in place here or a transient lock aborts it instantly.
+    connection.execute_batch("PRAGMA busy_timeout = 5000;")?;
+    Ok(connection)
 }
 
 fn create_lock_file(path: &Path) -> Result<File, SqliteServingOwnerError> {

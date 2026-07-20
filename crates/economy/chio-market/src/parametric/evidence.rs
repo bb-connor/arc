@@ -707,7 +707,7 @@ fn verify_range_members(
     }
     for pair in proof.members.windows(2) {
         if pair[0].proof.leaf_index.checked_add(1) != Some(pair[1].proof.leaf_index)
-            || pair[0].member.sequence.checked_add(1) != Some(pair[1].member.sequence)
+            || pair[0].member.sequence >= pair[1].member.sequence
         {
             return Err(ParametricContractError::IncompleteEvidenceBoundaries);
         }
