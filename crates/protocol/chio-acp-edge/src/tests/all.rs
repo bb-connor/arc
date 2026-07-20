@@ -23,7 +23,6 @@ mod tests {
         DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
     use chio_manifest::LatencyHint;
-
     static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
     fn metrics_test_guard() -> MutexGuard<'static, ()> {
         match METRICS_TEST_LOCK.lock() {
@@ -135,7 +134,7 @@ mod tests {
         }
     }
 
-    fn test_manifest() -> ToolManifest {
+    pub(super) fn test_manifest() -> ToolManifest {
         ToolManifest {
             schema: "chio.manifest.v1".to_string(),
             server_id: "test-srv".to_string(),
@@ -417,7 +416,7 @@ mod tests {
         }
     }
 
-    fn test_kernel_config() -> KernelConfig {
+    pub(super) fn test_kernel_config() -> KernelConfig {
         let keypair = Keypair::generate();
         KernelConfig {
             ca_public_keys: vec![keypair.public_key()],
@@ -439,7 +438,7 @@ mod tests {
         }
     }
 
-    fn capability_for_tool(
+    pub(super) fn capability_for_tool(
         issuer: &Keypair,
         subject: &Keypair,
         server_id: &str,
@@ -485,7 +484,7 @@ mod tests {
         .test_expect("capability should sign")
     }
 
-    fn threshold_artifacts(
+    pub(super) fn threshold_artifacts(
         subject: &Keypair,
         request_id: &str,
     ) -> (Vec<GovernedApprovalToken>, ThresholdApprovalProposal) {
@@ -580,35 +579,6 @@ mod tests {
         assert_eq!(projected.threshold_approval_proposal, Some(proposal));
         assert_eq!(projected.supplemental_authorization, Some(supplemental));
         assert_eq!(projected.kernel_request_id, "acp-auth-set");
-    }
-
-    #[test]
-    fn generated_request_id_rejects_threshold_approvals() {
-        let issuer = Keypair::generate();
-        let subject = Keypair::generate();
-        let capability = capability_for_tool(&issuer, &subject, "srv", "run");
-        let (approvals, proposal) = threshold_artifacts(&subject, "acp-auth-set");
-        let execution = AcpKernelExecutionContext {
-            capability,
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: approvals,
-            threshold_approval_proposal: Some(proposal),
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()])
-            .test_expect("ACP edge should construct");
-        let kernel = ChioKernel::new(test_kernel_config());
-
-        let error = edge
-            .invoke("run", serde_json::json!({}), &kernel, &execution)
-            .test_expect_err("generated request IDs must reject threshold approvals");
-
-        assert!(error.to_string().contains("invoke_with_request_id"));
     }
 
     fn dpop_proof_for_request(

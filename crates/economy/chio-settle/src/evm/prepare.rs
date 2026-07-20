@@ -39,6 +39,19 @@ const BOND_PROOF_LEAF_TYPE: &str = "ChioBondProof(uint256 chainId,address vault,
 const BOND_ACTION_RELEASE: u8 = 0;
 const BOND_ACTION_IMPAIR: u8 = 1;
 const MAX_IMPAIR_BENEFICIARIES: usize = 16;
+pub(super) const GUARDED_MONEY_EXIT_SELECTORS: [[u8; 4]; 11] = [
+    IChioRootRegistry::publishRootCall::SELECTOR,
+    IChioRootRegistry::publishRootBatchCall::SELECTOR,
+    IChioEscrow::releaseWithProofCall::SELECTOR,
+    IChioEscrow::releaseWithProofDetailedCall::SELECTOR,
+    IChioEscrow::partialReleaseWithProofCall::SELECTOR,
+    IChioEscrow::partialReleaseWithProofDetailedCall::SELECTOR,
+    IChioEscrow::releaseWithSignatureCall::SELECTOR,
+    IChioEscrow::refundCall::SELECTOR,
+    IChioBondVault::releaseBondDetailedCall::SELECTOR,
+    IChioBondVault::impairBondDetailedCall::SELECTOR,
+    IChioBondVault::expireReleaseCall::SELECTOR,
+];
 
 #[derive(Debug, Clone, Copy)]
 pub enum PreparedBondProofRoot<'a> {
@@ -1601,24 +1614,12 @@ pub async fn submit_call<T: PreparedEvmSubmission + ?Sized>(
 }
 
 fn reject_guarded_money_exit_selector(call: &PreparedEvmCall) -> Result<(), SettlementError> {
-    const GUARDED_SELECTORS: [[u8; 4]; 11] = [
-        IChioRootRegistry::publishRootCall::SELECTOR,
-        IChioRootRegistry::publishRootBatchCall::SELECTOR,
-        IChioEscrow::releaseWithProofCall::SELECTOR,
-        IChioEscrow::releaseWithProofDetailedCall::SELECTOR,
-        IChioEscrow::partialReleaseWithProofCall::SELECTOR,
-        IChioEscrow::partialReleaseWithProofDetailedCall::SELECTOR,
-        IChioEscrow::releaseWithSignatureCall::SELECTOR,
-        IChioEscrow::refundCall::SELECTOR,
-        IChioBondVault::releaseBondDetailedCall::SELECTOR,
-        IChioBondVault::impairBondDetailedCall::SELECTOR,
-        IChioBondVault::expireReleaseCall::SELECTOR,
-    ];
     let data = decode_hex_bytes(&call.data)?;
-    if data
-        .get(..4)
-        .is_some_and(|selector| GUARDED_SELECTORS.iter().any(|guarded| selector == guarded))
-    {
+    if data.get(..4).is_some_and(|selector| {
+        GUARDED_MONEY_EXIT_SELECTORS
+            .iter()
+            .any(|guarded| selector == guarded)
+    }) {
         return Err(SettlementError::Unsupported(
             "root publication, escrow release, escrow refund, and bond exits require a durable publisher"
                 .to_owned(),

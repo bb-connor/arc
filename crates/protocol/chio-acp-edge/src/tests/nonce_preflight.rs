@@ -13,6 +13,10 @@ use chio_test_support::prelude::*;
 use serde_json::{json, Value};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::tests::{
+    capability_for_tool as shared_capability_for_tool, test_kernel_config as shared_kernel_config,
+    test_manifest as shared_manifest, threshold_artifacts,
+};
 use super::*;
 
 struct MockToolServer;
@@ -116,6 +120,35 @@ fn capability_for_tool(
         issuer,
     )
     .test_expect("capability should sign")
+}
+
+#[test]
+fn generated_request_id_rejects_threshold_approvals() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let capability = shared_capability_for_tool(&issuer, &subject, "srv", "run");
+    let (approvals, proposal) = threshold_artifacts(&subject, "acp-auth-set");
+    let execution = AcpKernelExecutionContext {
+        capability,
+        agent_id: subject.public_key().to_hex(),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: approvals,
+        threshold_approval_proposal: Some(proposal),
+        supplemental_authorization: None,
+        model_metadata: None,
+    };
+    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![shared_manifest()])
+        .test_expect("ACP edge should construct");
+    let kernel = ChioKernel::new(shared_kernel_config());
+
+    let error = edge
+        .invoke("run", serde_json::json!({}), &kernel, &execution)
+        .test_expect_err("generated request IDs must reject threshold approvals");
+
+    assert!(error.to_string().contains("invoke_with_request_id"));
 }
 
 #[test]
