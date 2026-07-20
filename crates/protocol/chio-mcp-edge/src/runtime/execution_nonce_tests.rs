@@ -236,7 +236,7 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
     let allowed = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
-            "id": 3,
+            "id": 2,
             "method": "tools/call",
             "params": {
                 "name": "read_file",
@@ -252,7 +252,7 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
     let replay = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
-            "id": 4,
+            "id": 2,
             "method": "tools/call",
             "params": {
                 "name": "read_file",
