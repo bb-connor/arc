@@ -302,6 +302,13 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "session filesystem roots lookup failed pre-dispatch (nested flow)");
+                self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                    durable_admission
+                        .as_ref()
+                        .map(DurableToolAdmission::operation),
+                    None,
+                    None,
+                )?;
                 return self.build_deny_response(request, &msg, now, None);
             }
         };

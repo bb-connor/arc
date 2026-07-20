@@ -144,6 +144,69 @@ fn free_matching_grant_does_not_inherit_paid_grant_requirements() {
         .ends_with(":1"));
 }
 
+// The pre-execution hold debits the per-invocation ceiling, so a grant declaring
+// only a cumulative ceiling can fund no hold at all. Selection must pass over it
+// and bind a grant that can, rather than binding the unusable one and failing the
+// whole dispatch on a zero-amount payment journal.
+#[test]
+fn durable_monetary_selection_skips_a_cumulative_only_grant() {
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"durable-cumulative-only-selection-policy");
+    let mut kernel = make_kernel(config);
+    let fence = admission_test_fence();
+    let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
+    kernel
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
+        .expect("qualified admission store");
+    kernel.set_budget_store_handle(store.budget_store());
+    kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
+        authorization_references: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+        settlement_actions: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+    }));
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
+        id: "durable-server".to_owned(),
+        tools: vec!["mutate".to_owned()],
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+    let mut total_only = make_grant("durable-server", "mutate");
+    total_only.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let mut per_call = make_grant("durable-server", "mutate");
+    per_call.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    per_call.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let agent = make_keypair();
+    let capability = make_capability(&kernel, &agent, make_scope(vec![total_only, per_call]), 300);
+    let request = make_request(
+        "durable-cumulative-only-selection",
+        &capability,
+        "mutate",
+        "durable-server",
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("per-invocation fallback durable dispatch");
+
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert!(store
+        .operation()
+        .budget_hold_id()
+        .expect("bound budget hold")
+        .as_str()
+        .ends_with(":1"));
+}
+
 #[test]
 fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
     let mut config = make_config();

@@ -85,3 +85,148 @@ fn startup_recovery_rejects_a_changed_post_return_plan() {
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn an_unrelated_cumulative_grant_does_not_withdraw_an_exempt_admission() {
+    struct MixedEffectServer;
+
+    #[async_trait::async_trait]
+    impl ToolServerConnection for MixedEffectServer {
+        fn server_id(&self) -> &str {
+            "mixed-effect-server"
+        }
+
+        fn tool_names(&self) -> Vec<String> {
+            vec![
+                "lookup".to_owned(),
+                "write".to_owned(),
+                "escrow".to_owned(),
+                "audit".to_owned(),
+            ]
+        }
+
+        fn tool_is_read_only(&self, tool_name: &str) -> bool {
+            tool_name == "lookup" || tool_name == "audit"
+        }
+
+        async fn invoke(
+            &self,
+            _tool_name: &str,
+            _arguments: serde_json::Value,
+            _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            Ok(serde_json::json!({"ok": true}))
+        }
+    }
+
+    fn cumulative_grant(tool: &str, budget_id: &str) -> ToolGrant {
+        let mut grant = make_grant("mixed-effect-server", tool);
+        grant
+            .constraints
+            .push(Constraint::RequireCumulativeApprovalAbove {
+                threshold: MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_owned(),
+                },
+                approval_budget_id: budget_id.to_owned(),
+                approval_budget_epoch: 1,
+                cumulative_approval_root_binding: None,
+            });
+        grant
+    }
+
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(MixedEffectServer));
+    let agent = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![
+            make_grant("mixed-effect-server", "lookup"),
+            make_grant("mixed-effect-server", "write"),
+            cumulative_grant("escrow", "budget-escrow"),
+            cumulative_grant("audit", "budget-audit"),
+        ]),
+        300,
+    );
+
+    let admission_is_exempt = |tool: &str| -> Result<bool, KernelError> {
+        let request = make_request(
+            &format!("durable-unrelated-cumulative-{tool}"),
+            &capability,
+            tool,
+            "mixed-effect-server",
+        );
+        let matching = resolve_required_matching_grants(
+            &capability,
+            &request.tool_name,
+            &request.server_id,
+            &request.arguments,
+            request.model_metadata.as_ref(),
+        )
+        .expect("matching grant");
+        kernel
+            .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
+            .map(|admission| admission.is_none())
+    };
+
+    // Neither exempt tool matches a cumulative grant, so the cumulative grants
+    // elsewhere in the capability leave both admissions alone: the read-only tool
+    // stays outside side-effecting coverage, and the side-effecting tool still
+    // falls back to the ephemeral receipt log.
+    assert!(admission_is_exempt("lookup").expect("read-only admission"));
+    assert!(admission_is_exempt("write").expect("side-effecting admission"));
+
+    // The tools whose own matching grant carries the constraint still demand the
+    // durable path, on both the coverage and the store gate.
+    let uncovered = admission_is_exempt("audit")
+        .expect_err("cumulative read-only tool must not stay exempt");
+    assert!(
+        uncovered
+            .to_string()
+            .contains("requires durable admission coverage"),
+        "unexpected coverage denial: {uncovered}"
+    );
+    let unstored =
+        admission_is_exempt("escrow").expect_err("cumulative tool must require a durable store");
+    assert!(
+        unstored
+            .to_string()
+            .contains("no qualified admission operation store is configured"),
+        "unexpected store denial: {unstored}"
+    );
+}
+
+#[test]
+fn a_missing_nested_session_root_compensates_the_durable_admission() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-nested-missing-session-root");
+    // A parent session that was never opened models one closed or evicted between
+    // the durable admission and the roots lookup.
+    let parent_context = make_operation_context(
+        &SessionId::new("sess-durable-nested-missing-root"),
+        "req-parent-durable-missing-root",
+        &request.agent_id,
+    );
+    let mut client = NoopNestedFlowClient;
+
+    let response = kernel
+        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
+        .expect("missing session roots must fail closed as a deny, not propagate");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("unknown session")),
+        "deny must come from the session roots lookup, got {:?}",
+        response.reason
+    );
+    // The operation must not be left registered against a dispatch that never ran.
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}

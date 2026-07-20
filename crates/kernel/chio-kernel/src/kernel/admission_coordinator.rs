@@ -551,9 +551,23 @@ impl ChioKernel {
     ) -> Result<Option<DurableToolAdmission>, KernelError> {
         let aggregate_quota =
             self.verify_aggregate_quota_for_admission(request, trusted_now_unix_ms / 1_000)?;
+        let cumulative_matching_grant_count = matching_grants
+            .iter()
+            .filter(|matching| {
+                matching.grant.constraints.iter().any(|constraint| {
+                    matches!(
+                        constraint,
+                        Constraint::RequireCumulativeApprovalAbove { .. }
+                    )
+                })
+            })
+            .count();
+        // Only a grant that can serve this request may force the structured path. An
+        // unrelated cumulative grant elsewhere in the capability must not withdraw an
+        // otherwise exempt call.
         let requires_structured_admission = aggregate_quota.is_some()
             || request.supplemental_authorization.is_some()
-            || request.capability.scope.has_cumulative_approval();
+            || cumulative_matching_grant_count != 0;
         if request.supplemental_authorization.is_some()
             && self.supplemental_quota_verifier.is_none()
         {
@@ -654,17 +668,6 @@ impl ChioKernel {
                     "durable admission requires a canonical SHA-256 policy hash".to_owned(),
                 )
             })?;
-        let cumulative_matching_grant_count = matching_grants
-            .iter()
-            .filter(|matching| {
-                matching.grant.constraints.iter().any(|constraint| {
-                    matches!(
-                        constraint,
-                        Constraint::RequireCumulativeApprovalAbove { .. }
-                    )
-                })
-            })
-            .count();
         if cumulative_matching_grant_count != 0
             && cumulative_matching_grant_count != matching_grants.len()
         {
