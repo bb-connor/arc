@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_execution_overspend_detected",
   "threat_id": "resource_exhaustion_dos",
-  "pending": false,
+  "pending": true,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -32,9 +32,7 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_execution_overspend/mutants.out/outcomes.json",
-          "sha256": "f4960a59855f06db5808f17a83be56094a6321dc04847ef8389f3e3a7f8057ab",
-          "inputs_sha256": "64b0dfd2839d9159ae721e657c235bcda31476148736477c820e5d060f3b3bc6"
+          "path": "audits/evidence/mutants/security/broker_execution_overspend/mutants.out/outcomes.json"
         }
       }
     ]

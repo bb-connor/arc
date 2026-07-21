@@ -61,11 +61,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "budget store test suite; grows with the money-path durability tests, then splits by concern",
         max_lines=3_000,
     ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs": allow(
-        "2026-07-31",
-        "existing oversized retention test suite; capped to current size until split",
-        max_lines=4_600,
-    ),
     "crates/products/chio-wall/src/commands.rs": allow(
         "2026-07-31",
         "existing oversized wall command surface; capped to current size until split",
@@ -145,11 +140,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-07-31",
         "existing oversized Mercury CLI integration suite; capped to current size until split",
         max_lines=3_264,
-    ),
-    "crates/products/chio-cli/tests/trust_cluster.rs": allow(
-        "2026-07-31",
-        "existing oversized CLI trust-cluster integration suite; capped to current size until split",
-        max_lines=3_209,
     ),
     "crates/products/chio-api-protect/src/proxy/tests.rs": allow(
         "2026-07-31",

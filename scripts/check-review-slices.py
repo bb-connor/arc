@@ -94,6 +94,7 @@ SLICES: tuple[ReviewSlice, ...] = (
         (
             "crates/security/**",
             "third_party/provenance/**",
+            "third_party/nono-chio/**",
         ),
     ),
     ReviewSlice(
@@ -230,6 +231,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "supply-chain/**",
             "tools/knowledge-base/**",
             "CHANGELOG.md",
+            "NOTICE",
             "releases.toml",
             "deploy/**",
             "packaging/**",

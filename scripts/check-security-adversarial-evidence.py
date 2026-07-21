@@ -1167,9 +1167,8 @@ def render_threat_aggregate_replacements(
     return replacements, read_guards
 
 
-# Transaction v2 keeps all trusted coordination state outside the checkout.
-# These definitions supersede the legacy v1 helpers above while preserving the
-# public function names used by the gate contract tests.
+# Trusted refresh state is isolated from the repository.
+# Version 2 retains callable names and rejects repository-local transaction state.
 LEGACY_TRANSACTION_DIRECTORY = TRANSACTION_DIRECTORY
 STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v2."
 TRANSACTION_DIRECTORY = "refresh-transaction"

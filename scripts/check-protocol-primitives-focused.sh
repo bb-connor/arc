@@ -40,7 +40,7 @@ run_complete_inventory() {
 run_baseline() {
   run_committed_inventory \
     "kernel budget characterization" \
-    45 fe3e55ffebfebb8949fe02cd91197e71142634fcf10e70aae68f298281b76716 \
+    47 d303cf87af81c0345c0f7b027abc585beae02de147ce343ce462e2998e295144 \
     cargo test -p chio-kernel --lib kernel::tests::budget::
   run_committed_inventory \
     "kernel approval characterization" \
@@ -52,7 +52,7 @@ run_baseline() {
     cargo test -p chio-kernel --lib kernel::tests::budget_governed_call_chain::
   run_committed_inventory \
     "SQLite budget characterization" \
-    129 b49f4cb11be82c577a401dd4cbed4fb4e546f19f458c00ff853fae02c32526bc \
+    148 50a700ff183acddad12aafc19454daba121175a97a1f2235da10cb43f4242277 \
     cargo test -p chio-store-sqlite --lib budget_store::tests::
 }
 
@@ -82,7 +82,7 @@ run_model() {
 run_persistence() {
   run_committed_inventory \
     "SQLite composite budget persistence" \
-    129 b49f4cb11be82c577a401dd4cbed4fb4e546f19f458c00ff853fae02c32526bc \
+    148 50a700ff183acddad12aafc19454daba121175a97a1f2235da10cb43f4242277 \
     cargo test -p chio-store-sqlite --lib budget_store::tests::
   run_committed_inventory \
     "control-plane budget composition" \
@@ -94,7 +94,7 @@ run_persistence() {
     cargo test -p chio-control-plane --lib trust_control::cluster::admission_consensus::tests::
   run_complete_inventory \
     "protocol primitives tier 1 conformance" \
-    10 26acf3f20652ac3c7239d102c5bba5b124ac77b03e37775b550ebde905b78cbe \
+    10 d95926bf0e3365769b9dc427d3626b324d4d8faa5372099886863f569054abd0 \
     cargo test -p chio-conformance --test protocol_primitives_t1
   run_complete_inventory \
     "protocol primitives tier 2 conformance" \

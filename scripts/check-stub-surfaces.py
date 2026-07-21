@@ -198,10 +198,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "reviewed threat-model test-stub generator, expected to fail closed until populated",
         "2026-12-31",
     ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": allow(
-        "SQL bind placeholder terminology, not an unfinished stub surface",
-        "2026-12-31",
-    ),
     "crates/trust/chio-tee/src/tap.rs": allow(
         "reviewed TrafficTap test-double implementations",
         "2026-12-31",
@@ -371,8 +367,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "crates/tooling/chio-spec-codegen/src/threat_coverage_doc.rs": (
         r"threats stub directory",
-        r"Test stub",
-        r"not yet emitted",
     ),
     "crates/tooling/chio-spec-codegen/src/threat_model.rs": (
         r"threat-stub",
@@ -394,9 +388,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r"sanitised stub must parse",
         r"let stub",
         r"contains_live_unimplemented_marker",
-    ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": (
-        r"bind placeholders",
     ),
     "crates/trust/chio-tee/src/tap.rs": (
         r"Stub `TrafficTap` implementation",

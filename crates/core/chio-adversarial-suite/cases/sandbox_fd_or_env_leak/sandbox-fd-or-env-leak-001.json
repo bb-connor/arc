@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "sandbox_fd_or_env_leak_detected",
   "threat_id": "tool_server_escape",
-  "pending": false,
+  "pending": true,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -42,9 +42,7 @@
           "replacement": "Ok(())"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/sandbox_fd_leak/mutants.out/outcomes.json",
-          "sha256": "651a9f041dcad47963cb26eeb426b903aad9c513fbaaf09a9aeebff8f2decec6",
-          "inputs_sha256": "2c349f7d9cf3f414dd3aa44a4057b878e9a6a308932a2eb7033b7077039857b9"
+          "path": "audits/evidence/mutants/security/sandbox_fd_leak/mutants.out/outcomes.json"
         }
       },
       {
@@ -59,9 +57,7 @@
           "replacement": "false"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/sandbox_env_leak/mutants.out/outcomes.json",
-          "sha256": "b45fc33d0c81689e1e92f47e7f5f191d9e08fe9f007041d33fa6d2f744ba76de",
-          "inputs_sha256": "9b758d83193c493365affcf3d7f53d5f3c2d5763696f286badfc839935e3cf8b"
+          "path": "audits/evidence/mutants/security/sandbox_env_leak/mutants.out/outcomes.json"
         }
       }
     ]

@@ -39,7 +39,7 @@ lines = [
     'license = "Apache-2.0"',
     'source_notice = "ClawdStrike; Copyright 2026 Backbay Industries"',
     'notice_update_required = false',
-    'reviewer = "security implementation review"',
+    'reviewer = "security provenance review"',
     'reviewed_at = "2026-07-12"',
     '',
 ]

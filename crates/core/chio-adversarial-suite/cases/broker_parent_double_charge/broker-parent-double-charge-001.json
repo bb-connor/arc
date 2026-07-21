@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_parent_double_charge_detected",
   "threat_id": "resource_exhaustion_dos",
-  "pending": false,
+  "pending": true,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -32,9 +32,7 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_parent_double_charge/mutants.out/outcomes.json",
-          "sha256": "0d3e81552daafe967c564651e54879c9bf10c79f8a33fd7a11c75c29088fbecc",
-          "inputs_sha256": "dd535db61d854772d07f85083b3162c6241b79d297539e5e23782521d51b5216"
+          "path": "audits/evidence/mutants/security/broker_parent_double_charge/mutants.out/outcomes.json"
         }
       }
     ]

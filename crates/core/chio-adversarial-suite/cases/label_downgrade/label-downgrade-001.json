@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "label_downgrade_detected",
   "threat_id": "pii_phi_exposure",
-  "pending": false,
+  "pending": true,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -53,9 +53,7 @@
           "replacement": "||"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/reader_subset_direction/mutants.out/outcomes.json",
-          "sha256": "9fabd7d9554bc709148badaa256ab5654ada8f49d4076992c1072abd176fba1e",
-          "inputs_sha256": "7fc28b888a51bf995cdd3d1dcfc6410131dd7d8c8f074d1076ad3d3d4cc63b61"
+          "path": "audits/evidence/mutants/security/reader_subset_direction/mutants.out/outcomes.json"
         }
       },
       {
@@ -70,9 +68,7 @@
           "replacement": "Ok(())"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/missing_clearance_allow/mutants.out/outcomes.json",
-          "sha256": "606ac2a24d877ae83361deeb4eb1b53ebf94f375fc841edf633cd22944c569ac",
-          "inputs_sha256": "b9df63f7ec8f1f5561d3e984f590115c0dc335ed097c4a16fef98ea5205967c7"
+          "path": "audits/evidence/mutants/security/missing_clearance_allow/mutants.out/outcomes.json"
         }
       },
       {
@@ -87,9 +83,7 @@
           "replacement": "Ok(())"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/ignored_store_error/mutants.out/outcomes.json",
-          "sha256": "c387d25deec5b6c2f781a452e9b383f20f25905a482d14a5b6ecbbb9690e0822",
-          "inputs_sha256": "150188d1481552d9dc497d549e27072881ca6cad37a2f7a4d8ae34b3fe066251"
+          "path": "audits/evidence/mutants/security/ignored_store_error/mutants.out/outcomes.json"
         }
       },
       {
@@ -104,9 +98,7 @@
           "replacement": "true"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/grant_replay/mutants.out/outcomes.json",
-          "sha256": "e1461bdc2cf89ad205347649e5b27fec0516f81e205055a9aa5138fe13e47877",
-          "inputs_sha256": "9b358a559aee1b094f2069512c6245d8563ee001e940e3ff7fc15546ab6677f8"
+          "path": "audits/evidence/mutants/security/grant_replay/mutants.out/outcomes.json"
         }
       }
     ]

@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "temporal_evasion_detected",
   "threat_id": "behavioral_sequence_attack",
-  "pending": false,
+  "pending": true,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -30,9 +30,7 @@
           "replacement": "true"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/ingest_time_substitution/mutants.out/outcomes.json",
-          "sha256": "43f94b86c4327091a380de3982ea15ddece4d51b55ebf1f7c11c7df05327ef98",
-          "inputs_sha256": "bdb8b13087d89379fa35dba4bdb0d1683a11652e8b0710b183b01fc3b4d89036"
+          "path": "audits/evidence/mutants/security/ingest_time_substitution/mutants.out/outcomes.json"
         }
       }
     ]

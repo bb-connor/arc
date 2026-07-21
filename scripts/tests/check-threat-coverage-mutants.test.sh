@@ -6,23 +6,23 @@
 # Exercises the core threat-coverage evidence scenarios:
 #
 #   1. A row with valid evidence (caught >= 1) PASSES.
-#   2. A row with `needs_real_run: true` produces a downgrade hint
-#      (`bootstrap_placeholder`) and fails by default.
+#   2. Legacy `needs_real_run` evidence is rejected unconditionally.
 #   3. A row with `coverage_state: weak_coverage` in the JSON
 #      causes `check-threat-coverage.sh` (the file-existence gate
 #      that owns enum policy) to FAIL with a clear message naming
 #      the row.
 #   4. A missing evidence file produces a downgrade hint
-#      (`missing_evidence`) and FAILS the gate (without --dry-run)
-#      while passing under --dry-run.
+#      (`missing_evidence`) and FAILS the gate.
 #
 # We also lock in two extra invariants:
-#   - `caught: 0` without `needs_real_run` produces `zero_kills`
+#   - `caught: 0` produces `zero_kills`
 #     and FAILS.
 #   - A covered row with no `coveredBy`/`covered_by_tests` produces
 #     `no_coveredby` and FAILS.
 #   - Generated or conformance-only metadata cannot pass as real
-#     cargo-mutants evidence by setting `needs_real_run=false`.
+#     cargo-mutants evidence.
+#   - Pending rows pass only with an explicit technical closure condition.
+#   - Former evidence-bypass flags are rejected as unknown arguments.
 
 set -euo pipefail
 
@@ -31,9 +31,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Each case below sets CI explicitly when it needs it (case 9 opts into
-# CI=true to assert the dry-run refusal). Neutralize any ambient CI value so
-# the local-mode dry-run pass-cases are not tripped by the runner's CI=true.
+# Neutralize ambient CI so argument behavior is deterministic.
 unset CI
 
 MODEL="$TMP_DIR/threat-model.json"
@@ -91,15 +89,16 @@ write_closed_subvector_test() {
 }
 
 write_model_single() {
-    # write_model_single <id> <state> [<has_coveredby>=1]
+    # write_model_single <id> <state> [<has_coveredby>=1] [<deferred_to>]
     local id="$1"
     local state="$2"
     local has_coveredby="${3:-1}"
-    python3 - "$MODEL" "$id" "$state" "$has_coveredby" <<'PY'
+    local deferred_to="${4:-}"
+    python3 - "$MODEL" "$id" "$state" "$has_coveredby" "$deferred_to" <<'PY'
 import json
 import sys
 
-path, threat_id, state, has_coveredby = sys.argv[1:5]
+path, threat_id, state, has_coveredby, deferred_to = sys.argv[1:6]
 threat = {
     "id": threat_id,
     "name": threat_id.replace("_", " ").title(),
@@ -108,6 +107,8 @@ threat = {
 }
 if has_coveredby == "1":
     threat["coveredBy"] = [f"crates/tooling/chio-conformance/tests/threats/{threat_id}.rs"]
+if deferred_to:
+    threat["deferred_to"] = deferred_to
 
 with open(path, "w") as fh:
     json.dump({"threats": [threat]}, fh)
@@ -116,58 +117,37 @@ PY
 }
 
 write_evidence() {
-    # write_evidence <id> <caught> [<needs_real_run>=false] [<ran_at_override>]
-    #                [<timestamp_kind>] [<evidence_status>]
+    # write_evidence <id> <caught> [<ran_at_override>] [<timestamp_kind>]
+    #                [<evidence_status>]
     #                [<mutation_evidence_status>] [<promotion_status>]
-    # Bootstrap placeholders (needs_real_run=true) require ran_at to be the
-    # 1970 epoch sentinel; real-run rows record the actual timestamp.
     local id="$1"
     local caught="$2"
-    local needs_real_run="${3:-false}"
-    local ran_at_override="${4:-}"
-    local timestamp_kind="${5:-}"
-    local evidence_status="${6:-}"
-    local mutation_evidence_status="${7:-}"
-    local promotion_status="${8:-}"
+    local ran_at_override="${3:-}"
+    local timestamp_kind="${4:-}"
+    local evidence_status="${5:-}"
+    local mutation_evidence_status="${6:-}"
+    local promotion_status="${7:-}"
     local ran_at
     if [[ -n "$ran_at_override" ]]; then
         ran_at="$ran_at_override"
-    elif [[ "$needs_real_run" == "true" ]]; then
-        ran_at="1970-01-01T00:00:00Z"
     else
         ran_at="2026-05-05T00:00:00Z"
     fi
     if [[ -z "$timestamp_kind" ]]; then
-        if [[ "$needs_real_run" == "true" ]]; then
-            timestamp_kind="bootstrap-placeholder"
-        else
-            timestamp_kind="command-wall-clock"
-        fi
+        timestamp_kind="command-wall-clock"
     fi
     if [[ -z "$evidence_status" ]]; then
-        if [[ "$needs_real_run" == "true" ]]; then
-            evidence_status="conformance-only"
-        else
-            evidence_status="cargo-mutants-run"
-        fi
+        evidence_status="cargo-mutants-run"
     fi
     if [[ -z "$mutation_evidence_status" ]]; then
-        if [[ "$needs_real_run" == "true" ]]; then
-            mutation_evidence_status="not-run"
-        else
-            mutation_evidence_status="complete"
-        fi
+        mutation_evidence_status="complete"
     fi
     if [[ -z "$promotion_status" ]]; then
-        if [[ "$needs_real_run" == "true" ]]; then
-            promotion_status="not-promoted"
-        else
-            promotion_status="promoted"
-        fi
+        promotion_status="promoted"
     fi
     local child_relative=""
     local digest=""
-    if [[ "$needs_real_run" == "false" && "$caught" -ge 1 ]]; then
+    if [[ "$caught" -ge 1 ]]; then
         local child="$TMP_DIR/${id}-outcomes.json"
         python3 - "$child" "$caught" <<'PY'
 import json
@@ -213,8 +193,7 @@ PY
   "timestamp_kind": "$timestamp_kind",
   "evidence_status": "$evidence_status",
   "mutation_evidence_status": "$mutation_evidence_status",
-  "promotion_status": "$promotion_status",
-  "needs_real_run": $needs_real_run
+  "promotion_status": "$promotion_status"
 }
 JSON
     if [[ -n "$child_relative" ]]; then
@@ -303,7 +282,6 @@ PY
   "evidence_status": "cargo-mutants-run",
   "mutation_evidence_status": "complete",
   "promotion_status": "promoted",
-  "needs_real_run": false,
   "mutation_case_path": "cases/${id}_case.json",
   "closed_subvector_test": {
     "path": "tests/$id.rs",
@@ -393,28 +371,32 @@ assert_fails() {
 # Case 1: valid evidence (caught >= 1) PASSES.
 reset_fixture
 write_model_single "valid_threat" "covered"
-write_evidence "valid_threat" 7 false
+write_evidence "valid_threat" 7
 assert_passes "valid evidence passes" run_mutants_gate
 grep -q "passed: 1" "$OUT"
 
-# Case 2: bootstrap placeholder produces hint and fails by default because
-# placeholders are not release-covered evidence.
+# Case 2: legacy `needs_real_run` metadata is never release evidence.
 reset_fixture
-write_model_single "bootstrap_threat" "covered"
-write_evidence "bootstrap_threat" 0 true
-assert_fails "bootstrap placeholder fails by default" run_mutants_gate
-grep -q "bootstrap placeholders: 1" "$OUT"
-grep -q "WEAK: bootstrap_threat should be marked weak_coverage; reason=bootstrap_placeholder" "$OUT"
+write_model_single "non_evidence_threat" "covered"
+write_evidence "non_evidence_threat" 0
+python3 - "$EVIDENCE_DIR/non_evidence_threat.json" <<'PY'
+import json
+import sys
 
-# Case 2b: same input passes only under the explicit placeholder fixture mode
-# or dry-run. Release/preflight callers do not use this flag.
-assert_passes "bootstrap placeholder passes under explicit fixture mode" \
-    run_mutants_gate --allow-bootstrap-placeholders
-grep -q "bootstrap placeholders: 1" "$OUT"
+path = sys.argv[1]
+with open(path, encoding="utf-8") as source:
+    body = json.load(source)
+body["needs_real_run"] = True
+with open(path, "w", encoding="utf-8") as destination:
+    json.dump(body, destination)
+PY
+assert_fails "needs_real_run evidence fails" run_mutants_gate
+grep -q "WEAK: non_evidence_threat should be marked weak_coverage; reason=invalid_evidence" "$ERR"
 
-# Case 2c: same input, dry-run, also passes.
-assert_passes "bootstrap placeholder passes under --dry-run" run_mutants_gate --dry-run
-grep -q "bootstrap placeholders: 1" "$OUT"
+# Case 2b: evidence-bypass arguments are rejected.
+assert_fails "evidence bypass argument is rejected" \
+    run_mutants_gate --bypass-evidence
+grep -q "unknown argument --bypass-evidence" "$ERR"
 
 # Case 3: weak_coverage in JSON FAILS the file-existence gate with a
 # clear message naming the row.
@@ -424,21 +406,17 @@ write_stub "weak_threat" "assert!(true);"
 assert_fails "weak_coverage state fails the file-existence gate" run_file_gate
 grep -q "weak_threat (coverage_state weak_coverage" "$ERR"
 
-# Case 4: missing evidence file produces hint and FAILS by default,
-# but PASSES under --dry-run.
+# Case 4: missing evidence file produces a hint and FAILS.
 reset_fixture
 write_model_single "missing_evidence_threat" "covered"
 # Intentionally do NOT write evidence file.
-assert_fails "missing evidence fails by default" run_mutants_gate
+assert_fails "missing evidence fails" run_mutants_gate
 grep -q "WEAK: missing_evidence_threat should be marked weak_coverage; reason=missing_evidence" "$ERR"
 
-assert_passes "missing evidence passes under --dry-run" run_mutants_gate --dry-run
-grep -q "WEAK: missing_evidence_threat should be marked weak_coverage; reason=missing_evidence" "$ERR"
-
-# Case 5 (extra): caught: 0 without needs_real_run FAILS with zero_kills.
+# Case 5 (extra): caught: 0 FAILS with zero_kills.
 reset_fixture
 write_model_single "zero_kills_threat" "covered"
-write_evidence "zero_kills_threat" 0 false
+write_evidence "zero_kills_threat" 0
 assert_fails "zero kills fails the gate" run_mutants_gate
 grep -q "WEAK: zero_kills_threat should be marked weak_coverage; reason=zero_kills" "$ERR"
 
@@ -446,50 +424,13 @@ grep -q "WEAK: zero_kills_threat should be marked weak_coverage; reason=zero_kil
 reset_fixture
 write_model_single "no_coveredby_threat" "covered" 0
 # Even with valid evidence, missing coveredBy should still flag.
-write_evidence "no_coveredby_threat" 5 false
+write_evidence "no_coveredby_threat" 5
 assert_fails "no coveredBy fails the gate" run_mutants_gate
 grep -q "WEAK: no_coveredby_threat should be marked weak_coverage; reason=no_coveredby" "$ERR"
 
-# Case 7: bootstrap placeholder AFTER expiry FAILS with
-# reason=bootstrap_expired. CHIO_BOOTSTRAP_EXPIRY=1970-01-01 forces the
-# accommodation to be expired regardless of today's date.
-reset_fixture
-write_model_single "expired_bootstrap_threat" "covered"
-write_evidence "expired_bootstrap_threat" 0 true
-CHIO_BOOTSTRAP_EXPIRY="1970-01-01" \
-    assert_fails "bootstrap_expired fails after expiry date" run_mutants_gate
-grep -q "WEAK: expired_bootstrap_threat should be marked weak_coverage; reason=bootstrap_expired" "$ERR" \
-    || { echo "FAIL: missing bootstrap_expired diagnostic"; cat "$ERR"; exit 1; }
-
-# Case 7b: same input WITHOUT the expiry override still fails by default.
-CHIO_BOOTSTRAP_EXPIRY="2099-01-01" \
-    assert_fails "bootstrap placeholder fails before expiry by default" run_mutants_gate
-
-# Case 7c: explicit fixture mode can still admit the pre-expiry placeholder.
-CHIO_BOOTSTRAP_EXPIRY="2099-01-01" \
-    assert_passes "bootstrap placeholder fixture mode before expiry" \
-    run_mutants_gate --allow-bootstrap-placeholders
-
-# Case 8: needs_real_run=true with non-1970 ran_at is
-# rejected as inconsistent_bootstrap.
-reset_fixture
-write_model_single "inconsistent_bootstrap_threat" "covered"
-write_evidence "inconsistent_bootstrap_threat" 0 true "2026-05-05T12:00:00Z"
-assert_fails "inconsistent bootstrap (real ran_at + needs_real_run) fails" run_mutants_gate
-grep -q "WEAK: inconsistent_bootstrap_threat should be marked weak_coverage; reason=inconsistent_bootstrap" "$ERR" \
-    || { echo "FAIL: missing inconsistent_bootstrap diagnostic"; cat "$ERR"; exit 1; }
-
-# Case 9: CI=true + --dry-run is rejected (exit 2).
-reset_fixture
-write_model_single "ci_dryrun_threat" "covered"
-write_evidence "ci_dryrun_threat" 1 false
-CI=true assert_fails "CI=true forbids --dry-run" run_mutants_gate --dry-run
-grep -q "dry-run is not allowed in CI" "$ERR" \
-    || { echo "FAIL: missing CI dry-run diagnostic"; cat "$ERR"; exit 1; }
-
 # Case 10: partial rows are still gated by per-row mutants
 # evidence. The row can remain partial, but the defended sub-vector must
-# have present, non-placeholder evidence with caught >= 1.
+# have present source-bound evidence with caught >= 1.
 reset_fixture
 python3 - "$MODEL" <<'PY'
 import json, sys
@@ -508,21 +449,19 @@ PY
 assert_fails "partial-with-deferred row without evidence fails" run_mutants_gate
 grep -q "WEAK: partial_with_deferred should be marked weak_coverage; reason=missing_evidence" "$ERR"
 
-write_evidence "partial_with_deferred" 2 false "2026-05-05T12:34:56Z"
+write_evidence "partial_with_deferred" 2 "2026-05-05T12:34:56Z"
 assert_passes "partial-with-deferred row with evidence passes" run_mutants_gate
 grep -q "passed: 1" "$OUT" \
     || { echo "FAIL: partial row with evidence should be counted as passed"; cat "$OUT"; exit 1; }
 
 # Case 11: generated conformance metadata cannot be promoted as cargo-mutants
-# evidence just by flipping needs_real_run=false and caught>=1. Exact-midnight
-# timestamps are valid only when they are honestly labeled as generated
-# metadata, not command wall-clock evidence.
+# evidence. Exact-midnight timestamps are valid only when they are honestly
+# labeled as generated metadata, not command wall-clock evidence.
 reset_fixture
 write_model_single "generated_metadata_threat" "covered"
 write_evidence \
     "generated_metadata_threat" \
     1 \
-    false \
     "2026-05-08T00:00:00Z" \
     "generated-metadata" \
     "conformance-only" \
@@ -532,20 +471,29 @@ assert_fails "generated metadata cannot pass as mutants evidence" run_mutants_ga
 grep -q "WEAK: generated_metadata_threat should be marked weak_coverage; reason=non_mutants_metadata" "$ERR" \
     || { echo "FAIL: missing non_mutants_metadata diagnostic"; cat "$ERR"; exit 1; }
 
-# Case 12: a required mutation gate cannot pass without evaluating at least
-# one covered or partial row.
+# Case 12: pending rows need a technical closure condition and no evidence file.
 reset_fixture
-write_model_single "pending_only_threat" "pending"
-assert_fails "zero eligible rows fail the gate" run_mutants_gate
-grep -q "zero covered or partial rows" "$ERR" \
-    || { echo "FAIL: missing zero-row diagnostic"; cat "$ERR"; exit 1; }
+write_model_single \
+    "pending_only_threat" \
+    "pending" \
+    1 \
+    "promoted source-bound cargo-mutants evidence with caught >= 1"
+assert_passes "pending row with technical closure condition passes" run_mutants_gate
+grep -q "pending: 1" "$OUT" \
+    || { echo "FAIL: pending row was not counted"; cat "$OUT"; exit 1; }
+
+reset_fixture
+write_model_single "pending_without_condition" "pending"
+assert_fails "pending row without closure condition fails" run_mutants_gate
+grep -q "reason=pending_without_deferred_to" "$ERR" \
+    || { echo "FAIL: missing pending closure diagnostic"; cat "$ERR"; exit 1; }
 
 # Case 13: nested evidence cannot inflate the parent caught count.
 reset_fixture
 write_model_single "inflated_aggregate" "partial"
 write_nested_evidence "inflated_aggregate" 5 1
 assert_fails "nested caught count mismatch fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: missing aggregate-rejection diagnostic"; cat "$ERR"; exit 1; }
 
 # Case 14: nested evidence must bind the exact child bytes.
@@ -554,7 +502,7 @@ write_model_single "wrong_child_digest" "partial"
 write_nested_evidence "wrong_child_digest" 1 1 \
     "0000000000000000000000000000000000000000000000000000000000000000"
 assert_fails "nested child digest mismatch fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: missing child-digest diagnostic"; cat "$ERR"; exit 1; }
 
 # Case 15: an exact caught-only child aggregate passes fixture validation.
@@ -564,11 +512,11 @@ write_nested_evidence "valid_aggregate" 1 1
 assert_passes "valid nested aggregate passes" run_mutants_gate
 grep -q "passed: 1" "$OUT"
 
-# Case 16: a non-placeholder row cannot pass without a nonempty outcomes
+# Case 16: a positive-evidence row cannot pass without a nonempty outcomes
 # array, even when its parent caught count is positive.
 reset_fixture
 write_model_single "missing_outcomes" "partial"
-write_evidence "missing_outcomes" 1 false "2026-05-05T12:34:56Z"
+write_evidence "missing_outcomes" 1 "2026-05-05T12:34:56Z"
 python3 - "$EVIDENCE_DIR/missing_outcomes.json" <<'PY'
 import json
 import sys
@@ -580,8 +528,8 @@ body.pop("outcomes")
 with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
-assert_fails "non-placeholder evidence without outcomes fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+assert_fails "positive evidence without outcomes fails" run_mutants_gate
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: missing outcomes were not rejected"; cat "$ERR"; exit 1; }
 
 # Case 17: an outcome campaign cannot be borrowed from a case that cites a
@@ -601,7 +549,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "outcome bound to a different case threat fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: wrong case threat was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 18: the evidence record id must identify a campaign in the adversarial
@@ -621,7 +569,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "unknown outcome campaign id fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: unknown campaign id was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 19: a valid child cannot be substituted at a path other than the one
@@ -642,7 +590,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "outcome path different from indexed campaign path fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: wrong campaign path was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 20: mutation_case_path must name the exact adversarial case that owns
@@ -671,7 +619,7 @@ with open(evidence_path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "aggregate linked to a different case path fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: wrong mutation case link was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 21: closed_subvector_test must identify an actual #[test] function in
@@ -691,7 +639,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "aggregate linked to a nonexistent Rust test fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: wrong closed-subvector test was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 22: positive real evidence must carry both structured aggregate-linkage
@@ -711,7 +659,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "positive evidence without structured case linkage fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: missing mutation case link was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 23: a digest-bound child with any missed mutant is not caught-only
@@ -741,7 +689,7 @@ with open(evidence_path, "w", encoding="utf-8") as destination:
     json.dump(evidence, destination)
 PY
 assert_fails "nested evidence with a missed mutant fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: non-caught child evidence was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 24: each child total must equal its caught count even when every
@@ -770,7 +718,7 @@ with open(evidence_path, "w", encoding="utf-8") as destination:
     json.dump(evidence, destination)
 PY
 assert_fails "nested evidence with an inconsistent child total fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: inconsistent child count was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 25: duplicate keys in the aggregate row cannot override an earlier
@@ -789,7 +737,7 @@ with open(path, "w", encoding="utf-8") as destination:
     destination.write(payload)
 PY
 assert_fails "duplicate aggregate-row key fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: duplicate aggregate-row key was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 26: duplicate keys in an indexed adversarial case are ambiguous even
@@ -812,7 +760,7 @@ with open(path, "w", encoding="utf-8") as destination:
     destination.write(payload)
 PY
 assert_fails "duplicate adversarial-case key fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: duplicate adversarial-case key was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 27: duplicate keys in a digest-bound native child are ambiguous even
@@ -832,7 +780,7 @@ with open(path, "w", encoding="utf-8") as destination:
 PY
 refresh_nested_digest "duplicate_child_key"
 assert_fails "duplicate native-child key fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: duplicate native-child key was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 28: duplicate keys in a threat-model row are rejected before row
@@ -872,7 +820,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "string aggregate caught count fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: string caught count was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 30: a JSON boolean cannot be coerced into the aggregate caught count.
@@ -891,7 +839,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "boolean aggregate caught count fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: boolean caught count was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 31: a fractional JSON number cannot be truncated into the aggregate
@@ -911,15 +859,14 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "fractional aggregate caught count fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: fractional caught count was not rejected"; cat "$ERR"; exit 1; }
 
-# Case 32: needs_real_run accepts only a JSON boolean, not a false-like
-# integer.
+# Case 32: `needs_real_run` is rejected regardless of its JSON value.
 reset_fixture
-write_model_single "integer_placeholder_flag" "partial"
-write_nested_evidence "integer_placeholder_flag" 1 1
-python3 - "$EVIDENCE_DIR/integer_placeholder_flag.json" <<'PY'
+write_model_single "integer_needs_real_run" "partial"
+write_nested_evidence "integer_needs_real_run" 1 1
+python3 - "$EVIDENCE_DIR/integer_needs_real_run.json" <<'PY'
 import json
 import sys
 
@@ -931,7 +878,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "integer needs_real_run flag fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: integer needs_real_run was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 33: mutation_case_path cannot traverse a symlink, even when that link
@@ -942,7 +889,7 @@ write_nested_evidence "symlink_case" 1 1
 mv "$CASES_DIR/symlink_case_case.json" "$TMP_DIR/symlink-case-target.json"
 ln -s "../symlink-case-target.json" "$CASES_DIR/symlink_case_case.json"
 assert_fails "symlinked mutation case fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: symlinked mutation case was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 34: closed_subvector_test cannot traverse a symlink to otherwise valid
@@ -953,7 +900,7 @@ write_nested_evidence "symlink_closed_test" 1 1
 mv "$TESTS_DIR/symlink_closed_test.rs" "$TMP_DIR/symlink-closed-test-target.rs"
 ln -s "../symlink-closed-test-target.rs" "$TESTS_DIR/symlink_closed_test.rs"
 assert_fails "symlinked closed-subvector test fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: symlinked closed-subvector test was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 35: a native outcome child cannot be rebound through a symlink after
@@ -964,7 +911,7 @@ write_nested_evidence "symlink_child" 1 1
 mv "$TMP_DIR/symlink_child-outcomes.json" "$TMP_DIR/symlink-child-target.json"
 ln -s "symlink-child-target.json" "$TMP_DIR/symlink_child-outcomes.json"
 assert_fails "symlinked native child fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: symlinked native child was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 36: the aggregate row itself cannot be supplied through a symlink.
@@ -974,7 +921,7 @@ write_nested_evidence "symlink_row" 1 1
 mv "$EVIDENCE_DIR/symlink_row.json" "$TMP_DIR/symlink-row-target.json"
 ln -s "../symlink-row-target.json" "$EVIDENCE_DIR/symlink_row.json"
 assert_fails "symlinked aggregate row fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: symlinked aggregate row was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 37: success counts surviving mutants and must remain zero for caught-only
@@ -995,7 +942,7 @@ with open(path, "w", encoding="utf-8") as destination:
 PY
 refresh_nested_digest "successful_mutant"
 assert_fails "native child with a success count fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: nonzero success count was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 38: native mutation evidence must include exactly one successful
@@ -1016,7 +963,7 @@ with open(path, "w", encoding="utf-8") as destination:
 PY
 refresh_nested_digest "missing_native_records"
 assert_fails "native child without outcome records fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: missing native outcome records were not rejected"; cat "$ERR"; exit 1; }
 
 # Case 39: a native record classified as missed cannot be reconciled with a
@@ -1041,7 +988,7 @@ with open(path, "w", encoding="utf-8") as destination:
 PY
 refresh_nested_digest "wrong_native_summary"
 assert_fails "native child with a non-caught summary fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: wrong native outcome summary was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 40: native record cardinality must equal both total_mutants and caught.
@@ -1066,7 +1013,7 @@ with open(path, "w", encoding="utf-8") as destination:
 PY
 refresh_nested_digest "wrong_native_count"
 assert_fails "native child with inconsistent record count fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: native record count mismatch was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 41: real caught-only aggregates cannot retain top-level survivors even
@@ -1086,7 +1033,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "real aggregate with survivors fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: aggregate survivors were not rejected"; cat "$ERR"; exit 1; }
 
 # Case 42: numeric metadata cannot disappear through false-like string
@@ -1106,7 +1053,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "numeric ran_at metadata fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: numeric ran_at metadata was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 43: a test-shaped declaration inside a Rust comment is not an actual
@@ -1120,7 +1067,7 @@ printf '%s\n' \
     'fn comment_spoofed_test_closed_subvector() {}' \
     '*/' > "$TESTS_DIR/comment_spoofed_test.rs"
 assert_fails "comment-spoofed Rust test linkage fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: comment-spoofed Rust test was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 44: test-shaped text inside a multiline raw string is also non-code.
@@ -1133,7 +1080,7 @@ printf '%s\n' \
     'fn string_spoofed_test_closed_subvector() {}' \
     '"#;' > "$TESTS_DIR/string_spoofed_test.rs"
 assert_fails "string-spoofed Rust test linkage fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: string-spoofed Rust test was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 45: classifier failure after an earlier valid row cannot be lost through
@@ -1180,7 +1127,7 @@ with open(path, "w", encoding="utf-8") as destination:
     json.dump(body, destination)
 PY
 assert_fails "metadata TSV field injection fails" run_mutants_gate
-grep -q "reason=missing_evidence" "$ERR" \
+grep -q "reason=invalid_evidence" "$ERR" \
     || { echo "FAIL: metadata TSV injection was not rejected"; cat "$ERR"; exit 1; }
 
 # Case 47: promoted positive aggregates require evidence_status explicitly.

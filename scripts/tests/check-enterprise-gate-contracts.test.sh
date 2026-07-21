@@ -79,10 +79,4 @@ if ! grep -Fq './scripts/check-enterprise-cross-mechanism.sh' \
   echo "enterprise workflow omits the composed mechanism gate" >&2
   exit 1
 fi
-if ! grep -Fq 'bootstrap placeholders (`needs_real_run: true`) fail this' \
-  .github/workflows/threat-model-coverage.yml; then
-  echo "threat workflow header does not describe release placeholder failures" >&2
-  exit 1
-fi
-
 echo "enterprise gate static contracts passed"

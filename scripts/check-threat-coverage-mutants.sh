@@ -15,7 +15,7 @@
 #   1. Read the threat's `coveredBy` (preferred) or
 #      `covered_by_tests` cross-link list. If both are missing or
 #      empty, emit a downgrade hint with reason `no_coveredby` and
-#      exit 1 (or, in `--dry-run` mode, continue).
+#      exit 1.
 #
 #   2. Look up the evidence file at
 #      `audits/evidence/threats/<threat_id>.json`. The file is
@@ -26,9 +26,8 @@
 #            "caught": <int>,
 #            "survivors": [<string>, ...],
 #            "ran_at": "<iso8601>",
-#            "needs_real_run": <bool, optional>,
 #            "timestamp_kind": "cargo-mutants-run" | "command-wall-clock"
-#                | "bootstrap-placeholder" | "generated-metadata" (optional),
+#                | "generated-metadata" (optional),
 #            "evidence_status": "cargo-mutants-run" | "conformance-only"
 #                (optional),
 #            "mutation_evidence_status": "complete" | "not-run" (optional),
@@ -40,8 +39,8 @@
 #            }
 #          }
 #
-#      Every non-placeholder row with a positive caught count must contain a
-#      nonempty `outcomes` array. Each outcome id and path must identify the
+#      Every row with a positive caught count must contain a nonempty `outcomes`
+#      array. Each outcome id and path must identify the
 #      same campaign in the security adversarial case index, and that case must
 #      cite this threat row. Every child must also resolve below the repository,
 #      match its recorded SHA-256, contain only caught mutants, and sum exactly
@@ -49,30 +48,26 @@
 #      validates the complete adversarial suite's current-source input bindings
 #      before classifying any row.
 #
-#      A row with `needs_real_run: true` is treated as
-#      `weak_coverage` regardless of `caught`, and a downgrade hint
-#      is emitted with reason `bootstrap_placeholder`. By default
-#      bootstrap placeholders are hard failures: they are not release
-#      evidence and must not count as covered.
+#      Legacy `needs_real_run` metadata and unknown timestamp kinds are
+#      rejected. They are not evidence states and cannot be enabled by an
+#      argument or environment variable.
 #
 #      Generated conformance metadata is not mutation evidence. A row
 #      whose metadata says `generated-metadata`, `conformance-only`,
 #      `not-run`, or `not-promoted` cannot pass the mutants evidence
-#      gate by flipping `needs_real_run` to false and `caught` to a
-#      positive number.
+#      gate by recording a positive caught count.
 #
 #   3. If the evidence file is missing, emit a downgrade hint with
-#      reason `missing_evidence` and exit 1 (unless `--dry-run`).
+#      reason `missing_evidence` and exit 1.
 #
-#   4. If `caught == 0` and `needs_real_run` is not true, emit a
-#      downgrade hint with reason `zero_kills` and exit 1 (unless
-#      `--dry-run`).
+#   4. If `caught == 0`, emit a downgrade hint with reason `zero_kills`
+#      and exit 1.
 #
 #   5. If `caught >= 1`, the row passes.
 #
 # Partial rows are still required to carry evidence. The row can remain
 # `partial` in the threat model, but the defended sub-vector must have
-# a present evidence file, a non-placeholder run status, and caught >= 1.
+# a present source-bound evidence file and caught >= 1.
 #
 # Downgrade hint format (single line, machine-grep-able):
 #
@@ -82,83 +77,34 @@
 #   - `missing_evidence` - audits/evidence/threats/<id>.json is missing
 #   - `zero_kills`       - the evidence file records caught == 0
 #   - `no_coveredby`     - no coveredBy / covered_by_tests cross-link
-#   - `bootstrap_placeholder` - needs_real_run is true before expiry; still a
-#     normal failure unless --allow-bootstrap-placeholders is explicitly set
-#   - `bootstrap_expired` - needs_real_run is true but today >=
-#     BOOTSTRAP_EXPIRES_DATE; the accommodation has expired and the
-#     row is now a real failure
-#   - `inconsistent_bootstrap` - needs_real_run is true with a non-1970
-#     `ran_at` timestamp (the stale-timestamp check); a real timestamp
-#     contradicts the placeholder claim
+#   - `invalid_evidence` - the evidence file is malformed, legacy, unbound,
+#     or inconsistent with source-bound cargo-mutants outcomes
 #   - `non_mutants_metadata` - the row tries to pass with generated,
-#     conformance-only, not-run, bootstrap, or not-promoted metadata
-#
-# Modes:
-#   - default: any downgrade hint causes exit 1, including
-#     bootstrap_placeholder.
-#   - --dry-run: every downgrade hint is reported but exit code is 0,
-#     so authors can iterate locally before wiring evidence. NOTE:
-#     --dry-run is refused when CI=true so a CI run cannot land a PR
-#     by relying on the lenient mode.
-#   - --allow-bootstrap-placeholders: bootstrap placeholders are
-#     reported but do not fail. This exists only for non-release
-#     scaffolding fixtures; release and preflight callers must not use it.
-#
-# Bootstrap expiry:
-#   The `needs_real_run: true` accommodation is bounded by
-#   BOOTSTRAP_EXPIRES_DATE (default 2026-08-01). After that date the
-#   script treats every `needs_real_run: true` evidence file as a
-#   bootstrap_expired failure. CHIO_BOOTSTRAP_EXPIRY=YYYY-MM-DD
-#   overrides for local development and tests.
+#     conformance-only, not-run, or not-promoted metadata
+#   - `pending_without_deferred_to` - a pending row lacks its explicit
+#     technical closure condition
 #
 # Exit codes:
-#   0 - all covered rows have caught >= 1 evidence (or --dry-run, or
-#       --allow-bootstrap-placeholders for bootstrap-only fixtures).
-#   1 - one or more covered rows are missing real evidence and we are
-#       not in --dry-run.
-#   2 - argument or config error (unknown flag, --dry-run in CI,
-#       invalid CHIO_BOOTSTRAP_EXPIRY, or missing python3).
+#   0 - every pending row has a technical closure condition and every covered
+#       or partial row has source-bound evidence with caught >= 1.
+#   1 - the threat model or required evidence fails validation.
+#   2 - argument error.
 
 set -euo pipefail
 
-# Hard expiry for the bootstrap-placeholder accommodation. After this date,
-# `needs_real_run: true` evidence files are treated as a HARD FAIL (reason
-# `bootstrap_expired`) rather than an informational hint, so a slipped evidence backfill
-# cannot leave 20 covered threats green forever.
-#
-# Local development can override this via the CHIO_BOOTSTRAP_EXPIRY env var
-# (ISO-8601 date, YYYY-MM-DD).
-BOOTSTRAP_EXPIRES_DATE="2026-08-01"
-BOOTSTRAP_EXPIRES_DATE="${CHIO_BOOTSTRAP_EXPIRY:-$BOOTSTRAP_EXPIRES_DATE}"
-
-DRY_RUN=0
-ALLOW_BOOTSTRAP_PLACEHOLDERS=0
 for arg in "$@"; do
     case "$arg" in
-        --dry-run)
-            DRY_RUN=1
-            ;;
-        --allow-bootstrap-placeholders)
-            ALLOW_BOOTSTRAP_PLACEHOLDERS=1
-            ;;
         -h|--help)
             sed -n '1,80p' "$0"
             exit 0
             ;;
         *)
             echo "error: unknown argument $arg" >&2
-            echo "usage: $(basename "$0") [--dry-run] [--allow-bootstrap-placeholders]" >&2
+            echo "usage: $(basename "$0") [--help]" >&2
             exit 2
             ;;
     esac
 done
-
-# Refuse --dry-run in CI: a CI run cannot rely on the lenient mode to land a
-# PR. Local iteration is fine; CI is fail-closed.
-if [[ "${CI:-}" == "true" && "$DRY_RUN" == "1" ]]; then
-    echo "error: --dry-run is not allowed in CI" >&2
-    exit 2
-fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -206,29 +152,8 @@ if [[ "$PRODUCTION_INPUTS" == "1" ]]; then
     "$REPO_ROOT/scripts/check-security-adversarial-evidence.sh" --require-complete
 fi
 
-# Decide whether the bootstrap-placeholder accommodation has expired. Use
-# python3 to compare ISO-8601 dates portably (date-only, no clock-skew
-# math).
-BOOTSTRAP_EXPIRED=0
-if ! BOOTSTRAP_EXPIRED="$(python3 - "$BOOTSTRAP_EXPIRES_DATE" <<'PY'
-import datetime
-import sys
-
-expiry_str = sys.argv[1]
-try:
-    expiry = datetime.date.fromisoformat(expiry_str)
-except ValueError:
-    print(f"error: invalid CHIO_BOOTSTRAP_EXPIRY {expiry_str!r}; expected YYYY-MM-DD", file=sys.stderr)
-    sys.exit(2)
-print(1 if datetime.date.today() >= expiry else 0)
-PY
-)"; then
-    echo "error: could not evaluate bootstrap expiry" >&2
-    exit 2
-fi
-
 # Emit one tab-separated record per row needing classification:
-#   <threat_id>\t<state>\t<has_coveredby>
+#   <threat_id>\t<state>\t<has_coveredby>\t<has_deferred_to>
 # where state is whatever appears in the JSON (default 'covered').
 classify_threats() {
     python3 - "$THREAT_MODEL" "$EVIDENCE_REPOSITORY_ROOT" <<'PY'
@@ -361,15 +286,19 @@ for offset, t in enumerate(doc["threats"]):
         for reference in coveredby
     ):
         raise ValueError(f"threat {tid} has invalid coveredBy references")
+    deferred_to = t.get("deferred_to")
+    if deferred_to is not None and not isinstance(deferred_to, str):
+        raise ValueError(f"threat {tid} has an invalid deferred_to")
     has_coveredby = "1" if coveredby else "0"
-    print(f"{tid}\t{state}\t{has_coveredby}")
+    has_deferred_to = "1" if deferred_to and deferred_to.strip() else "0"
+    print(f"{tid}\t{state}\t{has_coveredby}\t{has_deferred_to}")
 PY
 }
 
 # Read the evidence file and emit a tab-separated record:
-#   <caught> <needs_real_run> <ran_at> <survivor_count> <timestamp_kind>
+#   <caught> <ran_at> <survivor_count> <timestamp_kind>
 #   <evidence_status> <mutation_evidence_status> <promotion_status>
-# where needs_real_run is "1" or "0". Returns nonzero exit if file missing.
+# Returns nonzero if the file is missing or invalid.
 read_evidence() {
     local evidence_file="$1"
     local threat_id="$2"
@@ -804,9 +733,8 @@ if not isinstance(data, dict):
 caught = data.get("caught")
 if type(caught) is not int or caught < 0:
     raise ValueError("caught must be a nonnegative integer")
-needs_real_run = data.get("needs_real_run", False)
-if type(needs_real_run) is not bool:
-    raise ValueError("needs_real_run must be a boolean")
+if "needs_real_run" in data:
+    raise ValueError("needs_real_run is not valid mutation evidence")
 ran_at = nonempty_string(data.get("ran_at"), "ran_at")
 if "timestamp_kind" in data and "timestamp_source" in data:
     raise ValueError("timestamp_kind and timestamp_source are mutually exclusive")
@@ -815,7 +743,6 @@ timestamp_kind = (
         data,
         "timestamp_kind",
         {
-            "bootstrap-placeholder",
             "cargo-mutants-run",
             "command-wall-clock",
             "generated-metadata",
@@ -825,7 +752,6 @@ timestamp_kind = (
         data,
         "timestamp_source",
         {
-            "bootstrap-placeholder",
             "cargo-mutants-run",
             "command-wall-clock",
             "generated-metadata",
@@ -837,8 +763,8 @@ if not isinstance(survivors, list) or any(
     not isinstance(survivor, str) or not survivor for survivor in survivors
 ):
     raise ValueError("survivors must be an array of nonempty strings")
-if not needs_real_run and survivors:
-    raise ValueError("non-placeholder evidence must not retain survivors")
+if survivors:
+    raise ValueError("promoted evidence must not retain survivors")
 evidence_status = optional_enum(
     data, "evidence_status", {"cargo-mutants-run", "conformance-only"}
 )
@@ -849,11 +775,11 @@ promotion_status = optional_enum(
     data, "promotion_status", {"promoted", "not-promoted"}
 )
 outcome_records = data.get("outcomes")
-requires_aggregate_evidence = not needs_real_run and caught >= 1
+requires_aggregate_evidence = caught >= 1
 if requires_aggregate_evidence and (
     not isinstance(outcome_records, list) or not outcome_records
 ):
-    raise ValueError("non-placeholder positive evidence requires nonempty outcomes")
+    raise ValueError("positive evidence requires nonempty outcomes")
 aggregate_case_path = None
 if (
     requires_aggregate_evidence
@@ -1027,34 +953,45 @@ if outcome_records is not None:
             ):
                 raise ValueError("aggregate timestamp_note is stale")
 print(
-    f"{caught}\t{1 if needs_real_run else 0}\t{ran_at}\t{len(survivors)}\t"
+    f"{caught}\t{ran_at}\t{len(survivors)}\t"
     f"{timestamp_kind}\t{evidence_status}\t{mutation_evidence_status}\t{promotion_status}"
 )
 PY
 }
 
 passed=()
+pending=()
 weak_hints=()
-bootstrap_hints=()
 fail=0
-eligible_count=0
+row_count=0
 
 if ! threat_records="$(classify_threats)"; then
     echo "FAIL: threat-model row classification did not complete." >&2
     exit 1
 fi
 
-while IFS=$'\t' read -r tid state has_coveredby; do
+while IFS=$'\t' read -r tid state has_coveredby has_deferred_to; do
     [[ -z "$tid" ]] && continue
+    row_count=$((row_count + 1))
 
-    # `covered` and `partial` rows are both gated by mutants evidence.
-    # Partial rows may remain partial, but the claimed sub-vector still
-    # needs present, non-placeholder evidence with at least one caught
-    # mutant.
-    if [[ "$state" != "covered" && "$state" != "partial" ]]; then
-        continue
-    fi
-    eligible_count=$((eligible_count + 1))
+    case "$state" in
+        pending)
+            if [[ "$has_deferred_to" != "1" ]]; then
+                weak_hints+=("WEAK: $tid pending row rejected; reason=pending_without_deferred_to")
+                fail=1
+            else
+                pending+=("$tid")
+            fi
+            continue
+            ;;
+        weak_coverage)
+            weak_hints+=("WEAK: $tid is not release-closed; reason=weak_coverage_state")
+            fail=1
+            continue
+            ;;
+        covered|partial)
+            ;;
+    esac
 
     if [[ "$has_coveredby" != "1" ]]; then
         weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=no_coveredby")
@@ -1063,69 +1000,24 @@ while IFS=$'\t' read -r tid state has_coveredby; do
     fi
 
     evidence_file="$EVIDENCE_DIR/$tid.json"
-    if ! evidence_record="$(read_evidence "$evidence_file" "$tid" 2>/dev/null)"; then
+    if [[ ! -f "$evidence_file" ]]; then
         weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=missing_evidence")
+        fail=1
+        continue
+    fi
+    if ! evidence_record="$(read_evidence "$evidence_file" "$tid" 2>/dev/null)"; then
+        weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=invalid_evidence")
         fail=1
         continue
     fi
 
     caught="$(printf '%s' "$evidence_record" | cut -f1)"
-    needs_real_run="$(printf '%s' "$evidence_record" | cut -f2)"
-    ran_at="$(printf '%s' "$evidence_record" | cut -f3)"
-    survivor_count="$(printf '%s' "$evidence_record" | cut -f4)"
-    timestamp_kind="$(printf '%s' "$evidence_record" | cut -f5)"
-    evidence_status="$(printf '%s' "$evidence_record" | cut -f6)"
-    mutation_evidence_status="$(printf '%s' "$evidence_record" | cut -f7)"
-    promotion_status="$(printf '%s' "$evidence_record" | cut -f8)"
-
-    if [[ "$needs_real_run" == "1" ]]; then
-        # Bootstrap placeholder consistency: the stale-timestamp check requires
-        # `ran_at: 1970-01-01T00:00:00Z` whenever needs_real_run is true, so
-        # a real cargo-mutants run timestamp combined with needs_real_run=true
-        # is internally inconsistent.
-        if [[ "$ran_at" != "1970-01-01T00:00:00Z" ]]; then
-            weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=inconsistent_bootstrap (needs_real_run=true requires ran_at=1970-01-01T00:00:00Z, got ${ran_at:-<missing>})")
-            fail=1
-            continue
-        fi
-        if [[ "${caught:-0}" -ne 0 || "${survivor_count:-0}" -ne 0 ]]; then
-            weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=inconsistent_bootstrap (needs_real_run=true requires caught=0 and no survivors)")
-            fail=1
-            continue
-        fi
-        if [[ -n "$timestamp_kind" && "$timestamp_kind" != "bootstrap-placeholder" ]]; then
-            weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=inconsistent_bootstrap (needs_real_run=true requires timestamp_kind=bootstrap-placeholder, got $timestamp_kind)")
-            fail=1
-            continue
-        fi
-        if [[ -n "$evidence_status" && "$evidence_status" != "conformance-only" ]]; then
-            weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=inconsistent_bootstrap (needs_real_run=true requires evidence_status=conformance-only, got $evidence_status)")
-            fail=1
-            continue
-        fi
-        if [[ -n "$mutation_evidence_status" && "$mutation_evidence_status" != "not-run" ]]; then
-            weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=inconsistent_bootstrap (needs_real_run=true requires mutation_evidence_status=not-run, got $mutation_evidence_status)")
-            fail=1
-            continue
-        fi
-        if [[ -n "$promotion_status" && "$promotion_status" != "not-promoted" ]]; then
-            weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=inconsistent_bootstrap (needs_real_run=true requires promotion_status=not-promoted, got $promotion_status)")
-            fail=1
-            continue
-        fi
-        # Hard expiry: after BOOTSTRAP_EXPIRES_DATE, bootstrap placeholders
-        # become a real failure (reason=bootstrap_expired).
-        if [[ "$BOOTSTRAP_EXPIRED" == "1" ]]; then
-            weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=bootstrap_expired (bootstrap accommodation expired on $BOOTSTRAP_EXPIRES_DATE)")
-            fail=1
-            continue
-        fi
-        bootstrap_hints+=("WEAK: $tid should be marked weak_coverage; reason=bootstrap_placeholder")
-        if [[ "$ALLOW_BOOTSTRAP_PLACEHOLDERS" != "1" ]]; then
-            fail=1
-        fi
-        continue
-    fi
+    ran_at="$(printf '%s' "$evidence_record" | cut -f2)"
+    survivor_count="$(printf '%s' "$evidence_record" | cut -f3)"
+    timestamp_kind="$(printf '%s' "$evidence_record" | cut -f4)"
+    evidence_status="$(printf '%s' "$evidence_record" | cut -f5)"
+    mutation_evidence_status="$(printf '%s' "$evidence_record" | cut -f6)"
+    promotion_status="$(printf '%s' "$evidence_record" | cut -f7)"
 
     if [[ -n "$timestamp_kind" && "$timestamp_kind" != "cargo-mutants-run" && "$timestamp_kind" != "command-wall-clock" ]]; then
         weak_hints+=("WEAK: $tid should be marked weak_coverage; reason=non_mutants_metadata (timestamp_kind=$timestamp_kind cannot pass as cargo-mutants evidence)")
@@ -1153,37 +1045,25 @@ while IFS=$'\t' read -r tid state has_coveredby; do
     passed+=("$tid")
 done <<< "$threat_records"
 
-if [[ "$eligible_count" -eq 0 ]]; then
-    echo "FAIL: zero covered or partial rows were evaluated by the mutants gate." >&2
+if [[ "$row_count" -eq 0 ]]; then
+    echo "FAIL: zero threat-model rows were evaluated by the mutants gate." >&2
     fail=1
 fi
 
 echo "threat-model mutants gate:"
 echo "  passed: ${#passed[@]}"
-echo "  weak (real failures): ${#weak_hints[@]}"
-echo "  bootstrap placeholders: ${#bootstrap_hints[@]}"
+echo "  pending: ${#pending[@]}"
+echo "  failures: ${#weak_hints[@]}"
 
-# Always print every hint so authors see the full picture. Use the
-# `${arr[@]+"${arr[@]}"}` indirection so an empty array does not trip
-# `set -u` (which fires on `${empty[@]}` in older bash builds).
-for h in ${bootstrap_hints[@]+"${bootstrap_hints[@]}"}; do
-    echo "$h"
-done
+# The indirection keeps empty arrays safe under older Bash `set -u` behavior.
 for h in ${weak_hints[@]+"${weak_hints[@]}"}; do
     echo "$h" >&2
 done
 
-if [[ "$fail" -eq 1 && "$DRY_RUN" -ne 1 ]]; then
-    echo "" >&2
-    echo "FAIL: per-row mutants evidence is missing or empty for one or more covered/partial threats." >&2
-    echo "hint: re-run cargo-mutants for the listed rows and update audits/evidence/threats/<id>.json," >&2
-    echo "       or downgrade the row to coverage_state=weak_coverage in $THREAT_MODEL." >&2
-    exit 1
-fi
-
 if [[ "$fail" -eq 1 ]]; then
-    echo ""
-    echo "DRY-RUN: ${#weak_hints[@]} row(s) would fail the mutants gate; not exiting non-zero."
+    echo "" >&2
+    echo "FAIL: threat mutation-evidence contract rejected one or more rows." >&2
+    exit 1
 fi
 
 echo "PASS: per-row mutants evidence gate"

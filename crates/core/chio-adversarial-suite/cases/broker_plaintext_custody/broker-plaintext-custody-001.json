@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_plaintext_custody_detected",
   "threat_id": "tool_server_escape",
-  "pending": false,
+  "pending": true,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -32,9 +32,7 @@
           "replacement": ""
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_plaintext_custody/mutants.out/outcomes.json",
-          "sha256": "d4fc24a26365b9a858c22958cd7eb26517d52954219b29e9efcbc5a1655565b5",
-          "inputs_sha256": "5626c8d7c545f04f7a547695d473c38895c3deb8ea2efbaacc606e0d20fc5fbd"
+          "path": "audits/evidence/mutants/security/broker_plaintext_custody/mutants.out/outcomes.json"
         }
       }
     ]

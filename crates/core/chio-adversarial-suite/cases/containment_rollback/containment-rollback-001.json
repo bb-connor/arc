@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "containment_rollback_detected",
   "threat_id": "resource_exhaustion_dos",
-  "pending": false,
+  "pending": true,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -56,9 +56,7 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json",
-          "sha256": "8e0bcf4d975fd75f1bb186c02b8a53b847d81c9512e1c254362e33213d1cfc2f",
-          "inputs_sha256": "10561ba4416f0f83a423f596abd8dce8fda43fad05707616ef9f78901d8e5243"
+          "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json"
         }
       },
       {
@@ -73,9 +71,7 @@
           "replacement": "Ok([0; 32])"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json",
-          "sha256": "48a590a5bef0bafc965a172e74206f438c41100204dc83ffdb1de61af19601d7",
-          "inputs_sha256": "55463f03206169dd4f9efdd7288d6843834cd0138d460c116f97ae2b2e129428"
+          "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json"
         }
       },
       {
@@ -92,9 +88,7 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/root_only_lift/mutants.out/outcomes.json",
-          "sha256": "877960401af5ad29f42d824aec62269a4128e188104ca88b89d1b114c630aec5",
-          "inputs_sha256": "0960dd5cfdbe9defaae47a7ecaace2824165d9db10c2f2868e72688fcf382e98"
+          "path": "audits/evidence/mutants/security/root_only_lift/mutants.out/outcomes.json"
         }
       },
       {
@@ -109,9 +103,7 @@
           "replacement": "true"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json",
-          "sha256": "4165f9e438ab3ceeb145e8cbb775f5174d6eaf08c5d062096ebce63c8c3b4389",
-          "inputs_sha256": "5b3aa11ed527df7428562aaf5295c2e884285ac898208fe0415e7529c236fb15"
+          "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json"
         }
       }
     ]

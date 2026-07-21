@@ -3,26 +3,16 @@
 # Two complementary gates run in this workflow:
 #
 #   1. `scripts/check-threat-coverage.sh` (file-existence gate):
-#      fails the build if any threat ID lacks a populated test
-#      body (the codegen stub at
-#      crates/tooling/chio-conformance/tests/threats/<id>.rs still calls
-#      `unimplemented!()`) and is not explicitly marked
-#      `coverage_state: pending` (with a `deferred_to`),
-#      `coverage_state: partial`, or `coverage_state:
-#      weak_coverage` in the threat-model JSON.
+#      fails if a covered or partial threat ID lacks the required test
+#      body, if partial evidence is invalid, or if a pending row lacks a
+#      technical `deferred_to` closure condition.
 #
 #   2. `scripts/check-threat-coverage-mutants.sh` (per-row mutation-
-#      testing gate): for each
-#      `covered` row, asserts the existence of an evidence file at
+#      testing gate): for each `covered` or `partial` row, asserts the
+#      existence of a source-bound evidence file at
 #      `audits/evidence/threats/<id>.json` recording at least one
-#      caught mutant. Missing evidence, zero-kill evidence, and
-#      bootstrap placeholders (`needs_real_run: true`) fail this
-#      release gate. The non-release diagnostic mode may emit weak
-#      coverage hints, but this workflow never selects that mode.
-#
-# Pending vectors auto-promoted by the fuzz-seed promoter live in
-# the corpus, not the threat list, and are excluded from this gate
-# by construction.
+#      caught mutant and zero survivors. Pending rows are accepted only by
+#      their explicit threat-model state and technical closure condition.
 #
 # Standalone check name: threat-model-coverage / coverage-gate. Pull requests
 # and pushes are enforced transitively through CI's required Security contract.

@@ -272,13 +272,13 @@ python3 scripts/tests/check-exact-cargo-test-inventory.test.py
 
 if rg -n '^cargo test -p chio-(kernel|store-sqlite|core-types|kernel-core|control-plane) (budget|approval|budget_store|aggregate_invocation|delegation)$' \
   docs/superpowers/plans/2026-07-09-protocol-primitives.md; then
-  echo "protocol plan still contains a raw zero-match-prone phase command" >&2
+  echo "zero-match-prone cargo test command detected in protocol primitive controls" >&2
   exit 1
 fi
 for lane in baseline model persistence; do
   if ! grep -Fq "./scripts/check-protocol-primitives-focused.sh --${lane}" \
     docs/superpowers/plans/2026-07-09-protocol-primitives.md; then
-    echo "protocol plan omits the ${lane} focused ratchet" >&2
+    echo "${lane} protocol primitive ratchet is absent" >&2
     exit 1
   fi
 done
