@@ -1496,6 +1496,22 @@ impl ChioKernel {
         verifier_policy: serde_json::Value,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
+        // A reserved credit exposure cannot be released through pre-dispatch
+        // compensation: releasing it requires verified economic no-effect
+        // evidence this path cannot produce, so the release manifest would omit
+        // the credit-exposure participant and be rejected obscurely by the store.
+        // Fail closed at the kernel instead.
+        if operation
+            .binding()
+            .participant_requirements()
+            .credit_exposure
+        {
+            return Err(KernelError::DurableAdmission(
+                "pre-dispatch compensation does not support a reserved credit exposure; \
+                 credit-exposure release requires verified economic no-effect evidence"
+                    .to_owned(),
+            ));
+        }
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
