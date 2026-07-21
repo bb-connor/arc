@@ -99,7 +99,9 @@ security-self-funding inequality stays satisfiable (GENESIS-PROGRAM 9.1).
 
 The public hit-reliability statistic `r` is published as
 `chio.genesis.reliability-epoch.v1`: a signed, windowed aggregate carrying
-`{ corpus, seller, guarantee_class, r_bps, n, decayed }` rows, computed as the
+`{ corpus, seller, guarantee_class, r_bps, r_lcb_bps, n, decayed }` rows
+(`r_lcb_bps` the Wilson lower confidence bound; reliability-gated consumers
+key off it, not the point estimate), computed as the
 time-decayed audit-success rate (the `compute_reliability` math,
 `chio-reputation/src/compare.rs:160`; crate-private today, so the builder
 exports or re-derives it) stratified by guarantee class, over audit receipts,

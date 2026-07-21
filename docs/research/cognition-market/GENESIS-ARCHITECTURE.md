@@ -199,13 +199,13 @@ per-key value, `chio-revocation-oracle/src/sparse_merkle.rs:89-97`).
 | `feed_operator_id` | string | the reliability-oracle operator (a genesis vertical, Q5) |
 | `epoch` | u64 | monotone |
 | `window` | `AttestationWindow` | reuse `chio-credentials`/`artifact.rs:183` window shape |
-| `rows` | array | each `{ corpus, seller, guarantee_class, r_bps, n, decayed }` |
+| `rows` | array | each `{ corpus, seller, guarantee_class, r_bps, r_lcb_bps, n, decayed }`; `r_lcb_bps` is the Wilson lower confidence bound at the published confidence level, and reliability-gated consumers (class multipliers, audit-rate step-downs) key off it, never the point estimate |
 | `signed_root` | ref | optional anchoring ref through the existing anchor lanes (K9) |
 | `issued_at` | u64 | |
 | `signature` | inline sig | chio-finding convention (section 3 preamble); the `SignedPortableReputationSummary` precedent this artifact follows is its WINDOWED-AGGREGATE shape, not its envelope |
 
-`r_bps` is the time-decayed audit success rate for the `(corpus, seller,
-guarantee_class)` triple, computed exactly as `compute_reliability`
+`r_bps` is the time-decayed audit success rate (with `r_lcb_bps` its lower
+confidence bound) for the `(corpus, seller, guarantee_class)` triple, computed exactly as `compute_reliability`
 (`chio-reputation/src/compare.rs:160`) but stratified by class and scoped to
 audit receipts. `n` (sample size) is mandatory: a low-`n` `r` is visibly weak and
 buyers discount it, which defuses audit-rate gaming (Q6). Stratification by

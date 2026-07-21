@@ -188,7 +188,8 @@ dashes); ADR-0018 in the ADR index.
 ### G3 Reliability epoch / r feed (after finding M5)
 
 - `chio.genesis.reliability-epoch.v1` registered here (its owning milestone);
-  rows `{ corpus, seller, guarantee_class, r_bps, n, decayed }`.
+  rows `{ corpus, seller, guarantee_class, r_bps, r_lcb_bps, n, decayed }`
+  (the LCB is what reliability-gated consumers read).
 - Reliability computation: a stratified wrapper over `compute_reliability`
   (`chio-reputation/src/compare.rs:160`) scoped to audit receipts, per
   `(corpus, seller, guarantee_class)`, with mandatory `n`.

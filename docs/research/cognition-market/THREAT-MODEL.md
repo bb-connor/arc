@@ -383,8 +383,9 @@ profile in parentheses where different.
   the schedule; for `deterministic_replay` an audit is a mediated re-run whose
   receipt is independently checkable, so a colluding pass reduces to slashable
   fabricated evidence (S1, `chio-market/src/insurance_flow.rs:390-414`); `n`
-  (sample size) is mandatory in every published row so a diluted low-`n` `r` is
-  visibly weak; `r` is stratified by `guarantee_class` so gaming one class cannot
+  (sample size) and the Wilson lower bound `r_lcb_bps` are mandatory in every
+  published row, and reliability-gated consumers key off the LCB, so a diluted
+  low-`n` `r` is not just visibly weak but mechanically weak; `r` is stratified by `guarantee_class` so gaming one class cannot
   inflate another (K6). Residual: for `metered_attested` (non-replayable)
   findings an audit cannot mechanically verify, so `r` there rests on the
   metering floor and reputation, both of which an honest-cost fabricator defeats

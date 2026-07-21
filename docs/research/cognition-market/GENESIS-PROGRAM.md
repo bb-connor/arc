@@ -248,6 +248,22 @@ These two rules are precisely what make "subsidy is demand-curve investment"
 true rather than aspirational. The program buys covered demand mass, and only
 covered demand mass.
 
+**Why the SUPPLY side is the subsidy side (the objection this model answers).**
+The obvious alternative bootstrap is buyer-side coupons (subsidize purchases
+instead of listings). The model says no, twice over. First, with `h = 0` on a
+descriptor there is nothing to buy at any coupon size: coverage is the binding
+constraint, and only supply-side subsidy relaxes it. Second, the cross-side
+externality is asymmetric: one covered demanded descriptor raises `P_max` for
+EVERY buyer who will ever hit that context (the `h_pool` composition), while
+one additional buyer raises seller value only through fees that do not exist
+until D7; the standard two-sided-market prescription is to subsidize the side
+whose participation exerts the larger externality on the other (Caillaud-
+Jullien's divide-and-conquer: subsidize one side to recruit it, monetize the
+other; 8.5). Coupons also pay for BEHAVIOR (purchases), which hard constraint
+2 forbids and which is Goodhartable into wash volume, whereas floors buy
+durable inventory. Buyer-side subsidy is therefore rejected as a launch
+mechanism, not merely unchosen.
+
 ---
 
 ## 4. The three mines (design, each pressure-tested against the input)
@@ -488,8 +504,14 @@ class) = correct_audits / total_audits` over a published window, time-decayed
 like `compute_reliability`, computed only over integrity-gated audit receipts
 (the audit is a mediated re-run; its receipt is checkable exactly as claim
 evidence is, `chio-market/src/insurance_flow.rs:390-414`). Each epoch publishes
-`(r, n, window, class)` rows: `n` (sample size) is mandatory so a small-sample
-`r` is discounted by buyers, which defuses audit-rate gaming. The statistic
+`(r, r_lcb, n, window, class)` rows: `n` (sample size) is mandatory, and
+`r_lcb` is the lower confidence bound of the rate at the published confidence
+level (a Wilson-interval bound over the decayed effective sample [modeling
+choice]), so a small-sample `r` is not merely discountable by buyers but
+mechanically weak: consumers that gate on reliability (the guarantee-class
+multipliers, and the audit-rate step-down conditions in the bullet above) key
+off `r_lcb`, never the point estimate, which defuses both audit-rate gaming
+and low-`n` inflation. The statistic
 feeds the `guarantee_class_bps` and the elicitation ceiling (MECHANISMS 2),
 never a proof (K8): buyers weight it, they do not treat it as verification.
 
@@ -876,7 +898,23 @@ reported and single-source figures are flagged inline.
   `kappa < 1` rather than reimbursing claimed cost (GA1). Credit Mobilier is
   the Genesis program's canonical failure to design against.
 
-### 8.5 References
+### 8.5 Two-sided markets and the chicken-and-egg launch (which side to subsidize)
+
+- Caillaud and Jullien (2003) analyze exactly this launch problem for
+  intermediaries: with indirect network externalities, the equilibrium entry
+  strategy is "divide and conquer", subsidize one side (possibly below cost)
+  to recruit it, then monetize the other side once cross-side value exists
+  [paper]. Rochet and Tirole (2003) generalize the price-structure result:
+  platforms optimally skew pricing toward the side with the larger cross-side
+  externality and the more elastic participation [paper]. The Genesis mapping
+  is direct: coverage (supply) is the subsidized side because its cross-side
+  externality is the whole demand curve (section 3.3), and the monetized side
+  is clearing (the D7 fee), which begins only after coverage exists. The
+  divide-and-conquer literature also carries the program's discipline
+  warning: the subsidy must END (the genesis clock `T_g`), because a platform
+  that never flips to monetization is the zombie regime (9.1).
+
+### 8.6 References
 
 All URLs retrieved 2026-07-21.
 
@@ -902,9 +940,15 @@ All URLs retrieved 2026-07-21.
    Credit Mobilier payments vs estimated cost: Gilder Lehrman Institute,
    "Financing the Transcontinental Railroad."
    https://www.gilderlehrman.org/history-resources/essays/financing-transcontinental-railroad
-8. Bug-bounty economics, agent-payment rails, credence-goods markets, peer-
-   prediction, and data-market prior art: see MECHANISMS section 10 (items
-   8-45), referenced here rather than duplicated. The load-bearing ones for the
+8. [paper] Caillaud, B., Jullien, B. "Chicken & Egg: Competition among
+   Intermediation Service Providers." RAND Journal of Economics 34(2), 2003,
+   309-328. https://econpapers.repec.org/RePEc:rje:randje:v:34:y:2003:i:2:p:309-28
+9. [paper] Rochet, J.-C., Tirole, J. "Platform Competition in Two-Sided
+   Markets." Journal of the European Economic Association 1(4), 2003,
+   990-1029. https://academic.oup.com/jeea/article-abstract/1/4/990/2280902
+10. Bug-bounty economics, agent-payment rails, credence-goods markets, peer-
+    prediction, and data-market prior art: see MECHANISMS section 10 (items
+    8-45), referenced here rather than duplicated. The load-bearing ones for the
    Genesis program are Gao-Wright-Leyton-Brown (limited-ground-truth audits
    dominate, item 18), Walshe-Simpson bug-bounty triage economics (item 29), and
    Erlei-Meub (bonds load-bearing for agent credence goods, item 44).
