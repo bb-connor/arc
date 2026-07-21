@@ -10,7 +10,6 @@ mod support {
     use std::collections::HashMap;
     use std::sync::atomic::AtomicUsize;
     use std::sync::{Arc, Mutex};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
         scope::{ChioScope, Operation, ToolGrant},
@@ -25,11 +24,7 @@ mod support {
     use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 
     pub fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time after epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{}-{nonce}.sqlite3", std::process::id()))
+        chio_test_support::private_fs::unique_sqlite_path(prefix)
     }
 
     /// Payment rail that settles locally and counts every capture/release so
@@ -390,7 +385,9 @@ mod support {
             reported_cost_units,
         }));
         kernel.set_payment_adapter(Box::new(SharedRail(Arc::clone(&rail))))?;
-        kernel.set_budget_store_handle(Arc::clone(&budget_store) as Arc<dyn chio_kernel::BudgetStore>);
+        kernel.set_budget_store_handle(
+            Arc::clone(&budget_store) as Arc<dyn chio_kernel::BudgetStore>
+        )?;
         kernel.set_receipt_store_handle(
             Arc::clone(&receipt_store) as Arc<dyn chio_kernel::ReceiptStore>
         )?;
@@ -530,7 +527,8 @@ fn adapter_installed_after_store_attach_still_reconciles_the_journal(
     // without a rail adapter (the journal is not active), so the orphan
     // survives the attach untouched.
     let mut kernel = ChioKernel::new(support::money_config(Keypair::generate()));
-    kernel.set_budget_store_handle(Arc::clone(&budget_store) as Arc<dyn chio_kernel::BudgetStore>);
+    kernel
+        .set_budget_store_handle(Arc::clone(&budget_store) as Arc<dyn chio_kernel::BudgetStore>)?;
     kernel.set_receipt_store_handle(
         Arc::clone(&receipt_store) as Arc<dyn chio_kernel::ReceiptStore>
     )?;
@@ -635,9 +633,7 @@ fn failed_settle_leaves_the_journal_open_for_boot_reconciliation(
 #[test]
 fn legacy_refund_recovery_replays_once_and_attests_refund_reference(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use chio_kernel::payment::{
-        PaymentJournalRecord, PaymentSettleAction,
-    };
+    use chio_kernel::payment::{PaymentJournalRecord, PaymentSettleAction};
 
     let harness = support::money_journal_harness("chio-legacy-refund-reconcile", 75)?;
     harness

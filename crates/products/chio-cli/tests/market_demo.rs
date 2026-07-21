@@ -56,6 +56,10 @@ struct CountingSettlementHook {
 }
 
 impl SettlementHook for CountingSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
     fn observe(
         &self,
         observation: &SettlementObservation,

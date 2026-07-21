@@ -378,10 +378,12 @@ fn chio_runtime_live_parent_and_vendor_calls_expose_package_valid_receipts(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn drop_guard_reverse_failure_records_pending_reversal() {
+async fn drop_guard_release_failure_omits_monetary_terminal() {
     let started = std::sync::Arc::new(tokio::sync::Notify::new());
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_budget_store(Box::new(ReverseFailingBudgetStore::new()));
+    kernel
+        .set_budget_store(Box::new(FailingReleaseBudgetStore::new()))
+        .expect("install budget store");
     kernel.register_tool_server(Box::new(PendingMonetaryServer {
         id: "cost-srv".to_string(),
         started: std::sync::Arc::clone(&started),
@@ -433,15 +435,35 @@ async fn drop_guard_reverse_failure_records_pending_reversal() {
         .metadata
         .as_ref()
         .expect("cancellation receipt must carry metadata");
-    assert_eq!(
-        metadata["budget_authority"]["terminal"]["disposition"],
-        "pending_reversal",
-        "reverse failure must embed a pending_reversal terminal disposition so the reaper can close the open hold"
-    );
+    assert!(metadata["budget_authority"]["terminal"].is_null());
+    let financial_budget_authority = receipt
+        .financial_budget_authority_metadata()
+        .expect("drop cleanup fault must retain typed budget authorization metadata");
+    assert!(financial_budget_authority.terminal.is_none());
     assert!(
         metadata["budget_authority"]["hold_id"].is_string(),
-        "pending_reversal receipt must identify the hold"
+        "drop cleanup fault receipt must identify the authorized hold"
     );
+    assert_eq!(
+        metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
+        true
+    );
+    let fault = &metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0];
+    assert_eq!(fault["step"], "budget_hold_release");
+    let reason = fault["reason"]
+        .as_str()
+        .expect("drop cleanup fault must carry its redacted failure reason");
+    assert!(reason.contains("[REDACTED-API-KEY]"));
+    assert!(!reason.contains("sk_live_"));
+    assert!(fault["attempted_release_event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
+    let hold_id = metadata["budget_authority"]["hold_id"]
+        .as_str()
+        .expect("authorized hold id must be a string");
+    assert!(fault["hold_ids"]
+        .as_array()
+        .is_some_and(|hold_ids| hold_ids.iter().any(|candidate| candidate == hold_id)));
 }
 
 // --- RFC-0002 drop-guard unwind tests ---

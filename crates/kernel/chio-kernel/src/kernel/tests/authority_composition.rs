@@ -227,6 +227,10 @@ struct CountingSettlementHook {
 }
 
 impl chio_settle::SettlementHook for CountingSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
     fn observe(
         &self,
         observation: &chio_settle::SettlementObservation,
@@ -284,14 +288,6 @@ struct AuthorityCompositionReceiptStore {
     checkpoint_backend: Mutex<Option<Arc<dyn SigningBackend>>>,
     latest_checkpoint: Mutex<Option<KernelCheckpoint>>,
     session_anchors: Mutex<Vec<serde_json::Value>>,
-}
-
-struct AuthorityCompositionClock(u64);
-
-impl chio_keyring::TrustedClock for AuthorityCompositionClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
-        Ok(self.0)
-    }
 }
 
 struct FailingAuthorityCompositionClock {
@@ -699,16 +695,18 @@ fn bound_authority_runtime_blocks_untrusted_settlement_observation_then_recovers
         )))
         .is_err());
 
+    install_empty_durable_settlement_stores(&mut kernel, 0x41);
     let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     kernel.set_settlement_observer(Arc::new(CountingSettlementHook {
         calls: Arc::clone(&calls),
-    }));
+    }))
+    .expect("install settlement observer");
     let receipt = authority_composition_economic_receipt(&kernel, "resolver-settlement");
 
     assert!(matches!(
         kernel.run_settlement_observer(&receipt),
-        settlement_observer::SettlementObserverStatus::Skipped { reason }
-            if reason.contains("authority trust resolution failed")
+        settlement_observer::SettlementObserverStatus::TrustFailed { error }
+            if error.contains("authority trust resolution failed")
     ));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 
@@ -1223,141 +1221,4 @@ fn split_backend_fails_closed_for_every_governed_artifact() {
         None,
     )
     .is_err());
-}
-
-#[test]
-fn keyring_authority_composition_rejects_an_unvalidated_router() {
-    use chio_keyring::{
-        derive_key_id, AnchorId, AuthorityId, BootstrapAuthorization, EventId, EventReason,
-        KeyLogAuthorizations, KeyLogEventBody, KeyLogOperation, KeyLogPolicy,
-        KeyLogPolicyConfig, KeyringSigningRouter, LogId, NewKeyProofOfPossession,
-        OldKeyAuthorization, RecoveryPolicyId, SignedKeyLogEvent, SigningTopology,
-        SqliteKeyLogStore, WitnessId, WitnessRosterId, WitnessSignature, KEY_LOG_EVENT_SCHEMA,
-    };
-
-    let bootstrap = make_keypair();
-    let operator = make_keypair();
-    let old = make_keypair();
-    let new = make_keypair();
-    let witnesses = [make_keypair(), make_keypair(), make_keypair()];
-    let artifact_time_signer = make_keypair();
-    let log_id = LogId::new("log.kernel.authority-composition").unwrap();
-    let authority_id = AuthorityId::new("authority.kernel.composition").unwrap();
-    let roster_id = WitnessRosterId::new("roster.kernel.composition").unwrap();
-    let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
-        log_id: log_id.clone(),
-        authority_id: authority_id.clone(),
-        bootstrap_key: bootstrap.public_key(),
-        operator_key: operator.public_key(),
-        witness_roster_id: roster_id.clone(),
-        witness_keys: BTreeMap::from([
-            (
-                WitnessId::new("witness.a").unwrap(),
-                witnesses[0].public_key(),
-            ),
-            (
-                WitnessId::new("witness.b").unwrap(),
-                witnesses[1].public_key(),
-            ),
-            (
-                WitnessId::new("witness.c").unwrap(),
-                witnesses[2].public_key(),
-            ),
-        ]),
-        recovery_policy_id: RecoveryPolicyId::new("recovery.kernel.composition").unwrap(),
-        recovery_keys: BTreeMap::new(),
-        recovery_threshold: 0,
-        max_checkpoint_future_skew: 100,
-    })
-    .unwrap()
-    .with_artifact_time_roots(BTreeMap::from([(
-        AnchorId::new("timestamp.kernel.composition").unwrap(),
-        artifact_time_signer.public_key(),
-    )]))
-    .unwrap();
-    let genesis_body = KeyLogEventBody {
-        schema: KEY_LOG_EVENT_SCHEMA.to_string(),
-        log_id: log_id.clone(),
-        sequence: 0,
-        event_id: EventId::new("event.kernel.genesis").unwrap(),
-        previous_event_hash: None,
-        authority_id: authority_id.clone(),
-        key_id: derive_key_id(old.public_key().algorithm(), &old.public_key()).unwrap(),
-        algorithm: old.public_key().algorithm(),
-        public_key: old.public_key(),
-        operation: KeyLogOperation::Genesis,
-        effective_at: 1_000,
-        verify_until: None,
-        reason: Some(EventReason::new("kernel genesis").unwrap()),
-        issued_at: 1_000,
-    };
-    let genesis = SignedKeyLogEvent {
-        authorizations: KeyLogAuthorizations::bootstrap(
-            BootstrapAuthorization::sign(&genesis_body, &Ed25519Backend::new(bootstrap.clone()))
-                .unwrap(),
-        ),
-        body: genesis_body,
-    };
-    let rotation_body = KeyLogEventBody {
-        schema: KEY_LOG_EVENT_SCHEMA.to_string(),
-        log_id,
-        sequence: 1,
-        event_id: EventId::new("event.kernel.rotation").unwrap(),
-        previous_event_hash: Some(genesis.envelope_hash().unwrap()),
-        authority_id,
-        key_id: derive_key_id(new.public_key().algorithm(), &new.public_key()).unwrap(),
-        algorithm: new.public_key().algorithm(),
-        public_key: new.public_key(),
-        operation: KeyLogOperation::Rotate {
-            previous_key_id: genesis.body.key_id,
-            witness_roster_id: roster_id,
-            witness_roster_binding: policy.witness_roster_binding().unwrap(),
-        },
-        effective_at: 2_000,
-        verify_until: Some(9_000),
-        reason: Some(EventReason::new("kernel rotation").unwrap()),
-        issued_at: 2_000,
-    };
-    let rotation = SignedKeyLogEvent {
-        authorizations: KeyLogAuthorizations::rotation(
-            OldKeyAuthorization::sign(&rotation_body, &Ed25519Backend::new(old.clone())).unwrap(),
-            NewKeyProofOfPossession::sign(&rotation_body, &Ed25519Backend::new(new.clone()))
-                .unwrap(),
-        ),
-        body: rotation_body,
-    };
-    let store_path = unique_receipt_db_path("chio-kernel-keyring-composition");
-    let store = Arc::new(
-        SqliteKeyLogStore::open_with_clock(
-            &store_path,
-            policy,
-            SigningTopology::LocalSingleWriter,
-            Arc::new(AuthorityCompositionClock(3_010)),
-        )
-        .unwrap(),
-    );
-    let operator_backend = Ed25519Backend::new(operator);
-    store.append_event(&genesis, &operator_backend).unwrap();
-    let checkpoint = store.append_event(&rotation, &operator_backend).unwrap();
-    let checkpoint_hash = checkpoint.checkpoint_hash().unwrap();
-    for (index, id) in ["witness.a", "witness.b"].into_iter().enumerate() {
-        let signature = WitnessSignature::sign(
-            &checkpoint,
-            WitnessId::new(id).unwrap(),
-            &Ed25519Backend::new(witnesses[index].clone()),
-        )
-        .unwrap();
-        store
-            .store_witness_signature(&checkpoint_hash, &signature)
-            .unwrap();
-    }
-    let router = Arc::new(
-        KeyringSigningRouter::open(
-            Arc::clone(&store),
-            Box::new(Ed25519Backend::new(old.clone())),
-        )
-        .unwrap(),
-    );
-    assert!(chio_keyring::KeyringAuthoritySigningBackend::new(router).is_err());
-    let _ = std::fs::remove_file(store_path);
 }

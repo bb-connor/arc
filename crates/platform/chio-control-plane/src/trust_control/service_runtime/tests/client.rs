@@ -1130,6 +1130,7 @@ fn sample_capability_token() -> chio_core::capability::token::CapabilityToken {
         issued_at: 0,
         expires_at: 3_600,
         delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
     };
     chio_core::capability::token::CapabilityToken::sign(body, &issuer)
         .test_expect("sign sample capability")

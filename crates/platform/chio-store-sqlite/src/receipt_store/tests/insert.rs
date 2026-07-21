@@ -326,14 +326,15 @@ fn receipt_commit_flush_waits_for_queued_receipts() -> Result<(), Box<dyn std::e
         store
             .receipt_commit_actor
             .sender
-            .send(ReceiptCommitCommand::Append(Box::new(
-                ReceiptCommitRequest {
+            .send(ReceiptCommitCommand::Append {
+                request: Box::new(ReceiptCommitRequest {
                     receipt,
                     raw_json,
                     ensure_lineage: false,
                     response,
-                },
-            )))
+                }),
+                inflight: WriterInflightLease::detached_for_test(),
+            })
             .map_err(|_| std::io::Error::other("send receipt append command"))?;
         results.push(result);
     }
@@ -367,14 +368,15 @@ fn receipt_commit_flush_reports_queued_batch_error() -> Result<(), Box<dyn std::
     store
         .receipt_commit_actor
         .sender
-        .send(ReceiptCommitCommand::Append(Box::new(
-            ReceiptCommitRequest {
+        .send(ReceiptCommitCommand::Append {
+            request: Box::new(ReceiptCommitRequest {
                 receipt: invalid,
                 raw_json,
                 ensure_lineage: false,
                 response,
-            },
-        )))
+            }),
+            inflight: WriterInflightLease::detached_for_test(),
+        })
         .map_err(|_| std::io::Error::other("send receipt append command"))?;
 
     let error = match store.flush_receipt_writes() {

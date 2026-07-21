@@ -17,6 +17,10 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody},
 };
 use chio_core::crypto::{sha256_hex, Keypair, SigningAlgorithm};
+use chio_kernel::admission_operation::{
+    AdmissionOperation, AdmissionOperationKind, AdmissionRequestBindingInput,
+    AdmissionRequestBindingParts, PreparedAdmissionOperation,
+};
 use chio_kernel::approval::ApprovalStore;
 use chio_kernel::budget_store::{
     BudgetAdmissionOperationBinding, BudgetAuthorizeHoldDecision, BudgetCaptureHoldRequest,
@@ -26,11 +30,9 @@ use chio_kernel::budget_store::{
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::threshold_approval::{
-    prepare_threshold_tool_admission_operation, verify_threshold_approval_set,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ThresholdApprovalRequest,
-    ThresholdApprovalRequirement, ThresholdApprovalResolutionError,
-    ThresholdApprovalVerificationInput, ThresholdToolAdmissionOperationInput,
-    VerifiedThresholdApprovalSet,
+    verify_threshold_approval_set, ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+    ThresholdApprovalRequest, ThresholdApprovalRequirement, ThresholdApprovalResolutionError,
+    ThresholdApprovalVerificationInput, VerifiedThresholdApprovalSet,
 };
 use chio_store_sqlite::budget_store::{
     SqliteAggregateFamilyEvidence, SqliteCompositeAuthorizeInput,
@@ -862,8 +864,46 @@ impl ThresholdFixture {
     }
 }
 
+fn threshold_operation(
+    request_fingerprint_hash: &str,
+    verified: &VerifiedThresholdApprovalSet,
+    fixture: &ThresholdFixture,
+) -> AdmissionOperation {
+    let approval_set_hash = verified.approval_set_hash().unwrap();
+    let request_binding_hash = AdmissionRequestBindingInput::new(AdmissionRequestBindingParts {
+        action_hash: request_fingerprint_hash.to_string(),
+        policy_hash: fixture.requirement.policy_hash().to_string(),
+        governed_intent_hash: Some(fixture.intent_hash.clone()),
+        threshold_proposal_hash: Some(verified.body().threshold_proposal_hash().to_string()),
+        verified_approval_set_hash: Some(approval_set_hash.clone()),
+        approval_token_digests: verified.body().token_digests().to_vec(),
+        budget_hold_reference: Some("threshold-budget-hold".to_string()),
+        supplemental_authorization_reference: Some("supplemental-reference".to_string()),
+        supplemental_authorization_digest: Some("44".repeat(32)),
+        execution_nonce_reference: Some("threshold-nonce".to_string()),
+    })
+    .unwrap()
+    .derive_hash()
+    .unwrap();
+    AdmissionOperation::prepared(PreparedAdmissionOperation {
+        kind: AdmissionOperationKind::ToolDispatch,
+        coordinator_authority_id: "threshold-coordinator".to_string(),
+        request_id: "threshold-request".to_string(),
+        capability_id: "threshold-capability".to_string(),
+        authorization_capability_hash: fixture.capability_hash.clone(),
+        request_binding_hash,
+        policy_hash: fixture.requirement.policy_hash().to_string(),
+        broker_attempt_id: None,
+        budget_hold_id: Some("threshold-budget-hold".to_string()),
+        approval_set_hash: Some(approval_set_hash),
+        execution_nonce_id: Some("threshold-nonce".to_string()),
+        coordinator_lease_epoch: 1,
+    })
+    .unwrap()
+}
+
 #[test]
-fn threshold_exact_n_is_order_independent_and_operation_domain_separated() {
+fn threshold_exact_n_is_order_independent_and_request_replay_separated() {
     let fixture = ThresholdFixture::new();
     let tokens = fixture.tokens_for(&fixture.proposal);
     let forward = fixture.verify(&fixture.proposal, &tokens, 1_200).unwrap();
@@ -880,76 +920,17 @@ fn threshold_exact_n_is_order_independent_and_operation_domain_separated() {
         reverse.approval_set_hash().unwrap()
     );
 
-    let arguments = serde_json::json!({"amount": 100, "currency": "USD"});
-    let operation =
-        prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
-            coordinator_authority_id: "threshold-coordinator",
-            request_id: "threshold-request",
-            capability_id: "threshold-capability",
-            authorization_capability_hash: &fixture.capability_hash,
-            arguments: &arguments,
-            governed_intent_hash: &fixture.intent_hash,
-            policy_hash: fixture.requirement.policy_hash(),
-            verified_approval_set: &forward,
-            broker_attempt_id: None,
-            budget_hold_id: Some("threshold-budget-hold"),
-            supplemental_authorization_reference: Some("supplemental-reference"),
-            supplemental_authorization_digest: Some(
-                "4444444444444444444444444444444444444444444444444444444444444444",
-            ),
-            execution_nonce_id: Some("threshold-nonce"),
-            coordinator_lease_epoch: 1,
-        })
-        .unwrap();
-    let reversed_operation =
-        prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
-            coordinator_authority_id: "threshold-coordinator",
-            request_id: "threshold-request",
-            capability_id: "threshold-capability",
-            authorization_capability_hash: &fixture.capability_hash,
-            arguments: &arguments,
-            governed_intent_hash: &fixture.intent_hash,
-            policy_hash: fixture.requirement.policy_hash(),
-            verified_approval_set: &reverse,
-            broker_attempt_id: None,
-            budget_hold_id: Some("threshold-budget-hold"),
-            supplemental_authorization_reference: Some("supplemental-reference"),
-            supplemental_authorization_digest: Some(
-                "4444444444444444444444444444444444444444444444444444444444444444",
-            ),
-            execution_nonce_id: Some("threshold-nonce"),
-            coordinator_lease_epoch: 1,
-        })
-        .unwrap();
-    assert_eq!(
-        operation.operation().operation_id(),
-        reversed_operation.operation().operation_id()
-    );
+    let request_fingerprint_hash = "55".repeat(32);
+    let operation = threshold_operation(&request_fingerprint_hash, &forward, &fixture);
+    let reversed_operation = threshold_operation(&request_fingerprint_hash, &reverse, &fixture);
+    assert_eq!(operation.operation_id(), reversed_operation.operation_id());
 
-    let changed_arguments = serde_json::json!({"amount": 101, "currency": "USD"});
-    let changed =
-        prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
-            coordinator_authority_id: "threshold-coordinator",
-            request_id: "threshold-request",
-            capability_id: "threshold-capability",
-            authorization_capability_hash: &fixture.capability_hash,
-            arguments: &changed_arguments,
-            governed_intent_hash: &fixture.intent_hash,
-            policy_hash: fixture.requirement.policy_hash(),
-            verified_approval_set: &forward,
-            broker_attempt_id: None,
-            budget_hold_id: Some("threshold-budget-hold"),
-            supplemental_authorization_reference: Some("supplemental-reference"),
-            supplemental_authorization_digest: Some(
-                "4444444444444444444444444444444444444444444444444444444444444444",
-            ),
-            execution_nonce_id: Some("threshold-nonce"),
-            coordinator_lease_epoch: 1,
-        })
-        .unwrap();
+    let replayed_request_fingerprint_hash = "66".repeat(32);
+    let changed = threshold_operation(&replayed_request_fingerprint_hash, &forward, &fixture);
+    assert_ne!(operation.operation_id(), changed.operation_id());
     assert_ne!(
-        operation.operation().operation_id(),
-        changed.operation().operation_id()
+        operation.request_binding_hash(),
+        changed.request_binding_hash()
     );
 }
 

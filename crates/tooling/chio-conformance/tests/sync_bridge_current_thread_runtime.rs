@@ -57,16 +57,7 @@ impl ToolServerConnection for EchoToolServer {
 }
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    static COUNTER: AtomicUsize = AtomicUsize::new(0);
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "{prefix}-{}-{nonce}-{counter}.sqlite3",
-        std::process::id()
-    ))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
 }
 
 fn make_kernel(receipt_store_path: &std::path::Path) -> ChioKernel {

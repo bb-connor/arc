@@ -332,7 +332,8 @@ fn test_kernel() -> (Keypair, ChioKernel) {
 }
 
 fn install_test_flow_runtime(kernel: &mut ChioKernel) -> tempfile::TempDir {
-    let directory = tempfile::tempdir().unwrap();
+    let directory =
+        chio_test_support::private_fs::private_tempdir("cross-protocol-flow-runtime-").unwrap();
     let receipt_store =
         Arc::new(SqliteReceiptStore::open(directory.path().join("receipts.sqlite3")).unwrap());
     kernel.set_receipt_store_handle(receipt_store).unwrap();
@@ -661,9 +662,12 @@ fn native_cross_protocol_unnegotiated_extensions_deny_before_dispatch_or_receipt
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(CountingNativeToolServer {
@@ -1615,9 +1619,12 @@ fn direct_openai_target_rejects_invalid_signed_schema_arguments_without_effects_
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(CountingNativeToolServer {

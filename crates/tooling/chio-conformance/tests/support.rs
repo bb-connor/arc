@@ -94,15 +94,19 @@ pub fn mediation_kernel(
         // matching `build_mediation_kernel`.
         dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
-    kernel.set_budget_store_handle(budget);
+    kernel
+        .set_budget_store_handle(budget)
+        .expect("install conformance budget store");
     let nonce_cfg = ExecutionNonceConfig {
         require_nonce,
         ..ExecutionNonceConfig::default()
     };
-    kernel.set_execution_nonce_store(
-        nonce_cfg.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_cfg)),
-    );
+    kernel
+        .set_execution_nonce_store(
+            nonce_cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&nonce_cfg)),
+        )
+        .expect("install conformance execution nonce store");
     kernel
 }
 

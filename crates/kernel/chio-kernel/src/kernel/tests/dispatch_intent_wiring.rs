@@ -478,11 +478,15 @@ fn a_failed_pre_dispatch_cleanup_clears_the_journaled_intent(
     kernel.set_receipt_store_handle(
         std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
     )?;
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
         "srv-chio-runtime",
         vec!["destructive_update"],
+        std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(ReverseFailingBudgetStore::new()))
+        .expect("install budget store");
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -532,11 +536,15 @@ fn nested_flow_failed_pre_dispatch_cleanup_clears_the_journaled_intent(
     kernel.set_receipt_store_handle(
         std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
     )?;
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
         "srv-chio-runtime",
         vec!["destructive_update"],
+        std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(ReverseFailingBudgetStore::new()))
+        .expect("install budget store");
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -613,7 +621,9 @@ fn a_second_cleanup_fault_receipt_persists_after_the_first_consumes_the_intent(
         vec!["destructive_update"],
         std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(ReverseFailingBudgetStore::new()))
+        .expect("install budget store");
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
     kernel.set_runtime_admission_hook(std::sync::Arc::new(FailingReleaseRuntimeAdmissionHook {
@@ -650,10 +660,32 @@ fn a_second_cleanup_fault_receipt_persists_after_the_first_consumes_the_intent(
     );
     // First fault: the failed runtime-admission release. Its receipt lands
     // while the intent row is still open, so its append consumes the intent.
-    assert_url_elicitation_release_fault_recorded(&kernel, "lease-second-fault-receipt")?;
-    // Second fault: the failed budget reversal, recorded for the SAME request
-    // after the intent row is already gone. It must persist as a plain
-    // append, not vanish behind a missing-intent conflict.
+    let release_fault_recorded = kernel.receipt_log().receipts().iter().any(|receipt| {
+        receipt.is_cancelled()
+            && receipt.metadata.as_ref().is_some_and(|metadata| {
+                metadata["chio_runtime"]["reservation_release_failed"] == true
+                    && metadata["chio_runtime"]["reserved_destructive_lease_id"]
+                        == "lease-second-fault-receipt"
+                    && metadata["chio_runtime"]["pre_dispatch_cleanup_faults"]
+                        .as_array()
+                        .is_some_and(|faults| {
+                            faults.iter().any(|fault| {
+                                fault["step"]
+                                    == "url_elicitation_runtime_admission_release"
+                                    && fault["hold_ids"].as_array().is_some_and(|ids| {
+                                        ids.iter().any(|id| id == "lease-second-fault-receipt")
+                                    })
+                            })
+                        })
+            })
+    });
+    assert!(
+        release_fault_recorded,
+        "the first cleanup fault must name the stuck runtime-admission lease"
+    );
+    // Second fault: the failed budget reversal, recorded for the same request
+    // after the intent row is already gone. It must persist as a plain append,
+    // not vanish behind a missing-intent conflict.
     assert_url_elicitation_budget_cleanup_fault_recorded(
         &kernel,
         "url_elicitation_budget_reversal",

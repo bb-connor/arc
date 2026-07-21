@@ -278,6 +278,9 @@ async fn legacy_approval_restart_after_dispatch_commit_never_redispatches() {
     let protocol = kernel
         .prepare_threshold_protocol_admission(&request, &capability, 0, now)
         .expect("protocol preparation");
+    let request_fingerprint_hash = kernel
+        .ordinary_request_fingerprint_hash(&request, &kernel.config.policy_hash, None)
+        .expect("legacy governed request fingerprint");
     let coordinator_authority_id = format!("kernel:{}", kernel.public_key().to_hex());
     let prepared = crate::threshold_approval::prepare_governed_tool_admission_operation(
         crate::threshold_approval::GovernedToolAdmissionOperationInput {
@@ -285,7 +288,7 @@ async fn legacy_approval_restart_after_dispatch_commit_never_redispatches() {
             request_id: &request.request_id,
             capability_id: &capability.id,
             authorization_capability_hash: &capability_hash,
-            arguments: &request.arguments,
+            request_fingerprint_hash: &request_fingerprint_hash,
             governed_intent_hash: &intent_hash,
             policy_hash: &kernel.config.policy_hash,
             verified_approval: &verified,
@@ -499,7 +502,7 @@ async fn post_receipt_finalization_failure_retains_completed_operation() {
 async fn top_level_threshold_payment_capture_ack_loss_retries_the_operation_binding() {
     let (mut kernel, capability, _grant, intent, mut request, now) = threshold_test_fixture();
     let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
-    let budget = std::sync::Arc::new(DurableThresholdBudgetStore::new());
+    let budget = durable_atomic_test_budget_store("threshold-payment-capture-ack-loss");
     let runtime = OperationAwareThresholdRuntimeHook::allowing();
     let payment = OperationAwareThresholdPaymentAdapter::with_capture_ack_loss();
     kernel.register_tool_server(Box::new(EchoServer::new("payments", vec!["transfer"])));

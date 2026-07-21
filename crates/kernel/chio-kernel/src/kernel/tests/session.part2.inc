@@ -134,7 +134,7 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
             &session_id,
             &resource_capability,
             &agent_kp.public_key().to_hex(),
-            "repo://docs/roadmap",
+            "repo://docs/architecture",
         )
         .unwrap();
 
@@ -184,7 +184,7 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(
         client.resource_updates,
-        vec!["repo://docs/roadmap".to_string()]
+        vec!["repo://docs/architecture".to_string()]
     );
     assert_eq!(client.resources_list_changed_count, 1);
 }
@@ -217,7 +217,7 @@ fn session_operation_list_resources_filters_to_session_scope() {
 
     let resources = session_resource_list(response).expect("expected resource list response");
     assert_eq!(resources.len(), 1);
-    assert_eq!(resources[0].uri, "repo://docs/roadmap");
+    assert_eq!(resources[0].uri, "repo://docs/architecture");
 }
 
 #[test]
@@ -250,12 +250,12 @@ fn session_operation_read_resource_enforces_scope() {
             &allowed_context,
             &SessionOperation::ReadResource(ReadResourceOperation {
                 capability: cap.clone(),
-                uri: "repo://docs/roadmap".to_string(),
+                uri: "repo://docs/architecture".to_string(),
             }),
         )
         .unwrap();
     let contents = session_resource_read(allowed).expect("expected resource read response");
-    assert_eq!(contents[0].text.as_deref(), Some("# Roadmap"));
+    assert_eq!(contents[0].text.as_deref(), Some("# Architecture"));
 
     let denied_context = make_operation_context(
         &session_id,
@@ -314,12 +314,12 @@ fn session_operation_read_resource_enforces_session_roots_for_filesystem_resourc
             &allowed_context,
             &SessionOperation::ReadResource(ReadResourceOperation {
                 capability: cap.clone(),
-                uri: "file:///workspace/project/docs/roadmap.md".to_string(),
+                uri: "file:///workspace/project/docs/architecture.md".to_string(),
             }),
         )
         .unwrap();
     let contents = session_resource_read(allowed).expect("expected resource read response");
-    assert_eq!(contents[0].text.as_deref(), Some("# Filesystem Roadmap"));
+    assert_eq!(contents[0].text.as_deref(), Some("# Filesystem Architecture"));
 
     let denied_context = make_operation_context(
         &session_id,
@@ -382,7 +382,7 @@ fn session_operation_read_resource_fails_closed_when_filesystem_roots_are_missin
         &context,
         &SessionOperation::ReadResource(ReadResourceOperation {
             capability: cap,
-            uri: "file:///workspace/project/docs/roadmap.md".to_string(),
+            uri: "file:///workspace/project/docs/architecture.md".to_string(),
         }),
     );
     let receipt = match denied {
@@ -425,7 +425,7 @@ fn subscribe_session_resource_requires_subscribe_operation() {
         &session_id,
         &read_only_cap,
         &agent_kp.public_key().to_hex(),
-        "repo://docs/roadmap",
+        "repo://docs/architecture",
     );
     assert!(matches!(
         denied,
@@ -445,12 +445,12 @@ fn subscribe_session_resource_requires_subscribe_operation() {
             &session_id,
             &subscribe_cap,
             &agent_kp.public_key().to_hex(),
-            "repo://docs/roadmap",
+            "repo://docs/architecture",
         )
         .unwrap();
 
     assert!(kernel
-        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .session_has_resource_subscription(&session_id, "repo://docs/architecture")
         .unwrap());
 }
 
@@ -478,19 +478,19 @@ fn unsubscribe_session_resource_is_idempotent() {
             &session_id,
             &cap,
             &agent_kp.public_key().to_hex(),
-            "repo://docs/roadmap",
+            "repo://docs/architecture",
         )
         .unwrap();
 
     kernel
-        .unsubscribe_session_resource(&session_id, "repo://docs/roadmap")
+        .unsubscribe_session_resource(&session_id, "repo://docs/architecture")
         .unwrap();
     kernel
-        .unsubscribe_session_resource(&session_id, "repo://docs/roadmap")
+        .unsubscribe_session_resource(&session_id, "repo://docs/architecture")
         .unwrap();
 
     assert!(!kernel
-        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .session_has_resource_subscription(&session_id, "repo://docs/architecture")
         .unwrap());
 }
 
@@ -531,12 +531,12 @@ fn session_operation_get_prompt_enforces_scope() {
             &SessionOperation::GetPrompt(GetPromptOperation {
                 capability: cap.clone(),
                 prompt_name: "summarize_docs".to_string(),
-                arguments: serde_json::json!({"topic": "roadmap"}),
+                arguments: serde_json::json!({"topic": "architecture"}),
             }),
         )
         .unwrap();
     let prompt = session_prompt_get(get_response).expect("expected prompt get response");
-    assert_eq!(prompt.messages[0].content["text"], "Summarize roadmap");
+    assert_eq!(prompt.messages[0].content["text"], "Summarize architecture");
 
     let denied_context =
         make_operation_context(&session_id, "prompts-3", &agent_kp.public_key().to_hex());
@@ -596,7 +596,7 @@ fn session_operation_completion_returns_candidates_and_enforces_scope() {
         .unwrap();
     let completion = session_completion(prompt_completion).expect("expected completion response");
     assert_eq!(completion.total, Some(2));
-    assert_eq!(completion.values, vec!["roadmap", "release-plan"]);
+    assert_eq!(completion.values, vec!["architecture", "release-notes"]);
 
     let resource_context =
         make_operation_context(&session_id, "complete-2", &agent_kp.public_key().to_hex());

@@ -548,6 +548,26 @@ impl chio_kernel::receipt_store::DispatchIntentReconciler for RecordingReconcile
     }
 }
 
+struct AdmissionOperationDeferringReconciler;
+
+impl chio_kernel::receipt_store::DispatchIntentReconciler
+    for AdmissionOperationDeferringReconciler
+{
+    fn resolve(
+        &self,
+        _intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<
+        chio_kernel::receipt_store::DispatchIntentResolution,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(
+            chio_kernel::receipt_store::DispatchIntentResolution::DeferredToAdmissionOperation {
+                operation_id: "operation-recovering-1".to_string(),
+            },
+        )
+    }
+}
+
 #[test]
 fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-reconcile");
@@ -594,6 +614,78 @@ fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std
         detail.contains("x402") && detail.contains("auth-9"),
         "monetary detail names the rail reference: {detail}"
     );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn operation_owned_monetary_intent_stays_out_of_generic_dead_letter_recovery(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::receipt_store::DispatchIntentKey;
+
+    let path = unique_db_path("chio-intents-operation-deferred");
+    let keypair = super::support::receipt_test_keypair();
+    let receipt =
+        super::support::sample_receipt_with_keypair("operation-deferred-receipt", 1, &keypair);
+    let mut monetary = sample_intent("operation-deferred-request");
+    monetary.capability_id = receipt.capability_id.clone();
+    monetary.tool_server = receipt.tool_server.clone();
+    monetary.tool_name = receipt.tool_name.clone();
+    monetary.parameter_hash = receipt.action.parameter_hash.clone();
+    monetary.side_effect_class = chio_kernel::receipt_store::SideEffectClass::Monetary;
+    monetary.monetary = true;
+    monetary.rail = Some("x402".to_string());
+    monetary.rail_authorization_id = Some("authorization-deferred-1".to_string());
+    monetary.tenant_id = receipt.tenant_id.clone();
+
+    {
+        let owner = SqliteReceiptStore::open(&path)?;
+        owner.record_dispatch_intent(&monetary)?;
+    }
+
+    let survivor = SqliteReceiptStore::open(&path)?;
+    let deferred = survivor.reconcile_dispatch_intents(&AdmissionOperationDeferringReconciler)?;
+    assert_eq!(deferred.open, 1);
+    assert_eq!(deferred.deferred_to_admission_operation, 1);
+    assert_eq!(deferred.dead_lettered, 0);
+
+    let connection = survivor.reader_connection_for_test()?;
+    let (state, detail): (String, String) = connection.query_row(
+        "SELECT state, resolution_detail FROM chio_dispatch_intents \
+         WHERE request_id = 'operation-deferred-request'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    drop(connection);
+    assert_eq!(state, "deferred_to_admission_operation");
+    assert_eq!(detail, "admission_operation_id=operation-recovering-1");
+
+    // The background worker uses the generic dead-letter reconciler. Its
+    // next pass must not re-claim operation-owned work after the
+    // operation-aware pass deliberately deferred it.
+    let generic_pass = survivor.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(generic_pass.open, 0);
+    assert_eq!(generic_pass.dead_lettered, 0);
+    assert_eq!(survivor.dead_letter_dispatch_intent_count()?, 0);
+
+    // The dedicated state is still an intent, not a terminal disposition:
+    // the operation's eventual terminal receipt consumes it atomically.
+    let key = DispatchIntentKey {
+        request_id: monetary.request_id,
+        parameter_hash: monetary.parameter_hash,
+        tenant_id: monetary.tenant_id,
+    };
+    let sequence = survivor.append_chio_receipt_consuming_intent(&receipt, &key)?;
+    assert!(sequence.is_some());
+    let connection = survivor.reader_connection_for_test()?;
+    let remaining: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_dispatch_intents \
+         WHERE request_id = 'operation-deferred-request'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(remaining, 0);
 
     let _ = std::fs::remove_file(&path);
     Ok(())

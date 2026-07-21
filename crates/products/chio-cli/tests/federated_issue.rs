@@ -3,7 +3,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::enterprise_federation::EnterpriseProviderRecord;
 use chio_control_plane::scim_lifecycle::{
@@ -22,11 +21,9 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::Client;
 
 fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 fn workspace_root() -> PathBuf {

@@ -202,7 +202,9 @@ struct OperationAwareThresholdPaymentAdapter {
     lose_authorize_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
     lose_capture_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
     lose_release_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    authorization: std::sync::Arc<std::sync::Mutex<Option<(String, String, PaymentAuthorization)>>>,
+    authorization: std::sync::Arc<
+        std::sync::Mutex<Option<(String, String, String, PaymentAuthorization)>>,
+    >,
     authorization_mutations: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
@@ -266,6 +268,14 @@ impl OperationAwareThresholdPaymentAdapter {
 }
 
 impl PaymentAdapter for OperationAwareThresholdPaymentAdapter {
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        true
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        true
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -326,10 +336,17 @@ impl PaymentAdapter for OperationAwareThresholdPaymentAdapter {
         let mut stored = self.authorization.lock().map_err(|_| {
             PaymentError::RailError("payment authorization state poisoned".to_string())
         })?;
-        if let Some((stored_operation_id, stored_binding_hash, authorization)) = stored.as_ref() {
+        if let Some((stored_operation_id, stored_binding_hash, stored_reference, authorization)) =
+            stored.as_ref()
+        {
             if stored_operation_id != operation_id || stored_binding_hash != request_binding_hash {
                 return Err(PaymentError::RailError(
                     "payment operation id reused with a different request binding".to_string(),
+                ));
+            }
+            if stored_reference != &request.reference {
+                return Err(PaymentError::RailError(
+                    "payment operation retry changed its reference".to_string(),
                 ));
             }
             return Ok(authorization.clone());
@@ -345,6 +362,7 @@ impl PaymentAdapter for OperationAwareThresholdPaymentAdapter {
         *stored = Some((
             operation_id.to_string(),
             request_binding_hash.to_string(),
+            request.reference.clone(),
             authorization.clone(),
         ));
         self.authorization_mutations
@@ -371,7 +389,7 @@ impl PaymentAdapter for OperationAwareThresholdPaymentAdapter {
             PaymentError::RailError("payment authorization state poisoned".to_string())
         })?;
         match stored.as_ref() {
-            Some((stored_operation_id, stored_binding_hash, authorization))
+            Some((stored_operation_id, stored_binding_hash, _, authorization))
                 if stored_operation_id == operation_id
                     && stored_binding_hash == request_binding_hash =>
             {
@@ -456,6 +474,70 @@ impl PaymentAdapter for OperationAwareThresholdPaymentAdapter {
             transaction_id: format!("refund:{operation_id}"),
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({}),
+        })
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        let stored = self.authorization.lock().map_err(|_| {
+            PaymentError::RailError("payment authorization state poisoned".to_string())
+        })?;
+        let Some((stored_operation_id, stored_binding_hash, stored_reference, authorization)) =
+            stored.as_ref()
+        else {
+            return Ok(crate::payment::RailSettlementState::NoAuthorization);
+        };
+        if stored_operation_id != operation_id
+            || stored_binding_hash != request_binding_hash
+            || stored_reference != reference
+            || authorization_id
+                .is_some_and(|expected| expected != authorization.authorization_id.as_str())
+        {
+            return Err(PaymentError::RailError(
+                "payment settlement lookup changed its operation binding".to_string(),
+            ));
+        }
+        let calls = self
+            .calls
+            .lock()
+            .map_err(|_| PaymentError::RailError("payment call trace poisoned".to_string()))?;
+        let has_phase = |phase: &str| {
+            calls.iter().any(|(recorded_phase, recorded_operation, recorded_binding)| {
+                recorded_phase == phase
+                    && recorded_operation == operation_id
+                    && recorded_binding == request_binding_hash
+            })
+        };
+        if has_phase("refund") {
+            return Ok(crate::payment::RailSettlementState::Settled {
+                authorization_id: authorization.authorization_id.clone(),
+                result: PaymentResult {
+                    transaction_id: format!("refund:{operation_id}"),
+                    settlement_status: RailSettlementStatus::Refunded,
+                    metadata: serde_json::json!({}),
+                },
+            });
+        }
+        if has_phase("capture") {
+            return Ok(crate::payment::RailSettlementState::Settled {
+                authorization_id: authorization.authorization_id.clone(),
+                result: PaymentResult {
+                    transaction_id: format!("capture:{operation_id}"),
+                    settlement_status: RailSettlementStatus::Captured,
+                    metadata: serde_json::json!({}),
+                },
+            });
+        }
+        if has_phase("release") {
+            return Ok(crate::payment::RailSettlementState::NoAuthorization);
+        }
+        Ok(crate::payment::RailSettlementState::Held {
+            authorization_id: authorization.authorization_id.clone(),
         })
     }
 }
@@ -590,7 +672,12 @@ fn assert_signed_receipt_matches_terminal_operation(
         .metadata
         .as_ref()
         .and_then(|metadata| metadata.pointer("/protocol_admission/admission_operation"))
-        .expect("signed admission operation projection");
+        .unwrap_or_else(|| {
+            panic!(
+                "signed admission operation projection; metadata={:#?}",
+                response.receipt.metadata
+            )
+        });
     let operation_id = projection["operation_id"]
         .as_str()
         .expect("projected operation_id");
@@ -872,6 +959,7 @@ struct DurableThresholdBudgetStore {
     forge_capture_event_id: bool,
     reverse_authorities: std::sync::Mutex<Vec<Option<crate::budget_store::BudgetEventAuthority>>>,
 }
+
 
 struct DurableThresholdNonceStore {
     inner: InMemoryExecutionNonceStore,
@@ -1221,6 +1309,25 @@ impl BudgetStore for DurableThresholdBudgetStore {
         self.inner.capture_budget_hold(request)
     }
 
+    fn mark_admission_operation_hold_reserved(
+        &self,
+        hold_id: &str,
+        admission_operation: &crate::budget_store::BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.mark_admission_operation_hold_reserved(
+            hold_id,
+            admission_operation,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
+
     fn capture_invocation_reservations(
         &self,
         request: crate::budget_store::BudgetCaptureInvocationRequest,
@@ -1248,7 +1355,7 @@ fn prepared_threshold_coordinator_admission(
     binding_byte: &str,
     set_byte: &str,
     members: &[(&str, &str)],
-) -> crate::threshold_approval::PreparedThresholdToolAdmission {
+) -> crate::threshold_approval::PreparedGovernedToolAdmission {
     prepared_threshold_coordinator_admission_for_authority(
         "kernel:test",
         request_id,
@@ -1266,7 +1373,7 @@ fn prepared_threshold_coordinator_admission_for_authority(
     binding_byte: &str,
     set_byte: &str,
     members: &[(&str, &str)],
-) -> crate::threshold_approval::PreparedThresholdToolAdmission {
+) -> crate::threshold_approval::PreparedGovernedToolAdmission {
     let approval_set_hash = set_byte.repeat(32);
     let approval_set = ApprovalSetReservationInput::new(
         approval_set_hash.clone(),
@@ -1295,7 +1402,7 @@ fn prepared_threshold_coordinator_admission_for_authority(
         coordinator_lease_epoch: 1,
     })
     .expect("prepared operation");
-    crate::threshold_approval::PreparedThresholdToolAdmission::from_parts(operation, approval_set)
+    crate::threshold_approval::PreparedGovernedToolAdmission::from_parts(operation, approval_set)
         .expect("prepared threshold admission")
 }
 

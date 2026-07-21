@@ -698,17 +698,14 @@ fn retention_repair_clears_stale_flush_error() -> Result<(), Box<dyn std::error:
 /// that error and publish poison instead of returning the repair's original
 /// `Ok(0)` while only changing the actor-local state.
 #[test]
-fn no_op_retention_repair_reseed_failure_publishes_poison(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn no_op_retention_repair_reseed_failure_publishes_poison() -> Result<(), Box<dyn std::error::Error>>
+{
     let path = unique_db_path("chio-repair-noop-reseed-poison");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
-        let receipt = sample_receipt_with_keypair(
-            &format!("rcpt-repair-noop-{i}"),
-            (i + 1) as u64,
-            &keypair,
-        );
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-repair-noop-{i}"), (i + 1) as u64, &keypair);
         store.append_chio_receipt_returning_seq(&receipt)?;
     }
     store.flush_receipt_writes()?;
@@ -1387,8 +1384,11 @@ fn adopted_delta_ignores_untrusted_watermark() -> Result<(), Box<dyn std::error:
     // the delta max (4) equals it, return early before validating the range.
     connection.execute(
         "INSERT INTO receipt_retention_watermark \
-         (archived_through_entry_seq, archived_through_timestamp, archive_path, rotated_at) \
-         VALUES (4, 0, '', 0)",
+         (archived_through_entry_seq, archived_through_timestamp, archive_path, archive_sha256, \
+          archive_content_sha256, rotated_at) \
+         VALUES (4, 0, '', \
+                 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', \
+                 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 0)",
         [],
     )?;
 
@@ -1841,7 +1841,14 @@ fn store_wide_append_failure_poisons_the_head() -> Result<(), Box<dyn std::error
         response,
     }];
 
-    let flush_error = commit_receipt_batch(&store.pool, &mut head_state, true, requests, &health);
+    let flush_error = commit_receipt_batch(
+        &store.pool,
+        &mut head_state,
+        true,
+        requests,
+        vec![WriterInflightLease::detached_for_test()],
+        &health,
+    );
 
     assert!(
         flush_error.is_some(),

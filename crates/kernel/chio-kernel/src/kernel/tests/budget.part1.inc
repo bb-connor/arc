@@ -527,7 +527,9 @@ fn kernel_accepts_optional_payment_adapter_installation() {
     let mut kernel = make_kernel(make_monetary_config());
     assert!(kernel.payment_adapter.is_none());
 
-    kernel.set_payment_adapter(Box::new(StubPaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(DeterministicPaymentAdapter))
+        .expect("install payment adapter");
 
     assert!(kernel.payment_adapter.is_some());
 }
@@ -1053,7 +1055,9 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
         .as_deref()
         .is_some_and(|reason| reason.contains("payment authorization failed")));
 
-    kernel.set_payment_adapter(Box::new(StubPaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(DeterministicPaymentAdapter))
+        .expect("install payment adapter");
     let allowed_sibling = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-delegated-payment-deny-b".to_string(),
@@ -1146,7 +1150,9 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
         .as_deref()
         .is_some_and(|reason| reason.contains("payment authorization failed")));
 
-    kernel.set_payment_adapter(Box::new(StubPaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(DeterministicPaymentAdapter))
+        .expect("install payment adapter");
     let allowed_sibling = kernel
         .evaluate_tool_call_with_nested_flow_client(
             &parent_context,
@@ -1393,6 +1399,9 @@ fn monetary_dispatch_failure_keeps_invocation_consumed() {
         .as_deref()
         .is_some_and(|reason| reason.contains("budget")));
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn unmeasured_cost_server_reverses_hold_and_signs_provisional_receipt() {
     // A tool server that does not measure realized cost (a pre-execution
     // authorization gate that dispatches a pass-through while the real tool
@@ -1481,7 +1490,8 @@ fn unmeasured_cost_provisional_allow_emits_no_execution_nonce() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
 
     let scope = make_scope(vec![
         make_monetary_grant("gate-srv", "compute", 100, 1000, "USD"),

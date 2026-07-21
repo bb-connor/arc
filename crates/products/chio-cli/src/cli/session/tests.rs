@@ -33,11 +33,7 @@ fn fixture_path(name: &str) -> PathBuf {
 }
 
 fn unique_db_path(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
 }
 
 fn unique_seed_path(prefix: &str) -> PathBuf {
@@ -145,7 +141,7 @@ capabilities:
         let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp)
             .expect("build session test kernel");
         configure_revocation_store(&mut kernel, Some(&revocation_db_path), None, None).unwrap();
-        kernel.register_tool_server(Box::new(StubToolServer {
+        kernel.register_tool_server(Box::new(FixtureToolServer {
             id: "*".to_string(),
         }));
 
@@ -166,7 +162,7 @@ capabilities:
     )
     .unwrap();
     configure_revocation_store(&mut restarted, Some(&revocation_db_path), None, None).unwrap();
-    restarted.register_tool_server(Box::new(StubToolServer {
+    restarted.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -344,7 +340,7 @@ capabilities:
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
     let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -394,7 +390,7 @@ capabilities:
     let kp = Keypair::generate();
     let mut kernel =
         build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -482,7 +478,7 @@ async fn mcp_edge_denies_dispatch_without_durable_or_opted_in_revocation() {
     let policy = policy::parse_policy(&yaml).unwrap();
     let kp = Keypair::generate();
     let (mut kernel, receipt_db_path) = mcp_edge_kernel(&policy, &kp);
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -504,7 +500,7 @@ async fn mcp_edge_allows_dispatch_with_policy_opted_in_ephemeral_revocation() {
     let policy = policy::parse_policy(&yaml).unwrap();
     let kp = Keypair::generate();
     let (mut kernel, receipt_db_path) = mcp_edge_kernel(&policy, &kp);
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -822,7 +818,7 @@ capabilities:
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
     let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "srv-b".to_string(),
     }));
 
@@ -882,7 +878,7 @@ capabilities:
     let kp = Keypair::generate();
     let mut kernel =
         build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "srv-a".to_string(),
     }));
 
@@ -939,7 +935,7 @@ fn hushspec_policy_drives_tool_access_via_session_runtime_path() {
 
     let kp = Keypair::generate();
     let mut kernel = build_kernel_with_receipt_store(loaded_policy, &kp);
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -1066,7 +1062,7 @@ extensions:
 
     let kp = Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -1145,7 +1141,7 @@ guards:
 
     let kp = Keypair::generate();
     let mut kernel = build_kernel_with_receipt_store(loaded_policy, &kp);
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -1236,7 +1232,7 @@ capabilities:
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
     let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
-    kernel.register_tool_server(Box::new(StubStreamingToolServer {
+    kernel.register_tool_server(Box::new(FixtureStreamingToolServer {
         id: "*".to_string(),
         incomplete: false,
     }));
@@ -1297,7 +1293,7 @@ capabilities:
     let policy = policy::parse_policy(yaml).unwrap();
     let kp = Keypair::generate();
     let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
-    kernel.register_tool_server(Box::new(StubStreamingToolServer {
+    kernel.register_tool_server(Box::new(FixtureStreamingToolServer {
         id: "*".to_string(),
         incomplete: true,
     }));
@@ -1346,7 +1342,7 @@ fn hushspec_policy_compiles_shell_guard_into_runtime_path() {
 
     let kp = Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -1418,7 +1414,7 @@ guards:
     let kp = Keypair::generate();
     let mut kernel =
         build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -1493,7 +1489,7 @@ guards:
 
     let kp = Keypair::generate();
     let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
-    kernel.register_tool_server(Box::new(StubSqlResultToolServer {
+    kernel.register_tool_server(Box::new(FixtureSqlResultToolServer {
         id: "*".to_string(),
     }));
 
@@ -1575,7 +1571,7 @@ guards:
     let kp = Keypair::generate();
     let mut kernel =
         build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -1673,7 +1669,7 @@ guards:
     let kp = Keypair::generate();
     let mut kernel =
         build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 
@@ -1774,7 +1770,7 @@ guards:
     let kp = Keypair::generate();
     let mut kernel =
         build_kernel(load_test_policy_runtime(&policy), &kp).expect("build session test kernel");
-    kernel.register_tool_server(Box::new(StubToolServer {
+    kernel.register_tool_server(Box::new(FixtureToolServer {
         id: "*".to_string(),
     }));
 

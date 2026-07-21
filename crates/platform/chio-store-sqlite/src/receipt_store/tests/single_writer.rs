@@ -2,6 +2,49 @@ use super::super::*;
 use super::support::*;
 use chio_kernel::ReceiptStore;
 
+#[test]
+fn graceful_close_drains_the_writer_before_private_directory_cleanup(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let store = SqliteReceiptStore::open(&path)?;
+    let writer_health = std::sync::Arc::clone(&store.receipt_commit_actor.health);
+
+    let receipt = sample_receipt_with_id("rcpt-graceful-close");
+    assert_eq!(store.append_chio_receipt_returning_seq(&receipt)?, 1);
+    let alongside = crate::SqliteIouEnvelopeStore::open_alongside(&store)
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+    let late_writer = store.writer_handle();
+
+    let report = store.close()?;
+    let late_write = late_writer.run_write(|_connection| Ok(()));
+    assert!(
+        matches!(
+            late_write,
+            Err(ReceiptStoreError::Pool(ref message)) if message.contains("actor is closing")
+        ),
+        "a co-located handle retained across close must reject later writes: {late_write:?}"
+    );
+    drop(alongside);
+    drop(late_writer);
+    assert_eq!(report.latest_committed_entry_seq, 1);
+    assert_eq!(
+        writer_health
+            .queue_depth
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    assert_eq!(
+        writer_health
+            .inflight
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    directory.close()?;
+    assert!(!path.exists());
+    Ok(())
+}
+
 /// A panic inside a Write-routed job (one of
 /// the ~30 rerouted write families: lineage, liability, underwriting,
 /// reconciliation, capability, federated, IOU, checkpoint, reseed) must not
@@ -101,6 +144,24 @@ fn append_batch_panic_poisons_the_head_and_fails_closed() -> Result<(), Box<dyn 
     assert!(
         error.to_string().contains("receipt writer job panicked"),
         "unexpected error message: {error}"
+    );
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "unwinding an append batch must drop every command lease exactly once"
+    );
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .queue_depth
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the panicking batch was already dequeued"
     );
 
     // Teeth: the caught panic poisoned the head, so the pre-dispatch gate reports

@@ -12,7 +12,7 @@
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod retention {
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
         scope::{ChioScope, Operation, ToolGrant},
@@ -25,20 +25,20 @@ mod retention {
         lineage::ChildRequestReceipt, lineage::ChildRequestReceiptBody,
     };
     use chio_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
+    use chio_credit::{CreditEvaluatorHook, IouEnvelopeStore, LocalCreditAccount};
 
     use chio_kernel::build_checkpoint;
     use chio_kernel::build_checkpoint_with_previous;
     use chio_kernel::build_inclusion_proof;
+    use chio_kernel::settlement_retry::{SettleAttemptRecord, SettlementRetryStore};
     use chio_kernel::verify_checkpoint_signature;
-    use chio_kernel::{ReceiptStore, RetentionConfig};
-    use chio_store_sqlite::SqliteReceiptStore;
+    use chio_kernel::{ReceiptStore, RetentionConfig, SettlementObserverOutboxClaimOutcome};
+    use chio_store_sqlite::{
+        SqliteIouEnvelopeStore, SqliteReceiptStore, SqliteSettlementRetryStore,
+    };
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        chio_test_support::private_fs::unique_sqlite_path(prefix)
     }
 
     fn receipt_with_capability_and_ts(
@@ -98,6 +98,18 @@ mod retention {
 
     fn receipt_with_ts_and_keypair(id: &str, timestamp: u64, keypair: &Keypair) -> ChioReceipt {
         receipt_with_capability_ts_and_keypair(id, "cap-1", timestamp, keypair)
+    }
+
+    fn priced_receipt_with_ts_and_keypair(
+        id: &str,
+        timestamp: u64,
+        keypair: &Keypair,
+    ) -> ChioReceipt {
+        let mut body = receipt_with_ts_and_keypair(id, timestamp, keypair).body();
+        body.metadata = Some(serde_json::json!({
+            "financial": {"cost_charged": 25, "currency": "USD"}
+        }));
+        ChioReceipt::sign(body, keypair).expect("sign priced receipt")
     }
 
     fn child_receipt_with_ts_and_keypair(
@@ -599,6 +611,185 @@ mod retention {
         let _ = fs::remove_file(&archive_path);
     }
 
+    #[test]
+    fn rotation_without_a_retry_store_table_still_archives() {
+        let live_path = unique_db_path("retention-no-retry-table-live");
+        let archive_path = unique_db_path("retention-no-retry-table-archive");
+        let store = SqliteReceiptStore::open(&live_path).unwrap();
+        let keypair = Keypair::generate();
+        let receipt = receipt_with_ts_and_keypair("no-retry-table", 100, &keypair);
+        let sequence = store.append_chio_receipt_returning_seq(&receipt).unwrap();
+        checkpoint_range(&store, 1, sequence, sequence, &keypair, None);
+
+        assert_eq!(
+            store
+                .archive_receipts_before(500, archive_path.to_str().unwrap())
+                .unwrap(),
+            1
+        );
+        assert_eq!(store.tool_receipt_count().unwrap(), 0);
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
+    #[test]
+    fn unfinished_observer_outbox_blocks_archival_until_acknowledged() {
+        let live_path = unique_db_path("retention-observer-outbox-live");
+        let archive_path = unique_db_path("retention-observer-outbox-archive");
+        let store = SqliteReceiptStore::open(&live_path).unwrap();
+        let keypair = Keypair::generate();
+        let receipt = receipt_with_ts_and_keypair("observer-outbox", 100, &keypair);
+        let sequence = store
+            .append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+                &receipt,
+                Duration::from_secs(1),
+            )
+            .unwrap()
+            .expect("SQLite append returns its claim-log sequence");
+        checkpoint_range(&store, 1, sequence, sequence, &keypair, None);
+
+        assert_eq!(
+            store
+                .archive_receipts_before(500, archive_path.to_str().unwrap())
+                .unwrap(),
+            0,
+            "pending observer delivery keeps authoritative receipt live"
+        );
+        assert_eq!(store.tool_receipt_count().unwrap(), 1);
+
+        let lease = match store
+            .claim_settlement_observer_outbox(&receipt.id, "retention-worker", 0, 10)
+            .unwrap()
+        {
+            SettlementObserverOutboxClaimOutcome::Claimed(lease) => lease,
+            other => panic!("expected claimed observer row, got {other:?}"),
+        };
+        let staged = store
+            .stage_settlement_observer_outbox_status(
+                &receipt.id,
+                lease.version,
+                &lease.claim_token,
+                "{}",
+            )
+            .unwrap()
+            .expect("claim fence stages status");
+        assert!(store
+            .acknowledge_settlement_observer_outbox(
+                &receipt.id,
+                staged.version,
+                &staged.claim_token,
+            )
+            .unwrap());
+
+        assert_eq!(
+            store
+                .archive_receipts_before(500, archive_path.to_str().unwrap())
+                .unwrap(),
+            1,
+            "completed observer tombstone no longer blocks archival"
+        );
+        assert_eq!(
+            store
+                .claim_settlement_observer_outbox(&receipt.id, "post-archive", 10, 20)
+                .unwrap(),
+            SettlementObserverOutboxClaimOutcome::Missing,
+            "archival deletes the completed observer tombstone"
+        );
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
+    #[test]
+    fn durable_settlement_attempt_blocks_archival_until_cleared() {
+        let live_path = unique_db_path("retention-retry-row-live");
+        let archive_path = unique_db_path("retention-retry-row-archive");
+        let store = SqliteReceiptStore::open(&live_path).unwrap();
+        let keypair = Keypair::generate();
+        let receipt = receipt_with_ts_and_keypair("retry-row", 100, &keypair);
+        let sequence = store.append_chio_receipt_returning_seq(&receipt).unwrap();
+        checkpoint_range(&store, 1, sequence, sequence, &keypair, None);
+        let retry_store = SqliteSettlementRetryStore::open_alongside(&store).unwrap();
+        retry_store
+            .upsert_attempt(&SettleAttemptRecord {
+                receipt_id: receipt.id.clone(),
+                finalized_at: receipt.timestamp,
+                attempts: 1,
+                next_visible_at: 10,
+                last_reason: Some("retry pending".to_string()),
+            })
+            .unwrap();
+
+        assert_eq!(
+            store
+                .archive_receipts_before(500, archive_path.to_str().unwrap())
+                .unwrap(),
+            0,
+            "durable retry row keeps authoritative receipt live"
+        );
+        assert_eq!(store.tool_receipt_count().unwrap(), 1);
+
+        retry_store.clear_attempt(&receipt.id).unwrap();
+        assert_eq!(
+            store
+                .archive_receipts_before(500, archive_path.to_str().unwrap())
+                .unwrap(),
+            1,
+            "terminally cleared retry row releases the receipt"
+        );
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
+    #[test]
+    fn pending_iou_blocks_archival_until_exact_reconciliation() {
+        let live_path = unique_db_path("retention-pending-iou-live");
+        let archive_path = unique_db_path("retention-pending-iou-archive");
+        let store = SqliteReceiptStore::open(&live_path).unwrap();
+        let kernel = Keypair::from_seed(&[81; 32]);
+        let issuer = Keypair::from_seed(&[82; 32]);
+        let receipt = priced_receipt_with_ts_and_keypair("pending-iou", 100, &kernel);
+        let sequence = store.append_chio_receipt_returning_seq(&receipt).unwrap();
+        checkpoint_range(&store, 1, sequence, sequence, &kernel, None);
+        let iou_store = SqliteIouEnvelopeStore::open_alongside(&store).unwrap();
+        let envelope = LocalCreditAccount::new_with_trusted_kernel_keys(
+            chio_core::crypto::Ed25519Backend::new(issuer),
+            [kernel.public_key()],
+        )
+        .evaluate(&receipt)
+        .unwrap()
+        .expect("priced receipt mints an IOU");
+        assert!(iou_store.insert(&envelope).unwrap());
+
+        assert_eq!(
+            store
+                .archive_receipts_before(500, archive_path.to_str().unwrap())
+                .unwrap(),
+            0,
+            "a pending IOU keeps its authoritative receipt live"
+        );
+        assert_eq!(store.tool_receipt_count().unwrap(), 1);
+
+        store
+            .complete_settlement_reconciliation_exact(&receipt.id, Some("transcript=retention"))
+            .unwrap();
+        assert_eq!(
+            store
+                .archive_receipts_before(500, archive_path.to_str().unwrap())
+                .unwrap(),
+            1,
+            "exact reconciliation releases the IOU receipt for archival"
+        );
+        assert!(iou_store.get_by_receipt_id(&receipt.id).unwrap().is_none());
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        let archive_ious = SqliteIouEnvelopeStore::open_alongside(&archive_store).unwrap();
+        assert_eq!(
+            archive_ious.get_by_receipt_id(&receipt.id).unwrap(),
+            Some(envelope)
+        );
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
     /// A checkpointed tool+child prefix co-archives both receipt kinds and
     /// deletes them together from the live store.
     #[test]
@@ -693,10 +884,10 @@ mod retention {
         // `SqliteReceiptStore` also has an inherent `enable_background_checkpoints`
         // that takes a `BackgroundCheckpointSigner` (not exported from this
         // integration-test crate); UFCS pins the call to the public
-        // `ReceiptStore` trait method (`keypair`, `max_batch`) instead.
+        // `ReceiptStore` trait method (`backend`, `max_batch`) instead.
         <SqliteReceiptStore as ReceiptStore>::enable_background_checkpoints(
             &store,
-            keypair.clone(),
+            Arc::new(chio_core::crypto::Ed25519Backend::new(keypair.clone())),
             2,
         )
         .unwrap();

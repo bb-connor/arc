@@ -846,11 +846,18 @@ fn assert_url_elicitation_budget_cleanup_fault_recorded(
             && receipt.metadata.as_ref().is_some_and(|metadata| {
                 metadata["chio_runtime"]["post_dispatch_cleanup_failed"] == true
                     && metadata["budget_authority"]["terminal"].is_null()
+                    && receipt
+                        .financial_budget_authority_metadata()
+                        .is_some_and(|authority| authority.terminal.is_none())
                     && metadata["chio_runtime"]["post_dispatch_cleanup_faults"]
                         .as_array()
                         .is_some_and(|faults| {
                             faults.iter().any(|fault| {
                                 fault["step"] == step
+                                    && fault["reason"].as_str().is_some_and(|reason| {
+                                        reason.contains("[REDACTED-API-KEY]")
+                                            && !reason.contains("sk_live_")
+                                    })
                                     && fault["attempted_release_event_id"]
                                         .as_str()
                                         .is_some_and(|event_id| event_id.ends_with(":release"))
@@ -1152,7 +1159,7 @@ fn url_elicitation_cleanup_failure_rejects_forged_budget_authority(
     let receipt = receipt_log.get(0).unwrap();
     assert!(receipt.is_incomplete());
     let metadata = receipt.metadata.as_ref().unwrap();
-    assert_forged_budget_authority_removed(metadata);
+    assert_forged_budget_authority_removed(receipt);
     assert_eq!(
         metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["step"],
         "payment_release"

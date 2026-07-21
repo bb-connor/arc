@@ -26,11 +26,9 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::Client;
 
 fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 fn current_unix_secs() -> u64 {

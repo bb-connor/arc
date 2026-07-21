@@ -11,7 +11,6 @@
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
@@ -29,11 +28,7 @@ use chio_store_sqlite::SqliteReceiptStore;
 // --- helpers ----------------------------------------------------------------
 
 fn unique_db_path(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
 }
 
 fn make_receipt(id: &str, capability_id: &str, timestamp: u64, decision: Decision) -> ChioReceipt {

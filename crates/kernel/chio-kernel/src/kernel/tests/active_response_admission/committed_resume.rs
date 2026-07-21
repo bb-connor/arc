@@ -368,6 +368,68 @@ fn cold_recovery_retains_exact_dispatch_commitment_for_outbox_resume() {
 }
 
 #[test]
+fn policy_rotation_preflight_does_not_commit_retained_governed_dispatch_participant() {
+    let mut coordinator = setup_governed();
+    let (_, retained_binding, operation_id) = governed_preparation(&coordinator);
+    commit_operation_without_executor(&coordinator, &operation_id);
+    let operation_before = coordinator
+        .operations
+        .load(&operation_id)
+        .expect("operation lookup")
+        .expect("dispatch commitment");
+    let approval_before = coordinator
+        .approvals
+        .get_approval_reservation(&operation_id)
+        .expect("approval lookup")
+        .expect("reserved approval");
+    assert_eq!(approval_before.state(), ReplayReservationState::Reserved);
+    let cleanup_before = coordinator
+        .operations
+        .load_cleanup_actions(&operation_id)
+        .expect("cleanup action lookup");
+    coordinator.fixture.kernel.config.policy_hash = "44".repeat(32);
+
+    let error = coordinator
+        .fixture
+        .kernel
+        .recover_nonterminal_admission_kind_with_authorities(
+            coordinator.operations.as_ref(),
+            coordinator.fixture.kernel.budget_store.as_ref(),
+            Some(coordinator.approvals.as_ref()),
+            AdmissionOperationKind::GovernedActiveResponse,
+            retained_binding.executor_authority_id.as_str(),
+        )
+        .expect_err("old-policy governed dispatch must block recovery before mutation");
+    assert!(error
+        .to_string()
+        .contains("policy rotation requires a zero-unresolved-operation drain"));
+    assert_eq!(
+        coordinator
+            .operations
+            .load(&operation_id)
+            .expect("operation lookup")
+            .expect("unchanged dispatch commitment"),
+        operation_before
+    );
+    assert_eq!(
+        coordinator
+            .approvals
+            .get_approval_reservation(&operation_id)
+            .expect("approval lookup")
+            .expect("unchanged reserved approval"),
+        approval_before
+    );
+    assert_eq!(
+        coordinator
+            .operations
+            .load_cleanup_actions(&operation_id)
+            .expect("cleanup action lookup"),
+        cleanup_before
+    );
+    assert_eq!(coordinator.executor_authority.calls(), 0);
+}
+
+#[test]
 fn initial_cold_publication_retains_governed_commit_states_for_outbox_resume() {
     for dispatch_already_committed in [false, true] {
         let mut coordinator = setup_governed();

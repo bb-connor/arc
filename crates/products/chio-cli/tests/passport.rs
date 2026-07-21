@@ -43,11 +43,8 @@ fn did_from_public_key(public_key: chio_core::PublicKey) -> DidChio {
 }
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
+        .with_extension(suffix.trim_start_matches('.'))
 }
 
 fn current_unix_secs() -> u64 {

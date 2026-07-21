@@ -125,7 +125,7 @@ fn admit_capability_budget_fails_closed_on_a_poisoned_registry() {
         1,
     );
     let delegated = make_chain_bound_capability(
-        &kernel,
+        &kernel.config.keypair,
         "cap-delegated-poison",
         subject.public_key(),
         scope.clone(),

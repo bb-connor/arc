@@ -37,12 +37,16 @@ fn concurrent_calls_over_half_budget_yield_exactly_one_allow() {
                 server_id: "cost-srv".to_string(),
                 agent_id: agent_hex,
                 arguments: serde_json::json!({ "i": i }),
+                supplemental_authorization: None,
                 dpop_proof: None,
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             };
             kernel
                 .evaluate_tool_call_blocking(&request)

@@ -1078,7 +1078,7 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
     let token = "test-token";
     let session_db_path = dir.join("remote-session-tombstones.sqlite3");
 
-    // Phase 1a: create the deleted-session tombstone with a long idle expiry so the
+    // Create the deleted-session tombstone with a long idle expiry so the
     // session cannot race the reaper between `initialize` and `notifications/initialized`.
     let (deleted_session, deleted_protocol) = {
         let _server = spawn_http_server_with_session_lifecycle_tuning(
@@ -1111,7 +1111,7 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         (deleted_session, deleted_protocol)
     };
 
-    // Phase 1b: create the expired-session tombstone using a tight idle expiry so the
+    // Create the expired-session tombstone using a tight idle expiry so the
     // reaper can transition the session to Expired within the wait loop budget. The
     // session is only `initialize`d once, so the brief race between `initialize` and
     // `notifications/initialized` is the only timing constraint here.
@@ -1155,7 +1155,7 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         (expired_session, expired_protocol)
     };
 
-    // Phase 1c: create the shutdown-session tombstone with a long idle expiry so the
+    // Create the shutdown-session tombstone with a long idle expiry so the
     // session cannot race the reaper before the admin shutdown call lands.
     let (shutdown_session, shutdown_protocol) = {
         let _server = spawn_http_server_with_session_lifecycle_tuning(

@@ -240,7 +240,6 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
 }
 
 #[test]
-#[cfg(any())]
 fn trust_control_cluster_multi_region_partition_qualification() {
     if skip_when_loopback_bind_denied("trust_control_cluster_multi_region_partition_qualification")
     {
@@ -260,7 +259,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
     let isolated_url = url_c.clone();
     let service_token = "cluster-multi-region-token";
 
-    let _server_a = spawn_trust_service(
+    let _server_a = spawn_partitionable_trust_service(
         addr_a,
         service_token,
         &dir.join("receipts-a.sqlite3"),
@@ -271,7 +270,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
         &url_a,
         &[url_b.clone(), url_c.clone()],
     );
-    let _server_b = spawn_trust_service(
+    let _server_b = spawn_partitionable_trust_service(
         addr_b,
         service_token,
         &dir.join("receipts-b.sqlite3"),
@@ -282,7 +281,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
         &url_b,
         &[url_a.clone(), url_c.clone()],
     );
-    let _server_c = spawn_trust_service(
+    let _server_c = spawn_partitionable_trust_service(
         addr_c,
         service_token,
         &dir.join("receipts-c.sqlite3"),
@@ -332,6 +331,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
     );
 
     let mut healed_partition_samples_ms = Vec::new();
+    let split_brain_observed = std::cell::Cell::new(false);
     for index in 0..MULTI_REGION_PARTITION_SAMPLES {
         for base_url in &majority_urls {
             let response = set_cluster_partition(
@@ -373,6 +373,11 @@ fn trust_control_cluster_multi_region_partition_qualification() {
                 else {
                     return false;
                 };
+                if isolated_status["role"].as_str() == Some("leader")
+                    || isolated_status["leaderUrl"].as_str() == Some(isolated_url.as_str())
+                {
+                    split_brain_observed.set(true);
+                }
                 majority_ok
                     && isolated_status["leaderUrl"].is_null()
                     && isolated_status["hasQuorum"].as_bool() == Some(false)
@@ -380,6 +385,10 @@ fn trust_control_cluster_multi_region_partition_qualification() {
                     && isolated_status["role"].as_str() == Some("candidate")
             },
             || cluster_status_diagnostics(&client, &all_urls, service_token),
+        );
+        assert!(
+            !split_brain_observed.get(),
+            "isolated node must never claim self leadership during partition"
         );
 
         if index == 0 {
@@ -417,7 +426,18 @@ fn trust_control_cluster_multi_region_partition_qualification() {
         );
         assert_eq!(stored["stored"].as_bool(), Some(true));
         assert_expected_write_visibility_metadata(&stored, &expected_leader_url);
+        assert!(
+            !tool_receipt_visible(
+                &client,
+                &isolated_url,
+                service_token,
+                &capability_id,
+                &receipt_id,
+            ),
+            "partitioned receipt must be absent from the isolated node before heal"
+        );
 
+        let heal_started_at = Instant::now();
         for base_url in &all_urls {
             let response = set_cluster_partition(&client, base_url, service_token, &[]);
             assert_eq!(
@@ -428,6 +448,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
 
         let lag_ms = measure_until_with_diagnostics(
             &format!("post-heal replication sample {index}"),
+            heal_started_at,
             Duration::from_secs(90),
             || {
                 let converged = all_urls.iter().all(|base_url| {
@@ -471,7 +492,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
             "leaderUrl": expected_leader_url,
             "minorityWritesFailClosed": true,
             "healedClusterRestoresQuorum": true,
-            "splitBrainObserved": false,
+            "splitBrainObserved": split_brain_observed.get(),
         },
         "postHealReplicationMs": {
             "samples": healed_partition_samples_ms,

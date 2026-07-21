@@ -889,6 +889,7 @@ fn test_comptroller_surface_report_endpoint() {
             issued_at: 1_000,
             expires_at: 10_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )
@@ -902,6 +903,7 @@ fn test_comptroller_surface_report_endpoint() {
             issued_at: 1_100,
             expires_at: 10_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )

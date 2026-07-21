@@ -14,6 +14,82 @@ fn parse_sidecar_operation_shorthand_read_preserves_read_scope() {
 }
 
 #[tokio::test]
+async fn runtime_revocation_cache_caches_positive_hits_until_full_then_requeries_authority() {
+    let observed = Arc::new(ObservedRevocationStore::with_revoked([
+        "cap-cacheable-positive",
+        "cap-overflow-positive",
+    ]));
+    let revocation_store: Arc<dyn chio_kernel::RevocationStore> = observed.clone();
+    let state = make_test_state_with_revocation_store(
+        Vec::new(),
+        "http://127.0.0.1:1".to_string(),
+        None,
+        false,
+        Some(revocation_store),
+    );
+
+    assert!(
+        state
+            .capability_is_revoked("cap-cacheable-positive")
+            .await
+    );
+    assert!(
+        state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .contains("cap-cacheable-positive")
+    );
+    assert!(
+        state
+            .capability_is_revoked("cap-cacheable-positive")
+            .await
+    );
+    assert_eq!(
+        observed
+            .queried_ids()
+            .iter()
+            .filter(|id| id.as_str() == "cap-cacheable-positive")
+            .count(),
+        1,
+        "a known positive below the bound must be served from the acceleration cache"
+    );
+
+    {
+        let mut cache = state.revoked_capability_ids.lock().await;
+        cache.clear();
+        for index in 0..REVOCATION_ACCELERATION_CACHE_MAX_IDS {
+            cache.insert(format!("cap-preloaded-{index:04}"));
+        }
+    }
+    observed.clear_queries();
+
+    assert!(
+        state
+            .capability_is_revoked("cap-overflow-positive")
+            .await
+    );
+    assert!(
+        state
+            .capability_is_revoked("cap-overflow-positive")
+            .await
+    );
+    let cache = state.revoked_capability_ids.lock().await;
+    assert_eq!(cache.len(), REVOCATION_ACCELERATION_CACHE_MAX_IDS);
+    assert!(!cache.contains("cap-overflow-positive"));
+    drop(cache);
+    assert_eq!(
+        observed
+            .queried_ids()
+            .iter()
+            .filter(|id| id.as_str() == "cap-overflow-positive")
+            .count(),
+        2,
+        "a positive outside the full cache must remain correct by re-querying the authority"
+    );
+}
+
+#[tokio::test]
 async fn sidecar_release_persists_revocation_and_blocks_reuse() {
     let receipt_db = temp_receipt_db_path();
     let state = test_state_with_receipt_db(
@@ -285,6 +361,7 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        trusted_historical_receipt_signers: Vec::new(),
         control_url: None,
         control_token: None,
         budget_db: None,
@@ -320,6 +397,7 @@ async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            trusted_historical_receipt_signers: Vec::new(),
             control_url: None,
             control_token: None,
             budget_db: None,
@@ -333,6 +411,45 @@ async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
         assert!(
             message.contains("durable receipt store"),
             "an in-memory receipt path ({receipt_db}) must refuse to start without an opt-in, got: {message}"
+        );
+    }
+}
+
+/// Explicit ephemeral mode must ignore every volatile receipt path throughout
+/// startup. Reopening the raw configured path for the HTTP sidecar log would
+/// either create a second private in-memory database or hit the durable store's
+/// path rejection before the listener boundary.
+#[tokio::test]
+async fn run_accepts_in_memory_receipt_paths_when_ephemeral_mode_is_opted_in() {
+    for receipt_db in [":memory:", "file:receipts.db?mode=memory"] {
+        let config = ProtectConfig {
+            upstream: "http://127.0.0.1:1".to_string(),
+            spec_content: Some(PETSTORE_YAML.to_string()),
+            spec_path: None,
+            listen_addr: "invalid-listen-address".to_string(),
+            receipt_db: Some(receipt_db.to_string()),
+            allow_ephemeral_receipts: true,
+            sidecar_control_token: None,
+            signer_seed_hex: None,
+            trusted_capability_issuers: Vec::new(),
+            trusted_historical_receipt_signers: Vec::new(),
+            control_url: None,
+            control_token: None,
+            budget_db: None,
+            revocation_db: None,
+            require_nonce: false,
+            allow_advisory: false,
+            upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
+        };
+        let error = ProtectProxy::new(config).run().await.test_unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("cannot bind"),
+            "ephemeral receipt path ({receipt_db}) must reach the listener boundary, got: {message}"
+        );
+        assert!(
+            !message.contains("receipt storage must be backed"),
+            "ephemeral receipt path ({receipt_db}) must not be reopened as a durable store"
         );
     }
 }
@@ -409,29 +526,19 @@ async fn durable_revocation_db_id_is_enforced_by_proxy_state() {
     assert!(chio_kernel::RevocationStore::revoke(&store, "cap-operator-revoked").test_unwrap());
     drop(store);
 
-    let config = ProtectConfig {
-        upstream: "http://127.0.0.1:1".to_string(),
-        spec_content: Some("{}".to_string()),
-        spec_path: None,
-        listen_addr: "127.0.0.1:0".to_string(),
-        receipt_db: None,
-        allow_ephemeral_receipts: true,
-        sidecar_control_token: None,
-        signer_seed_hex: None,
-        trusted_capability_issuers: Vec::new(),
-        control_url: None,
-        control_token: None,
-        budget_db: None,
-        revocation_db: Some(db.to_string_lossy().to_string()),
-        require_nonce: false,
-        allow_advisory: false,
-        upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
-    };
-
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    // Mirror the sidecar startup merge: durable operator revocations join the
-    // shared set that the mediated, validate, and proxy paths all consult.
-    let durable = load_revocation_db_ids(&config).test_unwrap();
+    let db_path = db.to_string_lossy().into_owned();
+    let prepared = prepare_revocation_store(Some(&db_path), None).test_unwrap();
+    let (revocation_store, durable) =
+        open_prepared_revocation_store(prepared).test_unwrap();
+    let state = make_test_state_with_revocation_store(
+        Vec::new(),
+        "http://127.0.0.1:1".to_string(),
+        None,
+        false,
+        revocation_store,
+    );
+    // Mirror sidecar startup: seed the bounded acceleration set from the exact
+    // live authority retained for cache misses after startup.
     state.revoked_capability_ids.lock().await.extend(durable);
 
     assert!(
@@ -442,10 +549,11 @@ async fn durable_revocation_db_id_is_enforced_by_proxy_state() {
             .contains("cap-operator-revoked"),
         "durable --revocation-db revocation must land in the enforced set"
     );
+    state.revoked_capability_ids.lock().await.clear();
     assert_eq!(
         find_revoked_capability_id(&state, None, Some("cap-operator-revoked")).await,
         Some("cap-operator-revoked".to_string()),
-        "a capability revoked via --revocation-db must be rejected on the request path"
+        "the retained live store must reject the capability after a cache miss"
     );
 }
 

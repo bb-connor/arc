@@ -249,7 +249,7 @@ async fn sidecar_verify_receipt_rejects_action_parameter_hash_mismatch() {
 
 #[tokio::test]
 async fn sidecar_verify_receipt_rejects_expected_decision_mismatch() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let state = make_test_state(Vec::new(), "http://127.0.0.1:1".to_string(), None, true);
 
     let mint_body = serde_json::json!({
         "subject": Keypair::generate().public_key().to_hex(),
@@ -308,10 +308,11 @@ async fn sidecar_verify_receipt_rejects_expected_decision_mismatch() {
 #[tokio::test]
 async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
     let receipt_db = temp_receipt_db_path();
-    let state = test_state_with_receipt_db(
+    let state = make_test_state(
         Vec::new(),
         "http://127.0.0.1:1".to_string(),
         Some(&receipt_db),
+        true,
     );
 
     let mint_body = serde_json::json!({
@@ -394,7 +395,7 @@ async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
 
 #[tokio::test]
 async fn sidecar_evaluate_tool_call_denies_parameter_hash_mismatch() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let state = make_test_state(Vec::new(), "http://127.0.0.1:1".to_string(), None, true);
 
     let evaluate_body = serde_json::json!({
         "capability_id": "cap-test",

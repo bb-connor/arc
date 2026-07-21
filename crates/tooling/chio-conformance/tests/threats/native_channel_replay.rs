@@ -30,7 +30,7 @@
 use chio_core::crypto::Keypair;
 use chio_kernel::execution_nonce::{
     mint_execution_nonce, verify_execution_nonce, ExecutionNonceConfig, ExecutionNonceError,
-    InMemoryExecutionNonceStore, NonceBinding,
+    InMemoryExecutionNonceStore, NonceBinding, SignedExecutionNonce,
 };
 
 fn sample_binding() -> NonceBinding {
@@ -147,4 +147,58 @@ fn threat_native_channel_replay_tampered_signature_rejected() {
         matches!(err, ExecutionNonceError::InvalidSignature),
         "expected InvalidSignature, got {err:?}"
     );
+}
+
+#[test]
+fn threat_native_channel_replay_unknown_signed_fields_rejected_at_decode() {
+    // covers: native_channel_replay
+    let kp = Keypair::generate();
+    let signed = match mint_execution_nonce(
+        &kp,
+        sample_binding(),
+        &ExecutionNonceConfig::default(),
+        1_700_000_300,
+    ) {
+        Ok(signed) => signed,
+        Err(err) => panic!("mint_execution_nonce failed: {err:?}"),
+    };
+    let baseline = match serde_json::to_value(signed) {
+        Ok(value) => value,
+        Err(err) => panic!("execution nonce serialization failed: {err:?}"),
+    };
+
+    let mut unknown_outer = baseline.clone();
+    match unknown_outer.as_object_mut() {
+        Some(object) => {
+            object.insert("unsigned_extension".to_string(), serde_json::json!(true));
+        }
+        None => panic!("signed execution nonce must serialize as an object"),
+    }
+
+    let mut unknown_nonce = baseline.clone();
+    match unknown_nonce["nonce"].as_object_mut() {
+        Some(object) => {
+            object.insert("unsigned_extension".to_string(), serde_json::json!(true));
+        }
+        None => panic!("execution nonce body must serialize as an object"),
+    }
+
+    let mut unknown_binding = baseline;
+    match unknown_binding["nonce"]["bound_to"].as_object_mut() {
+        Some(object) => {
+            object.insert("unsigned_extension".to_string(), serde_json::json!(true));
+        }
+        None => panic!("execution nonce binding must serialize as an object"),
+    }
+
+    for malformed in [unknown_outer, unknown_nonce, unknown_binding] {
+        let error = match serde_json::from_value::<SignedExecutionNonce>(malformed) {
+            Ok(_) => panic!("unknown signed execution-nonce field must be rejected"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("unknown field"),
+            "expected closed-schema rejection, got {error}"
+        );
+    }
 }

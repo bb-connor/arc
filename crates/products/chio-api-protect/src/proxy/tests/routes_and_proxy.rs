@@ -445,6 +445,7 @@ async fn threshold_approval_production_config_rejects_ephemeral_store() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        trusted_historical_receipt_signers: Vec::new(),
         control_url: None,
         control_token: None,
         budget_db: None,
@@ -1021,7 +1022,7 @@ async fn proxy_handler_surfaces_upstream_failures_after_allowing_request() {
         .await
         .test_unwrap();
     let text = String::from_utf8(body.to_vec()).test_unwrap();
-    assert!(text.contains("upstream error:"));
+    assert_eq!(text, "upstream request failed");
 
     let log = state.receipt_log.lock().await;
     assert_eq!(log.receipts.len(), 1);
@@ -1113,6 +1114,85 @@ async fn proxy_handler_denies_invalid_capability_tokens() {
     assert_eq!(
         http_status_scope(log.receipts[0].metadata.as_ref()),
         Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn proxy_auth_failures_never_query_caller_controlled_revocation_ids() {
+    let observed = Arc::new(ObservedRevocationStore::with_revoked(["cap-proxy-revoked"]));
+    let revocation_store: Arc<dyn chio_kernel::RevocationStore> = observed.clone();
+    let state = make_test_state_with_revocation_store(
+        vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }],
+        "http://127.0.0.1:1".to_string(),
+        None,
+        false,
+        Some(revocation_store),
+    );
+
+    let malformed = Request::builder()
+        .method("POST")
+        .uri("/pets")
+        .header("x-chio-capability", "not-json")
+        .body(Body::empty())
+        .test_unwrap();
+    assert_eq!(
+        proxy_handler(State(Arc::clone(&state)), malformed)
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    // The kernel may query its own freshly minted receipt-denial capability,
+    // but malformed caller bytes never become a revocation lookup key.
+    assert!(!observed.queried_ids().iter().any(|id| id == "not-json"));
+    observed.clear_queries();
+
+    let untrusted_id = "cap-proxy-untrusted";
+    let untrusted = Request::builder()
+        .method("POST")
+        .uri("/pets")
+        .header(
+            "x-chio-capability",
+            signed_capability_token_json(&Keypair::generate(), untrusted_id),
+        )
+        .body(Body::empty())
+        .test_unwrap();
+    assert_eq!(
+        proxy_handler(State(Arc::clone(&state)), untrusted)
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert!(!observed.queried_ids().iter().any(|id| id == untrusted_id));
+    observed.clear_queries();
+
+    let revoked = Request::builder()
+        .method("POST")
+        .uri("/pets")
+        .header(
+            "x-chio-capability",
+            signed_capability_token_json(&state.signer_keypair, "cap-proxy-revoked"),
+        )
+        .body(Body::empty())
+        .test_unwrap();
+    assert_eq!(
+        proxy_handler(State(Arc::clone(&state)), revoked)
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        observed
+            .queried_ids()
+            .iter()
+            .filter(|id| id.as_str() == "cap-proxy-revoked")
+            .count(),
+        1,
+        "a trusted authenticated leaf is queried exactly once"
     );
 }
 
@@ -1224,6 +1304,136 @@ async fn sidecar_evaluate_validates_transport_capability_header() {
         http_status_scope(evaluation.receipt.metadata.as_ref()),
         Some(CHIO_HTTP_STATUS_SCOPE_DECISION)
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sidecar_http_evaluate_auth_failures_never_query_caller_controlled_revocation_ids() {
+    let observed = Arc::new(ObservedRevocationStore::with_revoked(["cap-evaluate-revoked"]));
+    let revocation_store: Arc<dyn chio_kernel::RevocationStore> = observed.clone();
+    let state = make_test_state_with_revocation_store(
+        vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }],
+        "http://127.0.0.1:1".to_string(),
+        None,
+        false,
+        Some(revocation_store),
+    );
+
+    let evaluate_body = || {
+        ChioHttpRequest::new(
+            uuid::Uuid::now_v7().to_string(),
+            HttpMethod::Post,
+            "/pets".to_string(),
+            "/pets".to_string(),
+            chio_http_core::CallerIdentity::anonymous(),
+        )
+    };
+
+    let malformed = Request::builder()
+        .method("POST")
+        .uri("/chio/evaluate")
+        .header("content-type", "application/json")
+        .header("x-chio-capability", "not-json")
+        .body(Body::from(
+            serde_json::to_vec(&evaluate_body()).test_unwrap(),
+        ))
+        .test_unwrap();
+    let response = sidecar_evaluate_handler(State(Arc::clone(&state)), malformed).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(!observed.queried_ids().iter().any(|id| id == "not-json"));
+    observed.clear_queries();
+
+    let untrusted_id = "cap-evaluate-untrusted";
+    let untrusted = Request::builder()
+        .method("POST")
+        .uri("/chio/evaluate")
+        .header("content-type", "application/json")
+        .header(
+            "x-chio-capability",
+            signed_capability_token_json(&Keypair::generate(), untrusted_id),
+        )
+        .body(Body::from(
+            serde_json::to_vec(&evaluate_body()).test_unwrap(),
+        ))
+        .test_unwrap();
+    let response = sidecar_evaluate_handler(State(Arc::clone(&state)), untrusted).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(!observed.queried_ids().iter().any(|id| id == untrusted_id));
+    observed.clear_queries();
+
+    let mut revoked_body = evaluate_body();
+    revoked_body.capability_id = Some("cap-evaluate-revoked".to_string());
+    let revoked = Request::builder()
+        .method("POST")
+        .uri("/chio/evaluate")
+        .header("content-type", "application/json")
+        .header(
+            "x-chio-capability",
+            signed_capability_token_json(&state.signer_keypair, "cap-evaluate-revoked"),
+        )
+        .body(Body::from(
+            serde_json::to_vec(&revoked_body).test_unwrap(),
+        ))
+        .test_unwrap();
+    let response = sidecar_evaluate_handler(State(Arc::clone(&state)), revoked).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        observed
+            .queried_ids()
+            .iter()
+            .filter(|id| id.as_str() == "cap-evaluate-revoked")
+            .count(),
+        1
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn revocation_backend_failure_is_normalized_in_http_evaluation_receipt() {
+    let observed = Arc::new(ObservedRevocationStore::failing("cap-query-failure"));
+    let revocation_store: Arc<dyn chio_kernel::RevocationStore> = observed;
+    let state = make_test_state_with_revocation_store(
+        vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }],
+        "http://127.0.0.1:1".to_string(),
+        None,
+        false,
+        Some(revocation_store),
+    );
+    let mut body = ChioHttpRequest::new(
+        "req-revocation-unavailable".to_string(),
+        HttpMethod::Post,
+        "/pets".to_string(),
+        "/pets".to_string(),
+        chio_http_core::CallerIdentity::anonymous(),
+    );
+    body.capability_id = Some("cap-query-failure".to_string());
+    let request = Request::builder()
+        .method("POST")
+        .uri("/chio/evaluate")
+        .header("content-type", "application/json")
+        .header(
+            "x-chio-capability",
+            signed_capability_token_json(&state.signer_keypair, "cap-query-failure"),
+        )
+        .body(Body::from(serde_json::to_vec(&body).test_unwrap()))
+        .test_unwrap();
+
+    let response = sidecar_evaluate_handler(State(state), request).await;
+    let bytes = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let body = String::from_utf8(bytes.to_vec()).test_unwrap();
+    assert!(body.contains("capability revocation status unavailable"));
+    assert!(!body.contains("/var/lib/chio"));
+    assert!(!body.contains("sensitive revocation backend"));
 }
 
 #[tokio::test]

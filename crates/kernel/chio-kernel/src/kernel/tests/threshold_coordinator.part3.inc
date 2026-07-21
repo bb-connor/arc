@@ -22,7 +22,7 @@ fn threshold_coordinator_issues_one_dispatch_permit_under_race() {
         &[("approval-a", "55"), ("approval-b", "66")],
     );
     let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
-    let spawn = |prepared: crate::threshold_approval::PreparedThresholdToolAdmission| {
+    let spawn = |prepared: crate::threshold_approval::PreparedGovernedToolAdmission| {
         let kernel = std::sync::Arc::clone(&kernel);
         let barrier = std::sync::Arc::clone(&barrier);
         let request = request.clone();

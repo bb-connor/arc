@@ -1548,7 +1548,7 @@ struct MockNestedFlowClient {
 struct DocsResourceProvider;
 struct FilesystemResourceProvider;
 struct ExamplePromptProvider;
-struct StubPaymentAdapter;
+struct DeterministicPaymentAdapter;
 struct DecliningPaymentAdapter;
 struct PrepaidSettledPaymentAdapter;
 
@@ -1586,15 +1586,15 @@ impl FailingEventDrainServer {
     }
 }
 
-impl PaymentAdapter for StubPaymentAdapter {
+impl PaymentAdapter for DeterministicPaymentAdapter {
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, PaymentError> {
         Ok(PaymentAuthorization {
-            authorization_id: "auth_stub".to_string(),
+            authorization_id: "auth_test_rail".to_string(),
             settled: false,
-            metadata: serde_json::json!({ "adapter": "stub" }),
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
         })
     }
 
@@ -1606,9 +1606,9 @@ impl PaymentAdapter for StubPaymentAdapter {
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
         Ok(PaymentResult {
-            transaction_id: "txn_stub".to_string(),
+            transaction_id: "txn_test_rail".to_string(),
             settlement_status: RailSettlementStatus::Settled,
-            metadata: serde_json::json!({ "adapter": "stub" }),
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
         })
     }
 
@@ -1618,9 +1618,9 @@ impl PaymentAdapter for StubPaymentAdapter {
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
         Ok(PaymentResult {
-            transaction_id: "release_stub".to_string(),
+            transaction_id: "release_test_rail".to_string(),
             settlement_status: RailSettlementStatus::Released,
-            metadata: serde_json::json!({ "adapter": "stub" }),
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
         })
     }
 
@@ -1632,9 +1632,9 @@ impl PaymentAdapter for StubPaymentAdapter {
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
         Ok(PaymentResult {
-            transaction_id: "refund_stub".to_string(),
+            transaction_id: "refund_test_rail".to_string(),
             settlement_status: RailSettlementStatus::Refunded,
-            metadata: serde_json::json!({ "adapter": "stub" }),
+            metadata: serde_json::json!({ "adapter": "deterministic_test_rail" }),
         })
     }
 }

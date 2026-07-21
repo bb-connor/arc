@@ -41,12 +41,16 @@ fn mediated_case() -> (Keypair, ChioReceipt, Box<SignedExecutionNonce>) {
         server_id: "cost-srv".to_string(),
         agent_id: agent.public_key().to_hex(),
         arguments: serde_json::json!({ "k": "v" }),
+        supplemental_authorization: None,
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     let nonce = response.execution_nonce.clone().expect("nonce");

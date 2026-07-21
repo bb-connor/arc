@@ -18,7 +18,6 @@ mod support {
 
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
         scope::{ChioScope, Operation, ToolGrant},
@@ -37,11 +36,7 @@ mod support {
     pub type ObservedRailRefs = Arc<Mutex<Vec<(Option<String>, Option<String>)>>>;
 
     pub fn unique_kernel_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time after epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{}-{nonce}.sqlite3", std::process::id()))
+        chio_test_support::private_fs::unique_sqlite_path(prefix)
     }
 
     /// Tool server that probes the journal from INSIDE `invoke`, capturing the
@@ -412,9 +407,9 @@ mod support {
             // money path requires a journal-capable budget store; the
             // default in-memory store fails closed.
             let budget_db_path = unique_kernel_db_path("chio-intent-journal-budget");
-            kernel.set_budget_store_handle(Arc::new(chio_store_sqlite::SqliteBudgetStore::open(
-                &budget_db_path,
-            )?));
+            kernel.set_budget_store_handle(Arc::new(
+                chio_store_sqlite::SqliteBudgetStore::open(&budget_db_path)?,
+            ))?;
         }
         if reject_first_intent_write {
             kernel.set_receipt_store_handle(Arc::new(IntentRejectingStore {

@@ -1,4 +1,300 @@
-use crate::budget_store::BudgetStore as _;
+#[derive(Default)]
+struct InCratePaymentJournalStore {
+    inner: InMemoryBudgetStore,
+    rows: std::sync::Mutex<
+        std::collections::HashMap<String, crate::payment::PaymentJournalRecord>,
+    >,
+}
+
+impl InCratePaymentJournalStore {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl crate::budget_store::BudgetStore for InCratePaymentJournalStore {
+    fn authority_profile(&self) -> crate::budget_store::BudgetStoreProfile {
+        crate::budget_store::BudgetStoreProfile::SingleNodeDurable
+    }
+
+    fn budget_guarantee_level(&self) -> crate::budget_store::BudgetGuaranteeLevel {
+        crate::budget_store::BudgetGuaranteeLevel::SingleNodeAtomic
+    }
+
+    fn try_increment(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        self.inner
+            .try_increment(capability_id, grant_index, max_invocations)
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        self.inner.try_charge_cost(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+        )
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        self.inner
+            .reverse_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        self.inner
+            .reduce_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn settle_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        self.inner.settle_charge_cost(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+        )
+    }
+
+    fn list_usages(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<crate::budget_store::BudgetUsageRecord>, crate::budget_store::BudgetStoreError>
+    {
+        self.inner.list_usages(limit, capability_id)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<
+        Option<crate::budget_store::BudgetUsageRecord>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        self.inner.get_usage(capability_id, grant_index)
+    }
+
+    fn list_mutation_events(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+        grant_index: Option<usize>,
+    ) -> Result<
+        Vec<crate::budget_store::BudgetMutationRecord>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        self.inner
+            .list_mutation_events(limit, capability_id, grant_index)
+    }
+
+    fn record_payment_journal(
+        &self,
+        entry: &crate::payment::PaymentJournalRecord,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        let mut rows = self.rows.lock().map_err(|_| {
+            crate::budget_store::BudgetStoreError::Invariant(
+                "in-crate payment journal lock poisoned".to_string(),
+            )
+        })?;
+        if rows.contains_key(&entry.request_id) {
+            return Err(crate::budget_store::BudgetStoreError::Invariant(format!(
+                "payment journal request `{}` already exists",
+                entry.request_id
+            )));
+        }
+        rows.insert(entry.request_id.clone(), entry.clone());
+        Ok(())
+    }
+
+    fn advance_payment_journal(
+        &self,
+        request_id: &str,
+        expected: crate::payment::PaymentJournalState,
+        next: crate::payment::PaymentJournalState,
+        authorization_id: Option<&str>,
+        transaction_id: Option<&str>,
+        settle: Option<crate::payment::PaymentSettleIntent>,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        use crate::payment::{PaymentJournalState as State, PaymentSettleAction as Action};
+
+        if next == State::Settling && settle.is_none() {
+            return Err(crate::budget_store::BudgetStoreError::Invariant(
+                "advance to Settling requires a settle intent".to_string(),
+            ));
+        }
+        if next != State::Settling && settle.is_some() {
+            return Err(crate::budget_store::BudgetStoreError::Invariant(
+                "settle intent is only valid on the Settling transition".to_string(),
+            ));
+        }
+        if let Some(intent) = settle {
+            match intent.action {
+                Action::Capture | Action::Refund if intent.amount_units.is_none() => {
+                    return Err(crate::budget_store::BudgetStoreError::Invariant(
+                        "capture and refund settle intents require an exact amount".to_string(),
+                    ));
+                }
+                Action::Release if intent.amount_units.is_some() => {
+                    return Err(crate::budget_store::BudgetStoreError::Invariant(
+                        "release settle intent cannot carry an amount".to_string(),
+                    ));
+                }
+                Action::Refund if transaction_id.is_none() => {
+                    return Err(crate::budget_store::BudgetStoreError::Invariant(
+                        "refund settle intent requires the captured transaction id".to_string(),
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        let mut rows = self.rows.lock().map_err(|_| {
+            crate::budget_store::BudgetStoreError::Invariant(
+                "in-crate payment journal lock poisoned".to_string(),
+            )
+        })?;
+        let row = rows.get_mut(request_id).ok_or_else(|| {
+            crate::budget_store::BudgetStoreError::Invariant(format!(
+                "payment journal advance conflict for `{request_id}`"
+            ))
+        })?;
+        if row.state != expected {
+            return Err(crate::budget_store::BudgetStoreError::Invariant(format!(
+                "payment journal advance conflict for `{request_id}`"
+            )));
+        }
+        row.state = next;
+        if let Some(authorization_id) = authorization_id {
+            row.authorization_id = Some(authorization_id.to_string());
+        }
+        if let Some(transaction_id) = transaction_id {
+            row.transaction_id = Some(transaction_id.to_string());
+        }
+        if let Some(settle) = settle {
+            row.settle_action = Some(settle.action);
+            row.settle_amount_units = settle.amount_units;
+        }
+        Ok(())
+    }
+
+    fn close_payment_journal(
+        &self,
+        request_id: &str,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        let mut rows = self.rows.lock().map_err(|_| {
+            crate::budget_store::BudgetStoreError::Invariant(
+                "in-crate payment journal lock poisoned".to_string(),
+            )
+        })?;
+        let Some(row) = rows.get_mut(request_id) else {
+            return Ok(false);
+        };
+        if matches!(
+            row.state,
+            crate::payment::PaymentJournalState::Closed
+                | crate::payment::PaymentJournalState::ReconcileFailed
+        ) {
+            return Ok(false);
+        }
+        row.state = crate::payment::PaymentJournalState::Closed;
+        Ok(true)
+    }
+
+    fn list_incomplete_payment_journal(
+        &self,
+        older_than_unix_ms: u64,
+    ) -> Result<Vec<crate::payment::PaymentJournalRecord>, crate::budget_store::BudgetStoreError>
+    {
+        let rows = self.rows.lock().map_err(|_| {
+            crate::budget_store::BudgetStoreError::Invariant(
+                "in-crate payment journal lock poisoned".to_string(),
+            )
+        })?;
+        let mut incomplete = rows
+            .values()
+            .filter(|row| {
+                row.created_at_unix_ms <= older_than_unix_ms
+                    && !matches!(
+                        row.state,
+                        crate::payment::PaymentJournalState::Closed
+                            | crate::payment::PaymentJournalState::ReconcileFailed
+                    )
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        incomplete.sort_by(|left, right| {
+            left.created_at_unix_ms
+                .cmp(&right.created_at_unix_ms)
+                .then_with(|| left.request_id.cmp(&right.request_id))
+        });
+        Ok(incomplete)
+    }
+
+    fn get_payment_journal(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, crate::budget_store::BudgetStoreError>
+    {
+        let rows = self.rows.lock().map_err(|_| {
+            crate::budget_store::BudgetStoreError::Invariant(
+                "in-crate payment journal lock poisoned".to_string(),
+            )
+        })?;
+        Ok(rows.get(request_id).filter(|row| {
+            !matches!(
+                row.state,
+                crate::payment::PaymentJournalState::Closed
+                    | crate::payment::PaymentJournalState::ReconcileFailed
+            )
+        }).cloned())
+    }
+
+    fn payment_journal_reconcile_failed_rail(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<String>, crate::budget_store::BudgetStoreError> {
+        let rows = self.rows.lock().map_err(|_| {
+            crate::budget_store::BudgetStoreError::Invariant(
+                "in-crate payment journal lock poisoned".to_string(),
+            )
+        })?;
+        Ok(rows.get(request_id).and_then(|row| {
+            (row.state == crate::payment::PaymentJournalState::ReconcileFailed)
+                .then(|| row.rail.clone())
+        }))
+    }
+}
 
 #[derive(Clone)]
 struct AdmissionPaymentCleanupRail {
@@ -13,7 +309,7 @@ struct AdmissionPaymentCleanupRailInner {
     currency: String,
     authorization: PaymentAuthorization,
     settlement_transaction_id: Option<String>,
-    journal: std::sync::Arc<chio_store_sqlite::SqliteBudgetStore>,
+    journal: std::sync::Arc<InCratePaymentJournalStore>,
     settlement_state_calls: std::sync::atomic::AtomicUsize,
     refund_calls: std::sync::Mutex<Vec<String>>,
     refund_moves: std::sync::atomic::AtomicUsize,
@@ -28,7 +324,7 @@ impl AdmissionPaymentCleanupRail {
         currency: &str,
         authorization: PaymentAuthorization,
         settlement_transaction_id: Option<String>,
-        journal: std::sync::Arc<chio_store_sqlite::SqliteBudgetStore>,
+        journal: std::sync::Arc<InCratePaymentJournalStore>,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(AdmissionPaymentCleanupRailInner {
@@ -87,7 +383,7 @@ impl AdmissionPaymentCleanupRail {
             || record.transaction_id.as_deref() != transaction_id
         {
             return Err(PaymentError::RailError(
-                "rail mutation ran before its exact payment cleanup intent was durable"
+                "rail mutation ran before its exact payment cleanup intent was journaled"
                     .to_string(),
             ));
         }
@@ -280,9 +576,8 @@ impl PaymentAdapter for AdmissionPaymentCleanupRail {
 struct AdmissionPaymentCleanupFixture {
     kernel: ChioKernel,
     operation: AdmissionOperation,
-    store: std::sync::Arc<chio_store_sqlite::SqliteBudgetStore>,
+    store: std::sync::Arc<InCratePaymentJournalStore>,
     rail: AdmissionPaymentCleanupRail,
-    _directory: tempfile::TempDir,
 }
 
 impl AdmissionPaymentCleanupFixture {
@@ -305,11 +600,7 @@ impl AdmissionPaymentCleanupFixture {
         operation_store
             .create_prepared(operation.clone())
             .expect("prepared operation");
-        let directory = tempfile::tempdir().expect("payment cleanup directory");
-        let store = std::sync::Arc::new(
-            chio_store_sqlite::SqliteBudgetStore::open(directory.path().join("budget.sqlite"))
-                .expect("payment cleanup journal"),
-        );
+        let store = std::sync::Arc::new(InCratePaymentJournalStore::new());
         kernel
             .set_budget_store_handle(store.clone())
             .expect("budget store");
@@ -361,7 +652,6 @@ impl AdmissionPaymentCleanupFixture {
             operation,
             store,
             rail,
-            _directory: directory,
         }
     }
 
@@ -385,7 +675,7 @@ impl AdmissionPaymentCleanupFixture {
 }
 
 #[test]
-fn settled_admission_payment_cleanup_refunds_actual_operation_transaction_durably() {
+fn settled_admission_payment_cleanup_refunds_actual_operation_transaction_after_journaling() {
     let fixture = AdmissionPaymentCleanupFixture::new(
         true,
         Some("payment-cleanup-captured-transaction"),
@@ -476,7 +766,7 @@ fn unsettled_admission_payment_cleanup_stages_release_before_exact_retry() {
 }
 
 #[test]
-fn settled_admission_payment_cleanup_uses_exact_durable_capture_transaction() {
+fn settled_admission_payment_cleanup_uses_exact_journaled_capture_transaction() {
     let fixture = AdmissionPaymentCleanupFixture::new(
         true,
         Some("payment-cleanup-journal-transaction"),
@@ -499,7 +789,7 @@ fn settled_admission_payment_cleanup_uses_exact_durable_capture_transaction() {
             .settlement_state_calls
             .load(std::sync::atomic::Ordering::SeqCst),
         0,
-        "an exact durable capture transaction must not be replaced by a lookup guess"
+        "an exact journaled capture transaction must not be replaced by a lookup guess"
     );
     let row = fixture.row();
     assert_eq!(row.state, crate::payment::PaymentJournalState::Settled);

@@ -35,14 +35,14 @@ fn resources_unsubscribe_clears_session_state() {
         "jsonrpc": "2.0",
         "id": 2,
         "method": "resources/subscribe",
-        "params": { "uri": "repo://docs/roadmap" }
+        "params": { "uri": "repo://docs/architecture" }
     }));
     let response = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
             "id": 3,
             "method": "resources/unsubscribe",
-            "params": { "uri": "repo://docs/roadmap" }
+            "params": { "uri": "repo://docs/architecture" }
         }))
         .unwrap();
 
@@ -53,7 +53,7 @@ fn resources_unsubscribe_clears_session_state() {
     };
     assert!(!edge
         .kernel
-        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .session_has_resource_subscription(&session_id, "repo://docs/architecture")
         .unwrap());
 }
 
@@ -93,20 +93,20 @@ fn resource_update_notifications_only_emit_for_subscribed_uris() {
         "jsonrpc": "2.0",
         "id": 2,
         "method": "resources/subscribe",
-        "params": { "uri": "repo://docs/roadmap" }
+        "params": { "uri": "repo://docs/architecture" }
     }));
 
     edge.notify_resource_updated("repo://secret/ops");
     assert!(edge.take_pending_notifications().is_empty());
 
-    edge.notify_resource_updated("repo://docs/roadmap");
+    edge.notify_resource_updated("repo://docs/architecture");
     let notifications = edge.take_pending_notifications();
     assert_eq!(notifications.len(), 1);
     assert_eq!(
         notifications[0]["method"],
         "notifications/resources/updated"
     );
-    assert_eq!(notifications[0]["params"]["uri"], "repo://docs/roadmap");
+    assert_eq!(notifications[0]["params"]["uri"], "repo://docs/architecture");
 }
 
 #[test]
@@ -170,13 +170,13 @@ fn prompts_list_and_get_are_filtered_by_capabilities() {
             "jsonrpc": "2.0",
             "id": 3,
             "method": "prompts/get",
-            "params": { "name": "summarize_docs", "arguments": { "topic": "roadmap" } }
+            "params": { "name": "summarize_docs", "arguments": { "topic": "architecture" } }
         }))
         .unwrap();
 
     assert_eq!(
         get_response["result"]["messages"][0]["content"]["text"],
-        "Summarize roadmap"
+        "Summarize architecture"
     );
 }
 
@@ -210,7 +210,7 @@ fn completion_complete_returns_candidates_for_prompt_and_resource_refs() {
     assert_eq!(prompt_response["result"]["completion"]["total"], 2);
     assert_eq!(
         prompt_response["result"]["completion"]["values"],
-        json!(["roadmap", "release-plan"])
+        json!(["architecture", "release-notes"])
     );
 
     let resource_response = edge

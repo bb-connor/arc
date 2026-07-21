@@ -544,8 +544,8 @@ fn kernel_exposes_normalized_session_roots_for_later_enforcement() {
                     name: Some("Code".to_string()),
                 },
                 RootDefinition {
-                    uri: "repo://docs/roadmap".to_string(),
-                    name: Some("Roadmap".to_string()),
+                    uri: "repo://docs/architecture".to_string(),
+                    name: Some("Architecture".to_string()),
                 },
                 RootDefinition {
                     uri: "file://remote-host/workspace/project".to_string(),
@@ -1021,7 +1021,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
             role: "assistant".to_string(),
             content: serde_json::json!({
                 "type": "text",
-                "text": "Roadmap summary",
+                "text": "Architecture summary",
             }),
             model: "gpt-test".to_string(),
             stop_reason: Some("end_turn".to_string()),

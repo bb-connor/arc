@@ -275,6 +275,50 @@ fn operation_authorize_rejects_mismatched_rail_echo() {
     handle.join().expect("mismatched echo server");
 }
 
+#[test]
+fn http_authorize_bridges_do_not_claim_synthetic_operation_mutations() {
+    fn assert_authorize_only(adapter: &dyn PaymentAdapter) {
+        let operation_id = "authorize-only-operation";
+        let request_binding_hash = "90".repeat(32);
+        assert!(adapter.supports_operation_authorization_recovery());
+        assert!(!adapter.supports_operation_payment_mutations());
+        assert!(matches!(
+            adapter.capture_for_operation(OperationPaymentCaptureRequest {
+                operation_id,
+                request_binding_hash: &request_binding_hash,
+                authorization_id: "authorize-only-authorization",
+                amount_units: 25,
+                currency: "USD",
+                reference: "authorize-only-reference",
+            }),
+            Err(PaymentError::OperationIdempotencyUnsupported("capture"))
+        ));
+        assert!(matches!(
+            adapter.release_for_operation(
+                operation_id,
+                &request_binding_hash,
+                "authorize-only-authorization",
+                "authorize-only-reference",
+            ),
+            Err(PaymentError::OperationIdempotencyUnsupported("release"))
+        ));
+        assert!(matches!(
+            adapter.refund_for_operation(OperationPaymentRefundRequest {
+                operation_id,
+                request_binding_hash: &request_binding_hash,
+                transaction_id: "authorize-only-transaction",
+                amount_units: 25,
+                currency: "USD",
+                reference: "authorize-only-reference",
+            }),
+            Err(PaymentError::OperationIdempotencyUnsupported("refund"))
+        ));
+    }
+
+    assert_authorize_only(&X402PaymentAdapter::new("http://127.0.0.1:1"));
+    assert_authorize_only(&AcpPaymentAdapter::new("http://127.0.0.1:1"));
+}
+
 fn spawn_json_sequence_server(
     responses: Vec<Option<(u16, serde_json::Value)>>,
 ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {

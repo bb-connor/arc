@@ -5,7 +5,8 @@
 // `tests/support_monetary.rs` are in scope.
 
 use chio_core::capability::governance::{
-    MeteredBillingContext, MeteredBillingQuote, MeteredSettlementMode,
+    GovernedToolInvocationIntentBody, MeteredBillingContext, MeteredBillingQuote,
+    MeteredSettlementMode,
 };
 
 fn make_mustprepay_intent(
@@ -16,7 +17,7 @@ fn make_mustprepay_intent(
     currency: &str,
 ) -> GovernedTransactionIntent {
     let now = current_unix_timestamp();
-    GovernedTransactionIntent {
+    GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: id.to_string(),
         server_id: server.to_string(),
         tool_name: tool.to_string(),
@@ -46,7 +47,7 @@ fn make_mustprepay_intent(
         call_chain: None,
         autonomy: None,
         context: None,
-    }
+    })
 }
 
 struct MustPrepayFixture {
@@ -64,6 +65,19 @@ fn build_mustprepay_fixture(cost: u64) -> MustPrepayFixture {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
     MustPrepayFixture { kernel, cap, agent_kp }
+}
+
+fn install_operation_payment_test_authorities(kernel: &mut ChioKernel, prefix: &str) {
+    kernel
+        .set_budget_store_handle(durable_atomic_test_budget_store(&format!(
+            "{prefix}-budget"
+        )))
+        .expect("durable atomic operation payment budget store");
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-operations"
+        )))
+        .expect("durable operation payment admission store");
 }
 
 fn mustprepay_tool_call(
@@ -534,7 +548,10 @@ fn make_no_ceiling_mustprepay_intent_over_threshold(
     let mut intent = make_mustprepay_intent(id, "cost-srv", "compute", quoted_units, currency);
     // The prepaid amount is quote.quoted_cost; drop the declared max_amount so only
     // the quote can drive the approval-threshold decision.
-    intent.max_amount = None;
+    intent
+        .as_tool_invocation_mut()
+        .expect("MustPrepay helper must return a tool invocation intent")
+        .max_amount = None;
     intent
 }
 
@@ -651,7 +668,10 @@ fn governed_mustprepay_with_charge_gates_on_quote_not_charge() {
     // raise the gate above the 10-unit provisional charge.
     let mut intent =
         make_mustprepay_intent("intent-charge-quote-gate", "cost-srv", "compute", 100, "USD");
-    intent.max_amount = None;
+    intent
+        .as_tool_invocation_mut()
+        .expect("MustPrepay helper must return a tool invocation intent")
+        .max_amount = None;
 
     let no_token =
         mustprepay_request_without_token("req-charge-quote-deny", &cap, &agent_kp, intent.clone());
@@ -695,7 +715,10 @@ fn governed_mustprepay_with_charge_below_threshold_passes_without_token() {
     // Quote 40 < threshold 50 and charge 10 < 50: no approval token is required.
     let mut intent =
         make_mustprepay_intent("intent-charge-under-gate", "cost-srv", "compute", 40, "USD");
-    intent.max_amount = None;
+    intent
+        .as_tool_invocation_mut()
+        .expect("MustPrepay helper must return a tool invocation intent")
+        .max_amount = None;
 
     let no_token =
         mustprepay_request_without_token("req-charge-under-allow", &cap, &agent_kp, intent);
@@ -711,10 +734,23 @@ fn governed_mustprepay_with_charge_below_threshold_passes_without_token() {
 // fail-closed settlement path. Counts releases so a leaked hold is observable.
 #[derive(Debug, Clone, Default)]
 struct UncapturablePaymentAdapter {
+    inner: crate::payment::SimPaymentAdapter,
     released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl PaymentAdapter for UncapturablePaymentAdapter {
+    fn rail_id(&self) -> &str {
+        self.inner.rail_id()
+    }
+
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        self.inner.supports_operation_authorization_recovery()
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        self.inner.supports_operation_payment_mutations()
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -762,6 +798,71 @@ impl PaymentAdapter for UncapturablePaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "uncapturable" }),
         })
+    }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        self.inner
+            .authorize_for_operation(operation_id, request_binding_hash, request)
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        self.inner
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)
+    }
+
+    fn capture_for_operation(
+        &self,
+        _request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        Err(PaymentError::Declined("capture unavailable".to_string()))
+    }
+
+    fn release_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.released
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.release_for_operation(
+            operation_id,
+            request_binding_hash,
+            authorization_id,
+            reference,
+        )
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.inner.refund_for_operation(request)
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        self.inner.settlement_state_for_operation(
+            operation_id,
+            request_binding_hash,
+            reference,
+            authorization_id,
+        )
     }
 }
 
@@ -897,6 +998,7 @@ fn settled_no_charge_mustprepay_abort_refunds_prepaid_quote() {
 #[test]
 fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    install_operation_payment_test_authorities(&mut kernel, "reserve-mustprepay-deny");
     let payment = UncapturablePaymentAdapter::default();
     kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
@@ -941,6 +1043,7 @@ fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment
 #[test]
 fn reserving_authorization_admits_governed_mustprepay_with_settled_prepayment() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    install_operation_payment_test_authorities(&mut kernel, "reserve-mustprepay-allow");
     let payment = TrackingPaymentAdapter::new();
     kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
@@ -995,13 +1098,19 @@ fn reserving_authorization_admits_governed_mustprepay_with_settled_prepayment() 
 fn reserving_mustprepay_stamp_failure_refunds_captured_prepayment() {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
-    let payment = TrackingPaymentAdapter::new();
-    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
     kernel.set_budget_store(Box::new(StampFailingBudgetStore {
-        inner: InMemoryBudgetStore::new(),
+        inner: Box::new(DurableAtomicTestBudgetStore::new()),
         fail_mark: std::sync::Arc::clone(&fail_mark),
-    }));
+    }))
+    .expect("install budget store");
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(
+            "reserve-mustprepay-stamp-operations",
+        ))
+        .expect("durable operation payment admission store");
+    let payment = TrackingPaymentAdapter::new();
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
 
     let agent_kp = Keypair::generate();
@@ -1153,9 +1262,24 @@ fn reserving_authorization_leaves_non_mustprepay_path_unchanged() {
 // settlement) transaction id differ, so a reconcile receipt that echoes the
 // capture transaction id can be told apart from one that merely echoes the hold
 // id.
-struct DistinctCapturePaymentAdapter;
+#[derive(Debug, Clone, Default)]
+struct DistinctCapturePaymentAdapter {
+    inner: crate::payment::SimPaymentAdapter,
+}
 
 impl PaymentAdapter for DistinctCapturePaymentAdapter {
+    fn rail_id(&self) -> &str {
+        self.inner.rail_id()
+    }
+
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        self.inner.supports_operation_authorization_recovery()
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        self.inner.supports_operation_payment_mutations()
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -1206,6 +1330,86 @@ impl PaymentAdapter for DistinctCapturePaymentAdapter {
             metadata: serde_json::json!({ "adapter": "distinct" }),
         })
     }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        self.inner
+            .authorize_for_operation(operation_id, request_binding_hash, request)
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        self.inner
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)
+    }
+
+    fn capture_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        let mut result = self.inner.capture_for_operation(request)?;
+        result.transaction_id = "rail_txn_ref".to_string();
+        Ok(result)
+    }
+
+    fn release_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.inner.release_for_operation(
+            operation_id,
+            request_binding_hash,
+            authorization_id,
+            reference,
+        )
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        let mut result = self.inner.refund_for_operation(request)?;
+        result.transaction_id = "rail_txn_ref".to_string();
+        Ok(result)
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        let state = self.inner.settlement_state_for_operation(
+            operation_id,
+            request_binding_hash,
+            reference,
+            authorization_id,
+        )?;
+        Ok(match state {
+            crate::payment::RailSettlementState::Settled {
+                authorization_id,
+                mut result,
+            } => {
+                result.transaction_id = "rail_txn_ref".to_string();
+                crate::payment::RailSettlementState::Settled {
+                    authorization_id,
+                    result,
+                }
+            }
+            other => other,
+        })
+    }
 }
 
 // A governed MustPrepay mediated reserve captures a prepayment before minting the
@@ -1215,7 +1419,10 @@ impl PaymentAdapter for DistinctCapturePaymentAdapter {
 #[test]
 fn reconcile_stamps_mustprepay_prepayment_rail_reference() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
-    kernel.set_payment_adapter(Box::new(DistinctCapturePaymentAdapter)).expect("install payment adapter");
+    install_operation_payment_test_authorities(&mut kernel, "reserve-mustprepay-reconcile");
+    kernel
+        .set_payment_adapter(Box::new(DistinctCapturePaymentAdapter::default()))
+        .expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
 
     let intent = make_mustprepay_intent("intent-reserve-recon", "cost-srv", "compute", 100, "USD");

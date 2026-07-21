@@ -652,9 +652,12 @@ fn kernel_config() -> KernelConfig {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -1353,7 +1356,9 @@ fn causal_edge(
 
 #[test]
 fn truncated_lineage_no_containment() {
-    let directory = tempdir().test_expect("temporary directory");
+    let directory =
+        chio_test_support::private_fs::private_tempdir("conformance-truncated-lineage-")
+            .test_expect("temporary directory");
     let store = Arc::new(
         SqliteReceiptStore::open(directory.path().join("lineage.db"))
             .test_expect("open lineage store"),

@@ -176,7 +176,9 @@ struct RuntimeFixture {
 
 impl RuntimeFixture {
     fn new() -> Self {
-        let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory =
+            chio_test_support::private_fs::private_tempdir("control-plane-service-active-defense-")
+                .unwrap_or_else(|error| panic!("tempdir: {error}"));
         let security_path = directory.path().join("security.sqlite");
         let clock = Arc::new(FixedClock(50_000));
         let store_clock: Arc<dyn chio_store_sqlite::security_state::SecurityStateClock> =

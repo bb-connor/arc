@@ -399,7 +399,10 @@ fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
 
 #[test]
 fn migration_is_idempotent_and_preserves_existing_tables() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory = chio_test_support::private_fs::private_tempdir(
+        "receipt-security-state-migration",
+    )
+    .unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let receipt_store = SqliteReceiptStore::open(&path)
         .unwrap_or_else(|error| panic!("open receipt store: {error}"));

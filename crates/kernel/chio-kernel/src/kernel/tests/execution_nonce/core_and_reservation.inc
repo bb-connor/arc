@@ -658,7 +658,9 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
     );
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
 
-    kernel.set_payment_adapter(Box::new(StubPaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(DeterministicPaymentAdapter))
+        .expect("install payment adapter");
     request.request_id = "req-nonce-payment-allow".to_string();
     let allowed = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(allowed.verdict, Verdict::Allow);
@@ -821,7 +823,12 @@ fn mediated_allow_receipt_records_bound_execution_nonce_id() {
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig { nonce_ttl_secs: 30, nonce_store_capacity: 1024, require_nonce: false };
-    kernel.set_execution_nonce_store(cfg.clone(), Box::new(InMemoryExecutionNonceStore::from_config(&cfg)));
+    kernel
+        .set_execution_nonce_store(
+            cfg.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+        )
+        .expect("install execution nonce store");
 
     let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
     let cap = kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600).unwrap();
@@ -871,7 +878,8 @@ fn reserving_authorization_keeps_hold_open_and_blocks_oversubscription() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
 
     // max_cost_per_invocation == max_total_cost == 100: one authorization
     // reserves the entire grant budget.
@@ -969,7 +977,8 @@ fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
 
     let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
     let cap = kernel
@@ -1048,7 +1057,8 @@ fn reconcile_kernel_and_cap() -> (ChioKernel, Keypair, CapabilityToken, Executio
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     // max_cost_per_invocation 100, max_total 150: one authorization reserves the
     // worst-case 100; a second (needing 100 more -> 200 > 150) is blocked until
     // the first frees its unspent slack.
@@ -1268,7 +1278,8 @@ fn reconcile_by_nonce_clamps_realized_above_reserved() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     // Reserve the whole grant (max_per == max_total == 100).
     let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
     let cap = kernel
@@ -1314,7 +1325,8 @@ fn reserved_hold_ttl_reaper_settles_expired_authorization_at_worst_case() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     // Whole grant reserved by one authorization.
     let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
     let cap = kernel
@@ -1496,7 +1508,8 @@ fn reconcile_by_nonce_normalizes_currency_for_zero_exposure_invocation() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let grant = make_invocation_limited_grant("cost-srv", "compute", 1);
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
@@ -1552,7 +1565,8 @@ fn reserving_authorization_succeeds_for_unregistered_tool_server() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let grant = make_monetary_grant("unreg-srv", "compute", 100, 100, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
@@ -1654,7 +1668,8 @@ fn reserving_authorization_terminal_state_matches_receipt_decision_reason() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
@@ -1701,7 +1716,8 @@ fn preflight_retry_terminal_state_matches_receipt_decision_reason() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
@@ -1741,7 +1757,8 @@ fn reserving_authorization_rejects_presented_execution_nonce() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)

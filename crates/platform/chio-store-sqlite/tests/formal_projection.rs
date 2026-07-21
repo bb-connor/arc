@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
@@ -15,11 +13,7 @@ use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore, SqliteRevocationS
 use chio_test_support::prelude::*;
 
 fn temp_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_unwrap()
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
 }
 
 fn capability(id: &str, subject: &Keypair) -> CapabilityToken {

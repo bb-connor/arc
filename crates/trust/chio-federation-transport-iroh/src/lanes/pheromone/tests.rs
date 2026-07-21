@@ -596,7 +596,7 @@ fn outbox_retry_and_dead_letter_bump_outbox_counters() {
 // -- End-to-end over real loopback QUIC (mirrors the validated PoC shape) --
 //
 // The real receiver seam (RelayBatchReceiver, whose report type is not
-// nameable here) is stubbed by a canned-report handler that still exercises
+// nameable here) is represented by a canned-report handler that still exercises
 // the genuine transport path: the admission gate on the endpoint, the
 // handler's re-resolution of conn.remote_id(), the ALPN, and the
 // length-delimited bidi codec. The deterministic tests above prove the

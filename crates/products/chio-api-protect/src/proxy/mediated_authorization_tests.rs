@@ -17,7 +17,7 @@
             "parameters": { "invoice": "inv-1" }
         });
         let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
-        assert_eq!(status, StatusCode::OK);
+        assert_eq!(status, StatusCode::OK, "{json}");
 
         // Single-phase authorization: wire status "authorized", a minted nonce
         // object, and a non-authoritative reserved receipt. The route never
@@ -67,7 +67,11 @@
     async fn mediated_durable_reuse_guard_rejects_reused_request_id_across_capabilities() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let directory = tempfile::tempdir().unwrap();
+        let (budget, admission_config) =
+            durable_mediation_budget_and_admission(directory.path(), None);
+        let budget_path = admission_config.budget_path.clone();
+        let approval_path = admission_config.approval_path.clone();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap_a =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -80,7 +84,17 @@
 
         // First reservation under capability A binds request_id R to a durable
         // hold whose id embeds A.
-        let state_before = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let state_before = mediated_test_state_core(
+            signer.clone(),
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            None,
+            Some(admission_config),
+        );
         let body_a = serde_json::json!({
             "capability": cap_a,
             "tool_server": "cost-srv",
@@ -92,14 +106,30 @@
         assert_eq!(status_a, StatusCode::OK, "{json_a}");
         assert_eq!(json_a["status"], "authorized");
 
-        // Simulate a restart: a fresh sidecar state (empty minted-request-id
-        // window and approval replay cache) over the SAME durable budget store, so
-        // only the durable prefix guard can catch a reused request_id.
-        let state_after = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        drop(state_before);
+        drop(kernel);
+        drop(budget);
+        let reopened_budget: Arc<dyn BudgetStore> = Arc::new(
+            chio_store_sqlite::budget_store::SqliteBudgetStore::open(&budget_path).unwrap(),
+        );
+        let state_after = mediated_test_state_core(
+            signer,
+            Arc::clone(&reopened_budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            None,
+            Some(TestMediationAdmissionConfig {
+                budget_path,
+                approval_path,
+                threshold_config: None,
+            }),
+        );
 
-        // Replaying the SAME request_id under a DIFFERENT capability is rejected by
-        // the durable prefix guard, even though no `budget-hold:R:{capB}:..` row
-        // exists for capability B.
+        // A different authenticated capability cannot inherit the existing
+        // request id's replay result.
         let body_b = serde_json::json!({
             "capability": cap_b,
             "tool_server": "cost-srv",
@@ -196,6 +226,33 @@
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_declassification_grant_is_rejected_at_reservation_boundary() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_id = cap.id.clone();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-declassification" },
+            "declassification_grant": signed_declassification_grant(),
+        });
+
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("dispatching security kernel"));
+        assert!(budget.get_usage(&cap_id, 0).unwrap().is_none());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mediated_revoked_capability_is_rejected() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
@@ -228,6 +285,81 @@
         // The revoked capability never reaches the kernel, so no hold is placed.
         let usage = budget.get_usage(&cap_id, 0).unwrap();
         assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn forged_leaf_ids_do_not_expose_revocation_membership() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let capability =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let state = mediated_test_state(signer, budget, Vec::new());
+
+        let mut forged_revoked = capability.clone();
+        forged_revoked.id = "forged-revoked-leaf".to_string();
+        let mut forged_clear = capability;
+        forged_clear.id = "forged-clear-leaf".to_string();
+        state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .insert(forged_revoked.id.clone());
+
+        let request = |capability: CapabilityToken| {
+            serde_json::json!({
+                "capability": capability,
+                "tool_server": "cost-srv",
+                "tool_name": "compute",
+                "parameters": { "invoice": "inv-forged-leaf" },
+            })
+        };
+        let revoked_response = post_evaluate(Arc::clone(&state), &request(forged_revoked)).await;
+        let clear_response = post_evaluate(state, &request(forged_clear)).await;
+        assert_eq!(revoked_response, clear_response);
+        assert_eq!(revoked_response.0, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(revoked_response.1["error"], "chio_mediation_unavailable");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn forged_ancestor_ids_do_not_expose_revocation_membership() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let state = mediated_test_state(signer.clone(), budget, Vec::new());
+        let capability = delegated_child_capability(
+            &signer,
+            &signer,
+            &agent,
+            "authentic-ancestor",
+            "cost-srv",
+            "compute",
+        );
+        let mut forged_revoked = capability.clone();
+        forged_revoked.delegation_chain[0].capability_id =
+            "forged-revoked-ancestor".to_string();
+        let mut forged_clear = capability;
+        forged_clear.delegation_chain[0].capability_id = "forged-clear-ancestor".to_string();
+        state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .insert("forged-revoked-ancestor".to_string());
+
+        let request = |capability: CapabilityToken| {
+            serde_json::json!({
+                "capability": capability,
+                "tool_server": "cost-srv",
+                "tool_name": "compute",
+                "parameters": { "invoice": "inv-forged-ancestor" },
+            })
+        };
+        let revoked_response = post_evaluate(Arc::clone(&state), &request(forged_revoked)).await;
+        let clear_response = post_evaluate(state, &request(forged_clear)).await;
+        assert_eq!(revoked_response, clear_response);
+        assert_eq!(revoked_response.0, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(revoked_response.1["error"], "chio_mediation_unavailable");
     }
 
     /// Build a well-formed capability whose single delegation-chain link names
@@ -275,6 +407,7 @@
                 attenuations: vec![],
                 timestamp: now,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             delegator,
         )
@@ -287,6 +420,7 @@
             issued_at: now,
             expires_at: now + 3600,
             delegation_chain: vec![link],
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, issuer).test_unwrap()
     }
@@ -294,14 +428,19 @@
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mediated_revoked_delegation_ancestor_rejects_delegated_child() {
         let signer = Keypair::generate();
-        let root = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
         // Revoke only the ROOT ancestor; the presented leaf id is never revoked,
         // so a leaf-only guard would admit this delegated child.
         let ancestor_id = "cap-root-revoked".to_string();
-        let child =
-            delegated_child_capability(&signer, &root, &agent, &ancestor_id, "cost-srv", "compute");
+        let child = delegated_child_capability(
+            &signer,
+            &signer,
+            &agent,
+            &ancestor_id,
+            "cost-srv",
+            "compute",
+        );
         let child_id = child.id.clone();
         let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
         state
@@ -339,24 +478,30 @@
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mediated_route_honors_a_durable_only_revocation() {
         // A revocation a sibling replica (or `chio trust revoke --revocation-db`)
-        // records after this process boots lives in the shared durable store but
-        // never in this process's in-memory release set, which is loaded once at
+        // records after this service instance starts lives in the shared durable
+        // store but never in its resident release set, which is loaded once at
         // boot. The mediated money path must still reject it fail-closed, matching
         // the proxy and validate paths, or a revoked capability keeps reserving
         // budget and minting execution nonces until it expires.
         let signer = Keypair::generate();
-        let root = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let child =
-            delegated_child_capability(&signer, &root, &agent, "cap-root", "cost-srv", "compute");
-        let child_id = child.id.clone();
+        let issuing = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let capability = issue_cost_bearing_capability(
+            &issuing,
+            &agent,
+            "cost-srv",
+            "compute",
+            100,
+            1000,
+            "USD",
+        );
+        let capability_id = capability.id.clone();
 
-        // Revoke the presented leaf id in the DURABLE store only.
+        // Install the exact store handle on both state and kernel while it is
+        // still empty, then mutate it through a second owner after startup.
         let durable: Arc<dyn chio_kernel::RevocationStore> =
             Arc::new(chio_kernel::InMemoryRevocationStore::new());
-        chio_kernel::RevocationStore::revoke(durable.as_ref(), &child_id).test_unwrap();
-
         let state = mediated_test_state_core(
             signer,
             Arc::clone(&budget),
@@ -366,18 +511,32 @@
             true,
             None,
             Some(Arc::clone(&durable)),
+            None,
         );
+        assert!(!state.capability_is_revoked(&capability_id).await);
+        chio_kernel::RevocationStore::revoke(durable.as_ref(), &capability_id).test_unwrap();
         assert!(
             !state
                 .revoked_capability_ids
                 .lock()
                 .await
-                .contains(&child_id),
+                .contains(&capability_id),
             "the in-memory release set must not carry the durable-only revocation"
+        );
+        assert!(
+            state
+                .mediation_kernel
+                .as_ref()
+                .unwrap()
+                .lock()
+                .await
+                .is_capability_revoked(&capability_id)
+                .test_unwrap(),
+            "the mediation kernel must share the durable revocation authority"
         );
 
         let body = serde_json::json!({
-            "capability": child,
+            "capability": capability,
             "tool_server": "cost-srv",
             "tool_name": "compute",
             "parameters": { "invoice": "inv-1" }
@@ -387,7 +546,7 @@
         assert_eq!(json["error"], "chio_capability_revoked");
 
         // The revoked capability never reserved a hold.
-        let usage = budget.get_usage(&child_id, 0).unwrap();
+        let usage = budget.get_usage(&capability_id, 0).unwrap();
         assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
     }
 
@@ -489,15 +648,27 @@
     async fn mediated_governed_capability_requires_intent_and_approval() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         // The grant requires a governed intent and approval above 50 units; the
         // worst-case charge (100) crosses the threshold, so an approval token is
         // required.
+        let directory = tempfile::tempdir().unwrap();
+        let (budget, admission_config) =
+            durable_mediation_budget_and_admission(directory.path(), None);
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
         let cap_value = serde_json::to_value(&cap).unwrap();
         let approver = signer.clone();
-        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let state = mediated_test_state_core(
+            signer,
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            None,
+            Some(admission_config),
+        );
 
         // Without a governed intent + approval token, the governed
         // grant is DENIED (the forwarded fields are load-bearing).
@@ -536,6 +707,385 @@
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_threshold_collector_and_kernel_share_durable_replay_authority() {
+        use chio_core_types::capability::threshold_approval::{
+            ThresholdApprovalProposal, ThresholdApprovalProposalBody, ThresholdApprovalRequest,
+            ThresholdApprovalRequirement,
+        };
+        use chio_http_core::AuthenticatedThresholdApprovalRequestContext;
+        use chio_kernel::{
+            ThresholdApprovalProposalCreationContext,
+            ThresholdApprovalProposalCreationParameters,
+        };
+
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let policy_authority = Keypair::generate();
+        let first_approver = Keypair::generate();
+        let second_approver = Keypair::generate();
+        let policy_hash = "ab".repeat(32);
+        let directory = tempfile::tempdir().unwrap();
+        let (budget, mut admission_config) =
+            durable_mediation_budget_and_admission(directory.path(), None);
+        let approval_path = admission_config.approval_path.clone();
+        let issuing = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_governed_capability(&issuing, &agent, "cost-srv", "compute", 100, "USD", 50);
+        let cap_id = cap.id.clone();
+        let request_id = "req-threshold-product";
+        let intent = governed_intent("intent-threshold-product", "cost-srv", "compute", 100, "USD");
+        let intent_hash = intent.binding_hash().unwrap();
+        let capability_hash =
+            chio_kernel::threshold_approval::authorization_capability_hash(&cap).unwrap();
+        let requirement = ThresholdApprovalRequirement::new(
+            2,
+            std::collections::BTreeMap::from([
+                ("first".to_string(), first_approver.public_key()),
+                ("second".to_string(), second_approver.public_key()),
+            ]),
+            300,
+            policy_hash.clone(),
+            1,
+        )
+        .unwrap();
+        let now = chrono::Utc::now().timestamp() as u64;
+        let proposal = ThresholdApprovalProposal::sign(
+            ThresholdApprovalProposalBody::new(
+                "proposal-threshold-product",
+                request_id,
+                intent_hash.clone(),
+                agent.public_key(),
+                capability_hash.clone(),
+                policy_hash.clone(),
+                requirement.required(),
+                requirement.eligible_set_digest(),
+                now.saturating_sub(1),
+                requirement.proposal_timeout_seconds(),
+                cap.expires_at,
+                cap.expires_at,
+            )
+            .unwrap(),
+            &policy_authority,
+        )
+        .unwrap();
+        let matched_request =
+            ThresholdApprovalRequest::new(request_id, "cost-srv", "compute").unwrap();
+        let context = AuthenticatedThresholdApprovalRequestContext::new(
+            matched_request.clone(),
+            ThresholdApprovalProposalCreationContext::new(
+                ThresholdApprovalProposalCreationParameters {
+                    matched_request,
+                    requirement: requirement.clone(),
+                    subject: agent.public_key(),
+                    governed_intent_hash: intent_hash.clone(),
+                    authorization_capability_hash: capability_hash,
+                    authorizing_capability_expires_at: cap.expires_at,
+                    governed_operation_expires_at: cap.expires_at,
+                    submitter: None,
+                    separation_of_duties: false,
+                },
+            )
+            .unwrap(),
+        );
+        let resolved_context = context.clone();
+        let resolved_policy_hash = policy_hash.clone();
+        let threshold_config = ThresholdApprovalCollectorConfig::new(
+            policy_hash,
+            vec![policy_authority.public_key()],
+            Arc::new(move |resolved_request_id: &str, current_policy_hash: &str| {
+                if resolved_request_id != request_id
+                    || current_policy_hash != resolved_policy_hash
+                {
+                    return Err(
+                        chio_core_types::capability::threshold_approval::ThresholdApprovalResolutionError::Missing,
+                    );
+                }
+                Ok(resolved_context.clone())
+            }),
+        );
+        admission_config.threshold_config = Some(threshold_config.clone());
+        let state = mediated_test_state_core(
+            signer.clone(),
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            None,
+            Some(admission_config),
+        );
+
+        let (create_status, create_json) = post_json_with_bearer(
+            Arc::clone(&state),
+            "/approvals/threshold/proposals",
+            &serde_json::json!({ "proposal": proposal.clone() }),
+            Some(MEDIATED_CONTROL_TOKEN),
+        )
+        .await;
+        assert_eq!(create_status, StatusCode::CREATED, "{create_json}");
+
+        let proposal_hash = proposal.proposal_hash().unwrap();
+        let sign_threshold_vote = |id: &str, approver: &Keypair| {
+            GovernedApprovalToken::sign(
+                GovernedApprovalTokenBody {
+                    id: id.to_string(),
+                    approver: approver.public_key(),
+                    subject: agent.public_key(),
+                    governed_intent_hash: intent_hash.clone(),
+                    threshold_proposal_hash: Some(proposal_hash.clone()),
+                    request_id: request_id.to_string(),
+                    issued_at: now,
+                    expires_at: proposal.body().proposal_deadline(),
+                    decision: GovernedApprovalDecision::Approved,
+                },
+                approver,
+            )
+            .unwrap()
+        };
+        let first = sign_threshold_vote("approval-threshold-first", &first_approver);
+        let second = sign_threshold_vote("approval-threshold-second", &second_approver);
+        let (first_vote_status, first_vote_json) = post_json_with_bearer(
+            Arc::clone(&state),
+            "/approvals/threshold/proposals/proposal-threshold-product/votes",
+            &serde_json::json!({ "token": first.clone() }),
+            Some(MEDIATED_CONTROL_TOKEN),
+        )
+        .await;
+        assert_eq!(first_vote_status, StatusCode::OK, "{first_vote_json}");
+
+        let (insufficient_status, insufficient_json) = post_evaluate(
+            Arc::clone(&state),
+            &serde_json::json!({
+                "capability": cap.clone(),
+                "tool_server": "cost-srv",
+                "tool_name": "compute",
+                "parameters": { "invoice": "inv-threshold" },
+                "request_id": request_id,
+                "governed_intent": intent.clone(),
+                "approval_tokens": [first.clone()],
+                "threshold_approval_proposal": proposal.clone(),
+            }),
+        )
+        .await;
+        assert_eq!(insufficient_status, StatusCode::OK, "{insufficient_json}");
+        assert_eq!(insufficient_json["status"], "deny", "{insufficient_json}");
+        assert_eq!(
+            insufficient_json["receipt"]["decision"]["reason"],
+            "governed transaction denied: threshold approval verification denied: approval token set does not satisfy threshold"
+        );
+
+        let (second_vote_status, second_vote_json) = post_json_with_bearer(
+            Arc::clone(&state),
+            "/approvals/threshold/proposals/proposal-threshold-product/votes",
+            &serde_json::json!({ "token": second.clone() }),
+            Some(MEDIATED_CONTROL_TOKEN),
+        )
+        .await;
+        assert_eq!(second_vote_status, StatusCode::OK, "{second_vote_json}");
+        let (deliver_status, deliver_json) = post_json_with_bearer(
+            Arc::clone(&state),
+            "/approvals/threshold/proposals/proposal-threshold-product/deliver",
+            &serde_json::json!({}),
+            Some(MEDIATED_CONTROL_TOKEN),
+        )
+        .await;
+        assert_eq!(deliver_status, StatusCode::OK, "{deliver_json}");
+
+        let legacy = governed_approval_token(&signer, &agent.public_key(), &intent, request_id);
+        let (legacy_status, legacy_json) = post_evaluate(
+            Arc::clone(&state),
+            &serde_json::json!({
+                "capability": cap.clone(),
+                "tool_server": "cost-srv",
+                "tool_name": "compute",
+                "parameters": { "invoice": "inv-threshold" },
+                "request_id": request_id,
+                "governed_intent": intent.clone(),
+                "approval_token": legacy,
+            }),
+        )
+        .await;
+        assert_eq!(legacy_status, StatusCode::OK, "{legacy_json}");
+        assert_eq!(legacy_json["status"], "deny");
+        assert_eq!(
+            legacy_json["receipt"]["decision"]["reason"],
+            "governed transaction denied: signed threshold approval proposal is required"
+        );
+
+        let exact_body = serde_json::json!({
+            "capability": cap.clone(),
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-threshold" },
+            "request_id": request_id,
+            "governed_intent": intent.clone(),
+            "approval_tokens": [second.clone(), first.clone()],
+            "threshold_approval_proposal": proposal.clone(),
+        });
+        let (exact_status, exact_json) =
+            post_evaluate(Arc::clone(&state), &exact_body).await;
+        assert_eq!(exact_status, StatusCode::OK, "{exact_json}");
+        assert_eq!(exact_json["status"], "authorized", "{exact_json}");
+
+        let approval_db = rusqlite::Connection::open(&approval_path).unwrap();
+        let reservation_state: String = approval_db
+            .query_row(
+                "SELECT reservation.state FROM chio_hitl_threshold_operation_transfers AS transfer INNER JOIN chio_hitl_operation_reservations AS reservation ON reservation.operation_id = transfer.operation_id WHERE transfer.proposal_id = ?1",
+                ["proposal-threshold-product"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(reservation_state, "committed");
+        drop(approval_db);
+        drop(state);
+
+        let replay_budget_path = directory.path().join("budget-replay.db");
+        let replay_budget: Arc<dyn BudgetStore> = Arc::new(
+            chio_store_sqlite::budget_store::SqliteBudgetStore::open(&replay_budget_path).unwrap(),
+        );
+        let replay_hold_id = format!("budget-hold:{request_id}:{cap_id}:0");
+        assert!(replay_budget.get_budget_hold(&replay_hold_id).unwrap().is_none());
+        let replay_state = mediated_test_state_core(
+            signer,
+            Arc::clone(&replay_budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            None,
+            Some(TestMediationAdmissionConfig {
+                budget_path: replay_budget_path.to_string_lossy().into_owned(),
+                approval_path,
+                threshold_config: Some(threshold_config),
+            }),
+        );
+        let mut reordered = exact_body;
+        reordered["approval_tokens"] = serde_json::json!([first, second]);
+        let (replay_status, replay_json) = post_evaluate(replay_state, &reordered).await;
+        assert_eq!(replay_status, StatusCode::OK, "{replay_json}");
+        assert_eq!(replay_json["status"], "deny", "{replay_json}");
+        assert_eq!(
+            replay_json["receipt"]["decision"]["reason"],
+            "governed transaction denied: threshold approval reservation is already terminal"
+        );
+        let replay_hold = replay_budget.get_budget_hold(&replay_hold_id).unwrap();
+        assert!(
+            replay_hold
+                .as_ref()
+                .is_none_or(|hold| !hold.disposition.is_open()),
+            "terminal approval replay left an open budget reservation: {replay_hold:?}"
+        );
+        let replay_usage = replay_budget.get_usage(&cap_id, 0).unwrap();
+        assert_eq!(
+            replay_usage
+                .as_ref()
+                .map(|usage| usage.committed_cost_units().unwrap())
+                .unwrap_or(0),
+            0,
+            "terminal approval replay retained committed budget exposure"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_threshold_token_array_is_not_silently_dropped() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap = issue_governed_capability(
+            &kernel,
+            &agent,
+            "cost-srv",
+            "compute",
+            100,
+            "USD",
+            50,
+        );
+        let state = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let request_id = "req-ambiguous-approval-shape";
+        let intent = governed_intent("intent-ambiguous", "cost-srv", "compute", 100, "USD");
+        let approval = governed_approval_token(
+            &signer,
+            &agent.public_key(),
+            &intent,
+            request_id,
+        );
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-threshold" },
+            "request_id": request_id,
+            "governed_intent": intent,
+            "approval_token": approval,
+            "approval_tokens": [approval]
+        });
+
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("approval_token and approval_tokens"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_supplemental_authorization_is_not_silently_dropped() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-supplemental" },
+            "supplemental_authorization": {
+                "reference": "broker-authorization-1",
+                "artifact": [1, 2, 3]
+            }
+        });
+
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["status"], "deny");
+        assert!(json["receipt"]["decision"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("supplemental broker admission is not enabled"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_request_rejects_unknown_security_fields() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": {},
+            "unrecognized_security_artifact": { "proof": "ignored-without-this-check" }
+        });
+
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("unknown field"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mediated_governed_mustprepay_authorizes_with_payment_adapter() {
         // An approved governed MustPrepay request authorizes only because a payment
         // adapter is installed on the mediation kernel: the kernel prepays the
@@ -543,7 +1093,9 @@
         // a nonce.
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let directory = tempfile::tempdir().unwrap();
+        let (budget, admission_config) =
+            durable_mediation_budget_and_admission(directory.path(), None);
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         // Worst-case charge (100) crosses the approval threshold (50), so an
         // approval token is required alongside the governed intent.
@@ -559,6 +1111,7 @@
             true,
             Some(Box::new(chio_kernel::SimPaymentAdapter::new())),
             None,
+            Some(admission_config),
         );
 
         let request_id = "req-mustprepay-adapter";
@@ -583,6 +1136,91 @@
         assert!(
             json["execution_nonce"].is_object(),
             "an authorized MustPrepay reservation must mint an execution nonce"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_remote_budget_mustprepay_without_atomic_journal_never_calls_rail() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let directory = tempfile::tempdir().unwrap();
+        let (_, admission_config) =
+            durable_mediation_budget_and_admission(directory.path(), None);
+        let remote_budget: Arc<dyn BudgetStore> = Arc::from(
+            chio_control_plane::trust_control::service_runtime::budget::build_remote_budget_store(
+                "http://127.0.0.1:1",
+                "test-control-token",
+            )
+            .unwrap(),
+        );
+        assert!(!remote_budget.supports_durable_atomic_payment_journal());
+        let kernel = issuing_kernel(&signer, Arc::clone(&remote_budget), &[]);
+        let cap = issue_governed_capability(
+            &kernel,
+            &agent,
+            "cost-srv",
+            "compute",
+            100,
+            "USD",
+            50,
+        );
+        let approver = signer.clone();
+        let adapter = RecordingPaymentAdapter::default();
+        let rail_calls = Arc::clone(&adapter.rail_calls);
+        let authorizations = Arc::clone(&adapter.authorizations);
+        let captures = Arc::clone(&adapter.captures);
+        let state = mediated_test_state_core(
+            signer,
+            Arc::clone(&remote_budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            Some(Box::new(adapter)),
+            None,
+            Some(admission_config),
+        );
+
+        let request_id = "req-mustprepay-remote-no-atomic-journal";
+        let intent = governed_mustprepay_intent(
+            "intent-mustprepay-remote-no-atomic-journal",
+            "cost-srv",
+            "compute",
+            100,
+            "USD",
+        );
+        let approval = governed_approval_token(&approver, &agent.public_key(), &intent, request_id);
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-remote-no-atomic-journal" },
+            "request_id": request_id,
+            "governed_intent": intent,
+            "approval_token": approval,
+        });
+
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["status"], "deny", "{json}");
+        assert!(json["execution_nonce"].is_null(), "{json}");
+        assert!(json["receipt"]["decision"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("atomically co-commits payment-journal state")));
+        assert_eq!(
+            rail_calls.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "unsupported remote journal topology must fail before every payment rail call"
+        );
+        assert_eq!(
+            authorizations.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "unsupported remote journal topology must fail before rail authorization"
+        );
+        assert_eq!(
+            captures.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "unsupported remote journal topology must fail before rail capture"
         );
     }
 
@@ -684,7 +1322,7 @@
         // max_total (1000) far exceeds a single reservation (100), so the second
         // request cannot be denied for budget: the only reason to reject it is a
         // DPoP replay store that persists across requests. That persistence only
-        // holds if a single kernel is reused for the process lifetime.
+        // holds if a single kernel is reused for the service lifetime.
         let cap = issue_dpop_capability_with_total(
             &kernel, &agent, "cost-srv", "compute", 100, 1000, "USD",
         );
@@ -724,7 +1362,7 @@
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_reused_request_id_is_conflict() {
+    async fn mediated_exact_request_id_replays_without_new_reservation() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -744,14 +1382,71 @@
         let (status, first) = post_evaluate(Arc::clone(&state), &body).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(first["status"], "authorized");
+        let usage_before = budget.list_usages(100, None).unwrap();
+        let tool_log_before =
+            serde_json::to_value(&state.tool_receipt_log.lock().await.receipts).unwrap();
 
-        // Reusing the caller-supplied request_id is rejected fail-closed with 409
-        // before authorizing, so it cannot collapse into an idempotent no-op
-        // reservation that defeats the over-subscription guard.
+        // An identical authenticated retry receives the frozen handoff and does
+        // not reserve again or re-enter the sidecar receipt publisher.
         let (status, second) = post_evaluate(Arc::clone(&state), &body).await;
-        assert_eq!(status, StatusCode::CONFLICT);
-        assert_ne!(second["status"], "authorized");
-        assert_eq!(second["error"], "chio_request_id_reused");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(second, first);
+        assert_eq!(budget.list_usages(100, None).unwrap(), usage_before);
+        assert_eq!(
+            serde_json::to_value(&state.tool_receipt_log.lock().await.receipts).unwrap(),
+            tool_log_before
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn unauthenticated_requests_cannot_distinguish_mediation_topologies() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let issuing = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let mut forged = issue_cost_bearing_capability(
+            &issuing,
+            &agent,
+            "cost-srv",
+            "compute",
+            100,
+            1000,
+            "USD",
+        );
+        forged.id = "forged-topology-probe".to_string();
+        let body = serde_json::json!({
+            "capability": forged,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-topology" },
+        });
+
+        let local = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let remote = mediated_test_state_inner(
+            signer.clone(),
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            false,
+        );
+        let no_token = mediated_test_state_with_control_token(
+            signer.clone(),
+            Arc::clone(&budget),
+            Vec::new(),
+            None,
+        );
+        let mut no_budget = mediated_test_state(signer, budget, Vec::new());
+        let no_budget_state = Arc::get_mut(&mut no_budget).unwrap();
+        no_budget_state.mediation_kernel = None;
+        no_budget_state.mediation_hold_capable = false;
+        no_budget_state.budget_store = None;
+
+        let expected = post_evaluate_raw(local, &body).await;
+        assert_eq!(expected.0, StatusCode::INTERNAL_SERVER_ERROR);
+        for state in [remote, no_token, no_budget] {
+            assert_eq!(post_evaluate_raw(state, &body).await, expected);
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -784,7 +1479,7 @@
         // Fail-closed: the mediated route rejects rather than mint an
         // unreconcilable reserved nonce.
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(json["error"], "chio_mediation_requires_local_budget_store");
+        assert_eq!(json["error"], "chio_mediation_unavailable");
         assert_ne!(json["status"], "authorized");
         assert!(
             json["execution_nonce"].is_null(),
@@ -820,7 +1515,7 @@
         });
         let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(json["error"], "chio_mediation_requires_reconcile_token");
+        assert_eq!(json["error"], "chio_mediation_unavailable");
         assert_ne!(json["status"], "authorized");
         assert!(
             json["execution_nonce"].is_null(),
@@ -862,7 +1557,7 @@
         });
         let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(json["error"], "chio_mediation_requires_reconcile_token");
+        assert_eq!(json["error"], "chio_mediation_unavailable");
         assert_ne!(json["status"], "authorized");
         assert!(
             json["execution_nonce"].is_null(),
@@ -922,20 +1617,96 @@
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_durable_hold_rejects_request_id_reuse_across_restart() {
+    async fn reconcile_rejects_unknown_fields_at_every_signed_nonce_layer() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        // The durable budget store survives a restart; the ProxyState (and its
-        // in-memory request-id window) is rebuilt fresh.
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
+        let state = mediated_test_state(signer, budget, Vec::new());
+        let parameters = serde_json::json!({ "invoice": "inv-closed-schema" });
+        let authorize_body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": parameters,
+            "request_id": "recon-closed-schema",
+        });
+        let (status, authorized) = post_evaluate(Arc::clone(&state), &authorize_body).await;
+        assert_eq!(status, StatusCode::OK, "{authorized}");
+        let base = serde_json::json!({
+            "execution_nonce": authorized["execution_nonce"].clone(),
+            "arguments": parameters,
+            "realized_cost": { "units": 30, "currency": "USD" },
+        });
+
+        let mut unknown_request = base.clone();
+        unknown_request
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+
+        let mut unknown_outer_nonce = base.clone();
+        unknown_outer_nonce["execution_nonce"]
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+
+        let mut unknown_nonce_body = base.clone();
+        unknown_nonce_body["execution_nonce"]["nonce"]
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+
+        let mut unknown_binding = base.clone();
+        unknown_binding["execution_nonce"]["nonce"]["bound_to"]
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+
+        for malformed in [
+            unknown_request,
+            unknown_outer_nonce,
+            unknown_nonce_body,
+            unknown_binding,
+        ] {
+            let (status, rejected) = post_reconcile(Arc::clone(&state), &malformed).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{rejected}");
+            assert_eq!(rejected["error"], "chio_bad_request");
+            assert_eq!(rejected["message"], "invalid reconcile payload");
+        }
+
+        let (status, reconciled) = post_reconcile(state, &base).await;
+        assert_eq!(status, StatusCode::OK, "{reconciled}");
+        assert_eq!(reconciled["status"], "reconciled");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_exact_request_id_replays_across_restart() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let directory = tempfile::tempdir().unwrap();
+        let (budget, admission_config) =
+            durable_mediation_budget_and_admission(directory.path(), None);
+        let budget_path = admission_config.budget_path.clone();
+        let approval_path = admission_config.approval_path.clone();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
         let cap_value = serde_json::to_value(&cap).unwrap();
 
-        // Pre-restart sidecar: reserve a hold under a caller-chosen request_id. The
-        // kernel derives the durable hold id from it and marks the hold reserved.
-        let before = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let before = mediated_test_state_core(
+            signer.clone(),
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            None,
+            Some(admission_config),
+        );
         let body = serde_json::json!({
             "capability": cap_value,
             "tool_server": "cost-srv",
@@ -943,31 +1714,45 @@
             "parameters": { "invoice": "inv-1" },
             "request_id": "restart-req",
         });
-        let (status, authorized) = post_evaluate(Arc::clone(&before), &body).await;
+        let (status, authorized_bytes) = post_evaluate_raw(Arc::clone(&before), &body).await;
         assert_eq!(status, StatusCode::OK);
+        let authorized: serde_json::Value = serde_json::from_slice(&authorized_bytes).unwrap();
         assert_eq!(authorized["status"], "authorized");
 
-        // Restart: a fresh ProxyState with an EMPTY in-memory window, sharing only
-        // the durable budget store. The seeded sidecar signer survives, so the
-        // rebuilt mediation kernel still trusts the capability.
-        let after = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
-
-        // Reusing the same request_id must be rejected fail-closed via the DURABLE
-        // check: the in-memory fast path is empty after the restart, so only the
-        // open hold recorded in the budget store closes the gap. Without it the
-        // reused id would collapse into an idempotent authorize that mints a second
-        // nonce against the same open reservation.
-        let (status, replay) = post_evaluate(Arc::clone(&after), &body).await;
-        assert_eq!(status, StatusCode::CONFLICT);
-        assert_ne!(replay["status"], "authorized");
-        assert!(
-            replay["execution_nonce"].is_null(),
-            "no second nonce is minted against the open hold"
+        drop(before);
+        drop(kernel);
+        drop(budget);
+        let reopened_budget: Arc<dyn BudgetStore> = Arc::new(
+            chio_store_sqlite::budget_store::SqliteBudgetStore::open(&budget_path).unwrap(),
         );
-        assert_eq!(replay["error"], "chio_request_id_reused");
+        let after = mediated_test_state_core(
+            signer,
+            Arc::clone(&reopened_budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            None,
+            Some(TestMediationAdmissionConfig {
+                budget_path,
+                approval_path,
+                threshold_config: None,
+            }),
+        );
+        let usages_before_replay = reopened_budget.list_usages(100, None).unwrap();
 
-        // A fresh request_id still authorizes on the restarted sidecar: the durable
-        // check rejects only a reused id that already backs an open hold.
+        // The exact immutable retry receives the frozen handoff, including the
+        // original execution nonce, without reserving again.
+        let (status, replay_bytes) = post_evaluate_raw(Arc::clone(&after), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(replay_bytes, authorized_bytes);
+        assert_eq!(
+            reopened_budget.list_usages(100, None).unwrap(),
+            usages_before_replay
+        );
+
+        // A fresh request id remains independently authorized.
         let fresh_body = serde_json::json!({
             "capability": cap_value,
             "tool_server": "cost-srv",
@@ -1088,7 +1873,13 @@
         // nonce store already consumed it and the reserved hold is closed.
         let (status, replay) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(replay["error"], "chio_reconcile_rejected");
+        assert_eq!(
+            replay,
+            serde_json::json!({
+                "error": "chio_reconcile_rejected",
+                "message": "reconcile request was rejected",
+            })
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1123,7 +1914,13 @@
         });
         let (status, rejected) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(rejected["error"], "chio_reconcile_rejected");
+        assert_eq!(
+            rejected,
+            serde_json::json!({
+                "error": "chio_reconcile_rejected",
+                "message": "reconcile request was rejected",
+            })
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

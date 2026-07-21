@@ -214,6 +214,16 @@ fn make_test_state(
     receipt_db: Option<&str>,
     allow_advisory: bool,
 ) -> Arc<ProxyState> {
+    make_test_state_with_revocation_store(routes, upstream, receipt_db, allow_advisory, None)
+}
+
+fn make_test_state_with_revocation_store(
+    routes: Vec<RouteEntry>,
+    upstream: String,
+    receipt_db: Option<&str>,
+    allow_advisory: bool,
+    revocation_store_override: Option<Arc<dyn chio_kernel::RevocationStore>>,
+) -> Arc<ProxyState> {
     let keypair = Keypair::generate();
     let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
         Arc::new(SqliteApprovalStore::open(path).test_unwrap())
@@ -223,8 +233,9 @@ fn make_test_state(
     let (receipt_store, receipts, tool_receipts, revoked_capability_ids) =
         if let Some(path) = receipt_db {
             let store = SqliteReceiptStore::open(path).test_unwrap();
-            let receipts = store.load_receipts().test_unwrap();
-            let tool_receipts = store.load_tool_receipts().test_unwrap();
+            let trusted_signers = [keypair.public_key()];
+            let receipts = store.load_receipts(&trusted_signers).test_unwrap();
+            let tool_receipts = store.load_tool_receipts(&trusted_signers).test_unwrap();
             let revoked_capability_ids = store.load_revoked_capability_ids().test_unwrap();
             (
                 Some(Mutex::new(store)),
@@ -238,22 +249,35 @@ fn make_test_state(
     // Mirror the proxy's serving modes: a durable sibling store when a receipt
     // database is configured, an in-memory store shared with the release path
     // otherwise, so a release is honored in-process even without a receipt db.
-    let revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> = Some(match receipt_db {
-        Some(path) => Arc::new(
-            chio_store_sqlite::SqliteRevocationStore::open(format!("{path}.revocations"))
-                .test_unwrap(),
-        ) as Arc<dyn chio_kernel::RevocationStore>,
-        None => Arc::new(chio_kernel::InMemoryRevocationStore::new()),
-    });
+    let revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> = revocation_store_override
+        .or_else(|| {
+            Some(match receipt_db {
+                Some(path) => Arc::new(
+                    chio_store_sqlite::SqliteRevocationStore::open(format!("{path}.revocations"))
+                        .test_unwrap(),
+                ) as Arc<dyn chio_kernel::RevocationStore>,
+                None => Arc::new(chio_kernel::InMemoryRevocationStore::new()),
+            })
+        });
     let signer_public_key = keypair.public_key();
     let trusted_capability_issuers = vec![signer_public_key.clone()];
     let trusted_receipt_signers = vec![signer_public_key];
-    let evaluator = RequestEvaluator::new_ephemeral_with_approval_store(
+    let evaluator_receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>> =
+        receipt_db.map(|path| {
+            Arc::new(chio_store_sqlite::SqliteReceiptStore::open(path).test_unwrap())
+                as Arc<dyn chio_kernel::ReceiptStore>
+        });
+    let evaluator = RequestEvaluator::new_with_durable_stores(
         routes,
         keypair.clone(),
         "test-policy".to_string(),
         Arc::clone(&approval_store),
+        Vec::new(),
+        evaluator_receipt_store,
+        revocation_store.clone(),
+        true,
     )
+    .test_unwrap()
     .with_verified_manifest_registry(crate::evaluator::compatibility_manifest_registry_for_tests());
     let egress_contract = default_upstream_egress_contract(&upstream).test_unwrap();
     let http_client = client_builder_with_contract(&egress_contract)
@@ -279,14 +303,70 @@ fn make_test_state(
         budget_store: None,
         mediation_hold_capable: false,
         mediation_kernel: None,
-        minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
-            chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
-        )),
         reaper_handle: Mutex::new(None),
         allow_advisory,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",
     })
+}
+
+#[derive(Default)]
+struct ObservedRevocationStore {
+    queried_ids: std::sync::Mutex<Vec<String>>,
+    revoked_ids: std::sync::Mutex<HashSet<String>>,
+    fail_query_id: Option<String>,
+}
+
+impl ObservedRevocationStore {
+    fn with_revoked(ids: impl IntoIterator<Item = &'static str>) -> Self {
+        Self {
+            queried_ids: std::sync::Mutex::new(Vec::new()),
+            revoked_ids: std::sync::Mutex::new(ids.into_iter().map(str::to_string).collect()),
+            fail_query_id: None,
+        }
+    }
+
+    fn failing(capability_id: &str) -> Self {
+        Self {
+            fail_query_id: Some(capability_id.to_string()),
+            ..Self::default()
+        }
+    }
+
+    fn queried_ids(&self) -> Vec<String> {
+        self.queried_ids.lock().test_unwrap().clone()
+    }
+
+    fn clear_queries(&self) {
+        self.queried_ids.lock().test_unwrap().clear();
+    }
+}
+
+impl chio_kernel::RevocationStore for ObservedRevocationStore {
+    fn is_revoked(&self, capability_id: &str) -> Result<bool, chio_kernel::RevocationStoreError> {
+        self.queried_ids
+            .lock()
+            .test_unwrap()
+            .push(capability_id.to_string());
+        if self.fail_query_id.as_deref() == Some(capability_id) {
+            return Err(chio_kernel::RevocationStoreError::Sync(
+                "sensitive revocation backend /var/lib/chio/revocations.db".to_string(),
+            ));
+        }
+        Ok(self
+            .revoked_ids
+            .lock()
+            .test_unwrap()
+            .contains(capability_id))
+    }
+
+    fn revoke(&self, capability_id: &str) -> Result<bool, chio_kernel::RevocationStoreError> {
+        Ok(self
+            .revoked_ids
+            .lock()
+            .test_unwrap()
+            .insert(capability_id.to_string()))
+    }
 }
 
 /// Build proxy state whose upstream client aborts a hop after `timeout`, so a
@@ -335,9 +415,6 @@ fn test_state_with_client_timeout(
         budget_store: None,
         mediation_hold_capable: false,
         mediation_kernel: None,
-        minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
-            chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
-        )),
         reaper_handle: Mutex::new(None),
         allow_advisory: false,
         receipt_backend: "ephemeral",
@@ -394,9 +471,9 @@ fn signed_approval_response_token(
 }
 
 fn temp_receipt_db_path() -> String {
-    let mut path = std::env::temp_dir();
-    path.push(format!("chio-api-protect-test-{}.db", uuid::Uuid::now_v7()));
-    path.to_string_lossy().to_string()
+    chio_test_support::private_fs::unique_sqlite_path("chio-api-protect-test")
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn with_peer_addr(mut request: Request<Body>, peer: SocketAddr) -> Request<Body> {

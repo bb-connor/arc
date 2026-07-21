@@ -244,6 +244,11 @@ fn assert_post_dispatch_cleanup_failure_projection(
 
     let metadata = response.receipt.metadata.as_ref().unwrap();
     assert!(metadata["budget_authority"]["terminal"].is_null());
+    let financial_budget_authority = response
+        .receipt
+        .financial_budget_authority_metadata()
+        .expect("cleanup fault receipt must retain typed budget authorization metadata");
+    assert!(financial_budget_authority.terminal.is_none());
     assert_eq!(
         metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
         true
@@ -312,7 +317,7 @@ fn post_dispatch_cleanup_failure_rejects_forged_budget_authority() {
     assert!(response.receipt.is_denied());
     assert_eq!(entries.load(Ordering::SeqCst), 1);
     let metadata = response.receipt.metadata.as_ref().unwrap();
-    assert_forged_budget_authority_removed(metadata);
+    assert_forged_budget_authority_removed(&response.receipt);
     assert_eq!(
         metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["step"],
         "payment_release"

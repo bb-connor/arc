@@ -32,7 +32,8 @@ fn install_strict_nonce_store(kernel: &mut ChioKernel) {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
 }
 
 #[test]
@@ -192,7 +193,9 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
     // consumes 4000 bps of the parent's 5000 bps sibling budget.
     let mut kernel_before = make_kernel(config_before);
     kernel_before.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
-    kernel_before.set_budget_store_handle(Arc::clone(&budget));
+    kernel_before
+        .set_budget_store_handle(Arc::clone(&budget))
+        .expect("install budget store");
     let parent = make_capability(&kernel_before, &parent_kp, parent_scope.clone(), 300);
     {
         let seed_store = SqliteReceiptStore::open(&receipt_path).unwrap();
@@ -211,7 +214,6 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
     install_strict_nonce_store(&mut kernel_before);
 
     let child_a = make_v2_delegated_child(V2DelegatedChildInput {
-        kernel: &kernel_before,
         parent: &parent,
         parent_kp: &parent_kp,
         child_kp: &child_a_kp,
@@ -221,7 +223,6 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
         share_bps: 4_000,
     });
     let child_b = make_v2_delegated_child(V2DelegatedChildInput {
-        kernel: &kernel_before,
         parent: &parent,
         parent_kp: &parent_kp,
         child_kp: &child_b_kp,
@@ -249,7 +250,9 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
     config_after.keypair = signer.clone();
     let mut kernel_after = make_kernel(config_after);
     kernel_after.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
-    kernel_after.set_budget_store_handle(Arc::clone(&budget));
+    kernel_after
+        .set_budget_store_handle(Arc::clone(&budget))
+        .expect("install budget store");
     kernel_after
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&receipt_path).unwrap()))
         .unwrap();
@@ -364,6 +367,32 @@ fn delegated_reserving_child_with_non_monetary_grant_holds_sibling_share_until_r
         .execution_nonce
         .clone()
         .expect("child A invocation reservation mints a nonce");
+    let invocation_hold_id = format!("budget-hold:req-a-reserve:{}:0", fixture.child_a.id);
+    let invocation_hold = kernel
+        .budget_store
+        .get_budget_hold(&invocation_hold_id)
+        .unwrap()
+        .expect("atomic invocation-only reservation hold exists");
+    assert!(invocation_hold.reserved_until.is_some());
+    assert_eq!(invocation_hold.authorized_exposure_units, 0);
+    assert_eq!(invocation_hold.remaining_exposure_units, 0);
+    assert_eq!(invocation_hold.reserved_currency, None);
+    assert_eq!(invocation_hold.reserved_payment_reference, None);
+    assert_eq!(invocation_hold.reserved_budget_total, None);
+    let receipt_metadata = reserved_a
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("invocation reservation receipt metadata");
+    assert_eq!(
+        receipt_metadata["budget_authority"]["hold_id"],
+        invocation_hold_id
+    );
+    assert_eq!(
+        receipt_metadata["budget_authority"]["authorize"]["exposure_units"],
+        0
+    );
+    assert!(receipt_metadata.get("financial").is_none());
 
     let second = delegated_invocation_reserve_request(
         "req-b-reserve",
@@ -491,11 +520,23 @@ fn delegated_reserving_child_with_non_monetary_grant_sibling_share_freed_after_t
 // ---------------------------------------------------------------------------
 
 struct StampFailingBudgetStore {
-    inner: InMemoryBudgetStore,
+    inner: Box<dyn BudgetStore>,
     fail_mark: std::sync::Arc<AtomicBool>,
 }
 
 impl BudgetStore for StampFailingBudgetStore {
+    fn authority_profile(&self) -> crate::budget_store::BudgetStoreProfile {
+        self.inner.authority_profile()
+    }
+
+    fn budget_guarantee_level(&self) -> crate::budget_store::BudgetGuaranteeLevel {
+        self.inner.budget_guarantee_level()
+    }
+
+    fn supports_durable_atomic_payment_journal(&self) -> bool {
+        self.inner.supports_durable_atomic_payment_journal()
+    }
+
     fn try_increment(
         &self,
         capability_id: &str,
@@ -576,6 +617,59 @@ impl BudgetStore for StampFailingBudgetStore {
         self.inner.get_usage(capability_id, grant_index)
     }
 
+    fn record_payment_journal(
+        &self,
+        entry: &crate::payment::PaymentJournalRecord,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.record_payment_journal(entry)
+    }
+
+    fn advance_payment_journal(
+        &self,
+        request_id: &str,
+        expected: crate::payment::PaymentJournalState,
+        next: crate::payment::PaymentJournalState,
+        authorization_id: Option<&str>,
+        transaction_id: Option<&str>,
+        settle: Option<crate::payment::PaymentSettleIntent>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.advance_payment_journal(
+            request_id,
+            expected,
+            next,
+            authorization_id,
+            transaction_id,
+            settle,
+        )
+    }
+
+    fn close_payment_journal(&self, request_id: &str) -> Result<bool, BudgetStoreError> {
+        self.inner.close_payment_journal(request_id)
+    }
+
+    fn list_incomplete_payment_journal(
+        &self,
+        older_than_unix_ms: u64,
+    ) -> Result<Vec<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        self.inner
+            .list_incomplete_payment_journal(older_than_unix_ms)
+    }
+
+    fn get_payment_journal(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        self.inner.get_payment_journal(request_id)
+    }
+
+    fn payment_journal_reconcile_failed_rail(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<String>, BudgetStoreError> {
+        self.inner
+            .payment_journal_reconcile_failed_rail(request_id)
+    }
+
     fn authorize_budget_hold(
         &self,
         request: crate::budget_store::BudgetAuthorizeHoldRequest,
@@ -602,6 +696,13 @@ impl BudgetStore for StampFailingBudgetStore {
         request: crate::budget_store::BudgetReleaseHoldRequest,
     ) -> Result<crate::budget_store::BudgetReleaseHoldDecision, BudgetStoreError> {
         self.inner.release_budget_hold(request)
+    }
+
+    fn capture_invocation_reservations(
+        &self,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<crate::budget_store::BudgetHoldMutationDecision, BudgetStoreError> {
+        self.inner.capture_invocation_reservations(request)
     }
 
     fn get_budget_hold(
@@ -633,6 +734,52 @@ impl BudgetStore for StampFailingBudgetStore {
         )
     }
 
+    fn mark_invocation_hold_reserved(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        if self.fail_mark.load(Ordering::SeqCst) {
+            return Err(BudgetStoreError::Invariant(
+                "invocation reservation stamp write failed (test double)".to_string(),
+            ));
+        }
+        self.inner.mark_invocation_hold_reserved(
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        )
+    }
+
+    fn mark_admission_operation_hold_reserved(
+        &self,
+        hold_id: &str,
+        admission_operation: &crate::budget_store::BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        if self.fail_mark.load(Ordering::SeqCst) {
+            return Err(BudgetStoreError::Invariant(
+                "reservation stamp write failed (test double)".to_string(),
+            ));
+        }
+        self.inner.mark_admission_operation_hold_reserved(
+            hold_id,
+            admission_operation,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
+
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         self.inner.reap_expired_reserved_holds(now_unix_secs)
     }
@@ -645,9 +792,10 @@ fn reserving_stamp_failure_reverses_authorized_hold() {
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
     let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
     kernel.set_budget_store(Box::new(StampFailingBudgetStore {
-        inner: InMemoryBudgetStore::new(),
+        inner: Box::new(InMemoryBudgetStore::new()),
         fail_mark: std::sync::Arc::clone(&fail_mark),
-    }));
+    }))
+    .expect("install budget store");
     install_strict_nonce_store(&mut kernel);
 
     // The whole grant is reservable by one authorization, so a stranded hold
@@ -700,6 +848,78 @@ fn reserving_stamp_failure_reverses_authorized_hold() {
     );
 }
 
+#[test]
+fn invocation_only_stamp_failure_reverses_exact_atomic_hold() {
+    let fixture = make_sibling_sum_invocation_fixture("invocation-stamp-failure");
+    let path = fixture.path.clone();
+    let mut kernel = fixture.kernel;
+    let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
+    kernel
+        .set_budget_store(Box::new(StampFailingBudgetStore {
+            inner: Box::new(InMemoryBudgetStore::new()),
+            fail_mark: std::sync::Arc::clone(&fail_mark),
+        }))
+        .expect("install budget store");
+    install_strict_nonce_store(&mut kernel);
+
+    let failed = delegated_invocation_reserve_request(
+        "req-invocation-stamp-fail",
+        &fixture.child_a,
+        &fixture.child_a_kp,
+    );
+    let error = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&failed, None)
+        .expect_err("invocation-only reservation stamp must fail");
+    assert!(error.to_string().contains("stamp"));
+    let failed_hold_id = format!(
+        "budget-hold:req-invocation-stamp-fail:{}:0",
+        fixture.child_a.id
+    );
+    let failed_hold = kernel
+        .budget_store
+        .get_budget_hold(&failed_hold_id)
+        .unwrap()
+        .expect("atomic invocation hold remains auditable");
+    assert_eq!(
+        failed_hold.disposition,
+        crate::budget_store::BudgetHoldDispositionView::Reversed
+    );
+    assert_eq!(
+        kernel
+            .budget_store
+            .get_usage(&fixture.child_a.id, 0)
+            .unwrap()
+            .unwrap()
+            .invocation_count,
+        0
+    );
+
+    fail_mark.store(false, Ordering::SeqCst);
+    let retry = delegated_invocation_reserve_request(
+        "req-invocation-stamp-retry",
+        &fixture.child_a,
+        &fixture.child_a_kp,
+    );
+    let reserved = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&retry, None)
+        .expect("retry after exact hold reversal");
+    assert_eq!(reserved.verdict, Verdict::Allow);
+    let retry_hold_id = format!(
+        "budget-hold:req-invocation-stamp-retry:{}:0",
+        fixture.child_a.id
+    );
+    let retry_hold = kernel
+        .budget_store
+        .get_budget_hold(&retry_hold_id)
+        .unwrap()
+        .expect("retry invocation hold exists");
+    assert!(retry_hold.reserved_until.is_some());
+    assert_eq!(retry_hold.reserved_currency, None);
+    assert_eq!(retry_hold.reserved_budget_total, None);
+
+    let _ = std::fs::remove_file(path);
+}
+
 // A failed reservation stamp reverses the hold, so the reserved preflight receipt
 // must not have been persisted first: a `hold_disposition: reserved` receipt with
 // no terminal event standing over a reversed hold is a corrupted audit view. The
@@ -711,9 +931,10 @@ fn reserving_stamp_failure_persists_no_reserved_receipt() {
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
     let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
     kernel.set_budget_store(Box::new(StampFailingBudgetStore {
-        inner: InMemoryBudgetStore::new(),
+        inner: Box::new(InMemoryBudgetStore::new()),
         fail_mark: std::sync::Arc::clone(&fail_mark),
-    }));
+    }))
+    .expect("install budget store");
     install_strict_nonce_store(&mut kernel);
 
     let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
@@ -839,7 +1060,8 @@ fn reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable() 
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
 
     let grant = make_monetary_grant("cost-srv", "compute", 100, 150, "USD");
     let cap = kernel
@@ -1036,7 +1258,8 @@ fn reconcile_by_nonce_budget_remaining_accounts_for_other_committed_spend() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let grant = make_monetary_grant("cost-srv", "compute", 40, 150, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
@@ -1097,7 +1320,8 @@ fn reconcile_by_nonce_no_total_cap_grant_does_not_stamp_sentinel() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let grant = {
         use chio_core::capability::scope::MonetaryAmount;
         let mut grant = make_monetary_grant("cost-srv", "compute", 100, 999, "USD");
@@ -1229,7 +1453,8 @@ fn reconcile_by_nonce_receipt_persist_failure_still_returns_authoritative_receip
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let grant = make_monetary_grant("cost-srv", "compute", 100, 150, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
@@ -1416,7 +1641,7 @@ impl BudgetStore for PartialReapBudgetStore {
         // Close exactly one hold, then fail: models a store that settled some
         // holds before erroring partway through the sweep.
         if let Some(disposition) = self.lock().get_mut(&self.close_on_reap) {
-            *disposition = crate::budget_store::BudgetHoldDispositionView::Reconciled;
+            *disposition = crate::budget_store::BudgetHoldDispositionView::Expired;
         }
         Err(BudgetStoreError::Invariant(
             "reap failed after settling one hold (test double)".to_string(),
@@ -1427,7 +1652,9 @@ impl BudgetStore for PartialReapBudgetStore {
 #[test]
 fn reaper_releases_shares_for_holds_closed_before_a_store_error() {
     let mut kernel = make_kernel(make_config());
-    kernel.set_budget_store(Box::new(PartialReapBudgetStore::new("h1")));
+    kernel
+        .set_budget_store(Box::new(PartialReapBudgetStore::new("h1")))
+        .expect("install budget store");
     {
         let mut shares = match kernel.reserved_sibling_shares.lock() {
             Ok(guard) => guard,
@@ -1620,6 +1847,25 @@ impl BudgetStore for TransientReconcileFailBudgetStore {
         )
     }
 
+    fn mark_admission_operation_hold_reserved(
+        &self,
+        hold_id: &str,
+        admission_operation: &crate::budget_store::BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.mark_admission_operation_hold_reserved(
+            hold_id,
+            admission_operation,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
+
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         self.inner.reap_expired_reserved_holds(now_unix_secs)
     }
@@ -1638,12 +1884,14 @@ fn reconcile_by_nonce_transient_settle_error_preserves_nonce_for_retry() {
     kernel.set_execution_nonce_store(
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-    );
+    )
+    .expect("install execution nonce store");
     let fail_reconcile = std::sync::Arc::new(AtomicBool::new(false));
     kernel.set_budget_store(Box::new(TransientReconcileFailBudgetStore {
         inner: InMemoryBudgetStore::new(),
         fail_reconcile: std::sync::Arc::clone(&fail_reconcile),
-    }));
+    }))
+    .expect("install budget store");
     let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)

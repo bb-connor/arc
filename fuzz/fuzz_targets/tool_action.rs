@@ -246,6 +246,7 @@ fn with_guard_context(
         model_metadata: None,
         supplemental_authorization: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let ctx = GuardContext {
         request: &request,

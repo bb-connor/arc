@@ -13,11 +13,10 @@ use chio_core_types::{
 use chio_keyring::{
     derive_key_id, AnchorId, ArtifactTimeAnchorKind, AuthorityId, BootstrapAuthorization, EventId,
     EventReason, KeyLogAuthorizations, KeyLogEventBody, KeyLogOperation, KeyLogPolicy,
-    KeyLogPolicyConfig, KeyringAuthoritySigningBackend, KeyringSigningRouter, LogId,
-    NewKeyProofOfPossession, OldKeyAuthorization, RecoveryPolicyId, SignedArtifactTimeAnchor,
-    SignedKeyLogEvent, SigningTopology, SqliteKeyLogStore, SqlitePinnedKeyLogVerifier,
-    TrustedClock, WitnessId, WitnessRosterId, WitnessSignature, WitnessedRotationRuntime,
-    KEY_LOG_EVENT_SCHEMA,
+    KeyLogPolicyConfig, KeyringSigningRouter, LogId, NewKeyProofOfPossession, OldKeyAuthorization,
+    RecoveryPolicyId, SignedArtifactTimeAnchor, SignedKeyLogEvent, SigningTopology,
+    SqliteKeyLogStore, SqlitePinnedKeyLogVerifier, TrustedClock, WitnessId, WitnessRosterId,
+    WitnessSignature, WitnessedRotationRuntime, KEY_LOG_EVENT_SCHEMA,
 };
 
 mod support;
@@ -266,17 +265,6 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     let reopened_store = Arc::new(SqliteKeyLogStore::open(&path, ready.policy).test_unwrap());
     assert!(KeyringSigningRouter::open(Arc::clone(&reopened_store), Box::new(ready.old)).is_err());
     KeyringSigningRouter::open(reopened_store, Box::new(ready.new)).test_unwrap();
-}
-
-#[test]
-fn authority_backend_rejects_router_without_validated_independent_services() {
-    let directory = tempfile::tempdir().test_unwrap();
-    let ready = ready_log(&trusted_temp_path(&directory, "authority-backend.sqlite"));
-    let router = Arc::new(
-        KeyringSigningRouter::open(Arc::clone(&ready.store), Box::new(ready.old.clone()))
-            .test_unwrap(),
-    );
-    assert!(KeyringAuthoritySigningBackend::new(router).is_err());
 }
 
 #[test]

@@ -30,6 +30,7 @@ mod approval_flow {
     include!("tests/approval_flow.rs");
 }
 include!("tests/admission_saga.rs");
+include!("tests/ordinary_request_fingerprint.rs");
 include!("tests/admission_payment_cleanup.rs");
 include!("tests/execution_nonce.rs");
 include!("tests/threshold_approval.rs");

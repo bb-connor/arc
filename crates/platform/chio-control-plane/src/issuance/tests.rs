@@ -3,7 +3,6 @@ use chio_test_support::prelude::*;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::{
     aggregate_budget::{
@@ -30,11 +29,8 @@ use crate::policy::{
 };
 
 fn unique_path(prefix: &str, extension: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}{extension}"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix)
+        .with_extension(extension.trim_start_matches('.'))
 }
 
 fn wrap_capability_authority(

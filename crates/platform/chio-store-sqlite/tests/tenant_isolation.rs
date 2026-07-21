@@ -16,7 +16,6 @@
 //! accept caller-injected tenant hints, per the multi-tenant threat model.
 
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
@@ -28,11 +27,7 @@ use chio_store_sqlite::{SqliteReceiptStore, SqliteSecurityStateStore};
 use chio_test_support::prelude::*;
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("chio-{prefix}-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path(&format!("chio-{prefix}"))
 }
 
 fn cleanup(path: &std::path::Path) {

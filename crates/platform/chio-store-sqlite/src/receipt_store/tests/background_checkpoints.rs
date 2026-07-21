@@ -990,6 +990,7 @@ fn co_drain_flush_with_appends(
     id_prefix: &str,
 ) -> Result<Result<(), ReceiptStoreError>, Box<dyn std::error::Error>> {
     let sender = store.receipt_commit_actor.sender.clone();
+    let health = Arc::clone(&store.receipt_commit_actor.health);
     let handle = store.writer_handle();
     let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
     let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
@@ -1009,22 +1010,59 @@ fn co_drain_flush_with_appends(
         let receipt = sample_receipt_with_keypair(&format!("{id_prefix}-{i}"), i + 1, keypair);
         let raw_json = serde_json::to_string(&receipt)?;
         let (response, receiver) = std::sync::mpsc::sync_channel(1);
-        sender
-            .try_send(ReceiptCommitCommand::Append(Box::new(
-                ReceiptCommitRequest {
-                    receipt,
-                    raw_json,
-                    ensure_lineage: false,
-                    response,
-                },
-            )))
-            .map_err(|_| "failed to enqueue append")?;
+        let (inflight, inflight_release, _previous_inflight) =
+            WriterInflightLease::acquire(&health);
+        health.note_channel_send();
+        match sender.try_send(ReceiptCommitCommand::Append {
+            request: Box::new(ReceiptCommitRequest {
+                receipt,
+                raw_json,
+                ensure_lineage: false,
+                response,
+            }),
+            inflight,
+        }) {
+            Ok(()) => {
+                health.accepted_total.fetch_add(1, Ordering::SeqCst);
+                health.note_accept();
+            }
+            Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                inflight_release.release();
+                health.note_channel_send_rejected();
+                health.saturated_total.fetch_add(1, Ordering::SeqCst);
+                return Err("failed to enqueue append: writer queue is full".into());
+            }
+            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                inflight_release.release();
+                health.note_channel_send_rejected();
+                health.note_writer_unavailable();
+                return Err("failed to enqueue append: writer is unavailable".into());
+            }
+        }
         append_receivers.push(receiver);
     }
     let (flush_response, flush_receiver) = std::sync::mpsc::sync_channel(1);
-    sender
-        .try_send(ReceiptCommitCommand::Flush(flush_response))
-        .map_err(|_| "failed to enqueue flush")?;
+    let (flush_inflight, flush_inflight_release, _previous_inflight) =
+        WriterInflightLease::acquire(&health);
+    health.note_channel_send();
+    match sender.try_send(ReceiptCommitCommand::Flush {
+        response: flush_response,
+        inflight: flush_inflight,
+    }) {
+        Ok(()) => {}
+        Err(std::sync::mpsc::TrySendError::Full(_)) => {
+            flush_inflight_release.release();
+            health.note_channel_send_rejected();
+            health.saturated_total.fetch_add(1, Ordering::SeqCst);
+            return Err("failed to enqueue flush: writer queue is full".into());
+        }
+        Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+            flush_inflight_release.release();
+            health.note_channel_send_rejected();
+            health.note_writer_unavailable();
+            return Err("failed to enqueue flush: writer is unavailable".into());
+        }
+    }
 
     // Release the Write job: the actor now drains [Append x n, Flush] as one
     // batch, building owed checkpoints BEFORE releasing the flush waiter.
@@ -1034,7 +1072,191 @@ fn co_drain_flush_with_appends(
     let flush_result = flush_receiver.recv()?;
     // Keep the append receivers alive until the flush returns.
     drop(append_receivers);
+    assert_eq!(
+        health.inflight.load(Ordering::SeqCst),
+        0,
+        "all co-drained command leases must be released before Flush responds"
+    );
+    assert_eq!(
+        health.queue_depth.load(Ordering::SeqCst),
+        0,
+        "the actor must dequeue the complete co-drained batch"
+    );
     Ok(flush_result)
+}
+
+/// A co-drained Flush owns its command lease through the checkpoint portion of
+/// the barrier, after every Append command lease in the durable batch has been
+/// released. The actor also owns a checkpoint-activity lease so the same work
+/// stays visible even without a Flush. While the builder is held immediately
+/// before its transaction, queue depth is zero, inflight is two, and a zero
+/// stall threshold reports the active writer as wedged rather than idle.
+#[test]
+fn co_drained_flush_holds_inflight_through_checkpoint_work(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-flush-barrier-inflight");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = test_hooks::BLOCK_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+
+    let (entered, inflight, queue_depth, liveness, joined) = std::thread::scope(|scope| {
+        let checkpoint_hook = test_hooks::CheckpointBuildBlockGuard::arm();
+        let worker = scope.spawn(|| {
+            co_drain_flush_with_appends(&store, &keypair, max_batch, "rcpt-barrier-inflight")
+                .map_err(|error| error.to_string())
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !test_hooks::checkpoint_build_block_entered() && std::time::Instant::now() < deadline
+        {
+            std::thread::yield_now();
+        }
+        let entered = test_hooks::checkpoint_build_block_entered();
+        let inflight = store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(Ordering::SeqCst);
+        let queue_depth = store
+            .receipt_commit_actor
+            .health
+            .queue_depth
+            .load(Ordering::SeqCst);
+        let liveness = store.writer_liveness(std::time::Duration::ZERO);
+
+        // Always release the actor before joining, including when the hook was
+        // not reached because the worker failed early.
+        checkpoint_hook.release();
+        (entered, inflight, queue_depth, liveness, worker.join())
+    });
+
+    let flush_result = joined
+        .map_err(|_| "co-drained Flush worker panicked")?
+        .map_err(std::io::Error::other)?;
+    assert!(
+        entered,
+        "checkpoint builder did not reach its blocking hook"
+    );
+    assert_eq!(
+        inflight, 2,
+        "the co-drained Flush and checkpoint-activity leases must remain during checkpoint work"
+    );
+    assert_eq!(
+        queue_depth, 0,
+        "the co-drained commands already left the channel"
+    );
+    assert_eq!(
+        liveness,
+        chio_kernel::ReceiptWriterLiveness::Wedged,
+        "active checkpoint work must remain visible to writer liveness"
+    );
+    assert!(
+        flush_result.is_ok(),
+        "Flush must succeed after checkpoint work is released: {flush_result:?}"
+    );
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(Ordering::SeqCst),
+        0,
+        "Flush must release before responding"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Append durability responses intentionally precede background checkpoint
+/// construction, but the actor still owns the sole writer during that
+/// synchronous catch-up. The actor-activity lease must bridge the interval
+/// between Append command release and checkpoint completion so pre-dispatch
+/// health cannot admit a tool while the writer is blocked.
+#[test]
+fn append_checkpoint_catch_up_stays_inflight_after_append_response(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-append-checkpoint-inflight");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = test_hooks::BLOCK_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+
+    for index in 0..max_batch.saturating_sub(1) {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-append-checkpoint-inflight-{index}"),
+            index + 1,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+
+    let checkpoint_hook = test_hooks::CheckpointBuildBlockGuard::arm();
+    let final_receipt =
+        sample_receipt_with_keypair("rcpt-append-checkpoint-inflight-final", max_batch, &keypair);
+    // The append response arrives before checkpoint construction, so this call
+    // returns while the actor is held at the checkpoint hook.
+    store.append_chio_receipt_returning_seq(&final_receipt)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !test_hooks::checkpoint_build_block_entered() && std::time::Instant::now() < deadline {
+        std::thread::yield_now();
+    }
+    let entered = test_hooks::checkpoint_build_block_entered();
+    let inflight = store
+        .receipt_commit_actor
+        .health
+        .inflight
+        .load(Ordering::SeqCst);
+    let queue_depth = store
+        .receipt_commit_actor
+        .health
+        .queue_depth
+        .load(Ordering::SeqCst);
+    let liveness = store.writer_liveness(std::time::Duration::ZERO);
+    checkpoint_hook.release();
+
+    assert!(
+        entered,
+        "checkpoint builder did not reach its blocking hook"
+    );
+    assert_eq!(
+        inflight, 1,
+        "checkpoint activity must remain after the Append command response"
+    );
+    assert_eq!(
+        queue_depth, 0,
+        "the Append command already left the channel"
+    );
+    assert_eq!(
+        liveness,
+        chio_kernel::ReceiptWriterLiveness::Wedged,
+        "blocked post-Append checkpoint work must deny admission"
+    );
+    let drain_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while store
+        .receipt_commit_actor
+        .health
+        .inflight
+        .load(Ordering::SeqCst)
+        != 0
+        && std::time::Instant::now() < drain_deadline
+    {
+        std::thread::yield_now();
+    }
+    assert_eq!(
+        store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(Ordering::SeqCst),
+        0,
+        "checkpoint activity must release after catch-up completes"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
 }
 
 /// A Flush co-drained with a group-commit batch must not be answered by

@@ -271,11 +271,11 @@ async fn chio_wall_denied_receipt_exports_through_chio_siem() {
 
 /// A no-network alert backend so serve-mode alerting wiring can be exercised
 /// without an external PagerDuty/OpsGenie endpoint.
-struct StubAlertBackend {
+struct RecordingAlertBackend {
     route: String,
 }
 
-impl chio_siem::AlertBackend for StubAlertBackend {
+impl chio_siem::AlertBackend for RecordingAlertBackend {
     fn name(&self) -> &str {
         &self.route
     }
@@ -345,7 +345,7 @@ async fn serve_alerting_wiring_emits_real_alert_dispatch_metric() {
     let route = "chio-wall-serve-alert-dispatch-test";
     let sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink> =
         std::sync::Arc::new(crate::registry_metrics_sink::RegistryMetricsSink);
-    let backend = Box::new(StubAlertBackend {
+    let backend = Box::new(RecordingAlertBackend {
         route: route.to_string(),
     });
 

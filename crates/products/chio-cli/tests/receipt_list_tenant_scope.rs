@@ -10,7 +10,6 @@
 
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
@@ -28,11 +27,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn unique_db_path(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("chio-{prefix}-{nonce}.sqlite3"))
+    chio_test_support::private_fs::unique_sqlite_path(&format!("chio-{prefix}"))
 }
 
 fn cleanup(path: &std::path::Path) {

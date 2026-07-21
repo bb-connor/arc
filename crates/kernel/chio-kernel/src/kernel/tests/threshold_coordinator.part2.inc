@@ -219,7 +219,7 @@ async fn threshold_security_pre_dispatch_denial_reverses_the_composite_hold() {
     let (mut kernel, capability, _grant, intent, mut request, now) = threshold_test_fixture();
     let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
     let approvals = std::sync::Arc::new(DurableThresholdApprovalStore::new());
-    let budget = std::sync::Arc::new(DurableThresholdBudgetStore::new());
+    let budget = durable_atomic_test_budget_store("threshold-security-pre-dispatch-payment");
     let runtime = OperationAwareThresholdRuntimeHook::allowing();
     let payment = OperationAwareThresholdPaymentAdapter::with_release_ack_loss();
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
@@ -582,7 +582,7 @@ fn threshold_coordinator_orders_participants_and_commits_before_dispatch() {
 fn threshold_coordinator_accepts_operation_owned_runtime_and_payment_participants() {
     let (mut kernel, capability, grant, _intent, request, _now) = threshold_test_fixture();
     let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
-    let budget = std::sync::Arc::new(DurableThresholdBudgetStore::new());
+    let budget = durable_atomic_test_budget_store("threshold-operation-payment-participants");
     kernel
         .set_admission_operation_store_handle(operations.clone())
         .expect("operation store");
@@ -741,7 +741,7 @@ fn threshold_rejects_mutating_runtime_hook_before_prepared_is_persisted() {
 fn threshold_rejects_legacy_non_idempotent_payment_without_calling_authorize() {
     let (mut kernel, capability, grant, _intent, request, _now) = threshold_test_fixture();
     let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
-    let budget = std::sync::Arc::new(DurableThresholdBudgetStore::new());
+    let budget = durable_atomic_test_budget_store("threshold-legacy-payment-adapter-rejection");
     kernel
         .set_admission_operation_store_handle(operations.clone())
         .expect("operation store");
@@ -778,26 +778,13 @@ fn threshold_rejects_legacy_non_idempotent_payment_without_calling_authorize() {
 
     assert!(error
         .to_string()
-        .contains("does not support operation-owned idempotency for authorization lookup"));
+        .contains("requires authoritative authorization lookup and operation-bound payment mutations"));
     assert_eq!(payment.authorizations(), 0);
-    assert_eq!(
-        operations.states(),
-        vec![
-            AdmissionOperationState::Prepared,
-            AdmissionOperationState::BudgetAuthorized,
-            AdmissionOperationState::DelegatedBudgetReserved,
-            AdmissionOperationState::CompensationPending,
-            AdmissionOperationState::CompensatedBeforeDispatch,
-        ]
-    );
-    assert_eq!(
-        budget
-            .get_usage(&capability.id, 0)
-            .expect("budget lookup")
-            .expect("reversed budget usage")
-            .invocation_count,
-        0
-    );
+    assert!(operations.states().is_empty());
+    assert!(budget
+        .get_usage(&capability.id, 0)
+        .expect("budget lookup")
+        .is_none());
 }
 
 #[test]
@@ -811,7 +798,9 @@ fn threshold_payment_authorization_ack_loss_recovers_by_operation_lookup() {
         .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
         .expect("approval store");
     kernel
-        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .set_budget_store_handle(durable_atomic_test_budget_store(
+            "threshold-payment-authorization-ack-loss",
+        ))
         .expect("budget store");
     let prepared = prepared_threshold_coordinator_admission(
         &request.request_id,
@@ -887,7 +876,9 @@ fn threshold_no_ceiling_mustprepay_ack_loss_recovers_by_operation_lookup() {
         .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
         .expect("approval store");
     kernel
-        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .set_budget_store_handle(durable_atomic_test_budget_store(
+            "threshold-no-ceiling-payment-ack-loss",
+        ))
         .expect("budget store");
     let prepared = prepared_threshold_coordinator_admission(
         &request.request_id,

@@ -26,7 +26,7 @@ mod roster_enforcement {
         }
     }
 
-    fn stub_exposure_report() -> SignedExposureLedgerReport {
+    fn fixture_exposure_report() -> SignedExposureLedgerReport {
         let kp = Keypair::generate();
         SignedExposureLedgerReport::sign(
             ExposureLedgerReport {
@@ -72,9 +72,9 @@ mod roster_enforcement {
         .test_unwrap("sign exposure report")
     }
 
-    fn stub_credit_bond() -> SignedCreditBond {
+    fn fixture_credit_bond() -> SignedCreditBond {
         let kp = Keypair::generate();
-        let exposure = stub_exposure_report();
+        let exposure = fixture_exposure_report();
         SignedCreditBond::sign(
             CreditBondArtifact {
                 schema: CREDIT_BOND_ARTIFACT_SCHEMA.to_string(),
@@ -124,7 +124,7 @@ mod roster_enforcement {
         .test_unwrap("sign credit bond")
     }
 
-    fn stub_credit_loss_lifecycle() -> SignedCreditLossLifecycle {
+    fn fixture_credit_loss_lifecycle() -> SignedCreditLossLifecycle {
         let kp = Keypair::generate();
         SignedCreditLossLifecycle::sign(
             CreditLossLifecycleArtifact {
@@ -183,9 +183,9 @@ mod roster_enforcement {
         .test_unwrap("sign credit loss lifecycle")
     }
 
-    fn stub_risk_package() -> SignedCreditProviderRiskPackage {
+    fn fixture_risk_package() -> SignedCreditProviderRiskPackage {
         let kp = Keypair::generate();
-        let exposure = stub_exposure_report();
+        let exposure = fixture_exposure_report();
         let scorecard = SignedCreditScorecardReport::sign(
             CreditScorecardReport {
                 schema: CREDIT_SCORECARD_SCHEMA.to_string(),
@@ -305,7 +305,7 @@ mod roster_enforcement {
     /// The nested chain just needs to type-check; it is never validated because
     /// the roster gate fires first.
     fn sample_signed_off_roster_adjudication() -> SignedLiabilityClaimAdjudication {
-        let risk_package = stub_risk_package();
+        let risk_package = fixture_risk_package();
         let provider_policy = LiabilityProviderPolicyReference {
             provider_id: "provider-1".to_string(),
             provider_record_id: "lpr-1".to_string(),
@@ -384,9 +384,9 @@ mod roster_enforcement {
             claim_id: "clm-t1".to_string(),
             issued_at: 1_700_010_400,
             bound_coverage: bound_coverage.clone(),
-            exposure: stub_exposure_report(),
-            bond: stub_credit_bond(),
-            loss_event: stub_credit_loss_lifecycle(),
+            exposure: fixture_exposure_report(),
+            bond: fixture_credit_bond(),
+            loss_event: fixture_credit_loss_lifecycle(),
             claimant: "subject-1".to_string(),
             claim_event_at: 1_700_010_500,
             claim_amount: usd(9_000),
@@ -432,17 +432,17 @@ mod roster_enforcement {
         })
     }
 
-    fn stub_capital_instruction() -> SignedCapitalExecutionInstruction {
+    fn fixture_capital_instruction() -> SignedCapitalExecutionInstruction {
         sign_export(CapitalExecutionInstructionArtifact {
             schema: CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA.to_string(),
-            instruction_id: "cei-stub-t1".to_string(),
+            instruction_id: "cei-fixture-t1".to_string(),
             issued_at: 1_700_010_850,
             query: CapitalBookQuery {
                 agent_subject: Some("subject-1".to_string()),
                 ..CapitalBookQuery::default()
             },
             subject_key: "subject-1".to_string(),
-            source_id: "src-stub-1".to_string(),
+            source_id: "src-fixture-1".to_string(),
             source_kind: CapitalBookSourceKind::FacilityCommitment,
             governed_receipt_id: None,
             completion_flow_row_id: None,
@@ -458,8 +458,8 @@ mod roster_enforcement {
             },
             rail: CapitalExecutionRail {
                 kind: CapitalExecutionRailKind::Api,
-                rail_id: "rail-stub-1".to_string(),
-                custody_provider_id: "custody-stub-1".to_string(),
+                rail_id: "rail-fixture-1".to_string(),
+                custody_provider_id: "custody-fixture-1".to_string(),
                 source_account_ref: None,
                 destination_account_ref: None,
                 jurisdiction: None,
@@ -470,7 +470,7 @@ mod roster_enforcement {
             observed_execution: None,
             support_boundary: CapitalExecutionInstructionSupportBoundary::default(),
             evidence_refs: Vec::new(),
-            description: "stub transfer".to_string(),
+            description: "fixture transfer".to_string(),
         })
     }
 
@@ -480,41 +480,41 @@ mod roster_enforcement {
     ) -> Result<LiabilityClaimPayoutInstructionArtifact, CliError> {
         let request = LiabilityClaimPayoutInstructionIssueRequest {
             adjudication: adjudication.clone(),
-            capital_instruction: stub_capital_instruction(),
+            capital_instruction: fixture_capital_instruction(),
             note: None,
         };
         build_liability_claim_payout_instruction_artifact(&request, 1_700_010_900, policy)
     }
 
-    fn stub_payout_receipt_wrapping(
+    fn fixture_payout_receipt_wrapping(
         adjudication: &SignedLiabilityClaimAdjudication,
     ) -> SignedLiabilityClaimPayoutReceipt {
         let payout_instruction = sign_export(LiabilityClaimPayoutInstructionArtifact {
             schema: LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA.to_string(),
-            payout_instruction_id: "lpi-stub-t1".to_string(),
+            payout_instruction_id: "lpi-fixture-t1".to_string(),
             issued_at: 1_700_010_900,
             adjudication: adjudication.clone(),
-            capital_instruction: stub_capital_instruction(),
+            capital_instruction: fixture_capital_instruction(),
             payout_amount: usd(5_000),
             note: None,
         });
         sign_export(LiabilityClaimPayoutReceiptArtifact {
             schema: LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA.to_string(),
-            payout_receipt_id: "lprc-stub-t1".to_string(),
+            payout_receipt_id: "lprc-fixture-t1".to_string(),
             issued_at: 1_700_011_000,
             payout_instruction,
-            payout_receipt_ref: "receipt-stub-t1".to_string(),
+            payout_receipt_ref: "receipt-fixture-t1".to_string(),
             reconciliation_state: LiabilityClaimPayoutReconciliationState::Matched,
             observed_execution: CapitalExecutionObservation {
                 observed_at: 1_700_011_000,
-                external_reference_id: "exec-stub-t1".to_string(),
+                external_reference_id: "exec-fixture-t1".to_string(),
                 amount: usd(5_000),
             },
             note: None,
         })
     }
 
-    fn stub_capital_book() -> SignedCapitalBookReport {
+    fn fixture_capital_book() -> SignedCapitalBookReport {
         let kp = Keypair::generate();
         SignedCapitalBookReport::sign(
             CapitalBookReport {
@@ -556,12 +556,12 @@ mod roster_enforcement {
         adjudication: &SignedLiabilityClaimAdjudication,
         policy: &RosterPolicy,
     ) -> Result<LiabilityClaimSettlementInstructionArtifact, CliError> {
-        let payout_receipt = stub_payout_receipt_wrapping(adjudication);
+        let payout_receipt = fixture_payout_receipt_wrapping(adjudication);
         let kp = Keypair::generate();
         let facility_provider_id = kp.public_key().to_hex();
         let request = LiabilityClaimSettlementInstructionIssueRequest {
             payout_receipt,
-            capital_book: stub_capital_book(),
+            capital_book: fixture_capital_book(),
             settlement_kind: LiabilityClaimSettlementKind::FacilityReimbursement,
             settlement_amount: usd(5_000),
             topology: LiabilityClaimSettlementRoleTopology {
@@ -586,8 +586,8 @@ mod roster_enforcement {
             },
             rail: CapitalExecutionRail {
                 kind: CapitalExecutionRailKind::Api,
-                rail_id: "rail-settle-stub-t1".to_string(),
-                custody_provider_id: "custody-stub-1".to_string(),
+                rail_id: "rail-settle-fixture-t1".to_string(),
+                custody_provider_id: "custody-fixture-1".to_string(),
                 source_account_ref: None,
                 destination_account_ref: None,
                 jurisdiction: None,

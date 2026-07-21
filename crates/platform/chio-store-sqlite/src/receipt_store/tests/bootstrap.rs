@@ -1,6 +1,89 @@
 use super::super::*;
 use super::support::*;
 
+fn replace_settlement_observer_outbox_with_v2(connection: &rusqlite::Connection) {
+    connection
+        .execute_batch(
+            r#"
+            DROP TRIGGER chio_settlement_observer_outbox_validate_update;
+            DROP TRIGGER chio_settlement_observer_outbox_reject_unfinished_delete;
+            DROP INDEX idx_chio_settlement_observer_outbox_pending;
+            ALTER TABLE chio_settlement_observer_outbox
+                RENAME TO chio_settlement_observer_outbox_v3_discard;
+            "#,
+        )
+        .test_unwrap();
+    connection
+        .execute_batch(&format!(
+            r#"
+            {};
+            CREATE INDEX idx_chio_settlement_observer_outbox_pending
+                ON chio_settlement_observer_outbox(state, finalized_at, receipt_id);
+            CREATE TRIGGER chio_settlement_observer_outbox_validate_update
+            BEFORE UPDATE ON chio_settlement_observer_outbox
+            WHEN NEW.receipt_id != OLD.receipt_id
+              OR NEW.finalized_at != OLD.finalized_at
+              OR OLD.state = 'completed'
+              OR NEW.version != OLD.version + 1
+              OR (OLD.state = 'pending' AND NEW.state != 'claimed')
+              OR (OLD.state = 'claimed' AND NEW.state NOT IN ('pending', 'claimed', 'routing'))
+              OR (OLD.state = 'routing' AND NEW.state NOT IN ('routing', 'completed'))
+              OR (
+                  OLD.state = 'routing'
+                  AND NEW.state = 'routing'
+                  AND NEW.staged_status_json IS NOT OLD.staged_status_json
+              )
+            BEGIN
+                SELECT RAISE(ABORT, 'invalid settlement-observer outbox transition');
+            END;
+            CREATE TRIGGER chio_settlement_observer_outbox_reject_unfinished_delete
+            BEFORE DELETE ON chio_settlement_observer_outbox
+            WHEN OLD.state != 'completed'
+            BEGIN
+                SELECT RAISE(ABORT, 'unfinished settlement-observer outbox rows are durable');
+            END;
+            DROP TABLE chio_settlement_observer_outbox_v3_discard;
+            "#,
+            crate::receipt_store::bootstrap::open::SETTLEMENT_OBSERVER_OUTBOX_V2_TABLE_SQL,
+        ))
+        .test_unwrap();
+    crate::stamp_schema_version(connection, "receipt", 2).test_unwrap();
+}
+
+fn settlement_observer_outbox_rows(
+    connection: &rusqlite::Connection,
+) -> Vec<(
+    String,
+    i64,
+    String,
+    Option<String>,
+    Option<i64>,
+    i64,
+    Option<String>,
+    Option<String>,
+)> {
+    connection
+        .prepare(
+            "SELECT receipt_id, finalized_at, state, claim_token, claim_deadline_unix_ms, version, staged_status_json, last_error FROM chio_settlement_observer_outbox ORDER BY finalized_at, receipt_id",
+        )
+        .test_unwrap()
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+            ))
+        })
+        .test_unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .test_unwrap()
+}
+
 #[cfg(unix)]
 fn create_private_empty_file(path: &std::path::Path) {
     use std::os::unix::fs::OpenOptionsExt;
@@ -15,9 +98,181 @@ fn create_private_empty_file(path: &std::path::Path) {
 }
 
 #[cfg(unix)]
+fn receipt_sidecar_path(path: &std::path::Path, suffix: &str) -> std::path::PathBuf {
+    let mut sidecar = path.as_os_str().to_os_string();
+    sidecar.push(suffix);
+    std::path::PathBuf::from(sidecar)
+}
+
+#[cfg(unix)]
+fn retained_receipt_identity(
+    temporary: &tempfile::TempDir,
+    name: &str,
+) -> (std::path::PathBuf, ReceiptDatabaseIdentityFile) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).test_unwrap();
+    let path = temporary.path().join(name);
+    let identity = ReceiptDatabaseIdentityFile::open(&path, true).test_unwrap();
+    (path, identity)
+}
+
+#[cfg(unix)]
+fn direct_receipt_connection_manager(
+    temporary: &tempfile::TempDir,
+    name: &str,
+) -> (std::path::PathBuf, ReceiptConnectionManager) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).test_unwrap();
+    let path = temporary.path().join(name);
+    let identity = ReceiptDatabaseIdentityFile::open(&path, true).test_unwrap();
+    let manager = ReceiptConnectionManager::new(&path, std::sync::Arc::new(identity));
+    (path, manager)
+}
+
+#[cfg(unix)]
+#[test]
+fn receipt_identity_requires_a_private_final_authority_directory() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temporary = tempfile::tempdir().test_unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o750)).test_unwrap();
+    let path = temporary.path().join("non-private-parent.sqlite3");
+    let error = match ReceiptDatabaseIdentityFile::open(&path, true) {
+        Ok(_) => panic!("accepted a non-private receipt authority directory"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("mode 0700"));
+}
+
+#[cfg(unix)]
+#[test]
+fn receipt_connection_manager_rejects_an_open_transaction() {
+    let temporary = tempfile::tempdir().test_unwrap();
+    let (_path, manager) =
+        direct_receipt_connection_manager(&temporary, "transaction-hygiene.sqlite3");
+    let mut connection = r2d2::ManageConnection::connect(&manager).test_unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE transaction_probe (value INTEGER NOT NULL); \
+             BEGIN IMMEDIATE; \
+             INSERT INTO transaction_probe (value) VALUES (1)",
+        )
+        .test_unwrap();
+
+    assert!(r2d2::ManageConnection::is_valid(&manager, &mut connection).is_err());
+    assert!(r2d2::ManageConnection::has_broken(
+        &manager,
+        &mut connection
+    ));
+    assert!(!connection.is_autocommit());
+    connection.execute_batch("ROLLBACK").test_unwrap();
+    r2d2::ManageConnection::is_valid(&manager, &mut connection).test_unwrap();
+    assert!(!r2d2::ManageConnection::has_broken(
+        &manager,
+        &mut connection
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn receipt_connection_manager_rejects_an_unexpected_attachment() {
+    let temporary = tempfile::tempdir().test_unwrap();
+    let (_path, manager) =
+        direct_receipt_connection_manager(&temporary, "attachment-hygiene.sqlite3");
+    let attached = temporary.path().join("unexpected-attachment.sqlite3");
+    create_private_empty_file(&attached);
+    let escaped = attached.to_string_lossy().replace('\'', "''");
+    let mut connection = r2d2::ManageConnection::connect(&manager).test_unwrap();
+    connection
+        .execute_batch(&format!(
+            "ATTACH DATABASE '{escaped}' AS unexpected_authority"
+        ))
+        .test_unwrap();
+    let attached_schema = crate::receipt_store::bootstrap::open::sqlite_database_list(&connection)
+        .test_unwrap()
+        .into_iter()
+        .find(|(_, name, _)| name == "unexpected_authority")
+        .map(|(_, name, _)| name)
+        .test_unwrap();
+    assert_eq!(attached_schema, "unexpected_authority");
+
+    assert!(r2d2::ManageConnection::is_valid(&manager, &mut connection).is_err());
+    assert!(r2d2::ManageConnection::has_broken(
+        &manager,
+        &mut connection
+    ));
+    connection
+        .execute_batch("DETACH DATABASE unexpected_authority")
+        .test_unwrap();
+    connection
+        .execute_batch("CREATE TEMP TABLE poisoned_temp_schema (value INTEGER)")
+        .test_unwrap();
+    assert!(r2d2::ManageConnection::is_valid(&manager, &mut connection).is_err());
+    assert!(r2d2::ManageConnection::has_broken(
+        &manager,
+        &mut connection
+    ));
+    connection
+        .execute_batch("DROP TABLE temp.poisoned_temp_schema")
+        .test_unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE temp_trigger_target (value INTEGER NOT NULL); \
+             CREATE TEMP TRIGGER poisoned_retention_trigger \
+             AFTER DELETE ON main.temp_trigger_target \
+             BEGIN \
+                 INSERT INTO temp_trigger_target (value) VALUES (OLD.value); \
+             END",
+        )
+        .test_unwrap();
+    assert!(r2d2::ManageConnection::is_valid(&manager, &mut connection).is_err());
+    assert!(r2d2::ManageConnection::has_broken(
+        &manager,
+        &mut connection
+    ));
+    connection
+        .execute_batch("DROP TRIGGER temp.poisoned_retention_trigger")
+        .test_unwrap();
+    r2d2::ManageConnection::is_valid(&manager, &mut connection).test_unwrap();
+    assert!(!r2d2::ManageConnection::has_broken(
+        &manager,
+        &mut connection
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn receipt_connection_catalog_pragma_cannot_be_shadowed() {
+    let temporary = tempfile::tempdir().test_unwrap();
+    let (path, manager) =
+        direct_receipt_connection_manager(&temporary, "database-list-shadow.sqlite3");
+    let mut connection = r2d2::ManageConnection::connect(&manager).test_unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE pragma_database_list (seq INTEGER, name TEXT, file TEXT); \
+             INSERT INTO pragma_database_list (seq, name, file) \
+             VALUES (0, 'forged', '/forged.sqlite3'); \
+             CREATE TABLE pragma_foreign_key_list (id INTEGER NOT NULL); \
+             INSERT INTO pragma_foreign_key_list (id) VALUES (1)",
+        )
+        .test_unwrap();
+
+    let databases =
+        crate::receipt_store::bootstrap::open::sqlite_database_list(&connection).test_unwrap();
+    assert!(databases.iter().any(|(_, name, _)| name == "main"));
+    assert!(!databases.iter().any(|(_, name, _)| name == "forged"));
+    r2d2::ManageConnection::is_valid(&manager, &mut connection).test_unwrap();
+    drop(connection);
+    SqliteReceiptStore::open_existing_strict(&path).test_unwrap();
+}
+
+#[cfg(unix)]
 #[test]
 fn receipt_store_rejects_a_swap_during_initial_sqlite_open() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory =
+        chio_test_support::private_fs::private_tempdir("receipt-initial-open-swap").test_unwrap();
     let directory = fs::canonicalize(directory.path()).test_unwrap();
     let path = directory.join("receipt-initial-open.sqlite3");
     let replacement = directory.join("receipt-initial-open-replacement.sqlite3");
@@ -58,7 +313,8 @@ fn receipt_store_rejects_a_swap_during_initial_sqlite_open() {
 #[cfg(unix)]
 #[test]
 fn receipt_store_rejects_a_swap_during_pool_sqlite_open() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory =
+        chio_test_support::private_fs::private_tempdir("receipt-pool-open-swap").test_unwrap();
     let directory = fs::canonicalize(directory.path()).test_unwrap();
     let path = directory.join("receipt-pool-open.sqlite3");
     let replacement = directory.join("receipt-pool-open-replacement.sqlite3");
@@ -102,7 +358,8 @@ fn receipt_store_rejects_a_swap_during_pool_sqlite_open() {
 fn receipt_store_detects_post_open_hardlinks_and_path_rebinding() {
     use std::os::unix::fs::OpenOptionsExt;
 
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory =
+        chio_test_support::private_fs::private_tempdir("receipt-post-open-rebind").test_unwrap();
     let path = directory.path().join("receipt-identity.sqlite3");
     let hardlink = directory.path().join("receipt-identity-hardlink.sqlite3");
     let displaced = directory.path().join("receipt-identity-displaced.sqlite3");
@@ -123,6 +380,69 @@ fn receipt_store_detects_post_open_hardlinks_and_path_rebinding() {
         .test_unwrap();
     assert!(store.max_tool_receipt_seq().is_err());
     assert!(store.append_chio_receipt(&sample_receipt()).is_err());
+    assert!(
+        store.open_bound_colocated_connection().is_err(),
+        "a co-located connection must reject a post-open path replacement"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn receipt_identity_rejects_unsafe_sqlite_sidecars() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    for suffix in ["-wal", "-shm", "-journal"] {
+        let temporary = tempfile::tempdir().test_unwrap();
+        let (path, identity) = retained_receipt_identity(&temporary, "symlink.sqlite3");
+        let target = temporary.path().join("symlink-target");
+        create_private_empty_file(&target);
+        symlink(&target, receipt_sidecar_path(&path, suffix)).test_unwrap();
+        assert!(identity.validate().is_err(), "accepted {suffix} symlink");
+
+        let temporary = tempfile::tempdir().test_unwrap();
+        let (path, identity) = retained_receipt_identity(&temporary, "hardlink.sqlite3");
+        let target = temporary.path().join("hardlink-target");
+        create_private_empty_file(&target);
+        fs::hard_link(&target, receipt_sidecar_path(&path, suffix)).test_unwrap();
+        assert!(identity.validate().is_err(), "accepted {suffix} hardlink");
+
+        let temporary = tempfile::tempdir().test_unwrap();
+        let (path, identity) = retained_receipt_identity(&temporary, "mode.sqlite3");
+        let sidecar = receipt_sidecar_path(&path, suffix);
+        create_private_empty_file(&sidecar);
+        fs::set_permissions(&sidecar, fs::Permissions::from_mode(0o640)).test_unwrap();
+        assert!(
+            identity.validate().is_err(),
+            "accepted permissive {suffix} mode"
+        );
+
+        let temporary = tempfile::tempdir().test_unwrap();
+        let (path, identity) = retained_receipt_identity(&temporary, "nonregular.sqlite3");
+        fs::create_dir(receipt_sidecar_path(&path, suffix)).test_unwrap();
+        assert!(
+            identity.validate().is_err(),
+            "accepted non-regular {suffix}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn receipt_store_revalidates_live_sqlite_sidecars_before_use() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temporary = tempfile::tempdir().test_unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).test_unwrap();
+    let path = temporary.path().join("live-sidecars.sqlite3");
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
+    let wal = receipt_sidecar_path(&path, "-wal");
+    assert!(wal.is_file(), "receipt store did not materialize its WAL");
+    fs::set_permissions(&wal, fs::Permissions::from_mode(0o640)).test_unwrap();
+
+    assert!(
+        store.max_tool_receipt_seq().is_err(),
+        "receipt store accepted widened live WAL authority"
+    );
 }
 
 #[cfg(unix)]
@@ -130,9 +450,12 @@ fn receipt_store_detects_post_open_hardlinks_and_path_rebinding() {
 fn receipt_store_pins_a_resolved_parent_alias() {
     use std::os::unix::fs::symlink;
 
-    let alias_directory = tempfile::tempdir().test_unwrap();
-    let original_directory = tempfile::tempdir().test_unwrap();
-    let replacement_directory = tempfile::tempdir().test_unwrap();
+    let alias_directory =
+        chio_test_support::private_fs::private_tempdir("receipt-parent-alias").test_unwrap();
+    let original_directory =
+        chio_test_support::private_fs::private_tempdir("receipt-parent-original").test_unwrap();
+    let replacement_directory =
+        chio_test_support::private_fs::private_tempdir("receipt-parent-replacement").test_unwrap();
     let alias = alias_directory.path().join("database-parent");
     symlink(original_directory.path(), &alias).test_unwrap();
     let aliased_path = alias.join("receipts.sqlite3");
@@ -278,6 +601,146 @@ fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
         SqliteReceiptStore::open_existing(&path).is_err(),
         "a future-version receipt database must be refused"
     );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn receipt_schema_v3_atomically_preserves_valid_v2_outbox_rows() {
+    let path = unique_db_path("chio-receipts-v2-outbox-upgrade");
+    drop(SqliteReceiptStore::open(&path).test_unwrap());
+    let before = {
+        let connection = rusqlite::Connection::open(&path).test_unwrap();
+        replace_settlement_observer_outbox_with_v2(&connection);
+        connection
+            .execute_batch(
+                r#"
+                INSERT INTO chio_settlement_observer_outbox (
+                    receipt_id, finalized_at, state, version, last_error
+                ) VALUES ('pending', 1, 'pending', 0, 'prior pending error');
+                INSERT INTO chio_settlement_observer_outbox (
+                    receipt_id, finalized_at, state, claim_token,
+                    claim_deadline_unix_ms, version
+                ) VALUES ('claimed', 2, 'claimed', 'claim-token', 10, 2);
+                INSERT INTO chio_settlement_observer_outbox (
+                    receipt_id, finalized_at, state, claim_token,
+                    claim_deadline_unix_ms, version, staged_status_json,
+                    last_error
+                ) VALUES (
+                    'routing', 3, 'routing', 'routing-token', 20, 3,
+                    '{"kind":"skipped","reason":"bounded"}',
+                    'prior routing error'
+                );
+                INSERT INTO chio_settlement_observer_outbox (
+                    receipt_id, finalized_at, state, version
+                ) VALUES ('completed', 4, 'completed', 4);
+                "#,
+            )
+            .test_unwrap();
+        settlement_observer_outbox_rows(&connection)
+    };
+
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
+    let connection = store.connection().test_unwrap();
+    assert_eq!(settlement_observer_outbox_rows(&connection), before);
+    let version: i32 = connection
+        .query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(version, 3);
+    let staging_table_exists: i64 = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chio_settlement_observer_outbox_v2')",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(staging_table_exists, 0);
+    drop(connection);
+    drop(store);
+
+    let current_binary = rusqlite::Connection::open(&path).test_unwrap();
+    assert!(current_binary
+        .execute(
+            "INSERT INTO chio_settlement_observer_outbox (receipt_id, finalized_at, state, claim_token, claim_deadline_unix_ms) VALUES ('negative', 5, 'claimed', 'token', -1)",
+            [],
+        )
+        .is_err());
+    drop(current_binary);
+
+    let old_binary = rusqlite::Connection::open(&path).test_unwrap();
+    let old_error = crate::check_schema_version(
+        &old_binary,
+        "receipt",
+        2,
+        &["chio_tool_receipts", "http_receipts", "tool_receipts"],
+    )
+    .test_unwrap_err();
+    assert!(old_error.to_string().contains("schema version 3 is newer"));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn receipt_schema_v3_rejects_invalid_v2_rows_without_partial_mutation() {
+    let path = unique_db_path("chio-receipts-v2-outbox-invalid");
+    drop(SqliteReceiptStore::open(&path).test_unwrap());
+    let (before_table_sql, before_rows) = {
+        let connection = rusqlite::Connection::open(&path).test_unwrap();
+        replace_settlement_observer_outbox_with_v2(&connection);
+        connection
+            .execute(
+                "INSERT INTO chio_settlement_observer_outbox (receipt_id, finalized_at, state, claim_token, claim_deadline_unix_ms, version) VALUES ('invalid-deadline', 1, 'claimed', 'token', -1, 0)",
+                [],
+            )
+            .test_unwrap();
+        let table_sql = connection
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chio_settlement_observer_outbox'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .test_unwrap();
+        (table_sql, settlement_observer_outbox_rows(&connection))
+    };
+
+    let error = SqliteReceiptStore::open_existing(&path).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("outbox contains an invalid persisted row"),
+        "unexpected migration error: {error}"
+    );
+
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    let version: i32 = connection
+        .query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(version, 2);
+    let after_table_sql: String = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chio_settlement_observer_outbox'",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(after_table_sql, before_table_sql);
+    assert_eq!(settlement_observer_outbox_rows(&connection), before_rows);
+    let staging_table_exists: i64 = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chio_settlement_observer_outbox_v2')",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(staging_table_exists, 0);
 
     let _ = fs::remove_file(path);
 }

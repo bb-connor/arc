@@ -4,7 +4,10 @@ use crate::{
     CHIO_DECISION_RECEIPT_ID_KEY, CHIO_HTTP_STATUS_SCOPE_DECISION, CHIO_HTTP_STATUS_SCOPE_FINAL,
 };
 use chio_core_types::capability::{
-    attenuation::{compute_attenuation_witness, scope_hash, AttenuationProof},
+    attenuation::{
+        compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
+        DelegationLinkBody,
+    },
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityTokenAttenuationBody, CapabilityTokenBody},
 };
@@ -72,6 +75,30 @@ fn signed_direct_v2_capability_token_json(issuer: &Keypair, id: &str) -> String 
                 aggregate_family_preservation: None,
             },
             budget_share_bps: None,
+        },
+        issuer,
+    )
+    .test_unwrap();
+    serde_json::to_string(&token).test_unwrap()
+}
+
+fn signed_capability_token_json_with_chain(
+    issuer: &Keypair,
+    id: &str,
+    delegation_chain: Vec<DelegationLink>,
+    subject: PublicKey,
+) -> String {
+    let now = u64::try_from(chrono::Utc::now().timestamp()).test_unwrap();
+    let token = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: issuer.public_key(),
+            subject,
+            scope: ChioScope::default(),
+            issued_at: now.saturating_sub(60),
+            expires_at: now + 3600,
+            delegation_chain,
+            aggregate_invocation_budget: None,
         },
         issuer,
     )
@@ -172,10 +199,10 @@ fn authority_with_issuer() -> (HttpAuthority, Keypair) {
 fn authority_with_trusted_issuer(trusted_issuer: PublicKey) -> HttpAuthority {
     configure_compatibility_registry(
         HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
-        Keypair::generate(),
-        "policy-hash".to_string(),
-        Arc::new(InMemoryApprovalStore::new()),
-        vec![trusted_issuer],
+            Keypair::generate(),
+            "policy-hash".to_string(),
+            Arc::new(InMemoryApprovalStore::new()),
+            vec![trusted_issuer],
         ),
     )
 }
@@ -462,7 +489,7 @@ fn failclosed_authority_surfaces_durability_error_for_denied_projection() {
 #[test]
 fn builder_with_durable_stores_evaluates_without_persistence_deny(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let dir = tempfile::tempdir()?;
+    let dir = chio_test_support::private_fs::private_tempdir("http-authority-builder-")?;
     let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
         chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
     );
@@ -776,6 +803,160 @@ fn direct_v2_capability_denies_without_http_trust_root_resolver() {
 }
 
 #[test]
+fn capability_authentication_failures_do_not_touch_revocation_callback() {
+    let trusted = Keypair::generate();
+    let trusted_keys = [trusted.public_key()];
+    let calls = std::cell::Cell::new(0_usize);
+    let is_revoked = |_: &str| {
+        calls.set(calls.get() + 1);
+        Ok(false)
+    };
+
+    let malformed = validate_presented_capability(
+        None,
+        Some("not-json"),
+        &trusted_keys,
+        None,
+        None,
+        None,
+        None,
+        &is_revoked,
+    );
+    assert!(malformed.invalid_reason.is_some());
+    assert_eq!(calls.get(), 0);
+
+    let untrusted = signed_capability_token_json(&Keypair::generate(), "cap-untrusted-no-query");
+    let untrusted = validate_presented_capability(
+        None,
+        Some(&untrusted),
+        &trusted_keys,
+        None,
+        None,
+        None,
+        None,
+        &is_revoked,
+    );
+    assert_eq!(
+        untrusted.invalid_reason.as_deref(),
+        Some("capability issuer is not trusted")
+    );
+    assert_eq!(calls.get(), 0);
+
+    let revoked = signed_capability_token_json(&trusted, "cap-trusted-revoked");
+    let revoked_calls = std::cell::Cell::new(0_usize);
+    let revoked = validate_presented_capability(
+        None,
+        Some(&revoked),
+        &trusted_keys,
+        None,
+        None,
+        None,
+        None,
+        &|capability_id| {
+            revoked_calls.set(revoked_calls.get() + 1);
+            Ok(capability_id == "cap-trusted-revoked")
+        },
+    );
+    assert_eq!(
+        revoked.invalid_reason.as_deref(),
+        Some("capability token has been revoked")
+    );
+    assert_eq!(revoked_calls.get(), 1);
+}
+
+#[test]
+fn delegated_capability_shapes_fail_before_revocation_without_a_trust_root() {
+    let issuer = Keypair::generate();
+    let intermediate = Keypair::generate();
+    let subject = Keypair::generate();
+    let unrelated = Keypair::generate();
+    let now = u64::try_from(chrono::Utc::now().timestamp()).test_unwrap();
+
+    let first = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: "cap-forged-ancestor".to_string(),
+            delegator: issuer.public_key(),
+            delegatee: intermediate.public_key(),
+            attenuations: Vec::new(),
+            timestamp: now,
+            scope_hash: None,
+            aggregate_family_preservation: None,
+        },
+        &issuer,
+    )
+    .test_unwrap();
+    let second = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: "cap-broken-adjacency".to_string(),
+            delegator: unrelated.public_key(),
+            delegatee: subject.public_key(),
+            attenuations: Vec::new(),
+            timestamp: now,
+            scope_hash: None,
+            aggregate_family_preservation: None,
+        },
+        &unrelated,
+    )
+    .test_unwrap();
+
+    let mut forged_link = first.clone();
+    forged_link.signature = second.signature.clone();
+    let forged_signature = signed_capability_token_json_with_chain(
+        &issuer,
+        "cap-forged-link",
+        vec![forged_link],
+        intermediate.public_key(),
+    );
+    let broken_adjacency = signed_capability_token_json_with_chain(
+        &issuer,
+        "cap-broken-chain",
+        vec![first, second],
+        subject.public_key(),
+    );
+
+    let mut widening: CapabilityToken = serde_json::from_str(
+        &signed_direct_v2_capability_token_json(&issuer, "cap-widening-attenuation"),
+    )
+    .test_unwrap();
+    widening.scope = ChioScope {
+        grants: vec![http_authority_tool_grant()],
+        ..ChioScope::default()
+    };
+    let (signature, _) = issuer
+        .sign_canonical(&widening.signing_body())
+        .test_unwrap();
+    widening.signature = signature;
+    let widening = serde_json::to_string(&widening).test_unwrap();
+
+    for raw in [forged_signature, broken_adjacency, widening] {
+        let calls = std::cell::Cell::new(0_usize);
+        let state = validate_presented_capability(
+            None,
+            Some(&raw),
+            &[issuer.public_key()],
+            None,
+            None,
+            None,
+            None,
+            &|_| {
+                calls.set(calls.get() + 1);
+                Ok(false)
+            },
+        );
+        assert!(state.invalid_reason.is_some());
+        assert_eq!(calls.get(), 0);
+    }
+}
+
+#[test]
+fn pre_epoch_capability_clock_fails_closed() {
+    assert_eq!(
+        checked_unix_timestamp(-1).test_unwrap_err(),
+        "system clock is before the Unix epoch"
+    );
+}
+
+#[test]
 fn capability_hint_mismatch_becomes_denial() {
     let query = HashMap::new();
     let (authority, issuer) = authority_with_issuer();
@@ -878,7 +1059,7 @@ fn configured_external_issuer_allows_deny_by_default() {
 
 #[test]
 fn revoked_presented_capability_denies_deny_by_default() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = tempfile::tempdir()?;
+    let dir = chio_test_support::private_fs::private_tempdir("http-authority-revocation-")?;
     let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
         chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
     );
@@ -1737,105 +1918,4 @@ fn deny_by_default_requires_matching_tool_grant() {
         Some("capability does not authorize tool increment on server math")
     );
 }
-#[test]
-fn sign_transport_deny_receipt_signs_final_scope_deny() {
-    let authority = authority();
-    let verdict = Verdict::deny_with_status(
-        "request body exceeds limit",
-        "chio_tower_request_body_limit_guard",
-        413,
-    );
-    let receipt = authority
-        .sign_transport_deny_receipt(TransportDenyInput {
-            request_id: "req-transport-deny",
-            route_pattern: "/upload",
-            method: HttpMethod::Post,
-            caller_identity_hash: "caller-hash",
-            content_hash: None,
-            verdict,
-        })
-        .test_unwrap();
-
-    assert!(receipt.verify_signature().test_unwrap());
-    assert!(receipt.is_denied());
-    assert_eq!(receipt.response_status, 413);
-    assert_eq!(receipt.request_id, "req-transport-deny");
-    assert_eq!(receipt.route_pattern, "/upload");
-    assert_eq!(receipt.caller_identity_hash, "caller-hash");
-    assert!(receipt.capability_id.is_none());
-    assert!(receipt.evidence.is_empty());
-    assert_eq!(receipt.content_hash, "");
-    assert_eq!(
-        http_status_scope(receipt.metadata.as_ref()),
-        Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
-    );
-    assert!(
-        metadata_string(receipt.metadata.as_ref(), CHIO_KERNEL_RECEIPT_ID_KEY).is_none(),
-        "transport deny must not claim a kernel receipt id"
-    );
-}
-
-#[test]
-fn policy_deny_is_not_recorded_as_a_dispatch_failure() {
-    // A normal policy/capability deny is an expected fail-closed decision. It is
-    // tracked by the guard-verdict metrics and must NOT increment
-    // chio_dispatch_failure_total, or one ordinary rejected request would page
-    // the P0 fail-open/dispatch-failure alert.
-    let query = HashMap::new();
-    let denied = authority()
-        .evaluate(HttpAuthorityInput {
-            request_id: "req-deny-no-page".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
-        })
-        .test_unwrap();
-    assert!(denied.verdict.is_denied());
-
-    // No code path produces the "denied" outcome, so the paging counter never
-    // carries a deny series regardless of how many requests are rejected.
-    let mut body = String::new();
-    chio_metrics_spec::runtime::families::DISPATCH_FAILURE.render(&mut body);
-    assert!(
-        !body.contains("outcome=\"denied\""),
-        "a policy deny must not appear on the dispatch-failure paging metric: {body}"
-    );
-
-    // The deny is still observable via the guard-verdict metric.
-    assert!(
-        crate::metrics::guard_evaluations_total(crate::metrics::GUARD_OUTCOME_DENY) >= 1,
-        "a deny must be tracked by the guard-verdict metric"
-    );
-}
-
-#[test]
-fn sign_transport_deny_receipt_rejects_non_deny_verdict() {
-    let authority = authority();
-    let err = authority
-        .sign_transport_deny_receipt(TransportDenyInput {
-            request_id: "req-transport-allow",
-            route_pattern: "/pets",
-            method: HttpMethod::Get,
-            caller_identity_hash: "caller-hash",
-            content_hash: Some("abc"),
-            verdict: Verdict::Allow,
-        })
-        .test_unwrap_err();
-    assert!(matches!(err, HttpAuthorityError::Kernel(_)));
-    assert!(err
-        .to_string()
-        .contains("sign_transport_deny_receipt requires a Deny verdict"));
-}
+include!("tests/transport_deny_receipt_tests.inc");

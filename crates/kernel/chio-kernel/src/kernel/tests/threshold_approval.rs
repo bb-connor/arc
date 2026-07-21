@@ -360,6 +360,169 @@ fn threshold_replay_requires_a_durable_approval_store() {
 }
 
 #[test]
+fn legacy_admission_authorities_recover_without_threshold_policy() {
+    let mut kernel = make_admission_saga_kernel();
+    let operation_store = std::sync::Arc::new(ProfiledTestStore::new(
+        AdmissionOperationStoreProfile::SingleNodeDurable,
+    ));
+    let operation = prepared_admission_operation(&kernel);
+    let operation_id = operation.operation_id().to_string();
+    operation_store
+        .create_prepared(operation)
+        .expect("unresolved legacy admission operation");
+
+    kernel
+        .set_approval_store_handle(std::sync::Arc::new(
+            DurableThresholdApprovalStore::new(),
+        ))
+        .expect("durable approval store");
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .expect("durable budget store");
+    kernel
+        .set_admission_operation_store_handle(operation_store.clone())
+        .expect("durable operation store");
+
+    assert!(!kernel
+        .capability_negotiation_for_remote(None, current_unix_timestamp())
+        .expect("local negotiation")
+        .supports(chio_core::capability::features::THRESHOLD_GOVERNED_APPROVALS));
+    assert_eq!(
+        kernel
+            .recover_tool_dispatch_admission_operations()
+            .expect("legacy admission recovery"),
+        1
+    );
+    let recovered = operation_store
+        .load(&operation_id)
+        .expect("operation lookup")
+        .expect("recovered operation");
+    assert_eq!(
+        recovered.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(
+        kernel
+            .recover_tool_dispatch_admission_operations()
+            .expect("idempotent legacy admission recovery"),
+        0
+    );
+    assert!(!kernel
+        .capability_negotiation_for_remote(None, current_unix_timestamp())
+        .expect("local negotiation")
+        .supports(chio_core::capability::features::THRESHOLD_GOVERNED_APPROVALS));
+}
+
+#[test]
+fn admission_recovery_rejects_policy_rotation_with_unresolved_operation() {
+    let mut kernel = make_admission_saga_kernel();
+    let operation_store = std::sync::Arc::new(ProfiledTestStore::new(
+        AdmissionOperationStoreProfile::SingleNodeDurable,
+    ));
+    let operation = AdmissionOperation::prepared(PreparedAdmissionOperation {
+        kind: AdmissionOperationKind::ToolDispatch,
+        coordinator_authority_id: kernel_coordinator_authority_id(&kernel),
+        request_id: "request-policy-rotation-drain".to_string(),
+        capability_id: "capability-policy-rotation-drain".to_string(),
+        authorization_capability_hash: "11".repeat(32),
+        request_binding_hash: "22".repeat(32),
+        policy_hash: "44".repeat(32),
+        broker_attempt_id: None,
+        budget_hold_id: Some("hold-policy-rotation-drain".to_string()),
+        approval_set_hash: None,
+        execution_nonce_id: None,
+        coordinator_lease_epoch: 1,
+    })
+    .expect("old-policy operation");
+    operation_store
+        .create_prepared(operation)
+        .expect("unresolved old-policy operation");
+
+    kernel
+        .set_approval_store_handle(std::sync::Arc::new(
+            DurableThresholdApprovalStore::new(),
+        ))
+        .expect("durable approval store");
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .expect("durable budget store");
+    kernel
+        .set_admission_operation_store_handle(operation_store)
+        .expect("durable operation store");
+
+    let error = kernel
+        .recover_tool_dispatch_admission_operations()
+        .expect_err("policy rotation must drain unresolved admissions");
+    assert!(error
+        .to_string()
+        .contains("policy rotation requires a zero-unresolved-operation drain"));
+}
+
+#[test]
+fn threshold_activation_reuses_tool_dispatch_admission_recovery() {
+    let mut config = make_config();
+    config.policy_hash = "33".repeat(32);
+    let mut kernel = make_kernel(config);
+    let requirement = crate::threshold_approval::ThresholdApprovalRequirement::new(
+        1,
+        std::collections::BTreeMap::from([(
+            "approver".to_string(),
+            Keypair::generate().public_key(),
+        )]),
+        900,
+        kernel.config.policy_hash.clone(),
+        1,
+    )
+    .expect("requirement");
+    kernel
+        .set_threshold_approval_requirement_resolver(std::sync::Arc::new(
+            move |_: &crate::threshold_approval::ThresholdApprovalRequest, _: &str| {
+                Ok(requirement.clone())
+            },
+        ))
+        .expect("resolver");
+    kernel
+        .set_threshold_approval_policy_authority(Keypair::generate().public_key())
+        .expect("policy authority");
+
+    let operation_store = std::sync::Arc::new(ProfiledTestStore::new(
+        AdmissionOperationStoreProfile::SingleNodeDurable,
+    ));
+    let operation = prepared_admission_operation(&kernel);
+    let operation_id = operation.operation_id().to_string();
+    operation_store
+        .create_prepared(operation)
+        .expect("unresolved threshold admission operation");
+    kernel
+        .set_approval_store_handle(std::sync::Arc::new(
+            DurableThresholdApprovalStore::new(),
+        ))
+        .expect("durable approval store");
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .expect("durable budget store");
+    kernel
+        .set_admission_operation_store_handle(operation_store.clone())
+        .expect("durable operation store");
+
+    kernel
+        .enable_threshold_governed_approvals()
+        .expect("threshold activation");
+    assert_eq!(
+        operation_store
+            .load(&operation_id)
+            .expect("operation lookup")
+            .expect("recovered operation")
+            .state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(kernel
+        .capability_negotiation_for_remote(None, current_unix_timestamp())
+        .expect("local negotiation")
+        .supports(chio_core::capability::features::THRESHOLD_GOVERNED_APPROVALS));
+}
+
+#[test]
 fn threshold_activation_requires_all_durable_authorities() {
     let mut config = make_config();
     config.policy_hash = "33".repeat(32);

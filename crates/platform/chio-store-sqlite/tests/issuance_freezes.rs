@@ -623,7 +623,9 @@ fn require_error<T>(result: Result<T, PortError>) -> PortError {
 
 #[test]
 fn freeze_apply_and_capability_intent_prepare_have_one_sqlite_order() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_fs::private_tempdir("receipt-issuance-freeze-prepare-race")
+            .unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-freeze-prepare-race.db");
     drop(SqliteReceiptStore::open(&path).unwrap_or_else(|error| panic!("receipt store: {error}")));
     let action_id = action("issuance-freeze-prepare-race");
@@ -714,7 +716,9 @@ fn freeze_apply_and_capability_intent_prepare_have_one_sqlite_order() {
 
 #[test]
 fn crash_before_intent_authorization_recovers_exact_unsigned_body() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_fs::private_tempdir("receipt-issuance-before-authorization")
+            .unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-before-authorization.db");
     let store =
         SqliteReceiptStore::open(&path).unwrap_or_else(|error| panic!("receipt store: {error}"));
@@ -773,7 +777,9 @@ fn crash_before_intent_authorization_recovers_exact_unsigned_body() {
 
 #[test]
 fn crash_after_intent_authorization_recovers_exact_body_and_authorization() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_fs::private_tempdir("receipt-issuance-after-authorization")
+            .unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-after-authorization.db");
     let store =
         SqliteReceiptStore::open(&path).unwrap_or_else(|error| panic!("receipt store: {error}"));

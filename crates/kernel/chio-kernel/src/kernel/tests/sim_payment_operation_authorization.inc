@@ -271,8 +271,7 @@ struct OrdinaryOperationAuthorizationFixture {
     charge: BudgetChargeResult,
     binding: BudgetAdmissionOperationBinding,
     payment: OrdinaryOperationAuthorizationProbe,
-    budget_store: std::sync::Arc<chio_store_sqlite::SqliteBudgetStore>,
-    budget_db_path: std::path::PathBuf,
+    budget_store: std::sync::Arc<DurableAtomicTestBudgetStore>,
 }
 
 impl OrdinaryOperationAuthorizationFixture {
@@ -323,11 +322,7 @@ impl OrdinaryOperationAuthorizationFixture {
             binding.request_binding_hash(),
             script,
         );
-        let budget_db_path = unique_receipt_db_path(prefix);
-        let budget_store = std::sync::Arc::new(
-            chio_store_sqlite::SqliteBudgetStore::open(&budget_db_path)
-                .expect("ordinary payment budget store"),
-        );
+        let budget_store = durable_atomic_test_budget_store(prefix);
         kernel
             .set_budget_store_handle(
                 std::sync::Arc::clone(&budget_store)
@@ -385,7 +380,6 @@ impl OrdinaryOperationAuthorizationFixture {
             binding,
             payment,
             budget_store,
-            budget_db_path,
         }
     }
 
@@ -396,12 +390,6 @@ impl OrdinaryOperationAuthorizationFixture {
             .get_payment_journal(&self.request.request_id)
             .expect("ordinary payment journal read")
             .expect("ordinary payment journal row")
-    }
-}
-
-impl Drop for OrdinaryOperationAuthorizationFixture {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.budget_db_path);
     }
 }
 
@@ -609,4 +597,122 @@ fn ordinary_admission_activation_rejects_partial_operation_payment_adapter() {
     assert!(error
         .to_string()
         .contains("operation-bound payment mutations"));
+}
+
+#[test]
+fn ordinary_admission_activation_rejects_http_reference_adapters_without_remote_mutations() {
+    let adapters: Vec<Box<dyn PaymentAdapter>> = vec![
+        Box::new(crate::payment::X402PaymentAdapter::new(
+            "http://127.0.0.1:1",
+        )),
+        Box::new(crate::payment::AcpPaymentAdapter::new(
+            "http://127.0.0.1:1",
+        )),
+    ];
+    for adapter in adapters {
+        let rail = adapter.rail_id().to_string();
+        let mut kernel = make_kernel(make_monetary_config());
+        kernel
+            .set_payment_adapter(adapter)
+            .expect("pre-activation HTTP adapter install");
+
+        let error = kernel
+            .enable_aggregate_invocation_admission()
+            .expect_err("authorize-only HTTP adapter must reject at activation");
+        assert!(
+            error
+                .to_string()
+                .contains("operation-bound payment mutations"),
+            "{rail} must not activate without remote operation mutations: {error}"
+        );
+    }
+}
+
+#[test]
+fn operation_payment_activation_rejects_non_atomic_budget_stores_before_mutation() {
+    let unsupported_stores: Vec<(
+        &str,
+        std::sync::Arc<dyn crate::budget_store::BudgetStore>,
+    )> = vec![
+        (
+            "in-memory",
+            std::sync::Arc::new(InMemoryBudgetStore::new()),
+        ),
+        (
+            "profile-only durable test store",
+            std::sync::Arc::new(DurableThresholdBudgetStore::new()),
+        ),
+        (
+            "split budget and payment-journal test store",
+            std::sync::Arc::new(InCratePaymentJournalStore::new()),
+        ),
+    ];
+
+    for (label, budget) in unsupported_stores {
+        assert!(!budget.supports_durable_atomic_payment_journal(), "{label}");
+        let mut kernel = make_kernel(make_monetary_config());
+        let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
+        let payment = OperationAwareThresholdPaymentAdapter::new();
+        kernel
+            .set_admission_operation_store_handle(operations.clone())
+            .expect("operation store");
+        kernel
+            .set_budget_store_handle(std::sync::Arc::clone(&budget))
+            .expect("budget store");
+        kernel
+            .set_payment_adapter(Box::new(payment.clone()))
+            .expect("operation-capable payment adapter");
+
+        let error = kernel
+            .enable_aggregate_invocation_admission()
+            .expect_err("unsupported payment-journal topology must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("atomically co-commits payment-journal state"),
+            "{label}: {error}"
+        );
+        assert!(payment.calls().is_empty(), "{label}");
+        assert!(operations.states().is_empty(), "{label}");
+        assert!(budget.list_usages(10, None).unwrap().is_empty(), "{label}");
+    }
+}
+
+#[test]
+fn operation_payment_adapter_install_rejects_non_atomic_budget_before_mutation() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
+    let budget = std::sync::Arc::new(DurableThresholdBudgetStore::new());
+    let payment = OperationAwareThresholdPaymentAdapter::new();
+    assert!(!budget.supports_durable_atomic_payment_journal());
+    kernel
+        .set_admission_operation_store_handle(operations.clone())
+        .expect("operation store");
+    kernel
+        .set_budget_store_handle(budget.clone())
+        .expect("budget store");
+    kernel
+        .enable_aggregate_invocation_admission()
+        .expect("admission may activate before a payment adapter is installed");
+
+    let error = kernel
+        .set_payment_adapter(Box::new(payment.clone()))
+        .expect_err("adapter install must reject a non-atomic payment-journal topology");
+    assert!(
+        error
+            .to_string()
+            .contains("atomically co-commits payment-journal state"),
+        "{error}"
+    );
+    assert!(kernel.payment_adapter.is_none());
+    assert!(kernel.aggregate_invocation_admission_enabled);
+    assert!(payment.calls().is_empty());
+    assert_eq!(payment.authorization_mutations(), 0);
+    assert!(operations.states().is_empty());
+    assert!(
+        budget
+            .list_usages(10, None)
+            .expect("budget usages")
+            .is_empty()
+    );
 }

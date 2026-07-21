@@ -80,12 +80,25 @@ fn forged_budget_authority_metadata() -> serde_json::Value {
     })
 }
 
-fn assert_forged_budget_authority_removed(metadata: &serde_json::Value) {
+fn assert_forged_budget_authority_removed(receipt: &ChioReceipt) {
+    let metadata = receipt
+        .metadata
+        .as_ref()
+        .expect("cleanup fault receipt must carry metadata");
     let budget = &metadata["budget_authority"];
     assert!(
         budget["terminal"].is_null(),
-        "a failed cleanup must not retain a caller-forged released terminal: {budget}"
+        "a failed cleanup must not retain a caller-forged terminal: {budget}"
     );
+    let financial_budget_authority = receipt
+        .financial_budget_authority_metadata()
+        .expect("cleanup fault receipt must retain typed budget authorization metadata");
+    assert!(financial_budget_authority.terminal.is_none());
+    let reason = metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["reason"]
+        .as_str()
+        .expect("cleanup fault must carry its redacted failure reason");
+    assert!(reason.contains("[REDACTED-API-KEY]"));
+    assert!(!reason.contains("sk_live_"));
     assert_ne!(budget["hold_id"], "forged-budget-hold");
     assert_ne!(budget["budget_term"], "forged-budget-term");
     assert_ne!(budget["authority"]["authority_id"], "forged-authority");
@@ -1246,7 +1259,9 @@ fn install_durable_legacy_governed_admission_authorities(kernel: &mut ChioKernel
         .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
         .expect("legacy governed approval store");
     kernel
-        .set_budget_store_handle(std::sync::Arc::new(DurableThresholdBudgetStore::new()))
+        .set_budget_store_handle(durable_atomic_test_budget_store(
+            "legacy-governed-payment-budget",
+        ))
         .expect("legacy governed budget store");
 }
 
@@ -1254,6 +1269,7 @@ fn install_durable_legacy_governed_admission_authorities(kernel: &mut ChioKernel
 
 #[derive(Clone)]
 struct TrackingPaymentAdapter {
+    inner: crate::payment::SimPaymentAdapter,
     authorized: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     captured: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
@@ -1263,6 +1279,7 @@ struct TrackingPaymentAdapter {
 impl TrackingPaymentAdapter {
     fn new() -> Self {
         Self {
+            inner: crate::payment::SimPaymentAdapter::new(),
             authorized: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             captured: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             released: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -1272,6 +1289,18 @@ impl TrackingPaymentAdapter {
 }
 
 impl PaymentAdapter for TrackingPaymentAdapter {
+    fn rail_id(&self) -> &str {
+        self.inner.rail_id()
+    }
+
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        self.inner.supports_operation_authorization_recovery()
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        self.inner.supports_operation_payment_mutations()
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -1329,6 +1358,77 @@ impl PaymentAdapter for TrackingPaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "tracking" }),
         })
+    }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        self.authorized
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner
+            .authorize_for_operation(operation_id, request_binding_hash, request)
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        self.inner
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)
+    }
+
+    fn capture_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.captured
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.capture_for_operation(request)
+    }
+
+    fn release_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.released
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.release_for_operation(
+            operation_id,
+            request_binding_hash,
+            authorization_id,
+            reference,
+        )
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.refunded
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.refund_for_operation(request)
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        self.inner.settlement_state_for_operation(
+            operation_id,
+            request_binding_hash,
+            reference,
+            authorization_id,
+        )
     }
 }
 
@@ -1494,6 +1594,10 @@ async fn assert_post_dispatch_drop_cleanup_fault(
     assert!(receipt.is_cancelled());
     let metadata = receipt.metadata.as_ref().unwrap();
     assert!(metadata["budget_authority"]["terminal"].is_null());
+    let financial_budget_authority = receipt
+        .financial_budget_authority_metadata()
+        .expect("cleanup fault receipt must retain typed budget authorization metadata");
+    assert!(financial_budget_authority.terminal.is_none());
     assert_eq!(
         metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
         true
@@ -1518,7 +1622,7 @@ async fn assert_post_dispatch_drop_cleanup_fault(
         assert!(hold_ids.iter().any(|id| id == "auth_failing_release"));
     }
     if has_forged_budget_authority {
-        assert_forged_budget_authority_removed(metadata);
+        assert_forged_budget_authority_removed(receipt);
     }
 }
 
@@ -1621,7 +1725,7 @@ fn make_dpop_proof(
 }
 
 /// A budget store spy that authorizes holds normally but returns `Err` on every
-/// reverse. Used to exercise the drop-guard pending-reversal escalation path.
+/// reverse. Used to exercise pre-dispatch and recovery reversal failures.
 struct ReverseFailingBudgetStore {
     inner: InMemoryBudgetStore,
 }
