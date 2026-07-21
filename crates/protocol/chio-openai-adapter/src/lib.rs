@@ -419,7 +419,8 @@ impl ChioOpenAiAdapter {
         execution: &OpenAiExecutionContext,
     ) -> Vec<ToolCallResult> {
         if tool_calls.len() > 1
-            && (!execution.approval_tokens.is_empty()
+            && (execution.approval_token.is_some()
+                || !execution.approval_tokens.is_empty()
                 || execution.threshold_approval_proposal.is_some()
                 || execution.supplemental_authorization.is_some())
         {

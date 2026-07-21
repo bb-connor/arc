@@ -739,6 +739,53 @@ fn execute_tool_calls_rejects_shared_supplemental_authorization() {
 }
 
 #[test]
+fn execute_tool_calls_rejects_shared_legacy_approval_token() {
+    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let kernel = ChioKernel::new(test_kernel_config());
+    let agent = Keypair::generate();
+    let approver = Keypair::generate();
+    let mut execution = test_execution_context(&kernel, &agent, "test-srv", "*");
+    // The legacy single approval token is request-bound: `execute_tool_call`
+    // clones it into every call while stamping each a distinct per-call
+    // request_id, so a shared token cannot satisfy more than one call.
+    execution.approval_token = Some(
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: "approval-openai-legacy-batch".to_string(),
+                approver: approver.public_key(),
+                subject: agent.public_key(),
+                governed_intent_hash: "a".repeat(64),
+                request_id: "openai-call-weather".to_string(),
+                threshold_proposal_hash: None,
+                issued_at: 1,
+                expires_at: 2,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            &approver,
+        )
+        .unwrap(),
+    );
+    let calls = vec![
+        weather_tool_call(),
+        OpenAiToolCall {
+            id: "call_search".to_string(),
+            call_type: "function".to_string(),
+            function: OpenAiFunctionCall {
+                name: "search".to_string(),
+                arguments: r#"{"query": "test"}"#.to_string(),
+            },
+        },
+    ];
+
+    let results = adapter.execute_tool_calls(&calls, &kernel, &execution);
+
+    assert!(results.iter().all(|result| result.denied));
+    assert!(results
+        .iter()
+        .all(|result| result.content.contains("single OpenAI tool call")));
+}
+
+#[test]
 fn execute_tool_calls_uses_per_call_execution_nonces() {
     let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
     let mut kernel = ChioKernel::new(test_kernel_config());
