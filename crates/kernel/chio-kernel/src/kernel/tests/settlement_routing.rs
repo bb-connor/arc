@@ -119,6 +119,13 @@ mod settlement_routing_tests {
             Ok(Some(state.legacy_appends as u64))
         }
 
+        fn load_chio_receipt(
+            &self,
+            receipt_id: &str,
+        ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+            Ok(self.state().receipts.get(receipt_id).cloned())
+        }
+
         fn settlement_store_binding(&self) -> Option<SettlementStoreBinding> {
             Some(STORE_BINDING)
         }
@@ -739,5 +746,64 @@ mod settlement_routing_tests {
         );
         assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
         assert_eq!(store.state().atomic_appends, 2);
+    }
+
+    #[test]
+    fn durable_materialization_seeds_a_claimable_settlement_attempt() {
+        let harness =
+            recording_harness(ClaimMode::Claim, RouteMode::Contract, HookBehavior::Accepted);
+        let receipt = positive_receipt(&harness.keypair, 40);
+
+        // A durable monetary receipt must seed its settlement attempt exactly
+        // as the non-durable path does, so the observation the terminal
+        // projection records is claimable rather than stranded as durable-only
+        // work.
+        if let Err(error) = harness
+            .kernel
+            .materialize_durable_admission_receipt(&receipt)
+        {
+            panic!("durable receipt materialization failed: {error}");
+        }
+
+        let pending = {
+            let state = harness.store.state();
+            assert_eq!(state.timed_atomic_appends, 1);
+            assert_eq!(state.atomic_appends, 1);
+            assert_eq!(state.legacy_appends, 0);
+            assert!(state.receipts.contains_key(&receipt.id));
+            match state.attempts.get(&receipt.id) {
+                Some(pending) => *pending,
+                None => panic!("durable materialization left no claimable settlement attempt"),
+            }
+        };
+
+        // A settlement worker can genuinely claim the seeded row.
+        let claim = match harness.store.claim_receipt(
+            &receipt.id,
+            "settlement-worker",
+            pending.next_visible_at_ms,
+            1_000,
+        ) {
+            Ok(claim) => claim,
+            Err(error) => panic!("claiming the seeded attempt failed: {error}"),
+        };
+        assert!(
+            claim.is_some(),
+            "durable settlement attempt was seeded but is not claimable"
+        );
+
+        // Replaying materialization finds the receipt already durable and does
+        // not seed a second attempt.
+        if let Err(error) = harness
+            .kernel
+            .materialize_durable_admission_receipt(&receipt)
+        {
+            panic!("durable receipt re-materialization failed: {error}");
+        }
+        assert_eq!(
+            harness.store.state().atomic_appends,
+            1,
+            "replay must not seed a second settlement attempt"
+        );
     }
 }

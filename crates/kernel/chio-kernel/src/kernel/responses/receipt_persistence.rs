@@ -281,6 +281,18 @@ impl ChioKernel {
         if self.receipt_store.is_none() {
             return Ok(());
         }
+        // Seed the settlement attempt alongside the durable receipt exactly as
+        // `record_chio_receipt` does on the non-durable path. The terminal
+        // projection records observation-attempt-zero as due work, but the
+        // claimable `settle_attempts` row only exists once the receipt is
+        // appended with a pending observation, so without this branch a durable
+        // monetary receipt strands its observation with nothing for the
+        // settlement observer to claim. Seeding only on the first append keeps
+        // it exactly-once: a replay finds the receipt already present.
+        let settlement_visible_at_ms = self
+            .settlement_observer
+            .as_ref()
+            .map(|_| current_unix_timestamp_ms());
         let _receipt_store_write = self
             .receipt_store_write_lock
             .lock()
@@ -297,10 +309,18 @@ impl ChioKernel {
                 }
             }
             None => {
-                store.append_chio_receipt_with_timeout(
-                    receipt,
-                    self.config.deadlines.receipt_append_budget(),
-                )?;
+                if let Some(next_visible_at_ms) = settlement_visible_at_ms {
+                    store.append_chio_receipt_with_pending_observation_and_timeout(
+                        receipt,
+                        &PendingSettlementObservation { next_visible_at_ms },
+                        self.config.deadlines.receipt_append_budget(),
+                    )?;
+                } else {
+                    store.append_chio_receipt_with_timeout(
+                        receipt,
+                        self.config.deadlines.receipt_append_budget(),
+                    )?;
+                }
                 Ok(())
             }
         })?;

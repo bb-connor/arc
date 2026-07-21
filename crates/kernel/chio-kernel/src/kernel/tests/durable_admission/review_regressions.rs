@@ -62,12 +62,21 @@ fn startup_recovery_rejects_a_changed_post_return_plan() {
         AdmissionOperationState::Finalizing
     );
 
+    // Recovery runs under a rotated store lease, exactly as a restarted process
+    // takes over: the crashed operation's recovery lease belongs to the prior
+    // owner, so the sweep sees it as recoverable rather than actively leased.
+    let rotated_fence = StoreMutationFence {
+        store_uuid: admission_test_fence().store_uuid,
+        lease_id: "test-admission-lease-2".to_owned(),
+        owner_epoch: 2,
+    };
+    store.rotate_fence(rotated_fence.clone());
     let mut recovered_config = make_config();
     recovered_config.keypair = kernel.config.keypair.clone();
     recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
     let mut recovered_kernel = make_kernel(recovered_config);
     recovered_kernel
-        .set_durable_admission_store(store.clone(), store.clone(), admission_test_fence())
+        .set_durable_admission_store(store.clone(), store.clone(), rotated_fence)
         .expect("qualified admission store");
     recovered_kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
         replacement: "second",

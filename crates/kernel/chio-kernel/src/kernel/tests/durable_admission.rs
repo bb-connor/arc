@@ -391,16 +391,26 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
 
     fn list_recoverable(
         &self,
-        _not_after_unix_ms: u64,
+        not_after_unix_ms: u64,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        Ok(self
-            .state
-            .lock()
-            .expect("test admission state lock")
+        let store_fence = self.fence.lock().expect("test admission fence lock").clone();
+        let state = self.state.lock().expect("test admission state lock");
+        // Mirror the durable store's recovery contract: an operation still under a
+        // live recovery lease held by the serving fence is being actively driven
+        // and is not recoverable. Only an expired lease, a lease from another
+        // fence, or no lease at all makes an operation eligible for the sweep.
+        Ok(state
             .operation
             .iter()
             .filter(|operation| !operation.state().is_terminal())
+            .filter(|operation| {
+                !state.claim.as_ref().is_some_and(|claim| {
+                    claim.operation_id() == operation.binding().operation_id()
+                        && claim.expires_at_unix_ms() > not_after_unix_ms
+                        && claim.store_fence() == &store_fence
+                })
+            })
             .take(limit)
             .cloned()
             .collect())
@@ -2722,12 +2732,21 @@ fn durable_post_invocation_identity_change_cannot_replace_recovered_finalization
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
+    // Recovery runs under a rotated store lease, exactly as a restarted process
+    // takes over: the crashed operation's recovery lease belongs to the prior
+    // owner, so the sweep sees it as recoverable rather than actively leased.
+    let rotated_fence = StoreMutationFence {
+        store_uuid: admission_test_fence().store_uuid,
+        lease_id: "test-admission-lease-2".to_owned(),
+        owner_epoch: 2,
+    };
+    store.rotate_fence(rotated_fence.clone());
     let mut recovered_config = make_config();
     recovered_config.keypair = kernel.config.keypair.clone();
     recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
     let mut recovered_kernel = make_kernel(recovered_config);
     recovered_kernel
-        .set_durable_admission_store(store.clone(), store.clone(), admission_test_fence())
+        .set_durable_admission_store(store.clone(), store.clone(), rotated_fence)
         .expect("qualified admission store");
     recovered_kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
         replacement: "second",

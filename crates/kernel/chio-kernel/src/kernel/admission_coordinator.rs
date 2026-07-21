@@ -1517,6 +1517,15 @@ impl ChioKernel {
             ));
         }
         let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
+        let context = AdmissionProjectionContext {
+            operation_id: current.binding().operation_id().clone(),
+            request_id: current.binding().request_id().clone(),
+            expected_operation_version: current.version(),
+            trusted_time_unix_ms: trusted_now_unix_ms,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            store_fence: runtime.fence.clone(),
+        };
         if current
             .attachment(crate::admission_operation::AdmissionAttachmentKind::PaymentParticipant)
             .is_some()
@@ -1545,6 +1554,82 @@ impl ChioKernel {
                     })
                     .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
             }
+            if journal.state == crate::payment::PaymentJournalState::Authorized {
+                // The rail hold was authorized before dispatch, so the tool never
+                // ran and the authorization must be released rather than left held.
+                // Drive the durable release the same way the live cleanup path does:
+                // record the no-effect release authority, advance the journal to
+                // Settling, release on the rail, then settle. The release proof is
+                // built from the acquired-participant snapshot, which the terminal
+                // compensation projection below also accepts.
+                let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "authorized pre-dispatch hold has no configured payment adapter".to_owned(),
+                    )
+                })?;
+                let authorization_id = journal.authorization_id.clone().ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "authorized payment journal omitted its authorization".to_owned(),
+                    )
+                })?;
+                let proof =
+                    crate::tool_outcome::VerifiedPreDispatchNoEffect::from_qualified_released_operation_snapshot(
+                        &current,
+                        &context,
+                        verifier_policy.clone(),
+                    )
+                    .map_err(tool_outcome_error)?;
+                let evidence = crate::tool_outcome::MonetaryReleaseAuthority::NoEffect(
+                    crate::tool_outcome::VerifiedNoEffectProof::BeforeDispatch(proof),
+                )
+                .evidence_bundle()
+                .map_err(tool_outcome_error)?;
+                let persisted = evidence.to_persisted();
+                let authority = crate::payment::PaymentReleaseAuthorityBinding {
+                    kind: crate::payment::PaymentReleaseAuthorityKind::PreDispatchNoEffect,
+                    operation_id: persisted.operation_id.as_str().to_owned(),
+                    operation_version: persisted.operation_version,
+                    evidence_id: persisted.evidence_id.as_str().to_owned(),
+                    evidence_digest: persisted.bundle_digest.as_str().to_owned(),
+                };
+                journal = runtime
+                    .store
+                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
+                        operation: &current,
+                        recovery_lease: &lease,
+                        expected: &journal,
+                        transition: &crate::payment::PaymentJournalTransition::BeginRelease {
+                            authority,
+                        },
+                        release_evidence: Some(&evidence),
+                        active_fence: &runtime.fence,
+                        trusted_now_unix_ms,
+                    })
+                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                let result = adapter
+                    .release(&authorization_id, current.binding().request_id().as_str())
+                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                if result.settlement_status != crate::payment::RailSettlementStatus::Released {
+                    return Err(KernelError::DurableAdmission(
+                        "pre-dispatch rail release was not confirmed".to_owned(),
+                    ));
+                }
+                journal = runtime
+                    .store
+                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
+                        operation: &current,
+                        recovery_lease: &lease,
+                        expected: &journal,
+                        transition:
+                            &crate::payment::PaymentJournalTransition::SettlementCompleted {
+                                transaction_id: result.transaction_id,
+                            },
+                        release_evidence: None,
+                        active_fence: &runtime.fence,
+                        trusted_now_unix_ms,
+                    })
+                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            }
             let released = journal.state == crate::payment::PaymentJournalState::Settled
                 && journal.settle_action == Some(crate::payment::PaymentSettleAction::Release);
             let cancelled_before_authorization = journal.state
@@ -1556,15 +1641,6 @@ impl ChioKernel {
                 ));
             }
         }
-        let context = AdmissionProjectionContext {
-            operation_id: current.binding().operation_id().clone(),
-            request_id: current.binding().request_id().clone(),
-            expected_operation_version: current.version(),
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-            store_fence: runtime.fence.clone(),
-        };
         let projection = verified_released_pre_dispatch_compensation_projection(
             &current,
             context,
