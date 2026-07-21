@@ -79,7 +79,7 @@ Stop-loss is explicit because the exhaustion boundary is real (GENESIS-PROGRAM
 |---|---|---|---|---|
 | G0 | Program spec | this design set + ADR-0018 (Proposed) | - | now (this branch) |
 | G1a | `chio-genesis` crate types | pure artifact types + fail-closed validators for the four families; NO schema registration (each registers at its owning milestone) | G0, finding M1 | after finding M1 |
-| G1b | Procurement list surface | governance publish + k-anonymity demand sourcing + control-plane search; staleness/removal | G1a, finding M2 | after M2 |
+| G1b | Procurement list surface | schema registration; governance publish + member-nomination demand sourcing (k distinct member orgs) + control-plane search; staleness/removal | G1a, finding M2 | after M2 |
 | G2 | Coverage-mining floor path | pool custody convention; floor admission gate (venue acceptance recipe + mode-A burn + BondBacked + class rule + sampled audit); release-by-default floor escrow; royalty-right registration + accrual (declared, zero live flow) | G1b, finding M2, M4, M5 | after M5 |
 | G3 | Reliability epoch (r feed) | `chio.genesis.reliability-epoch.v1`; stratified reliability computation; control-plane epoch surface; cron ticking | G2, finding M5 | after M5 |
 | G4 | Operator seats | `chio.genesis.operator-seat.v1`; charter per-vertical cap; Sanction revocation wiring; neutrality covenant | G1a, finding M2 (declare), M7 (cross-org) | after M2; cross-org after M7 |
@@ -104,8 +104,8 @@ dashes); ADR-0018 in the ADR index.
   signature per the chio-finding convention (a `signature` field over the
   canonical body with `signature` cleared; NO `SignedExportEnvelope` wrapper,
   ADR-0018 D1).
-- NO schema registration here (review findings GA-R9/GA-R4b: registering ahead
-  of an owning milestone is the exact #1025 M0 anti-pattern, and it would also
+- NO schema registration here (review finding: registering ahead of an
+  owning milestone is the exact #1025 M0 anti-pattern, and it would also
   touch `registry.json` inside the pre-#974 freeze). Each schema registers at
   its owning milestone: procurement-list at G1b, royalty-right at G2,
   reliability-epoch at G3, operator-seat at G4.
@@ -117,18 +117,24 @@ dashes); ADR-0018 in the ADR index.
 
 ### G1b Procurement list surface (after finding M2)
 
+- Registers `chio.genesis.procurement-list.v1` (its owning milestone).
 - Governance-published list: `POST /v1/genesis/procurement-list` restricted to
   the governance charter signer (reuse the namespace-owner signature check
   pattern, `chio-listing/src/util.rs:27`); sellers are read-only.
-- k-anonymity demand sourcing: a descriptor is admitted only after
-  `k_anonymity_floor` distinct buyer clusters (`root_budget_holder`) have queried
-  it; the list publishes coarse `demand_bucket`s, never raw counts.
+- Demand sourcing at launch = SIGNED MEMBER DEMAND NOMINATIONS
+  (GENESIS-ARCHITECTURE 3.1.1; raw search telemetry gates nothing, it is
+  stateless, unpriced, and unattributable): `POST
+  /v1/genesis/demand-nominations` restricted to identified consortium member
+  keys; a descriptor is admitted only after `k_anonymity_floor` DISTINCT
+  member orgs have nominated it; the list publishes coarse `demand_bucket`s,
+  never raw counts or nominator identities.
 - Staleness/removal: `stale_after` on each entry (half-life idiom,
   `chio-pheromone/src/validation.rs:782`); `saturated` descriptors removed so the
   pool stops paying solved coverage; each republish is a monotone epoch.
 - Exit: an integration test publishes a governance-signed list, rejects a
-  seller-signed publish, admits a descriptor only after `k` distinct clusters,
-  and removes a saturated descriptor; gate green.
+  seller-signed publish, rejects a non-member nomination, admits a descriptor
+  only after `k` distinct member-org nominations, and removes a saturated
+  descriptor; gate green.
 
 ### G2 Coverage-mining floor path (after finding M5)
 
@@ -202,8 +208,9 @@ dashes); ADR-0018 in the ADR index.
 - Neutrality covenant bound to the F6 obligation; cross-org realization gated on
   the M7 operator-model decision.
 - Exit: an integration test issues seats up to the cap and rejects the cap+1
-  issue, and enforces a neutrality-violation Sanction that flips the seat to
-  revoked; gate green.
+  issue, enforces a neutrality-violation Sanction that flips the seat to
+  revoked, and lapses a seat on a change-of-control event pending re-grant;
+  gate green.
 
 ### G5 Clearing fee (D7) + CCV + genesis demonstration (after finding M4)
 
@@ -226,14 +233,15 @@ dashes); ADR-0018 in the ADR index.
   synthetic related-party trade is excluded; an external arm's-length trade is
   counted; gate green.
 
-### G6 Royalty live flow + qualification + permissionless turn (after M5/M9 + #974)
+### G6 Royalty live flow + qualification + permissionless turn (after G5 + M9; #974)
 
 - Settle royalty-leg generalization (ADR-0018 D5): generalize the exact-sum
   distribution beyond bond-impair for batched royalty legs, reviewed with the
   settle lane owner; single-leg royalties use the existing single-beneficiary
   release unchanged.
-- Fee-split at collection: once M2/M5 collection exists, the collecting operator
-  splits per the royalty table; forward-only.
+- Fee-split at collection: once the D7 clearing fee exists (G5) on the M2/M5
+  collection machinery, the collecting operator splits per the royalty and
+  seat tables; forward-only.
 - Qualification: bounded-matrix entries + feature-flag removal for qualified
   surfaces; CLAIM_REGISTRY approved-claim rows plus `audited_assumption` rows for
   the new trusted roles (subsidy-pool operator T5, royalty-split operator T6,
@@ -272,7 +280,7 @@ dashes); ADR-0018 in the ADR index.
 | Exhaustion before demand (Q1) | unknown | program value | leading indicators (9.1) wired into G2/G5 exit reports; per-mine stop-loss; the exhaustion driver is the standing audit bill, so audit-rate step-downs are published with the schedule |
 | Zombie regime: pool survives but organic supply/fees never take over (9.1 conclusion 3) | unknown | program value | exit criterion is organic takeover, not pool solvency; organic-listing-share and security-self-funding indicators alarm it; genesis window `T_g` hard-stops indefinite subsidy |
 | Fee collection (M2/M5) or #974 slips | medium | royalty + seat live flow slips | artifacts declare against the table with zero flow until collection lands; G1a/G4 declaration work is independent |
-| Demanded-descriptor telemetry too thin to source a list (Q3) | medium | G1b weak | k-anonymity floor tunable; wedge contexts (CI failures) are dense; fall back to curated seed descriptors with the same admission gate |
+| Too few member demand nominations to source a list (Q3) | medium | G1b weak | k floor tunable; wedge contexts (CI failures) are dense; fall back to curated seed descriptors with the same admission gate |
 | Adverse selection subsidizes dead R&D inventory (Q6) | high for R&D | pool waste | wedge-first; R&D coverage gated on wedge conversion telemetry; abandonment expected |
 | Permissionless Sybil (GA3) | high (permissionless) | limits the later profile | permissionless deferred to G6 with explicit Sybil hardening prerequisites |
 | Operator-seat neutrality abuse (GA7) | medium | trust in seated verticals | covenant + Sanction/deactivate revocation; equivocation anchoring |

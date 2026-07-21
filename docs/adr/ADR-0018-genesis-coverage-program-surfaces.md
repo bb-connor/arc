@@ -120,7 +120,8 @@ verifiable) is never read as a `deterministic_replay` `r`.
 
 A genesis operator seat (`chio.genesis.operator-seat.v1`) is a signed grant from
 the governance charter binding a vertical, an operator identity, a
-`fee_share_bps` (realized only once collection exists), the F6 neutrality
+`fee_share_bps` (denominated in the D7 clearing fee, realized only once D7
+lands at G5 on the M2/M5 collection machinery), the F6 neutrality
 covenant (ARCHITECTURE F6), a predeclared revocation rule, and a genesis expiry.
 The per-vertical cap is a charter parameter enforced at issue time (the issuer
 refuses to sign beyond the cap); there is no on-chain slot machine. Seats are
@@ -220,9 +221,11 @@ or seat live flow, and no CCV.
     `s + beta <= 0.8` bound (GENESIS-PROGRAM 4.2); the assignment lottery and
     the bound are what keep self-slash farming negative-EV, and both are
     published program parameters.
-  - Procurement demand-sourcing and its privacy (k-anonymity over buyer clusters)
-    are net-new; there is no existing telemetry or commit-to-query layer to lean
-    on.
+  - Procurement demand-sourcing and its privacy are net-new; the launch
+    signal is k distinct signed consortium member nominations (buyer-cluster
+    k-anonymity over telemetry is a deferred profile needing an authenticated
+    query surface that does not exist), and there is no commit-to-query layer
+    to lean on.
 
 ## Non-goals
 

@@ -364,7 +364,8 @@ profile in parentheses where different.
   authenticated-telemetry profile until that surface is designed).
 - **GA6. Pool-exhaustion griefing** (drive floor payouts to drain the bounded
   pool before organic demand arrives). Mitigated: floors pay only for
-  demanded-uncovered coverage that passes audit, so a griefer who extracts floors
+  demanded-uncovered coverage that passes the full admission gate (with the
+  sampled-audit refund path), so a griefer who extracts floors
   is producing the exact coverage the program wants; the per-descriptor cap and
   declining schedule bound total extractable subsidy; the leading indicators
   (GENESIS-PROGRAM 9.1) detect a low hit-conversion drain early and the
@@ -464,8 +465,10 @@ profile in parentheses where different.
 
 The Genesis implementation should formalize: royalty-forward-only (a royalty leg
 never references a pre-existing settled trade, preserving K2 no-clawback); floor-
-admission soundness (a floor release implies a matched demanded-uncovered
-descriptor plus mode-A burn plus passed audit); seat-cap monotonicity (issued
+admission soundness (a floor release implies the FULL admission gate:
+matched demanded-uncovered descriptor with the venue acceptance recipe,
+mode-A burn, bond backing, class rule, and a survived sampled-audit window;
+release-by-default means no per-floor audit is implied); seat-cap monotonicity (issued
 seats per vertical never exceed the charter cap); and CCV related-party exclusion
 (no CCV credit for a trade whose buyer and seller share a root budget holder).
 These are listed for the program plan (GENESIS-PLAN) alongside the finding-market

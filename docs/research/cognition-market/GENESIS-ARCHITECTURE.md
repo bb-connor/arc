@@ -82,7 +82,7 @@ reported, `chio-listing/src/discovery.rs:68`).
 | `governing_operator_id` | string | the venue governance operator that admits descriptors (NOT sellers, to defuse Goodhart, Q6) |
 | `epoch` | u64 | monotone; each republish is a new epoch |
 | `entries` | array | demanded descriptors, each `{ topic, context_sha256?, demand_bucket, coverage_state, required_guarantee_class, acceptance_recipe_sha256?, floor_schedule_ref, admitted_at, stale_after }`; FLOOR-BEARING entries MUST pin both `context_sha256` and a VENUE-authored `acceptance_recipe_sha256` (the audit executes the venue's recipe, not the seller's; GENESIS-PROGRAM 4.1, review finding GA-R4) |
-| `k_anonymity_floor` | u32 | minimum distinct buyer clusters that must have queried a descriptor before it is listed (privacy gate; see 3.1.1) |
+| `k_anonymity_floor` | u32 | minimum distinct nominating identities before a descriptor is listed: at launch, distinct consortium member orgs with signed demand nominations; under a later authenticated-telemetry profile, distinct buyer clusters (3.1.1) |
 | `issued_at` / `expires_at` | u64 | validity window |
 | `signature` | inline sig | over canonical body, verifiable against the governance charter signer |
 
@@ -216,14 +216,16 @@ read as a `deterministic_replay` `r`.
 summary is per-SUBJECT (`subject_key`), single composite; the r feed needs the
 `(corpus, seller, guarantee_class)` stratification and a compact buyer-facing row
 set, and it consumes AUDIT receipts specifically, not a subject's whole receipt
-corpus. It is the same signing envelope and the same reliability math, re-keyed.
+corpus. It is the same windowed-aggregate shape and the same reliability math, re-keyed (and the same inline-signature convention as the rest of the family).
 
 ### 3.4 `chio.genesis.operator-seat.v1` (Q5)
 
 The capped, non-transferable genesis seat. NEW because no seat / roster-with-
 roles / capped-slot primitive exists (the `RosterPolicy` is unsigned config,
 `chio-control-plane/src/trust_control/capital_and_liability/liability.rs:11`, and its referenced
-`AdjudicationJurisdictionReceipt` type is absent from the repo).
+`AdjudicationJurisdictionReceipt` type is crate-internal, `pub(super)` at
+`chio-trust-market-context/src/artifacts.rs:239`, so unverifiable at the
+consumption site).
 
 | Field | Type | Semantics |
 |---|---|---|
@@ -231,7 +233,7 @@ roles / capped-slot primitive exists (the `RosterPolicy` is unsigned config,
 | `seat_id` | string | content-addressed |
 | `vertical` | enum | `mediating_kernel` / `registry` / `status_oracle` / `reliability_oracle` |
 | `operator_id` | string | the seated operator; NON-transferable (bound here) |
-| `fee_share_bps` | u32 | basis points of the vertical's clearing fee (realized only once collection exists, K1) |
+| `fee_share_bps` | u32 | basis points of the vertical's D7 clearing fee (realized only once D7 lands at G5 on the M2/M5 collection machinery, K1); jointly capped with royalty shares by the published carve-out cap |
 | `neutrality_covenant_ref` | string | the F6 neutrality obligation this seat accepts (K3) |
 | `revocation_rule_ref` | string | predeclared decision rule that fires seat revocation on violation; change-of-control LAPSE is a named trigger beside it (continuity-of-control condition, GENESIS-PROGRAM 4.3) |
 | `granted_by` | string | the governance charter that granted it (also carries the per-vertical cap) |

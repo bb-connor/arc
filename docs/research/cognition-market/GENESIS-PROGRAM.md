@@ -287,11 +287,12 @@ constraints and are redesigned:
    marginal LISTING cost (sealing the payload, publishing, bond opportunity
    cost), not the production cost, which is sunk exhaust of a metered run.
 
-2. **The floor is per covered demanded descriptor, not per listing.** One floor
-   per descriptor, ever (K5). This is the "buys inventory, not volume"
-   guarantee made mechanical: you cannot farm floors by listing many findings,
-   because only demanded-uncovered descriptors admit a floor and each admits at
-   most one.
+2. **The floor is per covered demanded descriptor, not per listing.** One
+   floor per descriptor per coverage epoch (K5 intent; the ordering paragraph
+   below defines the epoch rule and the contested-descriptor tie-break). This
+   is the "buys inventory, not volume" guarantee made mechanical: you cannot
+   farm floors by listing many findings, because only demanded-uncovered
+   descriptors admit a floor and each admits at most one while covered.
 
 **Admission gate for a floor payment (all five required):**
 
@@ -573,9 +574,10 @@ It is:
   The seat artifact names the decision rule that fires revocation, so revocation
   is predeclared, not discretionary.
 
-The fee share the seat carries is realized only once fee collection exists
-(K1, M2/M5). Until then the seat is a signed claim on a declared split with zero
-live flow, exactly like the royalty (Q2). The seat is thus a reputation-and-fee-
+The fee share the seat carries denominates in the D7 clearing fee and is
+realized only once D7 lands (G5) on the M2/M5 collection machinery (K1). Until
+then the seat is a signed claim on a declared split with zero live flow,
+exactly like the royalty (Q2). The seat is thus a reputation-and-fee-
 share POSITION with a neutrality covenant, which is what "operator mining"
 reduces to on the real surface.
 
@@ -800,8 +802,9 @@ reported and single-source figures are flagged inline.
   weeks, after which mercenary capital rotated onward [news/vendor, self-reported
   figures, FLAGGED]. The lesson this program takes: emissions that pay for the
   BEHAVIOR of showing up buy volume that evaporates in days. The Genesis floor
-  pays for INVENTORY (a covered demanded descriptor, a durable asset), gated on
-  burn and audit, one floor per descriptor; there is no per-participation or
+  pays for INVENTORY (a covered demanded descriptor, a durable asset), gated on burn
+  and the sampled-audit admission gate, one floor per descriptor per coverage
+  epoch; there is no per-participation or
   per-volume emission and no token to rotate. This is the hard-constraint-2
   discipline with a measured cautionary tale attached.
 
@@ -826,8 +829,8 @@ reported and single-source figures are flagged inline.
   per-unit revenue tail [paper/report; $1.5B pilot, launched 2007]. The
   structural mapping to the Genesis coverage mine is exact: bounded pool =
   AMC fund; procurement-list entry = the published product specification;
-  floor paid on audit-passed delivery = the per-unit subsidy on verified
-  supply; royalty = the long-run tail; pool exhaustion = the AMC's designed
+  floor paid on gate-passed delivery (venue acceptance recipe, burn proof,
+  sampled-audit window) = the per-unit subsidy on verified supply; royalty = the long-run tail; pool exhaustion = the AMC's designed
   end state. Two AMC design lessons adopted: pay on VERIFIED DELIVERY against
   a pre-published spec (never on effort or claims), and keep the demanded
   spec under the buyer coalition's control, not suppliers' (the pilot's
@@ -846,7 +849,8 @@ reported and single-source figures are flagged inline.
   (cultivation), then a deed. Over one million claims were abandoned without
   proving up. Three lessons adopted directly: (1) grant on proof-of-improvement,
   not on claim-staking, which maps to the floor gated on mode-A proof-of-burn
-  plus descriptor match plus audit (you get paid for improving a demanded
+  plus the venue acceptance recipe plus the sampled-audit window (you get paid
+  for improving a demanded
   descriptor, not for filing a listing); (2) vest the durable reward on
   demonstrated use, which maps to the royalty vesting only on hits; (3) a public
   time-boxed clock (the genesis window `T_g`) with a real abandonment rate is
@@ -943,8 +947,9 @@ agree.
 The recurrence admits THREE regimes, not two:
 
 - **SELF-SUSTAIN**: organic supply covers demand inflow (`a_o >= lambda_d`)
-  AND fees cover the security bill (`f * X >= (alpha_new * a + alpha_corpus *
-  C) * c_a`), sustained. The program exits.
+  AND carve-net fees cover the security bill (`(1 - carve) * f * X >=
+  (alpha_new * a + alpha_corpus * C) * c_a`, conclusion 2), sustained. The
+  program exits.
 - **EXHAUST**: `B(t)` hits the month's committed spend before self-sustain.
 - **ZOMBIE**: the pool survives the horizon but organic supply and fees never
   take over; coverage is high, the market is permanently subsidy-dependent.
@@ -960,6 +965,7 @@ recurrence above):
 | Scenario | Verdict | Coverage g(12) | Cumulative floors (36m) | Pool-funded audits (36m) |
 |---|---|---|---|---|
 | base (carve 0) | SELF-SUSTAIN month 13 | 95% | $20.5k | $6.5k |
+| base, carve 15% | SELF-SUSTAIN month 15 | 95% | $20.5k | $6.9k |
 | base, carve 25% | SELF-SUSTAIN month 18 | 95% | $20.5k | $7.3k |
 | base, carve 40% | ZOMBIE | 95% | $20.5k | $10.3k |
 | optimistic (early, strong demand) | SELF-SUSTAIN month 6 | 94% | $22.0k | $4.4k |
@@ -1112,9 +1118,9 @@ sequencing (Q7) and the threat model.
   for subsidized findings), and its output is the signed **reliability epoch**
   (`r`) that buyer pricing consumes.
 - **Operator mining** grants **capped, non-transferable genesis seats** (reward
-  type c) carrying a **clearing-fee share** (realized only once collection
-  exists, M2/M5), bound to the F6 neutrality covenant and revocable on
-  violation.
+  type c) carrying a **D7 clearing-fee share** (realized only once D7 lands at
+  G5 on the M2/M5 collection machinery), bound to the F6 neutrality covenant,
+  lapsing on change of control, and revocable on violation.
 
 Every subsidy unit becomes inventory (a covered demanded descriptor) or security
 (an audit that establishes `r`), never rented behavior: the floor is per-
