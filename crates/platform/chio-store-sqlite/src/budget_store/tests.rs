@@ -735,6 +735,12 @@ fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
     assert!(error
         .to_string()
         .contains("no identical locally migration-anchored state"));
+    assert!(
+        error
+            .to_string()
+            .contains("copying the leader's already-migrated budget database file directly"),
+        "the refusal must name the supported bootstrap path: {error}"
+    );
     assert!(store.get_usage("cap-anchor-only", 0).unwrap().is_none());
     assert!(store.list_usage_history_anchors().unwrap().is_empty());
     assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);

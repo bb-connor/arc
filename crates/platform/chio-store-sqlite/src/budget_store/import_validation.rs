@@ -55,7 +55,7 @@ impl SqliteBudgetStore {
                 }
             } else {
                 return Err(BudgetStoreError::Invariant(format!(
-                    "budget history anchor `{}` grant {} has no identical locally migration-anchored state",
+                    "budget history anchor `{}` grant {} has no identical locally migration-anchored state; provision a fresh follower by copying the leader's already-migrated budget database file directly, because a pre-upgrade baseline imported over the snapshot wire path cannot carry verifiable anchor provenance",
                     anchor.capability_id, anchor.grant_index
                 )));
             }
