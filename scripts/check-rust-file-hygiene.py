@@ -94,12 +94,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-acp-edge/src/tests/all.rs": allow(
         "2026-07-31",
         "existing oversized ACP edge aggregate test suite; capped to current size until split",
-        max_lines=3_291,
+        max_lines=3_338,
     ),
     "crates/protocol/chio-a2a-edge/src/tests/all.rs": allow(
         "2026-07-31",
         "existing oversized A2A edge aggregate test suite; capped to current size until split",
-        max_lines=3_168,
+        max_lines=3_207,
     ),
     "crates/products/chio-cli/tests/proof_cli_contract/support.rs": allow(
         "2026-07-31",

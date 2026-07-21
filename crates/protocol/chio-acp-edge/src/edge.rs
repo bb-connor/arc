@@ -78,11 +78,14 @@ fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
 fn reject_request_bound_artifacts_without_stable_request_id(
     execution: &AcpKernelExecutionContext,
 ) -> Result<(), AcpEdgeError> {
-    if execution.approval_tokens.is_empty() && execution.supplemental_authorization.is_none() {
+    if execution.approval_token.is_none()
+        && execution.approval_tokens.is_empty()
+        && execution.supplemental_authorization.is_none()
+    {
         return Ok(());
     }
     Err(AcpEdgeError::InvalidRequest(
-        "ACP threshold approvals and supplemental authorization require invoke_with_request_id"
+        "ACP approval tokens and supplemental authorization require invoke_with_request_id"
             .to_string(),
     ))
 }

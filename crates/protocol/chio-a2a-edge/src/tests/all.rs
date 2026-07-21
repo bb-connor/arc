@@ -1085,7 +1085,46 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: A2A threshold approvals and supplemental authorization require \
+            "invalid request: A2A approval tokens and supplemental authorization require \
+             handle_send_message_with_request_id"
+        );
+    }
+
+    #[test]
+    fn send_message_rejects_singular_approval_token_without_stable_request_id() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let (approvals, _proposal) = threshold_artifacts(&subject, "a2a-singular-auth");
+        let approval_token = approvals
+            .into_iter()
+            .next()
+            .test_expect("threshold artifacts must yield at least one approval token");
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: Some(approval_token.clone()),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+
+        let error = edge
+            .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
+            .test_expect_err("a singular approval token must require a stable request id");
+
+        assert_eq!(
+            error.to_string(),
+            "invalid request: A2A approval tokens and supplemental authorization require \
              handle_send_message_with_request_id"
         );
     }

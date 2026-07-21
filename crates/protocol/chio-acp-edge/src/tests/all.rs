@@ -1303,7 +1303,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: ACP threshold approvals and supplemental authorization require \
+            "invalid request: ACP approval tokens and supplemental authorization require \
              invoke_with_request_id"
         );
 
@@ -1315,6 +1315,53 @@ mod tests {
             &execution,
         )
         .test_expect("stable request id path must accept request-bound artifacts");
+    }
+
+    #[test]
+    fn invoke_rejects_singular_approval_token_without_stable_request_id() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let (approvals, _proposal) = threshold_artifacts(&subject, "acp-singular-auth");
+        let approval_token = approvals
+            .into_iter()
+            .next()
+            .test_expect("threshold artifacts must yield at least one approval token");
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: Some(approval_token.clone()),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+
+        let error = edge
+            .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
+            .test_expect_err("a singular approval token must require a stable request id");
+
+        assert_eq!(
+            error.to_string(),
+            "invalid request: ACP approval tokens and supplemental authorization require \
+             invoke_with_request_id"
+        );
+
+        edge.invoke_with_request_id(
+            "caller-chosen-request",
+            "read_file",
+            json!({"path": "/tmp"}),
+            &kernel,
+            &execution,
+        )
+        .test_expect("stable request id path must accept a singular approval token");
     }
 
     #[test]

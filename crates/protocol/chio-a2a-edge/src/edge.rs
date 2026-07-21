@@ -78,11 +78,14 @@ fn validate_execution_agent_id(agent_id: &str) -> Result<(), A2aEdgeError> {
 fn reject_request_bound_artifacts_without_stable_request_id(
     execution: &A2aKernelExecutionContext,
 ) -> Result<(), A2aEdgeError> {
-    if execution.approval_tokens.is_empty() && execution.supplemental_authorization.is_none() {
+    if execution.approval_token.is_none()
+        && execution.approval_tokens.is_empty()
+        && execution.supplemental_authorization.is_none()
+    {
         return Ok(());
     }
     Err(A2aEdgeError::InvalidRequest(
-        "A2A threshold approvals and supplemental authorization require \
+        "A2A approval tokens and supplemental authorization require \
          handle_send_message_with_request_id"
             .to_string(),
     ))
