@@ -487,6 +487,156 @@ fn outcome_journal_survives_owner_rotation_and_detects_tampering() {
     drop(_temp);
 }
 
+fn mark_operation_terminal(fixture: &Fixture, operation_id: &AdmissionOperationId) {
+    // Reaching a terminal state through the real API requires the signed
+    // terminal-projection machinery; this isolates the compaction gate, which
+    // reads only `admission_operations.terminal`. The version bump keeps the
+    // `admission_operations_versioned_body` trigger satisfied.
+    let connection = fixture.outcomes.connection().expect("connection");
+    let changed = connection
+        .execute(
+            "UPDATE admission_operations
+             SET terminal = 1, version = version + 1
+             WHERE operation_id = ?1",
+            [operation_id.as_str()],
+        )
+        .expect("mark operation terminal");
+    assert_eq!(changed, 1);
+}
+
+fn blob_state(fixture: &Fixture, digest: &str) -> (i64, bool) {
+    let connection = fixture.outcomes.connection().expect("connection");
+    connection
+        .query_row(
+            "SELECT blob_size_bytes, canonical_bytes IS NOT NULL
+             FROM tool_outcome_blobs WHERE digest = ?1",
+            [digest],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)? != 0)),
+        )
+        .expect("blob row")
+}
+
+#[test]
+fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let committed = committed(&fixture, "compaction-terminal", begun_at);
+    let (operation, outcome) = record_return(&fixture, &committed, begun_at + 20);
+    let operation_id = operation.binding().operation_id().clone();
+    let digest = outcome.raw_output_digest().as_str().to_owned();
+
+    let (size_before, present_before) = blob_state(&fixture, &digest);
+    assert!(present_before, "blob payload is present before compaction");
+
+    mark_operation_terminal(&fixture, &operation_id);
+    let summary = fixture
+        .outcomes
+        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
+        .expect("compact terminal blob");
+    assert_eq!(summary.compacted, 1);
+    assert_eq!(summary.retained_live, 0);
+
+    let (size_after, present_after) = blob_state(&fixture, &digest);
+    assert!(!present_after, "blob payload is cleared after compaction");
+    assert_eq!(size_after, size_before, "blob size is retained");
+
+    let error = fixture
+        .outcomes
+        .load_raw_invocation_by_operation(&operation_id)
+        .expect_err("a compacted raw invocation must not load silently");
+    assert!(
+        matches!(&error, ToolOutcomeStoreError::Invariant(message) if message.contains("compacted")),
+        "compacted read reports a defined error, got {error:?}"
+    );
+
+    assert_eq!(
+        fixture
+            .outcomes
+            .lookup_by_operation(&operation_id)
+            .expect("outcome record survives compaction"),
+        Some(outcome)
+    );
+
+    // A second pass is idempotent: the payload is already cleared.
+    let repeat = fixture
+        .outcomes
+        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 201)
+        .expect("second compaction pass");
+    assert_eq!(repeat.compacted, 0);
+    assert_eq!(repeat.retained_live, 0);
+}
+
+#[test]
+fn compaction_is_refused_while_an_owning_operation_is_live() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let committed = committed(&fixture, "compaction-live", begun_at);
+    let (operation, _outcome) = record_return(&fixture, &committed, begun_at + 20);
+    let operation_id = operation.binding().operation_id().clone();
+    let digest = fixture
+        .outcomes
+        .lookup_by_operation(&operation_id)
+        .expect("lookup outcome")
+        .expect("outcome present")
+        .raw_output_digest()
+        .as_str()
+        .to_owned();
+
+    let summary = fixture
+        .outcomes
+        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
+        .expect("compaction pass over a live operation");
+    assert_eq!(summary.compacted, 0, "a live operation is never compacted");
+    assert_eq!(summary.retained_live, 1);
+
+    let (_size, present) = blob_state(&fixture, &digest);
+    assert!(present, "the live operation keeps its raw payload");
+    assert!(
+        fixture
+            .outcomes
+            .load_raw_invocation_by_operation(&operation_id)
+            .expect("load raw invocation")
+            .is_some(),
+        "the raw invocation still reads back while the operation is live"
+    );
+}
+
+#[test]
+fn compaction_respects_the_retention_cutoff() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let committed = committed(&fixture, "compaction-cutoff", begun_at);
+    let (operation, outcome) = record_return(&fixture, &committed, begun_at + 20);
+    let operation_id = operation.binding().operation_id().clone();
+    let digest = outcome.raw_output_digest().as_str().to_owned();
+    mark_operation_terminal(&fixture, &operation_id);
+
+    // The blob is recorded at `begun_at + 21`; a cutoff before it retains it.
+    let early = fixture
+        .outcomes
+        .compact_retained_invocation_blobs(begun_at, &fixture.fence, begun_at + 200)
+        .expect("compaction below the cutoff");
+    assert_eq!(
+        early.compacted, 0,
+        "a payload newer than the cutoff is kept"
+    );
+    assert_eq!(early.retained_live, 0);
+    assert!(
+        blob_state(&fixture, &digest).1,
+        "payload retained below cutoff"
+    );
+
+    let due = fixture
+        .outcomes
+        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 201)
+        .expect("compaction at the cutoff");
+    assert_eq!(due.compacted, 1, "a payload past the cutoff is compacted");
+    assert!(
+        !blob_state(&fixture, &digest).1,
+        "payload cleared past cutoff"
+    );
+}
+
 fn secure_temp_directory(path: &std::path::Path) {
     #[cfg(unix)]
     {

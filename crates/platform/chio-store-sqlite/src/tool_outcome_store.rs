@@ -32,6 +32,23 @@ const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
 const MAX_OUTCOME_RECORD_BYTES: usize = 1024 * 1024;
 const MAX_EVALUATION_RECORD_BYTES: usize = 64 * 1024 * 1024;
 
+/// Result of one raw-invocation retention pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ToolOutcomeCompactionSummary {
+    /// Raw invocation payloads cleared to NULL during this pass.
+    pub compacted: u64,
+    /// Payloads past the retention cutoff left in place because at least one
+    /// owning admission operation has not yet reached a terminal state.
+    pub retained_live: u64,
+}
+
+/// A stored raw invocation blob, or a marker that its payload was compacted away
+/// under retention while the digest and size were preserved.
+enum StoredInvocationBlob {
+    Present(CanonicalInvocationBlobV1),
+    Compacted,
+}
+
 #[derive(Clone)]
 pub struct SqliteToolOutcomeStore {
     connection: Arc<Mutex<Connection>>,
@@ -102,6 +119,72 @@ impl SqliteToolOutcomeStore {
             .sync_authority_anchor(connection)
             .map_err(|error| ToolOutcomeStoreError::Unavailable(error.to_string()))
     }
+
+    /// Clears the raw invocation payload of every content-addressed blob whose
+    /// owning operations are all terminal and that was recorded at or before
+    /// `retention_cutoff_unix_ms`, preserving the digest and size that
+    /// verification depends on. The caller supplies the cutoff (for example from
+    /// a retention policy); this store never reads kernel configuration on its
+    /// own. Blobs whose owning operation is still live are left untouched, which
+    /// the schema triggers independently enforce.
+    pub fn compact_retained_invocation_blobs(
+        &self,
+        retention_cutoff_unix_ms: u64,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeCompactionSummary, ToolOutcomeStoreError> {
+        let cutoff = sqlite_u64(retention_cutoff_unix_ms, "retention_cutoff_unix_ms")?;
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
+        let compacted = transaction
+            .execute(
+                r#"
+                UPDATE tool_outcome_blobs
+                SET canonical_bytes = NULL
+                WHERE canonical_bytes IS NOT NULL
+                  AND recorded_at_unix_ms <= ?1
+                  AND EXISTS (
+                      SELECT 1 FROM tool_outcomes o
+                      WHERE o.raw_output_digest = tool_outcome_blobs.digest
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM tool_outcomes o
+                      JOIN admission_operations a ON a.operation_id = o.operation_id
+                      WHERE o.raw_output_digest = tool_outcome_blobs.digest
+                        AND a.terminal = 0
+                  )
+                "#,
+                params![cutoff],
+            )
+            .map_err(sqlite_error)?;
+        let retained_live: i64 = transaction
+            .query_row(
+                r#"
+                SELECT COUNT(*) FROM tool_outcome_blobs b
+                WHERE b.canonical_bytes IS NOT NULL
+                  AND b.recorded_at_unix_ms <= ?1
+                  AND EXISTS (
+                      SELECT 1 FROM tool_outcomes o
+                      WHERE o.raw_output_digest = b.digest
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM tool_outcomes o
+                      JOIN admission_operations a ON a.operation_id = o.operation_id
+                      WHERE o.raw_output_digest = b.digest
+                        AND a.terminal = 0
+                  )
+                "#,
+                params![cutoff],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        Ok(ToolOutcomeCompactionSummary {
+            compacted: u64::try_from(compacted).unwrap_or(0),
+            retained_live: u64::try_from(retained_live).unwrap_or(0),
+        })
+    }
 }
 
 impl ToolOutcomeStore for SqliteToolOutcomeStore {
@@ -121,10 +204,20 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
                 .map_err(admission_error)?
                 .ok_or(ToolOutcomeStoreError::NotFound)?;
         if let Some(existing) = load_outcome_tx(&transaction, operation.binding().operation_id())? {
-            let existing_blob = load_blob_tx(&transaction, existing.raw_output_digest())?
+            let stored_blob = load_blob_state_tx(&transaction, existing.raw_output_digest())?
                 .ok_or_else(|| invariant("tool outcome lost its canonical blob"))?;
+            let blob_matches = match &stored_blob {
+                StoredInvocationBlob::Present(existing_blob) => {
+                    existing_blob.bytes() == blob.bytes()
+                }
+                // The payload was compacted under retention. Blobs are
+                // content-addressed, so an equal digest is an equal payload.
+                StoredInvocationBlob::Compacted => {
+                    existing.raw_output_digest() == blob.blob_ref().digest()
+                }
+            };
             if !existing.same_immutable_outcome(record)
-                || existing_blob.bytes() != blob.bytes()
+                || !blob_matches
                 || stored_operation.tool_outcome_id() != Some(existing.outcome_id())
                 || !matches!(
                     stored_operation.state(),
@@ -133,9 +226,11 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             {
                 return Err(ToolOutcomeStoreError::Conflict);
             }
-            existing
-                .validate_canonical_blob(&stored_operation, &existing_blob)
-                .map_err(|error| invariant(error.to_string()))?;
+            if let StoredInvocationBlob::Present(existing_blob) = &stored_blob {
+                existing
+                    .validate_canonical_blob(&stored_operation, existing_blob)
+                    .map_err(|error| invariant(error.to_string()))?;
+            }
             transaction.commit().map_err(sqlite_error)?;
             return Ok(ToolOutcomeInsertResultV1::ExactReplay {
                 outcome: existing,
@@ -149,7 +244,11 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             .validate_for_store_insert(operation, blob, active_fence, trusted_now_unix_ms)
             .map_err(|error| invariant(error.to_string()))?;
         let outcome_json = encode_outcome(record)?;
-        let participant_digest = returned_participant_digest(record, blob, &outcome_json)?;
+        let participant_digest = returned_participant_digest(
+            record,
+            record.raw_output_digest().as_str(),
+            &outcome_json,
+        )?;
         insert_blob_tx(&transaction, blob, active_fence, trusted_now_unix_ms)?;
         insert_outcome_tx(
             &transaction,
@@ -476,9 +575,14 @@ pub(crate) fn verify_tool_outcome_invariants(
     while let Some(row) = blob_rows.next().map_err(sqlite_error)? {
         let digest: String = row.get(0).map_err(sqlite_error)?;
         let size: i64 = row.get(1).map_err(sqlite_error)?;
-        let bytes: Vec<u8> = row.get(2).map_err(sqlite_error)?;
-        if usize::try_from(size).ok() != Some(bytes.len()) || sha256_hex(&bytes) != digest {
-            return Err(invariant("tool outcome blob digest is invalid"));
+        let bytes: Option<Vec<u8>> = row.get(2).map_err(sqlite_error)?;
+        // A compacted blob keeps its digest and size but holds no payload, so
+        // there are no bytes to re-hash; the triggers freeze the retained
+        // columns against tampering.
+        if let Some(bytes) = bytes {
+            if usize::try_from(size).ok() != Some(bytes.len()) || sha256_hex(&bytes) != digest {
+                return Err(invariant("tool outcome blob digest is invalid"));
+            }
         }
     }
     drop(blob_rows);
@@ -523,12 +627,21 @@ fn verify_outcome_projection(
     outcome
         .validate_against(&operation)
         .map_err(|error| invariant(error.to_string()))?;
-    let blob = load_blob_connection(connection, outcome.raw_output_digest())?
-        .ok_or_else(|| invariant("tool outcome canonical blob is absent"))?;
-    outcome
-        .validate_canonical_blob(&operation, &blob)
-        .map_err(|error| invariant(error.to_string()))?;
-    let returned_digest = returned_participant_digest(&outcome, &blob, &encode_outcome(&outcome)?)?;
+    match load_blob_state_connection(connection, outcome.raw_output_digest())? {
+        None => return Err(invariant("tool outcome canonical blob is absent")),
+        Some(StoredInvocationBlob::Present(blob)) => outcome
+            .validate_canonical_blob(&operation, &blob)
+            .map_err(|error| invariant(error.to_string()))?,
+        // The payload was compacted under retention; its bytes are gone, but the
+        // digest and size are retained and re-checked in
+        // verify_tool_outcome_invariants, so there is nothing to re-derive here.
+        Some(StoredInvocationBlob::Compacted) => {}
+    }
+    let returned_digest = returned_participant_digest(
+        &outcome,
+        outcome.raw_output_digest().as_str(),
+        &encode_outcome(&outcome)?,
+    )?;
     let stored_outcome_digest: String = connection
         .query_row(
             "SELECT participant_digest FROM tool_outcomes WHERE operation_id = ?1",
@@ -676,17 +789,21 @@ fn insert_blob_bytes_tx(
             ],
         )
         .map_err(sqlite_error)?;
-    let stored: Vec<u8> = transaction
+    let stored: Option<Vec<u8>> = transaction
         .query_row(
             "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
             [digest],
             |row| row.get(0),
         )
         .map_err(sqlite_error)?;
-    if stored != bytes {
-        return Err(invariant("content-addressed blob digest collision"));
+    match stored {
+        Some(stored) if stored == bytes => Ok(()),
+        Some(_) => Err(invariant("content-addressed blob digest collision")),
+        // The row already existed and was compacted under retention. Its digest
+        // matched these bytes above, so the compacted row holds the same content
+        // and stays compacted rather than being repopulated.
+        None => Ok(()),
     }
-    Ok(())
 }
 
 fn load_resolved_blob_connection(
@@ -700,10 +817,11 @@ fn load_resolved_blob_connection(
         .query_row(
             "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
             [expected.digest().as_str()],
-            |row| row.get::<_, Vec<u8>>(0),
+            |row| row.get::<_, Option<Vec<u8>>>(0),
         )
         .optional()
         .map_err(sqlite_error)?
+        .flatten()
         .ok_or_else(|| invariant("resolved tool output blob is absent"))?;
     let blob = CanonicalResolvedOutputBlobV1::from_signing_preimage(bytes)
         .map_err(|error| invariant(error.to_string()))?;
@@ -1006,21 +1124,48 @@ fn load_blob_connection(
     connection: &Connection,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
 ) -> Result<Option<CanonicalInvocationBlobV1>, ToolOutcomeStoreError> {
-    let bytes = connection
+    match load_blob_state_connection(connection, digest)? {
+        None => Ok(None),
+        Some(StoredInvocationBlob::Present(blob)) => Ok(Some(blob)),
+        Some(StoredInvocationBlob::Compacted) => Err(compacted_blob_error(digest.as_str())),
+    }
+}
+
+fn load_blob_state_tx(
+    transaction: &Transaction<'_>,
+    digest: &chio_kernel::admission_operation::AdmissionDigest,
+) -> Result<Option<StoredInvocationBlob>, ToolOutcomeStoreError> {
+    load_blob_state_connection(transaction, digest)
+}
+
+fn load_blob_state_connection(
+    connection: &Connection,
+    digest: &chio_kernel::admission_operation::AdmissionDigest,
+) -> Result<Option<StoredInvocationBlob>, ToolOutcomeStoreError> {
+    let stored: Option<Option<Vec<u8>>> = connection
         .query_row(
             "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
             [digest.as_str()],
-            |row| row.get::<_, Vec<u8>>(0),
+            |row| row.get::<_, Option<Vec<u8>>>(0),
         )
         .optional()
         .map_err(sqlite_error)?;
-    bytes
-        .map(|bytes| {
-            RawInvocationOutcomeV1::from_canonical_bytes(&bytes)
+    match stored {
+        None => Ok(None),
+        Some(None) => Ok(Some(StoredInvocationBlob::Compacted)),
+        Some(Some(bytes)) => {
+            let blob = RawInvocationOutcomeV1::from_canonical_bytes(&bytes)
                 .and_then(|raw| raw.canonical_blob())
-                .map_err(|error| invariant(error.to_string()))
-        })
-        .transpose()
+                .map_err(|error| invariant(error.to_string()))?;
+            Ok(Some(StoredInvocationBlob::Present(blob)))
+        }
+    }
+}
+
+fn compacted_blob_error(digest: &str) -> ToolOutcomeStoreError {
+    invariant(format!(
+        "tool outcome raw invocation blob `{digest}` was compacted under retention and is no longer available"
+    ))
 }
 
 fn encode_outcome(record: &ToolOutcomeRecordV1) -> Result<Vec<u8>, ToolOutcomeStoreError> {
@@ -1068,7 +1213,7 @@ struct ParticipantCommitment<'a> {
 
 fn returned_participant_digest(
     record: &ToolOutcomeRecordV1,
-    blob: &CanonicalInvocationBlobV1,
+    raw_output_digest: &str,
     outcome_json: &[u8],
 ) -> Result<String, ToolOutcomeStoreError> {
     participant_digest(&ParticipantCommitment {
@@ -1077,7 +1222,7 @@ fn returned_participant_digest(
         operation_id: record.operation_id().as_str(),
         outcome_id: record.outcome_id().as_str(),
         outcome_record_digest: Some(sha256_hex(outcome_json)),
-        raw_output_digest: Some(blob.blob_ref().digest().as_str()),
+        raw_output_digest: Some(raw_output_digest),
         evaluation_id: None,
         evaluation_record_digest: None,
     })
