@@ -1,0 +1,13 @@
+{
+  "_comment": "Negative fixture (.v999 convention): an otherwise well-formed royalty right carrying an UNSUPPORTED schema id. A fail-closed validator MUST reject it at load and at signature-verification time (unknown schemas are not accepted). Paired with ../royalty-right.schema.json, whose `schema` is const chio.genesis.royalty-right.v1. Inert until milestone G1a wires the chio-genesis crate; documents the expected rejection.",
+  "schema": "chio.genesis.royalty-right.v999",
+  "right_id": "0000000000000000000000000000000000000000000000000000000000000000",
+  "finding_id": "f3a90000000000000000000000000000000000000000000000000000000000ab",
+  "beneficiary": "6f00000000000000000000000000000000000000000000000000000000000000",
+  "share_bps": 250,
+  "step_down_schedule": [250, 150, 75],
+  "granted_by": "genesis-charter/consortium-01",
+  "issued_at": 1784880000,
+  "expires_at": 1792656000,
+  "signature": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+}

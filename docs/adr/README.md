@@ -29,3 +29,4 @@ Current ADR set:
 15. [ADR-0015 Predeclared Non-Discretionary Escrow Circuit Breakers](ADR-0015-predeclared-escrow-circuit-breakers.md)
 16. [ADR-0016 Authoritative Spend Contract](ADR-0016-authoritative-spend-contract.md)
 17. [ADR-0017 Cognition-Market Finding Artifacts And Reveal-As-Governed-Call](ADR-0017-cognition-market-finding-artifacts.md)
+18. [ADR-0018 Genesis Coverage Program Surfaces (Royalty Right, Procurement List, Reliability Epoch, Operator Seat)](ADR-0018-genesis-coverage-program-surfaces.md)

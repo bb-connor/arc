@@ -27,6 +27,26 @@ Reading order:
    crates and verification, formal/conformance hooks, decision backlog
    (future ADRs), risk register.
 
+Genesis Coverage Program (the adoption-bootstrap layer, "Chio mining" in
+builder-facing materials) - designs how coverage, audits, and clearing are
+subsidized ahead of organic demand, without a token, on a bounded treasury,
+consortium-first. It sits ON TOP of the finding market above and depends on its
+milestones without changing them:
+
+7. [GENESIS-PROGRAM.md](GENESIS-PROGRAM.md) - economics and mechanism: the
+   constraint register, the three mines (coverage/audit/operator), the treasury
+   runway model with its exhaustion boundary and leading indicators, the CCV
+   methodology, prior-art survey, and the mandatory honest-limits sections.
+8. [GENESIS-ARCHITECTURE.md](GENESIS-ARCHITECTURE.md) - the four new signed
+   surfaces (procurement list, royalty right, reliability epoch, operator seat)
+   mapped to existing crates with real paths, reuse over invention.
+9. [ADR-0018](../../adr/ADR-0018-genesis-coverage-program-surfaces.md) (Proposed)
+   - the compressed decision set for the new wire surfaces.
+10. [GENESIS-PLAN.md](GENESIS-PLAN.md) - the Genesis milestone ladder (G0-G6)
+    with explicit dependency edges into the finding-market ladder (M0-M9).
+    Threat-model additions for the program are in
+    [THREAT-MODEL.md](THREAT-MODEL.md) section 7.
+
 Companion executable spec: `crates/economy/chio-open-market/tests/cognition_market_flow.rs`
 (two tests pass today; one ignored test names the missing reveal seams).
 

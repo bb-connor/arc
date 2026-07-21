@@ -295,3 +295,146 @@ is what keeps `asserted` findings from masquerading as verified). New
 invariant candidates the implementation should formalize are listed in
 [PLAN.md](PLAN.md) (delivery-contract soundness; status-feed freshness
 monotonicity; challenge-outcome envelope).
+
+## 7. Genesis Coverage Program additions
+
+Scope: the bootstrap program in
+[GENESIS-PROGRAM.md](GENESIS-PROGRAM.md) /
+[GENESIS-ARCHITECTURE.md](GENESIS-ARCHITECTURE.md) /
+[ADR-0018](../../adr/ADR-0018-genesis-coverage-program-surfaces.md). The program
+subsidizes coverage (a bounded off-chain pool), security (audits), and
+operations (capped operator seats) ahead of organic demand, without a token.
+These attacks are on the SUBSIDY and the METRIC, on top of the finding-market
+attacks above. Format unchanged: attack -> mitigation (mechanism, path) ->
+residual. Severity is rated for the consortium launch profile first, permissionless
+profile in parentheses where different.
+
+### Subsidy-side (Q6)
+
+- **G1. Burn-farming the floor** (do expensive but useless work to farm a
+  cost-proportional bounty). Mitigated by DESIGN, not just detection: the floor
+  is driven by the procurement-list demand schedule and CAPPED by a fraction of
+  VERIFIED cost, never driven by cost (GENESIS-PROGRAM 4.1); it is paid at most
+  once per demanded-uncovered descriptor (an inventory unit), never per listing
+  (K5); a mode-B (projected) `evidence_cost` gates NOTHING (`kappa * 0 = 0`), so
+  unverifiable cost earns no floor; and the floor is escrowed pending an audit
+  sample. To extract a floor a "farmer" must therefore produce a real,
+  audit-passing finding on a demanded-uncovered descriptor, which is exactly the
+  coverage the program wants to buy. Residual: low; the attack degenerates into
+  honest coverage of demanded descriptors.
+- **G2. Wash trading to inflate CCV or farm royalties** (self-buy own
+  inventory). Mitigated: CCV counts the clearing fee NET OF SPREAD, deduplicated
+  by `(finding_id, buyer_cluster)`, EXCLUDING related-party clusters detected by
+  shared `root_budget_holder` / `delegation_depth`
+  (`chio-core-types/src/receipt/economics.rs:33`) and shared operator/funding
+  (GENESIS-PROGRAM 7); royalties are funded ONLY from real clearing fees, so a
+  self-paid fee nets to a pure loss (the fee is burned, principal round-trips
+  out) and earns no CCV credit and no net royalty. Residual: a patient adversary
+  can pay real fees to fake demand at a cost equal to the fees burned; bounded by
+  that cost, and the related-party filter strips the obvious clusters. Medium
+  (the wash-at-metering-cost residual, C1-adjacent).
+- **G3. Sybil across the three mines** (many identities farming floors, audits,
+  or seats). Consortium launch: identity is gated by membership, so Sybil is an
+  admission-control problem the consortium already owns; per-identity publication
+  fees and `BondBacked` slashable admission
+  (`chio-listing/src/trust_activation.rs:565`) bound farm size, and Tier-3
+  reputation needs two distinct evidence feeds
+  (`chio-reputation/src/tier.rs:98-139`). Permissionless: Sybil resistance falls
+  to bonds plus reputation tiers only, which is materially harder (no identity
+  gate). Residual: low (consortium); medium-high (permissionless), which is a
+  primary reason permissionless is deferred (GENESIS-ARCHITECTURE 9).
+- **G4. Procurement-list capture / Goodhart** (sellers manufacture demand for
+  their own inventory so the pool subsidizes it). Mitigated: the list is
+  published by the venue GOVERNANCE operator and is seller-read-only (sellers
+  cannot admit descriptors, GENESIS-ARCHITECTURE 3.1.2); a descriptor is admitted
+  only after at least `k_anonymity_floor` DISTINCT buyer clusters have queried it
+  (`root_budget_holder` distinctness), so manufacturing demand requires running
+  `k` distinct funded buyer clusters. Residual: a buyer-cluster ring can still
+  manufacture `k` queries; bounded by the cost of `k` funded clusters and
+  detectable by the same related-party clustering (G2). Medium.
+- **G6. Pool-exhaustion griefing** (drive floor payouts to drain the bounded
+  pool before organic demand arrives). Mitigated: floors pay only for
+  demanded-uncovered coverage that passes audit, so a griefer who extracts floors
+  is producing the exact coverage the program wants; the per-descriptor cap and
+  declining schedule bound total extractable subsidy; the leading indicators
+  (GENESIS-PROGRAM 9.1) detect a low hit-conversion drain early and the
+  stop-loss gates (GENESIS-PLAN) halt a failing mine. Residual: an adversary can
+  front-run genesis sellers to capture floors on descriptors they would have
+  covered anyway, shifting WHO earns without wasting the pool; bounded, and the
+  coverage still lands. Medium-low. This is the exhaustion-boundary residual in
+  its adversarial form (section 5 register).
+
+### Metric and reliability (Q4)
+
+- **G5. r-feed manipulation** (auditor-seller collusion, selective challenging,
+  audit-rate gaming). Mitigated: `r` is computed over VENUE-SCHEDULED RANDOM
+  audits, not challenger-selected challenges, so selection bias is controlled by
+  the schedule; for `deterministic_replay` an audit is a mediated re-run whose
+  receipt is independently checkable, so a colluding pass reduces to slashable
+  fabricated evidence (S1, `chio-market/src/insurance_flow.rs:390-414`); `n`
+  (sample size) is mandatory in every published row so a diluted low-`n` `r` is
+  visibly weak; `r` is stratified by `guarantee_class` so gaming one class cannot
+  inflate another (K6). Residual: for `metered_attested` (non-replayable)
+  findings an audit cannot mechanically verify, so `r` there rests on the
+  metering floor and reputation, both of which an honest-cost fabricator defeats
+  (S2). Severity: low for `deterministic_replay`; HIGH for `metered_attested`
+  (the R&D instance), carried as the r-manipulation residual.
+
+### Operator seats (Q5)
+
+- **G7. Seat neutrality violation** (a seated genesis operator self-deals:
+  front-runs reveals it mediates, biases the reliability epoch it signs, or
+  favors its own listings). Mitigated: the seat binds an explicit F6 neutrality
+  covenant and a predeclared revocation rule (`chio.genesis.operator-seat.v1`,
+  GENESIS-ARCHITECTURE 3.4); a violation is enforced through a governance
+  `Sanction`/`Freeze` case (`chio-governance/src/evaluation.rs:304-317`) that
+  revokes the seat, plus on-chain `deactivateOperator`
+  (`contracts/src/ChioIdentityRegistry.sol:89`); the escrow F6 requirement
+  (ARCHITECTURE F6) already forbids a seller-aligned mediator for cross-org
+  purchases; equivocation on the reliability epoch is detectable by anchoring
+  (O3 logic). Residual: detection lag; a seated operator can misbehave until the
+  case enforces (medium), the same institutional-trust residual as O4.
+- **G8. Genesis self-dealing counted as CCV** (our own seed swarms trade with
+  each other and inflate the headline metric). Mitigated: the related-party
+  exclusion (G2) drops our own buyer-seller clusters, and the scripted first
+  trade is explicitly labeled the GENESIS DEMONSTRATION (self-dealing, excluded);
+  CCV counts only from the first external arm's-length clearing
+  (GENESIS-PROGRAM 7). Residual: low.
+
+### Trust-role additions (extend section 2)
+
+- T5. The subsidy pool is off-chain, custodied by the bonded venue operator; the
+  pool trusts that operator not to misappropriate or misgate payouts. Outflow is
+  receipt-auditable (every floor is a settlement leg), and admission is the
+  discipline, but there is no trustless on-chain pool today (no treasury
+  primitive exists; GENESIS-PROGRAM 9.4).
+- T6. The royalty split trusts the collecting operator to apply the signed
+  `royalty-right` table correctly; a mis-split is challengeable (table and fee
+  receipt are both signed) but the trust is an F6-neutrality dependency (K3).
+- T7. The reliability-oracle operator is trusted for liveness; safety
+  (equivocation, small-sample inflation) is checkable via signed epochs,
+  mandatory `n`, class stratification, and anchoring (mirrors T2 for the status
+  feed).
+
+### Residual-risk register additions (extend section 5)
+
+| Risk | Instance | Severity | Owner of residual |
+|---|---|---|---|
+| Exhaustion before demand: bounded pool empties before organic clearing self-sustains (Q1) | both | high | economics sizing + leading indicators (GENESIS-PROGRAM 9.1) + per-mine stop-loss gates (GENESIS-PLAN) |
+| r-manipulation on `metered_attested` findings (Q4/G5) | R&D | high | class-stratified r + guarantee-class discount; open research (same as S2) |
+| Adverse selection on exhaust: subsidizing low-demand or negative-P_max coverage (Q6) | R&D | medium-high | procurement-list demanded-only admission; wedge-first sequencing; abandonment expected (Homestead precedent, GENESIS-PROGRAM 8.3) |
+| Royalty operator mis-split trust (Q2/T6) | both | medium | signed table + challengeable mis-split; F6 neutrality (K3) |
+| Off-chain subsidy-pool custody trust (Q1/T5) | both | medium | bonded operator + receipt-auditable outflow; permissionless needs an on-chain fund (deferred ADR-0015 Follow-up A, K1/K10) |
+| Sybil across mines under the permissionless profile (G3) | permissionless | medium-high | bonds + reputation only; a primary reason permissionless is deferred |
+| Procurement capture via manufactured demand (G4) | both | medium | governance-published list + k-anonymity floor + related-party detection |
+
+### Invariant-candidate additions (extend section 6)
+
+The Genesis implementation should formalize: royalty-forward-only (a royalty leg
+never references a pre-existing settled trade, preserving K2 no-clawback); floor-
+admission soundness (a floor release implies a matched demanded-uncovered
+descriptor plus mode-A burn plus passed audit); seat-cap monotonicity (issued
+seats per vertical never exceed the charter cap); and CCV related-party exclusion
+(no CCV credit for a trade whose buyer and seller share a root budget holder).
+These are listed for the program plan (GENESIS-PLAN) alongside the finding-market
+candidates.

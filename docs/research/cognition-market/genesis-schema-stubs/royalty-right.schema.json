@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-genesis/v1/royalty-right.schema.json",
+  "title": "Chio Genesis Royalty Right (Proposed stub)",
+  "description": "PROPOSED spec-shaped stub, deliberately located in the research tree, NOT in spec/schemas/. It documents the intended shape of the make-or-break Q2 artifact (a signed, non-transferable, forward-flowing claim on a fraction of the clearing fee that future hits to a finding generate). Registration into spec/schemas/registry.json, chio-core-types, and MANIFEST.sha256 happens at milestone G1a (docs/research/cognition-market/GENESIS-PLAN.md); it is intentionally unregistered here so the canonical schema manifest is untouched by a research proposal. Design: GENESIS-ARCHITECTURE.md section 3.2, ADR-0018 D2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "right_id",
+    "finding_id",
+    "beneficiary",
+    "share_bps",
+    "step_down_schedule",
+    "granted_by",
+    "issued_at",
+    "expires_at",
+    "signature"
+  ],
+  "properties": {
+    "schema": { "const": "chio.genesis.royalty-right.v1" },
+    "right_id": { "$ref": "#/$defs/sha256" },
+    "finding_id": { "type": "string", "minLength": 1 },
+    "beneficiary": {
+      "description": "Ed25519 issuer public key (64-hex). Bound here because the right is NON-transferable: there is no transfer operation, so the payee is fixed at grant time (ADR-0018 D2).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "share_bps": {
+      "description": "Basis points of the clearing fee (net of operator spread) this right receives on a hit to finding_id.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "step_down_schedule": {
+      "description": "Published bps steps keyed by elapsed genesis time (the TIER_DISCOUNT_PER_HUNDRED idiom, chio-appraisal/src/marketplace_pricing.rs:148). The share declines on this public schedule.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "integer", "minimum": 0, "maximum": 10000 }
+    },
+    "granted_by": {
+      "description": "The governance charter id that granted this right (the split authority).",
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": { "type": "integer", "minimum": 0 },
+    "expires_at": {
+      "description": "Genesis clock T_g; after this the share is 0.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
