@@ -552,10 +552,23 @@ impl ChioKernel {
                     grant_index,
                     proposal,
                 }) => {
-                    let (runtime_metadata, _) = self
+                    let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             runtime_metadata,
                         );
+                    if !runtime_release_confirmed {
+                        // A retained runtime lease cannot be parked for approval:
+                        // surface the stuck reservation as a fail-closed denial the
+                        // same way an exhausted budget does, rather than telling the
+                        // caller to collect approval for an operation whose
+                        // pre-dispatch lease was never released.
+                        budget_error = Some(KernelError::DurableAdmission(
+                            "runtime admission reservation retained on pending approval"
+                                .to_string(),
+                        ));
+                        budget_error_metadata = runtime_metadata;
+                        break;
+                    }
                     return self.with_pre_invocation_guard_evidence(
                         &pre_invocation_guard_evidence,
                         || {

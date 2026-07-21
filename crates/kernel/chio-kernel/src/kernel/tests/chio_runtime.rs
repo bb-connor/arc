@@ -1807,6 +1807,112 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
 }
 
 #[test]
+fn chio_runtime_release_failure_surfaces_cleanup_failure_on_pending_approval() {
+    let (mut kernel, mut request, _store, invocations) =
+        durable_admission_fixture("req-chio-runtime-release-failure-pending");
+    let approver_a = CoreKeypair::generate();
+    let approver_b = CoreKeypair::generate();
+    let requirement = ThresholdApprovalRequirement::new(
+        kernel.config.policy_hash.clone(),
+        2,
+        vec![
+            ThresholdApproverIdentity {
+                identifier: "approver-a".to_owned(),
+                public_key: approver_a.public_key(),
+            },
+            ThresholdApproverIdentity {
+                identifier: "approver-b".to_owned(),
+                public_key: approver_b.public_key(),
+            },
+        ],
+        "cumulative-approval-directory-v1".to_owned(),
+        300,
+    )
+    .expect("threshold requirement");
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement,
+    )));
+    let mut body = request.capability.body();
+    body.scope.grants[0]
+        .constraints
+        .push(Constraint::RequireCumulativeApprovalAbove {
+            threshold: MonetaryAmount {
+                units: 100,
+                currency: "USD".to_owned(),
+            },
+            approval_budget_id: "budget-pending-release".to_owned(),
+            approval_budget_epoch: 7,
+            cumulative_approval_root_binding: None,
+        });
+    request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
+        .expect("cumulative capability must sign");
+    request.governed_intent = Some(GovernedTransactionIntent {
+        id: "cumulative-approval-release-intent".to_owned(),
+        server_id: request.server_id.clone(),
+        tool_name: request.tool_name.clone(),
+        purpose: "authorize a bounded ledger mutation".to_owned(),
+        max_amount: Some(MonetaryAmount {
+            units: 100,
+            currency: "USD".to_owned(),
+        }),
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: None,
+        body: Default::default(),
+    });
+
+    let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
+    let releases = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(FailingReleaseRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-release-failure-pending",
+        admission_id: "adm-release-failure-pending",
+        lease_id: "lease-release-failure-pending",
+    }));
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("pending-approval evaluation");
+
+    // The runtime lease was reserved before the budget check parked the call for
+    // cumulative approval, and its release could not be confirmed. A retained
+    // lease cannot be parked for approval, so the outcome fails closed instead
+    // of returning a bare pending verdict.
+    assert_ne!(
+        response.verdict,
+        Verdict::PendingApproval,
+        "a stuck runtime lease must not surface as a bare pending approval"
+    );
+    assert_eq!(
+        response.verdict,
+        Verdict::Deny,
+        "unexpected verdict: {:?}",
+        response.reason
+    );
+    assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        releases.load(Ordering::SeqCst),
+        1,
+        "runtime release must be attempted before surfacing the cleanup failure"
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let metadata = response
+        .receipt
+        .metadata
+        .expect("cleanup-failure metadata present");
+    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
+    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
+    assert_eq!(
+        metadata["chio_runtime"]["reserved_destructive_lease_id"],
+        "lease-release-failure-pending"
+    );
+}
+
+#[test]
 fn exhausted_grant_receipt_retains_failed_runtime_release_evidence(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
