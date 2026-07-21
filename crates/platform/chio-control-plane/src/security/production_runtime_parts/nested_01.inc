@@ -338,6 +338,11 @@
         }
     }
 
+    fn receipt_authority_tempdir() -> tempfile::TempDir {
+        chio_test_support::private_fs::private_tempdir("control-plane-production-runtime-")
+            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"))
+    }
+
     fn open_factory(
         config: ProductionSecurityRuntimeFactoryConfig,
         decoy_registry_master_key: [u8; 32],
@@ -383,7 +388,7 @@
 
     #[test]
     fn production_factory_denies_concurrent_security_state_owners_and_reopens_after_drop() {
-        let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory = receipt_authority_tempdir();
         let first = open_factory(factory_config(directory.path()), [81_u8; 32])
             .unwrap_or_else(|error| panic!("open first factory: {error}"));
 
@@ -400,8 +405,7 @@
 
     #[test]
     fn production_factory_has_only_the_kernel_approval_ledger() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let config = factory_config(directory.path());
         let security_state_database_path = config.runtime.security_state_database_path.clone();
         let approval_database_path = config.runtime.approval_database_path.clone();
@@ -517,7 +521,7 @@
 
     #[test]
     fn security_state_lifecycle_lease_is_recoverable_after_process_abort() {
-        let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory = receipt_authority_tempdir();
         let marker = directory.path().join("lease-acquired.marker");
         let status = Command::new(
             std::env::current_exe()
@@ -555,9 +559,12 @@
             max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         })
     }
 
@@ -636,8 +643,7 @@
 
     #[test]
     fn production_factory_retains_the_exact_live_manifest_registry_arc() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [7_u8; 32])
             .unwrap_or_else(|error| panic!("open production security factory: {error}"));
         let manifests = Arc::new(chio_manifest::VerifiedManifestRegistry::default());
@@ -687,8 +693,7 @@
 
     #[test]
     fn post_release_worker_failure_closes_existing_and_new_lifecycle_admission() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [19_u8; 32])
             .unwrap_or_else(|error| panic!("open production security factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -745,8 +750,7 @@
 
     #[test]
     fn pre_dispatch_commit_rechecks_lifecycle_after_inner_commit() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create pre-dispatch lifecycle directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [88_u8; 32])
             .unwrap_or_else(|error| panic!("open pre-dispatch lifecycle factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -814,8 +818,7 @@
 
     #[test]
     fn dispatch_outcome_store_failure_closes_runtime_admission_until_reconciliation() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create outcome failure directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [96_u8; 32])
             .unwrap_or_else(|error| panic!("open outcome failure factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -856,8 +859,7 @@
 
     #[test]
     fn request_lifecycle_permit_gates_final_release_and_quiesces_on_drop() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create request lifecycle directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [93_u8; 32])
             .unwrap_or_else(|error| panic!("open request lifecycle factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -996,8 +998,7 @@
 
     #[test]
     fn installed_executor_denies_new_effects_after_close_or_worker_failure() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create executor lifecycle directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [90_u8; 32])
             .unwrap_or_else(|error| panic!("open executor lifecycle factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -1103,8 +1104,7 @@
 
     #[test]
     fn late_security_state_hardlink_permanently_closes_effective_admission() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let config = factory_config(directory.path());
         let security_state_path = config.runtime.security_state_database_path.clone();
         let hardlink_path = directory
@@ -1148,8 +1148,7 @@
 
     #[test]
     fn worker_failure_during_post_invocation_blocks_output_after_mutation() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [83_u8; 32])
             .unwrap_or_else(|error| panic!("open production security factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -1212,8 +1211,7 @@
 
     #[test]
     fn enforce_kernel_install_retains_first_response_kernel_and_runtime_lease() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [9_u8; 32])
             .unwrap_or_else(|error| panic!("open production security factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -1387,8 +1385,7 @@
 
     #[test]
     fn live_consumer_lease_closes_admission_and_blocks_shutdown_and_reconciliation() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [15_u8; 32])
             .unwrap_or_else(|error| panic!("open production security factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -1423,8 +1420,7 @@
 
     #[test]
     fn shadow_kernel_retains_observation_lease_without_declassification_hook() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [13_u8; 32])
             .unwrap_or_else(|error| panic!("open production security factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -1480,8 +1476,7 @@
 
     #[test]
     fn production_factory_reuses_one_declassification_store_and_receipt_sink_authority() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [31_u8; 32])
             .unwrap_or_else(|error| panic!("open production security factory: {error}"));
         let signer: Arc<dyn SigningBackend> =
@@ -1531,8 +1526,7 @@
 
     #[test]
     fn production_security_context_authority_preserves_taint_and_reloads_generation() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create security context directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [72_u8; 32])
             .unwrap_or_else(|error| panic!("open security context factory: {error}"));
         let agent = Keypair::from_seed(&[73_u8; 32]);
@@ -1707,8 +1701,7 @@
     #[test]
     fn production_security_context_authority_rejects_tenant_principal_capability_and_session_mismatch(
     ) {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create mismatch directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let factory = open_factory(factory_config(directory.path()), [74_u8; 32])
             .unwrap_or_else(|error| panic!("open mismatch factory: {error}"));
         let agent = Keypair::from_seed(&[75_u8; 32]);
@@ -1831,8 +1824,7 @@
 
     #[test]
     fn production_factory_rejects_aliased_authorities_and_empty_classifier_policy() {
-        let directory = tempfile::tempdir()
-            .unwrap_or_else(|error| panic!("create production runtime directory: {error}"));
+        let directory = receipt_authority_tempdir();
         let mut aliased = factory_config(directory.path());
         aliased.runtime.approval_database_path =
             aliased.runtime.security_state_database_path.clone();

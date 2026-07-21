@@ -34,6 +34,7 @@ base64 = { workspace = true }
 
 [dev-dependencies]
 chio-store-sqlite = { workspace = true }
+chio-test-support = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 

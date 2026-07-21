@@ -1177,14 +1177,26 @@ pub fn cmd_evidence_export(
         }
         (Some(receipt_db), None) => {
             let store = SqliteReceiptStore::open(receipt_db)?;
-            let bundle = store.build_evidence_export_bundle(&prepared.query)?;
-            let transparency =
-                store.build_evidence_export_transparency_summary(&bundle.checkpoints)?;
-            validate_evidence_bundle_requirements(&bundle, prepared.require_proofs)?;
-            RemoteEvidenceExportResponse {
-                bundle,
-                transparency: Some(transparency),
-                federation_policy: prepared.federation_policy,
+            let read = (|| -> Result<RemoteEvidenceExportResponse, CliError> {
+                let bundle = store.build_evidence_export_bundle(&prepared.query)?;
+                let transparency =
+                    store.build_evidence_export_transparency_summary(&bundle.checkpoints)?;
+                validate_evidence_bundle_requirements(&bundle, prepared.require_proofs)?;
+                Ok(RemoteEvidenceExportResponse {
+                    bundle,
+                    transparency: Some(transparency),
+                    federation_policy: prepared.federation_policy,
+                })
+            })();
+            let close = store.close().map(|_| ()).map_err(CliError::from);
+            match (read, close) {
+                (Err(read_error), Err(close_error)) => {
+                    return Err(CliError::Other(format!(
+                        "{read_error}; receipt store close failed: {close_error}"
+                    )))
+                }
+                (Err(error), Ok(())) | (Ok(_), Err(error)) => return Err(error),
+                (Ok(response), Ok(())) => response,
             }
         }
         (None, Some(control_url)) => {

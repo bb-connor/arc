@@ -23,6 +23,7 @@ chio-kernel = { workspace = true }
 chio-store-sqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 

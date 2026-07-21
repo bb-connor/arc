@@ -625,7 +625,7 @@ mod tests {
 
     #[test]
     fn durable_evaluator_reports_durable_backends() -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
+        let dir = chio_test_support::private_fs::private_tempdir("api-protect-evaluator-")?;
         let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
             chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
         );
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn durable_evaluator_requires_explicit_opt_in_for_ephemeral_revocation(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
+        let dir = chio_test_support::private_fs::private_tempdir("api-protect-revocation-gate-")?;
         let keypair = Keypair::generate();
         let mut headers = HashMap::new();
         headers.insert(

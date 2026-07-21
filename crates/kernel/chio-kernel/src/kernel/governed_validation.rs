@@ -1200,8 +1200,9 @@ impl ChioKernel {
         // A MustPrepay intent prepays its quote, so the gate must reflect at least
         // the quoted cost even when a smaller provisional charge or ceiling is
         // present. Fail-closed: take the larger of the two.
-        let requested_units = mustprepay_prepaid_units
-            .map_or(base_requested_units, |prepaid| base_requested_units.max(prepaid));
+        let requested_units = mustprepay_prepaid_units.map_or(base_requested_units, |prepaid| {
+            base_requested_units.max(prepaid)
+        });
         let approval_required = approval_threshold_units
             .map(|threshold_units| requested_units >= threshold_units)
             .unwrap_or(false);

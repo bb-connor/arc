@@ -12,6 +12,7 @@
 // All passes fail-closed; errors map to canonical exit codes 20/30/40/50.
 
 use base64::Engine;
+use std::io::Read;
 
 /// Canonical exit code: schema mismatch (`schema_version` unknown or
 /// `invocation` fails validation).
@@ -197,12 +198,28 @@ pub fn load_tenant_pubkey(path: &std::path::Path) -> Result<[u8; 32], ValidateEr
 pub fn load_trusted_kernel_pubkey(
     path: &std::path::Path,
 ) -> Result<chio_core::PublicKey, ValidateError> {
-    let bytes = std::fs::read(path).map_err(|e| {
+    const MAX_PUBLIC_KEY_FILE_BYTES: u64 = 16_384;
+    let file = std::fs::File::open(path).map_err(|e| {
         ValidateError::TenantSig(format!(
             "failed to read trusted kernel pubkey file {}: {e}",
             path.display()
         ))
     })?;
+    let mut bytes = Vec::new();
+    file.take(MAX_PUBLIC_KEY_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| {
+            ValidateError::TenantSig(format!(
+                "failed to read trusted kernel pubkey file {}: {e}",
+                path.display()
+            ))
+        })?;
+    if u64::try_from(bytes.len()).map_or(true, |len| len > MAX_PUBLIC_KEY_FILE_BYTES) {
+        return Err(ValidateError::TenantSig(format!(
+            "trusted kernel pubkey file {} exceeds {MAX_PUBLIC_KEY_FILE_BYTES} bytes",
+            path.display()
+        )));
+    }
     if bytes.len() == 32 {
         return chio_core::PublicKey::from_hex(&hex::encode(bytes))
             .map_err(|e| ValidateError::TenantSig(format!("invalid trusted kernel pubkey: {e}")));

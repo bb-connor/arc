@@ -1,7 +1,7 @@
 use super::evaluation_helpers::{PreDispatchCleanupDeny, SecurityDispatchOutcomeRecovery};
 use super::*;
 use crate::kernel::admission_coordinator::{
-    ThresholdDispatchPermit, ThresholdToolAdmissionContext,
+    ThresholdDispatchPermit, ThresholdPaymentMode, ThresholdToolAdmissionContext,
 };
 
 impl ChioKernel {
@@ -456,6 +456,7 @@ impl ChioKernel {
             });
         }
 
+        let caller_receipt_metadata = extra_metadata.clone();
         let mut _threshold_dispatch_intent_scope = None;
         let (mut runtime_admission_metadata, budget_mutation, mut threshold_dispatch_permit) =
             if let Some(verified_approval) = verified_governed_approval {
@@ -464,6 +465,11 @@ impl ChioKernel {
                     cap,
                     matched_grant_index,
                     now,
+                )?;
+                let request_fingerprint_hash = self.ordinary_request_fingerprint_hash(
+                    request,
+                    &self.config.policy_hash,
+                    caller_receipt_metadata.as_ref(),
                 )?;
                 let coordinator_authority_id = format!("kernel:{}", self.public_key().to_hex());
                 let prepared =
@@ -474,7 +480,7 @@ impl ChioKernel {
                             capability_id: &cap.id,
                             authorization_capability_hash: verified_approval
                                 .authorization_capability_hash(),
-                            arguments: &request.arguments,
+                            request_fingerprint_hash: &request_fingerprint_hash,
                             governed_intent_hash: verified_approval.governed_intent_hash(),
                             policy_hash: &self.config.policy_hash,
                             verified_approval,
@@ -533,22 +539,20 @@ impl ChioKernel {
                 // coordinated operation, so journal the intent before entering
                 // that coordinator and keep its request scope alive until the
                 // terminal receipt commits.
-                let threshold_has_monetary = self
-                    .ordinary_payment_charge_terms(matched_grant)
-                    .is_some()
-                    || Self::is_governed_mustprepay_request(request);
+                let threshold_has_monetary =
+                    self.ordinary_payment_charge_terms(matched_grant).is_some()
+                        || Self::is_governed_mustprepay_request(request);
                 match self.record_dispatch_intent_if_side_effecting(
                     request,
                     threshold_has_monetary,
                     now_unix_ms,
                 ) {
                     Ok(Some(handle)) => {
-                        _threshold_dispatch_intent_scope = Some(
-                            self.scope_dispatch_intent_for_request(
+                        _threshold_dispatch_intent_scope =
+                            Some(self.scope_dispatch_intent_for_request(
                                 &request.request_id,
                                 Some(handle),
-                            ),
-                        );
+                            ));
                     }
                     Ok(None) => {}
                     Err(error) => {
@@ -585,9 +589,11 @@ impl ChioKernel {
                         grant_index: matched_grant_index,
                         grant: matched_grant,
                         now,
+                        payment_mode: ThresholdPaymentMode::Dispatch,
                     },
                     prepared,
                     protocol_admission,
+                    None,
                 );
                 let (permit, mutation) = match reserved {
                     Ok(reserved) => reserved,
@@ -655,6 +661,8 @@ impl ChioKernel {
                     request,
                     cap,
                     std::slice::from_ref(&matched),
+                    false,
+                    caller_receipt_metadata.as_ref(),
                 ) {
                     Ok(result) => result,
                     Err(error) => {
@@ -762,45 +770,38 @@ impl ChioKernel {
         let has_monetary = budget_mutation.charge_result().is_some()
             || Self::is_governed_mustprepay_request(request);
         let _ordinary_dispatch_intent_scope = if threshold_dispatch_permit.is_none() {
-            let dispatch_intent =
-                match self.record_dispatch_intent_if_side_effecting(
-                    request,
-                    has_monetary,
-                    now_unix_ms,
-                ) {
-                    Ok(handle) => handle,
-                    Err(error) => {
-                        let msg = error.to_string();
-                        warn!(
-                            request_id = %request.request_id,
-                            reason = %redacted!(&msg),
-                            "dispatch intent write failed; denying before dispatch (nested flow)"
-                        );
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_pre_dispatch_cleanup_deny_response(
-                                    PreDispatchCleanupDeny {
-                                        request,
-                                        reason: &msg,
-                                        timestamp: now,
-                                        matched_grant_index,
-                                        cap,
-                                        budget_mutation: &budget_mutation,
-                                        payment_authorization: None,
-                                        runtime_admission_metadata:
-                                            runtime_admission_metadata.clone(),
-                                        budget_lease_acquired,
-                                    },
-                                )
-                            },
-                        );
-                    }
-                };
-            Some(self.scope_dispatch_intent_for_request(
-                &request.request_id,
-                dispatch_intent,
-            ))
+            let dispatch_intent = match self.record_dispatch_intent_if_side_effecting(
+                request,
+                has_monetary,
+                now_unix_ms,
+            ) {
+                Ok(handle) => handle,
+                Err(error) => {
+                    let msg = error.to_string();
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&msg),
+                        "dispatch intent write failed; denying before dispatch (nested flow)"
+                    );
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                                request,
+                                reason: &msg,
+                                timestamp: now,
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                payment_authorization: None,
+                                runtime_admission_metadata: runtime_admission_metadata.clone(),
+                                budget_lease_acquired,
+                            })
+                        },
+                    );
+                }
+            };
+            Some(self.scope_dispatch_intent_for_request(&request.request_id, dispatch_intent))
         } else {
             None
         };
@@ -808,7 +809,11 @@ impl ChioKernel {
         let payment_authorization = if let Some(permit) = threshold_dispatch_permit.as_ref() {
             permit.payment_authorization().cloned()
         } else {
-            match self.authorize_payment_if_needed(request, budget_mutation.charge_result()) {
+            match self.authorize_payment_if_needed(
+                request,
+                budget_mutation.charge_result(),
+                budget_mutation.admission_operation_binding(),
+            ) {
                 Ok(authorization) => authorization,
                 Err(error) => {
                     let msg = format!("payment authorization failed: {error}");
@@ -1215,7 +1220,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1243,7 +1248,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1274,8 +1279,7 @@ impl ChioKernel {
                                 cleanup_metadata.clone(),
                             ),
                         )
-                    },
-                );
+                    });
                 return response;
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
@@ -1283,7 +1287,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1312,13 +1316,14 @@ impl ChioKernel {
                                 cleanup_metadata.clone(),
                             ),
                         )
-                    });
+                    },
+                );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1356,7 +1361,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1392,6 +1397,7 @@ impl ChioKernel {
                     matched_grant_index,
                     FinalizeToolOutputCostContext {
                         charge_result: budget_mutation.charge_result().cloned(),
+                        admission_operation: budget_mutation.admission_operation_binding().cloned(),
                         reported_cost: None,
                         payment_authorization,
                         cap,

@@ -1467,9 +1467,12 @@ mod tests {
             max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: 64,
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         });
         kernel
             .set_admission_operation_store_handle(Arc::clone(&authority.admission_operations))

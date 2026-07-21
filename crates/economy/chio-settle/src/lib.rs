@@ -81,9 +81,12 @@ pub use payments::{
     DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
-    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, RetryPolicyError,
-    DEFAULT_BACKOFF_CAP_MS, DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS,
-    DEFAULT_MAX_RETRIES, SETTLE_DEAD_LETTER_SCHEMA,
+    classify_attempt, DeadLetterRecord, DeadLetterRecordError, RetryDecision, RetryPolicy,
+    RetryPolicyError, DEAD_LETTER_MAX_ATTEMPTS, DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX,
+    DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES, DEAD_LETTER_REASON_DIGEST_PREFIX,
+    DEAD_LETTER_REASON_MAX_BYTES, DEAD_LETTER_RECEIPT_ID_MAX_BYTES, DEFAULT_BACKOFF_CAP_MS,
+    DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS, DEFAULT_MAX_RETRIES,
+    SETTLE_DEAD_LETTER_SCHEMA,
 };
 pub use solana::{
     compare_commitments, prepare_solana_settlement, verify_solana_binding_and_receipt,

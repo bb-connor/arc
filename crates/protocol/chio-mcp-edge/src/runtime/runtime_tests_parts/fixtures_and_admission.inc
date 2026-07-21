@@ -423,10 +423,10 @@ impl ResourceProvider for DocsResourceProvider {
     fn list_resources(&self) -> Vec<ResourceDefinition> {
         vec![
             ResourceDefinition {
-                uri: "repo://docs/roadmap".to_string(),
-                name: "Roadmap".to_string(),
-                title: Some("Roadmap".to_string()),
-                description: Some("Project roadmap".to_string()),
+                uri: "repo://docs/architecture".to_string(),
+                name: "Architecture".to_string(),
+                title: Some("Architecture".to_string()),
+                description: Some("System architecture".to_string()),
                 mime_type: Some("text/markdown".to_string()),
                 size: Some(128),
                 annotations: Some(json!({"audience": "engineering"})),
@@ -459,10 +459,10 @@ impl ResourceProvider for DocsResourceProvider {
 
     fn read_resource(&self, uri: &str) -> Result<Option<Vec<ResourceContent>>, KernelError> {
         match uri {
-            "repo://docs/roadmap" => Ok(Some(vec![ResourceContent {
+            "repo://docs/architecture" => Ok(Some(vec![ResourceContent {
                 uri: uri.to_string(),
                 mime_type: Some("text/markdown".to_string()),
-                text: Some("# Roadmap".to_string()),
+                text: Some("# Architecture".to_string()),
                 blob: None,
                 annotations: None,
             }])),
@@ -478,7 +478,7 @@ impl ResourceProvider for DocsResourceProvider {
         _context: &serde_json::Value,
     ) -> Result<Option<CompletionResult>, KernelError> {
         if uri == "repo://docs/{slug}" && argument_name == "slug" {
-            let values = ["roadmap", "architecture", "api"]
+            let values = ["architecture", "protocol", "api"]
                 .into_iter()
                 .filter(|candidate| candidate.starts_with(value))
                 .map(str::to_string)
@@ -500,9 +500,9 @@ impl ResourceProvider for FilesystemResourceProvider {
     fn list_resources(&self) -> Vec<ResourceDefinition> {
         vec![
             ResourceDefinition {
-                uri: "file:///workspace/project/docs/roadmap.md".to_string(),
-                name: "Filesystem Roadmap".to_string(),
-                title: Some("Filesystem Roadmap".to_string()),
+                uri: "file:///workspace/project/docs/architecture.md".to_string(),
+                name: "Filesystem Architecture".to_string(),
+                title: Some("Filesystem Architecture".to_string()),
                 description: Some("In-root file-backed resource".to_string()),
                 mime_type: Some("text/markdown".to_string()),
                 size: Some(64),
@@ -524,10 +524,10 @@ impl ResourceProvider for FilesystemResourceProvider {
 
     fn read_resource(&self, uri: &str) -> Result<Option<Vec<ResourceContent>>, KernelError> {
         match uri {
-            "file:///workspace/project/docs/roadmap.md" => Ok(Some(vec![ResourceContent {
+            "file:///workspace/project/docs/architecture.md" => Ok(Some(vec![ResourceContent {
                 uri: uri.to_string(),
                 mime_type: Some("text/markdown".to_string()),
-                text: Some("# Filesystem Roadmap".to_string()),
+                text: Some("# Filesystem Architecture".to_string()),
                 blob: None,
                 annotations: None,
             }])),
@@ -599,7 +599,7 @@ impl PromptProvider for ExamplePromptProvider {
         _context: &serde_json::Value,
     ) -> Result<Option<CompletionResult>, KernelError> {
         if name == "summarize_docs" && argument_name == "topic" {
-            let values = ["roadmap", "architecture", "release-plan"]
+            let values = ["architecture", "protocol", "release-notes"]
                 .into_iter()
                 .filter(|candidate| candidate.starts_with(value))
                 .map(str::to_string)

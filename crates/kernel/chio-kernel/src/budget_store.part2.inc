@@ -3,6 +3,17 @@ pub trait BudgetStore: Send + Sync {
         BudgetStoreProfile::EphemeralLocal
     }
 
+    /// Whether this backend durably co-commits an authorization hold and its
+    /// `HoldPlaced` payment-journal row, then supports durable compare-and-set
+    /// journal advances, exact readback, incomplete-row listing, and closure.
+    ///
+    /// Operation-owned payment admission relies on all of those properties as
+    /// one recovery contract. Backends must not return `true` merely because
+    /// they implement one or more journal methods. The default is fail-closed.
+    fn supports_durable_atomic_payment_journal(&self) -> bool {
+        false
+    }
+
     fn try_increment(
         &self,
         capability_id: &str,
@@ -266,6 +277,17 @@ pub trait BudgetStore: Send + Sync {
         Err(BudgetStoreError::Invariant(
             "open-hold sweep is not supported by this budget store".to_string(),
         ))
+    }
+
+    /// Reverse legacy no-payment caller-reservation holds whose atomic
+    /// authorization committed but whose nonce TTL stamp did not.
+    /// Implementations must select only holds carrying the explicit no-payment
+    /// authorization marker, still open, unstamped, and not owned by an
+    /// admission operation. A rail-moving path must never enter this recovery
+    /// lane. The recovery is a startup operation and must make each recovered
+    /// request id retryable.
+    fn recover_unstamped_caller_reservations(&self) -> Result<usize, BudgetStoreError> {
+        Ok(0)
     }
 
     /// Count of holds currently open, for the open-holds gauge. Default: 0.
@@ -636,10 +658,11 @@ pub trait BudgetStore: Send + Sync {
 
     /// Ids of holds that are still `open` and were stamped as a delegated
     /// reserve-for-caller reservation: marked reserved (via
-    /// [`Self::mark_hold_reserved`] or [`Self::reserve_invocation_hold`]) with a
-    /// delegation depth of at least one. Such a hold keeps its delegated child's
-    /// sibling-sum share admitted against the parent for as long as it stays
-    /// open. A freshly built mediation kernel consults this after a restart: the
+    /// [`Self::mark_hold_reserved`], [`Self::mark_invocation_hold_reserved`], or
+    /// [`Self::reserve_invocation_hold`]) with a delegation depth of at least
+    /// one. Such a hold keeps its delegated child's sibling-sum share admitted
+    /// against the parent for as long as it stays open. A freshly built mediation
+    /// kernel consults this after a restart: the
     /// in-memory sibling-sum reservations were lost, and the durable hold record
     /// carries neither the immediate parent capability id nor the child and
     /// parent shares needed to rebuild them, so mediation denies delegated
@@ -726,6 +749,59 @@ pub trait BudgetStore: Send + Sync {
         Ok(())
     }
 
+    /// Stamp an existing atomic invocation-only authorization hold for
+    /// caller-mediated execution. The hold must already be open, must belong to
+    /// the exact capability and grant, must carry an invocation debit, and must
+    /// have zero authorized and remaining monetary exposure. This method never
+    /// creates a hold and never records a currency, payment reference, or budget
+    /// total. `envelope.budget_total` must therefore be `None`.
+    fn mark_invocation_hold_reserved(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        );
+        Err(BudgetStoreError::Invariant(
+            "invocation hold reservation stamping is unavailable for this backend".to_string(),
+        ))
+    }
+
+    /// Stamp an existing operation-owned composite hold for caller-mediated
+    /// execution. The store must match both immutable admission identifiers and
+    /// must never create or fall back to a legacy hold. `currency` is required
+    /// for non-zero monetary exposure and must be `None` for zero exposure.
+    fn mark_admission_operation_hold_reserved(
+        &self,
+        hold_id: &str,
+        admission_operation: &BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (
+            hold_id,
+            admission_operation,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        );
+        Err(BudgetStoreError::Invariant(
+            "operation-owned hold reservation stamping is unavailable for this backend"
+                .to_string(),
+        ))
+    }
+
     /// Adopt an already-debited invocation into a durable reserved hold that
     /// carries zero monetary exposure, so a `max_invocations`-only reservation is
     /// reversible and reapable by hold id exactly like a monetary reserve. The
@@ -766,11 +842,14 @@ pub trait BudgetStore: Send + Sync {
     /// reserved worst-case (the grant's realized total advances by it) and must
     /// reconcile the real cost before expiry to reclaim the difference.
     /// Fail-closed and self-healing: it settles ONLY holds that were explicitly
-    /// marked reserved (via [`Self::mark_hold_reserved`]) and are past their
+    /// marked reserved (via [`Self::mark_hold_reserved`],
+    /// [`Self::mark_invocation_hold_reserved`], or
+    /// [`Self::mark_admission_operation_hold_reserved`]) and are past their
     /// expiry; a not-yet-expired reserved hold and a reconciled/reversed/released
-    /// hold are never touched. Idempotent (a settled hold is no longer open).
-    /// Returns the number of holds settled. Stores that do not persist hold state
-    /// return `Ok(0)` (the default).
+    /// hold are never touched. A reaped snapshot reports `Expired` after the
+    /// worst-case amount is committed. Idempotent (an expired hold is no longer
+    /// open). Returns the number of holds settled. Stores that do not persist
+    /// hold state return `Ok(0)` (the default).
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         let _ = now_unix_secs;
         Ok(0)
@@ -794,4 +873,5 @@ pub use in_memory::InMemoryBudgetStore;
 #[cfg(test)]
 mod tests {
     include!("budget_store/tests.inc");
+    include!("budget_store/tests.part2.inc");
 }

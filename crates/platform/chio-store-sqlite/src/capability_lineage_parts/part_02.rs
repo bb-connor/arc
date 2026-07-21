@@ -728,16 +728,25 @@ fn unix_time_ms_receipt() -> Result<u64, chio_kernel::ReceiptStoreError> {
 
 fn receipt_error_to_port(error: chio_kernel::ReceiptStoreError) -> PortError {
     match error {
-        chio_kernel::ReceiptStoreError::Conflict(_) => PortError::conflict(),
+        chio_kernel::ReceiptStoreError::Conflict(_)
+        | chio_kernel::ReceiptStoreError::RetentionTenantScopeUnsupported => {
+            PortError::conflict()
+        }
         chio_kernel::ReceiptStoreError::NotFound(_)
         | chio_kernel::ReceiptStoreError::CryptoDecode(_)
         | chio_kernel::ReceiptStoreError::Canonical(_)
         | chio_kernel::ReceiptStoreError::InvalidOutcome(_)
         | chio_kernel::ReceiptStoreError::ReadBoundary(_)
-        | chio_kernel::ReceiptStoreError::Json(_) => PortError::integrity_failure(),
+        | chio_kernel::ReceiptStoreError::Json(_)
+        | chio_kernel::ReceiptStoreError::RetentionArchiveIncomplete { .. }
+        | chio_kernel::ReceiptStoreError::RetentionWatermarkRegression { .. }
+        | chio_kernel::ReceiptStoreError::ArchivedRangeProjection { .. } => {
+            PortError::integrity_failure()
+        }
         chio_kernel::ReceiptStoreError::Sqlite(_)
         | chio_kernel::ReceiptStoreError::Pool(_)
         | chio_kernel::ReceiptStoreError::Timeout { .. }
-        | chio_kernel::ReceiptStoreError::Io(_) => PortError::unavailable(),
+        | chio_kernel::ReceiptStoreError::Io(_)
+        | chio_kernel::ReceiptStoreError::WriterDead { .. } => PortError::unavailable(),
     }
 }

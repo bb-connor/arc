@@ -17,4 +17,4 @@ pub(crate) use handler::{handle_agent_message, normalize_agent_message};
 pub(crate) use response::tool_response_messages;
 pub(crate) use stats::{print_summary, SessionStats};
 #[cfg(test)]
-pub(crate) use test_support::{StubSqlResultToolServer, StubStreamingToolServer, StubToolServer};
+pub(crate) use test_support::{FixtureSqlResultToolServer, FixtureStreamingToolServer, FixtureToolServer};

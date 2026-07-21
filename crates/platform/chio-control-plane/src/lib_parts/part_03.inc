@@ -2,7 +2,6 @@
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use std::cell::Cell;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
     use chio_guards::PostInvocationPipeline;
@@ -118,11 +117,7 @@ mod tests {
     }
 
     fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time before unix epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        chio_test_support::private_fs::unique_sqlite_path(prefix)
     }
 
     fn expect_receipt_configuration_error(

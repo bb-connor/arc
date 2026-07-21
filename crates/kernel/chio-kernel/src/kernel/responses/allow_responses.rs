@@ -16,20 +16,30 @@ pub(crate) enum ReservedHoldStamp<'a> {
         charge: &'a BudgetChargeResult,
         payment_reference: Option<String>,
     },
-    /// An invocation-only reserve: the invocation was already debited by
-    /// `try_increment`. The builder adopts it into a durable zero-exposure
-    /// reserved hold so the TTL reaper and reconcile-by-nonce can settle it, and
+    /// An invocation-only reserve whose invocation debit and zero-exposure hold
+    /// were committed atomically. The builder stamps that exact existing hold;
     /// reverse-by-nonce or a stamp failure can return the invocation.
-    Invocation { hold_id: String, grant_index: usize },
+    InvocationReservation {
+        reservation: &'a BudgetInvocationReservationResult,
+    },
 }
 
 impl ReservedHoldStamp<'_> {
     fn hold_id(&self) -> &str {
         match self {
             Self::Monetary { charge, .. } => charge.budget_hold_id.as_str(),
-            Self::Invocation { hold_id, .. } => hold_id.as_str(),
+            Self::InvocationReservation { reservation } => reservation.budget_hold_id.as_str(),
         }
     }
+}
+
+pub(crate) struct OperationOwnedCallerReservationResponse<'a> {
+    pub(crate) request: &'a ToolCallRequest,
+    pub(crate) admission: &'a OrdinaryAdmissionMutation,
+    pub(crate) caller_receipt_metadata: Option<&'a serde_json::Value>,
+    pub(crate) reserved_payment_reference: Option<String>,
+    pub(crate) threshold_supplemental_prepared: bool,
+    pub(crate) budget_lease_acquired: bool,
 }
 
 /// How `build_allow_response_with_metadata` populates the response execution nonce.
@@ -270,10 +280,7 @@ impl ChioKernel {
                     // headroom when it closes.
                     self.record_reserved_sibling_share(charge.budget_hold_id.as_str(), cap);
                 }
-                ReservedHoldStamp::Invocation {
-                    hold_id,
-                    grant_index,
-                } => {
+                ReservedHoldStamp::InvocationReservation { reservation } => {
                     // An invocation reserve carries no monetary ceiling, but its
                     // delegation lineage is still recorded so reconcile-by-nonce
                     // stamps the true depth/root rather than zero.
@@ -283,25 +290,21 @@ impl ChioKernel {
                         root_budget_holder: cap.issuer.to_hex(),
                     };
                     if let Err(error) = self.with_budget_store(|store| {
-                        Ok(store.reserve_invocation_hold(
-                            hold_id.as_str(),
+                        Ok(store.mark_invocation_hold_reserved(
+                            reservation.budget_hold_id.as_str(),
                             &cap.id,
-                            *grant_index,
+                            reservation.grant_index,
                             reserved_until,
                             &envelope,
                         )?)
                     }) {
-                        // The invocation was already debited by `try_increment`;
-                        // adopting it into a durable reserved hold failed, so no hold
-                        // exists to reap or reconcile. Reverse the bare invocation
-                        // debit (no hold id) so the grant is not left permanently
-                        // short an invocation, and release the delegated child's
-                        // sibling-sum share this reservation was holding, before
-                        // surfacing the error. The receipt is not yet persisted, so
-                        // no orphaned receipt stands over the released state.
-                        self.with_budget_store(|store| {
-                            Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
-                        })?;
+                        // Authorization already committed the invocation debit and
+                        // zero-exposure hold. A failed TTL stamp must reverse that
+                        // exact hold with its original authority metadata, then
+                        // release the delegated sibling-sum share. The receipt is
+                        // not yet persisted, so no orphaned receipt stands over the
+                        // released state.
+                        self.reverse_budget_invocation_reservation(&cap.id, reservation)?;
                         self.release_admitted_capability_budget(cap)
                             .map_err(KernelError::DelegationInvalid)?;
                         return Err(error);
@@ -310,7 +313,7 @@ impl ChioKernel {
                     // sibling-sum share admitted and record it against the hold so
                     // reconcile-by-nonce or the TTL reaper releases the parent's
                     // headroom when the hold closes, matching the monetary reserve.
-                    self.record_reserved_sibling_share(hold_id.as_str(), cap);
+                    self.record_reserved_sibling_share(reservation.budget_hold_id.as_str(), cap);
                 }
             }
         }
@@ -346,6 +349,177 @@ impl ChioKernel {
             receipt,
             execution_nonce,
         })
+    }
+
+    /// Issue a caller reservation backed by an operation-owned composite hold.
+    /// The nonce remains private until the existing hold is stamped, aggregate
+    /// and supplemental invocation reservations are captured, and the operation
+    /// reaches `CallerReserved` durably.
+    pub(crate) fn build_operation_owned_caller_reservation_response(
+        &self,
+        reserving: OperationOwnedCallerReservationResponse<'_>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let OperationOwnedCallerReservationResponse {
+            request,
+            admission,
+            caller_receipt_metadata,
+            reserved_payment_reference,
+            threshold_supplemental_prepared,
+            budget_lease_acquired,
+        } = reserving;
+        let cap = &request.capability;
+        let execution_nonce = match self.caller_reservation_handoff_nonce(
+            admission.operation_id(),
+            request,
+            caller_receipt_metadata,
+            current_unix_timestamp(),
+        ) {
+            Ok(nonce) => nonce,
+            Err(error) => {
+                return Err(self.compensate_unissued_caller_reservation(
+                    cap,
+                    admission,
+                    budget_lease_acquired,
+                    error,
+                ));
+            }
+        };
+
+        let charge = admission.charge_result();
+        let envelope = crate::budget_store::ReservedHoldEnvelope {
+            budget_total: charge.map(|charge| charge.budget_total),
+            delegation_depth: cap.delegation_chain.len() as u32,
+            root_budget_holder: cap.issuer.to_hex(),
+        };
+        let stamp = self.with_budget_store(|store| {
+            Ok(store.mark_admission_operation_hold_reserved(
+                admission.hold_id.as_str(),
+                admission.admission_operation(),
+                execution_nonce.expires_at(),
+                charge
+                    .filter(|charge| charge.cost_charged > 0)
+                    .map(|charge| charge.currency.as_str()),
+                reserved_payment_reference.as_deref(),
+                &envelope,
+            )?)
+        });
+        if let Err(error) = stamp {
+            return Err(self.compensate_unissued_caller_reservation(
+                cap,
+                admission,
+                budget_lease_acquired,
+                error,
+            ));
+        }
+        if budget_lease_acquired {
+            self.record_reserved_sibling_share(admission.hold_id.as_str(), cap);
+        }
+
+        if let CallerReservationReplayProbe::Replayed(response) = self
+            .probe_caller_reservation_handoff_after_authentication(
+                request,
+                caller_receipt_metadata,
+            )?
+        {
+            return Ok(response);
+        }
+
+        let capture = if threshold_supplemental_prepared {
+            self.commit_threshold_protocol_caller_reservation(cap, admission)
+        } else {
+            self.commit_ordinary_protocol_caller_reservation(cap, admission)
+        };
+        let capture = match capture {
+            Ok(capture) => capture,
+            Err(error) => {
+                if let Ok(CallerReservationReplayProbe::Replayed(response)) = self
+                    .probe_caller_reservation_handoff_after_authentication(
+                        request,
+                        caller_receipt_metadata,
+                    )
+                {
+                    return Ok(response);
+                }
+                self.resolve_failed_caller_reservation_capture(
+                    cap,
+                    admission,
+                    budget_lease_acquired,
+                    &error,
+                );
+                return Err(error);
+            }
+        };
+        self.commit_caller_reservation_handoff(capture, request, caller_receipt_metadata)
+    }
+
+    fn compensate_unissued_caller_reservation(
+        &self,
+        cap: &CapabilityToken,
+        admission: &OrdinaryAdmissionMutation,
+        budget_lease_acquired: bool,
+        primary: KernelError,
+    ) -> KernelError {
+        match self.reverse_ordinary_protocol_admission(cap, admission) {
+            Ok(_) => {
+                if budget_lease_acquired
+                    && self
+                        .release_admitted_capability_budget(cap)
+                        .map_err(KernelError::DelegationInvalid)
+                        .is_err()
+                {
+                    return KernelError::Internal(format!(
+                        "{primary}; caller reservation compensation could not release delegated budget"
+                    ));
+                }
+                primary
+            }
+            Err(cleanup) => KernelError::Internal(format!(
+                "{primary}; caller reservation compensation failed: {cleanup}"
+            )),
+        }
+    }
+
+    fn resolve_failed_caller_reservation_capture(
+        &self,
+        cap: &CapabilityToken,
+        admission: &OrdinaryAdmissionMutation,
+        budget_lease_acquired: bool,
+        error: &KernelError,
+    ) {
+        let state = self
+            .load_ordinary_admission(admission.operation_id())
+            .map(|operation| operation.state());
+        match state {
+            Ok(AdmissionOperationState::CompensatedBeforeDispatch) => {
+                if budget_lease_acquired {
+                    self.release_reserved_sibling_share_for_hold(admission.hold_id.as_str());
+                }
+            }
+            Ok(AdmissionOperationState::CallerReservationCapturePending)
+            | Ok(AdmissionOperationState::CallerReserved) => {}
+            Ok(_) => {
+                let cleanup = self.reverse_ordinary_protocol_admission(cap, admission);
+                if cleanup.is_ok() && budget_lease_acquired {
+                    self.release_reserved_sibling_share_for_hold(admission.hold_id.as_str());
+                }
+                if let Err(cleanup) = cleanup {
+                    warn!(
+                        operation_id = %admission.operation_id(),
+                        reason = %redacted!(&cleanup.to_string()),
+                        primary = %redacted!(&error.to_string()),
+                        "caller reservation capture failed before commitment and compensation did not complete"
+                    );
+                }
+            }
+            Err(load_error) => {
+                warn!(
+                    operation_id = %admission.operation_id(),
+                    reason = %redacted!(&load_error.to_string()),
+                    primary = %redacted!(&error.to_string()),
+                    "caller reservation capture state could not be recovered; retaining the stamped hold"
+                );
+            }
+        }
     }
 
     /// Build receipt metadata describing the provenance record that governs

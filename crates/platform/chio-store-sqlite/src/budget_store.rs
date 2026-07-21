@@ -1,19 +1,18 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::{
     AuthorizedBudgetHold, BudgetAdmissionOperationBinding, BudgetAuthorityProfile,
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureHoldDecision,
-    BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest, BudgetCommitMetadata,
-    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldDispositionView,
-    BudgetHoldMutationDecision, BudgetHoldSnapshot, BudgetInvocationQuota,
-    BudgetInvocationQuotaUsage, BudgetInvocationReservationState, BudgetMeteringProfile,
-    BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey,
-    BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
-    BudgetReverseHoldRequest, DeniedBudgetHold, ReservedHoldEnvelope,
-    MAX_INVOCATION_QUOTAS_PER_ADMISSION,
+    BudgetAuthorizeHoldDecision, BudgetCaptureHoldDecision, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetCommitMetadata, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetHoldDispositionView, BudgetHoldMutationDecision,
+    BudgetHoldSnapshot, BudgetInvocationQuota, BudgetInvocationQuotaUsage,
+    BudgetInvocationReservationState, BudgetMeteringProfile, BudgetMonetaryHoldState,
+    BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
+    DeniedBudgetHold, ReservedHoldEnvelope, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{
@@ -46,6 +45,7 @@ pub use reaper::ReapSummary;
 pub struct SqliteBudgetStore {
     connection: Mutex<Connection>,
     authority_profile: BudgetStoreProfile,
+    database_identity_file: Option<Arc<crate::durable_sqlite::DurableSqliteFile>>,
 }
 
 /// Replicated projection of one legacy grant's structured invocation authority.

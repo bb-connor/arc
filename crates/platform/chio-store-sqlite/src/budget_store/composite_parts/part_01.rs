@@ -588,6 +588,7 @@ impl SqliteBudgetStore {
             BudgetMonetaryHoldState::Reconciled => Some(HoldDisposition::Reconciled),
             BudgetMonetaryHoldState::Released => Some(HoldDisposition::Released),
             BudgetMonetaryHoldState::Captured => Some(HoldDisposition::Captured),
+            BudgetMonetaryHoldState::None if base_hold.reserved_until.is_some() => None,
             BudgetMonetaryHoldState::None => Some(HoldDisposition::Captured),
             BudgetMonetaryHoldState::Exposed => None,
             BudgetMonetaryHoldState::Reversed => {

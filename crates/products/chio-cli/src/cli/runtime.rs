@@ -362,6 +362,8 @@ pub(crate) fn cmd_api_protect(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_historical_receipt_signers =
+            parse_trusted_historical_receipt_signers_from_env()?;
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             upstream: upstream.to_string(),
@@ -374,6 +376,7 @@ pub(crate) fn cmd_api_protect(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            trusted_historical_receipt_signers,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -445,6 +448,8 @@ pub(crate) fn cmd_start(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_historical_receipt_signers =
+            parse_trusted_historical_receipt_signers_from_env()?;
         let mediation_available =
             sidecar_mediation_available(budget_db, sidecar_control_token.as_deref());
         let payment_adapter = resolve_sidecar_payment_adapter()?;
@@ -465,6 +470,7 @@ pub(crate) fn cmd_start(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            trusted_historical_receipt_signers,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -561,6 +567,29 @@ pub(crate) fn parse_trusted_capability_issuers_from_env(
     }
 
     Ok(issuers)
+}
+
+pub(crate) fn parse_trusted_historical_receipt_signers_from_env(
+) -> Result<Vec<chio_core::PublicKey>, CliError> {
+    let mut signers = Vec::new();
+    let Ok(configured) = std::env::var("CHIO_TRUSTED_HISTORICAL_RECEIPT_SIGNER_KEYS") else {
+        return Ok(signers);
+    };
+    for signer in configured
+        .split(',')
+        .map(str::trim)
+        .filter(|signer| !signer.is_empty())
+    {
+        let parsed = chio_core::PublicKey::from_hex(signer).map_err(|error| {
+            CliError::transport_error(format!(
+                "failed to parse CHIO_TRUSTED_HISTORICAL_RECEIPT_SIGNER_KEYS entry as a public key: {error}"
+            ))
+        })?;
+        if !signers.contains(&parsed) {
+            signers.push(parsed);
+        }
+    }
+    Ok(signers)
 }
 
 pub(crate) fn cmd_check(

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chio_log_redact::redacted;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +25,16 @@ pub(super) struct ScopedThresholdTerminalReceiptIntent {
     request_id: String,
     intents: Arc<DashMap<String, ThresholdTerminalReceiptIntent>>,
     previous: Option<ThresholdTerminalReceiptIntent>,
+}
+
+/// Immutable projection used to sign an authoritative caller-reservation
+/// reconcile receipt before the operation and exact receipt are committed
+/// atomically. Keeping both versions prevents the receipt from being signed
+/// against one operation projection and staged against another.
+#[derive(Clone)]
+pub(super) struct CallerReservationCompletionIntent {
+    current: AdmissionOperation,
+    terminal: AdmissionOperation,
 }
 
 impl Drop for ScopedThresholdTerminalReceiptIntent {
@@ -54,6 +65,213 @@ struct TerminalReceiptOutboxPayload {
 }
 
 impl ChioKernel {
+    /// Project a caller-owned reservation into its exact completed operation
+    /// metadata without mutating the store. The reconcile path merges this
+    /// metadata before signing, then supplies the signed receipt to
+    /// `commit_caller_reservation_completion_receipt`.
+    pub(super) fn project_caller_reservation_completion(
+        &self,
+        operation_id: &str,
+    ) -> Result<(serde_json::Value, CallerReservationCompletionIntent), KernelError> {
+        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is unavailable".to_string())
+        })?;
+        let current = store.load(operation_id)?.ok_or_else(|| {
+            KernelError::Internal(format!(
+                "caller reservation operation {operation_id} disappeared before reconcile"
+            ))
+        })?;
+        let issued = current.state() == AdmissionOperationState::CallerReserved
+            && current.dispatch_state() == AdmissionDispatchState::Committed;
+        if current.kind() != AdmissionOperationKind::ToolDispatch || !issued {
+            return Err(KernelError::Internal(format!(
+                "caller reservation operation {operation_id} cannot complete from {}",
+                current.state().as_str()
+            )));
+        }
+        self.validate_caller_reserved_handoff_with_store(store.as_ref(), &current)?;
+        let terminal = current.transition_checked(
+            AdmissionOperationState::Completed,
+            AdmissionDispatchState::EffectCompleted,
+            current.coordinator_lease_epoch(),
+            None,
+        )?;
+        let metadata = self.ordinary_admission_operation_metadata(&terminal);
+        Ok((
+            metadata,
+            CallerReservationCompletionIntent { current, terminal },
+        ))
+    }
+
+    /// Atomically commit a previously projected caller-reservation completion
+    /// and the exact signed authoritative reconcile receipt.
+    pub(super) fn commit_caller_reservation_completion_receipt(
+        &self,
+        intent: &CallerReservationCompletionIntent,
+        receipt: &ChioReceipt,
+    ) -> Result<AdmissionOperation, KernelError> {
+        let payload = TerminalReceiptOutboxPayload {
+            schema: TERMINAL_RECEIPT_OUTBOX_SCHEMA.to_string(),
+            operation_id: intent.terminal.operation_id().to_string(),
+            request_binding_hash: intent.terminal.request_binding_hash().to_string(),
+            terminal_state: intent.terminal.state(),
+            terminal_dispatch_state: intent.terminal.dispatch_state(),
+            terminal_coordinator_lease_epoch: intent.terminal.coordinator_lease_epoch(),
+            terminal_version: intent.terminal.version(),
+            terminal_last_error: intent.terminal.last_error().map(ToOwned::to_owned),
+            receipt_authority_id: format!("kernel:{}", receipt.kernel_key.to_hex()),
+            receipt: receipt.clone(),
+            executor_receipt: None,
+        };
+        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is unavailable".to_string())
+        })?;
+        let terminal = self.stage_terminal_receipt_outbox_with_store(
+            store.as_ref(),
+            &intent.current,
+            &intent.terminal,
+            &payload,
+        )?;
+        if let Err(error) =
+            self.persist_and_acknowledge_terminal_receipt(store.as_ref(), &terminal, &payload)
+        {
+            warn!(
+                operation_id = %terminal.operation_id(),
+                receipt_id = %receipt.id,
+                reason = %redacted!(&error.to_string()),
+                "authoritative caller reservation receipt remains pending in the durable outbox"
+            );
+        }
+        Ok(terminal)
+    }
+
+    /// Conservatively close an issued caller reservation whose downstream
+    /// outcome cannot be proven. The terminal state and signed receipt outbox
+    /// commit atomically, so TTL and cold-recovery callers never leave a closed
+    /// hold behind a nonterminal admission operation.
+    pub(super) fn finalize_caller_reservation_outcome_unknown(
+        &self,
+        current: &AdmissionOperation,
+        reason: &str,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<AdmissionOperation, KernelError> {
+        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is unavailable".to_string())
+        })?;
+        self.finalize_caller_reservation_outcome_unknown_with_store(
+            store.as_ref(),
+            current,
+            reason,
+            extra_metadata,
+        )
+    }
+
+    pub(super) fn finalize_caller_reservation_outcome_unknown_with_store(
+        &self,
+        store: &dyn AdmissionOperationStore,
+        current: &AdmissionOperation,
+        reason: &str,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<AdmissionOperation, KernelError> {
+        let issued = current.state() == AdmissionOperationState::CallerReserved
+            && current.dispatch_state() == AdmissionDispatchState::Committed;
+        let captured_before_handoff = current.state()
+            == AdmissionOperationState::CallerReservationCapturePending
+            && current.dispatch_state() == AdmissionDispatchState::NotStarted;
+        if current.kind() != AdmissionOperationKind::ToolDispatch
+            || !(issued || captured_before_handoff)
+        {
+            return Err(KernelError::Internal(format!(
+                "caller reservation operation {} cannot become outcome-unknown from {}",
+                current.operation_id(),
+                current.state().as_str()
+            )));
+        }
+        if captured_before_handoff {
+            if current.policy_hash() != self.config.policy_hash {
+                return Err(KernelError::ReceiptSigningFailed(
+                    "capture-pending caller reservation policy does not match the installed kernel"
+                        .to_string(),
+                ));
+            }
+            self.validate_caller_reservation_capture_pending_for_reap(store, current)?;
+        } else {
+            self.validate_caller_reserved_handoff_with_store(store, current)
+                .map_err(|error| {
+                    KernelError::ReceiptSigningFailed(format!(
+                        "caller reservation lacks a fully validated final handoff: {error}"
+                    ))
+                })?;
+        }
+        let bounded_reason = super::active_response_coordinator::bounded_admission_error(reason);
+        let terminal = current.transition_checked(
+            AdmissionOperationState::OutcomeUnknownAfterDispatch,
+            AdmissionDispatchState::OutcomeUnknown,
+            current.coordinator_lease_epoch(),
+            Some(bounded_reason.clone()),
+        )?;
+        let action = ToolCallAction::from_parameters(serde_json::json!({
+            "operation_id": terminal.operation_id(),
+            "request_binding_hash": terminal.request_binding_hash(),
+            "terminal_state": terminal.state().as_str(),
+        }))
+        .map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to bind caller reservation terminal action: {error}"
+            ))
+        })?;
+        let receipt_content = receipt_content_for_output(None, None)?;
+        let metadata = merge_metadata_objects(
+            extra_metadata,
+            Some(self.ordinary_admission_operation_metadata(&terminal)),
+        );
+        let receipt = self.build_and_sign_receipt_for_policy_hash(
+            ReceiptParams {
+                request_id: Some(terminal.request_id()),
+                capability_id: terminal.capability_id(),
+                tool_name: "caller_reservation",
+                server_id: "chio.kernel",
+                decision: Decision::Incomplete {
+                    reason: bounded_reason,
+                },
+                action,
+                content_hash: receipt_content.content_hash,
+                canonical_content: receipt_content.canonical_content,
+                metadata,
+                timestamp: current_unix_timestamp(),
+                trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
+                tenant_id: None,
+            },
+            current.policy_hash(),
+        )?;
+        let payload = TerminalReceiptOutboxPayload {
+            schema: TERMINAL_RECEIPT_OUTBOX_SCHEMA.to_string(),
+            operation_id: terminal.operation_id().to_string(),
+            request_binding_hash: terminal.request_binding_hash().to_string(),
+            terminal_state: terminal.state(),
+            terminal_dispatch_state: terminal.dispatch_state(),
+            terminal_coordinator_lease_epoch: terminal.coordinator_lease_epoch(),
+            terminal_version: terminal.version(),
+            terminal_last_error: terminal.last_error().map(ToOwned::to_owned),
+            receipt_authority_id: format!("kernel:{}", receipt.kernel_key.to_hex()),
+            receipt,
+            executor_receipt: None,
+        };
+        let terminal =
+            self.stage_terminal_receipt_outbox_with_store(store, current, &terminal, &payload)?;
+        if let Err(error) =
+            self.persist_and_acknowledge_terminal_receipt(store, &terminal, &payload)
+        {
+            warn!(
+                operation_id = %terminal.operation_id(),
+                receipt_id = %payload.receipt.id,
+                reason = %redacted!(&error.to_string()),
+                "caller reservation outcome-unknown receipt remains pending in the durable outbox"
+            );
+        }
+        Ok(terminal)
+    }
+
     pub(super) fn stage_compensation_pending_with_terminal_receipt(
         &self,
         store: &dyn AdmissionOperationStore,
@@ -610,6 +828,23 @@ impl ChioKernel {
         payload: &TerminalReceiptOutboxPayload,
     ) -> Result<AdmissionOperation, KernelError> {
         self.ensure_receipt_persistence_ready()?;
+        let terminal = self.stage_terminal_receipt_outbox_with_store(
+            store,
+            current,
+            expected_terminal,
+            payload,
+        )?;
+        self.persist_and_acknowledge_terminal_receipt(store, &terminal, payload)?;
+        Ok(terminal)
+    }
+
+    fn stage_terminal_receipt_outbox_with_store(
+        &self,
+        store: &dyn AdmissionOperationStore,
+        current: &AdmissionOperation,
+        expected_terminal: &AdmissionOperation,
+        payload: &TerminalReceiptOutboxPayload,
+    ) -> Result<AdmissionOperation, KernelError> {
         self.validate_terminal_receipt_payload_with_store(store, expected_terminal, payload)?;
         let action = AdmissionCleanupAction::pending(
             current,
@@ -663,7 +898,6 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
-        self.persist_and_acknowledge_terminal_receipt(store, &terminal, payload)?;
         Ok(terminal)
     }
 
@@ -714,8 +948,7 @@ impl ChioKernel {
         payload: &TerminalReceiptOutboxPayload,
     ) -> Result<(), KernelError> {
         self.validate_terminal_receipt_payload_with_store(store, operation, payload)?;
-        let request_id =
-            receipt_metadata_string(&payload.receipt, "/receipt_context/request_id");
+        let request_id = receipt_metadata_string(&payload.receipt, "/receipt_context/request_id");
         self.record_chio_receipt_consuming_optional_intent(&payload.receipt, request_id)?;
         if operation.state() == AdmissionOperationState::Completed
             && operation.broker_attempt_id().is_some()
@@ -740,26 +973,14 @@ impl ChioKernel {
         expected_coordinator_authority_id: Option<&str>,
     ) -> Result<usize, KernelError> {
         self.ensure_receipt_persistence_ready()?;
-        let scan_limit = MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION
-            .checked_add(1)
-            .ok_or_else(|| {
-                KernelError::Internal(
-                    "terminal receipt recovery scan limit overflowed usize".to_string(),
-                )
-            })?;
-        let mut operation_ids = store.list_operations_with_pending_cleanup_action(
-            kind,
-            AdmissionCleanupActionKind::TerminalReceipt,
-            scan_limit,
-        )?;
-        if operation_ids.len() > MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION {
-            return Err(KernelError::Internal(format!(
-                "terminal receipt recovery backlog exceeds the bounded {MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation scan"
-            )));
-        }
         let mut recovered = 0usize;
         let mut errors = Vec::new();
-        for operation_id in operation_ids.drain(..) {
+        let operation_ids = store.list_operations_with_pending_cleanup_action(
+            kind,
+            AdmissionCleanupActionKind::TerminalReceipt,
+            MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION,
+        )?;
+        for operation_id in operation_ids {
             if store.load(&operation_id)?.is_some_and(|operation| {
                 operation.state() == AdmissionOperationState::CompensationPending
             }) {
@@ -820,6 +1041,18 @@ impl ChioKernel {
                 }
                 Err(error) => errors.push(format!("operation {operation_id}: {error}")),
             }
+        }
+        if !store
+            .list_operations_with_pending_cleanup_action(
+                kind,
+                AdmissionCleanupActionKind::TerminalReceipt,
+                1,
+            )?
+            .is_empty()
+        {
+            errors.push(format!(
+                "more terminal receipt outboxes remain after the bounded {MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation recovery batch"
+            ));
         }
         if errors.is_empty() {
             Ok(recovered)

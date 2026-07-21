@@ -136,8 +136,8 @@ mod tests {
     fn governed_mustprepay_via_cli_sim() {
         use chio_core::capability::governance::{
             GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-            GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-            MeteredSettlementMode,
+            GovernedToolInvocationIntentBody, GovernedTransactionIntent, MeteredBillingContext,
+            MeteredBillingQuote, MeteredSettlementMode,
         };
         use chio_core::capability::scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant};
         use chio_core::crypto::Keypair;
@@ -244,37 +244,38 @@ mod tests {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        let intent = GovernedTransactionIntent {
-            id: "intent-cli-sim-1".to_string(),
-            server_id: "cli-sim-srv".to_string(),
-            tool_name: "compute".to_string(),
-            purpose: "prepaid invocation".to_string(),
-            max_amount: Some(MonetaryAmount {
-                units: 100,
-                currency: "USD".to_string(),
-            }),
-            commerce: None,
-            metered_billing: Some(MeteredBillingContext {
-                settlement_mode: MeteredSettlementMode::MustPrepay,
-                quote: MeteredBillingQuote {
-                    quote_id: "q-cli-sim-1".to_string(),
-                    provider: "billing.chio".to_string(),
-                    billing_unit: "call".to_string(),
-                    quoted_units: 1,
-                    quoted_cost: MonetaryAmount {
-                        units: 100,
-                        currency: "USD".to_string(),
+        let intent =
+            GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
+                id: "intent-cli-sim-1".to_string(),
+                server_id: "cli-sim-srv".to_string(),
+                tool_name: "compute".to_string(),
+                purpose: "prepaid invocation".to_string(),
+                max_amount: Some(MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_string(),
+                }),
+                commerce: None,
+                metered_billing: Some(MeteredBillingContext {
+                    settlement_mode: MeteredSettlementMode::MustPrepay,
+                    quote: MeteredBillingQuote {
+                        quote_id: "q-cli-sim-1".to_string(),
+                        provider: "billing.chio".to_string(),
+                        billing_unit: "call".to_string(),
+                        quoted_units: 1,
+                        quoted_cost: MonetaryAmount {
+                            units: 100,
+                            currency: "USD".to_string(),
+                        },
+                        issued_at: now.saturating_sub(5),
+                        expires_at: Some(now + 300),
                     },
-                    issued_at: now.saturating_sub(5),
-                    expires_at: Some(now + 300),
-                },
-                max_billed_units: Some(2),
-            }),
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: None,
-        };
+                    max_billed_units: Some(2),
+                }),
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            });
 
         let intent_hash = intent.binding_hash().test_unwrap();
         let approval_token = GovernedApprovalToken::sign(
@@ -283,6 +284,7 @@ mod tests {
                 approver: kernel_kp.public_key(),
                 subject: agent_kp.public_key(),
                 governed_intent_hash: intent_hash,
+                threshold_proposal_hash: None,
                 request_id: "req-cli-sim-1".to_string(),
                 issued_at: now.saturating_sub(1),
                 expires_at: now + 300,
@@ -299,12 +301,16 @@ mod tests {
             server_id: "cli-sim-srv".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({}),
+            supplemental_authorization: None,
             dpop_proof: None,
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).test_unwrap();

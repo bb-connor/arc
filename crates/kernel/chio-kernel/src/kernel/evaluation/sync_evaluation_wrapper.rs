@@ -73,6 +73,7 @@ impl ChioKernel {
             Some(metadata),
             None,
             Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
         ))
     }
 
@@ -100,6 +101,7 @@ impl ChioKernel {
             Some(metadata),
             Some(authenticated_session_id),
             Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
         ))
     }
 
@@ -114,6 +116,7 @@ impl ChioKernel {
             None,
             None,
             Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
         ))
     }
 
@@ -130,6 +133,7 @@ impl ChioKernel {
             extra_metadata,
             None,
             Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
         ))
     }
 
@@ -219,16 +223,39 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.authorize_tool_call_reserving_blocking_with_metadata_outcome(request, extra_metadata)
+            .map(CallerReservationAuthorizationOutcome::into_response)
+    }
+
+    /// Runs the operation-owned caller-reservation authorization path and
+    /// reports whether the response was newly authorized or loaded from the
+    /// exact durable handoff. Adapters must skip their legacy receipt and
+    /// request-id publication effects for `Replayed`.
+    pub fn authorize_tool_call_reserving_blocking_with_metadata_outcome(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<CallerReservationAuthorizationOutcome, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         if request.execution_nonce.is_some() {
             return Err(KernelError::ReservingAuthorizationRejectsPresentedNonce);
         }
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
-            request,
-            None,
-            extra_metadata,
-            None,
-            None,
-            PreflightHoldDisposition::ReserveForCaller,
-        ))
+        let replayed = std::sync::atomic::AtomicBool::new(false);
+        let response = block_on_async_tool_dispatch(
+            self.evaluate_tool_call_async_with_session_context_tracking_replay(
+                request,
+                None,
+                extra_metadata,
+                None,
+                None,
+                PreflightHoldDisposition::ReserveForCaller,
+                Some(&replayed),
+            ),
+        )?;
+        if replayed.load(std::sync::atomic::Ordering::Acquire) {
+            Ok(CallerReservationAuthorizationOutcome::Replayed(response))
+        } else {
+            Ok(CallerReservationAuthorizationOutcome::Authorized(response))
+        }
     }
 }

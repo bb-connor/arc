@@ -38,11 +38,18 @@ mod receipt_commit_actor_tests {
     }
 
     fn actor_test_receipt() -> Result<ChioReceipt, ReceiptStoreError> {
+        actor_test_receipt_with_content_hash("content", 1)
+    }
+
+    fn actor_test_receipt_with_content_hash(
+        content_hash: &str,
+        timestamp: u64,
+    ) -> Result<ChioReceipt, ReceiptStoreError> {
         let keypair = chio_core::crypto::Keypair::generate();
         ChioReceipt::sign(
             chio_core::receipt::body::ChioReceiptBody {
                 id: "rcpt-actor-test".to_string(),
-                timestamp: 1,
+                timestamp,
                 capability_id: "cap-actor".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
@@ -57,7 +64,7 @@ mod receipt_commit_actor_tests {
                 tool_origin: Default::default(),
                 redaction_mode: Default::default(),
                 actor_chain: Vec::new(),
-                content_hash: "content".to_string(),
+                content_hash: content_hash.to_string(),
                 policy_hash: "policy".to_string(),
                 evidence: Vec::new(),
                 metadata: None,
@@ -76,11 +83,17 @@ mod receipt_commit_actor_tests {
         let (sender, _receiver) = receipt_commit_channel();
         for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
             let (response, _result) = mpsc::sync_channel(1);
-            sender.try_send(ReceiptCommitCommand::Flush(response))?;
+            sender.try_send(ReceiptCommitCommand::Flush {
+                response,
+                inflight: WriterInflightLease::detached_for_test(),
+            })?;
         }
 
         let (response, _result) = mpsc::sync_channel(1);
-        match sender.try_send(ReceiptCommitCommand::Flush(response)) {
+        match sender.try_send(ReceiptCommitCommand::Flush {
+            response,
+            inflight: WriterInflightLease::detached_for_test(),
+        }) {
             Err(mpsc::TrySendError::Full(_)) => Ok(()),
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 Err("commit actor channel disconnected unexpectedly".into())
@@ -96,7 +109,10 @@ mod receipt_commit_actor_tests {
         let health = Arc::new(ReceiptCommitWriterHealth::default());
         for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
             let (response, _result) = mpsc::sync_channel(1);
-            sender.try_send(ReceiptCommitCommand::Flush(response))?;
+            sender.try_send(ReceiptCommitCommand::Flush {
+                response,
+                inflight: WriterInflightLease::detached_for_test(),
+            })?;
         }
         let actor = ReceiptCommitActor {
             sender,
@@ -116,8 +132,37 @@ mod receipt_commit_actor_tests {
     }
 
     #[test]
-    fn receipt_commit_actor_flush_honors_timeout() -> Result<(), Box<dyn std::error::Error>> {
+    fn receipt_commit_actor_flush_releases_its_lease_when_queue_is_full(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let (sender, _receiver) = receipt_commit_channel();
+        for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
+            let (response, _result) = mpsc::sync_channel(1);
+            sender.try_send(ReceiptCommitCommand::Flush {
+                response,
+                inflight: WriterInflightLease::detached_for_test(),
+            })?;
+        }
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let actor = ReceiptCommitActor {
+            sender,
+            health: Arc::clone(&health),
+            writer: idle_writer(),
+            database_identity_file: None,
+        };
+
+        let error = actor.flush().err().ok_or("expected queue saturation error")?;
+        assert!(error
+            .to_string()
+            .contains("sqlite receipt commit queue saturated"));
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 0);
+        assert_eq!(health.queue_depth.load(Ordering::SeqCst), 0);
+        assert_eq!(health.saturated_total.load(Ordering::SeqCst), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_commit_actor_flush_honors_timeout() -> Result<(), Box<dyn std::error::Error>> {
+        let (sender, receiver) = receipt_commit_channel();
         let health = Arc::new(ReceiptCommitWriterHealth::default());
         let actor = ReceiptCommitActor {
             sender,
@@ -142,6 +187,63 @@ mod receipt_commit_actor_tests {
                 );
             }
         }
+        assert_eq!(
+            actor.health.inflight.load(Ordering::SeqCst),
+            1,
+            "a timed-out Flush must remain counted while its queued lease is live"
+        );
+        assert_eq!(
+            actor.health.queue_depth.load(Ordering::SeqCst),
+            1,
+            "the timed-out Flush is still waiting in the actor channel"
+        );
+        assert_eq!(actor.health.failed_total.load(Ordering::SeqCst), 0);
+        assert_eq!(actor.health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(actor.health.timed_out_inflight.load(Ordering::SeqCst), 1);
+        let timed_out = actor.writer_counters();
+        assert_eq!(
+            classify_writer_liveness(
+                &timed_out,
+                10_000,
+                RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+                actor.backlog_started_unix_ms(),
+                current_unix_ms(),
+            ),
+            chio_kernel::ReceiptWriterLiveness::Wedged,
+            "a Flush timeout must be immediately visible to admission"
+        );
+
+        // Model the actor eventually draining this slow command. Its terminal
+        // lease release must clear only the active timeout marker while keeping
+        // the cumulative timeout observation and terminal failure count honest.
+        let command = receiver
+            .try_recv()
+            .map_err(|error| format!("timed-out Flush was not queued: {error}"))?;
+        actor.health.note_channel_dequeue();
+        match command {
+            ReceiptCommitCommand::Flush { response, inflight } => {
+                actor.health.note_maintenance_success();
+                inflight.release();
+                let _ = response.send(Ok(()));
+            }
+            _ => return Err("expected queued Flush command".into()),
+        }
+        assert_eq!(actor.health.inflight.load(Ordering::SeqCst), 0);
+        assert_eq!(actor.health.queue_depth.load(Ordering::SeqCst), 0);
+        assert_eq!(actor.health.timed_out_inflight.load(Ordering::SeqCst), 0);
+        assert_eq!(actor.health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(actor.health.failed_total.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            classify_writer_liveness(
+                &actor.writer_counters(),
+                10_000,
+                RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+                actor.backlog_started_unix_ms(),
+                current_unix_ms(),
+            ),
+            chio_kernel::ReceiptWriterLiveness::Healthy,
+            "late Flush completion must clear its active timeout marker"
+        );
         Ok(())
     }
 
@@ -185,7 +287,9 @@ mod receipt_commit_actor_tests {
             actor.health.inflight.load(Ordering::SeqCst),
             inflight_before + 1
         );
-        assert!(actor.health.failed_total.load(Ordering::SeqCst) >= 1);
+        assert_eq!(actor.health.failed_total.load(Ordering::SeqCst), 0);
+        assert_eq!(actor.health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(actor.health.timed_out_inflight.load(Ordering::SeqCst), 1);
         Ok(())
     }
 
@@ -242,55 +346,163 @@ mod receipt_commit_actor_tests {
     }
 
     #[test]
-    fn note_accept_restamps_backlog_start_only_on_a_fresh_backlog() {
-        let health = ReceiptCommitWriterHealth::default();
+    fn inflight_reservations_anchor_and_reset_each_backlog() {
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
 
-        // 0 -> 1 begins a backlog and stamps a real start time.
-        health.note_accept(0);
-        assert_ne!(
-            health.backlog_started_unix_ms.load(Ordering::SeqCst),
-            0,
-            "the first enqueue of a backlog must stamp its start"
-        );
+        // The first reservation establishes the backlog anchor before its
+        // command can be published to the actor.
+        let (first, _first_release, first_previous) = WriterInflightLease::acquire(&health);
+        assert_eq!(first_previous, 0);
+        let first_anchor = health.backlog_started_unix_ms.load(Ordering::SeqCst);
+        assert_ne!(first_anchor, 0, "the first reservation must stamp its start");
 
-        // 1 -> 2 grows an ongoing backlog and must NOT move its start.
-        health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
-        health.note_accept(1);
+        // A growing backlog preserves that first anchor.
+        let (second, _second_release, second_previous) = WriterInflightLease::acquire(&health);
+        assert_eq!(second_previous, 1);
         assert_eq!(
             health.backlog_started_unix_ms.load(Ordering::SeqCst),
-            1,
+            first_anchor,
             "a growing backlog must keep its original start"
         );
 
-        // 0 -> 1 after the writer drained begins a NEW backlog and restamps.
+        first.release();
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            health.backlog_started_unix_ms.load(Ordering::SeqCst),
+            first_anchor,
+            "releasing one reservation must not erase another command's anchor"
+        );
+        second.release();
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 0);
+        assert_eq!(health.backlog_started_unix_ms.load(Ordering::SeqCst), 0);
+
+        // A later 0 -> 1 transition must replace any stale mirror value with a
+        // fresh anchor while holding the same transition lock.
         health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
-        health.note_accept(0);
+        let (fresh, _fresh_release, fresh_previous) = WriterInflightLease::acquire(&health);
+        assert_eq!(fresh_previous, 0);
         assert_ne!(
             health.backlog_started_unix_ms.load(Ordering::SeqCst),
             1,
             "a fresh backlog after draining must restamp the start"
         );
+        fresh.release();
     }
 
     #[test]
-    fn committed_write_clears_a_stale_bounded_timeout_marker() {
-        let health = ReceiptCommitWriterHealth::default();
-        // An earlier bounded writer-routed op timed out and left the marker set
-        // while its work was still in flight.
-        if let Ok(mut last_error) = health.last_error.lock() {
-            *last_error = Some("sqlite receipt commit write timed out".to_string());
-        }
-        // The writer catches up and a later write commits.
-        record_write_job_outcome(&health, true);
-        let cleared = match health.last_error.lock() {
-            Ok(guard) => guard.is_none(),
-            Err(_) => false,
-        };
+    fn rejected_prev_zero_reservation_cannot_mask_later_accepted_work() {
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let (rejected, rejected_release, rejected_previous) =
+            WriterInflightLease::acquire(&health);
+        let (accepted, _accepted_release, accepted_previous) =
+            WriterInflightLease::acquire(&health);
+        assert_eq!(rejected_previous, 0);
+        assert_eq!(accepted_previous, 1);
+        health.note_accept();
+        let anchor = health.backlog_started_unix_ms.load(Ordering::SeqCst);
+        assert_ne!(anchor, 0);
+
+        // Model the first producer's `try_send(Full)`: both its returned command
+        // lease and caller handle can release, but the accepted second command
+        // remains counted and retains the backlog anchor.
+        rejected_release.release();
+        drop(rejected);
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 1);
+        assert_eq!(health.backlog_started_unix_ms.load(Ordering::SeqCst), anchor);
+
+        accepted.release();
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 0);
+        assert_eq!(health.backlog_started_unix_ms.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn write_terminal_state_precedes_lease_release_and_response_delivery() {
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        health.accepted_total.store(1, Ordering::SeqCst);
+        let (lease, _release, previous) = WriterInflightLease::acquire(&health);
+        assert_eq!(previous, 0);
+        // Model synchronous checkpoint catch-up that must stay visible after
+        // the Write command itself is terminal and its response is delivered.
+        let (actor_activity, _activity_release, activity_previous) =
+            WriterInflightLease::acquire(&health);
+        assert_eq!(activity_previous, 1);
+
+        let response_saw_terminal_state = Arc::new(AtomicBool::new(false));
+        let response_health = Arc::clone(&health);
+        let response_observation = Arc::clone(&response_saw_terminal_state);
+        let respond: WriterResponder = Box::new(move |resync| PreparedWriterResponse {
+            committed: resync.is_ok(),
+            send: Box::new(move || {
+                let error_published = match response_health.last_error.lock() {
+                    Ok(last_error) => {
+                        last_error.as_deref() == Some("terminal health published")
+                    }
+                    Err(_) => false,
+                };
+                response_observation.store(
+                    response_health.committed_total.load(Ordering::SeqCst) == 1
+                        && response_health.failed_total.load(Ordering::SeqCst) == 0
+                        && response_health.inflight.load(Ordering::SeqCst) == 1
+                        && error_published,
+                    Ordering::SeqCst,
+                );
+            }),
+        });
+
+        finish_write_response(&health, lease, respond, Ok(()), || {
+            if let Ok(mut last_error) = health.last_error.lock() {
+                *last_error = Some("terminal health published".to_string());
+            }
+        });
+
         assert!(
-            cleared,
-            "a committed write must clear the stale timeout marker so a later merely in-flight write is not misclassified Wedged"
+            response_saw_terminal_state.load(Ordering::SeqCst),
+            "the responder must observe terminal counters, health state, command release, and remaining actor activity"
         );
         assert_eq!(health.committed_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 1);
+        actor_activity.release();
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn late_completion_after_timeout_records_one_terminal_outcome() {
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        health.accepted_total.store(1, Ordering::SeqCst);
+        let (lease, release, previous) = WriterInflightLease::acquire(&health);
+        assert_eq!(previous, 0);
+
+        release.note_timeout();
+        assert_eq!(health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.timed_out_inflight.load(Ordering::SeqCst), 1);
+        assert_eq!(health.committed_total.load(Ordering::SeqCst), 0);
+        assert_eq!(health.failed_total.load(Ordering::SeqCst), 0);
+
+        let respond: WriterResponder = Box::new(|resync| PreparedWriterResponse {
+            committed: resync.is_ok(),
+            send: Box::new(|| {}),
+        });
+        finish_write_response(&health, lease, respond, Ok(()), || {});
+
+        // The timeout remains a cumulative observation, but late completion is
+        // exactly one terminal outcome and clears the command-scoped marker.
+        assert_eq!(health.accepted_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.committed_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.failed_total.load(Ordering::SeqCst), 0);
+        assert_eq!(health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.timed_out_inflight.load(Ordering::SeqCst), 0);
+        assert_eq!(health.inflight.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            health.committed_total.load(Ordering::SeqCst)
+                + health.failed_total.load(Ordering::SeqCst),
+            health.accepted_total.load(Ordering::SeqCst),
+            "terminal totals must not exceed accepted after late completion"
+        );
+        // Duplicate observation after terminal release is command-scoped and
+        // cannot install a stale marker or increment the cumulative counter.
+        release.note_timeout();
+        assert_eq!(health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.timed_out_inflight.load(Ordering::SeqCst), 0);
     }
 
     #[test]
@@ -345,7 +557,9 @@ mod receipt_commit_actor_tests {
         // Ownership of the queued job stays with the actor, so the timeout side
         // must leave inflight elevated (the honest wedged-writer signal).
         assert_eq!(health.inflight.load(Ordering::SeqCst), inflight_before + 1);
-        assert!(health.failed_total.load(Ordering::SeqCst) >= 1);
+        assert_eq!(health.failed_total.load(Ordering::SeqCst), 0);
+        assert_eq!(health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.timed_out_inflight.load(Ordering::SeqCst), 1);
         Ok(())
     }
 
@@ -381,7 +595,9 @@ mod receipt_commit_actor_tests {
         // Ownership of the queued job stays with the actor, so the timeout side
         // must leave inflight elevated (the honest wedged-writer signal).
         assert_eq!(health.inflight.load(Ordering::SeqCst), inflight_before + 1);
-        assert!(health.failed_total.load(Ordering::SeqCst) >= 1);
+        assert_eq!(health.failed_total.load(Ordering::SeqCst), 0);
+        assert_eq!(health.timeout_total.load(Ordering::SeqCst), 1);
+        assert_eq!(health.timed_out_inflight.load(Ordering::SeqCst), 1);
         Ok(())
     }
 
@@ -443,20 +659,13 @@ mod receipt_commit_actor_tests {
     }
 
     #[test]
-    fn disconnected_reseed_flips_writer_liveness_dead_immediately(
+    fn disconnected_admin_commands_release_and_flip_writer_liveness_dead_immediately(
     ) -> Result<(), Box<dyn std::error::Error>> {
         // A disconnected admin send (reseed after the commit actor has already
         // exited) is the first observation that the writer is gone. It must flip
         // liveness to Dead now, so the pre-dispatch gate denies admission before
         // a later append reconfirms the death.
-        let path = std::env::temp_dir().join(format!(
-            "chio-reseed-dead-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let path = chio_test_support::private_fs::unique_sqlite_path("chio-reseed-dead");
         let mut store = SqliteReceiptStore::open(&path)?;
 
         // Replace the live commit actor with one whose receiver is dropped, so
@@ -482,22 +691,204 @@ mod receipt_commit_actor_tests {
             chio_kernel::ReceiptWriterLiveness::Dead,
             "a disconnected reseed must flip writer liveness to Dead immediately"
         );
+        assert_eq!(
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst),
+            0,
+            "a rejected ReseedHead must release its speculative lease exactly once"
+        );
+        assert_eq!(
+            store
+                .receipt_commit_actor
+                .health
+                .queue_depth
+                .load(Ordering::SeqCst),
+            0,
+            "a rejected ReseedHead must undo its speculative queue depth"
+        );
+
+        let keypair = chio_core::crypto::Keypair::generate();
+        let signer_error = store
+            .enable_background_checkpoints(BackgroundCheckpointSigner {
+                backend: Arc::new(chio_core::crypto::Ed25519Backend::new(keypair)),
+                max_batch: 1,
+            })
+            .err()
+            .ok_or("InstallSigner against a dead actor must fail closed")?;
+        assert!(signer_error.to_string().contains("unavailable"));
+        assert_eq!(
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst),
+            0,
+            "a rejected InstallSigner must release its speculative lease exactly once"
+        );
+        assert_eq!(
+            store
+                .receipt_commit_actor
+                .health
+                .queue_depth
+                .load(Ordering::SeqCst),
+            0,
+            "a rejected InstallSigner must undo its speculative queue depth"
+        );
 
         let _ = std::fs::remove_file(&path);
         Ok(())
     }
 
     #[test]
+    fn reseed_holds_inflight_after_dequeue_until_full_verification_finishes(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let path = chio_test_support::private_fs::unique_sqlite_path("chio-reseed-inflight");
+        let store = SqliteReceiptStore::open(&path)?;
+        let marker_receipt = actor_test_receipt_with_content_hash(
+            test_hooks::BLOCK_DURING_RESEED_MARKER_CONTENT_HASH,
+            1,
+        )?;
+        store.append_chio_receipt_returning_seq(&marker_receipt)?;
+        store.flush_receipt_writes()?;
+
+        let (observed_running, inflight, queue_depth, liveness, joined) =
+            std::thread::scope(|scope| {
+                let reseed_hook = test_hooks::ReseedBlockGuard::arm();
+                let worker = scope.spawn(|| store.reseed_verified_head());
+                let observed_running = wait_until(|| {
+                    test_hooks::BLOCK_DURING_RESEED_ENTERED.load(Ordering::SeqCst)
+                });
+                let inflight = store
+                    .receipt_commit_actor
+                    .health
+                    .inflight
+                    .load(Ordering::SeqCst);
+                let queue_depth = store
+                    .receipt_commit_actor
+                    .health
+                    .queue_depth
+                    .load(Ordering::SeqCst);
+                let liveness = store.writer_liveness(Duration::ZERO);
+                // Release before joining even if the hook was not reached, so a
+                // failed observation cannot strand the actor.
+                reseed_hook.release();
+                (
+                    observed_running,
+                    inflight,
+                    queue_depth,
+                    liveness,
+                    worker.join(),
+                )
+            });
+
+        let outcome = joined.map_err(|_| "reseed worker thread panicked")?;
+        assert!(
+            observed_running,
+            "ReseedHead did not become observably active after dequeue"
+        );
+        assert_eq!(inflight, 1, "a running ReseedHead must retain its lease");
+        assert_eq!(queue_depth, 0, "ReseedHead must already be dequeued");
+        assert_eq!(
+            liveness,
+            chio_kernel::ReceiptWriterLiveness::Wedged,
+            "a blocked ReseedHead must not make the writer appear idle"
+        );
+        outcome?;
+        assert_eq!(
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst),
+            0,
+            "ReseedHead must release before responding"
+        );
+
+        let _ = fs::remove_file(path);
+        Ok(())
+    }
+
+    #[test]
+    fn install_signer_holds_inflight_after_dequeue_until_catch_up_finishes(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let path =
+            chio_test_support::private_fs::unique_sqlite_path("chio-install-signer-inflight");
+        let store = SqliteReceiptStore::open(&path)?;
+        let max_batch = test_hooks::BLOCK_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+        for index in 0..max_batch {
+            let receipt = actor_test_receipt_with_content_hash(
+                &format!("content-install-signer-inflight-{index}"),
+                index + 1,
+            )?;
+            store.append_chio_receipt_returning_seq(&receipt)?;
+        }
+        store.flush_receipt_writes()?;
+        let keypair = chio_core::crypto::Keypair::generate();
+        let signer = BackgroundCheckpointSigner {
+            backend: Arc::new(chio_core::crypto::Ed25519Backend::new(keypair)),
+            max_batch,
+        };
+
+        let checkpoint_hook = test_hooks::CheckpointBuildBlockGuard::arm();
+
+        // InstallSigner returns after enqueue. The owed checkpoint makes its
+        // actor-local catch-up enter the gated builder after dequeue.
+        let enqueue_result = store.enable_background_checkpoints(signer);
+        let observed_running = wait_until(test_hooks::checkpoint_build_block_entered);
+        let inflight = store
+            .receipt_commit_actor
+            .health
+            .inflight
+            .load(Ordering::SeqCst);
+        let queue_depth = store
+            .receipt_commit_actor
+            .health
+            .queue_depth
+            .load(Ordering::SeqCst);
+        let liveness = store.writer_liveness(Duration::ZERO);
+        // Release before checking any assertion or result, so no failure can
+        // strand the actor inside the test hook.
+        checkpoint_hook.release();
+
+        enqueue_result?;
+        assert!(
+            observed_running,
+            "InstallSigner did not become observably active after dequeue"
+        );
+        assert_eq!(inflight, 1, "a running InstallSigner must retain its lease");
+        assert_eq!(queue_depth, 0, "InstallSigner must already be dequeued");
+        assert_eq!(
+            liveness,
+            chio_kernel::ReceiptWriterLiveness::Wedged,
+            "blocked signer catch-up must not make the writer appear idle"
+        );
+        assert!(
+            wait_until(|| {
+                store
+                    .receipt_commit_actor
+                    .health
+                    .inflight
+                    .load(Ordering::SeqCst)
+                    == 0
+            }),
+            "InstallSigner must release after catch-up finishes"
+        );
+        assert!(
+            store.load_checkpoint_by_seq(1)?.is_some(),
+            "InstallSigner catch-up must build the owed checkpoint"
+        );
+
+        let _ = fs::remove_file(path);
+        Ok(())
+    }
+
+    #[test]
     fn run_write_executes_jobs_serially_on_the_writer_thread(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-run-write-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let path = chio_test_support::private_fs::unique_sqlite_path("chio-run-write");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 
@@ -542,7 +933,10 @@ mod receipt_commit_actor_tests {
         let health = Arc::new(ReceiptCommitWriterHealth::default());
         for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
             let (response, _result) = mpsc::sync_channel(1);
-            sender.try_send(ReceiptCommitCommand::Flush(response))?;
+            sender.try_send(ReceiptCommitCommand::Flush {
+                response,
+                inflight: WriterInflightLease::detached_for_test(),
+            })?;
         }
         let handle = WriterHandle {
             sender,
@@ -569,18 +963,11 @@ mod receipt_commit_actor_tests {
     /// A writer-routed `Write` job (liability write, manual checkpoint creation)
     /// must keep `writer_inflight` nonzero for the DURATION of the job, not just
     /// at enqueue, so a health poll during a slow or stuck Write does not report
-    /// `inflight: 0` and hide active writer work. The `WriterInflightGuard`
+    /// `inflight: 0` and hide active writer work. The command's inflight lease
     /// holds the count until the job completes, mirroring the Append path.
     #[test]
     fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-inflight-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let path = chio_test_support::private_fs::unique_sqlite_path("chio-write-inflight");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 
@@ -623,8 +1010,8 @@ mod receipt_commit_actor_tests {
         );
 
         // Release the job and confirm inflight drains back to baseline. The
-        // `WriterInflightGuard` decrements just BEFORE the caller's response is
-        // delivered, so this is already at baseline once the worker join
+        // command's inflight lease decrements just BEFORE the caller's response
+        // is delivered, so this is already at baseline once the worker join
         // returns; poll defensively regardless.
         release_tx.send(())?;
         worker
@@ -647,28 +1034,18 @@ mod receipt_commit_actor_tests {
         Ok(())
     }
 
-    /// The `WriterInflightGuard` decrement must be SYNCHRONOUS with
-    /// caller-return: the guard drops IMMEDIATELY BEFORE each `respond(...)`,
-    /// matching the Append path's decrement-then-fan-out ordering
-    /// (`commit_receipt_batch`), so caller-return implies the decrement already
-    /// happened. If the guard instead dropped at the END of the Write arm (after
-    /// `respond(...)` unblocked `run_write`), a caller could return while
-    /// `inflight` was still counted, the exact window that would make
-    /// `run_write_executes_jobs_serially_on_the_writer_thread` intermittently
-    /// observe `inflight == 1`. This asserts the guarantee DIRECTLY and
-    /// deterministically (no `wait_until`): right after `run_write` returns,
-    /// `inflight` reads 0 on every one of many iterations.
+    /// Write finalization must be synchronous with caller return: terminal
+    /// counters publish first, the lease releases second, and the prepared
+    /// response is delivered last. If delivery happened earlier, a caller could
+    /// return while `inflight` or terminal counters were still stale. This
+    /// asserts the guarantee directly and deterministically (no `wait_until`):
+    /// right after `run_write` returns, all terminal state is visible on every
+    /// iteration.
     #[test]
     fn write_decrements_inflight_before_returning_to_caller(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-inflight-order-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let path =
+            chio_test_support::private_fs::unique_sqlite_path("chio-write-inflight-order");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 
@@ -682,8 +1059,23 @@ mod receipt_commit_actor_tests {
                 == 0
         });
         assert!(drained_baseline, "writer failed to drain to baseline");
+        let accepted_before = store
+            .receipt_commit_actor
+            .health
+            .accepted_total
+            .load(Ordering::SeqCst);
+        let committed_before = store
+            .receipt_commit_actor
+            .health
+            .committed_total
+            .load(Ordering::SeqCst);
+        let failed_before = store
+            .receipt_commit_actor
+            .health
+            .failed_total
+            .load(Ordering::SeqCst);
 
-        // Many iterations to expose the ordering race: if the guard dropped
+        // Many iterations to expose the ordering race: if the lease released
         // AFTER the response reached the caller (while the writer thread still
         // had the head snapshot, error clear, connection drop and catch-up build
         // to run), this load could intermittently observe 1. Because the
@@ -700,6 +1092,34 @@ mod receipt_commit_actor_tests {
                 observed, 0,
                 "caller returned from run_write with inflight still counted \
                  (iteration {iteration}); the decrement must precede the response"
+            );
+            let completed = iteration as u64 + 1;
+            assert_eq!(
+                store
+                    .receipt_commit_actor
+                    .health
+                    .accepted_total
+                    .load(Ordering::SeqCst),
+                accepted_before + completed,
+                "caller returned before accepted accounting was visible"
+            );
+            assert_eq!(
+                store
+                    .receipt_commit_actor
+                    .health
+                    .committed_total
+                    .load(Ordering::SeqCst),
+                committed_before + completed,
+                "caller returned before committed accounting was visible"
+            );
+            assert_eq!(
+                store
+                    .receipt_commit_actor
+                    .health
+                    .failed_total
+                    .load(Ordering::SeqCst),
+                failed_before,
+                "successful writes must not publish terminal failure"
             );
         }
 

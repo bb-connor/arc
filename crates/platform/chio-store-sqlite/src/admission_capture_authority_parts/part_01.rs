@@ -20,7 +20,7 @@ use crate::revocation_store::{configure_revocation_connection, ensure_revocation
 pub(crate) const COMBINED_AUTHORITY_MODE: &str = "combined-admission-capture-v1";
 const MAX_ADMISSION_IDENTIFIER_BYTES: usize = 512;
 
-const INSTALL_REVOCATION_WRITE_GUARDS: &str = r#"
+pub(crate) const INSTALL_REVOCATION_WRITE_GUARDS: &str = r#"
     CREATE TRIGGER IF NOT EXISTS admission_revocation_insert_requires_authority
     BEFORE INSERT ON revoked_capabilities
     BEGIN
@@ -190,11 +190,11 @@ impl SqliteAdmissionCaptureAuthority {
         drop(SqliteBudgetStore::open(&budget_path)?);
         let mut connection = Connection::open(&budget_path).map_err(RevocationStoreError::from)?;
         configure_revocation_connection(&connection)?;
-        ensure_revocation_schema(&connection)?;
 
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(RevocationStoreError::from)?;
+        ensure_revocation_schema(&transaction)?;
         ensure_admission_authority_schema(&transaction)?;
         backfill_legacy_revocations(&transaction)?;
         validate_authority_state(&transaction)?;

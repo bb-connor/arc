@@ -264,9 +264,12 @@ mod tests {
             max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: 64,
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         })
     }
 
@@ -594,6 +597,11 @@ mod tests {
         }
     }
 
+    fn production_receipt_tempdir() -> tempfile::TempDir {
+        chio_test_support::private_fs::private_tempdir("control-plane-broker-composition-")
+            .require("production receipt authority directory")
+    }
+
     fn product_file_config(
         directory: &Path,
         keys: &ProductionBrokerKeys,
@@ -875,7 +883,7 @@ mod tests {
 
     #[test]
     fn production_composition_rejects_missing_or_ephemeral_components() {
-        let directory = tempfile::tempdir().require("production config directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let mut config = production_config(directory.path(), &keys);
         config.selected_provider_adapter_ids.clear();
@@ -894,7 +902,7 @@ mod tests {
 
     #[test]
     fn production_signing_topology_accepts_one_broker_identity_and_rejects_role_collapse() {
-        let directory = tempfile::tempdir().require("production topology directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let baseline = production_config(directory.path(), &keys);
         baseline
@@ -950,7 +958,7 @@ mod tests {
 
     #[test]
     fn response_authority_requires_separate_process_path_and_signing_roles() {
-        let directory = tempfile::tempdir().require("response authority topology directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let baseline = production_config(directory.path(), &keys);
         baseline
@@ -986,7 +994,7 @@ mod tests {
 
     #[test]
     fn product_response_authority_socket_cannot_alias_security_runtime_files() {
-        let directory = tempfile::tempdir().require("response authority product directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let mut config = product_file_config(directory.path(), &keys);
         config.active_defense.response_authority.socket_path =
@@ -996,7 +1004,7 @@ mod tests {
 
     #[test]
     fn product_active_defense_executor_requires_distinct_key_and_custody() {
-        let directory = tempfile::tempdir().require("active-defense executor product directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let baseline = product_file_config(directory.path(), &keys);
         baseline
@@ -1120,7 +1128,7 @@ mod tests {
 
     #[test]
     fn product_active_defense_receipt_ingress_flag_matches_configured_trust() {
-        let directory = tempfile::tempdir().require("receipt ingress product directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let mut config = product_file_config(directory.path(), &keys);
         assert!(config.validate_wire_contract().is_ok());
@@ -1131,7 +1139,7 @@ mod tests {
 
     #[test]
     fn product_broker_migration_requires_complete_enforced_external_anchors() {
-        let directory = tempfile::tempdir().require("broker migration product directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let baseline = product_file_config(directory.path(), &keys);
         baseline
@@ -1222,7 +1230,7 @@ mod tests {
 
     #[test]
     fn product_active_defense_recovery_limits_are_bounded() {
-        let directory = tempfile::tempdir().require("recovery limits product directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let mut config = product_file_config(directory.path(), &keys);
 
@@ -1249,7 +1257,7 @@ mod tests {
 
     #[test]
     fn product_config_loader_rejects_unknown_and_noncanonical_json() {
-        let directory = tempfile::tempdir().require("product config directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let config = product_file_config(directory.path(), &keys);
         let config_path = directory.path().join("broker-product.json");
@@ -1340,7 +1348,7 @@ mod tests {
 
     #[test]
     fn product_config_rejects_reused_active_response_worker_identity() {
-        let directory = tempfile::tempdir().require("product config directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let mut config = product_file_config(directory.path(), &keys);
         config
@@ -1433,7 +1441,7 @@ mod tests {
 
     #[test]
     fn production_composition_binds_authority_before_broker_is_available() {
-        let directory = tempfile::tempdir().require("cold-start directory");
+        let directory = production_receipt_tempdir();
         let keys = production_keys();
         let config = production_config(directory.path(), &keys);
         let authority_socket = config.authority_socket_path.clone();

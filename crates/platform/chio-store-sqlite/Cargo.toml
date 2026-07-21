@@ -36,6 +36,7 @@ r2d2 = "0.8"
 r2d2_sqlite = "0.33.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 rusqlite = { workspace = true }
 rustix = { workspace = true }
 tracing = { workspace = true }

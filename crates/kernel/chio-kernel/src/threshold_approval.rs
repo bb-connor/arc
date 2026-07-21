@@ -222,12 +222,15 @@ impl VerifiedGovernedApprovalAdmission {
 }
 
 /// Explicit inputs for deriving one governed tool admission identity.
+///
+/// `request_fingerprint_hash` is the kernel-derived, domain-separated digest
+/// of the complete request, not an argument-only hash.
 pub(crate) struct GovernedToolAdmissionOperationInput<'a> {
     pub(crate) coordinator_authority_id: &'a str,
     pub(crate) request_id: &'a str,
     pub(crate) capability_id: &'a str,
     pub(crate) authorization_capability_hash: &'a str,
-    pub(crate) arguments: &'a serde_json::Value,
+    pub(crate) request_fingerprint_hash: &'a str,
     pub(crate) governed_intent_hash: &'a str,
     pub(crate) policy_hash: &'a str,
     pub(crate) verified_approval: &'a VerifiedGovernedApprovalAdmission,
@@ -237,24 +240,6 @@ pub(crate) struct GovernedToolAdmissionOperationInput<'a> {
     pub(crate) supplemental_authorization_digest: Option<&'a str>,
     pub(crate) execution_nonce_id: Option<&'a str>,
     pub(crate) coordinator_lease_epoch: u64,
-}
-
-/// Explicit inputs for deriving one threshold-governed tool admission identity.
-pub struct ThresholdToolAdmissionOperationInput<'a> {
-    pub coordinator_authority_id: &'a str,
-    pub request_id: &'a str,
-    pub capability_id: &'a str,
-    pub authorization_capability_hash: &'a str,
-    pub arguments: &'a serde_json::Value,
-    pub governed_intent_hash: &'a str,
-    pub policy_hash: &'a str,
-    pub verified_approval_set: &'a VerifiedThresholdApprovalSet,
-    pub broker_attempt_id: Option<&'a str>,
-    pub budget_hold_id: Option<&'a str>,
-    pub supplemental_authorization_reference: Option<&'a str>,
-    pub supplemental_authorization_digest: Option<&'a str>,
-    pub execution_nonce_id: Option<&'a str>,
-    pub coordinator_lease_epoch: u64,
 }
 
 /// Deterministic operation plus the exact verified replay members it owns.
@@ -299,33 +284,6 @@ impl PreparedGovernedToolAdmission {
     }
 }
 
-/// Compatibility name for callers that prepare a threshold approval set.
-pub type PreparedThresholdToolAdmission = PreparedGovernedToolAdmission;
-
-/// Derive the stable operation identity before any replay or budget mutation.
-pub fn prepare_threshold_tool_admission_operation(
-    input: ThresholdToolAdmissionOperationInput<'_>,
-) -> Result<PreparedThresholdToolAdmission, ThresholdApprovalVerificationError> {
-    let verified_approval =
-        VerifiedGovernedApprovalAdmission::from_threshold(input.verified_approval_set)?;
-    prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
-        coordinator_authority_id: input.coordinator_authority_id,
-        request_id: input.request_id,
-        capability_id: input.capability_id,
-        authorization_capability_hash: input.authorization_capability_hash,
-        arguments: input.arguments,
-        governed_intent_hash: input.governed_intent_hash,
-        policy_hash: input.policy_hash,
-        verified_approval: &verified_approval,
-        broker_attempt_id: input.broker_attempt_id,
-        budget_hold_id: input.budget_hold_id,
-        supplemental_authorization_reference: input.supplemental_authorization_reference,
-        supplemental_authorization_digest: input.supplemental_authorization_digest,
-        execution_nonce_id: input.execution_nonce_id,
-        coordinator_lease_epoch: input.coordinator_lease_epoch,
-    })
-}
-
 /// Derive the stable governed operation identity before any replay or budget mutation.
 pub(crate) fn prepare_governed_tool_admission_operation(
     input: GovernedToolAdmissionOperationInput<'_>,
@@ -355,14 +313,9 @@ pub(crate) fn prepare_governed_tool_admission_operation(
         ));
     }
 
-    let action_hash = sha256_hex(&canonical_json_bytes(input.arguments).map_err(|error| {
-        denied(&format!(
-            "tool arguments failed canonical admission binding: {error}"
-        ))
-    })?);
     let approval_set_hash = verified.approval_set.approval_set_hash().to_string();
     let request_binding_hash = AdmissionRequestBindingInput::new(AdmissionRequestBindingParts {
-        action_hash,
+        action_hash: input.request_fingerprint_hash.to_string(),
         policy_hash: input.policy_hash.to_string(),
         governed_intent_hash: Some(input.governed_intent_hash.to_string()),
         threshold_proposal_hash: verified.threshold_proposal_hash.clone(),
@@ -758,18 +711,22 @@ mod tests {
             left.body().token_digests()
         );
 
-        let arguments = serde_json::json!({"amount": 100, "currency": "USD"});
+        let request_fingerprint_hash = "88".repeat(32);
         let supplemental_digest = "66".repeat(32);
+        let left_approval =
+            VerifiedGovernedApprovalAdmission::from_threshold(&left).expect("left admission");
+        let right_approval =
+            VerifiedGovernedApprovalAdmission::from_threshold(&right).expect("right admission");
         let left_operation =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &fixture.capability_hash,
-                arguments: &arguments,
+                request_fingerprint_hash: &request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &left,
+                verified_approval: &left_approval,
                 broker_attempt_id: None,
                 budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
                 supplemental_authorization_reference: Some("supplemental-1"),
@@ -779,15 +736,15 @@ mod tests {
             })
             .expect("left operation");
         let right_operation =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &fixture.capability_hash,
-                arguments: &arguments,
+                request_fingerprint_hash: &request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &right,
+                verified_approval: &right_approval,
                 broker_attempt_id: None,
                 budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
                 supplemental_authorization_reference: Some("supplemental-1"),
@@ -807,15 +764,15 @@ mod tests {
         assert_eq!(left_operation.approval_set().members(), left.members());
 
         let changed_supplemental_reference =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &fixture.capability_hash,
-                arguments: &arguments,
+                request_fingerprint_hash: &request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &left,
+                verified_approval: &left_approval,
                 broker_attempt_id: None,
                 budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
                 supplemental_authorization_reference: Some("supplemental-2"),
@@ -826,15 +783,15 @@ mod tests {
             .expect("changed supplemental reference");
         let changed_supplemental_digest = "77".repeat(32);
         let changed_supplemental_digest =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &fixture.capability_hash,
-                arguments: &arguments,
+                request_fingerprint_hash: &request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &left,
+                verified_approval: &left_approval,
                 broker_attempt_id: None,
                 budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
                 supplemental_authorization_reference: Some("supplemental-1"),
@@ -852,17 +809,17 @@ mod tests {
             changed_supplemental_digest.operation().operation_id()
         );
 
-        let changed_arguments = serde_json::json!({"amount": 101, "currency": "USD"});
+        let replayed_request_fingerprint_hash = "99".repeat(32);
         let changed_operation =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &fixture.capability_hash,
-                arguments: &changed_arguments,
+                request_fingerprint_hash: &replayed_request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &left,
+                verified_approval: &left_approval,
                 broker_attempt_id: None,
                 budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
                 supplemental_authorization_reference: Some("supplemental-1"),
@@ -875,17 +832,21 @@ mod tests {
             left_operation.operation().operation_id(),
             changed_operation.operation().operation_id()
         );
+        assert_ne!(
+            left_operation.operation().request_binding_hash(),
+            changed_operation.operation().request_binding_hash()
+        );
 
         let changed_budget_operation =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &fixture.capability_hash,
-                arguments: &arguments,
+                request_fingerprint_hash: &request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &left,
+                verified_approval: &left_approval,
                 broker_attempt_id: None,
                 budget_hold_id: Some("budget-hold:request-1:capability-1:1"),
                 supplemental_authorization_reference: Some("supplemental-1"),
@@ -900,15 +861,15 @@ mod tests {
         );
 
         let missing_budget =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &fixture.capability_hash,
-                arguments: &arguments,
+                request_fingerprint_hash: &request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &left,
+                verified_approval: &left_approval,
                 broker_attempt_id: None,
                 budget_hold_id: None,
                 supplemental_authorization_reference: Some("supplemental-1"),
@@ -921,15 +882,15 @@ mod tests {
 
         let mismatched_capability = "44".repeat(32);
         let mismatch =
-            prepare_threshold_tool_admission_operation(ThresholdToolAdmissionOperationInput {
+            prepare_governed_tool_admission_operation(GovernedToolAdmissionOperationInput {
                 coordinator_authority_id: "kernel-authority-1",
                 request_id: "request-1",
                 capability_id: "capability-1",
                 authorization_capability_hash: &mismatched_capability,
-                arguments: &arguments,
+                request_fingerprint_hash: &request_fingerprint_hash,
                 governed_intent_hash: &fixture.intent_hash,
                 policy_hash: fixture.requirement.policy_hash(),
-                verified_approval_set: &left,
+                verified_approval: &left_approval,
                 broker_attempt_id: None,
                 budget_hold_id: Some("budget-hold:request-1:capability-1:0"),
                 supplemental_authorization_reference: Some("supplemental-1"),

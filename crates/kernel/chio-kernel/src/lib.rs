@@ -55,9 +55,9 @@ pub mod revocation_runtime;
 pub mod revocation_store;
 pub mod runtime;
 pub mod session;
+pub mod settlement_retry;
 pub mod supplemental_quota;
 pub mod threshold_approval;
-pub mod settlement_retry;
 pub mod transport;
 pub mod weights_binding;
 
@@ -454,8 +454,8 @@ pub use receipt_store::{
     IndexedSecurityEvidenceStore, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
     ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
     ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
-    ReceiptWriterLiveness, RetentionConfig, SideEffectClass, StoredChildReceipt,
-    StoredToolReceipt,
+    ReceiptWriterLiveness, RetentionConfig, SettlementObserverOutboxClaimOutcome,
+    SettlementObserverOutboxLease, SideEffectClass, StoredChildReceipt, StoredToolReceipt,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};
@@ -502,14 +502,14 @@ pub use kernel::{
     ActiveResponseRequirement, ActiveResponseRequirementResolver, ActiveResponseSubmissionProof,
     ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError, AgentId,
     AuthoritativeCorrelatedFindingEvidence, AutomaticActiveResponseDispatchFenceOutcome,
-    AutomaticActiveResponsePermit, CapabilityId, CapabilityIssuanceAdmissionAuthority,
-    ChildReceiptLog, ChioKernel, DispatchCommittedActiveResponseResume,
-    GovernedActiveResponseReservation, GovernedSecurityRuntimePublication,
-    GovernedSecurityRuntimeStatus, Guard, GuardContext, GuardDecision, HybridSigningConfig,
-    BudgetHoldSweepHandle, DefaultDispatchIntentReconciler, HotPathDeadlineConfig, HotPathStage,
-    KernelBuildError, KernelConfig, KernelError, MemoryBudgetConfig,
-    MonetaryDispatchIntentReconciler, OverloadResource, PaymentReconcileOutcome,
-    PaymentReconcileReport,
+    AutomaticActiveResponsePermit, BudgetHoldSweepHandle, CallerReservationAuthorizationOutcome,
+    CallerReservationReplayProbe, CapabilityId, CapabilityIssuanceAdmissionAuthority,
+    ChildReceiptLog, ChioKernel, DefaultDispatchIntentReconciler,
+    DispatchCommittedActiveResponseResume, GovernedActiveResponseReservation,
+    GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus, Guard, GuardContext,
+    GuardDecision, HotPathDeadlineConfig, HotPathStage, HybridSigningConfig, KernelBuildError,
+    KernelConfig, KernelError, MemoryBudgetConfig, MonetaryDispatchIntentReconciler,
+    OverloadResource, PaymentReconcileOutcome, PaymentReconcileReport,
     PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission, PromptProvider,
     ReceiptLog, ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision,
     RuntimeAdmissionHook, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,

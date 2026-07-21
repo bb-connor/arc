@@ -206,13 +206,9 @@ mod tests {
     use chio_test_support::prelude::*;
 
     fn unique_test_directory() -> PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
+        chio_test_support::private_fs::private_tempdir("chio-aggregate-root-lookup-")
             .test_unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!("chio-aggregate-root-lookup-{nonce}"));
-        std::fs::create_dir_all(&path).test_unwrap();
-        path
+            .keep()
     }
 
     fn test_state(receipt_db_path: PathBuf, authority_db_path: PathBuf) -> TrustServiceState {

@@ -278,28 +278,39 @@ impl ReceiptStore for SqliteReceiptStore {
         true
     }
 
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
+    }
+
     fn load_chio_receipt(
         &self,
         receipt_id: &str,
     ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
-        verify_latest_checkpoint_integrity(&connection)?;
-        connection
+        let live = connection
             .query_row(
                 "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
                 params![receipt_id],
                 |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
             )
-            .optional()?
-            .map(|(seq, raw_json)| {
+            .optional()?;
+        match live {
+            Some((seq, raw_json)) => {
+                verify_latest_checkpoint_integrity(&connection)?;
                 decode_verified_chio_receipt(
                     &raw_json,
                     "persisted tool receipt",
                     Some(seq.max(0) as u64),
                 )
-            })
-            .transpose()
+                .map(Some)
+            }
+            None => {
+                let archived = load_trusted_archived_chio_receipt(&connection, receipt_id)?;
+                verify_latest_checkpoint_integrity(&connection)?;
+                Ok(archived)
+            }
+        }
     }
 
     fn load_child_receipt(
@@ -355,6 +366,16 @@ impl ReceiptStore for SqliteReceiptStore {
         let seq = self
             .append_verified_chio_receipt_record_with_timeout(receipt, &raw_json, true, budget)?;
         Ok(Some(seq))
+    }
+
+    fn append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+            self, receipt, budget,
+        )
     }
 
     fn writer_liveness(
@@ -448,6 +469,95 @@ impl ReceiptStore for SqliteReceiptStore {
     ) -> Result<Option<u64>, ReceiptStoreError> {
         SqliteReceiptStore::append_chio_receipt_consuming_intent_with_timeout(
             self, receipt, intent, budget,
+        )
+    }
+
+    fn append_chio_receipt_consuming_intent_with_settlement_observer_outbox_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        intent: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_consuming_intent_with_settlement_observer_outbox_with_timeout(
+            self, receipt, intent, budget,
+        )
+    }
+
+    fn supports_durable_settlement_observer_outbox(&self) -> bool {
+        SqliteReceiptStore::supports_durable_settlement_observer_outbox(self)
+    }
+
+    fn list_settlement_observer_outbox_receipt_ids(
+        &self,
+        now_unix_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<String>, ReceiptStoreError> {
+        SqliteReceiptStore::list_settlement_observer_outbox_receipt_ids(self, now_unix_ms, limit)
+    }
+
+    fn count_unfinished_settlement_observer_outbox(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::count_unfinished_settlement_observer_outbox(self)
+    }
+
+    fn claim_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        claim_token: &str,
+        now_unix_ms: u64,
+        claim_deadline_unix_ms: u64,
+    ) -> Result<chio_kernel::SettlementObserverOutboxClaimOutcome, ReceiptStoreError> {
+        SqliteReceiptStore::claim_settlement_observer_outbox(
+            self,
+            receipt_id,
+            claim_token,
+            now_unix_ms,
+            claim_deadline_unix_ms,
+        )
+    }
+
+    fn stage_settlement_observer_outbox_status(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        status_json: &str,
+    ) -> Result<Option<chio_kernel::SettlementObserverOutboxLease>, ReceiptStoreError> {
+        SqliteReceiptStore::stage_settlement_observer_outbox_status(
+            self,
+            receipt_id,
+            expected_version,
+            claim_token,
+            status_json,
+        )
+    }
+
+    fn acknowledge_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::acknowledge_settlement_observer_outbox(
+            self,
+            receipt_id,
+            expected_version,
+            claim_token,
+        )
+    }
+
+    fn abandon_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        last_error: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::abandon_settlement_observer_outbox(
+            self,
+            receipt_id,
+            expected_version,
+            claim_token,
+            last_error,
         )
     }
 

@@ -28,7 +28,7 @@ pub mod store_binding;
 pub use hook::{
     CreditEvaluatorError, CreditEvaluatorHook, IouEnvelope, IouEnvelopeBody, IOU_ENVELOPE_SCHEMA,
 };
-pub use local_account::LocalCreditAccount;
+pub use local_account::{derive_iou_id, LocalCreditAccount};
 pub use risk_reports::{
     CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
     CreditBacktestWindow, CreditCertificationState, CreditLossLifecycleArtifact,

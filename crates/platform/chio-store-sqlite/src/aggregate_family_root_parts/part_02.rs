@@ -21,11 +21,13 @@ mod tests {
     };
     use chio_core::{canonical_json_bytes, Keypair, PublicKey, SigningAlgorithm};
     use rusqlite::{params, Connection};
-    use tempfile::tempdir;
-
     use crate::SqliteReceiptStore;
 
     type TestResult = Result<(), Box<dyn StdError>>;
+
+    fn tempdir() -> std::io::Result<tempfile::TempDir> {
+        chio_test_support::private_fs::private_tempdir("aggregate-family-root-")
+    }
 
     fn delegable_scope() -> ChioScope {
         ChioScope {

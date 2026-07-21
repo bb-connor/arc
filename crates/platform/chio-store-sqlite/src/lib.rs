@@ -35,6 +35,7 @@ pub mod batch_approval_store;
 pub mod budget_store;
 pub mod capability_lineage;
 pub mod dead_letters;
+pub mod durable_sqlite;
 pub mod eip3009_nonces;
 pub mod encrypted_blob;
 pub mod enterprise_migration_state;
@@ -47,9 +48,9 @@ pub mod memory_provenance_store;
 pub mod receipt_query;
 pub mod receipt_store;
 pub mod revocation_store;
+pub mod schema_version;
 pub mod sealed_decoy_registry;
 pub mod security_state;
-pub mod schema_version;
 pub mod settle_attempts;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
@@ -283,13 +284,15 @@ pub use enterprise_migration_state::{
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
-pub use receipt_store::{BackgroundCheckpointSigner, SqliteReceiptStore};
+pub use receipt_store::{
+    BackgroundCheckpointSigner, SqliteReceiptBoundConnection, SqliteReceiptStore,
+};
 pub use revocation_store::SqliteRevocationStore;
-pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
-pub use security_state::SqliteSecurityStateStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
+pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
+pub use security_state::SqliteSecurityStateStore;
 pub use settle_attempts::SqliteSettlementRetryStore;
 
 #[cfg(test)]

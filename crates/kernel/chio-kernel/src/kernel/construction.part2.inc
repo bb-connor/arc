@@ -101,7 +101,7 @@ impl ChioKernel {
         self.public_key().to_hex()
     }
 
-    fn treaty_dsse_extensions_from_receipt_metadata(
+    pub(super) fn treaty_dsse_extensions_from_receipt_metadata(
         &self,
         receipt: &chio_core::receipt::body::ChioReceipt,
     ) -> Result<Option<chio_federation::bilateral_dsse::BilateralPredicateExtensions>, KernelError>
@@ -182,6 +182,21 @@ impl ChioKernel {
         receipt: &chio_core::receipt::body::ChioReceipt,
         admitted_peer: Option<&chio_federation::trust_establishment::FederationPeer>,
     ) -> Result<(), KernelError> {
+        self.apply_federation_cosign_at_timestamp(
+            request,
+            receipt,
+            admitted_peer,
+            current_unix_timestamp().saturating_mul(1_000),
+        )
+    }
+
+    pub(crate) fn apply_federation_cosign_at_timestamp(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+        admitted_peer: Option<&chio_federation::trust_establishment::FederationPeer>,
+        timestamp_unix_ms: u64,
+    ) -> Result<(), KernelError> {
         let Some(origin_kernel_id) = request.federated_origin_kernel_id.as_ref() else {
             return Ok(());
         };
@@ -237,7 +252,6 @@ impl ChioKernel {
             cosigner.as_ref(),
         )
         .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
-        let timestamp_unix_ms = current_unix_timestamp().saturating_mul(1000);
         let dsse_envelope =
             chio_federation::bilateral_dsse::sign_chio_bilateral_dsse_envelope_with_cosigner_backend(
                 chio_federation::bilateral_dsse::BilateralDsseBackendCosigningInput {
@@ -523,6 +537,26 @@ impl ChioKernel {
         receipt: &ChioReceipt,
         reserved_hold_id: Option<&str>,
     ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
+        self.mint_execution_nonce_for_allow_reserving_parameter_hash(
+            request,
+            cap,
+            &receipt.action.parameter_hash,
+            reserved_hold_id,
+        )
+    }
+
+    /// Mint a reserving nonce from the canonical action hash before the
+    /// reservation receipt is signed. Operation-owned caller reservations use
+    /// this ordering so the private nonce can stamp the exact hold expiry before
+    /// invocation capture, while the later receipt records the durable
+    /// `CallerReserved` projection.
+    pub(crate) fn mint_execution_nonce_for_allow_reserving_parameter_hash(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        parameter_hash: &str,
+        reserved_hold_id: Option<&str>,
+    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
         if request.execution_nonce.is_some() {
             return Ok(None);
         }
@@ -530,7 +564,7 @@ impl ChioKernel {
             return Ok(None);
         };
         let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        let binding = self.nonce_binding_for(request, cap, &receipt.action.parameter_hash);
+        let binding = self.nonce_binding_for(request, cap, parameter_hash);
         let (reserved_hold_id, reserving_request_id) = match reserved_hold_id {
             Some(hold_id) => (Some(hold_id.to_string()), Some(request.request_id.clone())),
             None => (None, None),

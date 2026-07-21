@@ -1,15 +1,18 @@
 use super::*;
 
 use chio_core_types::capability::governance::GovernedTransactionIntent;
+use chio_core_types::capability::threshold_approval::ThresholdApprovalProposal;
+use chio_core_types::declassification::SignedDeclassificationGrant;
+use chio_core_types::message::OpaqueSupplementalAuthorization;
 use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof};
 use chio_kernel::execution_nonce::{
-    ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
+    ExecutionNonceConfig, ExecutionNonceStore, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
-    ChioKernel, KernelConfig, KernelError, ToolCallRequest, ToolInvocationCost,
-    ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    AdmissionOperationStore, ApprovalStore, ChioKernel, KernelConfig, KernelError, ToolCallRequest,
+    ToolInvocationCost, ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
 /// A configured budget store together with whether it supports the pre-execution
@@ -26,6 +29,246 @@ use chio_kernel::{
 pub(crate) struct ConfiguredBudgetStore {
     pub(crate) store: Arc<dyn BudgetStore>,
     pub(crate) hold_capable: bool,
+    /// The one resolved local filesystem path used to open `store`.
+    ///
+    /// Remote stores have no local path. Local admission-operation and
+    /// execution-nonce authorities must derive their sibling paths from this
+    /// retained value instead of resolving the operator input a second time.
+    pub(crate) resolved_path: Option<String>,
+    /// The retained parent descriptor shared by the local budget, admission,
+    /// and nonce authorities.
+    pub(crate) authority_directory:
+        Option<Arc<chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory>>,
+    pub(crate) admission_operation_path: Option<String>,
+    pub(crate) execution_nonce_path: Option<String>,
+}
+
+/// Side-effect-free budget topology prepared before any durable database is
+/// created. Local mediation retains the one resolved path and trusted parent
+/// descriptor that every authority will use. Remote topology is constructed
+/// here because client construction validates the control URL without making a
+/// network request or mutating durable state.
+pub(crate) enum PreparedBudgetStore {
+    Local {
+        resolved_path: String,
+        authority_directory: Arc<chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory>,
+        admission_operation_path: String,
+        execution_nonce_path: String,
+    },
+    Remote {
+        store: Arc<dyn BudgetStore>,
+    },
+}
+
+impl PreparedBudgetStore {
+    pub(crate) fn local_authority_paths(&self) -> Option<(&str, &str, &str)> {
+        match self {
+            Self::Local {
+                resolved_path,
+                admission_operation_path,
+                execution_nonce_path,
+                ..
+            } => Some((
+                resolved_path,
+                admission_operation_path,
+                execution_nonce_path,
+            )),
+            Self::Remote { .. } => None,
+        }
+    }
+}
+
+/// Durable authorities required by the governed admission coordinator.
+///
+/// Legacy one-of-one approvals and threshold approval sets use the same atomic
+/// admission operation. Threshold mode additionally installs the authenticated
+/// policy resolver and trust roots before it is activated.
+pub(crate) struct MediationAdmissionAuthorities {
+    operation_store: Arc<dyn AdmissionOperationStore>,
+    approval_store: Arc<dyn ApprovalStore>,
+    execution_nonce_store: Arc<dyn ExecutionNonceStore>,
+    threshold_policy: Option<MediationThresholdPolicy>,
+}
+
+struct MediationThresholdPolicy {
+    policy_hash: String,
+    trusted_policy_authorities: Vec<PublicKey>,
+    requirement_resolver:
+        Arc<dyn chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver>,
+}
+
+/// Build the governed-admission authorities beside a local budget database.
+/// Separate SQLite files preserve each store's schema provenance while keeping
+/// their lifecycle tied to the operator-configured budget path.
+#[cfg(test)]
+pub(crate) fn build_mediation_admission_authorities(
+    budget_path: &str,
+    approval_store: Arc<dyn ApprovalStore>,
+    threshold_config: Option<&ThresholdApprovalCollectorConfig>,
+) -> Result<MediationAdmissionAuthorities, ProtectError> {
+    let authority_directory = Arc::new(
+        chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory::open_for_database(budget_path)
+            .map_err(|error| ProtectError::Config(error.to_string()))?,
+    );
+    build_mediation_admission_authorities_in_directory(
+        budget_path,
+        authority_directory,
+        approval_store,
+        threshold_config,
+    )
+}
+
+/// Build governed-admission siblings through the exact parent descriptor that
+/// opened the budget authority.
+#[cfg(test)]
+pub(crate) fn build_mediation_admission_authorities_in_directory(
+    budget_path: &str,
+    authority_directory: Arc<chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory>,
+    approval_store: Arc<dyn ApprovalStore>,
+    threshold_config: Option<&ThresholdApprovalCollectorConfig>,
+) -> Result<MediationAdmissionAuthorities, ProtectError> {
+    if budget_path.to_ascii_lowercase().starts_with("file:") {
+        return Err(ProtectError::Config(
+            "budget_db must be a plain filesystem path, not a SQLite file URI".to_string(),
+        ));
+    }
+    if !std::path::Path::new(budget_path).is_absolute() {
+        return Err(ProtectError::Config(
+            "mediation authorities require the resolved absolute budget_db path".to_string(),
+        ));
+    }
+    let operation_path = resolved_plain_database_path(
+        &format!("{budget_path}.admission-operations"),
+        "admission operation store",
+    )?;
+    let nonce_path = resolved_plain_database_path(
+        &format!("{budget_path}.execution-nonces"),
+        "execution nonce store",
+    )?;
+    build_mediation_admission_authorities_with_paths(
+        budget_path,
+        &operation_path,
+        &nonce_path,
+        authority_directory,
+        approval_store,
+        threshold_config,
+    )
+}
+
+/// Open the exact admission and nonce paths retained during side-effect-free
+/// topology preparation. Production uses this entry point so no operator or
+/// derived path is resolved after another durable store has been created.
+pub(crate) fn build_mediation_admission_authorities_with_paths(
+    budget_path: &str,
+    operation_path: &str,
+    nonce_path: &str,
+    authority_directory: Arc<chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory>,
+    approval_store: Arc<dyn ApprovalStore>,
+    threshold_config: Option<&ThresholdApprovalCollectorConfig>,
+) -> Result<MediationAdmissionAuthorities, ProtectError> {
+    if !std::path::Path::new(budget_path).is_absolute()
+        || !std::path::Path::new(operation_path).is_absolute()
+        || !std::path::Path::new(nonce_path).is_absolute()
+    {
+        return Err(ProtectError::Config(
+            "mediation authorities require resolved absolute database paths".to_string(),
+        ));
+    }
+    let operation_store: Arc<dyn AdmissionOperationStore> = Arc::new(
+        chio_store_sqlite::SqliteAdmissionOperationStore::open_hardened(
+            operation_path,
+            Arc::clone(&authority_directory),
+        )
+        .map_err(|error| {
+            ProtectError::Config(format!(
+                "cannot open mediation admission-operation store `{operation_path}`: {error}"
+            ))
+        })?,
+    );
+    let execution_nonce_store: Arc<dyn ExecutionNonceStore> = Arc::new(
+        chio_store_sqlite::SqliteExecutionNonceStore::open_hardened(
+            nonce_path,
+            authority_directory,
+        )
+        .map_err(|error| {
+            ProtectError::Config(format!(
+                "cannot open mediation execution-nonce store `{nonce_path}`: {error}"
+            ))
+        })?,
+    );
+
+    let threshold_policy = threshold_config.map(|config| {
+        let expected_policy_hash = config.current_policy_hash.clone();
+        let request_context_resolver = Arc::clone(&config.request_context_resolver);
+        let requirement_resolver: Arc<
+            dyn chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver,
+        > = Arc::new(
+            move |matched_request: &chio_kernel::threshold_approval::ThresholdApprovalRequest,
+                  policy_hash: &str|
+                  -> Result<
+                chio_kernel::threshold_approval::ThresholdApprovalRequirement,
+                chio_kernel::threshold_approval::ThresholdApprovalResolutionError,
+            > {
+                if policy_hash != expected_policy_hash {
+                    return Err(
+                        chio_kernel::threshold_approval::ThresholdApprovalResolutionError::StalePolicy {
+                            expected: expected_policy_hash.clone(),
+                            received: policy_hash.to_string(),
+                        },
+                    );
+                }
+                let context = request_context_resolver
+                    .resolve_threshold_approval_request_context(
+                        matched_request.request_id(),
+                        policy_hash,
+                    )?;
+                if context.matched_request() != matched_request
+                    || context.proposal_context().matched_request() != matched_request
+                {
+                    return Err(
+                        chio_kernel::threshold_approval::ThresholdApprovalResolutionError::Corrupt(
+                            "authenticated threshold context does not match the admitted request"
+                                .to_string(),
+                        ),
+                    );
+                }
+                let requirement = context.proposal_context().requirement();
+                if requirement.policy_hash() != policy_hash {
+                    return Err(
+                        chio_kernel::threshold_approval::ThresholdApprovalResolutionError::StalePolicy {
+                            expected: policy_hash.to_string(),
+                            received: requirement.policy_hash().to_string(),
+                        },
+                    );
+                }
+                Ok(requirement.clone())
+            },
+        );
+        MediationThresholdPolicy {
+            policy_hash: config.current_policy_hash.clone(),
+            trusted_policy_authorities: config.trusted_policy_authorities.clone(),
+            requirement_resolver,
+        }
+    });
+
+    Ok(MediationAdmissionAuthorities {
+        operation_store,
+        approval_store,
+        execution_nonce_store,
+        threshold_policy,
+    })
+}
+
+/// Resolve a durable budget database to the one absolute plain filesystem path
+/// used by every local mediation authority.
+///
+/// Existing path components are canonicalized before the budget store opens so
+/// an existing symlink is reduced to its target once. Missing trailing
+/// components are appended to the nearest existing canonical ancestor. The
+/// resulting path is retained and is never resolved again when sibling stores
+/// are opened.
+fn resolved_budget_database_path(path: &str) -> Result<String, ProtectError> {
+    resolved_plain_database_path(path, "budget_db")
 }
 
 /// Build the sidecar's budget store, preferring the hold-capable local SQLite
@@ -39,15 +282,30 @@ pub(crate) struct ConfiguredBudgetStore {
 /// mediation keeps working; a remote-only deployment stays not hold-capable and
 /// those routes reject fail-closed rather than mint an unreconcilable reserved
 /// nonce.
-pub(crate) fn build_budget_store(
+pub(crate) fn prepare_budget_store(
     config: &ProtectConfig,
-) -> Result<Option<ConfiguredBudgetStore>, ProtectError> {
+) -> Result<Option<PreparedBudgetStore>, ProtectError> {
     if let Some(path) = config.budget_db.as_deref() {
-        let store = chio_store_sqlite::budget_store::SqliteBudgetStore::open(path)
-            .map_err(|error| ProtectError::Config(error.to_string()))?;
-        return Ok(Some(ConfiguredBudgetStore {
-            store: Arc::new(store),
-            hold_capable: true,
+        let resolved_path = resolved_budget_database_path(path)?;
+        let admission_operation_path = resolved_plain_database_path(
+            &format!("{resolved_path}.admission-operations"),
+            "admission operation store",
+        )?;
+        let execution_nonce_path = resolved_plain_database_path(
+            &format!("{resolved_path}.execution-nonces"),
+            "execution nonce store",
+        )?;
+        let authority_directory = Arc::new(
+            chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory::open_for_database(
+                &resolved_path,
+            )
+            .map_err(|error| ProtectError::Config(error.to_string()))?,
+        );
+        return Ok(Some(PreparedBudgetStore::Local {
+            resolved_path,
+            authority_directory,
+            admission_operation_path,
+            execution_nonce_path,
         }));
     }
     if let Some(control_url) = config.control_url.as_deref() {
@@ -58,57 +316,77 @@ pub(crate) fn build_budget_store(
                 token,
             )
             .map_err(|error| ProtectError::Config(error.to_string()))?;
-        return Ok(Some(ConfiguredBudgetStore {
+        return Ok(Some(PreparedBudgetStore::Remote {
             store: Arc::from(store),
-            hold_capable: false,
         }));
     }
     Ok(None)
 }
 
-/// Load the durable revocation store's revoked capability ids so operator
-/// revocations recorded through `chio trust revoke --revocation-db <path>` are
-/// enforced on `/v1/evaluate` and every other path that consults the sidecar's
-/// revoked set. Returns an empty set when no revocation-db is configured.
-///
-/// Opening or reading a configured store that fails is fatal (fail-closed): the
-/// caller must not start the sidecar advertising revocation enforcement it
-/// cannot provide. The whole table is paged into memory once at startup;
-/// revocations recorded after startup require a sidecar restart or the
-/// in-process `/v1/capabilities/release` (or `--control-url`) channel.
-pub(crate) fn load_revocation_db_ids(
-    config: &ProtectConfig,
-) -> Result<std::collections::HashSet<String>, ProtectError> {
-    let Some(path) = config.revocation_db.as_deref() else {
-        return Ok(std::collections::HashSet::new());
-    };
-    let store = chio_store_sqlite::SqliteRevocationStore::open(path).map_err(|error| {
-        ProtectError::Config(format!("cannot open revocation-db `{path}`: {error}"))
-    })?;
-
-    const PAGE_SIZE: usize = 1024;
-    let mut ids = std::collections::HashSet::new();
-    let mut cursor: Option<(i64, String)> = None;
-    loop {
-        let (after_revoked_at, after_capability_id) = match &cursor {
-            Some((revoked_at, capability_id)) => (Some(*revoked_at), Some(capability_id.as_str())),
-            None => (None, None),
-        };
-        let page = store
-            .list_revocations_after(PAGE_SIZE, after_revoked_at, after_capability_id)
-            .map_err(|error| {
-                ProtectError::Config(format!("cannot read revocation-db `{path}`: {error}"))
-            })?;
-        let page_len = page.len();
-        for record in page {
-            cursor = Some((record.revoked_at, record.capability_id.clone()));
-            ids.insert(record.capability_id);
+/// Open the already-resolved budget authority. This function never consults
+/// operator input or resolves a path a second time.
+pub(crate) fn open_prepared_budget_store(
+    prepared: Option<PreparedBudgetStore>,
+) -> Result<Option<ConfiguredBudgetStore>, ProtectError> {
+    match prepared {
+        Some(PreparedBudgetStore::Local {
+            resolved_path,
+            authority_directory,
+            admission_operation_path,
+            execution_nonce_path,
+        }) => {
+            let store = chio_store_sqlite::budget_store::SqliteBudgetStore::open_hardened(
+                &resolved_path,
+                Arc::clone(&authority_directory),
+            )
+            .map_err(|error| ProtectError::Config(error.to_string()))?;
+            Ok(Some(ConfiguredBudgetStore {
+                store: Arc::new(store),
+                hold_capable: true,
+                resolved_path: Some(resolved_path),
+                authority_directory: Some(authority_directory),
+                admission_operation_path: Some(admission_operation_path),
+                execution_nonce_path: Some(execution_nonce_path),
+            }))
         }
-        if page_len < PAGE_SIZE {
-            break;
-        }
+        Some(PreparedBudgetStore::Remote { store }) => Ok(Some(ConfiguredBudgetStore {
+            store,
+            hold_capable: false,
+            resolved_path: None,
+            authority_directory: None,
+            admission_operation_path: None,
+            execution_nonce_path: None,
+        })),
+        None => Ok(None),
     }
-    Ok(ids)
+}
+
+/// Maximum number of known-positive revocations retained in the optional
+/// in-process acceleration cache. Correctness always comes from the live shared
+/// authority; this bound prevents historical revocation volume from becoming
+/// unbounded startup memory.
+pub(crate) const REVOCATION_ACCELERATION_CACHE_MAX_IDS: usize = 256;
+
+/// Read only the newest bounded slice of one already-open SQLite authority into
+/// the in-process acceleration cache. Production calls this before erasing the
+/// concrete type behind the exact `Arc<dyn RevocationStore>` shared by the
+/// evaluator, kernel, release route, and proxy state. Older positives remain
+/// authoritative and are discovered on cache miss through that live handle.
+pub(crate) fn load_revocation_store_ids(
+    store: &chio_store_sqlite::SqliteRevocationStore,
+    path: &str,
+) -> Result<std::collections::HashSet<String>, ProtectError> {
+    store
+        .list_revocations(REVOCATION_ACCELERATION_CACHE_MAX_IDS, None)
+        .map(|records| {
+            records
+                .into_iter()
+                .map(|record| record.capability_id)
+                .collect()
+        })
+        .map_err(|error| {
+            ProtectError::Config(format!("cannot read revocation-db `{path}`: {error}"))
+        })
 }
 
 /// Build a `ChioKernel` for tool-call mediation with the budget store, a strict
@@ -124,14 +402,14 @@ pub(crate) fn load_revocation_db_ids(
 /// real tool server, which verifies and consumes it and reconciles the reserved
 /// hold at the execution site.
 ///
-/// A SINGLE kernel is built once at sidecar startup and reused for the process
-/// lifetime (held behind a `Mutex` in `ProxyState`). Reuse is load-bearing for
-/// security: the kernel's approval-token replay store and DPoP-nonce store live
-/// on the instance, so a per-request kernel would reset them every call and let
-/// an approval token or DPoP proof be replayed within its TTL. One instance
-/// keeps both replay stores authoritative across `/v1/evaluate` requests, and it
-/// is the same nonce store that mints on `/v1/evaluate` and verifies+consumes on
-/// `/v1/reconcile`, so a reconciled nonce cannot be replayed. The route never
+/// A SINGLE kernel is built once at sidecar startup and reused for the service
+/// lifetime (held behind a `Mutex` in `ProxyState`). Reuse remains load-bearing
+/// for ephemeral approval-token and DPoP replay state. When durable admission
+/// authorities are configured, both execution nonces and DPoP replay digests
+/// share the SQLite execution-nonce authority and survive service restart. It
+/// is also the same execution-nonce store that mints on `/v1/evaluate` and
+/// verifies and consumes on `/v1/reconcile`, so a reconciled nonce cannot be
+/// replayed. The route never
 /// registers the caller-named `server_id`: the reserve-for-caller authorization
 /// path never dispatches a tool on this kernel and so no longer requires the
 /// target to be registered, which keeps the kernel's tool-server map from
@@ -141,6 +419,11 @@ pub(crate) fn load_revocation_db_ids(
 /// addition to the sidecar signer, so an externally minted capability that the
 /// sidecar's other endpoints accept is not rejected here as untrusted.
 ///
+/// `receipt_store` is the sidecar's shared durable receipt authority. Direct
+/// mediation requires authoritative point lookup from this exact store for
+/// restart-safe publication and exact replay. It must be installed before
+/// admission recovery runs.
+///
 /// `payment_adapter` is the operator-configured payment rail. When present it is
 /// installed on the kernel so a governed `MustPrepay` (x402/ACP) quote is
 /// authorized and captured before the reserve-for-caller path mints a nonce.
@@ -149,9 +432,12 @@ pub(crate) fn load_revocation_db_ids(
 pub(crate) fn build_mediation_kernel(
     signer: &Keypair,
     budget_store: Arc<dyn BudgetStore>,
+    receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>>,
+    revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
     trusted_capability_issuers: &[PublicKey],
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    admission_authorities: Option<MediationAdmissionAuthorities>,
 ) -> Result<ChioKernel, ProtectError> {
     let mut ca_public_keys = vec![signer.public_key()];
     for issuer in trusted_capability_issuers {
@@ -159,11 +445,16 @@ pub(crate) fn build_mediation_kernel(
             ca_public_keys.push(issuer.clone());
         }
     }
+    let policy_hash = admission_authorities
+        .as_ref()
+        .and_then(|authorities| authorities.threshold_policy.as_ref())
+        .map(|policy| policy.policy_hash.clone())
+        .unwrap_or_else(|| chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1"));
     let mut kernel = ChioKernel::new(KernelConfig {
         keypair: signer.clone(),
         ca_public_keys,
         max_delegation_depth: 5,
-        policy_hash: "chio_api_protect_mediation_v1".to_string(),
+        policy_hash,
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -171,9 +462,9 @@ pub(crate) fn build_mediation_kernel(
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
-        // Revocation is enforced sidecar-side over the durable revoked set (the
-        // revoked-ancestor walk below); this kernel's internal store is
-        // intentionally empty, so its durability gate must not deny mediation.
+        // Ephemeral construction remains available for isolated embeddings.
+        // Production construction replaces the default with the sidecar's
+        // shared revocation authority below.
         allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
@@ -181,35 +472,91 @@ pub(crate) fn build_mediation_kernel(
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         // The dispatch-intent payment journal is off on this reserve-only kernel.
         // Its money-path durability is the reserved-hold TTL reaper plus settle
-        // by reconcile-by-nonce, not the in-process HoldPlaced -> Authorized ->
-        // Settled journal that the dispatching kernels (`chio mcp serve`, `chio
-        // run`) use: this kernel reserves a hold and mints a nonce but never
-        // dispatches or settles in-process, so it never writes the HoldPlaced row
-        // an Authorized advance would require. A MustPrepay prepayment is still
-        // authorized through the adapter before a nonce is minted.
+        // by reconcile-by-nonce, not a general dispatch-intent journal: this
+        // kernel reserves a hold and mints a nonce but never dispatches a tool.
+        // An operation-owned MustPrepay reservation still writes its HoldPlaced
+        // payment row atomically with budget authorization, because its rail
+        // capture and any pre-dispatch compensation must survive restart.
         dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
-    kernel.set_budget_store_handle(budget_store);
+    kernel
+        .set_budget_store_handle(budget_store)
+        .map_err(|error| {
+            ProtectError::Config(format!(
+                "failed to install budget authority on the mediation kernel: {error}"
+            ))
+        })?;
+    if let Some(receipt_store) = receipt_store {
+        kernel
+            .set_receipt_store_handle(receipt_store)
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "failed to install receipt authority on the mediation kernel: {error}"
+                ))
+            })?;
+    }
+    if let Some(revocation_store) = revocation_store {
+        kernel.set_revocation_store_handle(revocation_store);
+    }
+    let mut threshold_policy = None;
+    let mut admission_recovery_required = false;
+    let dpop_config = DpopConfig::default();
+    let dpop_ttl = std::time::Duration::from_secs(dpop_config.proof_ttl_secs);
+    let (execution_nonce_store, dpop_nonce_store): (Box<dyn ExecutionNonceStore>, DpopNonceStore) =
+        if let Some(authorities) = admission_authorities {
+            let MediationAdmissionAuthorities {
+                operation_store,
+                approval_store,
+                execution_nonce_store,
+                threshold_policy: configured_threshold_policy,
+            } = authorities;
+            admission_recovery_required = true;
+            kernel
+                .set_admission_operation_store_handle(operation_store)
+                .map_err(|error| {
+                    ProtectError::Config(format!(
+                        "failed to install admission-operation authority on the mediation kernel: {error}"
+                    ))
+                })?;
+            kernel
+                .set_approval_store_handle(approval_store)
+                .map_err(|error| {
+                    ProtectError::Config(format!(
+                        "failed to install approval authority on the mediation kernel: {error}"
+                    ))
+                })?;
+            threshold_policy = configured_threshold_policy;
+            (
+                Box::new(Arc::clone(&execution_nonce_store)),
+                DpopNonceStore::with_authoritative_store(
+                    dpop_config.nonce_store_capacity,
+                    dpop_ttl,
+                    execution_nonce_store,
+                ),
+            )
+        } else {
+            (
+                Box::new(InMemoryExecutionNonceStore::from_config(
+                    &ExecutionNonceConfig::default(),
+                )),
+                DpopNonceStore::new(dpop_config.nonce_store_capacity, dpop_ttl),
+            )
+        };
     let nonce_cfg = ExecutionNonceConfig {
         require_nonce: true,
         ..ExecutionNonceConfig::default()
     };
-    kernel.set_execution_nonce_store(
-        nonce_cfg,
-        Box::new(InMemoryExecutionNonceStore::from_config(
-            &ExecutionNonceConfig::default(),
-        )),
-    );
+    kernel
+        .set_execution_nonce_store(nonce_cfg, execution_nonce_store)
+        .map_err(|error| {
+            ProtectError::Config(format!(
+                "failed to install execution nonce authority on the mediation kernel: {error}"
+            ))
+        })?;
     // Install DPoP verification state so a grant with `dpop_required` can verify
     // a presented proof. Without it every dpop_required capability denies
     // fail-closed with no way to present a proof.
-    kernel.set_dpop_store(
-        DpopNonceStore::new(
-            DpopConfig::default().nonce_store_capacity,
-            std::time::Duration::from_secs(DpopConfig::default().proof_ttl_secs),
-        ),
-        DpopConfig::default(),
-    );
+    kernel.set_dpop_store(dpop_nonce_store, dpop_config);
     // Install the operator's payment rail so the governed prepayment gate can
     // authorize and capture a MustPrepay (x402/ACP) quote before the
     // reserve-for-caller path mints a nonce. Absent an adapter the gate denies
@@ -223,8 +570,60 @@ pub(crate) fn build_mediation_kernel(
                 ))
             })?;
     }
+    if admission_recovery_required {
+        kernel
+            .recover_tool_dispatch_admission_operations()
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "failed to recover governed mediation admissions: {error}"
+                ))
+            })?;
+        let payment_recovery = kernel.reconcile_payment_journal(0).map_err(|error| {
+            ProtectError::Config(format!(
+                "failed to reconcile governed mediation payments: {error}"
+            ))
+        })?;
+        if payment_recovery.resolved > 0
+            || payment_recovery.reconcile_failed > 0
+            || payment_recovery.deferred_to_admission_operation > 0
+        {
+            warn!(
+                resolved = payment_recovery.resolved,
+                reconcile_failed = payment_recovery.reconcile_failed,
+                deferred_to_admission_operation = payment_recovery.deferred_to_admission_operation,
+                "governed mediation payment journal recovered before serving"
+            );
+        }
+    }
     for server in tool_servers {
         kernel.register_tool_server(server);
+    }
+    if let Some(threshold_policy) = threshold_policy {
+        kernel
+            .set_threshold_approval_requirement_resolver(
+                threshold_policy.requirement_resolver,
+            )
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "failed to install threshold requirement authority on the mediation kernel: {error}"
+                ))
+            })?;
+        kernel
+            .set_threshold_approval_policy_authorities(
+                threshold_policy.trusted_policy_authorities,
+            )
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "failed to install threshold policy authorities on the mediation kernel: {error}"
+                ))
+            })?;
+        kernel
+            .enable_threshold_governed_approvals()
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "failed to activate threshold governed admission on the mediation kernel: {error}"
+                ))
+            })?;
     }
     // Rebuild the delegated reserve-for-caller accounting from the durable budget
     // store. A delegated reservation keeps its child's sibling-sum share admitted
@@ -234,7 +633,7 @@ pub(crate) fn build_mediation_kernel(
     // reservation consumed nothing. Since the durable hold record does not carry
     // the parent capability id or the shares needed to rebuild the reservation,
     // this arms a fail-closed gate that denies delegated admission while any such
-    // hold from a prior process remains open. Fail-closed: a store read error here
+    // hold from a prior service instance remains open. Fail-closed: a store read error here
     // aborts startup so the sidecar refuses to mediate over a store it could not
     // inspect.
     kernel
@@ -244,6 +643,7 @@ pub(crate) fn build_mediation_kernel(
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     capability: chio_core_types::capability::token::CapabilityToken,
     tool_server: String,
@@ -268,6 +668,20 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// alongside `governed_intent` so an approval-gated grant can be authorized.
     #[serde(default)]
     approval_token: Option<GovernedApprovalToken>,
+    /// Canonical threshold approval token set. Supplying this together with the
+    /// singular compatibility field is rejected by the kernel as ambiguous.
+    #[serde(default)]
+    approval_tokens: Vec<GovernedApprovalToken>,
+    /// Policy-authority-signed proposal binding a threshold approval set.
+    #[serde(default)]
+    threshold_approval_proposal: Option<ThresholdApprovalProposal>,
+    /// Opaque broker authorization verified by the installed supplemental
+    /// authorization authority before admission.
+    #[serde(default)]
+    supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
+    /// One-shot signed declassification authority for this exact invocation.
+    #[serde(default)]
+    declassification_grant: Option<SignedDeclassificationGrant>,
     /// Optional DPoP proof-of-possession. Forwarded so a grant carrying
     /// `dpop_required` can verify the proof instead of denying fail-closed.
     #[serde(default)]
@@ -278,6 +692,41 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// having the nonce silently ignored.
     #[serde(default)]
     execution_nonce: Option<SignedExecutionNonce>,
+}
+
+fn mediated_request_id_conflict_response() -> Response {
+    (
+        StatusCode::CONFLICT,
+        axum::Json(serde_json::json!({
+            "error": "chio_request_id_reused",
+            "message": "request_id is unavailable; choose a fresh request_id",
+        })),
+    )
+        .into_response()
+}
+
+fn mediated_unavailable_response() -> Response {
+    internal_json_error_response(
+        "chio_mediation_unavailable",
+        "mediated authorization is unavailable",
+    )
+}
+
+fn mediated_authorization_response(response: chio_kernel::ToolCallResponse) -> Response {
+    let status = match &response.verdict {
+        chio_kernel::Verdict::Allow => "authorized",
+        chio_kernel::Verdict::Deny => "deny",
+        chio_kernel::Verdict::PendingApproval => "pending_approval",
+    };
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "status": status,
+            "receipt": response.receipt,
+            "execution_nonce": response.execution_nonce,
+        })),
+    )
+        .into_response()
 }
 
 pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
@@ -295,8 +744,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     let parsed: SidecarEvaluateToolCallMediatedRequest = match serde_json::from_slice(&body_bytes) {
         Ok(parsed) => parsed,
         Err(error) => {
-            return sidecar_bad_request(&format!("invalid mediated payload: {error}"))
-                .into_response();
+            warn!("failed to decode mediated evaluate payload: {error}");
+            return sidecar_bad_request("invalid mediated payload").into_response();
         }
     };
     // This endpoint is a pre-execution authorization gate: it mints an execution
@@ -312,66 +761,79 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         )
         .into_response();
     }
-    let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
-        return internal_json_error_response(
-            "chio_mediation_unavailable",
-            "mediated tool-call route requires a configured budget store (--control-url or --budget-db)",
-        );
-    };
-    // A mediated reservation requires a hold-capable budget store. The remote
-    // control-plane store forwards only charge/reverse/reconcile and falls back to
-    // the no-op hold-API defaults, so a reservation minted against it could never
-    // be reconciled by nonce or reclaimed by the TTL reaper. Reject fail-closed
-    // rather than mint an unreconcilable reserved nonce.
-    if !state.mediation_hold_capable {
-        return internal_json_error_response(
-            "chio_mediation_requires_local_budget_store",
-            "mediated authorization requires a hold-capable local budget store (--budget-db); \
-             a remote control-plane budget store (--control-url) cannot persist a reserved hold",
-        );
+    // Declassification is consumed at the dispatching security-kernel boundary,
+    // where the exact invocation and information-flow transition are known. This
+    // route only reserves authority for a later caller dispatch, so accepting a
+    // grant here would leave it outside both dispatch verification and nonce
+    // binding. Reject it explicitly instead of forwarding a security artifact
+    // that this boundary cannot consume.
+    if parsed.declassification_grant.is_some() {
+        return sidecar_bad_request(
+            "declassification_grant must be presented to the dispatching security kernel, not to the reserve-only /v1/evaluate route",
+        )
+        .into_response();
     }
-    // A reserved hold is settled only through `/v1/reconcile`, which the
-    // reconcile control gate restricts to the trusted tool server presenting the
-    // sidecar-control token. Without a configured token every reconcile is
-    // rejected, so a reservation minted here could only expire and forfeit
-    // budget. The reconcile gate trims the configured token and treats a
-    // whitespace-only value as unconfigured, so an unconfigured OR blank token
-    // is rejected here identically. Reject fail-closed before reserving budget or
-    // minting a nonce, mirroring the reconcile gate's own configured-token
-    // requirement.
+    // Bound caller-controlled collections before authentication. The production
+    // verifier applies the stricter delegation-depth limit after signature and
+    // lineage validation.
+    const MAX_MEDIATED_DELEGATION_CHAIN: usize = 32;
+    if parsed.capability.delegation_chain.len() > MAX_MEDIATED_DELEGATION_CHAIN {
+        return sidecar_bad_request("capability delegation chain is too long").into_response();
+    }
+    const MAX_MEDIATED_SCOPE_GRANTS: usize = 64;
+    if parsed.capability.scope.grants.len() > MAX_MEDIATED_SCOPE_GRANTS {
+        return sidecar_bad_request("capability scope carries too many grants").into_response();
+    }
+
+    let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
+        warn!("mediated authorization unavailable: no mediation kernel is configured");
+        return mediated_unavailable_response();
+    };
+    let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(duration) => duration.as_secs(),
+        Err(error) => {
+            warn!("mediated capability authentication clock failed: {error}");
+            return mediated_unavailable_response();
+        }
+    };
+    let authenticated = {
+        let kernel = mediation_kernel.lock().await;
+        kernel.verify_stored_capability_for_reuse(&parsed.capability, now)
+    };
+    if let Err(error) = authenticated {
+        warn!("mediated capability authentication failed: {error}");
+        return mediated_unavailable_response();
+    }
+
+    // A mediated reservation requires a hold-capable budget store. Log the
+    // operator-facing cause while keeping every client topology response equal.
+    if !state.mediation_hold_capable {
+        warn!("mediated authorization unavailable: budget authority cannot persist holds");
+        return mediated_unavailable_response();
+    }
     if state
         .sidecar_control_token
         .as_deref()
         .map(str::trim)
         .is_none_or(str::is_empty)
     {
-        return internal_json_error_response(
-            "chio_mediation_requires_reconcile_token",
-            "mediated authorization requires a configured sidecar-control token so the reserved \
-             hold can be settled on /v1/reconcile; without one the reservation could only expire \
-             and forfeit budget",
-        );
+        warn!("mediated authorization unavailable: reconcile control token is not configured");
+        return mediated_unavailable_response();
     }
-    // Fail-closed: reject the presented capability when its own id OR any ancestor
+    if state.budget_store.is_none() {
+        warn!("mediated authorization unavailable: budget authority is not configured");
+        return mediated_unavailable_response();
+    }
+
+    // Reject the authenticated capability when its own id OR any ancestor
     // in its delegation chain is revoked, so a delegated child of a revoked root
     // cannot keep earning mediated reservations until expiry. `capability_is_revoked`
     // consults the in-memory release set first (no I/O for a known-revoked id) and
     // then the durable revocation store, failing closed if that store cannot be
     // read, so a revocation a sibling replica or `chio trust revoke --revocation-db`
-    // recorded after this process booted is honored here exactly as it is on the
-    // proxy and validate paths. The kernel's own revocation store starts empty, so
-    // this sidecar-side walk is the authority.
-    //
-    // Bound the chain before the per-ancestor durable walk: the capability
-    // signature is not verified until the kernel below, so cap the ancestors
-    // consulted to keep an unverified, caller-supplied token from forcing one
-    // durable store read per fabricated ancestor. A legitimate chain never
-    // approaches this bound (the kernel caps delegation depth far under it) and a
-    // longer one is rejected by the kernel regardless.
-    const MAX_MEDIATED_DELEGATION_CHAIN: usize = 32;
-    if parsed.capability.delegation_chain.len() > MAX_MEDIATED_DELEGATION_CHAIN {
-        return sidecar_bad_request("capability delegation chain is too long").into_response();
-    }
+    // recorded after this service instance started is honored here exactly as on
+    // the proxy and validate paths. The mediation kernel shares the same store
+    // and checks it again during admission, closing a revoke-between-checks race.
     let mut revoked = state.capability_is_revoked(&parsed.capability.id).await;
     if !revoked {
         for ancestor in &parsed.capability.delegation_chain {
@@ -397,124 +859,31 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     let request_id = parsed
         .request_id
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
-    // Durable reuse guard that survives a restart, which the in-memory window
-    // below cannot: after a restart the window is empty, but a reservation opened
-    // before it persists as a budget hold. Rejecting the reuse fail-closed (409)
-    // is load-bearing because a reused id would either collapse into an idempotent
-    // authorize that mints a second nonce against one reservation without
-    // reserving more budget, or (for a closed, settled-or-reaped hold) make the
-    // kernel reject the duplicate hold id on creation and turn an otherwise valid
-    // later authorization into a 500 instead of the documented bounded-reuse 409.
-    let Some(budget_store) = state.budget_store.as_ref() else {
-        return internal_json_error_response(
-            "chio_mediation_requires_local_budget_store",
-            "mediated authorization requires a configured hold-capable budget store",
-        );
-    };
-    // Bound the pre-verification durable lookup: the capability signature is
-    // verified inside the kernel below, so cap the number of grants scanned to a
-    // sane maximum and reject an oversized scope fail-closed, rather than fan out
-    // one store read per grant for an unverified, caller-supplied capability.
-    const MAX_MEDIATED_SCOPE_GRANTS: usize = 64;
-    if parsed.capability.scope.grants.len() > MAX_MEDIATED_SCOPE_GRANTS {
-        return sidecar_bad_request("capability scope carries too many grants").into_response();
-    }
-    // Prefer the capability-agnostic durable probe. The kernel derives each hold
-    // id from (request_id, capability id, grant index), so the per-grant exact-id
-    // lookup below only sees a reuse under the SAME capability: a caller that
-    // replays this request_id under a DIFFERENT capability token would miss the
-    // existing `budget-hold:{request_id}:{other_cap}:..` row and win a second
-    // reservation once a restart cleared the in-memory window. When the store can
-    // enumerate holds by the `budget-hold:{request_id}:` prefix it rejects the
-    // reuse regardless of which capability opened the hold; when it cannot
-    // (`Ok(None)`), fall back to the per-grant exact-id probe.
-    match budget_store.request_id_has_reserved_hold(&request_id) {
-        Ok(Some(true)) => {
-            return (
-                StatusCode::CONFLICT,
-                axum::Json(serde_json::json!({
-                    "error": "chio_request_id_reused",
-                    "message": "request_id already backs a reservation; choose a fresh request_id",
-                })),
-            )
-                .into_response();
-        }
-        Ok(Some(false)) => {}
-        Ok(None) => {
-            for grant_index in 0..parsed.capability.scope.grants.len() {
-                let hold_id = format!(
-                    "budget-hold:{}:{}:{}",
-                    request_id, parsed.capability.id, grant_index
-                );
-                match budget_store.get_budget_hold(&hold_id) {
-                    Ok(Some(_)) => {
-                        return (
-                            StatusCode::CONFLICT,
-                            axum::Json(serde_json::json!({
-                                "error": "chio_request_id_reused",
-                                "message": "request_id already backs a reservation; choose a fresh request_id",
-                            })),
-                        )
-                            .into_response();
-                    }
-                    Ok(None) => {}
-                    Err(error) => {
-                        warn!("durable hold lookup failed: {error}");
-                        return internal_json_error_response(
-                            "chio_mediation_failed",
-                            &error.to_string(),
-                        );
-                    }
-                }
-            }
-        }
-        Err(error) => {
-            warn!("durable hold lookup failed: {error}");
-            return internal_json_error_response("chio_mediation_failed", &error.to_string());
-        }
-    }
-    // Fail-closed over-subscription guard: the kernel derives the durable budget
-    // hold identity from `request_id`, so a reused id inside a live reservation
-    // window would collapse into an idempotent authorize with no fresh
-    // reservation. Claim the id for this window before authorizing and reject a
-    // reuse with 409. The claim is released below when the authorization places
-    // no durable hold, so a denied or failed attempt does not permanently burn
-    // the id; claimed ids expire with the reservation TTL, keeping the set
-    // bounded.
-    let now_unix = chrono::Utc::now().timestamp();
-    if !state
-        .minted_request_ids
-        .lock()
-        .await
-        .claim(&request_id, now_unix)
-    {
-        return (
-            StatusCode::CONFLICT,
-            axum::Json(serde_json::json!({
-                "error": "chio_request_id_reused",
-                "message":
-                    "request_id has already been used for a reservation; choose a fresh request_id",
-            })),
-        )
-            .into_response();
-    }
     let kernel_request = ToolCallRequest {
-        request_id: request_id.clone(),
+        request_id,
         capability: parsed.capability,
         tool_name: parsed.tool_name,
         server_id: parsed.tool_server,
         agent_id,
         arguments: parsed.parameters,
+        supplemental_authorization: parsed.supplemental_authorization,
         dpop_proof: parsed.dpop_proof,
         // The route mints the nonce; it never forwards a presented one (rejected
         // above), so the kernel always takes the authorization-reserve path.
         execution_nonce: None,
         governed_intent: parsed.governed_intent,
         approval_token: parsed.approval_token,
+        approval_tokens: parsed.approval_tokens,
+        threshold_approval_proposal: parsed.threshold_approval_proposal,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
-    // Single-phase authorization on the shared, process-lifetime kernel: verify +
+    if let Err(error) = kernel_request.validate() {
+        warn!("mediated authorization request validation failed: {error}");
+        return sidecar_bad_request("invalid mediated authorization").into_response();
+    }
+    // Single-phase authorization on the shared, service-lifetime kernel: verify +
     // reserve the budget hold (kept open) + mint a fresh execution nonce. The
     // reserve-for-caller path never dispatches, so it does not require the
     // caller-named server to be registered; the route therefore never registers
@@ -522,25 +891,26 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // reconcile, no settlement. The lock is released at the end of the block,
     // before any await, so authorizations serialize without holding the kernel
     // across receipt-persistence I/O.
-    let response = {
+    let outcome = {
         let kernel = mediation_kernel.lock().await;
-        match kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None) {
-            Ok(response) => response,
-            Err(error) => {
-                // The reservation did not open; release the claimed id so a
-                // failed authorization does not permanently burn it.
-                state.minted_request_ids.lock().await.release(&request_id);
-                warn!("mediated authorization error: {error}");
-                return internal_json_error_response("chio_mediation_failed", &error.to_string());
-            }
+        kernel.authorize_tool_call_reserving_blocking_with_metadata_outcome(&kernel_request, None)
+    };
+    let response = match outcome {
+        Ok(chio_kernel::CallerReservationAuthorizationOutcome::Authorized(response)) => response,
+        Ok(chio_kernel::CallerReservationAuthorizationOutcome::Replayed(response)) => {
+            return mediated_authorization_response(response)
+        }
+        Err(KernelError::CallerReservationConflict(_)) => {
+            return mediated_request_id_conflict_response()
+        }
+        Err(error) => {
+            warn!("mediated authorization error: {error}");
+            return internal_json_error_response(
+                "chio_mediation_failed",
+                "mediated authorization failed",
+            );
         }
     };
-    // Only a successful reservation (Verdict::Allow) keeps its request-id claim: a
-    // denied or pending verdict placed no durable hold, so release the id to let
-    // the caller retry it without a spurious 409.
-    if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
-        state.minted_request_ids.lock().await.release(&request_id);
-    }
     if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
         // The reserve receipt persisted here is a local audit entry, not the
         // authoritative record. When the reserve SUCCEEDED (Verdict::Allow with a
@@ -560,32 +930,14 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             warn!("failed to persist mediated receipt: {error}");
             return internal_json_error_response(
                 "chio_receipt_persistence_failed",
-                &error.to_string(),
+                "mediated receipt persistence failed",
             );
         }
         warn!(
             "mediated reserve receipt persistence failed; returning minted nonce to caller: {error}"
         );
     }
-    // A successful authorization is `Verdict::Allow` with an incomplete terminal
-    // state (the tool has not run) and a minted nonce. It maps to the wire
-    // status "authorized": the reserved hold enforces budget and the caller
-    // presents the minted nonce to the real tool server. This route never
-    // completes or settles a spend, so no wire status implies a completed spend.
-    let status_str = match &response.verdict {
-        chio_kernel::Verdict::Allow => "authorized",
-        chio_kernel::Verdict::Deny => "deny",
-        chio_kernel::Verdict::PendingApproval => "pending_approval",
-    };
-    (
-        StatusCode::OK,
-        axum::Json(serde_json::json!({
-            "status": status_str,
-            "receipt": response.receipt,
-            "execution_nonce": response.execution_nonce,
-        })),
-    )
-        .into_response()
+    mediated_authorization_response(response)
 }
 
 /// `POST /v1/reconcile` request shape. The caller presents the execution nonce
@@ -594,6 +946,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
 /// names at `min(realized, reserved)` and returns an authoritative
 /// mediated-spend receipt.
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SidecarReconcileRequest {
     execution_nonce: SignedExecutionNonce,
     #[serde(default)]
@@ -612,8 +965,8 @@ pub(crate) struct SidecarReconcileRequest {
 /// verifies it (signature under the sidecar key, expiry, single-use replay),
 /// settles the exact reserved hold at `min(realized, reserved)`, releases the
 /// difference back to the grant, and signs a completed authoritative receipt.
-/// The `realized_cost` is the tool server's own report of what the call cost;
-/// binding it to an attested oracle cost is a later concern. Fail-closed: a
+/// The `realized_cost` is the tool server's own report and is not bound to an
+/// attested oracle cost at this boundary. Fail-closed: a
 /// forged, tampered, replayed, or argument-mismatched nonce, or a hold that is
 /// already closed, is rejected with a 4xx and never settles.
 pub(crate) async fn sidecar_reconcile_handler(
@@ -631,8 +984,8 @@ pub(crate) async fn sidecar_reconcile_handler(
     let parsed: SidecarReconcileRequest = match serde_json::from_slice(&body_bytes) {
         Ok(parsed) => parsed,
         Err(error) => {
-            return sidecar_bad_request(&format!("invalid reconcile payload: {error}"))
-                .into_response();
+            warn!("failed to decode reconcile payload: {error}");
+            return sidecar_bad_request("invalid reconcile payload").into_response();
         }
     };
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
@@ -672,7 +1025,7 @@ pub(crate) async fn sidecar_reconcile_handler(
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({
                     "error": "chio_reconcile_rejected",
-                    "message": error.to_string(),
+                    "message": "reconcile request was rejected",
                 })),
             )
                 .into_response();
@@ -703,7 +1056,7 @@ pub(crate) async fn sidecar_reconcile_handler(
 /// caller that authorizes but never reconciles cannot permanently burn budget.
 /// Returns the number of holds released; a sidecar without a configured budget
 /// store (no mediation kernel) releases nothing. Factored out of the startup
-/// interval task so it is directly unit-testable with a controlled clock.
+/// interval worker so it is directly unit-testable with a controlled clock.
 pub(crate) async fn reap_expired_reserved_holds_once(
     state: &Arc<ProxyState>,
     now_unix_secs: i64,
@@ -720,8 +1073,61 @@ pub(crate) async fn reap_expired_reserved_holds_once(
 mod tests {
     use super::*;
     use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
+    use chio_security_types::flow::{DeclassificationPurpose, InformationLabel, PrincipalId};
+    use chio_security_types::ports::{
+        DestinationId, Digest32, GrantId, RecordId, SessionId, TenantId,
+    };
+    use chio_security_types::{DeclassificationGrantBody, DeclassificationGrantClaims};
     use chio_test_support::prelude::*;
     use tower::ServiceExt;
+
+    struct TestMediationAdmissionConfig {
+        budget_path: String,
+        approval_path: String,
+        threshold_config: Option<ThresholdApprovalCollectorConfig>,
+    }
+
+    fn durable_mediation_budget_and_admission(
+        directory: &std::path::Path,
+        threshold_config: Option<ThresholdApprovalCollectorConfig>,
+    ) -> (Arc<dyn BudgetStore>, TestMediationAdmissionConfig) {
+        let budget_path = directory.join("budget.db");
+        let approval_path = directory.join("approvals.db");
+        let budget: Arc<dyn BudgetStore> = Arc::new(
+            chio_store_sqlite::budget_store::SqliteBudgetStore::open(&budget_path).test_unwrap(),
+        );
+        (
+            budget,
+            TestMediationAdmissionConfig {
+                budget_path: budget_path.to_string_lossy().into_owned(),
+                approval_path: approval_path.to_string_lossy().into_owned(),
+                threshold_config,
+            },
+        )
+    }
+
+    fn signed_declassification_grant() -> SignedDeclassificationGrant {
+        let id = |value: &str| RecordId::new(value).test_unwrap();
+        let body = DeclassificationGrantBody::new(DeclassificationGrantClaims {
+            grant_id: GrantId::new("grant-api-protect").test_unwrap(),
+            capability_id: id("capability-api-protect"),
+            tenant_id: TenantId::new("tenant-api-protect").test_unwrap(),
+            subject_id: PrincipalId::new("subject-api-protect").test_unwrap(),
+            agent_id: id("agent-api-protect"),
+            session_id: SessionId::new("session-api-protect").test_unwrap(),
+            source_label_hash: Digest32::new([1; 32]),
+            target_label: InformationLabel::bottom(),
+            destination_id: DestinationId::new("server-api-protect").test_unwrap(),
+            tool_name: id("tool-api-protect"),
+            purpose: DeclassificationPurpose::new("support").test_unwrap(),
+            request_hash: Digest32::new([2; 32]),
+            issued_at_unix_seconds: 100,
+            expires_at_unix_seconds: 200,
+            authority_key_id: id("authority-api-protect"),
+        })
+        .test_unwrap();
+        SignedDeclassificationGrant::sign(body, &Keypair::from_seed(&[7; 32])).test_unwrap()
+    }
 
     /// Build an ephemeral kernel used only to mint capabilities in tests. It
     /// shares the budget store with the state's mediation kernel; cost is never
@@ -733,8 +1139,17 @@ mod tests {
         trusted_capability_issuers: &[PublicKey],
     ) -> Arc<ChioKernel> {
         Arc::new(
-            build_mediation_kernel(signer, budget, trusted_capability_issuers, Vec::new(), None)
-                .test_unwrap(),
+            build_mediation_kernel(
+                signer,
+                budget,
+                None,
+                None,
+                trusted_capability_issuers,
+                Vec::new(),
+                None,
+                None,
+            )
+            .test_unwrap(),
         )
     }
 
@@ -869,6 +1284,7 @@ mod tests {
             hold_capable,
             None,
             None,
+            None,
         )
     }
 
@@ -886,8 +1302,62 @@ mod tests {
         hold_capable: bool,
         payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
         revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
+        admission_config: Option<TestMediationAdmissionConfig>,
     ) -> Arc<ProxyState> {
-        let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
+        let (approval_store, admission_authorities, threshold_config, kernel_receipt_store): (
+            Arc<dyn ApprovalStore>,
+            Option<MediationAdmissionAuthorities>,
+            Option<ThresholdApprovalCollectorConfig>,
+            Arc<dyn chio_kernel::ReceiptStore>,
+        ) = if let Some(config) = admission_config {
+            let kernel_receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
+                chio_store_sqlite::SqliteReceiptStore::open(&config.approval_path).test_unwrap(),
+            );
+            let approval_store: Arc<dyn ApprovalStore> = Arc::new(
+                SqliteApprovalStore::open_colocated_with_receipt_store(&config.approval_path)
+                    .test_unwrap(),
+            );
+            let authorities = build_mediation_admission_authorities(
+                &config.budget_path,
+                Arc::clone(&approval_store),
+                config.threshold_config.as_ref(),
+            )
+            .test_unwrap();
+            (
+                approval_store,
+                Some(authorities),
+                config.threshold_config,
+                kernel_receipt_store,
+            )
+        } else {
+            let authority_directory = chio_test_support::private_fs::private_tempdir(
+                "chio-api-protect-mediation-authorities-",
+            )
+            .test_unwrap()
+            .keep();
+            let receipt_path = authority_directory.join("receipts.db");
+            let budget_path = authority_directory
+                .join("budget.db")
+                .to_string_lossy()
+                .into_owned();
+            let kernel_receipt_store: Arc<dyn chio_kernel::ReceiptStore> =
+                Arc::new(chio_store_sqlite::SqliteReceiptStore::open(&receipt_path).test_unwrap());
+            let approval_store: Arc<dyn ApprovalStore> = Arc::new(
+                SqliteApprovalStore::open_colocated_with_receipt_store(&receipt_path).test_unwrap(),
+            );
+            let authorities = build_mediation_admission_authorities(
+                &budget_path,
+                Arc::clone(&approval_store),
+                None,
+            )
+            .test_unwrap();
+            (
+                approval_store,
+                Some(authorities),
+                None,
+                kernel_receipt_store,
+            )
+        };
         let signer_public_key = signer.public_key();
         let mut trusted_capability_issuers = trusted_capability_issuers;
         if !trusted_capability_issuers.contains(&signer_public_key) {
@@ -904,7 +1374,7 @@ mod tests {
         let http_client = client_builder_with_contract(&egress_contract)
             .build()
             .test_unwrap();
-        // One shared mediation kernel for the process, matching production wiring:
+        // One shared mediation kernel for the service lifetime:
         // reuse keeps the approval-token and DPoP replay stores authoritative and
         // makes the nonce minted on `/v1/evaluate` the one settled on
         // `/v1/reconcile`.
@@ -912,24 +1382,43 @@ mod tests {
             build_mediation_kernel(
                 &signer,
                 Arc::clone(&budget),
+                Some(kernel_receipt_store),
+                revocation_store.clone(),
                 &trusted_capability_issuers,
                 Vec::new(),
                 payment_adapter,
+                admission_authorities,
             )
             .test_unwrap(),
         );
+        let approval_admin = match threshold_config {
+            Some(config) => ApprovalAdmin::new_with_threshold_policy(
+                Arc::clone(&approval_store),
+                config.current_policy_hash,
+                config.trusted_policy_authorities,
+                config.request_context_resolver,
+            )
+            .test_unwrap(),
+            None => ApprovalAdmin::new(Arc::clone(&approval_store)),
+        };
+        let persisted_tool_receipts = receipt_store
+            .as_ref()
+            .map(|store| store.load_tool_receipts(&trusted_receipt_signers))
+            .transpose()
+            .test_unwrap()
+            .unwrap_or_default();
         Arc::new(ProxyState {
             evaluator,
             signer_keypair: signer,
             upstream: "http://127.0.0.1:1".to_string(),
             http_client,
             egress_contract,
-            approval_admin: ApprovalAdmin::new(approval_store),
+            approval_admin,
             receipt_log: Mutex::new(ReceiptLog {
                 receipts: Vec::new(),
             }),
             tool_receipt_log: Mutex::new(ToolReceiptLog {
-                receipts: Vec::new(),
+                receipts: persisted_tool_receipts,
             }),
             receipt_store: receipt_store.map(Mutex::new),
             revocation_store,
@@ -940,9 +1429,6 @@ mod tests {
             budget_store: Some(budget),
             mediation_hold_capable: hold_capable,
             mediation_kernel: Some(mediation_kernel),
-            minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
-                chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
-            )),
             reaper_handle: Mutex::new(None),
             allow_advisory: false,
             receipt_backend: "ephemeral",
@@ -966,8 +1452,8 @@ mod tests {
 
     use chio_core_types::capability::governance::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-        MeteredSettlementMode,
+        GovernedToolInvocationIntentBody, GovernedTransactionIntent, MeteredBillingContext,
+        MeteredBillingQuote, MeteredSettlementMode,
     };
     use chio_core_types::capability::scope::{Constraint, MonetaryAmount};
     use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
@@ -1009,6 +1495,51 @@ mod tests {
         };
         kernel
             .issue_capability(&agent.public_key(), scope, 3600)
+            .test_unwrap()
+    }
+
+    fn issue_governed_dpop_capability(
+        kernel: &Arc<ChioKernel>,
+        agent: &Keypair,
+        destinations: &[(&str, &str)],
+        max_per: u64,
+        max_total: u64,
+        currency: &str,
+        approval_threshold_units: u64,
+    ) -> CapabilityToken {
+        let grants = destinations
+            .iter()
+            .map(|(server, tool)| ToolGrant {
+                server_id: (*server).to_string(),
+                tool_name: (*tool).to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![
+                    Constraint::GovernedIntentRequired,
+                    Constraint::RequireApprovalAbove {
+                        threshold_units: approval_threshold_units,
+                    },
+                ],
+                max_invocations: None,
+                max_cost_per_invocation: Some(MonetaryAmount {
+                    units: max_per,
+                    currency: currency.to_string(),
+                }),
+                max_total_cost: Some(MonetaryAmount {
+                    units: max_total,
+                    currency: currency.to_string(),
+                }),
+                dpop_required: Some(true),
+            })
+            .collect();
+        kernel
+            .issue_capability(
+                &agent.public_key(),
+                ChioScope {
+                    grants,
+                    ..ChioScope::default()
+                },
+                3600,
+            )
             .test_unwrap()
     }
 
@@ -1064,7 +1595,7 @@ mod tests {
         units: u64,
         currency: &str,
     ) -> GovernedTransactionIntent {
-        GovernedTransactionIntent {
+        GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
             id: id.to_string(),
             server_id: server.to_string(),
             tool_name: tool.to_string(),
@@ -1079,7 +1610,7 @@ mod tests {
             call_chain: None,
             autonomy: None,
             context: None,
-        }
+        })
     }
 
     /// A governed intent that mandates prepayment: it carries a metered-billing
@@ -1098,7 +1629,10 @@ mod tests {
             .test_unwrap()
             .as_secs();
         let mut intent = governed_intent(id, server, tool, units, currency);
-        intent.metered_billing = Some(MeteredBillingContext {
+        intent
+            .as_tool_invocation_mut()
+            .test_expect("governed test intent is a tool invocation")
+            .metered_billing = Some(MeteredBillingContext {
             settlement_mode: MeteredSettlementMode::MustPrepay,
             quote: MeteredBillingQuote {
                 quote_id: format!("quote-{id}"),
@@ -1133,6 +1667,7 @@ mod tests {
                 approver: approver.public_key(),
                 subject: subject.clone(),
                 governed_intent_hash: intent.binding_hash().test_unwrap(),
+                threshold_proposal_hash: None,
                 request_id: request_id.to_string(),
                 issued_at: now.saturating_sub(1),
                 expires_at: now + 300,
@@ -1182,6 +1717,13 @@ mod tests {
         post_json(state, "/v1/evaluate", body).await
     }
 
+    async fn post_evaluate_raw(
+        state: Arc<ProxyState>,
+        body: &serde_json::Value,
+    ) -> (StatusCode, Vec<u8>) {
+        post_json_bytes_with_bearer(state, "/v1/evaluate", body, None).await
+    }
+
     /// POST a body to `/v1/reconcile` presenting the standard control token, so
     /// the reconcile control gate admits it, and return the status and JSON.
     async fn post_reconcile(
@@ -1205,6 +1747,17 @@ mod tests {
         body: &serde_json::Value,
         bearer: Option<&str>,
     ) -> (StatusCode, serde_json::Value) {
+        let (status, bytes) = post_json_bytes_with_bearer(state, uri, body, bearer).await;
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        (status, json)
+    }
+
+    async fn post_json_bytes_with_bearer(
+        state: Arc<ProxyState>,
+        uri: &str,
+        body: &serde_json::Value,
+        bearer: Option<&str>,
+    ) -> (StatusCode, Vec<u8>) {
         let mut builder = Request::builder()
             .method("POST")
             .uri(uri)
@@ -1222,8 +1775,7 @@ mod tests {
         let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
             .await
             .unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        (status, json)
+        (status, bytes.to_vec())
     }
 
     include!("mediated_authorization_tests.rs");

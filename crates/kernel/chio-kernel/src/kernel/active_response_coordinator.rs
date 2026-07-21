@@ -449,7 +449,9 @@ impl ChioKernel {
                         | AdmissionOperationState::DelegatedBudgetReserved
                         | AdmissionOperationState::PaymentAuthorized
                         | AdmissionOperationState::ReadyToDispatch
-                        | AdmissionOperationState::CapturePending => {
+                        | AdmissionOperationState::CapturePending
+                        | AdmissionOperationState::CallerReservationCapturePending
+                        | AdmissionOperationState::CallerReserved => {
                             return Err(active_response_internal(
                                 "governed active response entered a tool-dispatch-only state",
                             ));
@@ -723,7 +725,9 @@ impl ChioKernel {
                 | AdmissionOperationState::DelegatedBudgetReserved
                 | AdmissionOperationState::PaymentAuthorized
                 | AdmissionOperationState::ReadyToDispatch
-                | AdmissionOperationState::CapturePending => {
+                | AdmissionOperationState::CapturePending
+                | AdmissionOperationState::CallerReservationCapturePending
+                | AdmissionOperationState::CallerReserved => {
                     return Err(active_response_internal(
                         "governed active response entered a tool-dispatch-only state",
                     ));

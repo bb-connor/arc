@@ -440,10 +440,18 @@ fn archived_prefix_is_backed(
     let Some(archive_path) = latest_watermark_archive_path(connection)? else {
         return Ok(false);
     };
+    let Some(archive_identity) = latest_watermark_archive_sha256(connection)? else {
+        return Ok(false);
+    };
+    let Some(archive_content_sha256) = latest_watermark_archive_content_sha256(connection)? else {
+        return Ok(false);
+    };
     archive_path_backs_prefix(
         connection,
         &archive_path,
         sqlite_u64(watermark, "watermark")?,
+        &archive_identity,
+        &archive_content_sha256,
     )
 }
 
@@ -460,22 +468,54 @@ fn archived_prefix_is_backed(
 /// A row count is not proof: an archive holding the right `entry_seq` values but
 /// replaced or corrupted `raw_json` would satisfy a count while no longer
 /// matching the signed roots. Opens the archive read-only on its own connection.
-/// Any missing, unreadable, short, non-contiguous, or root-divergent archive
-/// returns false (never an error) so every caller falls back to full
-/// verification fail-closed.
+/// A missing archive, a refused open, an identity mismatch, or a canonical
+/// content mismatch returns false so the caller falls back to full verification
+/// fail-closed. A structurally hostile archive catalog is an integrity failure,
+/// not missing evidence, and propagates after the read snapshot begins.
 pub(crate) fn archive_path_backs_prefix(
     connection: &Connection,
     archive_path: &str,
     watermark: u64,
+    expected_archive_identity: &str,
+    expected_archive_content_sha256: &str,
 ) -> Result<bool, ReceiptStoreError> {
     if watermark == 0 {
         return Ok(false);
     }
-    let flags =
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX;
+    let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+        | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW;
     let Ok(archive) = rusqlite::Connection::open_with_flags(archive_path, flags) else {
         return Ok(false);
     };
+    archive.execute_batch("PRAGMA query_only = ON; BEGIN DEFERRED")?;
+    archive.query_row("SELECT COUNT(*) FROM main.sqlite_master", [], |row| {
+        row.get::<_, i64>(0)
+    })?;
+    if validate_retention_archive_identity(&archive, expected_archive_identity).is_err() {
+        return Ok(false);
+    }
+    crate::receipt_store::evidence_retention::validate_archive_schema_contract_in_schema(
+        &archive, "main",
+    )?;
+    if crate::receipt_store::evidence_retention::validate_retention_archive_prefix_content_sha256(
+        &archive,
+        "main",
+        sqlite_i64(watermark, "archive prefix watermark")?,
+        expected_archive_content_sha256,
+    )
+    .is_err()
+    {
+        return Ok(false);
+    }
+    archive_connection_backs_prefix(connection, &archive, watermark)
+}
+
+pub(crate) fn archive_connection_backs_prefix(
+    connection: &Connection,
+    archive: &Connection,
+    watermark: u64,
+) -> Result<bool, ReceiptStoreError> {
     let covered: Vec<PersistedCheckpointRow> = load_all_persisted_checkpoint_rows(connection)?
         .into_iter()
         .filter(|row| row.batch_end_seq <= watermark)
@@ -489,11 +529,160 @@ pub(crate) fn archive_path_backs_prefix(
         // Parse validates the signature and that the stored root matches the
         // signed body, so `body.merkle_root` is the authenticated root.
         let checkpoint = parse_persisted_checkpoint_row(row)?;
-        if !archive_batch_matches_signed_root(&archive, &checkpoint)? {
+        if !archive_batch_matches_signed_root(archive, &checkpoint)? {
             return Ok(false);
         }
     }
     Ok(true)
+}
+
+/// Resolve one tool receipt from the archive named by the trusted retention
+/// watermark. The archive is held in one read transaction while its complete
+/// checkpointed prefix is re-derived and the exact source/log projection is
+/// loaded, so a replaced or concurrently rewritten archive cannot pass one
+/// verification read and supply different bytes to the point lookup.
+///
+/// A tombstone is the live store's authoritative evidence that an id was
+/// archived. If that tombstone exists, any missing or divergent archive row is
+/// corruption rather than an ordinary point-lookup miss and fails closed.
+pub(crate) fn load_trusted_archived_chio_receipt(
+    connection: &Connection,
+    receipt_id: &str,
+) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+    let Some(watermark) = retention_watermark(connection)? else {
+        return Ok(None);
+    };
+    if watermark == 0 {
+        return Ok(None);
+    }
+    let tombstone = connection
+        .query_row(
+            "SELECT receipt_kind, archived_through_entry_seq \
+             FROM receipt_retention_tombstones WHERE receipt_id = ?1",
+            params![receipt_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+        )
+        .optional()?;
+    let Some((receipt_kind, tombstone_watermark)) = tombstone else {
+        return Ok(None);
+    };
+    if receipt_kind != "tool_receipt" {
+        return Ok(None);
+    }
+    let tombstone_watermark = sqlite_positive_u64(
+        tombstone_watermark,
+        "archived tool receipt tombstone watermark",
+    )?;
+    if tombstone_watermark > watermark {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "archived tool receipt `{receipt_id}` tombstone watermark {tombstone_watermark} exceeds retention watermark {watermark}"
+        )));
+    }
+    let watermark_i64 = sqlite_i64(watermark, "archived tool receipt watermark")?;
+    let boundary_matches: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM kernel_checkpoints WHERE batch_end_seq = ?1)",
+        params![watermark_i64],
+        |row| row.get(0),
+    )?;
+    let live_prefix_present: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM claim_receipt_log_entries WHERE entry_seq <= ?1)",
+        params![watermark_i64],
+        |row| row.get(0),
+    )?;
+    if !boundary_matches || live_prefix_present {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "archived tool receipt `{receipt_id}` is bound to an untrusted retention watermark"
+        )));
+    }
+    let archive_path = latest_watermark_archive_path(connection)?.ok_or_else(|| {
+        ReceiptStoreError::Conflict(format!(
+            "archived tool receipt `{receipt_id}` has no retention archive path"
+        ))
+    })?;
+    let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+        | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW;
+    let archive = rusqlite::Connection::open_with_flags(&archive_path, flags).map_err(|error| {
+        ReceiptStoreError::Conflict(format!(
+            "archived tool receipt `{receipt_id}` cannot open retention archive {archive_path:?}: {error}"
+        ))
+    })?;
+    let archive_read = archive.unchecked_transaction()?;
+    let expected_archive_identity =
+        latest_watermark_archive_sha256(connection)?.ok_or_else(|| {
+            ReceiptStoreError::Conflict(
+                "trusted archived receipt lookup requires a committed archive identity".to_string(),
+            )
+        })?;
+    let expected_archive_content_sha256 = latest_watermark_archive_content_sha256(connection)?
+        .ok_or_else(|| {
+            ReceiptStoreError::Conflict(
+                "trusted archived receipt lookup requires a committed canonical archive content \
+                 digest"
+                    .to_string(),
+            )
+        })?;
+    validate_retention_archive_identity(&archive_read, &expected_archive_identity)?;
+    crate::receipt_store::evidence_retention::validate_retention_archive_prefix_content_sha256(
+        &archive_read,
+        "main",
+        watermark_i64,
+        &expected_archive_content_sha256,
+    )?;
+    if !archive_connection_backs_prefix(connection, &archive_read, watermark)? {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "archived tool receipt `{receipt_id}` is not backed by the signed retention prefix"
+        )));
+    }
+    let entry_seq = archive_read
+        .query_row(
+            "SELECT entry_seq FROM claim_receipt_log_entries WHERE receipt_id = ?1",
+            params![receipt_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+        .ok_or_else(|| {
+            ReceiptStoreError::Conflict(format!(
+                "archived tool receipt `{receipt_id}` is missing its claim-log projection"
+            ))
+        })?;
+    let entry_seq = sqlite_positive_u64(entry_seq, "archived tool receipt entry_seq")?;
+    if entry_seq > tombstone_watermark || entry_seq > watermark {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "archived tool receipt `{receipt_id}` entry_seq {entry_seq} exceeds tombstone watermark {tombstone_watermark} or retention watermark {watermark}"
+        )));
+    }
+    let log_projection = load_claim_receipt_log_projection_row(&archive_read, receipt_id)?
+        .ok_or_else(|| {
+            ReceiptStoreError::Conflict(format!(
+                "archived tool receipt `{receipt_id}` lost its claim-log projection"
+            ))
+        })?;
+    let source_projection =
+        load_tool_claim_receipt_projection_row_by_id(&archive_read, receipt_id)?.ok_or_else(
+            || {
+                ReceiptStoreError::Conflict(format!(
+                    "archived tool receipt `{receipt_id}` lost its exact source row"
+                ))
+            },
+        )?;
+    if !log_projection.matches_projection_or_enrichment(&source_projection) {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "archived tool receipt `{receipt_id}` diverges from its signed claim-log projection"
+        )));
+    }
+    let receipt = decode_verified_chio_receipt(
+        &source_projection.raw_json,
+        "archived tool receipt",
+        Some(entry_seq),
+    )?;
+    if receipt.id != receipt_id {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "archived tool receipt id `{}` does not match requested id `{receipt_id}`",
+            receipt.id
+        )));
+    }
+    Ok(Some(receipt))
 }
 
 /// Re-derive the Merkle root of `checkpoint`'s batch range from the archived

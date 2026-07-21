@@ -82,7 +82,8 @@ impl Drop for ScopedKernelDispatchIntent {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ReceiptFederationAdmission {
     pub remote_kernel_id: Option<String>,
     pub peer: Option<chio_federation::trust_establishment::FederationPeer>,

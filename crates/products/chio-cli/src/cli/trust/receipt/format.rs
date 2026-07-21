@@ -67,11 +67,16 @@ pub(crate) fn push_writer_counters_human(
         writer.committed_total
     ));
     lines.push(format!("writer_failed_total: {}", writer.failed_total));
+    lines.push(format!("writer_timeout_total: {}", writer.timeout_total));
     lines.push(format!(
         "writer_saturated_total: {}",
         writer.saturated_total
     ));
     lines.push(format!("writer_inflight: {}", writer.inflight));
+    lines.push(format!(
+        "writer_timed_out_inflight: {}",
+        writer.timed_out_inflight
+    ));
     lines.push(format!(
         "writer_last_commit_unix_ms: {}",
         optional_u64(writer.last_commit_unix_ms)

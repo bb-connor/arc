@@ -399,8 +399,10 @@ impl ChioKernel {
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
             signing_task,
             settlement_observer: None,
+            settlement_observer_recovery: None,
             settlement_retry_store: None,
             settlement_retry_policy: chio_settle::RetryPolicy::default(),
+            caller_reservation_reap_cursor: Mutex::new(None),
             budget_hold_sweep: None,
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
@@ -672,21 +674,6 @@ impl ChioKernel {
         self.revocation_view.as_ref()
     }
 
-    /// Borrow the kernel's mpsc-backed signing-task handle.
-    ///
-    /// Internal callers submit `ChioReceiptBody` payloads through this handle
-    /// and `.await` the signed `ChioReceipt`. The underlying tokio task is
-    /// spawned lazily on the first call.
-    ///
-    /// Not exposed publicly: callers should go through
-    /// [`Self::sign_receipt_via_channel`] or the `ToolEvaluator` trait so the
-    /// channel boundary stays an implementation detail of the kernel crate.
-    /// Crash-recovery tests reach this directly.
-    #[allow(dead_code)]
-    pub(crate) fn signing_task_handle(&self) -> &signing_task::SigningTaskHandle {
-        &self.signing_task
-    }
-
     /// Sign a [`ChioReceiptBody`] off the kernel critical path via the
     /// mpsc-backed signing task.
     ///
@@ -706,8 +693,8 @@ impl ChioKernel {
     ///
     /// `canonical_content` is the exact byte preimage `body.content_hash` was
     /// derived from. The signing task recomputes `sha256_hex(canonical_content)`
-    /// inside the trust boundary and refuses to sign on mismatch (WYSIWYS,
-    /// ), so this channel path is as fail-closed as the inline
+    /// inside the trust boundary and refuses to sign on mismatch (WYSIWYS),
+    /// so this channel path is as fail-closed as the inline
     /// `build_and_sign_receipt` path.
     pub async fn sign_receipt_via_channel(
         &self,
@@ -833,6 +820,45 @@ impl ChioKernel {
         Ok(())
     }
 
+    /// Recover unresolved tool-dispatch admissions using the installed durable
+    /// operation, budget, and approval authorities. This recovery is independent
+    /// of threshold policy activation and is safe to retry.
+    pub fn recover_tool_dispatch_admission_operations(&self) -> Result<usize, KernelError> {
+        let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal(
+                "durable admission operation store authority is required".to_string(),
+            )
+        })?;
+        Self::validate_admission_operation_store_profile(
+            operation_store.authority_profile(),
+            self.dispatch_worker_count,
+        )?;
+        let approval_store = self.approval_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable approval store authority is required".to_string())
+        })?;
+        Self::validate_approval_store_profile(
+            approval_store.authority_profile(),
+            self.dispatch_worker_count,
+        )?;
+        if !self
+            .budget_store
+            .authority_profile()
+            .supports_dispatch_workers(self.dispatch_worker_count)
+        {
+            return Err(KernelError::Internal(
+                "durable budget store authority is required for tool-dispatch admission recovery"
+                    .to_string(),
+            ));
+        }
+        self.recover_nonterminal_admission_kind_with_authorities(
+            operation_store.as_ref(),
+            self.budget_store.as_ref(),
+            Some(approval_store.as_ref()),
+            crate::admission_operation::AdmissionOperationKind::ToolDispatch,
+            &format!("kernel:{}", self.public_key().to_hex()),
+        )
+    }
+
     /// Activate threshold admission only after all durable authorities are installed.
     pub fn enable_threshold_governed_approvals(&mut self) -> Result<(), KernelError> {
         self.require_no_atomic_security_runtime_publication()?;
@@ -890,13 +916,7 @@ impl ChioKernel {
                 ));
             }
         }
-        self.recover_nonterminal_admission_kind_with_authorities(
-            operation_store.as_ref(),
-            self.budget_store.as_ref(),
-            Some(approval_store.as_ref()),
-            crate::admission_operation::AdmissionOperationKind::ToolDispatch,
-            &format!("kernel:{}", self.public_key().to_hex()),
-        )?;
+        self.recover_tool_dispatch_admission_operations()?;
         self.threshold_governed_approvals_enabled = true;
         Ok(())
     }
@@ -960,11 +980,19 @@ impl ChioKernel {
         // any worker installed on the way are rolled back so a failed attach
         // never leaves a store serving (fail-closed), exactly as if the
         // attach had been refused up front.
-        self.receipt_store = Some(Arc::clone(&receipt_store));
+        let previous_receipt_store = self.receipt_store.replace(Arc::clone(&receipt_store));
+        let previous_retention_maintenance = self.retention_maintenance.take();
+        let previous_dispatch_intent_recovery = self.dispatch_intent_recovery.take();
+        let previous_settlement_observer_recovery =
+            self.settlement_observer_recovery.take();
         if let Err(error) = self.finish_receipt_store_attach(receipt_store) {
-            self.receipt_store = None;
+            self.receipt_store = previous_receipt_store;
             self.retention_maintenance = None;
             self.dispatch_intent_recovery = None;
+            self.settlement_observer_recovery = None;
+            self.retention_maintenance = previous_retention_maintenance;
+            self.dispatch_intent_recovery = previous_dispatch_intent_recovery;
+            self.settlement_observer_recovery = previous_settlement_observer_recovery;
             return Err(error);
         }
         Ok(())
@@ -974,6 +1002,50 @@ impl ChioKernel {
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
+        if self.settlement_observer.is_some() {
+            if !receipt_store.supports_durable_settlement_observer_outbox()
+                || !receipt_store.supports_authoritative_chio_receipt_lookup()
+            {
+                return Err(KernelError::Internal(
+                    "settlement observer requires a durable receipt store with authoritative lookup and atomic observer outbox support"
+                        .to_string(),
+                ));
+            }
+            let receipt_identity = receipt_store
+                .durable_storage_identity()?
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "settlement observer receipt store omitted durable storage identity"
+                            .to_string(),
+                    )
+                })?;
+            let retry_store = self.settlement_retry_store.as_deref().ok_or_else(|| {
+                KernelError::Internal(
+                    "settlement observer lost its durable retry store".to_string(),
+                )
+            })?;
+            if !retry_store.supports_durable_settlement_retry() {
+                return Err(KernelError::Internal(
+                    "settlement observer retry store is not crash durable".to_string(),
+                ));
+            }
+            let retry_identity = retry_store
+                .durable_storage_identity()
+                .map_err(|error| KernelError::Internal(error.to_string()))?
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "settlement observer retry store omitted durable storage identity"
+                            .to_string(),
+                    )
+                })?;
+            if receipt_identity != retry_identity {
+                return Err(KernelError::Internal(
+                    "settlement observer receipt outbox and retry store use different commit domains"
+                        .to_string(),
+                ));
+            }
+            self.recover_settlement_observer_outboxes()?;
+        }
         // Resolve the money path first: every incomplete payment-journal row
         // reaches a terminal outcome before the intent pass below runs, so
         // that pass consults settled journal state instead of racing it. No
@@ -981,10 +1053,14 @@ impl ChioKernel {
         // applies.
         if self.payment_journal_active() {
             let journal_report = self.reconcile_payment_journal(0)?;
-            if journal_report.resolved > 0 || journal_report.reconcile_failed > 0 {
+            if journal_report.resolved > 0
+                || journal_report.reconcile_failed > 0
+                || journal_report.deferred_to_admission_operation > 0
+            {
                 tracing::warn!(
                     resolved = journal_report.resolved,
                     reconcile_failed = journal_report.reconcile_failed,
+                    deferred_to_admission_operation = journal_report.deferred_to_admission_operation,
                     "payment journal rows survived a restart; reconciled before serving"
                 );
             }
@@ -1148,6 +1224,9 @@ impl ChioKernel {
                     crate::receipt_store::DISPATCH_INTENT_RECOVERY_INTERVAL,
                 )
             });
+        if self.settlement_observer.is_some() {
+            self.settlement_observer_recovery = self.spawn_settlement_observer_recovery();
+        }
         Ok(())
     }
 }

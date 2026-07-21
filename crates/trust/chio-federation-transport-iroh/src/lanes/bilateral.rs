@@ -548,6 +548,22 @@ where
 }
 
 impl BilateralCoSigningProtocol for IrohBilateralCoSigner {
+    fn supports_complete_receipt_cosigning_profile(&self) -> bool {
+        false
+    }
+
+    fn supports_idempotent_receipt_cosigning(&self) -> bool {
+        true
+    }
+
+    fn maximum_receipt_cosigning_duration(&self) -> Option<std::time::Duration> {
+        self.limits
+            .accept_stream_timeout
+            .checked_mul(2)
+            .and_then(|duration| duration.checked_add(self.limits.write_timeout))
+            .and_then(|duration| duration.checked_add(self.limits.read_timeout))
+    }
+
     fn request_cosignature(
         &self,
         request: &chio_federation::bilateral::CoSigningRequest,

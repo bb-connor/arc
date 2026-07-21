@@ -49,6 +49,9 @@ pub enum AdmissionOperationError {
     #[error("invalid admission operation: {0}")]
     Invalid(String),
 
+    #[error("admission operation conflict: {0}")]
+    Conflict(String),
+
     #[error("admission operation arithmetic overflow: {0}")]
     Overflow(String),
 
@@ -91,8 +94,10 @@ pub enum AdmissionOperationState {
     ApprovalReserved,
     ReadyToDispatch,
     CapturePending,
+    CallerReservationCapturePending,
     CompensationPending,
     DispatchCommitted,
+    CallerReserved,
     Completed,
     CompensatedBeforeDispatch,
     OutcomeUnknownAfterDispatch,
@@ -109,8 +114,10 @@ impl AdmissionOperationState {
             Self::ApprovalReserved => "approval_reserved",
             Self::ReadyToDispatch => "ready_to_dispatch",
             Self::CapturePending => "capture_pending",
+            Self::CallerReservationCapturePending => "caller_reservation_capture_pending",
             Self::CompensationPending => "compensation_pending",
             Self::DispatchCommitted => "dispatch_committed",
+            Self::CallerReserved => "caller_reserved",
             Self::Completed => "completed",
             Self::CompensatedBeforeDispatch => "compensated_before_dispatch",
             Self::OutcomeUnknownAfterDispatch => "outcome_unknown_after_dispatch",
@@ -127,8 +134,12 @@ impl AdmissionOperationState {
             "approval_reserved" => Some(Self::ApprovalReserved),
             "ready_to_dispatch" => Some(Self::ReadyToDispatch),
             "capture_pending" => Some(Self::CapturePending),
+            "caller_reservation_capture_pending" => {
+                Some(Self::CallerReservationCapturePending)
+            }
             "compensation_pending" => Some(Self::CompensationPending),
             "dispatch_committed" => Some(Self::DispatchCommitted),
+            "caller_reserved" => Some(Self::CallerReserved),
             "completed" => Some(Self::Completed),
             "compensated_before_dispatch" => Some(Self::CompensatedBeforeDispatch),
             "outcome_unknown_after_dispatch" => Some(Self::OutcomeUnknownAfterDispatch),
@@ -702,6 +713,8 @@ pub enum AdmissionCleanupActionKind {
     Approval,
     ExecutionNonce,
     Broker,
+    CallerReservationHandoffIntent,
+    CallerReservationHandoff,
     TerminalReceipt,
 }
 
@@ -714,6 +727,8 @@ impl AdmissionCleanupActionKind {
             Self::Approval => "approval",
             Self::ExecutionNonce => "execution_nonce",
             Self::Broker => "broker",
+            Self::CallerReservationHandoffIntent => "caller_reservation_handoff_intent",
+            Self::CallerReservationHandoff => "caller_reservation_handoff",
             Self::TerminalReceipt => "terminal_receipt",
         }
     }
@@ -726,6 +741,10 @@ impl AdmissionCleanupActionKind {
             "approval" => Some(Self::Approval),
             "execution_nonce" => Some(Self::ExecutionNonce),
             "broker" => Some(Self::Broker),
+            "caller_reservation_handoff_intent" => {
+                Some(Self::CallerReservationHandoffIntent)
+            }
+            "caller_reservation_handoff" => Some(Self::CallerReservationHandoff),
             "terminal_receipt" => Some(Self::TerminalReceipt),
             _ => None,
         }
@@ -1039,6 +1058,39 @@ pub trait AdmissionOperationStore: Send + Sync {
         operation_id: &str,
     ) -> Result<Option<AdmissionOperation>, AdmissionOperationError>;
 
+    /// Return a bounded deterministic inventory for one caller request id.
+    /// Exact caller-reservation replay uses this index before any new admission
+    /// effect. More than one row is intentionally returned so the replay gate
+    /// can reject an ambiguous or reused request id without choosing a row.
+    fn load_by_request_id(
+        &self,
+        kind: AdmissionOperationKind,
+        request_id: &str,
+        limit: usize,
+    ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
+        if let Some(delegate) = self.cleanup_journal_delegate() {
+            return delegate.load_by_request_id(kind, request_id, limit);
+        }
+        Err(AdmissionOperationError::Unavailable(
+            "exact admission operation lookup by request id is unavailable".to_string(),
+        ))
+    }
+
+    /// Resolve the one immutable admission operation that owns a budget hold.
+    /// Concrete durable stores must enforce uniqueness for every non-null
+    /// `budget_hold_id`; returning an arbitrary match is not permitted.
+    fn load_by_budget_hold_id(
+        &self,
+        budget_hold_id: &str,
+    ) -> Result<Option<AdmissionOperation>, AdmissionOperationError> {
+        if let Some(delegate) = self.cleanup_journal_delegate() {
+            return delegate.load_by_budget_hold_id(budget_hold_id);
+        }
+        Err(AdmissionOperationError::Unavailable(
+            "exact admission operation lookup by budget hold is unavailable".to_string(),
+        ))
+    }
+
     /// Return a bounded, deterministic inventory of operations that still
     /// require recovery or reconciliation.
     fn list_unresolved(
@@ -1051,6 +1103,43 @@ pub trait AdmissionOperationStore: Send + Sync {
         }
         Err(AdmissionOperationError::Unavailable(
             "unresolved admission operation inventory is unavailable".to_string(),
+        ))
+    }
+
+    /// Return one bounded activation-recovery batch with mutable operations
+    /// first, incomplete caller handoffs second, and completed caller handoffs
+    /// last. Outcome-unknown rows are excluded because their TerminalReceipt
+    /// outboxes are recovered by the dedicated forward-only path.
+    fn list_admission_recovery_candidates(
+        &self,
+        kind: AdmissionOperationKind,
+        limit: usize,
+    ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
+        if let Some(delegate) = self.cleanup_journal_delegate() {
+            return delegate.list_admission_recovery_candidates(kind, limit);
+        }
+        Err(AdmissionOperationError::Unavailable(
+            "prioritized admission recovery inventory is unavailable".to_string(),
+        ))
+    }
+
+    /// Return a bounded deterministic page of nonterminal caller-reservation
+    /// operations that can require expiry terminalization. Expiry is deliberately
+    /// not evaluated by the store: the only authoritative deadline is inside the
+    /// signed handoff intent and must be verified by the kernel. The exclusive
+    /// operation-id cursor lets repeated bounded calls cross arbitrarily large
+    /// mixtures of unexpired, damaged, and terminalizable rows without starvation.
+    fn list_caller_reservation_reap_candidates(
+        &self,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
+        if let Some(delegate) = self.cleanup_journal_delegate() {
+            return delegate
+                .list_caller_reservation_reap_candidates(after_operation_id, limit);
+        }
+        Err(AdmissionOperationError::Unavailable(
+            "caller reservation reap inventory is unavailable".to_string(),
         ))
     }
 

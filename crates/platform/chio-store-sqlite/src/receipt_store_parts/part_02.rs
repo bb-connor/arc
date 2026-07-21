@@ -1,16 +1,49 @@
-/// Writer-actor head snapshot exposed to `flush_report` and diagnostics.
-/// Values are read from the health struct's atomics, written
-/// only by the actor thread.
+const SETTLEMENT_OBSERVER_OUTBOX_RECEIPT_ID_MAX_BYTES: usize = 512;
+const SETTLEMENT_OBSERVER_OUTBOX_CLAIM_TOKEN_MAX_BYTES: usize = 512;
+const SETTLEMENT_OBSERVER_OUTBOX_STAGED_STATUS_MAX_BYTES: usize = 65_536;
+const SETTLEMENT_OBSERVER_OUTBOX_LAST_ERROR_MAX_BYTES: usize = 2_048;
+
+fn validate_settlement_observer_outbox_text(
+    value: &str,
+    field: &str,
+    max_bytes: usize,
+) -> Result<(), ReceiptStoreError> {
+    if value.trim().is_empty() {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "settlement-observer outbox {field} must not be empty"
+        )));
+    }
+    if value.len() > max_bytes {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "settlement-observer outbox {field} exceeds {max_bytes} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn truncate_settlement_observer_outbox_error(value: &str) -> String {
+    if value.len() <= SETTLEMENT_OBSERVER_OUTBOX_LAST_ERROR_MAX_BYTES {
+        return value.to_string();
+    }
+    let mut end = SETTLEMENT_OBSERVER_OUTBOX_LAST_ERROR_MAX_BYTES;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    value[..end].to_string()
+}
+
+/// Writer-actor checkpoint head consumed by production flush reporting.
+pub(crate) struct WriterCheckpointSnapshot {
+    pub(crate) checkpoint_seq: u64,
+    pub(crate) checkpointed_entry_seq: u64,
+}
+
+/// Complete writer head exposed only to in-crate verification.
+#[cfg(test)]
 pub(crate) struct WriterHeadSnapshot {
     pub(crate) checkpoint_seq: u64,
     pub(crate) checkpointed_entry_seq: u64,
-    // Read only by tests (`incremental_append_updates_the_head_and_stays_correct`,
-    // `writer_routed_inserts_do_not_false_conflict_the_next_append`): they
-    // cross-check the actor-maintained head against a full re-verification.
-    // `flush_report` does not need the claim-log counters today.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) claim_log_count: u64,
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) claim_log_max_seq: u64,
 }
 
@@ -194,6 +227,7 @@ fn catch_up_verified_head_to(
     head: &mut VerifiedHead,
     latest_seq: u64,
 ) -> Result<(), ReceiptStoreError> {
+    let retention_watermark = trusted_retention_watermark(connection)?;
     let mut cursor = head.checkpoint_seq();
     while cursor < latest_seq {
         let next_seq = cursor.saturating_add(1);
@@ -210,7 +244,9 @@ fn catch_up_verified_head_to(
             }
             None => validate_checkpoint_base(&checkpoint)?,
         }
-        validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        if checkpoint.body.batch_end_seq > retention_watermark {
+            validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        }
         // Projection validation before adoption: the
         // catch-up path verified signature + predecessor + claim-log range but
         // not the transparency projection rows that full
@@ -255,46 +291,26 @@ fn append_receipt_batch(
     head: &mut VerifiedHead,
     incremental_verification: bool,
     requests: &[ReceiptCommitRequest],
-) -> Vec<Result<u64, ReceiptStoreError>> {
-    let mut connection = match pool.get() {
-        Ok(connection) => connection,
-        Err(error) => {
-            return receipt_batch_error_results(
-                requests.len(),
-                ReceiptStoreError::Pool(error.to_string()),
-            );
-        }
-    };
-    if let Err(error) = ensure_checkpoint_transparency_guards(&connection) {
-        return receipt_batch_error_results(requests.len(), error);
-    }
+) -> Result<Vec<Result<u64, ReceiptStoreError>>, ReceiptStoreError> {
+    let mut connection = pool
+        .get()
+        .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
+    ensure_checkpoint_transparency_guards(&connection)?;
     if incremental_verification {
         // O(1) predecessor check (+ bounded catch-up), not a chain rebuild.
-        if let Err(error) = verify_head_against_latest_checkpoint(&connection, head) {
-            return receipt_batch_error_results(requests.len(), error);
-        }
-    } else if let Err(error) = validate_claim_receipt_log_entries(&connection) {
-        return receipt_batch_error_results(requests.len(), error);
+        verify_head_against_latest_checkpoint(&connection, head)?;
+    } else {
+        validate_claim_receipt_log_entries(&connection)?;
     }
-    let tx = match connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate) {
-        Ok(tx) => tx,
-        Err(error) => {
-            return receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error));
-        }
-    };
+    let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     if !incremental_verification {
-        if let Err(error) = verify_latest_checkpoint_integrity(&tx) {
-            return receipt_batch_error_results(requests.len(), error);
-        }
+        verify_latest_checkpoint_integrity(&tx)?;
     }
     // Baseline inside the IMMEDIATE tx: rows another store instance committed
     // since our last look are adopted as pre-existing, so the cross-check
     // below measures exactly what THIS batch inserted.
     let (pre_delta, baseline_max) =
-        match claim_log_delta_count_and_max_seq(&tx, head.claim_log_max_seq) {
-            Ok(pair) => pair,
-            Err(error) => return receipt_batch_error_results(requests.len(), error),
-        };
+        claim_log_delta_count_and_max_seq(&tx, head.claim_log_max_seq)?;
     // Validate the ADOPTED baseline delta before trusting it. Rows another
     // store instance committed since our last look
     // (head.claim_log_max_seq + 1 ..= baseline_max) are absorbed as
@@ -305,11 +321,7 @@ fn append_receipt_batch(
     // single-writer hot path the head is never stale, so pre_delta is 0 and
     // this is a no-op (zero added cost).
     if pre_delta > 0 {
-        if let Err(error) =
-            validate_adopted_claim_log_delta(&tx, head.claim_log_max_seq, baseline_max)
-        {
-            return receipt_batch_error_results(requests.len(), error);
-        }
+        validate_adopted_claim_log_delta(&tx, head.claim_log_max_seq, baseline_max)?;
     }
     let mut results = Vec::with_capacity(requests.len());
     for request in requests {
@@ -328,17 +340,10 @@ fn append_receipt_batch(
         // contiguous - and the loop continues with the others. Two extra SQL
         // statements per record: O(1) per record, O(b) per batch, never a
         // full-history scan, so the flat per-append cost holds.
-        if let Err(error) = tx.execute_batch("SAVEPOINT chio_append_record") {
-            return receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error));
-        }
+        tx.execute_batch("SAVEPOINT chio_append_record")?;
         match append_single_receipt_record(&tx, request) {
             Ok(seq) => {
-                if let Err(error) = tx.execute_batch("RELEASE chio_append_record") {
-                    return receipt_batch_error_results(
-                        requests.len(),
-                        ReceiptStoreError::Sqlite(error),
-                    );
-                }
+                tx.execute_batch("RELEASE chio_append_record")?;
                 results.push(Ok(seq));
             }
             Err(error) => {
@@ -346,14 +351,9 @@ fn append_receipt_batch(
                 // for the others. A savepoint that will not unwind is a
                 // transaction-integrity fault, so fail the whole batch closed in
                 // that (unexpected) case.
-                if let Err(rollback) =
-                    tx.execute_batch("ROLLBACK TO chio_append_record; RELEASE chio_append_record")
-                {
-                    return receipt_batch_error_results(
-                        requests.len(),
-                        ReceiptStoreError::Sqlite(rollback),
-                    );
-                }
+                tx.execute_batch(
+                    "ROLLBACK TO chio_append_record; RELEASE chio_append_record",
+                )?;
                 results.push(Err(error));
             }
         }
@@ -378,18 +378,11 @@ fn append_receipt_batch(
     // O(b) projection cross-check over the delta only: the claim-log
     // projection triggers (bootstrap/open.rs:676 tool, :711 child) must have
     // advanced the projection by exactly the rows this batch inserted.
-    let (delta_count, post_max) = match claim_log_delta_count_and_max_seq(&tx, baseline_max) {
-        Ok(pair) => pair,
-        Err(error) => return receipt_batch_error_results(requests.len(), error),
-    };
+    let (delta_count, post_max) = claim_log_delta_count_and_max_seq(&tx, baseline_max)?;
     if delta_count != inserted || post_max < baseline_max {
-        return receipt_batch_error_results(
-            requests.len(),
-            ReceiptStoreError::Conflict(
-                "claim receipt log projection drift on append; run `chio receipt audit`"
-                    .to_string(),
-            ),
-        );
+        return Err(ReceiptStoreError::Conflict(
+            "claim receipt log projection drift on append; run `chio receipt audit`".to_string(),
+        ));
     }
     // Validate the NEWLY-projected rows before advancing the head. The
     // count/MAX cross-check above only proves the projection
@@ -407,21 +400,15 @@ fn append_receipt_batch(
     // batch projects nothing, so this is a no-op). Fail-closed: a divergent row
     // returns the Conflict before `tx.commit()`, so the head never advances.
     if delta_count > 0 {
-        if let Err(error) = validate_adopted_claim_log_delta(&tx, baseline_max, post_max) {
-            return receipt_batch_error_results(requests.len(), error);
-        }
+        validate_adopted_claim_log_delta(&tx, baseline_max, post_max)?;
     }
-    match tx.commit() {
-        Ok(()) => {
-            head.claim_log_count = head
-                .claim_log_count
-                .saturating_add(pre_delta)
-                .saturating_add(delta_count);
-            head.claim_log_max_seq = post_max.max(baseline_max);
-            results
-        }
-        Err(error) => receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error)),
-    }
+    tx.commit()?;
+    head.claim_log_count = head
+        .claim_log_count
+        .saturating_add(pre_delta)
+        .saturating_add(delta_count);
+    head.claim_log_max_seq = post_max.max(baseline_max);
+    Ok(results)
 }
 
 fn receipt_batch_error_results(
@@ -472,6 +459,36 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         }
         ReceiptStoreError::Conflict(message) => ReceiptStoreError::Conflict(message.clone()),
         ReceiptStoreError::NotFound(message) => ReceiptStoreError::NotFound(message.clone()),
+        ReceiptStoreError::RetentionArchiveIncomplete {
+            table,
+            live,
+            archived,
+        } => ReceiptStoreError::RetentionArchiveIncomplete {
+            table,
+            live: *live,
+            archived: *archived,
+        },
+        ReceiptStoreError::RetentionWatermarkRegression { attempted, current } => {
+            ReceiptStoreError::RetentionWatermarkRegression {
+                attempted: *attempted,
+                current: *current,
+            }
+        }
+        ReceiptStoreError::ArchivedRangeProjection { watermark } => {
+            ReceiptStoreError::ArchivedRangeProjection {
+                watermark: *watermark,
+            }
+        }
+        ReceiptStoreError::RetentionTenantScopeUnsupported => {
+            ReceiptStoreError::RetentionTenantScopeUnsupported
+        }
+        ReceiptStoreError::WriterDead {
+            restarts,
+            last_error,
+        } => ReceiptStoreError::WriterDead {
+            restarts: *restarts,
+            last_error: last_error.clone(),
+        },
     }
 }
 
@@ -499,7 +516,9 @@ fn receipt_writer_job_panic_error(payload: &(dyn std::any::Any + Send)) -> Recei
 /// the unwind in the actor loop, which fans out the returned error to them
 /// after this. This mirrors `receipt_batch_error_results`'s uniform fan-out and
 /// the health bookkeeping `commit_receipt_batch` would otherwise have performed
-/// itself.
+/// itself. The batch's moved inflight leases drop during unwind before this
+/// function runs, so this path updates result counters and sends errors without
+/// a second aggregate inflight decrement.
 fn fan_out_batch_panic_error(
     health: &ReceiptCommitWriterHealth,
     request_responses: Vec<mpsc::SyncSender<Result<u64, ReceiptStoreError>>>,
@@ -507,7 +526,6 @@ fn fan_out_batch_panic_error(
 ) -> ReceiptStoreError {
     let batch_len = request_responses.len() as u64;
     health.failed_total.fetch_add(batch_len, Ordering::SeqCst);
-    atomic_saturating_sub(&health.inflight, batch_len);
     if let Ok(mut last_error) = health.last_error.lock() {
         *last_error = Some(error.to_string());
     }
@@ -519,7 +537,8 @@ fn fan_out_batch_panic_error(
 
 #[cfg(test)]
 pub(crate) mod test_hooks {
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+    use std::sync::Mutex;
 
     /// When set, `append_receipt_batch` fails the batch between the receipt
     /// insert and the lineage ensure, proving the fold is one transaction.
@@ -561,6 +580,169 @@ pub(crate) mod test_hooks {
     pub(crate) fn fail_checkpoint_build(max_batch: u64) -> bool {
         max_batch == FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH
             && FAIL_CHECKPOINT_BUILD.load(Ordering::SeqCst)
+    }
+
+    /// Hold a checkpoint build after the signed body exists but before its
+    /// transaction opens. The dedicated marker isolates this process-global
+    /// hook from unrelated checkpoint tests. It lets the Flush barrier test
+    /// sample writer accounting while checkpoint work is still in progress.
+    const BLOCK_STATE_DISARMED: u8 = 0;
+    const BLOCK_STATE_ARMED: u8 = 1;
+    const BLOCK_STATE_ENTERED: u8 = 2;
+    const BLOCK_STATE_RELEASED: u8 = 3;
+    static CHECKPOINT_BUILD_BLOCK_STATE: AtomicU8 = AtomicU8::new(BLOCK_STATE_DISARMED);
+    static CHECKPOINT_BUILD_BLOCK_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    pub(crate) const BLOCK_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH: u64 = 11;
+
+    pub(crate) struct CheckpointBuildBlockGuard {
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+
+    impl CheckpointBuildBlockGuard {
+        pub(crate) fn arm() -> Self {
+            let lock = match CHECKPOINT_BUILD_BLOCK_TEST_LOCK.lock() {
+                Ok(lock) => lock,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            CHECKPOINT_BUILD_BLOCK_STATE.store(BLOCK_STATE_ARMED, Ordering::SeqCst);
+            Self { _lock: lock }
+        }
+
+        pub(crate) fn release(&self) {
+            release_block_state(&CHECKPOINT_BUILD_BLOCK_STATE);
+        }
+    }
+
+    impl Drop for CheckpointBuildBlockGuard {
+        fn drop(&mut self) {
+            self.release();
+        }
+    }
+
+    pub(crate) fn checkpoint_build_block_entered() -> bool {
+        matches!(
+            CHECKPOINT_BUILD_BLOCK_STATE.load(Ordering::SeqCst),
+            BLOCK_STATE_ENTERED | BLOCK_STATE_RELEASED
+        )
+    }
+
+    pub(crate) fn block_during_checkpoint_build(max_batch: u64) {
+        if max_batch != BLOCK_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH {
+            return;
+        }
+        if CHECKPOINT_BUILD_BLOCK_STATE
+            .compare_exchange(
+                BLOCK_STATE_ARMED,
+                BLOCK_STATE_ENTERED,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_err()
+        {
+            return;
+        }
+        while CHECKPOINT_BUILD_BLOCK_STATE.load(Ordering::SeqCst) != BLOCK_STATE_RELEASED {
+            std::thread::yield_now();
+        }
+        CHECKPOINT_BUILD_BLOCK_STATE.store(BLOCK_STATE_DISARMED, Ordering::SeqCst);
+    }
+
+    fn release_block_state(state: &AtomicU8) {
+        loop {
+            match state.load(Ordering::SeqCst) {
+                BLOCK_STATE_DISARMED => return,
+                BLOCK_STATE_ARMED => {
+                    if state
+                        .compare_exchange(
+                            BLOCK_STATE_ARMED,
+                            BLOCK_STATE_DISARMED,
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                        )
+                        .is_ok()
+                    {
+                        return;
+                    }
+                }
+                BLOCK_STATE_ENTERED => {
+                    if state
+                        .compare_exchange(
+                            BLOCK_STATE_ENTERED,
+                            BLOCK_STATE_RELEASED,
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                        )
+                        .is_ok()
+                    {
+                        while state.load(Ordering::SeqCst) != BLOCK_STATE_DISARMED {
+                            std::thread::yield_now();
+                        }
+                        return;
+                    }
+                }
+                BLOCK_STATE_RELEASED => {
+                    while state.load(Ordering::SeqCst) != BLOCK_STATE_DISARMED {
+                        std::thread::yield_now();
+                    }
+                    return;
+                }
+                _ => return,
+            }
+        }
+    }
+
+    /// Hold a full ReseedHead verification after it owns the writer connection.
+    /// The source-row marker prevents the process-global flag from affecting
+    /// unrelated reseed tests running in parallel.
+    pub(crate) static BLOCK_DURING_RESEED: AtomicBool = AtomicBool::new(false);
+    pub(crate) static BLOCK_DURING_RESEED_ENTERED: AtomicBool = AtomicBool::new(false);
+    pub(crate) static RELEASE_BLOCKED_RESEED: AtomicBool = AtomicBool::new(false);
+    pub(crate) const BLOCK_DURING_RESEED_MARKER_CONTENT_HASH: &str =
+        "content-test-hook-block-during-reseed";
+
+    pub(crate) struct ReseedBlockGuard;
+
+    impl ReseedBlockGuard {
+        pub(crate) fn arm() -> Self {
+            BLOCK_DURING_RESEED_ENTERED.store(false, Ordering::SeqCst);
+            RELEASE_BLOCKED_RESEED.store(false, Ordering::SeqCst);
+            BLOCK_DURING_RESEED.store(true, Ordering::SeqCst);
+            Self
+        }
+
+        pub(crate) fn release(&self) {
+            RELEASE_BLOCKED_RESEED.store(true, Ordering::SeqCst);
+            BLOCK_DURING_RESEED.store(false, Ordering::SeqCst);
+        }
+    }
+
+    impl Drop for ReseedBlockGuard {
+        fn drop(&mut self) {
+            self.release();
+            BLOCK_DURING_RESEED_ENTERED.store(false, Ordering::SeqCst);
+        }
+    }
+
+    pub(crate) fn block_during_reseed(connection: &rusqlite::Connection) {
+        if !BLOCK_DURING_RESEED.load(Ordering::SeqCst) {
+            return;
+        }
+        let marker_present = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE content_hash = ?1)",
+                rusqlite::params![BLOCK_DURING_RESEED_MARKER_CONTENT_HASH],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|present| present != 0)
+            .unwrap_or(false);
+        if !marker_present {
+            return;
+        }
+        BLOCK_DURING_RESEED_ENTERED.store(true, Ordering::SeqCst);
+        while !RELEASE_BLOCKED_RESEED.load(Ordering::SeqCst) {
+            std::thread::yield_now();
+        }
     }
 
     /// When set, `append_receipt_batch` panics before inserting the next
@@ -840,6 +1022,36 @@ fn append_chio_receipt_tx(
     };
     let source_seq = sqlite_positive_u64(source_seq, "tool receipt source_seq")?;
     claim_log_entry_seq_for_source_tx(tx, "tool_receipt", source_seq)
+}
+
+fn enqueue_settlement_observer_outbox_tx(
+    tx: &rusqlite::Transaction<'_>,
+    receipt: &ChioReceipt,
+) -> Result<(), ReceiptStoreError> {
+    validate_settlement_observer_outbox_text(
+        &receipt.id,
+        "receipt id",
+        SETTLEMENT_OBSERVER_OUTBOX_RECEIPT_ID_MAX_BYTES,
+    )?;
+    tx.execute(
+        r#"
+        INSERT INTO chio_settlement_observer_outbox (
+            receipt_id,
+            finalized_at,
+            state,
+            claim_token,
+            claim_deadline_unix_ms,
+            version,
+            last_error
+        ) VALUES (?1, ?2, 'pending', NULL, NULL, 0, NULL)
+        ON CONFLICT(receipt_id) DO NOTHING
+        "#,
+        params![
+            receipt.id.as_str(),
+            sqlite_i64(receipt.timestamp, "settlement-observer finalized_at")?,
+        ],
+    )?;
+    Ok(())
 }
 
 fn consume_authorization_receipt_tx(

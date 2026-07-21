@@ -24,6 +24,17 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
+        if (self.aggregate_invocation_admission_enabled
+            || self.supplemental_broker_admission_enabled)
+            && !self
+                .budget_store
+                .supports_durable_atomic_payment_journal()
+        {
+            return Err(KernelError::Internal(
+                "operation-owned payment admission requires a durable budget store that atomically co-commits payment-journal state"
+                    .to_string(),
+            ));
+        }
         if self.payment_adapter.is_some() {
             self.prepare_current_admission_authority_replacement()?;
         }
@@ -31,10 +42,14 @@ impl ChioKernel {
         if self.receipt_store.is_some() && self.payment_journal_active() {
             match self.reconcile_payment_journal(0) {
                 Ok(report) => {
-                    if report.resolved > 0 || report.reconcile_failed > 0 {
+                    if report.resolved > 0
+                        || report.reconcile_failed > 0
+                        || report.deferred_to_admission_operation > 0
+                    {
                         tracing::warn!(
                             resolved = report.resolved,
                             reconcile_failed = report.reconcile_failed,
+                            deferred_to_admission_operation = report.deferred_to_admission_operation,
                             "payment journal rows survived a restart; reconciled at adapter install"
                         );
                     }
@@ -487,9 +502,20 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
+        if self.payment_adapter.is_some()
+            && !self
+                .budget_store
+                .supports_durable_atomic_payment_journal()
+        {
+            return Err(KernelError::Internal(
+                "operation-owned payment admission requires a durable budget store that atomically co-commits payment-journal state"
+                    .to_string(),
+            ));
+        }
         let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
             KernelError::Internal(
-                "durable admission operation store is required for aggregate admission".to_string(),
+                "durable admission operation store is required for operation-owned admission"
+                    .to_string(),
             )
         })?;
         Self::validate_admission_operation_store_profile(
@@ -587,13 +613,11 @@ impl ChioKernel {
         self.post_invocation_pipeline.add(hook);
     }
 
-    /// Install a settlement hook that runs after each receipt is signed
-    /// and persisted. Settlement is strictly an observer relative to
-    /// receipt bytes; the hook MUST NOT mutate the receipt store and
-    /// MUST NOT block the dispatch path on its own latency. Hook
-    /// failures are surfaced through
-    /// [`Self::run_settlement_observer`]'s return value and routed through
-    /// the retry/dead-letter machinery.
+    /// Install the single settlement hook consumed by the background outbox
+    /// recovery worker. Settlement is strictly an observer relative to receipt
+    /// bytes; terminal receipt persistence atomically appends the outbox row
+    /// and never invokes the hook on the caller's dispatch path. Hook failures
+    /// are routed through the retry/dead-letter machinery.
     ///
     /// Fail-closed wiring: a durable settlement retry store MUST already
     /// be installed (see [`Self::set_settlement_retry_store`]) so every
@@ -605,10 +629,69 @@ impl ChioKernel {
         &mut self,
         hook: std::sync::Arc<dyn chio_settle::SettlementHook>,
     ) -> Result<(), KernelBuildError> {
+        if self.settlement_observer.is_some() {
+            return Err(KernelBuildError::SettlementObserverAlreadyInstalled);
+        }
         if self.settlement_retry_store.is_none() {
             return Err(KernelBuildError::MissingSettlementRetryStore);
         }
-        self.settlement_observer = Some(hook);
+        if !self
+            .settlement_retry_store
+            .as_deref()
+            .is_some_and(|store| store.supports_durable_settlement_retry())
+        {
+            return Err(KernelBuildError::SettlementRetryStoreNotDurable);
+        }
+        if !hook.supports_receipt_id_idempotency() {
+            return Err(KernelBuildError::SettlementHookNotIdempotent);
+        }
+        let receipt_store = self
+            .receipt_store
+            .as_deref()
+            .ok_or(KernelBuildError::SettlementObserverOutboxUnsupported)?;
+        if !receipt_store.supports_durable_settlement_observer_outbox()
+            || !receipt_store.supports_authoritative_chio_receipt_lookup()
+        {
+            return Err(KernelBuildError::SettlementObserverOutboxUnsupported);
+        }
+        let receipt_identity = receipt_store
+            .durable_storage_identity()
+            .map_err(|error| {
+                KernelBuildError::SettlementObserverStorageTopology(error.to_string())
+            })?
+            .ok_or_else(|| {
+                KernelBuildError::SettlementObserverStorageTopology(
+                    "receipt store omitted durable storage identity".to_string(),
+                )
+            })?;
+        let retry_identity = self
+            .settlement_retry_store
+            .as_deref()
+            .ok_or(KernelBuildError::MissingSettlementRetryStore)?
+            .durable_storage_identity()
+            .map_err(|error| {
+                KernelBuildError::SettlementObserverStorageTopology(error.to_string())
+            })?
+            .ok_or_else(|| {
+                KernelBuildError::SettlementObserverStorageTopology(
+                    "retry store omitted durable storage identity".to_string(),
+                )
+            })?;
+        if receipt_identity != retry_identity {
+            return Err(KernelBuildError::SettlementObserverStorageTopology(
+                "receipt outbox and retry store use different commit domains".to_string(),
+            ));
+        }
+        let previous_observer = self.settlement_observer.replace(hook);
+        let previous_recovery = self.settlement_observer_recovery.take();
+        if let Err(error) = self.recover_settlement_observer_outboxes() {
+            self.settlement_observer = previous_observer;
+            self.settlement_observer_recovery = previous_recovery;
+            return Err(KernelBuildError::SettlementObserverRecovery(
+                error.to_string(),
+            ));
+        }
+        self.settlement_observer_recovery = self.spawn_settlement_observer_recovery();
         Ok(())
     }
 
@@ -619,8 +702,69 @@ impl ChioKernel {
     pub fn set_settlement_retry_store(
         &mut self,
         store: std::sync::Arc<dyn crate::settlement_retry::SettlementRetryStore>,
-    ) {
-        self.settlement_retry_store = Some(store);
+    ) -> Result<(), KernelBuildError> {
+        if !store.supports_durable_settlement_retry() {
+            return Err(KernelBuildError::SettlementRetryStoreNotDurable);
+        }
+        if self.settlement_observer.is_some() {
+            let receipt_store = self
+                .receipt_store
+                .as_deref()
+                .ok_or(KernelBuildError::SettlementObserverOutboxUnsupported)?;
+            let receipt_identity = receipt_store
+                .durable_storage_identity()
+                .map_err(|error| {
+                    KernelBuildError::SettlementObserverStorageTopology(error.to_string())
+                })?
+                .ok_or_else(|| {
+                    KernelBuildError::SettlementObserverStorageTopology(
+                        "receipt store omitted durable storage identity".to_string(),
+                    )
+                })?;
+            let retry_identity = store
+                .durable_storage_identity()
+                .map_err(|error| {
+                    KernelBuildError::SettlementObserverStorageTopology(error.to_string())
+                })?
+                .ok_or_else(|| {
+                    KernelBuildError::SettlementObserverStorageTopology(
+                        "retry store omitted durable storage identity".to_string(),
+                    )
+                })?;
+            if receipt_identity != retry_identity {
+                return Err(KernelBuildError::SettlementObserverStorageTopology(
+                    "receipt outbox and retry store use different commit domains".to_string(),
+                ));
+            }
+        }
+        let previous_store = self.settlement_retry_store.replace(store);
+        let previous_recovery = self.settlement_observer_recovery.take();
+        if self.settlement_observer.is_some() {
+            if let Err(error) = self.recover_settlement_observer_outboxes() {
+                self.settlement_retry_store = previous_store;
+                self.settlement_observer_recovery = previous_recovery;
+                return Err(KernelBuildError::SettlementObserverRecovery(
+                    error.to_string(),
+                ));
+            }
+            self.settlement_observer_recovery = self.spawn_settlement_observer_recovery();
+        }
+        Ok(())
+    }
+
+    pub(super) fn spawn_settlement_observer_recovery(
+        &self,
+    ) -> Option<settlement_observer::SettlementObserverRecoveryHandle> {
+        Some(settlement_observer::SettlementObserverRecoveryHandle::spawn(
+            std::sync::Arc::clone(self.receipt_store.as_ref()?),
+            std::sync::Arc::clone(self.settlement_retry_store.as_ref()?),
+            std::sync::Arc::clone(self.settlement_observer.as_ref()?),
+            self.settlement_retry_policy,
+            settlement_observer::SettlementReceiptTrustVerifier::new(
+                self.public_key(),
+                self.authority_artifact_trust_resolver.clone(),
+            ),
+        ))
     }
 
     /// Start the background sweeper for orphaned budget holds: once at
@@ -641,13 +785,15 @@ impl ChioKernel {
     }
 
     /// Whether the durable payment journal is in force: a payment adapter is
-    /// installed and the dispatch-intent journal covers the monetary class.
+    /// installed and either the dispatch-intent journal covers the monetary
+    /// class or a durable admission operation owns the payment mutation.
     pub(crate) fn payment_journal_active(&self) -> bool {
         self.payment_adapter.is_some()
-            && !matches!(
-                self.config.dispatch_intent_journal,
-                crate::receipt_store::DispatchIntentJournalMode::Off
-            )
+            && (self.admission_operation_store.is_some()
+                || !matches!(
+                    self.config.dispatch_intent_journal,
+                    crate::receipt_store::DispatchIntentJournalMode::Off
+                ))
     }
 
     /// Advance the payment journal for a monetary call. Fail-closed: an
@@ -772,14 +918,15 @@ impl ChioKernel {
         match self.verify_trusted_receipt(receipt) {
             Ok(true) => {}
             Ok(false) => {
-                return settlement_observer::SettlementObserverStatus::skipped(
-                    "receipt signer is not trusted by the runtime authority resolver",
-                );
+                return settlement_observer::SettlementObserverStatus::TrustFailed {
+                    error: "receipt signer is not trusted by the runtime authority resolver"
+                        .to_string(),
+                };
             }
-            Err(error) => {
-                return settlement_observer::SettlementObserverStatus::skipped(format!(
-                    "receipt authority trust resolution failed: {error}"
-                ));
+            Err(_) => {
+                return settlement_observer::SettlementObserverStatus::TrustFailed {
+                    error: "receipt authority trust resolution failed".to_string(),
+                };
             }
         }
         settlement_observer::run_observer(
@@ -789,51 +936,11 @@ impl ChioKernel {
         )
     }
 
-    /// Route the settlement-observer outcome into the retry/dead-letter
-    /// machinery. Fail-loud and fail-closed: an outcome that cannot be
-    /// persisted is warned and counted, never silently dropped.
-    pub(crate) fn route_settlement_observer_status(
-        &self,
-        receipt: &chio_core::receipt::body::ChioReceipt,
-        status: &settlement_observer::SettlementObserverStatus,
-    ) {
-        use settlement_observer::SettlementObserverStatus as Status;
-        let (reason, retryable) = match status {
-            // Steady state: no hook, or the receipt is outside the
-            // marketplace surface. Nothing is owed downstream.
-            Status::NotRegistered | Status::Skipped { .. } => return,
-            Status::Observed { outcome } => match self.classify_and_persist(receipt, outcome) {
-                Ok(()) => return,
-                Err(error) => (error.to_string(), true),
-            },
-            Status::HookFailed { error } => {
-                // A hook error is a transient settlement failure (an RPC
-                // outage looks exactly like a rail returning Retryable), so
-                // it consumes the same bounded retry/dead-letter envelope:
-                // a durable settle_attempts row that `chio settle drive`
-                // picks up, dead-lettering after the policy's max attempts.
-                // Warn-only routing would leave the outcome undriven and
-                // unbounded.
-                let outcome = chio_settle::SettlementOutcome::retryable(error.clone());
-                match self.classify_and_persist(receipt, &outcome) {
-                    Ok(()) => return,
-                    Err(persist_error) => (persist_error.to_string(), true),
-                }
-            }
-        };
-        tracing::warn!(
-            receipt_id = %receipt.id,
-            retryable,
-            reason = %redacted!(&reason),
-            "settlement outcome unresolved"
-        );
-        chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.incr(&[]);
-    }
-
     /// Classify an observed settlement outcome against the retry policy and
     /// persist the decision: retryable outcomes upsert a bounded attempt row,
     /// terminal failures land an idempotent dead-letter row, and resolved
     /// outcomes clear the envelope.
+    #[cfg(test)]
     pub(crate) fn classify_and_persist(
         &self,
         receipt: &chio_core::receipt::body::ChioReceipt,
@@ -842,6 +949,7 @@ impl ChioKernel {
         use crate::settlement_retry::{SettleAttemptRecord, SettlementRetryError};
         use chio_settle::RetryDecision;
 
+        let outcome = settlement_observer::validate_and_sanitize_settlement_outcome(outcome)?;
         let store = self.settlement_retry_store.as_deref();
         let prior_attempts = match store {
             Some(store) => store
@@ -850,7 +958,11 @@ impl ChioKernel {
                 .unwrap_or(0),
             None => 0,
         };
-        match chio_settle::classify_attempt(&self.settlement_retry_policy, prior_attempts, outcome)
+        match chio_settle::classify_attempt(
+            &self.settlement_retry_policy,
+            prior_attempts,
+            &outcome,
+        )
         {
             RetryDecision::Skip { .. } => {
                 // Resolved (accepted or skipped): the receipt owes nothing
@@ -866,9 +978,9 @@ impl ChioKernel {
                         "no settlement retry store installed".to_string(),
                     ));
                 };
-                let reason = match outcome {
+                let reason = match &outcome {
                     chio_settle::SettlementOutcome::Retryable { reason, .. } => reason.clone(),
-                    other => format!("{other:?}"),
+                    _ => "settlement retry scheduled".to_string(),
                 };
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -906,7 +1018,7 @@ impl ChioKernel {
                             "dead-letter insert conflicted with a divergent row"
                         );
                         chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.incr(&[]);
-                        Ok(())
+                        Err(SettlementRetryError::Conflict(message))
                     }
                     Err(other) => Err(other),
                 }

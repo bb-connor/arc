@@ -79,7 +79,7 @@ pub(crate) fn sidecar_advisory_tool_call_evaluate_response(receipt: ChioReceipt)
             warn!("failed to serialize advisory evaluate receipt: {error}");
             return internal_json_error_response(
                 "chio_receipt_serialize_failed",
-                &error.to_string(),
+                "failed to serialize advisory evaluation receipt",
             );
         }
     };
@@ -105,6 +105,7 @@ pub(crate) fn sidecar_advisory_tool_call_evaluate_json_response(receipt: ChioRec
     response
 }
 
+#[cfg(test)]
 pub(crate) fn extract_presented_capability_from_maps<'a>(
     headers: &'a HashMap<String, String>,
     query: &'a HashMap<String, String>,
@@ -113,10 +114,12 @@ pub(crate) fn extract_presented_capability_from_maps<'a>(
         .or_else(|| query.get("chio_capability").map(String::as_str))
 }
 
+#[cfg(test)]
 pub(crate) fn extract_caller_identity(headers: &HashMap<String, String>) -> CallerIdentity {
     crate::evaluator::caller_identity_from_headers(headers)
 }
 
+#[cfg(test)]
 pub(crate) fn presented_capability_id(raw_capability: Option<&str>) -> Option<String> {
     serde_json::from_str::<CapabilityToken>(raw_capability?)
         .ok()
@@ -156,7 +159,7 @@ pub(crate) fn extract_execution_nonce_from_maps(
     }
     serde_json::from_str(raw_nonce)
         .map(Some)
-        .map_err(|error| format!("invalid execution nonce header: {error}"))
+        .map_err(|_| "invalid execution nonce header".to_string())
 }
 
 pub(crate) fn extract_transport_capability(

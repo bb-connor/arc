@@ -30,6 +30,10 @@ pub enum PaymentReconcileOutcome {
         /// Why the row could not be resolved.
         detail: String,
     },
+    /// A nonterminal admission operation still owns this row. Its saga must
+    /// settle or compensate the payment before generic journal recovery may
+    /// close the row.
+    DeferredToAdmissionOperation { operation_id: String },
 }
 
 /// Summary of one reconciliation pass over the payment journal.
@@ -39,6 +43,9 @@ pub struct PaymentReconcileReport {
     pub resolved: u64,
     /// Rows marked as operator incidents.
     pub reconcile_failed: u64,
+    /// Rows deliberately retained because a nonterminal admission operation
+    /// still owns their money-path decision.
+    pub deferred_to_admission_operation: u64,
 }
 
 impl ChioKernel {
@@ -66,6 +73,9 @@ impl ChioKernel {
         for record in &rows {
             match resolve_and_finalize_payment_journal_row(self, record)? {
                 PaymentReconcileOutcome::ReconcileFailed { .. } => report.reconcile_failed += 1,
+                PaymentReconcileOutcome::DeferredToAdmissionOperation { .. } => {
+                    report.deferred_to_admission_operation += 1;
+                }
                 _ => report.resolved += 1,
             }
         }
@@ -81,6 +91,9 @@ pub(crate) fn resolve_and_finalize_payment_journal_row(
     kernel: &ChioKernel,
     record: &PaymentJournalRecord,
 ) -> Result<PaymentReconcileOutcome, KernelError> {
+    if let Some(operation_id) = nonterminal_payment_owner(kernel, record)? {
+        return Ok(PaymentReconcileOutcome::DeferredToAdmissionOperation { operation_id });
+    }
     let outcome = resolve_incomplete_payment_journal_row(kernel, record)?;
     match &outcome {
         PaymentReconcileOutcome::ReconcileFailed { detail } => {
@@ -104,6 +117,7 @@ pub(crate) fn resolve_and_finalize_payment_journal_row(
                 "payment reconcile failed; operator incident"
             );
         }
+        PaymentReconcileOutcome::DeferredToAdmissionOperation { .. } => {}
         _ => {
             kernel.with_budget_store(|store| {
                 store
@@ -113,6 +127,40 @@ pub(crate) fn resolve_and_finalize_payment_journal_row(
         }
     }
     Ok(outcome)
+}
+
+fn nonterminal_payment_owner(
+    kernel: &ChioKernel,
+    record: &PaymentJournalRecord,
+) -> Result<Option<String>, KernelError> {
+    let Some(binding) = record.admission_operation.as_ref() else {
+        return Ok(None);
+    };
+    let store = kernel.admission_operation_store.as_ref().ok_or_else(|| {
+        KernelError::Internal(format!(
+            "operation-owned payment row {} cannot be recovered without its admission operation store",
+            record.request_id
+        ))
+    })?;
+    let operation = store.load(binding.operation_id())?.ok_or_else(|| {
+        KernelError::Internal(format!(
+            "operation-owned payment row {} lost admission operation {}",
+            record.request_id,
+            binding.operation_id()
+        ))
+    })?;
+    if operation.request_binding_hash() != binding.request_binding_hash()
+        || operation.request_id() != record.request_id
+        || operation.capability_id() != record.capability_id
+        || operation.budget_hold_id() != record.hold_id.as_deref()
+    {
+        return Err(KernelError::Internal(format!(
+            "operation-owned payment row {} does not match admission operation {}",
+            record.request_id,
+            binding.operation_id()
+        )));
+    }
+    Ok((!operation.state().is_terminal()).then(|| operation.operation_id().to_string()))
 }
 
 /// The deterministic per-row resolver. Never selects a new amount: a
@@ -128,6 +176,15 @@ fn resolve_incomplete_payment_journal_row(
             detail: "no payment adapter configured for reconcile".to_string(),
         });
     };
+    if adapter.rail_id() != record.rail {
+        return Ok(PaymentReconcileOutcome::ReconcileFailed {
+            detail: format!(
+                "configured payment rail `{}` does not match durable journal rail `{}`",
+                adapter.rail_id(),
+                record.rail
+            ),
+        });
+    }
     match record.state {
         PaymentJournalState::HoldPlaced => {
             // Authorize may or may not have fired; no authorization id is
@@ -139,7 +196,7 @@ fn resolve_incomplete_payment_journal_row(
                 Ok(RailSettlementState::NoAuthorization) => {
                     // Authorize never took effect: nothing to release on the
                     // rail, and funds never moved.
-                    reverse_hold_and_report(kernel, record)
+                    Ok(reverse_hold_and_report(kernel, record))
                 }
                 Ok(RailSettlementState::Held { authorization_id }) => {
                     // A live hold with no settlement: no price was ever
@@ -190,7 +247,7 @@ fn resolve_incomplete_payment_journal_row(
             // answers whether funds already moved, exactly like the
             // HoldPlaced arm above, so a release is never issued against
             // money that already moved.
-            let Some(authorization_id) = record.authorization_id.as_deref() else {
+            let Some(_authorization_id) = record.authorization_id.as_deref() else {
                 return Ok(PaymentReconcileOutcome::ReconcileFailed {
                     detail: "authorized row missing authorization_id".to_string(),
                 });
@@ -199,7 +256,7 @@ fn resolve_incomplete_payment_journal_row(
                 Ok(RailSettlementState::NoAuthorization) => {
                     // The rail has no record of this authorization: nothing
                     // to release, and funds never moved.
-                    reverse_hold_and_report(kernel, record)
+                    Ok(reverse_hold_and_report(kernel, record))
                 }
                 Ok(RailSettlementState::Held { authorization_id }) => {
                     // A live hold with no settlement: no price was ever
@@ -257,12 +314,7 @@ fn resolve_incomplete_payment_journal_row(
                             detail: "settling capture row missing settle_amount_units".to_string(),
                         });
                     };
-                    match capture_for_journal_record(
-                        adapter,
-                        record,
-                        authorization_id,
-                        amount,
-                    ) {
+                    match capture_for_journal_record(adapter, record, authorization_id, amount) {
                         Ok(result) => {
                             let mut settled_record = record.clone();
                             settled_record.transaction_id = Some(result.transaction_id);
@@ -278,7 +330,7 @@ fn resolve_incomplete_payment_journal_row(
                 }
                 Some(PaymentSettleAction::Release) => {
                     match release_for_journal_record(adapter, record, authorization_id) {
-                        Ok(_) => reverse_hold_and_report(kernel, record),
+                        Ok(_) => Ok(reverse_hold_and_report(kernel, record)),
                         Err(error) => Ok(PaymentReconcileOutcome::ReconcileFailed {
                             detail: format!("release replay during reconcile failed: {error}"),
                         }),
@@ -295,12 +347,7 @@ fn resolve_incomplete_payment_journal_row(
                             detail: "settling refund row missing transaction_id".to_string(),
                         });
                     };
-                    match refund_for_journal_record(
-                        adapter,
-                        record,
-                        transaction_id,
-                        amount,
-                    ) {
+                    match refund_for_journal_record(adapter, record, transaction_id, amount) {
                         Ok(result) => match reverse_hold_and_report(kernel, record) {
                             PaymentReconcileOutcome::Released => {
                                 let mut refunded_record = record.clone();
@@ -651,6 +698,9 @@ impl DispatchIntentReconciler for MonetaryDispatchIntentReconciler<'_> {
                 Ok(DispatchIntentResolution::MonetaryReconciled { rail_reference })
             }
             PaymentReconcileOutcome::Released => Ok(DispatchIntentResolution::SafeToReplay),
+            PaymentReconcileOutcome::DeferredToAdmissionOperation { operation_id } => {
+                Ok(DispatchIntentResolution::DeferredToAdmissionOperation { operation_id })
+            }
         }
     }
 }

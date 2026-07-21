@@ -1049,7 +1049,7 @@ fn resources_list_is_filtered_by_capabilities() {
 
     let resources = response["result"]["resources"].as_array().unwrap();
     assert_eq!(resources.len(), 1);
-    assert_eq!(resources[0]["uri"], "repo://docs/roadmap");
+    assert_eq!(resources[0]["uri"], "repo://docs/architecture");
 }
 
 #[test]
@@ -1072,11 +1072,11 @@ fn resources_read_returns_contents() {
             "jsonrpc": "2.0",
             "id": 2,
             "method": "resources/read",
-            "params": { "uri": "repo://docs/roadmap" }
+            "params": { "uri": "repo://docs/architecture" }
         }))
         .unwrap();
 
-    assert_eq!(response["result"]["contents"][0]["text"], "# Roadmap");
+    assert_eq!(response["result"]["contents"][0]["text"], "# Architecture");
 }
 
 #[test]
@@ -1131,13 +1131,13 @@ fn resources_read_allows_in_root_filesystem_resources() {
             "jsonrpc": "2.0",
             "id": 2,
             "method": "resources/read",
-            "params": { "uri": "file:///workspace/project/docs/roadmap.md" }
+            "params": { "uri": "file:///workspace/project/docs/architecture.md" }
         }))
         .unwrap();
 
     assert_eq!(
         response["result"]["contents"][0]["text"],
-        "# Filesystem Roadmap"
+        "# Filesystem Architecture"
     );
 }
 
@@ -1252,7 +1252,7 @@ fn resources_read_denies_filesystem_resources_when_roots_are_missing() {
             "jsonrpc": "2.0",
             "id": 2,
             "method": "resources/read",
-            "params": { "uri": "file:///workspace/project/docs/roadmap.md" }
+            "params": { "uri": "file:///workspace/project/docs/architecture.md" }
         }))
         .unwrap();
 
@@ -1317,7 +1317,7 @@ fn resources_subscribe_tracks_session_state() {
             "jsonrpc": "2.0",
             "id": 2,
             "method": "resources/subscribe",
-            "params": { "uri": "repo://docs/roadmap" }
+            "params": { "uri": "repo://docs/architecture" }
         }))
         .unwrap();
 
@@ -1328,6 +1328,6 @@ fn resources_subscribe_tracks_session_state() {
     };
     assert!(edge
         .kernel
-        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .session_has_resource_subscription(&session_id, "repo://docs/architecture")
         .unwrap());
 }

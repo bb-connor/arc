@@ -279,6 +279,12 @@ pub enum KernelError {
     )]
     ReservingAuthorizationRejectsPresentedNonce,
 
+    /// An authenticated reserving request reused a request id whose durable
+    /// operation does not match the exact frozen request, or whose ownership is
+    /// ambiguous. No new operation, hold, nonce, or payment effect is allowed.
+    #[error("caller reservation request id conflict: {0}")]
+    CallerReservationConflict(String),
+
     /// The kernel shed load to stay within its memory budget. Always a deny;
     /// never admits a call and never grows a collection.
     #[error("kernel overloaded: {resource:?} at capacity")]
@@ -615,6 +621,11 @@ impl KernelError {
                 "CHIO-KERNEL-RESERVING-AUTHORIZATION-PRESENTED-NONCE",
                 serde_json::json!({}),
                 "Submit the reserving authorization request without a presented execution nonce; present the minted nonce to the tool server for settlement instead.",
+            ),
+            Self::CallerReservationConflict(reason) => self.report_with_context(
+                "CHIO-KERNEL-CALLER-RESERVATION-CONFLICT",
+                serde_json::json!({ "reason": reason }),
+                "Use the exact original request for replay or submit a fresh request id.",
             ),
             Self::HotPathDeadlineExceeded { stage, budget_ms } => self.report_with_context(
                 "CHIO-KERNEL-HOT-PATH-DEADLINE",

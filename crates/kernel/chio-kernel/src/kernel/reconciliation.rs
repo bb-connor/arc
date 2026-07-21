@@ -19,7 +19,9 @@ use chio_log_redact::redacted;
 
 use super::*;
 
-use crate::budget_store::{BudgetHoldSnapshot, BudgetReconcileHoldRequest};
+use crate::budget_store::{
+    BudgetHoldDispositionView, BudgetHoldSnapshot, BudgetReconcileHoldRequest,
+};
 use crate::execution_nonce::{
     consume_execution_nonce, verify_execution_nonce_without_consume, SignedExecutionNonce,
 };
@@ -31,6 +33,55 @@ use crate::execution_nonce::{
 /// the signed artifact while still marking the receipt as carrying no monetary
 /// envelope.
 const INVOCATION_RECONCILE_RECEIPT_CURRENCY: &str = "";
+const MAX_CALLER_RESERVATION_REAP_OPERATIONS: usize = 4_096;
+const MAX_CALLER_RESERVATION_REAP_FAILURE_DETAILS: usize = 16;
+const MAX_CALLER_RESERVATION_REAP_FAILURE_CHARS: usize = 512;
+
+#[derive(Default)]
+struct CallerReservationReapFailures {
+    count: usize,
+    details: Vec<String>,
+}
+
+impl CallerReservationReapFailures {
+    fn push(&mut self, message: String) {
+        self.count += 1;
+        if self.details.len() < MAX_CALLER_RESERVATION_REAP_FAILURE_DETAILS {
+            self.details.push(
+                redacted!(&message)
+                    .to_string()
+                    .chars()
+                    .take(MAX_CALLER_RESERVATION_REAP_FAILURE_CHARS)
+                    .collect(),
+            );
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    fn summary(&self) -> String {
+        let omitted = self.count.saturating_sub(self.details.len());
+        if omitted == 0 {
+            format!("{} failures: {}", self.count, self.details.join("; "))
+        } else {
+            format!(
+                "{} failures: {}; {omitted} additional failures omitted",
+                self.count,
+                self.details.join("; ")
+            )
+        }
+    }
+}
+
+fn bounded_reap_error(error: &impl std::fmt::Display) -> String {
+    redacted!(error)
+        .to_string()
+        .chars()
+        .take(MAX_CALLER_RESERVATION_REAP_FAILURE_CHARS)
+        .collect()
+}
 
 impl ChioKernel {
     /// Settle every expired, unreconciled reserved budget hold at its reserved
@@ -41,12 +92,135 @@ impl ChioKernel {
     /// and fail open for a cumulative spend cap. Self-healing and fail-closed: a
     /// still-valid reserved hold and any reconciled/reversed/released hold are
     /// never touched, and a settled hold is idempotent under repeated reaps.
-    /// Returns the number of holds settled. The sidecar drives this on a timer
-    /// (startup wiring is a later task); this method is the reachable primitive.
+    /// Each call scans one bounded page in stable operation-id order; repeated
+    /// calls advance a process-local cursor and wrap after the final page.
     pub fn reap_expired_reserved_budget_holds(
         &self,
         now_unix_secs: i64,
     ) -> Result<usize, KernelError> {
+        let mut reap_inventory_errors = CallerReservationReapFailures::default();
+        let expiring_caller_reservations = if let Some(operation_store) =
+            self.admission_operation_store.as_ref()
+        {
+            let after_operation_id = self
+                .caller_reservation_reap_cursor
+                .lock()
+                .map_err(|_| {
+                    KernelError::Internal(
+                        "caller reservation reap cursor lock is poisoned".to_string(),
+                    )
+                })?
+                .clone();
+            let operations = operation_store.list_caller_reservation_reap_candidates(
+                after_operation_id.as_deref(),
+                MAX_CALLER_RESERVATION_REAP_OPERATIONS,
+            )?;
+            {
+                let mut cursor = self.caller_reservation_reap_cursor.lock().map_err(|_| {
+                    KernelError::Internal(
+                        "caller reservation reap cursor lock is poisoned".to_string(),
+                    )
+                })?;
+                *cursor = operations
+                    .last()
+                    .map(|operation| operation.operation_id().to_string());
+            }
+            let mut expiring = Vec::new();
+            for mut operation in operations {
+                let operation_id = operation.operation_id().to_string();
+                let inspected = (|| -> Result<Option<AdmissionOperation>, KernelError> {
+                    let expires_at = self.validated_caller_reservation_reap_expiry(
+                        operation_store.as_ref(),
+                        &operation,
+                    )?;
+                    if expires_at > now_unix_secs {
+                        return Ok(None);
+                    }
+                    if operation.state() == AdmissionOperationState::CallerReservationCapturePending
+                    {
+                        self.recover_caller_reservation_capture_pending_handoff(
+                            operation_store.as_ref(),
+                            self.budget_store.as_ref(),
+                            self.approval_store.as_deref(),
+                            &operation,
+                        )?;
+                        let recovered = operation_store
+                            .load(operation.operation_id())?
+                            .ok_or_else(|| {
+                                KernelError::Internal(format!(
+                                    "caller reservation operation {} disappeared during expiry recovery",
+                                    operation.operation_id()
+                                ))
+                            })?;
+                        match recovered.state() {
+                            AdmissionOperationState::CompensatedBeforeDispatch => {
+                                if let Some(hold_id) = recovered.budget_hold_id() {
+                                    self.release_reserved_sibling_share_for_hold(hold_id);
+                                }
+                                return Ok(None);
+                            }
+                            AdmissionOperationState::CallerReserved => operation = recovered,
+                            AdmissionOperationState::OutcomeUnknownAfterDispatch => {}
+                            state => {
+                                return Err(KernelError::Internal(format!(
+                                    "caller reservation expiry recovery stopped in {}",
+                                    state.as_str()
+                                )))
+                            }
+                        }
+                    }
+                    let hold_id = operation.budget_hold_id().ok_or_else(|| {
+                        KernelError::Internal(format!(
+                            "caller reservation operation {} has no budget hold",
+                            operation.operation_id()
+                        ))
+                    })?;
+                    let authorization = if operation.state()
+                        == AdmissionOperationState::CallerReserved
+                    {
+                        self.resolve_caller_reserved_admission_for_nonce(
+                            hold_id,
+                            operation.capability_id(),
+                            operation.request_id(),
+                        )?
+                        .authorization
+                    } else {
+                        self.load_recovery_budget_snapshot(operation_store.as_ref(), &operation)?
+                            .authorization_request()?
+                    };
+                    let hold = self
+                        .with_budget_store(|store| Ok(store.get_budget_hold(hold_id)?))?
+                        .ok_or_else(|| {
+                            KernelError::Internal(format!(
+                                "caller reservation operation {} lost budget hold {hold_id}",
+                                operation.operation_id()
+                            ))
+                        })?;
+                    if authorization.hold_id.as_deref() != Some(hold.hold_id.as_str())
+                        || authorization.capability_id != hold.capability_id
+                        || authorization.grant_index != hold.grant_index
+                        || authorization.requested_exposure_units != hold.authorized_exposure_units
+                    {
+                        return Err(KernelError::Internal(format!(
+                            "caller reservation operation {} changed its expiring hold binding",
+                            operation.operation_id()
+                        )));
+                    }
+                    Ok(Some(operation))
+                })();
+                match inspected {
+                    Ok(Some(operation)) => expiring.push(operation),
+                    Ok(None) => {}
+                    Err(error) => reap_inventory_errors.push(format!(
+                        "operation {operation_id} validation failed: {error}"
+                    )),
+                }
+            }
+            expiring
+        } else {
+            Vec::new()
+        };
+
         // Reserved holds this reap will settle (open, past their reserved expiry)
         // still hold their delegated child's sibling-sum share admitted. Capture
         // that set before settling so the parent's headroom is released once, and
@@ -93,10 +267,131 @@ impl ChioKernel {
             }
         }
 
-        // Propagate any store reap error only after the settled holds' shares are
-        // released.
-        let settled = reap_result?;
-        Ok(settled)
+        let mut terminal_errors = reap_inventory_errors;
+        if let Some(operation_store) = self.admission_operation_store.as_ref() {
+            for expected in expiring_caller_reservations {
+                let Some(hold_id) = expected.budget_hold_id() else {
+                    terminal_errors.push(format!(
+                        "operation {} lost its budget hold binding",
+                        expected.operation_id()
+                    ));
+                    continue;
+                };
+                let hold = match self.with_budget_store(|store| Ok(store.get_budget_hold(hold_id)?))
+                {
+                    Ok(hold) => hold,
+                    Err(error) => {
+                        terminal_errors.push(format!(
+                            "operation {} hold read failed: {error}",
+                            expected.operation_id()
+                        ));
+                        continue;
+                    }
+                };
+                let Some(hold) = hold else {
+                    terminal_errors.push(format!(
+                        "operation {} hold {hold_id} disappeared after reap",
+                        expected.operation_id()
+                    ));
+                    continue;
+                };
+                if hold.disposition.is_open() {
+                    terminal_errors.push(format!(
+                        "operation {} hold {hold_id} remained open after its bounded expiry reap",
+                        expected.operation_id()
+                    ));
+                    continue;
+                }
+                let current = match operation_store.load(expected.operation_id()) {
+                    Ok(Some(operation)) => operation,
+                    Ok(None) => {
+                        terminal_errors.push(format!(
+                            "operation {} disappeared after hold expiry",
+                            expected.operation_id()
+                        ));
+                        continue;
+                    }
+                    Err(error) => {
+                        terminal_errors.push(format!(
+                            "operation {} reload failed after hold expiry: {error}",
+                            expected.operation_id()
+                        ));
+                        continue;
+                    }
+                };
+                let terminal_reason = if hold.disposition == BudgetHoldDispositionView::Expired {
+                    "caller reservation expired before authoritative reconcile"
+                } else {
+                    "caller reservation hold closed without an authoritative operation completion"
+                };
+                let finalize =
+                    if current.state() == AdmissionOperationState::OutcomeUnknownAfterDispatch {
+                        self.validate_terminal_receipt_binding_with_store(
+                            operation_store.as_ref(),
+                            &current,
+                        )
+                        .map(|()| current)
+                    } else {
+                        self.finalize_caller_reservation_outcome_unknown(
+                            &current,
+                            terminal_reason,
+                            Some(serde_json::json!({
+                                "caller_reservation_recovery": {
+                                    "hold_id": hold_id,
+                                    "hold_disposition": hold.disposition.as_str(),
+                                    "closed_exposure_units": hold.authorized_exposure_units,
+                                }
+                            })),
+                        )
+                    };
+                self.release_reserved_sibling_share_for_hold(hold_id);
+                if let Err(error) = finalize {
+                    let recovered = operation_store
+                        .load(expected.operation_id())
+                        .ok()
+                        .flatten()
+                        .filter(|operation| {
+                            operation.state()
+                                == AdmissionOperationState::OutcomeUnknownAfterDispatch
+                        })
+                        .is_some_and(|operation| {
+                            self.validate_terminal_receipt_binding_with_store(
+                                operation_store.as_ref(),
+                                &operation,
+                            )
+                            .is_ok()
+                        });
+                    if !recovered {
+                        terminal_errors.push(format!(
+                            "operation {} terminalization failed: {error}",
+                            expected.operation_id()
+                        ));
+                    }
+                }
+            }
+        }
+
+        let settled = match reap_result {
+            Ok(settled) => settled,
+            Err(error) => {
+                if terminal_errors.is_empty() {
+                    return Err(error);
+                }
+                let error = bounded_reap_error(&error);
+                return Err(KernelError::Internal(format!(
+                    "reserved hold reap failed: {error}; caller reservation terminalization failures: {}",
+                    terminal_errors.summary()
+                )));
+            }
+        };
+        if terminal_errors.is_empty() {
+            Ok(settled)
+        } else {
+            Err(KernelError::Internal(format!(
+                "caller reservation terminalization failures: {}",
+                terminal_errors.summary()
+            )))
+        }
     }
 
     /// Reconcile the reserved budget hold named by a presented execution nonce
@@ -217,6 +512,33 @@ impl ChioKernel {
         .map_err(|error| {
             KernelError::Internal(format!("reconcile-by-nonce rejected the nonce: {error}"))
         })?;
+        let caller_reservation_terms = match self.admission_operation_store.as_ref() {
+            Some(operation_store) => {
+                match operation_store.load_by_budget_hold_id(reserved_hold_id)? {
+                    Some(_) => {
+                        let reserving_request_id =
+                            presented_nonce.reserving_request_id().ok_or_else(|| {
+                                KernelError::Internal(
+                                    "operation-owned reserved nonce omitted its reserving request id"
+                                        .to_string(),
+                                )
+                            })?;
+                        Some(self.resolve_caller_reserved_admission_for_nonce(
+                            reserved_hold_id,
+                            &bound_capability_id,
+                            reserving_request_id,
+                        )?)
+                    }
+                    None => None,
+                }
+            }
+            None => None,
+        };
+        let caller_completion = if let Some(terms) = caller_reservation_terms.as_ref() {
+            Some(self.project_caller_reservation_completion(terms.operation.operation_id())?)
+        } else {
+            None
+        };
 
         // (5)+(6) Look up the exact hold and reconcile it, all under one budget
         // store lock so the open-state check and the settle are atomic.
@@ -240,6 +562,21 @@ impl ChioKernel {
                         "reserved budget hold `{reserved_hold_id}` capability does not match the nonce binding"
                     )));
                 }
+                let admission_operation = if let Some(terms) = caller_reservation_terms.as_ref() {
+                    if terms.authorization.hold_id.as_deref() != Some(hold.hold_id.as_str())
+                        || hold.capability_id != terms.authorization.capability_id
+                        || hold.grant_index != terms.authorization.grant_index
+                        || hold.authorized_exposure_units
+                            != terms.authorization.requested_exposure_units
+                    {
+                        return Err(KernelError::Internal(format!(
+                            "reserved budget hold `{reserved_hold_id}` changed its operation-owned authorization binding"
+                        )));
+                    }
+                    terms.authorization.admission_operation.clone()
+                } else {
+                    None
+                };
 
                 let exposed = hold.remaining_exposure_units;
                 // CLAMP: the payer authorized only the reserved worst-case.
@@ -256,6 +593,7 @@ impl ChioKernel {
                     hold_id: Some(hold.hold_id.clone()),
                     event_id: Some(format!("{}:reconcile", hold.hold_id)),
                     authority: hold.authority.clone(),
+                    admission_operation,
                 })?;
                 Ok((
                     hold,
@@ -266,28 +604,6 @@ impl ChioKernel {
                     store.budget_metering_profile(),
                 ))
             })?;
-
-        // (7) The hold settled successfully and is now closed, so take the
-        // single-use nonce mark. Deferring it to here means a transient store
-        // error at the settle above left the nonce unconsumed, so the caller can
-        // re-present the same signed nonce and settle at realized cost rather than
-        // forfeiting the reservation. A consume failure now is non-fatal: the
-        // settle is already irreversible and the closed hold alone rejects any
-        // replay (a second presentation fails the open-hold check at step 5), so
-        // log it and continue rather than deny a spend that truly committed.
-        if let Err(error) = consume_execution_nonce(
-            store,
-            presented_nonce.nonce_id(),
-            presented_nonce.expires_at(),
-        ) {
-            warn!(
-                nonce_id = %presented_nonce.nonce_id(),
-                hold_id = %hold.hold_id,
-                reason = %redacted!(&error),
-                "failed to mark the reconcile nonce consumed after an irreversible settlement; \
-                 the closed hold still rejects any replay"
-            );
-        }
 
         // The reserved hold is now settled (closed), so release the sibling-sum
         // share it kept admitted, freeing the parent's headroom for a sibling.
@@ -329,7 +645,9 @@ impl ChioKernel {
             new_committed_cost_units: committed_before,
             budget_hold_id: hold.hold_id.clone(),
             authorize_metadata,
-            admission_operation: None,
+            admission_operation: caller_reservation_terms
+                .as_ref()
+                .and_then(|terms| terms.authorization.admission_operation.clone()),
         };
         let budget_metadata = self.budget_execution_receipt_metadata(
             &charge,
@@ -376,26 +694,52 @@ impl ChioKernel {
             oracle_evidence: None,
             attempted_cost: None,
         };
-        let metadata = merge_metadata_objects(
+        let mut metadata = merge_metadata_objects(
             Some(serde_json::json!({ "financial": financial })),
             Some(budget_metadata),
         );
+        if let Some((operation_metadata, _)) = caller_completion.as_ref() {
+            metadata = merge_metadata_objects(metadata, Some(operation_metadata.clone()));
+        }
 
-        let receipt_content = receipt_content_for_output(None, None)?;
-        let receipt = self.build_and_sign_receipt(ReceiptParams {
-            request_id: presented_nonce.reserving_request_id(),
-            capability_id: &bound_capability_id,
-            tool_name: &presented_nonce.nonce.bound_to.tool_name,
-            server_id: &presented_nonce.nonce.bound_to.tool_server,
-            decision: Decision::Allow,
-            action,
-            content_hash: receipt_content.content_hash,
-            canonical_content: receipt_content.canonical_content,
-            metadata,
-            timestamp: now_unix,
-            trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
-            tenant_id: None,
-        })?;
+        let receipt = (|| {
+            let receipt_content = receipt_content_for_output(None, None)?;
+            let frozen_policy_hash = caller_reservation_terms
+                .as_ref()
+                .map_or(self.config.policy_hash.as_str(), |terms| {
+                    terms.operation.policy_hash()
+                });
+            self.build_and_sign_receipt_for_policy_hash(
+                ReceiptParams {
+                    request_id: presented_nonce.reserving_request_id(),
+                    capability_id: &bound_capability_id,
+                    tool_name: &presented_nonce.nonce.bound_to.tool_name,
+                    server_id: &presented_nonce.nonce.bound_to.tool_server,
+                    decision: Decision::Allow,
+                    action,
+                    content_hash: receipt_content.content_hash,
+                    canonical_content: receipt_content.canonical_content,
+                    metadata,
+                    timestamp: now_unix,
+                    trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
+                    tenant_id: None,
+                },
+                frozen_policy_hash,
+            )
+        })();
+        let receipt = match receipt {
+            Ok(receipt) => receipt,
+            Err(error) => {
+                if let Some(terms) = caller_reservation_terms.as_ref() {
+                    self.terminalize_failed_caller_reservation_reconcile(
+                        terms.operation.operation_id(),
+                        reserved_hold_id,
+                        &error,
+                    )?;
+                }
+                return Err(error);
+            }
+        };
 
         let request_id = presented_nonce
             .reserving_request_id()
@@ -410,7 +754,22 @@ impl ChioKernel {
         // the persist failure rather than surfacing only the error. A settlement
         // FAILURE earlier (forged/replayed nonce, closed hold, currency mismatch)
         // still fails closed above, before this point.
-        if let Err(error) = self.record_chio_receipt(&receipt) {
+        if let Some((_, intent)) = caller_completion.as_ref() {
+            let Some(terms) = caller_reservation_terms.as_ref() else {
+                return Err(KernelError::Internal(
+                    "caller completion intent omitted its operation terms".to_string(),
+                ));
+            };
+            if let Err(error) = self.commit_caller_reservation_completion_receipt(intent, &receipt)
+            {
+                self.terminalize_failed_caller_reservation_reconcile(
+                    terms.operation.operation_id(),
+                    reserved_hold_id,
+                    &error,
+                )?;
+                return Err(error);
+            }
+        } else if let Err(error) = self.record_chio_receipt(&receipt) {
             warn!(
                 request_id = %request_id,
                 hold_id = %hold.hold_id,
@@ -419,6 +778,23 @@ impl ChioKernel {
                 reason = %redacted!(&error),
                 "durable receipt persistence failed after an irreversible reconcile settlement; \
                  returning the signed authoritative receipt"
+            );
+        }
+
+        // (7) The hold and, for an operation-owned reservation, its terminal
+        // signed outbox are durable before the single-use nonce mark. A consume
+        // failure is non-fatal because the closed hold rejects every replay.
+        if let Err(error) = consume_execution_nonce(
+            store,
+            presented_nonce.nonce_id(),
+            presented_nonce.expires_at(),
+        ) {
+            warn!(
+                nonce_id = %presented_nonce.nonce_id(),
+                hold_id = %hold.hold_id,
+                reason = %redacted!(&error),
+                "failed to mark the reconcile nonce consumed after an irreversible settlement; \
+                 the closed hold still rejects any replay"
             );
         }
 
@@ -439,6 +815,54 @@ impl ChioKernel {
             terminal_state: OperationTerminalState::Completed,
             receipt,
             execution_nonce: None,
+        })
+    }
+
+    fn terminalize_failed_caller_reservation_reconcile(
+        &self,
+        operation_id: &str,
+        hold_id: &str,
+        primary: &KernelError,
+    ) -> Result<(), KernelError> {
+        let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal(
+                "caller reservation reconcile lost its admission operation store".to_string(),
+            )
+        })?;
+        let operation = operation_store.load(operation_id)?.ok_or_else(|| {
+            KernelError::Internal(format!(
+                "caller reservation operation {operation_id} disappeared after settlement"
+            ))
+        })?;
+        let terminal = match operation.state() {
+            AdmissionOperationState::CallerReserved => self
+                .finalize_caller_reservation_outcome_unknown(
+                    &operation,
+                    "authoritative caller reservation receipt could not be signed after settlement",
+                    Some(serde_json::json!({
+                        "caller_reservation_recovery": {
+                            "hold_id": hold_id,
+                            "hold_disposition": "reconciled",
+                            "receipt_signing_failed": true,
+                        }
+                    })),
+                )
+                .map(|_| ()),
+            AdmissionOperationState::Completed
+            | AdmissionOperationState::OutcomeUnknownAfterDispatch => self
+                .validate_terminal_receipt_binding_with_store(
+                    operation_store.as_ref(),
+                    &operation,
+                ),
+            state => Err(KernelError::Internal(format!(
+                "caller reservation operation {operation_id} reached unexpected state {} after settlement",
+                state.as_str()
+            ))),
+        };
+        terminal.map_err(|error| {
+            KernelError::Internal(format!(
+                "{primary}; caller reservation settlement terminalization failed: {error}"
+            ))
         })
     }
 }

@@ -13,7 +13,7 @@ impl ChioKernel {
             })?;
         let mut operation_ids =
             operation_store.list_compensated_with_pending_cleanup(kind, scan_limit)?;
-        let overflowed_bound =
+        let more_remaining =
             operation_ids.len() > MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION;
         operation_ids.truncate(MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION);
         self.recover_compensated_admission_operation_ids(
@@ -21,7 +21,7 @@ impl ChioKernel {
             budget_store,
             approval_store,
             operation_ids,
-            overflowed_bound,
+            more_remaining,
         )
     }
 
@@ -49,7 +49,7 @@ impl ChioKernel {
         budget_store: &dyn BudgetStore,
         approval_store: Option<&dyn ApprovalStore>,
         operation_ids: Vec<String>,
-        overflowed_bound: bool,
+        more_remaining: bool,
     ) -> Result<usize, KernelError> {
         let mut completed = 0usize;
         let mut errors = Vec::new();
@@ -71,9 +71,9 @@ impl ChioKernel {
                 Err(error) => errors.push(format!("operation {operation_id}: {error}")),
             }
         }
-        if overflowed_bound {
+        if more_remaining {
             errors.push(format!(
-                "activation cleanup backlog exceeds the bounded {MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation scan"
+                "more admission cleanup operations remain after the bounded {MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation recovery batch"
             ));
         }
         if errors.is_empty() {
@@ -130,7 +130,12 @@ impl ChioKernel {
             if action.state() == AdmissionCleanupActionState::Completed {
                 continue;
             }
-            if action.kind() == AdmissionCleanupActionKind::TerminalReceipt {
+            if matches!(
+                action.kind(),
+                AdmissionCleanupActionKind::TerminalReceipt
+                    | AdmissionCleanupActionKind::CallerReservationHandoffIntent
+                    | AdmissionCleanupActionKind::CallerReservationHandoff
+            ) {
                 continue;
             }
             let now_unix_ms = match cleanup_unix_ms() {
@@ -284,8 +289,12 @@ impl ChioKernel {
         }
         let participants_completed = match operation_store.load_cleanup_actions(operation_id) {
             Ok(actions) => actions.iter().all(|action| {
-                action.kind() == AdmissionCleanupActionKind::TerminalReceipt
-                    || action.state() == AdmissionCleanupActionState::Completed
+                matches!(
+                    action.kind(),
+                    AdmissionCleanupActionKind::TerminalReceipt
+                        | AdmissionCleanupActionKind::CallerReservationHandoffIntent
+                        | AdmissionCleanupActionKind::CallerReservationHandoff
+                ) || action.state() == AdmissionCleanupActionState::Completed
             }),
             Err(error) => {
                 errors.push(format!("final cleanup journal reload failed: {error}"));
@@ -406,6 +415,13 @@ impl ChioKernel {
                 validate_schema(&payload.schema, BROKER_CLEANUP_SCHEMA)?;
                 self.execute_broker_cleanup(operation, payload)
             }
+            AdmissionCleanupActionKind::CallerReservationHandoffIntent
+            | AdmissionCleanupActionKind::CallerReservationHandoff => Err(
+                KernelError::Internal(
+                    "caller reservation forward actions must never enter compensation dispatch"
+                        .to_string(),
+                ),
+            ),
             AdmissionCleanupActionKind::TerminalReceipt => Err(KernelError::Internal(
                 "terminal receipt outboxes must be replayed forward by terminal receipt recovery"
                     .to_string(),
@@ -824,6 +840,7 @@ impl ChioKernel {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn advance_payment_cleanup_journal(
         &self,
         journaled: bool,

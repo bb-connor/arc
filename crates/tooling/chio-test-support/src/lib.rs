@@ -23,6 +23,9 @@
 //! permits loopback sockets and return early only when the operating system
 //! denies the bind itself.
 //!
+//! The [`private_fs`] module creates private temporary directories and unique
+//! SQLite paths beneath a canonical process-scoped root.
+//!
 //! These helpers are intended for use from `#[cfg(test)]` code only. Add the
 //! crate as a `[dev-dependencies]` entry and bring the traits into scope with
 //! `use chio_test_support::prelude::*;` (or `use chio_test_support::ctx::*;`).
@@ -174,6 +177,435 @@ pub mod ctx {
     }
 }
 
+/// Private filesystem fixtures for tests that exercise authority-bearing files.
+pub mod private_fs {
+    use std::fs;
+    use std::io;
+    use std::path::{Component, Path, PathBuf};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::OnceLock;
+
+    use tempfile::{Builder, TempDir};
+
+    const SQLITE_ROOT_PREFIX: &str = "chio-sqlite-tests-";
+
+    #[cfg(unix)]
+    const SQLITE_ROOT_LEASE_FILE: &str = ".chio-sqlite-root.lease";
+
+    static PRIVATE_SQLITE_ROOT: OnceLock<PrivateSqliteRoot> = OnceLock::new();
+    static NEXT_SQLITE_PATH: AtomicU64 = AtomicU64::new(0);
+
+    struct PrivateSqliteRoot {
+        path: PathBuf,
+        #[cfg(unix)]
+        _lease: fs::File,
+    }
+
+    /// Return a unique SQLite path beneath this test process's canonical private root.
+    #[must_use]
+    #[track_caller]
+    pub fn unique_sqlite_path(prefix: &str) -> PathBuf {
+        if let Err(error) = validate_prefix(prefix) {
+            panic!("invalid private test path prefix {prefix:?}: {error}");
+        }
+        let sequence =
+            match NEXT_SQLITE_PATH.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                current.checked_add(1)
+            }) {
+                Ok(sequence) => sequence,
+                Err(_) => panic!("private SQLite test path sequence exhausted"),
+            };
+        private_sqlite_root().join(format!("{prefix}-{sequence}.sqlite3"))
+    }
+
+    /// Create a randomized temporary directory with private authority.
+    pub fn private_tempdir(prefix: &str) -> io::Result<TempDir> {
+        validate_prefix(prefix)?;
+        let base = fs::canonicalize(std::env::temp_dir())?;
+        private_tempdir_in(prefix, &base)
+    }
+
+    fn private_tempdir_in(prefix: &str, base: &Path) -> io::Result<TempDir> {
+        validate_prefix(prefix)?;
+        let mut builder = Builder::new();
+        builder.prefix(prefix);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            builder.permissions(fs::Permissions::from_mode(0o700));
+        }
+        let directory = builder.tempdir_in(base)?;
+        enforce_private_directory(directory.path())?;
+        Ok(directory)
+    }
+
+    #[track_caller]
+    fn private_sqlite_root() -> &'static Path {
+        PRIVATE_SQLITE_ROOT
+            .get_or_init(|| match initialize_private_sqlite_root() {
+                Ok(root) => root,
+                Err(error) => panic!("create private SQLite test root: {error}"),
+            })
+            .path
+            .as_path()
+    }
+
+    #[cfg(unix)]
+    fn initialize_private_sqlite_root() -> io::Result<PrivateSqliteRoot> {
+        let base = fs::canonicalize(std::env::temp_dir())?;
+        initialize_private_sqlite_root_in(&base)
+    }
+
+    #[cfg(unix)]
+    fn initialize_private_sqlite_root_in(base: &Path) -> io::Result<PrivateSqliteRoot> {
+        let setup_lock = acquire_sqlite_root_setup_lock(base)?;
+        reap_stale_sqlite_roots(base)?;
+
+        let directory = private_tempdir_in(SQLITE_ROOT_PREFIX, base)?;
+        let canonical = fs::canonicalize(directory.path())?;
+        let lease = create_private_lock_file(&canonical.join(SQLITE_ROOT_LEASE_FILE))?;
+        rustix::fs::flock(&lease, rustix::fs::FlockOperation::LockExclusive)
+            .map_err(io::Error::from)?;
+
+        // The root must outlive every parallel test in this process. A later
+        // process reclaims it only after this process's lease is released.
+        let retained_path = directory.keep();
+        drop(retained_path);
+        drop(setup_lock);
+
+        Ok(PrivateSqliteRoot {
+            path: canonical,
+            _lease: lease,
+        })
+    }
+
+    #[cfg(not(unix))]
+    fn initialize_private_sqlite_root() -> io::Result<PrivateSqliteRoot> {
+        let directory = private_tempdir(SQLITE_ROOT_PREFIX)?;
+        let canonical = fs::canonicalize(directory.path())?;
+        let retained_path = directory.keep();
+        drop(retained_path);
+        Ok(PrivateSqliteRoot { path: canonical })
+    }
+
+    #[cfg(unix)]
+    fn acquire_sqlite_root_setup_lock(base: &Path) -> io::Result<fs::File> {
+        let path = sqlite_root_setup_lock_path(base);
+        let lock = open_or_create_private_lock_file(&path)?;
+        loop {
+            match rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive) {
+                Ok(()) => return Ok(lock),
+                Err(error) if error == rustix::io::Errno::INTR => {}
+                Err(error) => return Err(io::Error::from(error)),
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn sqlite_root_setup_lock_path(base: &Path) -> PathBuf {
+        let effective_uid = rustix::process::geteuid().as_raw();
+        base.join(format!(".chio-sqlite-root-setup-{effective_uid}.lock"))
+    }
+
+    #[cfg(unix)]
+    fn reap_stale_sqlite_roots(base: &Path) -> io::Result<()> {
+        for entry in fs::read_dir(base)? {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(_) => continue,
+            };
+            let candidate = entry.path();
+            if !is_sqlite_root_name(&candidate) || !is_private_sqlite_root(&candidate) {
+                continue;
+            }
+
+            let lease_path = candidate.join(SQLITE_ROOT_LEASE_FILE);
+            let lease = match open_existing_private_lock_file(&lease_path) {
+                Ok(lease) => lease,
+                Err(_) => continue,
+            };
+            match rustix::fs::flock(&lease, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+                Ok(()) => {
+                    if is_private_sqlite_root(&candidate)
+                        && validate_private_lock_file(&lease_path, &lease).is_ok()
+                    {
+                        let _ = fs::remove_dir_all(candidate);
+                    }
+                }
+                Err(error)
+                    if error == rustix::io::Errno::WOULDBLOCK
+                        || error == rustix::io::Errno::AGAIN => {}
+                Err(_) => {}
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn is_sqlite_root_name(path: &Path) -> bool {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| {
+                name.starts_with(SQLITE_ROOT_PREFIX) && name.len() > SQLITE_ROOT_PREFIX.len()
+            })
+    }
+
+    #[cfg(unix)]
+    fn is_private_sqlite_root(path: &Path) -> bool {
+        use std::os::unix::fs::MetadataExt;
+
+        let metadata = match fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(_) => return false,
+        };
+        metadata.file_type().is_dir()
+            && metadata.uid() == rustix::process::geteuid().as_raw()
+            && metadata.mode() & 0o7777 == 0o700
+    }
+
+    #[cfg(unix)]
+    fn open_or_create_private_lock_file(path: &Path) -> io::Result<fs::File> {
+        match create_private_lock_file(path) {
+            Ok(file) => Ok(file),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                open_existing_private_lock_file(path)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    #[cfg(unix)]
+    fn create_private_lock_file(path: &Path) -> io::Result<fs::File> {
+        let descriptor = rustix::fs::open(
+            path,
+            rustix::fs::OFlags::RDWR
+                | rustix::fs::OFlags::CREATE
+                | rustix::fs::OFlags::EXCL
+                | rustix::fs::OFlags::CLOEXEC
+                | rustix::fs::OFlags::NOFOLLOW,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        )
+        .map_err(io::Error::from)?;
+        let file = fs::File::from(descriptor);
+        validate_private_lock_file_identity(path, &file)?;
+        rustix::fs::fchmod(&file, rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR)
+            .map_err(io::Error::from)?;
+        validate_private_lock_file(path, &file)?;
+        Ok(file)
+    }
+
+    #[cfg(unix)]
+    fn open_existing_private_lock_file(path: &Path) -> io::Result<fs::File> {
+        let descriptor = rustix::fs::open(
+            path,
+            rustix::fs::OFlags::RDWR | rustix::fs::OFlags::CLOEXEC | rustix::fs::OFlags::NOFOLLOW,
+            rustix::fs::Mode::empty(),
+        )
+        .map_err(io::Error::from)?;
+        let file = fs::File::from(descriptor);
+        validate_private_lock_file(path, &file)?;
+        Ok(file)
+    }
+
+    #[cfg(unix)]
+    fn validate_private_lock_file_identity(path: &Path, file: &fs::File) -> io::Result<()> {
+        use std::os::unix::fs::MetadataExt;
+
+        let path_metadata = fs::symlink_metadata(path)?;
+        let descriptor_metadata = file.metadata()?;
+        if !path_metadata.file_type().is_file()
+            || !descriptor_metadata.file_type().is_file()
+            || path_metadata.dev() != descriptor_metadata.dev()
+            || path_metadata.ino() != descriptor_metadata.ino()
+            || descriptor_metadata.uid() != rustix::process::geteuid().as_raw()
+            || descriptor_metadata.nlink() != 1
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "private lock file identity is unsafe",
+            ));
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn validate_private_lock_file(path: &Path, file: &fs::File) -> io::Result<()> {
+        use std::os::unix::fs::MetadataExt;
+
+        validate_private_lock_file_identity(path, file)?;
+        let mode = file.metadata()?.mode() & 0o7777;
+        if mode != 0o600 {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!("private lock file has mode {mode:04o}, expected 0600"),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_prefix(prefix: &str) -> io::Result<()> {
+        let mut components = Path::new(prefix).components();
+        match (components.next(), components.next()) {
+            (Some(Component::Normal(component)), None) if !component.is_empty() => Ok(()),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "prefix must be one non-empty normal path component",
+            )),
+        }
+    }
+
+    fn enforce_private_directory(path: &Path) -> io::Result<()> {
+        let metadata = fs::symlink_metadata(path)?;
+        if !metadata.file_type().is_dir() {
+            return Err(io::Error::other(
+                "private test directory is not a real directory",
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+            let mode = fs::symlink_metadata(path)?.permissions().mode() & 0o777;
+            if mode != 0o700 {
+                return Err(io::Error::other(format!(
+                    "private test directory has mode {mode:04o}, expected 0700"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(all(test, unix))]
+    mod tests {
+        use std::io;
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        use super::{
+            acquire_sqlite_root_setup_lock, create_private_lock_file,
+            open_existing_private_lock_file, private_tempdir, reap_stale_sqlite_roots,
+            sqlite_root_setup_lock_path, SQLITE_ROOT_LEASE_FILE, SQLITE_ROOT_PREFIX,
+        };
+
+        #[test]
+        fn active_sqlite_root_is_preserved() -> io::Result<()> {
+            let base = private_tempdir("chio-reaper-active-")?;
+            let candidate = create_candidate(base.path(), "active")?;
+            let lease = create_private_lock_file(&candidate.join(SQLITE_ROOT_LEASE_FILE))?;
+            rustix::fs::flock(&lease, rustix::fs::FlockOperation::LockExclusive)
+                .map_err(io::Error::from)?;
+
+            reap_stale_sqlite_roots(base.path())?;
+
+            assert!(candidate.is_dir());
+            Ok(())
+        }
+
+        #[test]
+        fn released_sqlite_root_is_reclaimed() -> io::Result<()> {
+            let base = private_tempdir("chio-reaper-released-")?;
+            let candidate = create_candidate(base.path(), "released")?;
+            let lease = create_private_lock_file(&candidate.join(SQLITE_ROOT_LEASE_FILE))?;
+            rustix::fs::flock(&lease, rustix::fs::FlockOperation::LockExclusive)
+                .map_err(io::Error::from)?;
+            drop(lease);
+
+            reap_stale_sqlite_roots(base.path())?;
+
+            assert!(!candidate.exists());
+            Ok(())
+        }
+
+        #[test]
+        fn unsafe_roots_and_lease_files_are_preserved() -> io::Result<()> {
+            let base = private_tempdir("chio-reaper-unsafe-")?;
+            let unsafe_root = create_candidate(base.path(), "unsafe-root")?;
+            let root_lease = create_private_lock_file(&unsafe_root.join(SQLITE_ROOT_LEASE_FILE))?;
+            drop(root_lease);
+            std::fs::set_permissions(&unsafe_root, std::fs::Permissions::from_mode(0o755))?;
+
+            let unsafe_lease = create_candidate(base.path(), "unsafe-lease")?;
+            let lease_path = unsafe_lease.join(SQLITE_ROOT_LEASE_FILE);
+            let lease = create_private_lock_file(&lease_path)?;
+            drop(lease);
+            std::fs::set_permissions(&lease_path, std::fs::Permissions::from_mode(0o644))?;
+
+            reap_stale_sqlite_roots(base.path())?;
+
+            assert!(unsafe_root.is_dir());
+            assert!(unsafe_lease.is_dir());
+            Ok(())
+        }
+
+        #[test]
+        fn symlink_roots_and_lease_files_are_preserved() -> io::Result<()> {
+            let base = private_tempdir("chio-reaper-symlink-")?;
+            let root_target = base.path().join("root-target");
+            std::fs::create_dir(&root_target)?;
+            let symlink_root = base
+                .path()
+                .join(format!("{SQLITE_ROOT_PREFIX}symlink-root"));
+            symlink(&root_target, &symlink_root)?;
+
+            let symlink_lease_root = create_candidate(base.path(), "symlink-lease")?;
+            let lease_target = base.path().join("lease-target");
+            std::fs::write(&lease_target, b"not a lease")?;
+            symlink(
+                &lease_target,
+                symlink_lease_root.join(SQLITE_ROOT_LEASE_FILE),
+            )?;
+
+            reap_stale_sqlite_roots(base.path())?;
+
+            assert!(std::fs::symlink_metadata(&symlink_root)?
+                .file_type()
+                .is_symlink());
+            assert!(root_target.is_dir());
+            assert!(symlink_lease_root.is_dir());
+            assert!(lease_target.is_file());
+            Ok(())
+        }
+
+        #[test]
+        fn sqlite_root_setup_lock_serializes_initializers() -> io::Result<()> {
+            let base = private_tempdir("chio-reaper-setup-")?;
+            let canonical_base = std::fs::canonicalize(base.path())?;
+            let setup_lock = acquire_sqlite_root_setup_lock(&canonical_base)?;
+            let contender =
+                open_existing_private_lock_file(&sqlite_root_setup_lock_path(&canonical_base))?;
+            let contention = rustix::fs::flock(
+                &contender,
+                rustix::fs::FlockOperation::NonBlockingLockExclusive,
+            );
+            assert!(matches!(
+                contention,
+                Err(error)
+                    if error == rustix::io::Errno::WOULDBLOCK
+                        || error == rustix::io::Errno::AGAIN
+            ));
+
+            drop(setup_lock);
+            rustix::fs::flock(
+                &contender,
+                rustix::fs::FlockOperation::NonBlockingLockExclusive,
+            )
+            .map_err(io::Error::from)?;
+            Ok(())
+        }
+
+        fn create_candidate(
+            base: &std::path::Path,
+            suffix: &str,
+        ) -> io::Result<std::path::PathBuf> {
+            let path = base.join(format!("{SQLITE_ROOT_PREFIX}{suffix}"));
+            std::fs::create_dir(&path)?;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
+            Ok(path)
+        }
+    }
+}
+
 /// Glob-import target for the default (context-free) helper family.
 ///
 /// `use chio_test_support::prelude::*;` brings [`plain::TestResultOk`] and
@@ -264,6 +696,39 @@ mod tests {
     use crate::plain;
 
     struct NonDebugHandle;
+
+    #[cfg(unix)]
+    #[test]
+    fn unique_sqlite_path_uses_an_exact_private_parent_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        use plain::TestResultOk;
+
+        let path = crate::private_fs::unique_sqlite_path("private-mode");
+        let parent = path.parent().test_expect("SQLite test path has a parent");
+        let mode = std::fs::symlink_metadata(parent)
+            .test_expect("inspect SQLite test parent")
+            .permissions()
+            .mode()
+            & 0o777;
+
+        assert_eq!(mode, 0o700);
+    }
+
+    #[test]
+    fn unique_sqlite_paths_do_not_reuse_a_same_prefix_name() {
+        let first = crate::private_fs::unique_sqlite_path("same-prefix");
+        let second = crate::private_fs::unique_sqlite_path("same-prefix");
+
+        assert_ne!(first, second);
+        assert_eq!(first.parent(), second.parent());
+    }
+
+    #[test]
+    #[should_panic(expected = "prefix must be one non-empty normal path component")]
+    fn unique_sqlite_path_rejects_a_separator_prefix() {
+        let _ = crate::private_fs::unique_sqlite_path("nested/path");
+    }
 
     #[test]
     fn ctx_unwrap_err_accepts_non_debug_ok_payloads() {

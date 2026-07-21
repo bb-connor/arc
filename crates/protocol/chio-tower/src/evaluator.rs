@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn builder_with_durable_stores_allows_safe_method() -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
+        let dir = chio_test_support::private_fs::private_tempdir("tower-durable-evaluator-")?;
         let receipt_store: std::sync::Arc<dyn chio_kernel::ReceiptStore> = std::sync::Arc::new(
             chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
         );
@@ -633,7 +633,7 @@ mod tests {
         // must convert into a core receipt that this verification accepts, or a
         // durable deployment fails closed on every request instead of serving with
         // persistence.
-        let dir = tempfile::tempdir()?;
+        let dir = chio_test_support::private_fs::private_tempdir("tower-receipt-persistence-")?;
         let keypair = Keypair::generate();
         let store: std::sync::Arc<dyn chio_kernel::ReceiptStore> = std::sync::Arc::new(
             chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,

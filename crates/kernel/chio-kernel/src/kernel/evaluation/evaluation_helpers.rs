@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::kernel::responses::ReservedHoldStamp;
+use crate::kernel::responses::{OperationOwnedCallerReservationResponse, ReservedHoldStamp};
 
 /// Incomplete-decision reason for a strict-nonce preflight whose hold was
 /// reversed. The caller retries the same endpoint presenting the minted nonce,
@@ -48,7 +48,9 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
     pub(super) matched_grant_index: usize,
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
+    pub(super) caller_receipt_metadata: Option<&'a serde_json::Value>,
     pub(super) reserved_payment_reference: Option<String>,
+    pub(super) threshold_supplemental_prepared: bool,
     /// Whether THIS evaluation acquired a sibling-sum child-budget holder lease
     /// (the `admit_capability_budget` return). The non-monetary share release
     /// runs only when true so the reference-counted release never frees an
@@ -82,7 +84,7 @@ impl ChioKernel {
         if let Err(failure) = self.release_post_dispatch_monetary_invocation(
             request,
             cap,
-            budget_mutation.charge_result(),
+            budget_mutation,
             payment_authorization,
             threshold_operation.is_some(),
         ) {
@@ -354,10 +356,9 @@ impl ChioKernel {
     /// the caller presents the minted nonce, or reclaimed by the crash reaper
     /// if the caller never executes (fail-closed, never over-subscribed).
     ///
-    /// A non-monetary grant authorizes no reserved hold, so there is nothing to
-    /// record the sibling-sum share against or ever close; the share is released
-    /// immediately (as the reverse-for-retry preflight does) rather than leaked
-    /// for the parent's lifetime.
+    /// An invocation-limited non-monetary grant authorizes an atomic
+    /// zero-exposure hold. Only a fully unlimited grant authorizes no hold and
+    /// releases its sibling-sum share immediately.
     ///
     /// The receipt records the reserved hold's authorize block with no terminal
     /// disposition, so it is truthfully non-authoritative: the hold is reserved,
@@ -372,13 +373,11 @@ impl ChioKernel {
             matched_grant_index,
             budget_mutation,
             runtime_admission_metadata,
+            caller_receipt_metadata,
             reserved_payment_reference,
+            threshold_supplemental_prepared,
             budget_lease_acquired,
         } = reserving;
-        let runtime_admission_metadata = self
-            .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                runtime_admission_metadata,
-            );
 
         // Only an unlimited grant (no reserved hold at all) authorizes nothing
         // durable to record the delegated child's admitted sibling-sum share
@@ -399,43 +398,49 @@ impl ChioKernel {
         // Record the reserved hold's authorize block with NO terminal event:
         // the hold is open, neither reversed nor reconciled. This is what keeps
         // the receipt non-authoritative and keeps the budget reserved.
-        let budget_metadata = budget_mutation
-            .charge_result()
-            .map(|charge| self.budget_execution_receipt_metadata(charge, None, None));
-        let authorization_metadata = Some(serde_json::json!({
-            "execution_nonce": {
-                "stage": "authorization",
-                "tool_dispatched": false,
-                "hold_disposition": "reserved"
-            }
-        }));
-        let metadata = merge_metadata_objects(
-            merge_metadata_objects(runtime_admission_metadata, budget_metadata),
-            authorization_metadata,
-        );
+        let metadata =
+            self.caller_reservation_response_metadata(budget_mutation, runtime_admission_metadata);
+
+        if let PreExecutionBudgetMutation::Admission(admission) = budget_mutation {
+            return self.build_operation_owned_caller_reservation_response(
+                OperationOwnedCallerReservationResponse {
+                    request,
+                    admission,
+                    caller_receipt_metadata,
+                    reserved_payment_reference,
+                    threshold_supplemental_prepared,
+                    budget_lease_acquired,
+                },
+            );
+        }
 
         // The reserved hold is kept open and bound into the signed nonce so
         // reconcile-by-nonce (and reverse-by-nonce) can name the exact hold to
         // settle at the execution site. The response builder stamps the hold's TTL
         // deadline from the minted nonce's exact expiry, keeping the reaper
         // deadline and the nonce validity window consistent. A monetary grant
-        // keeps its already-authorized charge; an invocation-only grant adopts its
-        // already-debited invocation into a durable zero-exposure reserved hold so
-        // the reaper and reconcile/reverse paths handle it uniformly.
+        // keeps its already-authorized charge; an invocation-only caller
+        // reservation stamps the zero-exposure hold that was authorized atomically
+        // with its invocation debit.
         let reserved_hold = match budget_mutation {
             PreExecutionBudgetMutation::Charge(charge) => Some(ReservedHoldStamp::Monetary {
                 charge,
                 payment_reference: reserved_payment_reference,
             }),
-            PreExecutionBudgetMutation::Invocation { grant_index } => {
-                let hold_id = format!(
-                    "budget-hold:{}:{}:{}",
-                    request.request_id, request.capability.id, grant_index
-                );
-                Some(ReservedHoldStamp::Invocation {
-                    hold_id,
-                    grant_index: *grant_index,
-                })
+            PreExecutionBudgetMutation::InvocationReservation(reservation) => {
+                Some(ReservedHoldStamp::InvocationReservation { reservation })
+            }
+            PreExecutionBudgetMutation::Invocation { .. } => {
+                return Err(KernelError::Internal(
+                    "caller reservation reached response without an atomic invocation hold"
+                        .to_string(),
+                ));
+            }
+            PreExecutionBudgetMutation::Admission(_) => {
+                return Err(KernelError::Internal(
+                    "operation-owned reservation bypassed the composite reservation builder"
+                        .to_string(),
+                ));
             }
             PreExecutionBudgetMutation::None => None,
         };
@@ -448,5 +453,52 @@ impl ChioKernel {
             EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
             reserved_hold,
         )
+    }
+
+    pub(crate) fn caller_reservation_response_metadata(
+        &self,
+        budget_mutation: &PreExecutionBudgetMutation,
+        runtime_admission_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let budget_metadata = budget_mutation
+            .charge_result()
+            .map(|charge| self.budget_execution_receipt_metadata(charge, None, None))
+            .or_else(|| match budget_mutation {
+                PreExecutionBudgetMutation::InvocationReservation(reservation) => {
+                    Some(self.budget_invocation_reservation_receipt_metadata(reservation))
+                }
+                _ => None,
+            });
+        let authorization_metadata = Some(serde_json::json!({
+            "execution_nonce": {
+                "stage": "authorization",
+                "tool_dispatched": false,
+                "hold_disposition": "reserved"
+            }
+        }));
+        merge_metadata_objects(
+            merge_metadata_objects(runtime_admission_metadata, budget_metadata),
+            authorization_metadata,
+        )
+    }
+
+    pub(crate) fn prepare_operation_owned_caller_reservation_handoff(
+        &self,
+        request: &ToolCallRequest,
+        timestamp: u64,
+        matched_grant_index: usize,
+        admission: &OrdinaryAdmissionMutation,
+        response_metadata: Option<serde_json::Value>,
+        caller_receipt_metadata: Option<&serde_json::Value>,
+    ) -> Result<(), KernelError> {
+        self.prepare_caller_reservation_handoff_intent(PrepareCallerReservationHandoff {
+            request,
+            timestamp,
+            matched_grant_index,
+            admission,
+            response_metadata,
+            caller_receipt_metadata,
+            incomplete_reason: EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
+        })
     }
 }

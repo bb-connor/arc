@@ -30,19 +30,12 @@ pub(crate) async fn sidecar_evaluate_handler(
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({
                     "error": "chio_bad_request",
-                    "message": format!("invalid ChioHttpRequest payload: {error}"),
+                    "message": "invalid ChioHttpRequest payload",
                 })),
             )
                 .into_response();
         }
     };
-
-    if let Some(response) =
-        revoked_sidecar_evaluate_response(&state, &chio_request, presented_capability.as_deref())
-            .await
-    {
-        return response;
-    }
 
     let result = match state
         .evaluator
@@ -61,7 +54,7 @@ pub(crate) async fn sidecar_evaluate_handler(
             StatusCode::INTERNAL_SERVER_ERROR,
             axum::Json(serde_json::json!({
                 "error": "chio_receipt_persistence_failed",
-                "message": error.to_string(),
+                "message": "failed to persist evaluation receipt",
             })),
         )
             .into_response();
@@ -107,7 +100,7 @@ pub(crate) async fn sidecar_verify_handler(
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({
                     "error": "chio_bad_request",
-                    "message": format!("invalid HttpReceipt payload: {error}"),
+                    "message": "invalid HttpReceipt payload",
                 })),
             )
                 .into_response();
@@ -243,8 +236,7 @@ pub(crate) async fn sidecar_mint_handler(
         Ok(request) => request,
         Err(error) => {
             warn!("failed to decode capability mint request: {error}");
-            return sidecar_bad_request(&format!("invalid capability mint payload: {error}"))
-                .into_response();
+            return sidecar_bad_request("invalid capability mint payload").into_response();
         }
     };
 
@@ -257,7 +249,7 @@ pub(crate) async fn sidecar_mint_handler(
         Err(error) => return sidecar_bad_request(&error).into_response(),
     };
 
-    let issued_at = chrono::Utc::now().timestamp() as u64;
+    let issued_at = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
     let ttl_seconds = ttl_seconds_from_wire(mint_request.ttl_seconds, mint_request.ttl_nanos);
     let expires_at = issued_at.saturating_add(ttl_seconds);
     let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
@@ -297,7 +289,7 @@ pub(crate) async fn sidecar_mint_handler(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(serde_json::json!({
                     "error": "chio_capability_mint_failed",
-                    "message": error.to_string(),
+                    "message": "failed to sign capability token",
                 })),
             )
                 .into_response();
@@ -333,53 +325,50 @@ pub(crate) async fn sidecar_release_handler(
         Ok(request) => request,
         Err(error) => {
             warn!("failed to decode capability release request: {error}");
-            return sidecar_bad_request(&format!("invalid capability release payload: {error}"))
-                .into_response();
+            return sidecar_bad_request("invalid capability release payload").into_response();
         }
     };
 
-    if release_request.capability_id.trim().is_empty() {
-        return sidecar_bad_request("capability_id must not be empty").into_response();
+    if release_request.capability_id.is_empty() || release_request.capability_id.len() > 1024 {
+        return sidecar_bad_request("capability_id must contain between 1 and 1024 bytes")
+            .into_response();
     }
 
-    let capability_id = release_request.capability_id.trim().to_string();
+    // Capability identifiers are signed protocol values. Preserve the exact
+    // Unicode scalar sequence supplied by the caller: trimming or normalizing
+    // here could revoke a different signed identifier.
+    let capability_id = release_request.capability_id;
 
-    // Record the release in the receipt store's revoked-capabilities table when
-    // a durable receipt database is configured, so a restart reloads it into the
-    // in-memory validate set. In ephemeral mode there is no such table; the
-    // shared revocation store below still makes the release effective in-process.
-    if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
-        if let Err(error) = store.revoke_capability(&capability_id) {
-            warn!("failed to persist capability revocation: {error}");
-            return internal_json_error_response(
-                "chio_capability_release_failed",
-                &error.to_string(),
-            );
-        }
-    }
-
-    // Record in the revocation store shared with the embedded kernel. It is
-    // present in every serving mode (the durable sibling database, or an
-    // in-memory store in ephemeral mode), so a release takes effect for mediated
-    // dispatch in-process and, when durable, for a sibling replica sharing the
-    // volume without waiting for a restart. Fail closed: a release that cannot be
-    // recorded must not report success.
+    // Commit to the exact revocation authority shared by the evaluator, kernel,
+    // release route, and proxy state before touching any derivative state. If
+    // this write fails, no cache or legacy receipt-table mutation is permitted.
     let Some(revocation_store) = &state.revocation_store else {
+        warn!("capability release rejected: no authoritative revocation store is configured");
         return internal_json_error_response(
             "chio_capability_release_failed",
-            "no revocation store is configured for capability release",
+            "capability release could not be recorded",
         );
     };
     if let Err(error) = revocation_store.revoke(&capability_id) {
-        warn!("failed to record capability revocation: {error}");
-        return internal_json_error_response("chio_capability_release_failed", &error.to_string());
+        warn!("failed to write authoritative capability revocation: {error}");
+        return internal_json_error_response(
+            "chio_capability_release_failed",
+            "capability release could not be recorded",
+        );
     }
-    state
-        .revoked_capability_ids
-        .lock()
-        .await
-        .insert(capability_id);
+    state.cache_revoked_capability(&capability_id).await;
+
+    // Preserve the historical receipt-table copy for compatibility, but it is
+    // no longer an authority. A mirror failure is logged and cannot undo or hide
+    // the already-effective shared revocation.
+    if let Some(store) = &state.receipt_store {
+        let mut store = store.lock().await;
+        if let Err(error) = store.revoke_capability(&capability_id) {
+            warn!(
+                "failed to mirror authoritative capability revocation into legacy receipt table: {error}"
+            );
+        }
+    }
     let _ = (release_request.job_uid, release_request.reason);
 
     (
@@ -411,8 +400,7 @@ pub(crate) async fn sidecar_submit_receipt_handler(
         Ok(request) => request,
         Err(error) => {
             warn!("failed to decode receipt submission payload: {error}");
-            return sidecar_bad_request(&format!("invalid receipt submission payload: {error}"))
-                .into_response();
+            return sidecar_bad_request("invalid receipt submission payload").into_response();
         }
     };
 
@@ -442,7 +430,10 @@ pub(crate) async fn sidecar_submit_receipt_handler(
         Ok(hash) => hash,
         Err(error) => {
             warn!("failed to hash synthetic receipt caller identity: {error}");
-            return internal_json_error_response("chio_receipt_sign_failed", &error.to_string());
+            return internal_json_error_response(
+                "chio_receipt_sign_failed",
+                "failed to create submitted sidecar receipt",
+            );
         }
     };
 
@@ -450,7 +441,7 @@ pub(crate) async fn sidecar_submit_receipt_handler(
     let capability_id = receipt_request
         .capability_id
         .clone()
-        .filter(|value| !value.trim().is_empty());
+        .filter(|value| !value.is_empty());
     let receipt = match HttpReceipt::sign(
         HttpReceiptBody {
             id: receipt_id.clone(),
@@ -468,7 +459,7 @@ pub(crate) async fn sidecar_submit_receipt_handler(
             actor_chain: Vec::new(),
             evidence: Vec::new(),
             response_status: StatusCode::OK.as_u16(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0),
             content_hash: chio_core_types::sha256_hex(&body_bytes),
             policy_hash: manual_receipt_policy_hash("chio_api_protect_sidecar_receipt_submission"),
             trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
@@ -481,13 +472,19 @@ pub(crate) async fn sidecar_submit_receipt_handler(
         Ok(receipt) => receipt,
         Err(error) => {
             warn!("failed to sign submitted sidecar receipt: {error}");
-            return internal_json_error_response("chio_receipt_sign_failed", &error.to_string());
+            return internal_json_error_response(
+                "chio_receipt_sign_failed",
+                "failed to create submitted sidecar receipt",
+            );
         }
     };
 
     if let Err(error) = record_receipt(&state, &receipt).await {
         warn!("failed to persist submitted sidecar receipt: {error}");
-        return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
+        return internal_json_error_response(
+            "chio_receipt_persistence_failed",
+            "failed to persist submitted sidecar receipt",
+        );
     }
 
     (
@@ -557,8 +554,7 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         Ok(request) => request,
         Err(error) => {
             warn!("failed to decode capability alias mint request: {error}");
-            return sidecar_bad_request(&format!("invalid capability mint payload: {error}"))
-                .into_response();
+            return sidecar_bad_request("invalid capability mint payload").into_response();
         }
     };
 
@@ -594,7 +590,7 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         }
     };
 
-    let issued_at = chrono::Utc::now().timestamp() as u64;
+    let issued_at = u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
     let ttl_seconds = ttl_seconds_from_wire(ttl_seconds_wire, ttl_nanos_wire);
     let expires_at = issued_at.saturating_add(ttl_seconds);
     let subject_key = derive_sidecar_subject_key(&subject, &job_uid);
@@ -626,7 +622,10 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         Ok(capability) => capability,
         Err(error) => {
             warn!("failed to sign capability token from alias mint: {error}");
-            return internal_json_error_response("chio_capability_mint_failed", &error.to_string());
+            return internal_json_error_response(
+                "chio_capability_mint_failed",
+                "failed to sign capability token",
+            );
         }
     };
 
@@ -701,23 +700,6 @@ pub(crate) async fn sidecar_validate_capability_handler(
     let capability_id = token.id.clone();
     let expires_at = Some(token.expires_at);
 
-    // Fail-closed: revoked capabilities are invalid even if the signature
-    // verifies and `expires_at` is in the future. Consult the durable store as
-    // well so a revocation a sibling replica recorded is honored here too.
-    let revoked = state.capability_is_revoked(&capability_id).await;
-    if revoked {
-        return (
-            StatusCode::OK,
-            axum::Json(SidecarValidateCapabilityResponse {
-                valid: false,
-                reason: Some("capability has been revoked".to_string()),
-                expires_at,
-                capability_id,
-            }),
-        )
-            .into_response();
-    }
-
     if !state.trusted_capability_issuers.contains(&token.issuer) {
         return (
             StatusCode::OK,
@@ -745,7 +727,33 @@ pub(crate) async fn sidecar_validate_capability_handler(
             .into_response();
     }
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match checked_unix_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(reason) => {
+            return (
+                StatusCode::OK,
+                axum::Json(SidecarValidateCapabilityResponse {
+                    valid: false,
+                    reason: Some(reason.to_string()),
+                    expires_at,
+                    capability_id,
+                }),
+            )
+                .into_response();
+        }
+    };
+    if token.issued_at > now {
+        return (
+            StatusCode::OK,
+            axum::Json(SidecarValidateCapabilityResponse {
+                valid: false,
+                reason: Some("capability is not yet valid".to_string()),
+                expires_at,
+                capability_id,
+            }),
+        )
+            .into_response();
+    }
     if token.expires_at <= now {
         return (
             StatusCode::OK,
@@ -759,31 +767,40 @@ pub(crate) async fn sidecar_validate_capability_handler(
             .into_response();
     }
 
-    // A delegated token is only as live as its lineage: revoking a parent must
-    // invalidate every attenuated child minted beneath it. Consult the durable
-    // store for each delegation-chain ancestor so this freshness signal matches
-    // the mediated request path, which also rejects a token when any chain
-    // ancestor is revoked.
-    //
-    // This walk runs only after the issuer, signature, and expiry gates above,
-    // so an untrusted or unverified token cannot force one durable revocation
-    // lookup per fabricated ancestor: a caller must present a trusted, signed,
-    // unexpired token before its chain is weighed.
-    for ancestor in &token.delegation_chain {
-        if state.capability_is_revoked(&ancestor.capability_id).await {
-            return (
-                StatusCode::OK,
-                axum::Json(SidecarValidateCapabilityResponse {
-                    valid: false,
-                    reason: Some(
-                        "a delegated capability in the chain has been revoked".to_string(),
-                    ),
-                    expires_at,
-                    capability_id,
-                }),
-            )
-                .into_response();
-        }
+    // This endpoint has no configured trust-root resolver. A signed leaf token
+    // does not authenticate attacker-carried delegation links or prove scope
+    // attenuation, so delegated and otherwise attenuated tokens must fail
+    // closed before any identifier reaches the revocation authority.
+    if !token.delegation_chain.is_empty() || token.attenuation_proof.is_some() {
+        return (
+            StatusCode::OK,
+            axum::Json(SidecarValidateCapabilityResponse {
+                valid: false,
+                reason: Some(
+                    "chain-binding requires a trust-root resolver on the capability validation path"
+                        .to_string(),
+                ),
+                expires_at,
+                capability_id,
+            }),
+        )
+            .into_response();
+    }
+
+    // Authentication gates precede every revocation lookup. This avoids
+    // turning the live authority into a membership or availability oracle for
+    // malformed, untrusted, forged, or expired tokens.
+    if state.capability_is_revoked(&capability_id).await {
+        return (
+            StatusCode::OK,
+            axum::Json(SidecarValidateCapabilityResponse {
+                valid: false,
+                reason: Some("capability has been revoked".to_string()),
+                expires_at,
+                capability_id,
+            }),
+        )
+            .into_response();
     }
 
     if let Some(expected_subject) = validate_request.expected_subject.as_deref() {
@@ -827,6 +844,15 @@ pub(crate) async fn sidecar_validate_capability_handler(
         }),
     )
         .into_response()
+}
+
+fn checked_unix_timestamp(timestamp: i64) -> Result<u64, &'static str> {
+    u64::try_from(timestamp).map_err(|_| "system clock is before the Unix epoch")
+}
+
+#[cfg(test)]
+pub(crate) fn checked_unix_timestamp_for_test(timestamp: i64) -> Result<u64, &'static str> {
+    checked_unix_timestamp(timestamp)
 }
 
 // ---------------------------------------------------------------------------
@@ -953,8 +979,7 @@ pub(crate) async fn sidecar_verify_receipt_handler(
         Ok(request) => request,
         Err(error) => {
             warn!("failed to decode ChioReceipt verify request: {error}");
-            return sidecar_bad_request(&format!("invalid receipt verify payload: {error}"))
-                .into_response();
+            return sidecar_bad_request("invalid receipt verify payload").into_response();
         }
     };
 
@@ -1011,8 +1036,7 @@ pub(crate) async fn sidecar_verify_receipt_handler(
     }
 
     if let Some(expected_capability_id) = verify_request.expected_capability_id.as_deref() {
-        let expected = expected_capability_id.trim();
-        if !expected.is_empty() && expected != receipt.capability_id {
+        if !expected_capability_id.is_empty() && expected_capability_id != receipt.capability_id {
             report.ok = false;
             report.authorized = false;
             return (
@@ -1098,13 +1122,13 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
         Ok(request) => request,
         Err(error) => {
             warn!("failed to decode evaluate tool-call request: {error}");
-            return sidecar_bad_request(&format!("invalid evaluate payload: {error}"))
-                .into_response();
+            return sidecar_bad_request("invalid evaluate payload").into_response();
         }
     };
 
-    if evaluate_request.capability_id.trim().is_empty() {
-        return sidecar_bad_request("capability_id must not be empty").into_response();
+    if evaluate_request.capability_id.is_empty() || evaluate_request.capability_id.len() > 1024 {
+        return sidecar_bad_request("capability_id must contain between 1 and 1024 bytes")
+            .into_response();
     }
     if evaluate_request.tool_server.trim().is_empty() {
         return sidecar_bad_request("tool_server must not be empty").into_response();
@@ -1120,7 +1144,10 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
         Ok(canonical) => chio_core_types::sha256_hex(&canonical),
         Err(error) => {
             warn!("failed to canonicalise tool-call parameters: {error}");
-            return internal_json_error_response("chio_receipt_sign_failed", &error.to_string());
+            return internal_json_error_response(
+                "chio_receipt_sign_failed",
+                "failed to canonicalize tool-call parameters",
+            );
         }
     };
 
@@ -1164,7 +1191,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
     let receipt = match ChioReceipt::sign(
         ChioReceiptBody {
             id: uuid::Uuid::now_v7().to_string(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: u64::try_from(chrono::Utc::now().timestamp()).unwrap_or(0),
             capability_id: evaluate_request.capability_id,
             tool_server: evaluate_request.tool_server,
             tool_name: evaluate_request.tool_name,
@@ -1197,13 +1224,19 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
         Ok(receipt) => receipt,
         Err(error) => {
             warn!("failed to sign tool-call evaluation receipt: {error}");
-            return internal_json_error_response("chio_receipt_sign_failed", &error.to_string());
+            return internal_json_error_response(
+                "chio_receipt_sign_failed",
+                "failed to sign tool-call evaluation receipt",
+            );
         }
     };
 
     if let Err(error) = record_tool_receipt(&state, &receipt).await {
         warn!("failed to persist tool-call evaluation receipt: {error}");
-        return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
+        return internal_json_error_response(
+            "chio_receipt_persistence_failed",
+            "failed to persist tool-call evaluation receipt",
+        );
     }
 
     sidecar_advisory_tool_call_evaluate_response(receipt)

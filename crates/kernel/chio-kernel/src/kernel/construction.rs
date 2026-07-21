@@ -26,6 +26,18 @@ pub enum KernelBuildError {
          instead of a warn-only log"
     )]
     MissingSettlementRetryStore,
+    #[error("settlement observer is already installed")]
+    SettlementObserverAlreadyInstalled,
+    #[error("settlement observer requires a crash-durable settlement retry store")]
+    SettlementRetryStoreNotDurable,
+    #[error("settlement hook must be idempotent by receipt id")]
+    SettlementHookNotIdempotent,
+    #[error("receipt store does not support the durable settlement-observer outbox contract")]
+    SettlementObserverOutboxUnsupported,
+    #[error("settlement observer durable storage topology is invalid: {0}")]
+    SettlementObserverStorageTopology(String),
+    #[error("settlement-observer outbox recovery failed: {0}")]
+    SettlementObserverRecovery(String),
 }
 
 include!("construction.part1.inc");

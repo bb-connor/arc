@@ -6,7 +6,6 @@
 
 use super::*;
 
-#[allow(dead_code)]
 #[path = "service_types/admission_budget.rs"]
 mod admission_budget;
 #[path = "service_types/admission_consensus.rs"]

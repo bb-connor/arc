@@ -426,6 +426,13 @@ impl InMemoryBudgetStoreInner {
                     remaining_exposure_units: request.requested_exposure_units,
                     authority: request.authority.clone(),
                     admission_operation: request.admission_operation.clone(),
+                    reserved_until: None,
+                    reserved_currency: None,
+                    reserved_payment_reference: None,
+                    reserved_budget_total: None,
+                    reserved_delegation_depth: None,
+                    reserved_root_budget_holder: None,
+                    expired: false,
                 },
             );
         }
@@ -1134,13 +1141,56 @@ impl InMemoryBudgetStoreInner {
         &self,
         hold_id: &str,
     ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
-        Ok(self.holds.get(hold_id).map(|hold| BudgetHoldSnapshot {
+        if let Some(hold) = self.holds.get(hold_id) {
+            return Ok(Some(BudgetHoldSnapshot {
+                hold_id: hold_id.to_string(),
+                capability_id: hold.capability_id.clone(),
+                grant_index: hold.grant_index,
+                authorized_exposure_units: hold.authorized_exposure_units,
+                remaining_exposure_units: hold.remaining_exposure_units,
+                disposition: hold.disposition.view(),
+                reserved_until: hold.reserved_until,
+                reserved_currency: hold.reserved_currency.clone(),
+                reserved_payment_reference: hold.reserved_payment_reference.clone(),
+                reserved_budget_total: hold.reserved_budget_total,
+                reserved_delegation_depth: hold.reserved_delegation_depth,
+                reserved_root_budget_holder: hold.reserved_root_budget_holder.clone(),
+                authority: hold.authority.clone(),
+            }));
+        }
+        let Some(hold) = self.composite_holds.get(hold_id) else {
+            return Ok(None);
+        };
+        let disposition = if hold.expired {
+            BudgetHoldDispositionView::Expired
+        } else {
+            match (hold.invocation_state, hold.monetary_state) {
+                (_, BudgetMonetaryHoldState::Reconciled) => BudgetHoldDispositionView::Reconciled,
+                (_, BudgetMonetaryHoldState::Released) => BudgetHoldDispositionView::Released,
+                (_, BudgetMonetaryHoldState::Captured) => BudgetHoldDispositionView::Captured,
+                (_, BudgetMonetaryHoldState::Reversed)
+                | (BudgetInvocationReservationState::Reversed, BudgetMonetaryHoldState::None) => {
+                    BudgetHoldDispositionView::Reversed
+                }
+                (
+                    BudgetInvocationReservationState::Authorized
+                    | BudgetInvocationReservationState::Captured,
+                    BudgetMonetaryHoldState::None | BudgetMonetaryHoldState::Exposed,
+                ) => BudgetHoldDispositionView::Open,
+                _ => {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "composite budget hold `{hold_id}` has no valid disposition"
+                    )))
+                }
+            }
+        };
+        Ok(Some(BudgetHoldSnapshot {
             hold_id: hold_id.to_string(),
             capability_id: hold.capability_id.clone(),
             grant_index: hold.grant_index,
             authorized_exposure_units: hold.authorized_exposure_units,
             remaining_exposure_units: hold.remaining_exposure_units,
-            disposition: hold.disposition.view(),
+            disposition,
             reserved_until: hold.reserved_until,
             reserved_currency: hold.reserved_currency.clone(),
             reserved_payment_reference: hold.reserved_payment_reference.clone(),
@@ -1176,6 +1226,133 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
+    fn mark_invocation_hold_reserved(
+        &mut self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        if envelope.budget_total.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "invocation-only reservation must not carry a monetary budget total".to_string(),
+            ));
+        }
+        let hold = self.holds.get_mut(hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("missing invocation budget hold `{hold_id}`"))
+        })?;
+        if hold.capability_id != capability_id || hold.grant_index != grant_index {
+            return Err(BudgetStoreError::Conflict(format!(
+                "invocation budget hold `{hold_id}` belongs to a different capability or grant"
+            )));
+        }
+        if hold.disposition != BudgetHoldDisposition::Open
+            || !hold.invocation_count_debited
+            || hold.authorized_exposure_units != 0
+            || hold.remaining_exposure_units != 0
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` is not an open zero-exposure invocation hold"
+            )));
+        }
+        if hold.reserved_currency.is_some()
+            || hold.reserved_payment_reference.is_some()
+            || hold.reserved_budget_total.is_some()
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "invocation budget hold `{hold_id}` carries monetary reservation metadata"
+            )));
+        }
+        let exact_retry = hold.reserved_until == Some(reserved_until_unix_secs)
+            && hold.reserved_delegation_depth == Some(envelope.delegation_depth)
+            && hold.reserved_root_budget_holder.as_deref()
+                == Some(envelope.root_budget_holder.as_str());
+        if hold.reserved_until.is_some() {
+            return if exact_retry {
+                Ok(())
+            } else {
+                Err(BudgetStoreError::Conflict(format!(
+                    "invocation budget hold `{hold_id}` was already stamped with different reservation terms"
+                )))
+            };
+        }
+        hold.reserved_until = Some(reserved_until_unix_secs);
+        hold.reserved_delegation_depth = Some(envelope.delegation_depth);
+        hold.reserved_root_budget_holder = Some(envelope.root_budget_holder.clone());
+        Ok(())
+    }
+
+    fn mark_admission_operation_hold_reserved(
+        &mut self,
+        hold_id: &str,
+        admission_operation: &super::BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let hold = self.composite_holds.get_mut(hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "missing operation-owned composite budget hold `{hold_id}`"
+            ))
+        })?;
+        if hold.admission_operation.as_ref() != Some(admission_operation) {
+            return Err(BudgetStoreError::Conflict(format!(
+                "composite budget hold `{hold_id}` belongs to a different admission operation"
+            )));
+        }
+        if hold.expired {
+            return Err(BudgetStoreError::Invariant(format!(
+                "composite budget hold `{hold_id}` is already expired"
+            )));
+        }
+        if !matches!(
+            hold.invocation_state,
+            BudgetInvocationReservationState::Authorized
+                | BudgetInvocationReservationState::Captured
+        )
+            || !matches!(
+                hold.monetary_state,
+                BudgetMonetaryHoldState::None | BudgetMonetaryHoldState::Exposed
+            )
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "composite budget hold `{hold_id}` is not open for caller reservation"
+            )));
+        }
+        if (hold.authorized_exposure_units == 0) != currency.is_none()
+            || currency.is_some_and(str::is_empty)
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "composite budget hold `{hold_id}` has an invalid reserved currency"
+            )));
+        }
+        let exact_retry = hold.reserved_until == Some(reserved_until_unix_secs)
+            && hold.reserved_currency.as_deref() == currency
+            && hold.reserved_payment_reference.as_deref() == payment_reference
+            && hold.reserved_budget_total == envelope.budget_total
+            && hold.reserved_delegation_depth == Some(envelope.delegation_depth)
+            && hold.reserved_root_budget_holder.as_deref()
+                == Some(envelope.root_budget_holder.as_str());
+        if hold.reserved_until.is_some() {
+            return if exact_retry {
+                Ok(())
+            } else {
+                Err(BudgetStoreError::Conflict(format!(
+                    "composite budget hold `{hold_id}` was already stamped with different reservation terms"
+                )))
+            };
+        }
+        hold.reserved_until = Some(reserved_until_unix_secs);
+        hold.reserved_currency = currency.map(ToOwned::to_owned);
+        hold.reserved_payment_reference = payment_reference.map(ToOwned::to_owned);
+        hold.reserved_budget_total = envelope.budget_total;
+        hold.reserved_delegation_depth = Some(envelope.delegation_depth);
+        hold.reserved_root_budget_holder = Some(envelope.root_budget_holder.clone());
+        Ok(())
+    }
+
     fn reserve_invocation_hold(
         &mut self,
         hold_id: &str,
@@ -1184,7 +1361,11 @@ impl InMemoryBudgetStoreInner {
         reserved_until_unix_secs: i64,
         envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
-        if self.holds.contains_key(hold_id) {
+        if self.holds.contains_key(hold_id)
+            || self.legacy_authorization_hold_ids.contains(hold_id)
+            || self.composite_holds.contains_key(hold_id)
+            || self.composite_authorizations.contains_key(hold_id)
+        {
             return Err(BudgetStoreError::Invariant(format!(
                 "budget hold `{hold_id}` already exists"
             )));
@@ -1219,6 +1400,7 @@ impl InMemoryBudgetStoreInner {
         let prefix = format!("budget-hold:{request_id}:");
         self.holds
             .keys()
+            .chain(self.composite_holds.keys())
             .any(|hold_id| hold_id.starts_with(&prefix))
     }
 
@@ -1278,506 +1460,78 @@ impl InMemoryBudgetStoreInner {
                 Some(&format!("{hold_id}:ttl-reap-settle")),
                 authority.as_ref(),
             )?;
+            let hold = self.holds.get_mut(&hold_id).ok_or_else(|| {
+                BudgetStoreError::Invariant(format!(
+                    "budget hold `{hold_id}` disappeared during TTL reap"
+                ))
+            })?;
+            hold.disposition = BudgetHoldDisposition::Expired;
+            settled += 1;
+        }
+
+        // Reap captured composite reservations only; Authorized may still be capturing.
+        let mut expired_composite = Vec::new();
+        for (hold_id, hold) in &self.composite_holds {
+            let is_expired_caller_reservation = !hold.expired
+                && hold.invocation_state == BudgetInvocationReservationState::Captured
+                && matches!(
+                    hold.monetary_state,
+                    BudgetMonetaryHoldState::None | BudgetMonetaryHoldState::Exposed
+                )
+                && hold
+                    .reserved_until
+                    .is_some_and(|until| until <= now_unix_secs);
+            if !is_expired_caller_reservation {
+                continue;
+            }
+            let binding = hold.admission_operation.clone().ok_or_else(|| {
+                BudgetStoreError::Invariant(format!(
+                    "composite budget hold `{hold_id}` omits admission ownership"
+                ))
+            })?;
+            expired_composite.push((
+                hold_id.clone(),
+                hold.capability_id.clone(),
+                hold.grant_index,
+                hold.remaining_exposure_units,
+                hold.authority.clone(),
+                binding,
+                hold.monetary_state,
+            ));
+        }
+        for (
+            hold_id,
+            capability_id,
+            grant_index,
+            remaining,
+            authority,
+            admission_operation,
+            monetary_state,
+        ) in expired_composite
+        {
+            if monetary_state == BudgetMonetaryHoldState::Exposed {
+                self.settle_composite_hold(
+                    BudgetReconcileHoldRequest {
+                        capability_id,
+                        grant_index,
+                        exposed_cost_units: remaining,
+                        realized_spend_units: remaining,
+                        hold_id: Some(hold_id.clone()),
+                        event_id: Some(format!("{hold_id}:ttl-reap-settle")),
+                        authority,
+                        admission_operation: Some(admission_operation),
+                    },
+                    false,
+                )?;
+            }
+            let hold = self.composite_holds.get_mut(&hold_id).ok_or_else(|| {
+                BudgetStoreError::Invariant(format!(
+                    "composite budget hold `{hold_id}` disappeared during TTL reap"
+                ))
+            })?;
+            hold.expired = true;
             settled += 1;
         }
         Ok(settled)
     }
-}
-
-impl BudgetStore for InMemoryBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn try_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?.try_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn try_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?.try_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reverse_charge_cost(capability_id, grant_index, cost_units)
-            .map(|_| ())
-    }
-
-    fn reverse_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-            .map(|_| ())
-    }
-
-    fn reverse_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reverse_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-            .map(|_| ())
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-            .map(|_| ())
-    }
-
-    fn reduce_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-            .map(|_| ())
-    }
-
-    fn reduce_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reduce_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-            .map(|_| ())
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .settle_charge_cost(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-            )
-            .map(|_| ())
-    }
-
-    fn settle_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .settle_charge_cost_with_ids(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-                hold_id,
-                event_id,
-            )
-            .map(|_| ())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn settle_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .settle_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-            .map(|_| ())
-    }
-
-    fn list_usages(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        self.lock_inner()?.list_usages(limit, capability_id)
-    }
-
-    fn get_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-        self.lock_inner()?.get_usage(capability_id, grant_index)
-    }
-
-    fn list_mutation_events(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-        grant_index: Option<usize>,
-    ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError> {
-        self.lock_inner()?
-            .list_mutation_events(limit, capability_id, grant_index)
-    }
-
-    fn authorize_budget_hold(
-        &self,
-        mut request: BudgetAuthorizeHoldRequest,
-    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
-        if request.payment_journal.is_some() {
-            // The in-memory store cannot journal the money path durably, and
-            // a silently dropped journal row would leave a rail movement
-            // unrecoverable after a crash. Deny rather than proceed.
-            return Err(BudgetStoreError::Invariant(
-                "payment journal is not supported by this budget store".to_string(),
-            ));
-        }
-        let mut inner = self.lock_inner()?;
-        if request.invocation_admission.is_some() && request.admission_operation.is_none() {
-            return Err(BudgetStoreError::Invariant(
-                "composite budget hold requires admission operation ownership".to_string(),
-            ));
-        }
-        if request.invocation_admission.is_none() {
-            let admission = VerifiedInvocationAdmission::grant_only(
-                &request.capability_id,
-                request.grant_index,
-                request.max_invocations,
-            )?;
-            request.max_invocations = None;
-            request.install_verified_invocation_admission(admission)?;
-        }
-        inner.authorize_composite_budget_hold(request)
-    }
-
-    fn reverse_budget_hold(
-        &self,
-        request: BudgetReverseHoldRequest,
-    ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
-        let mut inner = self.lock_inner()?;
-        if request
-            .hold_id
-            .as_ref()
-            .is_some_and(|hold_id| inner.composite_holds.contains_key(hold_id))
-        {
-            return inner.reverse_composite_hold(request);
-        }
-        let record = inner.reverse_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.reversed_exposure_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-        )?;
-        self.decision_from_legacy_record(record)
-    }
-
-    fn release_budget_hold(
-        &self,
-        request: BudgetReleaseHoldRequest,
-    ) -> Result<BudgetReleaseHoldDecision, BudgetStoreError> {
-        let mut inner = self.lock_inner()?;
-        if request
-            .hold_id
-            .as_ref()
-            .is_some_and(|hold_id| inner.composite_holds.contains_key(hold_id))
-        {
-            return inner.release_composite_hold(request);
-        }
-        let record = inner.reduce_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.released_exposure_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-        )?;
-        self.decision_from_legacy_record(record)
-    }
-
-    fn reconcile_budget_hold(
-        &self,
-        request: BudgetReconcileHoldRequest,
-    ) -> Result<BudgetReconcileHoldDecision, BudgetStoreError> {
-        let mut inner = self.lock_inner()?;
-        if request
-            .hold_id
-            .as_ref()
-            .is_some_and(|hold_id| inner.composite_holds.contains_key(hold_id))
-        {
-            return inner.settle_composite_hold(request, false);
-        }
-        let record = inner.settle_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.exposed_cost_units,
-            request.realized_spend_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-        )?;
-        self.decision_from_legacy_record(record)
-    }
-
-    fn capture_budget_hold(
-        &self,
-        request: BudgetCaptureHoldRequest,
-    ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
-        let mut inner = self.lock_inner()?;
-        if request
-            .hold_id
-            .as_ref()
-            .is_some_and(|hold_id| inner.composite_holds.contains_key(hold_id))
-        {
-            return inner.settle_composite_hold(request, true);
-        }
-        let record = inner.capture_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.exposed_cost_units,
-            request.realized_spend_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-        )?;
-        Ok(BudgetHoldMutationDecision {
-            hold_id: record.hold_id.clone(),
-            exposure_units: record.exposure_units,
-            realized_spend_units: record.realized_spend_units,
-            committed_cost_units_after: checked_committed_cost_units(
-                record.total_cost_exposed_after,
-                record.total_cost_realized_spend_after,
-            )?,
-            invocation_count_after: record.invocation_count_after,
-            invocation_counts_after: record.invocation_counts_after.clone(),
-            invocation_state: record.invocation_state,
-            monetary_state: record.monetary_state,
-            revocation_set: record.revocation_set.clone(),
-            metadata: budget_commit_metadata(
-                self,
-                record.authority.clone(),
-                record.usage_seq,
-                Some(record.event_id.clone()),
-            ),
-        })
-    }
-
-    fn capture_invocation_reservations(
-        &self,
-        request: BudgetCaptureInvocationRequest,
-    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
-        self.lock_inner()?.capture_composite_invocations(request)
-    }
-
-    fn query_invocation_capture(
-        &self,
-        request: &BudgetCaptureInvocationRequest,
-    ) -> Result<Option<BudgetHoldMutationDecision>, BudgetStoreError> {
-        let event_id = request.event_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("invocation capture query requires event_id".to_string())
-        })?;
-        let composite_request = CompositeMutationRequest::CaptureInvocation(request.clone());
-        self.lock_inner()?
-            .composite_duplicate(event_id, &composite_request)?
-            .map(|decision| match decision {
-                CompositeMutationDecision::Hold(decision) => Ok(decision),
-                CompositeMutationDecision::Authorize(_) => Err(BudgetStoreError::Invariant(
-                    format!("budget event_id `{event_id}` has the wrong decision kind"),
-                )),
-            })
-            .transpose()
-    }
-
-    fn get_budget_hold(
-        &self,
-        hold_id: &str,
-    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
-        self.lock_inner()?.get_budget_hold(hold_id)
-    }
-
-    fn mark_hold_reserved(
-        &self,
-        hold_id: &str,
-        reserved_until_unix_secs: i64,
-        currency: &str,
-        payment_reference: Option<&str>,
-        envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?.mark_hold_reserved(
-            hold_id,
-            reserved_until_unix_secs,
-            currency,
-            payment_reference,
-            envelope,
-        )
-    }
-
-    fn reserve_invocation_hold(
-        &self,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        reserved_until_unix_secs: i64,
-        envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?.reserve_invocation_hold(
-            hold_id,
-            capability_id,
-            grant_index,
-            reserved_until_unix_secs,
-            envelope,
-        )
-    }
-
-    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
-        self.lock_inner()?
-            .reap_expired_reserved_holds(now_unix_secs)
-    }
-
-    fn list_open_delegated_reserved_hold_ids(
-        &self,
-    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
-        Ok(Some(
-            self.lock_inner()?.list_open_delegated_reserved_hold_ids(),
-        ))
-    }
-
-    fn request_id_has_reserved_hold(
-        &self,
-        request_id: &str,
-    ) -> Result<Option<bool>, BudgetStoreError> {
-        Ok(Some(
-            self.lock_inner()?.request_id_has_reserved_hold(request_id),
-        ))
-    }
-}
-
-fn unix_now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
 }

@@ -518,6 +518,10 @@ impl OpsSettlementHook {
 }
 
 impl crate::SettlementHook for OpsSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
     fn observe(
         &self,
         observation: &crate::SettlementObservation,
@@ -660,6 +664,10 @@ mod driver_tests {
     fn runtime_folds_outcomes_into_terminal_steps() {
         struct FlakyHook;
         impl SettlementHook for FlakyHook {
+            fn supports_receipt_id_idempotency(&self) -> bool {
+                true
+            }
+
             fn observe(
                 &self,
                 observation: &SettlementObservation,

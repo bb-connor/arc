@@ -2,6 +2,9 @@ use chio_core::receipt::kinds::TrustLevel;
 
 use super::*;
 
+const SETTLEMENT_OBSERVER_CLAIM_LEASE_MS: u64 = 30_000;
+const MAX_SETTLEMENT_OBSERVER_RECOVERY_ROWS: usize = 4_096;
+
 /// A cost-bearing receipt may claim `TrustLevel::Mediated` only when it carries a
 /// reconciled budget-authority hold. This is the sign-site fail-closed invariant
 /// that turns `Mediated` from a stamp into earned proof.
@@ -77,6 +80,35 @@ impl ChioKernel {
         params: ReceiptParams<'_>,
         backend: &dyn chio_core::crypto::SigningBackend,
     ) -> Result<ChioReceipt, KernelError> {
+        self.build_and_sign_receipt_with_backend_for_policy_hash(
+            params,
+            backend,
+            &self.config.policy_hash,
+        )
+    }
+
+    /// Sign a receipt against a frozen operation policy after validating that
+    /// the operation's durable signed outbox remains authoritative. This is
+    /// intentionally crate-private so ordinary evaluation cannot select an
+    /// arbitrary historical policy.
+    pub(crate) fn build_and_sign_receipt_for_policy_hash(
+        &self,
+        params: ReceiptParams<'_>,
+        policy_hash: &str,
+    ) -> Result<ChioReceipt, KernelError> {
+        self.build_and_sign_receipt_with_backend_for_policy_hash(
+            params,
+            self.authority_signing_backend.as_ref(),
+            policy_hash,
+        )
+    }
+
+    fn build_and_sign_receipt_with_backend_for_policy_hash(
+        &self,
+        params: ReceiptParams<'_>,
+        backend: &dyn chio_core::crypto::SigningBackend,
+        policy_hash: &str,
+    ) -> Result<ChioReceipt, KernelError> {
         // Multi-tenant receipt isolation: resolve tenant_id for this receipt.
         // Precedence:
         //   1. An explicit override on `ReceiptParams` (currently unused).
@@ -128,7 +160,7 @@ impl ChioKernel {
             redaction_mode: RedactionMode::None,
             actor_chain: Vec::new(),
             content_hash: params.content_hash,
-            policy_hash: self.config.policy_hash.clone(),
+            policy_hash: policy_hash.to_string(),
             evidence,
             metadata,
             trust_level: params.trust_level,
@@ -280,13 +312,12 @@ impl ChioKernel {
         receipt: &ChioReceipt,
         request_id: Option<&str>,
     ) -> Result<(), KernelError> {
-        // Scope the receipt-store write lock so it is released before the
-        // settlement observer runs. Holding the mutex across
-        // `run_settlement_observer` would serialize all concurrent receipt
-        // persistence behind potentially I/O-bound hook latency; the observer
-        // needs only a fully-persisted receipt, so the guard is dropped first.
-        // Checkpoint construction runs on the store's writer actor, so this
-        // critical section holds no checkpoint work.
+        // Scope the receipt-store write lock around the atomic receipt and
+        // settlement-outbox append. Terminal persistence never invokes an
+        // arbitrary settlement hook: the background recovery worker owns
+        // delivery after this commit. Checkpoint construction runs on the
+        // store's writer actor, so this critical section holds no checkpoint
+        // work.
         {
             let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
@@ -306,6 +337,7 @@ impl ChioKernel {
             // ReceiptPersistence(Timeout); no allow response is signed until the
             // append succeeds.
             let budget = self.config.deadlines.receipt_append_budget();
+            let settlement_observer_enabled = self.settlement_observer.is_some();
             match intent {
                 Some(intent) => {
                     // The key binds the consume to the exact attested call:
@@ -318,9 +350,15 @@ impl ChioKernel {
                         tenant_id: receipt.tenant_id.clone(),
                     };
                     let append = self.with_receipt_store(|store| {
-                        Ok(store.append_chio_receipt_consuming_intent_with_timeout(
-                            receipt, &key, budget,
-                        ))
+                        if settlement_observer_enabled {
+                            Ok(store.append_chio_receipt_consuming_intent_with_settlement_observer_outbox_with_timeout(
+                                receipt, &key, budget,
+                            ))
+                        } else {
+                            Ok(store.append_chio_receipt_consuming_intent_with_timeout(
+                                receipt, &key, budget,
+                            ))
+                        }
                     })?;
                     if let Some(append) = append {
                         match append {
@@ -361,9 +399,23 @@ impl ChioKernel {
                     }
                 }
                 None => {
-                    self.with_receipt_store(|store| {
-                        Ok(store.append_chio_receipt_with_timeout(receipt, budget)?)
+                    let appended = self.with_receipt_store(|store| {
+                        if settlement_observer_enabled {
+                            Ok(store
+                                .append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+                                    receipt, budget,
+                                )?)
+                        } else {
+                            Ok(store.append_chio_receipt_with_timeout(receipt, budget)?)
+                        }
                     })?;
+                    if settlement_observer_enabled && appended.is_none() {
+                        return Err(KernelError::ReceiptPersistence(
+                            crate::receipt_store::ReceiptStoreError::Conflict(
+                                "settlement observer requires a durable receipt store".to_string(),
+                            ),
+                        ));
+                    }
                 }
             }
             self.append_chio_receipt_to_local_log(receipt.clone());
@@ -380,9 +432,135 @@ impl ChioKernel {
                 matches!(receipt.decision.as_ref(), Some(Decision::Allow)),
             );
         }
-        let settlement_status = self.run_settlement_observer(receipt);
-        self.route_settlement_observer_status(receipt, &settlement_status);
         Ok(())
+    }
+
+    fn deliver_settlement_observer_outbox_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<(), KernelError> {
+        let now_unix_ms = current_unix_timestamp_ms();
+        let claim_deadline_unix_ms = now_unix_ms
+            .checked_add(SETTLEMENT_OBSERVER_CLAIM_LEASE_MS)
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "settlement-observer claim deadline overflowed u64".to_string(),
+                )
+            })?;
+        let claim_token = uuid::Uuid::now_v7().to_string();
+        let claim = self
+            .with_receipt_store(|store| {
+                Ok(store.claim_settlement_observer_outbox(
+                    receipt_id,
+                    &claim_token,
+                    now_unix_ms,
+                    claim_deadline_unix_ms,
+                )?)
+            })?
+            .ok_or_else(|| {
+                KernelError::ReceiptPersistence(crate::receipt_store::ReceiptStoreError::Conflict(
+                    "settlement observer requires a durable receipt store".to_string(),
+                ))
+            })?;
+        let mut lease = match claim {
+            crate::receipt_store::SettlementObserverOutboxClaimOutcome::Claimed(lease) => lease,
+            crate::receipt_store::SettlementObserverOutboxClaimOutcome::Completed => return Ok(()),
+            crate::receipt_store::SettlementObserverOutboxClaimOutcome::Busy => {
+                return Err(KernelError::Internal(format!(
+                    "settlement-observer delivery for receipt {receipt_id} is already claimed"
+                )))
+            }
+            crate::receipt_store::SettlementObserverOutboxClaimOutcome::Missing => {
+                return Err(KernelError::Internal(format!(
+                    "settlement-observer outbox row for receipt {receipt_id} is missing"
+                )))
+            }
+        };
+        let receipt_store = self.receipt_store.as_deref().ok_or_else(|| {
+            KernelError::Internal(
+                "settlement observer requires a durable receipt store".to_string(),
+            )
+        })?;
+        let retry_store = self.settlement_retry_store.as_deref().ok_or_else(|| {
+            KernelError::Internal(
+                "settlement observer requires a durable settlement retry store".to_string(),
+            )
+        })?;
+        let hook = self.settlement_observer.as_ref().ok_or_else(|| {
+            KernelError::Internal("settlement observer disappeared during delivery".to_string())
+        })?;
+        let trust_verifier = settlement_observer::SettlementReceiptTrustVerifier::new(
+            self.public_key(),
+            self.authority_artifact_trust_resolver.clone(),
+        );
+        if let Err(error) = settlement_observer::deliver_claimed_settlement_observer_outbox(
+            receipt_store,
+            retry_store,
+            hook,
+            &self.settlement_retry_policy,
+            &trust_verifier,
+            None,
+            &mut lease,
+        ) {
+            let abandoned = receipt_store
+                .abandon_settlement_observer_outbox(
+                    &lease.receipt_id,
+                    lease.version,
+                    &lease.claim_token,
+                    &error,
+                )
+                .map_err(KernelError::ReceiptPersistence)?;
+            if !abandoned {
+                return Err(KernelError::Internal(format!(
+                    "settlement routing failed ({error}) and its outbox lease could not be released"
+                )));
+            }
+            return Err(KernelError::Internal(format!(
+                "settlement routing failed: {error}"
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn recover_settlement_observer_outboxes(&self) -> Result<usize, KernelError> {
+        if self.settlement_observer.is_none() {
+            return Ok(0);
+        }
+        let mut recovered = 0usize;
+        let mut errors = Vec::new();
+        for _ in 0..MAX_SETTLEMENT_OBSERVER_RECOVERY_ROWS {
+            let now_unix_ms = current_unix_timestamp_ms();
+            let receipt_id = self
+                .with_receipt_store(|store| {
+                    Ok(store
+                        .list_settlement_observer_outbox_receipt_ids(now_unix_ms, 1)?
+                        .into_iter()
+                        .next())
+                })?
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "settlement observer requires a durable receipt store".to_string(),
+                    )
+                })?;
+            let Some(receipt_id) = receipt_id else {
+                break;
+            };
+            match self.deliver_settlement_observer_outbox_receipt(&receipt_id) {
+                Ok(()) => recovered = recovered.saturating_add(1),
+                Err(error) => {
+                    errors.push(format!("receipt {receipt_id}: {error}"));
+                    break;
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(recovered)
+        } else {
+            Err(KernelError::Internal(format!(
+                "one or more settlement-observer deliveries remain unfinished: {}",
+                errors.join("; ")
+            )))
+        }
     }
 
     /// Whether a durable receipt store is configured but no longer serving (its

@@ -128,6 +128,58 @@ impl ChioKernel {
         serde_json::json!({ "budget_authority": budget_authority })
     }
 
+    pub(crate) fn budget_invocation_reservation_receipt_metadata(
+        &self,
+        reservation: &BudgetInvocationReservationResult,
+    ) -> serde_json::Value {
+        let mut budget_authority = serde_json::Map::new();
+        budget_authority.insert(
+            "guarantee_level".to_string(),
+            serde_json::json!(reservation.authorize_metadata.guarantee_level.as_str()),
+        );
+        budget_authority.insert(
+            "authority_profile".to_string(),
+            serde_json::json!(reservation.authorize_metadata.budget_profile.as_str()),
+        );
+        budget_authority.insert(
+            "metering_profile".to_string(),
+            serde_json::json!(reservation.authorize_metadata.metering_profile.as_str()),
+        );
+        budget_authority.insert(
+            "hold_id".to_string(),
+            serde_json::json!(&reservation.budget_hold_id),
+        );
+        if let Some(budget_term) = reservation.authorize_metadata.budget_term() {
+            budget_authority.insert("budget_term".to_string(), serde_json::json!(budget_term));
+        }
+        if let Some(authority) = reservation.authorize_metadata.authority.as_ref() {
+            budget_authority.insert(
+                "authority".to_string(),
+                serde_json::json!({
+                    "authority_id": &authority.authority_id,
+                    "lease_id": &authority.lease_id,
+                    "lease_epoch": authority.lease_epoch,
+                }),
+            );
+        }
+        let mut authorize = serde_json::Map::new();
+        if let Some(event_id) = reservation.authorize_metadata.event_id.as_ref() {
+            authorize.insert("event_id".to_string(), serde_json::json!(event_id));
+        }
+        if let Some(commit_index) = reservation.authorize_metadata.budget_commit_index {
+            authorize.insert(
+                "budget_commit_index".to_string(),
+                serde_json::json!(commit_index),
+            );
+        }
+        authorize.insert("exposure_units".to_string(), serde_json::json!(0));
+        budget_authority.insert(
+            "authorize".to_string(),
+            serde_json::Value::Object(authorize),
+        );
+        serde_json::json!({ "budget_authority": budget_authority })
+    }
+
     pub(crate) fn merge_budget_receipt_metadata(
         &self,
         extra_metadata: Option<serde_json::Value>,
@@ -162,12 +214,17 @@ impl ChioKernel {
         request: &ToolCallRequest,
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
+        caller_reservation: bool,
+        caller_receipt_metadata: Option<&serde_json::Value>,
     ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
         let mut saw_exhausted_budget = false;
 
         for matching in matching_grants {
             let grant = matching.grant;
-            if cap.aggregate_invocation_budget.is_some()
+            let has_monetary =
+                grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
+            if caller_reservation
+                || cap.aggregate_invocation_budget.is_some()
                 || request.supplemental_authorization.is_some()
             {
                 let mutation = self.coordinate_ordinary_protocol_admission(
@@ -175,14 +232,20 @@ impl ChioKernel {
                     cap,
                     matching.index,
                     grant,
+                    caller_reservation,
+                    caller_receipt_metadata,
                     current_unix_timestamp(),
                 )?;
                 return Ok((matching.index, mutation));
             }
-            let has_monetary =
-                grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
 
-            if has_monetary {
+            // Caller-mediated invocation-only reservations authorize a
+            // zero-exposure hold in the same transaction as their invocation
+            // debit. That hold carries the no-payment startup-recovery marker
+            // until its nonce TTL is stamped.
+            let invocation_only_caller_reservation =
+                caller_reservation && !has_monetary && grant.max_invocations.is_some();
+            if has_monetary || invocation_only_caller_reservation {
                 // Use worst-case max_cost_per_invocation as the pre-execution debit.
                 let cost_units = grant
                     .max_cost_per_invocation
@@ -202,51 +265,65 @@ impl ChioKernel {
                     "budget-hold:{}:{}:{}",
                     request.request_id, cap.id, matching.index
                 );
-                let authorize_event_id = format!("{budget_hold_id}:authorize");
+                let authorize_event_id = if caller_reservation {
+                    format!(
+                        "{budget_hold_id}{}",
+                        crate::budget_store::CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX
+                    )
+                } else {
+                    format!("{budget_hold_id}:authorize")
+                };
                 let authority = self.local_budget_event_authority();
 
                 // The recoverable money record commits in the SAME
                 // transaction as the hold write, before the rail is touched:
                 // a crash in any later window resolves through the journal
                 // instead of leaving moved funds with no trace.
-                let payment_journal = self.payment_journal_active().then(|| {
-                    let now_ms = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|elapsed| elapsed.as_millis().min(u64::MAX as u128) as u64)
-                        .unwrap_or(0);
-                    let rail = self
-                        .payment_adapter
-                        .as_ref()
-                        .map(|adapter| adapter.rail_id().to_string())
-                        .unwrap_or_default();
-                    // Resolved exactly as the terminal receipt and the
-                    // dispatch intent resolve it (request-scoped entry
-                    // first, thread-local scope otherwise), so a recovered
-                    // charge's reconciliation receipt is never dropped from
-                    // the owning tenant's receipt view.
-                    let tenant_id = self
-                        .receipt_tenant_id_for_request(Some(&request.request_id))
-                        .unwrap_or_else(current_scoped_receipt_tenant_id);
-                    crate::payment::PaymentJournalRecord {
-                        request_id: request.request_id.clone(),
-                        capability_id: cap.id.clone(),
-                        grant_index: matching.index as u32,
-                        admission_operation: None,
-                        authority: Some(authority.clone()),
-                        hold_id: Some(budget_hold_id.clone()),
-                        rail,
-                        authorization_id: None,
-                        transaction_id: None,
-                        amount_units: cost_units,
-                        budget_exposure_units: cost_units,
-                        settle_action: None,
-                        settle_amount_units: None,
-                        currency: currency.clone(),
-                        state: crate::payment::PaymentJournalState::HoldPlaced,
-                        created_at_unix_ms: now_ms,
-                        tenant_id,
-                    }
-                });
+                // ReserveForCaller is different: a non-MustPrepay reservation
+                // deliberately moves no rail funds. Writing HoldPlaced there
+                // would make startup recovery reverse a hold the caller owns.
+                let payment_journal = (has_monetary
+                    && self.payment_journal_active()
+                    && (!caller_reservation
+                        || Self::is_governed_mustprepay_request(request)))
+                    .then(|| {
+                        let now_ms = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|elapsed| elapsed.as_millis().min(u64::MAX as u128) as u64)
+                            .unwrap_or(0);
+                        let rail = self
+                            .payment_adapter
+                            .as_ref()
+                            .map(|adapter| adapter.rail_id().to_string())
+                            .unwrap_or_default();
+                        // Resolved exactly as the terminal receipt and the
+                        // dispatch intent resolve it (request-scoped entry
+                        // first, thread-local scope otherwise), so a recovered
+                        // charge's reconciliation receipt is never dropped from
+                        // the owning tenant's receipt view.
+                        let tenant_id = self
+                            .receipt_tenant_id_for_request(Some(&request.request_id))
+                            .unwrap_or_else(current_scoped_receipt_tenant_id);
+                        crate::payment::PaymentJournalRecord {
+                            request_id: request.request_id.clone(),
+                            capability_id: cap.id.clone(),
+                            grant_index: matching.index as u32,
+                            admission_operation: None,
+                            authority: Some(authority.clone()),
+                            hold_id: Some(budget_hold_id.clone()),
+                            rail,
+                            authorization_id: None,
+                            transaction_id: None,
+                            amount_units: cost_units,
+                            budget_exposure_units: cost_units,
+                            settle_action: None,
+                            settle_amount_units: None,
+                            currency: currency.clone(),
+                            state: crate::payment::PaymentJournalState::HoldPlaced,
+                            created_at_unix_ms: now_ms,
+                            tenant_id,
+                        }
+                    });
 
                 let decision = self.with_budget_store(|store| {
                     let mut hold = BudgetAuthorizeHoldRequest::legacy(
@@ -265,6 +342,21 @@ impl ChioKernel {
                 })?;
                 match decision {
                     BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                        if invocation_only_caller_reservation {
+                            let reservation = BudgetInvocationReservationResult {
+                                grant_index: matching.index,
+                                budget_hold_id: authorized
+                                    .hold_id
+                                    .unwrap_or_else(|| budget_hold_id.clone()),
+                                authorize_metadata: authorized.metadata,
+                            };
+                            return Ok((
+                                matching.index,
+                                PreExecutionBudgetMutation::InvocationReservation(Box::new(
+                                    reservation,
+                                )),
+                            ));
+                        }
                         let charge = BudgetChargeResult {
                             grant_index: matching.index,
                             cost_charged: cost_units,
@@ -352,6 +444,25 @@ impl ChioKernel {
         })
     }
 
+    pub(crate) fn reverse_budget_invocation_reservation(
+        &self,
+        capability_id: &str,
+        reservation: &BudgetInvocationReservationResult,
+    ) -> Result<BudgetReverseHoldDecision, KernelError> {
+        let authority = reservation.authorize_metadata.authority.clone();
+        self.with_budget_store(|store| {
+            Ok(store.reverse_budget_hold(BudgetReverseHoldRequest {
+                capability_id: capability_id.to_string(),
+                grant_index: reservation.grant_index,
+                reversed_exposure_units: 0,
+                hold_id: Some(reservation.budget_hold_id.clone()),
+                event_id: Some(reservation.reverse_event_id()),
+                authority,
+                admission_operation: None,
+            })?)
+        })
+    }
+
     pub(crate) fn reverse_pre_execution_budget_mutation(
         &self,
         cap: &CapabilityToken,
@@ -367,6 +478,9 @@ impl ChioKernel {
                 })?;
                 Ok(None)
             }
+            PreExecutionBudgetMutation::InvocationReservation(reservation) => self
+                .reverse_budget_invocation_reservation(&cap.id, reservation)
+                .map(Some),
             PreExecutionBudgetMutation::Admission(admission) => self
                 .reverse_ordinary_protocol_admission(cap, admission.as_ref())
                 .map(Some),
@@ -397,6 +511,7 @@ impl ChioKernel {
     /// `reversed` terminal and whose settlement stays `pending`. Such a receipt
     /// is rejected by `is_authoritative_spend_receipt` (the hold is not
     /// reconciled). Real reconciliation happens at the execution site.
+    #[allow(clippy::too_many_arguments)]
     fn finalize_unmeasured_cost_provisional_allow(
         &self,
         request: &ToolCallRequest,

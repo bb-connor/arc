@@ -28,6 +28,57 @@ struct IssuedCapabilityPostconditions<'a> {
     now: u64,
 }
 
+pub(super) fn verify_trusted_authority_artifact_signature_with_resolver(
+    artifact: &[u8],
+    claimed_issuer: &chio_core::PublicKey,
+    signature: &chio_core::Signature,
+    current_kernel_key: &chio_core::PublicKey,
+    resolver: Option<&dyn crate::authority::AuthorityArtifactTrustResolver>,
+) -> Result<bool, KernelError> {
+    if !claimed_issuer.verify(artifact, signature) {
+        return Ok(false);
+    }
+    match resolver {
+        Some(resolver) => {
+            let trusted = resolver
+                .trusted_issuer_for_artifact(artifact, claimed_issuer, signature)
+                .map_err(|error| {
+                    KernelError::Internal(format!(
+                        "authority artifact trust resolution failed: {error}"
+                    ))
+                })?;
+            Ok(trusted.as_ref() == Some(claimed_issuer))
+        }
+        None => Ok(claimed_issuer == current_kernel_key),
+    }
+}
+
+pub(super) fn verify_trusted_receipt_with_resolver(
+    receipt: &chio_core::receipt::body::ChioReceipt,
+    current_kernel_key: &chio_core::PublicKey,
+    resolver: Option<&dyn crate::authority::AuthorityArtifactTrustResolver>,
+) -> Result<bool, KernelError> {
+    if !receipt
+        .verify_signature()
+        .map_err(|error| KernelError::Internal(error.to_string()))?
+    {
+        return Ok(false);
+    }
+    let signing_body = chio_core::receipt::signing::ChioReceiptSigningBody::from_body_and_bbs(
+        &receipt.body(),
+        receipt.bbs_signature.as_ref(),
+    );
+    let artifact = canonical_json_bytes(&signing_body)
+        .map_err(|error| KernelError::Internal(error.to_string()))?;
+    verify_trusted_authority_artifact_signature_with_resolver(
+        &artifact,
+        &receipt.kernel_key,
+        &receipt.signature,
+        current_kernel_key,
+        resolver,
+    )
+}
+
 /// A settled MustPrepay prepayment captured before a reserve-for-caller execution
 /// nonce is minted, paired with the rail reference that funded it.
 ///
@@ -509,44 +560,23 @@ impl ChioKernel {
         claimed_issuer: &chio_core::PublicKey,
         signature: &chio_core::Signature,
     ) -> Result<bool, KernelError> {
-        if !claimed_issuer.verify(artifact, signature) {
-            return Ok(false);
-        }
-        match self.authority_artifact_trust_resolver.as_ref() {
-            Some(resolver) => {
-                let trusted = resolver
-                    .trusted_issuer_for_artifact(artifact, claimed_issuer, signature)
-                    .map_err(|error| {
-                        KernelError::Internal(format!(
-                            "authority artifact trust resolution failed: {error}"
-                        ))
-                    })?;
-                Ok(trusted.as_ref() == Some(claimed_issuer))
-            }
-            None => Ok(claimed_issuer == &self.public_key()),
-        }
+        verify_trusted_authority_artifact_signature_with_resolver(
+            artifact,
+            claimed_issuer,
+            signature,
+            &self.public_key(),
+            self.authority_artifact_trust_resolver.as_deref(),
+        )
     }
 
     pub fn verify_trusted_receipt(
         &self,
         receipt: &chio_core::receipt::body::ChioReceipt,
     ) -> Result<bool, KernelError> {
-        if !receipt
-            .verify_signature()
-            .map_err(|error| KernelError::Internal(error.to_string()))?
-        {
-            return Ok(false);
-        }
-        let signing_body = chio_core::receipt::signing::ChioReceiptSigningBody::from_body_and_bbs(
-            &receipt.body(),
-            receipt.bbs_signature.as_ref(),
-        );
-        let artifact = canonical_json_bytes(&signing_body)
-            .map_err(|error| KernelError::Internal(error.to_string()))?;
-        self.verify_trusted_authority_artifact_signature(
-            &artifact,
-            &receipt.kernel_key,
-            &receipt.signature,
+        verify_trusted_receipt_with_resolver(
+            receipt,
+            &self.public_key(),
+            self.authority_artifact_trust_resolver.as_deref(),
         )
     }
 

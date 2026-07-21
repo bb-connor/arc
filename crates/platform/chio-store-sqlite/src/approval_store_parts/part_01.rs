@@ -15,7 +15,7 @@ use chio_kernel::{
     ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStore, ApprovalStoreError,
     ApprovalStoreProfile, ReplayReservationState, ResolvedApproval,
 };
-use r2d2::Pool;
+use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{de::DeserializeOwned, Serialize};
@@ -37,8 +37,47 @@ const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] = &[
 /// Schema is created on `open`. Migrations are additive and idempotent
 /// via `CREATE TABLE IF NOT EXISTS`.
 pub struct SqliteApprovalStore {
-    pool: Pool<SqliteConnectionManager>,
+    pool: ApprovalConnectionPool,
     authority_profile: ApprovalStoreProfile,
+}
+
+enum ApprovalConnectionPool {
+    Standalone(Pool<SqliteConnectionManager>),
+    ReceiptBound(Pool<crate::receipt_store::ReceiptConnectionManager>),
+}
+
+enum ApprovalPooledConnection {
+    Standalone(PooledConnection<SqliteConnectionManager>),
+    ReceiptBound(PooledConnection<crate::receipt_store::ReceiptConnectionManager>),
+}
+
+impl ApprovalConnectionPool {
+    fn get(&self) -> Result<ApprovalPooledConnection, r2d2::Error> {
+        match self {
+            Self::Standalone(pool) => pool.get().map(ApprovalPooledConnection::Standalone),
+            Self::ReceiptBound(pool) => pool.get().map(ApprovalPooledConnection::ReceiptBound),
+        }
+    }
+}
+
+impl std::ops::Deref for ApprovalPooledConnection {
+    type Target = Connection;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Standalone(connection) => connection,
+            Self::ReceiptBound(connection) => connection,
+        }
+    }
+}
+
+impl std::ops::DerefMut for ApprovalPooledConnection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Standalone(connection) => connection,
+            Self::ReceiptBound(connection) => connection,
+        }
+    }
 }
 
 impl SqliteApprovalStore {
@@ -71,7 +110,7 @@ impl SqliteApprovalStore {
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
         let store = Self {
-            pool,
+            pool: ApprovalConnectionPool::Standalone(pool),
             authority_profile: ApprovalStoreProfile::SingleNodeDurable,
         };
         store.run_migrations(anchor_tables)?;
@@ -86,10 +125,26 @@ impl SqliteApprovalStore {
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
         let store = Self {
-            pool,
+            pool: ApprovalConnectionPool::Standalone(pool),
             authority_profile: ApprovalStoreProfile::EphemeralLocal,
         };
         store.run_migrations(APPROVAL_STORE_OWN_ANCHOR_TABLES)?;
+        Ok(store)
+    }
+
+    /// Open an approval authority through the concrete receipt store's
+    /// descriptor-validating pool. No pathname is re-resolved or reopened by an
+    /// unbound connection manager.
+    pub fn open_colocated_with_receipt_store_handle(
+        receipt_store: &crate::SqliteReceiptStore,
+    ) -> Result<Self, ApprovalStoreError> {
+        let store = Self {
+            pool: ApprovalConnectionPool::ReceiptBound(
+                receipt_store.colocated_connection_pool(),
+            ),
+            authority_profile: ApprovalStoreProfile::SingleNodeDurable,
+        };
+        store.run_migrations(APPROVAL_STORE_COLOCATED_ANCHOR_TABLES)?;
         Ok(store)
     }
 

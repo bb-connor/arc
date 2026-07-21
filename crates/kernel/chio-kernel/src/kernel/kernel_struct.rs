@@ -768,6 +768,8 @@ pub struct ChioKernel {
     /// blocks dispatch; failures are surfaced through the retry/dead-
     /// letter machinery, not through this option.
     pub(super) settlement_observer: Option<std::sync::Arc<dyn chio_settle::SettlementHook>>,
+    pub(super) settlement_observer_recovery:
+        Option<super::settlement_observer::SettlementObserverRecoveryHandle>,
     /// Durable sink for unresolved settlement outcomes. When `Some`, the
     /// observer routing consumer persists a bounded attempt row for
     /// retryable outcomes and an idempotent dead-letter row for terminal
@@ -778,6 +780,11 @@ pub struct ChioKernel {
     /// Retry policy the routing consumer classifies settlement outcomes
     /// against.
     pub(super) settlement_retry_policy: chio_settle::RetryPolicy,
+    /// Exclusive operation-id cursor for bounded caller-reservation expiry
+    /// inventory. Store-side inventory never trusts unsigned JSON deadlines;
+    /// advancing this cursor lets repeated passes validate every signed intent
+    /// even when more than one bounded page is unexpired or damaged.
+    pub(super) caller_reservation_reap_cursor: Mutex<Option<String>>,
     /// Background sweeper for orphaned budget holds. `None` until an
     /// operator opts in via `start_budget_hold_sweeper`; joined on drop.
     pub(super) budget_hold_sweep: Option<super::budget_sweep::BudgetHoldSweepHandle>,

@@ -31,7 +31,7 @@
 //! present a fresh nonce.
 
 use std::num::NonZeroUsize;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
@@ -70,6 +70,7 @@ pub fn is_supported_execution_nonce_schema(schema: &str) -> bool {
 /// means either the nonce was minted for a different call or the nonce was
 /// tampered with after issuance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct NonceBinding {
     /// Hex-encoded subject (agent) public key, taken from `capability.subject`.
     pub subject_id: String,
@@ -94,6 +95,7 @@ pub struct NonceBinding {
 /// This is the canonical-JSON-serialized message the kernel signs. Every
 /// field is covered by the signature; none are mutable after issuance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExecutionNonce {
     /// Schema identifier. Must equal `EXECUTION_NONCE_SCHEMA`.
     pub schema: String,
@@ -126,6 +128,7 @@ pub struct ExecutionNonce {
 
 /// A kernel-signed execution nonce ready for transmission on an allow verdict.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SignedExecutionNonce {
     /// The nonce body that was signed.
     pub nonce: ExecutionNonce,
@@ -432,6 +435,57 @@ pub trait ExecutionNonceStore: Send + Sync {
     }
 }
 
+impl<T> ExecutionNonceStore for Arc<T>
+where
+    T: ExecutionNonceStore + ?Sized,
+{
+    fn authority_profile(&self) -> ExecutionNonceStoreProfile {
+        (**self).authority_profile()
+    }
+
+    fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
+        (**self).reserve(nonce_id)
+    }
+
+    fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError> {
+        (**self).reserve_until(nonce_id, nonce_expires_at)
+    }
+
+    fn reserve_nonce_for_operation(
+        &self,
+        operation_id: &str,
+        nonce_id: &str,
+        signed_expires_at: i64,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        (**self).reserve_nonce_for_operation(operation_id, nonce_id, signed_expires_at)
+    }
+
+    fn commit_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        (**self).commit_nonce_reservation(operation_id)
+    }
+
+    fn cancel_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        (**self).cancel_nonce_reservation(operation_id)
+    }
+
+    fn get_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<ExecutionNonceReservation>, ExecutionNonceReservationError> {
+        (**self).get_nonce_reservation(operation_id)
+    }
+
+    fn is_consumed(&self, nonce_id: &str) -> Result<bool, KernelError> {
+        (**self).is_consumed(nonce_id)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // InMemoryExecutionNonceStore
 // ---------------------------------------------------------------------------
@@ -697,9 +751,7 @@ pub fn mint_execution_nonce_with_backend(
     config: &ExecutionNonceConfig,
     now: i64,
 ) -> Result<SignedExecutionNonce, KernelError> {
-    mint_execution_nonce_with_backend_and_reservation(
-        backend, binding, None, None, config, now,
-    )
+    mint_execution_nonce_with_backend_and_reservation(backend, binding, None, None, config, now)
 }
 
 /// Mint a nonce that additionally binds a reserved budget hold identity.
@@ -1353,6 +1405,43 @@ mod tests {
                 .map(String::from)
                 .collect()
         );
+    }
+
+    #[test]
+    fn execution_nonce_rejects_unknown_fields_at_every_signed_layer() {
+        let kp = Keypair::generate();
+        let signed = mint_execution_nonce(
+            &kp,
+            sample_binding(),
+            &ExecutionNonceConfig::default(),
+            1_000_000,
+        )
+        .unwrap();
+        let baseline = serde_json::to_value(&signed).unwrap();
+
+        let mut unknown_outer = baseline.clone();
+        unknown_outer
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+        let error = serde_json::from_value::<SignedExecutionNonce>(unknown_outer).unwrap_err();
+        assert!(error.to_string().contains("unknown field"));
+
+        let mut unknown_nonce = baseline.clone();
+        unknown_nonce["nonce"]
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+        let error = serde_json::from_value::<SignedExecutionNonce>(unknown_nonce).unwrap_err();
+        assert!(error.to_string().contains("unknown field"));
+
+        let mut unknown_binding = baseline;
+        unknown_binding["nonce"]["bound_to"]
+            .as_object_mut()
+            .unwrap()
+            .insert("unsigned_extension".to_string(), serde_json::json!(true));
+        let error = serde_json::from_value::<SignedExecutionNonce>(unknown_binding).unwrap_err();
+        assert!(error.to_string().contains("unknown field"));
     }
 
     #[test]

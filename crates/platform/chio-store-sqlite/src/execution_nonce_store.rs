@@ -18,6 +18,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::{
@@ -64,6 +65,7 @@ impl From<r2d2::Error> for SqliteExecutionNonceStoreError {
 pub struct SqliteExecutionNonceStore {
     pool: Pool<SqliteConnectionManager>,
     authority_profile: ExecutionNonceStoreProfile,
+    database_identity_file: Option<Arc<crate::durable_sqlite::DurableSqliteFile>>,
 }
 
 /// Execution-nonce-store schema revision. Bump on every schema-affecting change.
@@ -92,6 +94,38 @@ impl SqliteExecutionNonceStore {
         let store = Self {
             pool,
             authority_profile: ExecutionNonceStoreProfile::SingleNodeDurable,
+            database_identity_file: None,
+        };
+        store.run_migrations()?;
+        Ok(store)
+    }
+
+    /// Open a durable nonce authority through one retained trusted parent
+    /// shared with its sibling authorities.
+    pub fn open_hardened(
+        path: impl AsRef<Path>,
+        directory: Arc<crate::durable_sqlite::TrustedSqliteDirectory>,
+    ) -> Result<Self, SqliteExecutionNonceStoreError> {
+        let database_identity_file = directory
+            .open_database(path, true)
+            .map_err(|error| SqliteExecutionNonceStoreError(error.to_string()))?;
+        let manager_identity = Arc::clone(&database_identity_file);
+        let manager = SqliteConnectionManager::file(database_identity_file.path())
+            .with_flags(
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            )
+            .with_init(move |connection| {
+                manager_identity
+                    .validate_live_connection(connection)
+                    .map_err(|error| rusqlite::Error::InvalidParameterName(error.to_string()))
+            });
+        let pool = Pool::builder().max_size(8).build(manager)?;
+        let store = Self {
+            pool,
+            authority_profile: ExecutionNonceStoreProfile::SingleNodeDurable,
+            database_identity_file: Some(database_identity_file),
         };
         store.run_migrations()?;
         Ok(store)
@@ -104,6 +138,7 @@ impl SqliteExecutionNonceStore {
         let store = Self {
             pool,
             authority_profile: ExecutionNonceStoreProfile::EphemeralLocal,
+            database_identity_file: None,
         };
         store.run_migrations()?;
         Ok(store)
@@ -114,6 +149,7 @@ impl SqliteExecutionNonceStore {
             .pool
             .get()
             .map_err(|e| SqliteExecutionNonceStoreError(format!("pool acquire: {e}")))?;
+        self.validate_connection(&conn)?;
         crate::check_schema_version(
             &conn,
             EXECUTION_NONCE_STORE_SCHEMA_KEY,
@@ -126,6 +162,11 @@ impl SqliteExecutionNonceStore {
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = FULL;
             PRAGMA busy_timeout = 5000;
+            "#,
+        )?;
+        self.validate_connection(&conn)?;
+        conn.execute_batch(
+            r#"
 
             CREATE TABLE IF NOT EXISTS chio_execution_nonces (
                 nonce_id    TEXT PRIMARY KEY,
@@ -223,6 +264,19 @@ impl SqliteExecutionNonceStore {
             EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| SqliteExecutionNonceStoreError(error.to_string()))?;
+        self.validate_connection(&conn)?;
+        Ok(())
+    }
+
+    fn validate_connection(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteExecutionNonceStoreError> {
+        if let Some(database_identity_file) = self.database_identity_file.as_ref() {
+            database_identity_file
+                .validate_live_connection(connection)
+                .map_err(|error| SqliteExecutionNonceStoreError(error.to_string()))?;
+        }
         Ok(())
     }
 
@@ -248,6 +302,7 @@ impl SqliteExecutionNonceStore {
             .pool
             .get()
             .map_err(|e| SqliteExecutionNonceStoreError(format!("pool acquire: {e}")))?;
+        self.validate_connection(&conn)?;
 
         configure_nonce_connection(&conn)?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -288,6 +343,9 @@ impl SqliteExecutionNonceStore {
             .pool
             .get()
             .map_err(|e| ExecutionNonceReservationError::Store(format!("pool acquire: {e}")))?;
+        self.validate_connection(&conn).map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("database identity: {error}"))
+        })?;
         configure_nonce_connection(&conn).map_err(|e| {
             ExecutionNonceReservationError::Store(format!("configure database: {e}"))
         })?;
@@ -509,6 +567,9 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
             .pool
             .get()
             .map_err(|e| ExecutionNonceReservationError::Store(format!("pool acquire: {e}")))?;
+        self.validate_connection(&conn).map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("database identity: {error}"))
+        })?;
         configure_nonce_connection(&conn).map_err(|e| {
             ExecutionNonceReservationError::Store(format!("configure database: {e}"))
         })?;
@@ -607,6 +668,9 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
             .pool
             .get()
             .map_err(|e| ExecutionNonceReservationError::Store(format!("pool acquire: {e}")))?;
+        self.validate_connection(&conn).map_err(|error| {
+            ExecutionNonceReservationError::Store(format!("database identity: {error}"))
+        })?;
         configure_nonce_connection(&conn).map_err(|e| {
             ExecutionNonceReservationError::Store(format!("configure database: {e}"))
         })?;

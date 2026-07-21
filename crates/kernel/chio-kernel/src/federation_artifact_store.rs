@@ -18,6 +18,33 @@ pub trait FederationArtifactStore: Send + Sync {
     fn put_dsse(&self, id: &str, envelope: &DsseEnvelope) -> Result<(), KernelError>;
     fn get_dsse(&self, id: &str) -> Result<Option<DsseEnvelope>, KernelError>;
 
+    /// Whether `insert_*_if_absent_or_equal` is one atomic store operation.
+    /// Caller-reservation crash recovery must never overwrite a retained
+    /// artifact with a newly generated signature after a partial publication.
+    fn supports_atomic_insert_or_equal(&self) -> bool {
+        false
+    }
+
+    fn insert_dual_signed_if_absent_or_equal(
+        &self,
+        _id: &str,
+        _receipt: &DualSignedReceipt,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::Internal(
+            "federation artifact store lacks atomic dual receipt insert-or-equal".to_string(),
+        ))
+    }
+
+    fn insert_dsse_if_absent_or_equal(
+        &self,
+        _id: &str,
+        _envelope: &DsseEnvelope,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::Internal(
+            "federation artifact store lacks atomic DSSE insert-or-equal".to_string(),
+        ))
+    }
+
     /// Whether a written artifact survives once the kernel's bounded front caches
     /// evict it, so an evicted `id` is still resolvable through this store. Only a
     /// persistent backend (database, object store) whose writes outlive eviction
@@ -103,6 +130,66 @@ impl InMemoryFederationArtifactStore {
 }
 
 impl FederationArtifactStore for InMemoryFederationArtifactStore {
+    fn supports_atomic_insert_or_equal(&self) -> bool {
+        true
+    }
+
+    fn insert_dual_signed_if_absent_or_equal(
+        &self,
+        id: &str,
+        receipt: &DualSignedReceipt,
+    ) -> Result<(), KernelError> {
+        let now = current_unix_timestamp();
+        let mut guard = match self.dual.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(existing) = guard.get(&id.to_string(), now) {
+            let existing_bytes =
+                chio_core::canonical::canonical_json_bytes(existing).map_err(|error| {
+                    KernelError::Internal(format!(
+                        "stored federation dual receipt `{id}` is not canonical: {error}"
+                    ))
+                })?;
+            let receipt_bytes =
+                chio_core::canonical::canonical_json_bytes(receipt).map_err(|error| {
+                    KernelError::Internal(format!(
+                        "incoming federation dual receipt `{id}` is not canonical: {error}"
+                    ))
+                })?;
+            if existing_bytes == receipt_bytes {
+                return Ok(());
+            }
+            return Err(KernelError::Internal(format!(
+                "federation dual receipt id `{id}` already has different content"
+            )));
+        }
+        let _ = guard.insert(id.to_string(), receipt.clone(), now);
+        Ok(())
+    }
+
+    fn insert_dsse_if_absent_or_equal(
+        &self,
+        id: &str,
+        envelope: &DsseEnvelope,
+    ) -> Result<(), KernelError> {
+        let now = current_unix_timestamp();
+        let mut guard = match self.dsse.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(existing) = guard.get(&id.to_string(), now) {
+            if existing == envelope {
+                return Ok(());
+            }
+            return Err(KernelError::Internal(format!(
+                "federation DSSE id `{id}` already has different content"
+            )));
+        }
+        let _ = guard.insert(id.to_string(), envelope.clone(), now);
+        Ok(())
+    }
+
     fn put_dual_signed(&self, id: &str, receipt: &DualSignedReceipt) -> Result<(), KernelError> {
         let now = current_unix_timestamp();
         let mut guard = match self.dual.lock() {
@@ -228,6 +315,45 @@ mod tests {
         );
         let as_trait: &dyn FederationArtifactStore = &store;
         assert!(!as_trait.is_durable());
+    }
+
+    #[test]
+    fn insert_or_equal_never_overwrites_retained_federation_artifacts() {
+        let store = InMemoryFederationArtifactStore::default();
+        assert!(store.supports_atomic_insert_or_equal());
+
+        let dual = sample_dual_signed("immutable-artifact");
+        store
+            .insert_dual_signed_if_absent_or_equal("immutable-artifact", &dual)
+            .unwrap();
+        store
+            .insert_dual_signed_if_absent_or_equal("immutable-artifact", &dual)
+            .unwrap();
+        let conflicting_dual = sample_dual_signed("immutable-artifact");
+        assert!(store
+            .insert_dual_signed_if_absent_or_equal("immutable-artifact", &conflicting_dual,)
+            .is_err());
+        let retained_dual = store
+            .get_dual_signed("immutable-artifact")
+            .unwrap()
+            .expect("inserted dual receipt must remain available");
+        assert_eq!(
+            chio_core::canonical::canonical_json_bytes(&retained_dual).unwrap(),
+            chio_core::canonical::canonical_json_bytes(&dual).unwrap()
+        );
+
+        let dsse = sample_dsse("immutable-artifact");
+        store
+            .insert_dsse_if_absent_or_equal("immutable-artifact", &dsse)
+            .unwrap();
+        store
+            .insert_dsse_if_absent_or_equal("immutable-artifact", &dsse)
+            .unwrap();
+        let conflicting_dsse = sample_dsse("different-artifact");
+        assert!(store
+            .insert_dsse_if_absent_or_equal("immutable-artifact", &conflicting_dsse)
+            .is_err());
+        assert_eq!(store.get_dsse("immutable-artifact").unwrap(), Some(dsse));
     }
 
     #[test]

@@ -235,7 +235,7 @@ pub(crate) use session_cli::{
 };
 #[cfg(test)]
 #[allow(unused_imports)]
-pub(crate) use session_cli::{StubSqlResultToolServer, StubStreamingToolServer, StubToolServer};
+pub(crate) use session_cli::{FixtureSqlResultToolServer, FixtureStreamingToolServer, FixtureToolServer};
 #[path = "cli/conformance.rs"]
 mod conformance_cli;
 #[allow(unused_imports)]

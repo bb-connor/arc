@@ -80,6 +80,15 @@ impl SqliteReceiptStore {
         self.incremental_verification
     }
 
+    fn writer_checkpoint_snapshot(&self) -> WriterCheckpointSnapshot {
+        let health = &self.receipt_commit_actor.health;
+        WriterCheckpointSnapshot {
+            checkpoint_seq: health.head_checkpoint_seq.load(Ordering::SeqCst),
+            checkpointed_entry_seq: health.head_checkpointed_entry_seq.load(Ordering::SeqCst),
+        }
+    }
+
+    #[cfg(test)]
     pub(crate) fn writer_head_snapshot(&self) -> WriterHeadSnapshot {
         let health = &self.receipt_commit_actor.health;
         WriterHeadSnapshot {
@@ -148,6 +157,50 @@ impl SqliteReceiptStore {
             ensure_lineage,
             timeout,
         )
+    }
+
+    pub fn append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.writer_handle().run_write_receipt_with_timeout(
+            self.settlement_observer_append_job(receipt)?,
+            budget,
+        )
+    }
+
+    fn settlement_observer_append_job(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<
+        impl FnOnce(&mut SqliteStoreConnection) -> Result<Option<u64>, ReceiptStoreError>
+            + Send
+            + 'static,
+        ReceiptStoreError,
+    > {
+        ensure_chio_receipt_verified(receipt)?;
+        sqlite_i64(receipt.timestamp, "receipt timestamp")?;
+        let raw_json = canonical_json_bytes(receipt)
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+        let raw_json = std::str::from_utf8(raw_json.as_slice())
+            .map_err(|error| {
+                ReceiptStoreError::Canonical(format!(
+                    "canonical receipt bytes are not UTF-8: {error}"
+                ))
+            })?
+            .to_string();
+        let receipt = receipt.clone();
+        Ok(move |connection: &mut SqliteStoreConnection| {
+            ensure_checkpoint_transparency_guards(connection)?;
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let seq = append_chio_receipt_tx(&tx, &receipt, &raw_json)?;
+            ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+            enqueue_settlement_observer_outbox_tx(&tx, &receipt)?;
+            tx.commit()?;
+            Ok(Some(seq))
+        })
     }
 
     /// Best-effort writer liveness derived from the commit-actor counters,
@@ -288,7 +341,7 @@ impl SqliteReceiptStore {
         key: &chio_kernel::receipt_store::DispatchIntentKey,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.writer_handle()
-            .run_write_receipt(self.dispatch_intent_consuming_append_job(receipt, key)?)
+            .run_write_receipt(self.dispatch_intent_consuming_append_job(receipt, key, false)?)
     }
 
     /// Bounded variant of [`Self::append_chio_receipt_consuming_intent`]: the
@@ -301,7 +354,19 @@ impl SqliteReceiptStore {
         budget: Duration,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.writer_handle().run_write_receipt_with_timeout(
-            self.dispatch_intent_consuming_append_job(receipt, key)?,
+            self.dispatch_intent_consuming_append_job(receipt, key, false)?,
+            budget,
+        )
+    }
+
+    pub fn append_chio_receipt_consuming_intent_with_settlement_observer_outbox_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.writer_handle().run_write_receipt_with_timeout(
+            self.dispatch_intent_consuming_append_job(receipt, key, true)?,
             budget,
         )
     }
@@ -312,6 +377,7 @@ impl SqliteReceiptStore {
         &self,
         receipt: &ChioReceipt,
         key: &chio_kernel::receipt_store::DispatchIntentKey,
+        enqueue_settlement_observer: bool,
     ) -> Result<
         impl FnOnce(&mut SqliteStoreConnection) -> Result<Option<u64>, ReceiptStoreError>
             + Send
@@ -348,8 +414,386 @@ impl SqliteReceiptStore {
             finalize_dispatch_intent_tx(&tx, &key)?;
             let seq = append_chio_receipt_tx(&tx, &receipt, &raw_json)?;
             ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+            if enqueue_settlement_observer {
+                enqueue_settlement_observer_outbox_tx(&tx, &receipt)?;
+            }
             tx.commit()?;
             Ok(Some(seq))
+        })
+    }
+
+    pub fn supports_durable_settlement_observer_outbox(&self) -> bool {
+        true
+    }
+
+    pub fn list_settlement_observer_outbox_receipt_ids(
+        &self,
+        now_unix_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<String>, ReceiptStoreError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let now_unix_ms = sqlite_i64(now_unix_ms, "settlement-observer inventory time")?;
+        let limit = i64::try_from(limit).map_err(|_| {
+            ReceiptStoreError::Conflict(
+                "settlement-observer inventory limit exceeds i64".to_string(),
+            )
+        })?;
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r#"
+            SELECT receipt_id
+            FROM chio_settlement_observer_outbox AS candidate
+            WHERE candidate.state != 'completed'
+              AND (
+                  candidate.state = 'pending'
+                  OR (
+                      candidate.state IN ('claimed', 'routing')
+                      AND candidate.claim_deadline_unix_ms <= ?1
+                  )
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM chio_settlement_observer_outbox AS earlier
+                  WHERE earlier.state != 'completed'
+                    AND (
+                        earlier.finalized_at < candidate.finalized_at
+                        OR (
+                            earlier.finalized_at = candidate.finalized_at
+                            AND earlier.receipt_id < candidate.receipt_id
+                        )
+                    )
+              )
+            ORDER BY finalized_at ASC, receipt_id ASC
+            LIMIT ?2
+            "#,
+        )?;
+        let rows = statement.query_map(params![now_unix_ms, limit], |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut receipt_ids = Vec::new();
+        for row in rows {
+            receipt_ids.push(row?);
+        }
+        Ok(receipt_ids)
+    }
+
+    pub fn count_unfinished_settlement_observer_outbox(&self) -> Result<u64, ReceiptStoreError> {
+        let connection = self.connection()?;
+        let count = connection.query_row(
+            "SELECT COUNT(*) FROM chio_settlement_observer_outbox WHERE state != 'completed'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        sqlite_u64(count, "unfinished settlement-observer outbox count")
+    }
+
+    pub fn claim_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        claim_token: &str,
+        now_unix_ms: u64,
+        claim_deadline_unix_ms: u64,
+    ) -> Result<chio_kernel::SettlementObserverOutboxClaimOutcome, ReceiptStoreError> {
+        validate_settlement_observer_outbox_text(
+            receipt_id,
+            "receipt id",
+            SETTLEMENT_OBSERVER_OUTBOX_RECEIPT_ID_MAX_BYTES,
+        )?;
+        validate_settlement_observer_outbox_text(
+            claim_token,
+            "claim token",
+            SETTLEMENT_OBSERVER_OUTBOX_CLAIM_TOKEN_MAX_BYTES,
+        )?;
+        if claim_deadline_unix_ms <= now_unix_ms {
+            return Err(ReceiptStoreError::Conflict(
+                "settlement-observer claim deadline must be after claim time".to_string(),
+            ));
+        }
+        let receipt_id = receipt_id.to_string();
+        let claim_token = claim_token.to_string();
+        self.writer_handle().run_write(move |connection| {
+            let now_unix_ms = sqlite_i64(now_unix_ms, "settlement-observer claim time")?;
+            let claim_deadline_unix_ms = sqlite_i64(
+                claim_deadline_unix_ms,
+                "settlement-observer claim deadline",
+            )?;
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let claimed_version = tx
+                .query_row(
+                    r#"
+                    UPDATE chio_settlement_observer_outbox
+                    SET state = CASE
+                            WHEN state = 'routing' THEN 'routing'
+                            ELSE 'claimed'
+                        END,
+                        claim_token = ?2,
+                        claim_deadline_unix_ms = ?3,
+                        version = version + 1,
+                        last_error = NULL
+                    WHERE receipt_id = ?1
+                      AND (
+                          state = 'pending'
+                          OR (
+                              state IN ('claimed', 'routing')
+                              AND claim_deadline_unix_ms <= ?4
+                          )
+                      )
+                    RETURNING version, finalized_at, staged_status_json
+                    "#,
+                    params![
+                        receipt_id.as_str(),
+                        claim_token.as_str(),
+                        claim_deadline_unix_ms,
+                        now_unix_ms,
+                    ],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            let outcome = if let Some((version, finalized_at, staged_status_json)) = claimed_version
+            {
+                chio_kernel::SettlementObserverOutboxClaimOutcome::Claimed(
+                    chio_kernel::SettlementObserverOutboxLease {
+                        receipt_id: receipt_id.clone(),
+                        finalized_at: sqlite_u64(
+                            finalized_at,
+                            "settlement-observer finalized_at",
+                        )?,
+                        claim_token: claim_token.clone(),
+                        claim_deadline_unix_ms: sqlite_u64(
+                            claim_deadline_unix_ms,
+                            "settlement-observer claim deadline",
+                        )?,
+                        version: sqlite_u64(version, "settlement-observer outbox version")?,
+                        staged_status_json,
+                    },
+                )
+            } else {
+                match tx
+                    .query_row(
+                        "SELECT state FROM chio_settlement_observer_outbox WHERE receipt_id = ?1",
+                        params![receipt_id.as_str()],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .optional()?
+                    .as_deref()
+                {
+                    Some("completed") => {
+                        chio_kernel::SettlementObserverOutboxClaimOutcome::Completed
+                    }
+                    Some("pending" | "claimed" | "routing") => {
+                        chio_kernel::SettlementObserverOutboxClaimOutcome::Busy
+                    }
+                    Some(other) => {
+                        return Err(ReceiptStoreError::Conflict(format!(
+                            "settlement-observer outbox has unknown state `{other}`"
+                        )))
+                    }
+                    None => chio_kernel::SettlementObserverOutboxClaimOutcome::Missing,
+                }
+            };
+            tx.commit()?;
+            Ok(outcome)
+        })
+    }
+
+    pub fn stage_settlement_observer_outbox_status(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        status_json: &str,
+    ) -> Result<Option<chio_kernel::SettlementObserverOutboxLease>, ReceiptStoreError> {
+        validate_settlement_observer_outbox_text(
+            receipt_id,
+            "receipt id",
+            SETTLEMENT_OBSERVER_OUTBOX_RECEIPT_ID_MAX_BYTES,
+        )?;
+        validate_settlement_observer_outbox_text(
+            claim_token,
+            "claim token",
+            SETTLEMENT_OBSERVER_OUTBOX_CLAIM_TOKEN_MAX_BYTES,
+        )?;
+        validate_settlement_observer_outbox_text(
+            status_json,
+            "staged status",
+            SETTLEMENT_OBSERVER_OUTBOX_STAGED_STATUS_MAX_BYTES,
+        )?;
+        let receipt_id = receipt_id.to_string();
+        let claim_token = claim_token.to_string();
+        let status_json = status_json.to_string();
+        self.writer_handle().run_write(move |connection| {
+            let expected_version =
+                sqlite_i64(expected_version, "settlement-observer staging version")?;
+            let staged = connection
+                .query_row(
+                    r#"
+                    UPDATE chio_settlement_observer_outbox
+                    SET state = 'routing',
+                        version = version + 1,
+                        staged_status_json = ?4,
+                        last_error = NULL
+                    WHERE receipt_id = ?1
+                      AND state = 'claimed'
+                      AND version = ?2
+                      AND claim_token = ?3
+                    RETURNING version, finalized_at, claim_deadline_unix_ms
+                    "#,
+                    params![
+                        receipt_id.as_str(),
+                        expected_version,
+                        claim_token.as_str(),
+                        status_json.as_str(),
+                    ],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, i64>(2)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            staged
+                .map(|(version, finalized_at, claim_deadline_unix_ms)| {
+                    Ok(chio_kernel::SettlementObserverOutboxLease {
+                        receipt_id,
+                        finalized_at: sqlite_u64(
+                            finalized_at,
+                            "settlement-observer finalized_at",
+                        )?,
+                        claim_token,
+                        claim_deadline_unix_ms: sqlite_u64(
+                            claim_deadline_unix_ms,
+                            "settlement-observer claim deadline",
+                        )?,
+                        version: sqlite_u64(version, "settlement-observer outbox version")?,
+                        staged_status_json: Some(status_json),
+                    })
+                })
+                .transpose()
+        })
+    }
+
+    pub fn acknowledge_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        validate_settlement_observer_outbox_text(
+            receipt_id,
+            "receipt id",
+            SETTLEMENT_OBSERVER_OUTBOX_RECEIPT_ID_MAX_BYTES,
+        )?;
+        validate_settlement_observer_outbox_text(
+            claim_token,
+            "claim token",
+            SETTLEMENT_OBSERVER_OUTBOX_CLAIM_TOKEN_MAX_BYTES,
+        )?;
+        let receipt_id = receipt_id.to_string();
+        let claim_token = claim_token.to_string();
+        self.writer_handle().run_write(move |connection| {
+            let expected_version = sqlite_i64(
+                expected_version,
+                "settlement-observer acknowledgement version",
+            )?;
+            let changed = connection.execute(
+                r#"
+                UPDATE chio_settlement_observer_outbox
+                SET state = 'completed',
+                    claim_token = NULL,
+                    claim_deadline_unix_ms = NULL,
+                    version = version + 1,
+                    staged_status_json = NULL,
+                    last_error = NULL
+                WHERE receipt_id = ?1
+                  AND state = 'routing'
+                  AND version = ?2
+                  AND claim_token = ?3
+                "#,
+                params![receipt_id.as_str(), expected_version, claim_token.as_str()],
+            )?;
+            if changed == 1 {
+                connection.execute(
+                    r#"
+                    DELETE FROM chio_settlement_observer_outbox
+                    WHERE receipt_id = ?1
+                      AND state = 'completed'
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM chio_tool_receipts
+                          WHERE receipt_id = ?1
+                      )
+                    "#,
+                    params![receipt_id.as_str()],
+                )?;
+            }
+            Ok(changed == 1)
+        })
+    }
+
+    pub fn abandon_settlement_observer_outbox(
+        &self,
+        receipt_id: &str,
+        expected_version: u64,
+        claim_token: &str,
+        last_error: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        validate_settlement_observer_outbox_text(
+            receipt_id,
+            "receipt id",
+            SETTLEMENT_OBSERVER_OUTBOX_RECEIPT_ID_MAX_BYTES,
+        )?;
+        validate_settlement_observer_outbox_text(
+            claim_token,
+            "claim token",
+            SETTLEMENT_OBSERVER_OUTBOX_CLAIM_TOKEN_MAX_BYTES,
+        )?;
+        let receipt_id = receipt_id.to_string();
+        let claim_token = claim_token.to_string();
+        let last_error = truncate_settlement_observer_outbox_error(last_error);
+        self.writer_handle().run_write(move |connection| {
+            let expected_version =
+                sqlite_i64(expected_version, "settlement-observer abandon version")?;
+            let changed = connection.execute(
+                r#"
+                UPDATE chio_settlement_observer_outbox
+                SET state = CASE
+                        WHEN state = 'routing' THEN 'routing'
+                        ELSE 'pending'
+                    END,
+                    claim_token = CASE
+                        WHEN state = 'routing' THEN claim_token
+                        ELSE NULL
+                    END,
+                    claim_deadline_unix_ms = CASE
+                        WHEN state = 'routing' THEN 0
+                        ELSE NULL
+                    END,
+                    version = version + 1,
+                    last_error = ?4
+                WHERE receipt_id = ?1
+                  AND state IN ('claimed', 'routing')
+                  AND version = ?2
+                  AND claim_token = ?3
+                "#,
+                params![
+                    receipt_id.as_str(),
+                    expected_version,
+                    claim_token.as_str(),
+                    last_error,
+                ],
+            )?;
+            Ok(changed == 1)
         })
     }
 
@@ -598,6 +1042,12 @@ impl SqliteReceiptStore {
         let claim = (|| {
             let mut dead_letters: Vec<(String, Option<String>, String)> = Vec::new();
             let mut reconciled: Vec<(String, Option<String>, String)> = Vec::new();
+            let mut deferred_to_admission_operations: Vec<(
+                String,
+                Option<String>,
+                String,
+                String,
+            )> = Vec::new();
             let mut replayable: Vec<(String, Option<String>)> = Vec::new();
             for intent in &claimable {
                 match reconciler.resolve(intent)? {
@@ -632,6 +1082,15 @@ impl SqliteReceiptStore {
                         report.replayed += 1;
                         replayable.push((intent.request_id.clone(), intent.tenant_id.clone()));
                     }
+                    DispatchIntentResolution::DeferredToAdmissionOperation { operation_id } => {
+                        report.deferred_to_admission_operation += 1;
+                        deferred_to_admission_operations.push((
+                            intent.request_id.clone(),
+                            intent.tenant_id.clone(),
+                            intent.parameter_hash.clone(),
+                            operation_id,
+                        ));
+                    }
                 }
             }
             // Every resolution write is keyed on the claimed row's (tenant,
@@ -648,6 +1107,7 @@ impl SqliteReceiptStore {
             let job = dispatch_intent_resolution_batch_job(
                 dead_letters,
                 reconciled,
+                deferred_to_admission_operations,
                 replayable,
                 Arc::clone(&abandoned),
             );
@@ -827,6 +1287,23 @@ impl SqliteReceiptStore {
         self.flush_report(wal_checkpoint)
     }
 
+    /// Flush every accepted receipt write, stop and join the writer actor, and
+    /// release all SQLite handles before returning.
+    pub fn close(self) -> Result<ReceiptFlushReport, ReceiptStoreError> {
+        let flush = self
+            .receipt_commit_actor
+            .flush_for_shutdown()
+            .and_then(|()| {
+                let wal_checkpoint = Some(self.wal_checkpoint_passive()?);
+                self.flush_report(wal_checkpoint)
+            });
+        let shutdown = self.receipt_commit_actor.shutdown();
+        match flush {
+            Err(error) => Err(error),
+            Ok(report) => shutdown.map(|()| report),
+        }
+    }
+
     /// Recover a store whose claim-log projection rows survived a source-row
     /// delete. Fail-closed: only removes claim-log `extra` rows (absent from
     /// both source tables) that are (a) present in the named archive and (b) at
@@ -851,11 +1328,11 @@ impl SqliteReceiptStore {
         // In-flight writer, same accounting discipline as a rotation
         // (`dispatch_rotate`): increment before handing the command to the
         // actor so a concurrent `receipt_store_health` cannot observe a
-        // dequeued-but-uncounted repair. The `RetentionRepair` arm
-        // decrements unconditionally on dequeue; any send/recv failure here
-        // undoes the speculative increment so a rejected repair never leaks
-        // inflight.
-        health.inflight.fetch_add(1, Ordering::SeqCst);
+        // dequeued-but-uncounted repair. The `RetentionRepair` arm adopts the
+        // increment until repair and head reseeding have finished; a rejected
+        // send is released here before returning.
+        let (inflight, inflight_release, _previous_inflight) =
+            WriterInflightLease::acquire(health);
         health.note_channel_send();
         if let Err(error) =
             self.receipt_commit_actor
@@ -863,9 +1340,10 @@ impl SqliteReceiptStore {
                 .try_send(ReceiptCommitCommand::RetentionRepair {
                     archive_path: archive_path.to_string(),
                     response,
+                    inflight,
                 })
         {
-            atomic_saturating_sub(&health.inflight, 1);
+            inflight_release.release();
             health.note_channel_send_rejected();
             return Err(match error {
                 mpsc::TrySendError::Full(_) => {
@@ -881,7 +1359,7 @@ impl SqliteReceiptStore {
         match result.recv() {
             Ok(outcome) => outcome,
             Err(_) => {
-                atomic_saturating_sub(&health.inflight, 1);
+                inflight_release.release();
                 health.note_writer_unavailable();
                 Err(receipt_actor_unavailable_error())
             }
@@ -894,34 +1372,41 @@ impl SqliteReceiptStore {
     pub fn reseed_verified_head(&self) -> Result<(), ReceiptStoreError> {
         self.database_identity_file.validate()?;
         let (response, result) = mpsc::sync_channel(1);
-        self.receipt_commit_actor.health.note_channel_send();
+        let health = &self.receipt_commit_actor.health;
+        let (inflight, inflight_release, _previous_inflight) =
+            WriterInflightLease::acquire(health);
+        health.note_channel_send();
         match self
             .receipt_commit_actor
             .sender
-            .try_send(ReceiptCommitCommand::ReseedHead(response))
+            .try_send(ReceiptCommitCommand::ReseedHead { response, inflight })
         {
             Ok(()) => {}
             Err(mpsc::TrySendError::Full(_)) => {
-                self.receipt_commit_actor
-                    .health
-                    .note_channel_send_rejected();
+                inflight_release.release();
+                health.note_channel_send_rejected();
+                health.saturated_total.fetch_add(1, Ordering::SeqCst);
                 return Err(receipt_actor_saturated_error());
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
-                self.receipt_commit_actor
-                    .health
-                    .note_channel_send_rejected();
+                inflight_release.release();
+                health.note_channel_send_rejected();
                 // A disconnected admin send is the first observation that the
                 // writer is gone. Record the unavailable marker so the next
                 // liveness sample reports the writer Dead immediately, rather
                 // than staying Healthy until a later append also disconnects.
-                self.receipt_commit_actor.health.note_writer_unavailable();
+                health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
         }
-        result
-            .recv()
-            .map_err(|_| receipt_actor_unavailable_error())?
+        match result.recv() {
+            Ok(outcome) => outcome,
+            Err(_) => {
+                inflight_release.release();
+                health.note_writer_unavailable();
+                Err(receipt_actor_unavailable_error())
+            }
+        }
     }
 
     /// Install the background checkpoint signer. Idempotent per store (a
@@ -932,26 +1417,28 @@ impl SqliteReceiptStore {
         signer: BackgroundCheckpointSigner,
     ) -> Result<(), ReceiptStoreError> {
         self.database_identity_file.validate()?;
-        self.receipt_commit_actor.health.note_channel_send();
+        let health = &self.receipt_commit_actor.health;
+        let (inflight, inflight_release, _previous_inflight) =
+            WriterInflightLease::acquire(health);
+        health.note_channel_send();
         match self
             .receipt_commit_actor
             .sender
-            .try_send(ReceiptCommitCommand::InstallSigner(signer))
+            .try_send(ReceiptCommitCommand::InstallSigner { signer, inflight })
         {
             Ok(()) => Ok(()),
             Err(mpsc::TrySendError::Full(_)) => {
-                self.receipt_commit_actor
-                    .health
-                    .note_channel_send_rejected();
+                inflight_release.release();
+                health.note_channel_send_rejected();
+                health.saturated_total.fetch_add(1, Ordering::SeqCst);
                 Err(receipt_actor_saturated_error())
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
-                self.receipt_commit_actor
-                    .health
-                    .note_channel_send_rejected();
+                inflight_release.release();
+                health.note_channel_send_rejected();
                 // See `reseed_verified_head`: a disconnected admin send must
                 // flip liveness to Dead now, not on a later append.
-                self.receipt_commit_actor.health.note_writer_unavailable();
+                health.note_writer_unavailable();
                 Err(receipt_actor_unavailable_error())
             }
         }
@@ -1351,7 +1838,7 @@ impl SqliteReceiptStore {
         &self,
         wal_checkpoint: Option<ReceiptWalCheckpointReport>,
     ) -> Result<ReceiptFlushReport, ReceiptStoreError> {
-        let head = self.writer_head_snapshot();
+        let head = self.writer_checkpoint_snapshot();
         let connection = self.connection()?;
         // After a full-prefix rotation the live claim-log table is empty, so
         // MAX(entry_seq) drops to 0 while the latest checkpoint and the retention

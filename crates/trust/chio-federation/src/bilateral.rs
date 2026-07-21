@@ -318,6 +318,28 @@ pub enum BilateralCoSigningError {
 /// remote kernel. Production deployments plug an mTLS-backed RPC client
 /// in here; in-process tests use [`InProcessCoSigner`].
 pub trait BilateralCoSigningProtocol: Send + Sync {
+    /// Whether this transport implements both receipt co-signing profiles used
+    /// by the kernel: the legacy dual-signed receipt and the treaty-bound DSSE
+    /// envelope. Caller-reservation publication requires both durable
+    /// artifacts and must reject DSSE-only transports during preflight.
+    fn supports_complete_receipt_cosigning_profile(&self) -> bool {
+        false
+    }
+
+    /// Whether retrying the same canonical receipt and DSSE PAE request is
+    /// idempotent at the remote boundary. Durable caller-reservation outboxes
+    /// require this because a process can fail after the remote accepted a
+    /// request but before the local artifact acknowledgement commits.
+    fn supports_idempotent_receipt_cosigning(&self) -> bool {
+        false
+    }
+
+    /// Maximum wall-clock time for the complete receipt co-signing exchange.
+    /// Durable outbox owners size their claim lease from this bound.
+    fn maximum_receipt_cosigning_duration(&self) -> Option<core::time::Duration> {
+        None
+    }
+
     /// Request a co-signature for a receipt that this kernel already
     /// signed. The caller is the tool-host kernel (Org B); the remote is
     /// the origin kernel (Org A) whose agent initiated the call.
@@ -386,6 +408,18 @@ impl InProcessCoSigner {
 }
 
 impl BilateralCoSigningProtocol for InProcessCoSigner {
+    fn supports_complete_receipt_cosigning_profile(&self) -> bool {
+        true
+    }
+
+    fn supports_idempotent_receipt_cosigning(&self) -> bool {
+        true
+    }
+
+    fn maximum_receipt_cosigning_duration(&self) -> Option<core::time::Duration> {
+        Some(core::time::Duration::from_secs(5))
+    }
+
     fn request_cosignature(
         &self,
         request: &CoSigningRequest,

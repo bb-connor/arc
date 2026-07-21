@@ -242,8 +242,18 @@ pub struct ReceiptWriterCounters {
     pub accepted_total: u64,
     pub committed_total: u64,
     pub failed_total: u64,
+    /// Bounded caller waits that elapsed before observing their command's
+    /// terminal response. A timeout is an observation, not a terminal command
+    /// outcome, so it is deliberately separate from `failed_total`.
+    #[serde(default)]
+    pub timeout_total: u64,
     pub saturated_total: u64,
     pub inflight: u64,
+    /// Timeout-observed commands that are still owned by the writer actor.
+    /// These remain live until the command reaches a terminal outcome or its
+    /// lease is dropped during actor teardown.
+    #[serde(default)]
+    pub timed_out_inflight: u64,
     /// Commands still queued in the commit-actor channel, not yet pulled for
     /// processing. Unlike `inflight`, this excludes work the actor has already
     /// drained and is committing, so it is the honest saturation signal: the
@@ -402,6 +412,30 @@ pub struct AuthorizationReceiptConsumption {
     pub consumed_at_unix_ms: u64,
 }
 
+/// Fenced lease over one durable settlement-observer outbox row.
+///
+/// The row is keyed by the exact signed receipt id. A worker may acknowledge
+/// only the version and claim token it acquired, so a worker that resumes
+/// after its lease expired cannot erase a newer delivery attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SettlementObserverOutboxLease {
+    pub receipt_id: String,
+    pub finalized_at: u64,
+    pub claim_token: String,
+    pub claim_deadline_unix_ms: u64,
+    pub version: u64,
+    pub staged_status_json: Option<String>,
+}
+
+/// Result of claiming the settlement-observer delivery for one receipt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SettlementObserverOutboxClaimOutcome {
+    Claimed(SettlementObserverOutboxLease),
+    Completed,
+    Busy,
+    Missing,
+}
+
 /// Side-effect classification that gates the durable dispatch-intent write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -487,6 +521,10 @@ pub enum DispatchIntentResolution {
     /// Rail query confirmed a monetary outcome; the incident carries the
     /// reference.
     MonetaryReconciled { rail_reference: String },
+    /// A durable admission operation still owns the effect boundary. Persist
+    /// that ownership outside the generic open-recovery candidate set until
+    /// the operation commits a terminal receipt or cleanup.
+    DeferredToAdmissionOperation { operation_id: String },
 }
 
 /// Decides how to resolve an orphaned dispatch intent at boot. The default
@@ -508,6 +546,8 @@ pub struct DispatchIntentReconcileReport {
     pub dead_lettered: u64,
     pub replayed: u64,
     pub monetary_reconciled: u64,
+    #[serde(default)]
+    pub deferred_to_admission_operation: u64,
     /// Open intents left unclaimed because a live sibling writer instance
     /// shares the store: they mark that writer's in-flight calls, not
     /// restart orphans, and only their owner (or a later attach that holds
@@ -625,6 +665,12 @@ pub trait ReceiptStore: Send + Sync {
     fn supports_native_security_receipts(&self) -> bool {
         false
     }
+
+    /// Whether `load_chio_receipt` authoritatively distinguishes an absent id
+    /// from a receipt that this durable store already committed.
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        false
+    }
     /// Load a chio receipt by id. The provided default returns `None`; a store
     /// backing a store-authoritative deployment MUST override this (and
     /// `load_child_receipt`) with a real point lookup.
@@ -680,6 +726,18 @@ pub trait ReceiptStore: Send + Sync {
         _budget: std::time::Duration,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.append_chio_receipt_returning_seq(receipt)
+    }
+    /// Append a receipt and enqueue its settlement-observer delivery in the
+    /// same durable transaction. A duplicate exact receipt must preserve an
+    /// existing pending, claimed, or completed outbox row.
+    fn append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+        &self,
+        _receipt: &ChioReceipt,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable settlement-observer outbox is not supported by this receipt store".to_string(),
+        ))
     }
     /// Point-in-time writer liveness, assessed against the operator-configured
     /// stall threshold. Default `Unknown` keeps stores with no async writer, or
@@ -747,6 +805,85 @@ pub trait ReceiptStore: Send + Sync {
         _budget: std::time::Duration,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.append_chio_receipt_consuming_intent(receipt, intent)
+    }
+    /// Consume a dispatch intent, append its receipt, and enqueue the exact
+    /// settlement-observer delivery in one durable transaction.
+    fn append_chio_receipt_consuming_intent_with_settlement_observer_outbox_with_timeout(
+        &self,
+        _receipt: &ChioReceipt,
+        _intent: &DispatchIntentKey,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "atomic dispatch-intent consumption with settlement-observer outbox is not supported by this receipt store"
+                .to_string(),
+        ))
+    }
+    /// Whether the receipt store durably implements atomic observer enqueue
+    /// plus fenced claim, retry release, and completion acknowledgement.
+    fn supports_durable_settlement_observer_outbox(&self) -> bool {
+        false
+    }
+    /// Return claimable observer deliveries in signed receipt timestamp and
+    /// receipt-id order. Live leases are excluded; expired leases are eligible.
+    fn list_settlement_observer_outbox_receipt_ids(
+        &self,
+        _now_unix_ms: u64,
+        _limit: usize,
+    ) -> Result<Vec<String>, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable settlement-observer outbox is not supported by this receipt store".to_string(),
+        ))
+    }
+    fn count_unfinished_settlement_observer_outbox(&self) -> Result<u64, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable settlement-observer outbox is not supported by this receipt store".to_string(),
+        ))
+    }
+    fn claim_settlement_observer_outbox(
+        &self,
+        _receipt_id: &str,
+        _claim_token: &str,
+        _now_unix_ms: u64,
+        _claim_deadline_unix_ms: u64,
+    ) -> Result<SettlementObserverOutboxClaimOutcome, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable settlement-observer outbox is not supported by this receipt store".to_string(),
+        ))
+    }
+    /// Fence and persist the exact hook status before any retry/dead-letter
+    /// mutation. A stale lease returns `Ok(None)` and must not route its status.
+    fn stage_settlement_observer_outbox_status(
+        &self,
+        _receipt_id: &str,
+        _expected_version: u64,
+        _claim_token: &str,
+        _status_json: &str,
+    ) -> Result<Option<SettlementObserverOutboxLease>, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable settlement-observer outbox is not supported by this receipt store".to_string(),
+        ))
+    }
+    fn acknowledge_settlement_observer_outbox(
+        &self,
+        _receipt_id: &str,
+        _expected_version: u64,
+        _claim_token: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable settlement-observer outbox is not supported by this receipt store".to_string(),
+        ))
+    }
+    fn abandon_settlement_observer_outbox(
+        &self,
+        _receipt_id: &str,
+        _expected_version: u64,
+        _claim_token: &str,
+        _last_error: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable settlement-observer outbox is not supported by this receipt store".to_string(),
+        ))
     }
     /// Best-effort attach of a rail authorization id to an open monetary
     /// intent, so a monetary orphan names the exact reference an operator

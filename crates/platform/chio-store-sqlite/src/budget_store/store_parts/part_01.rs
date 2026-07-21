@@ -230,18 +230,59 @@ impl SqliteBudgetStore {
         Self::from_connection(connection, BudgetStoreProfile::SingleNodeDurable)
     }
 
+    /// Open a durable budget authority through one retained trusted parent.
+    pub fn open_hardened(
+        path: impl AsRef<Path>,
+        directory: Arc<crate::durable_sqlite::TrustedSqliteDirectory>,
+    ) -> Result<Self, BudgetStoreError> {
+        let database_identity_file = directory
+            .open_database(path, true)
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        let connection = database_identity_file
+            .open_connection(
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::check_schema_version(
+            &connection,
+            BUDGET_STORE_SCHEMA_KEY,
+            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+            BUDGET_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        Self::from_connection_with_identity(
+            connection,
+            BudgetStoreProfile::SingleNodeDurable,
+            Some(database_identity_file),
+        )
+    }
+
     pub fn open_in_memory() -> Result<Self, BudgetStoreError> {
         let connection = Connection::open_in_memory()?;
         Self::from_connection(connection, BudgetStoreProfile::EphemeralLocal)
     }
 
     fn from_connection(
+        connection: Connection,
+        authority_profile: BudgetStoreProfile,
+    ) -> Result<Self, BudgetStoreError> {
+        Self::from_connection_with_identity(connection, authority_profile, None)
+    }
+
+    fn from_connection_with_identity(
         mut connection: Connection,
         authority_profile: BudgetStoreProfile,
+        database_identity_file: Option<Arc<crate::durable_sqlite::DurableSqliteFile>>,
     ) -> Result<Self, BudgetStoreError> {
         connection.busy_timeout(SQLITE_LOCK_WAIT)?;
         if authority_profile == BudgetStoreProfile::SingleNodeDurable {
             enable_write_ahead_logging(&connection)?;
+            if let Some(database_identity_file) = database_identity_file.as_ref() {
+                database_identity_file
+                    .validate_live_connection(&connection)
+                    .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+            }
         }
         connection.execute_batch(
             r#"
@@ -494,17 +535,29 @@ impl SqliteBudgetStore {
             BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        if let Some(database_identity_file) = database_identity_file.as_ref() {
+            database_identity_file
+                .validate_live_connection(&connection)
+                .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        }
 
         Ok(Self {
             connection: Mutex::new(connection),
             authority_profile,
+            database_identity_file,
         })
     }
 
     pub(super) fn connection(&self) -> Result<MutexGuard<'_, Connection>, BudgetStoreError> {
-        self.connection.lock().map_err(|_| {
+        let connection = self.connection.lock().map_err(|_| {
             BudgetStoreError::Invariant("sqlite budget store lock poisoned".to_string())
-        })
+        })?;
+        if let Some(database_identity_file) = self.database_identity_file.as_ref() {
+            database_identity_file
+                .validate_live_connection(&connection)
+                .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        }
+        Ok(connection)
     }
 
     pub fn is_admission_authority_managed(&self) -> Result<bool, BudgetStoreError> {

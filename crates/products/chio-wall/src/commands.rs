@@ -451,32 +451,42 @@ fn create_chio_wall_receipt_db(
     policy_snapshot: &ChioWallPolicySnapshot,
 ) -> Result<(), CliError> {
     let store = SqliteReceiptStore::open(receipt_db_path)?;
-    let issuer = Keypair::generate();
-    let subject = Keypair::generate();
-    let kernel = Keypair::generate();
-    let capability = chio_wall_capability_with_id("cap-chio-wall-1", &subject, &issuer)?;
-    let receipt = chio_wall_receipt(
-        authorization_context,
-        guard_outcome,
-        denied_access_record,
-        policy_snapshot,
-        &capability.body().id,
-        &kernel,
-    )?;
-    let seq = store.append_chio_receipt_returning_seq(&receipt)?;
-    let canonical = store.receipts_canonical_bytes_range(seq, seq)?;
-    let checkpoint = build_checkpoint(
-        1,
-        seq,
-        seq,
-        &canonical
-            .into_iter()
-            .map(|(_, bytes)| bytes)
-            .collect::<Vec<_>>(),
-        &kernel,
-    )?;
-    store.store_checkpoint(&checkpoint)?;
-    Ok(())
+    let write = (|| -> Result<(), CliError> {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let kernel = Keypair::generate();
+        let capability = chio_wall_capability_with_id("cap-chio-wall-1", &subject, &issuer)?;
+        let receipt = chio_wall_receipt(
+            authorization_context,
+            guard_outcome,
+            denied_access_record,
+            policy_snapshot,
+            &capability.body().id,
+            &kernel,
+        )?;
+        let seq = store.append_chio_receipt_returning_seq(&receipt)?;
+        let canonical = store.receipts_canonical_bytes_range(seq, seq)?;
+        let checkpoint = build_checkpoint(
+            1,
+            seq,
+            seq,
+            &canonical
+                .into_iter()
+                .map(|(_, bytes)| bytes)
+                .collect::<Vec<_>>(),
+            &kernel,
+        )?;
+        store.store_checkpoint(&checkpoint)?;
+        Ok(())
+    })();
+    let close = store.close().map(|_| ()).map_err(CliError::from);
+    match (write, close) {
+        (Err(write_error), Err(close_error)) => Err(CliError::Other(format!(
+            "{write_error}; receipt store close failed: {close_error}"
+        ))),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(())) => Ok(()),
+    }
 }
 
 fn write_chio_evidence_package(
@@ -486,36 +496,58 @@ fn write_chio_evidence_package(
     denied_access_record: &ChioWallDeniedAccessRecord,
     policy_snapshot: &ChioWallPolicySnapshot,
 ) -> Result<(), CliError> {
-    let receipt_staging = tempfile::tempdir()?;
+    let temporary_root = fs::canonicalize(std::env::temp_dir())?;
+    let mut receipt_staging_builder = tempfile::Builder::new();
+    receipt_staging_builder.prefix("chio-wall-receipts-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        receipt_staging_builder.permissions(fs::Permissions::from_mode(0o700));
+    }
+    let receipt_staging = receipt_staging_builder.tempdir_in(temporary_root)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(receipt_staging.path(), fs::Permissions::from_mode(0o700))?;
+    }
     let receipt_db_path = receipt_staging.path().join("chio-wall-receipts.sqlite3");
     let chio_evidence_dir = output.join("chio-evidence");
 
-    create_chio_wall_receipt_db(
-        &receipt_db_path,
-        authorization_context,
-        guard_outcome,
-        denied_access_record,
-        policy_snapshot,
-    )?;
+    let write = (|| -> Result<(), CliError> {
+        create_chio_wall_receipt_db(
+            &receipt_db_path,
+            authorization_context,
+            guard_outcome,
+            denied_access_record,
+            policy_snapshot,
+        )?;
 
-    evidence_export::cmd_evidence_export(
-        &chio_evidence_dir,
-        None,
-        None,
-        None,
-        None,
-        None,
-        true,
-        None,
-        None,
-        false,
-        Some(&receipt_db_path),
-        None,
-        None,
-    )?;
-
-    let _ = fs::remove_file(receipt_db_path);
-    Ok(())
+        evidence_export::cmd_evidence_export(
+            &chio_evidence_dir,
+            None,
+            None,
+            None,
+            None,
+            None,
+            true,
+            None,
+            None,
+            false,
+            Some(&receipt_db_path),
+            None,
+            None,
+        )
+    })();
+    let cleanup = receipt_staging.close().map_err(CliError::from);
+    match (write, cleanup) {
+        (Err(write_error), Err(cleanup_error)) => Err(CliError::Other(format!(
+            "{write_error}; receipt staging removal failed: {cleanup_error}"
+        ))),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(())) => Ok(()),
+    }
 }
 
 fn expected_artifact_path(kind: ChioWallArtifactKind) -> &'static str {

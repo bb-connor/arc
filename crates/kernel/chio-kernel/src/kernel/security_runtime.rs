@@ -211,7 +211,7 @@ impl ChioKernel {
             executor_identity.authority_id(),
         )?;
 
-        self.guards = publication.guards;
+        self.guards = Arc::new(publication.guards.into_iter().map(Arc::from).collect());
         self.post_invocation_pipeline = publication.post_invocation_pipeline;
         self.security_pre_dispatch_hook = Some(publication.pre_dispatch_hook);
         self.security_pre_dispatch_policy = SecurityPreDispatchPolicy::Enforce;

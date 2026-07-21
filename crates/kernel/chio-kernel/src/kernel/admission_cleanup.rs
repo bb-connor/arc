@@ -17,8 +17,8 @@ use crate::approval::{ApprovalSetReservationInput, ApprovalStore};
 use crate::budget_store::{
     AuthorizedBudgetHold, BudgetAdmissionOperationBinding, BudgetAuthorizationCleanupSnapshot,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCommitMetadata,
-    BudgetGuaranteeLevel, BudgetHoldDispositionView, BudgetInvocationReservationState,
-    BudgetMonetaryHoldState, BudgetStore, DeniedBudgetHold,
+    BudgetGuaranteeLevel, BudgetInvocationReservationState, BudgetMonetaryHoldState, BudgetStore,
+    DeniedBudgetHold,
 };
 use crate::payment::{
     PaymentJournalRecord, PaymentJournalState, PaymentSettleAction, PaymentSettleIntent,
@@ -670,22 +670,56 @@ impl ChioKernel {
         kind: AdmissionOperationKind,
         expected_coordinator_authority_id: &str,
     ) -> Result<usize, KernelError> {
-        let mut recovered = self.recover_terminal_receipt_outboxes_with_store(
-            operation_store,
-            kind,
-            Some(expected_coordinator_authority_id),
-        )?;
         let scan_limit = MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION
             .checked_add(1)
             .ok_or_else(|| {
                 KernelError::Internal("admission recovery scan limit overflowed usize".to_string())
             })?;
-        let mut operations = operation_store.list_unresolved(Some(kind), scan_limit)?;
-        let overflowed_bound =
+        let mut operations =
+            operation_store.list_admission_recovery_candidates(kind, scan_limit)?;
+        let more_remaining =
             operations.len() > MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION;
         operations.truncate(MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION);
+        let mut preflight_errors = Vec::new();
+        for operation in &operations {
+            if operation.coordinator_authority_id() != expected_coordinator_authority_id {
+                preflight_errors.push(format!(
+                        "operation {} belongs to coordinator authority `{}` instead of `{expected_coordinator_authority_id}`",
+                        operation.operation_id(),
+                        operation.coordinator_authority_id()
+                    ));
+            }
+            let validated_historical_caller_handoff = operation.state()
+                == AdmissionOperationState::CallerReserved
+                && operation.dispatch_state() == AdmissionDispatchState::Committed
+                && self
+                    .validate_caller_reserved_handoff_with_store(operation_store, operation)
+                    .is_ok();
+            if operation.policy_hash() != self.config.policy_hash
+                && !validated_historical_caller_handoff
+            {
+                preflight_errors.push(format!(
+                        "operation {} belongs to policy `{}` instead of installed policy `{}`; policy rotation requires a zero-unresolved-operation drain",
+                        operation.operation_id(),
+                        operation.policy_hash(),
+                        self.config.policy_hash
+                    ));
+            }
+        }
+        if !preflight_errors.is_empty() {
+            return Err(KernelError::Internal(format!(
+                "one or more nonterminal admission operations remain unrecovered: {}",
+                preflight_errors.join("; ")
+            )));
+        }
+
+        let mut recovered = self.recover_terminal_receipt_outboxes_with_store(
+            operation_store,
+            kind,
+            Some(expected_coordinator_authority_id),
+        )?;
         let mut errors = Vec::new();
-        for operation in operations {
+        for operation in operations.iter() {
             if operation.coordinator_authority_id() != expected_coordinator_authority_id {
                 errors.push(format!(
                     "operation {} belongs to coordinator authority `{}` instead of `{expected_coordinator_authority_id}`",
@@ -697,11 +731,28 @@ impl ChioKernel {
             if operation.state() == AdmissionOperationState::OutcomeUnknownAfterDispatch {
                 continue;
             }
+            let validated_historical_caller_handoff = operation.state()
+                == AdmissionOperationState::CallerReserved
+                && operation.dispatch_state() == AdmissionDispatchState::Committed
+                && self
+                    .validate_caller_reserved_handoff_with_store(operation_store, operation)
+                    .is_ok();
+            if operation.policy_hash() != self.config.policy_hash
+                && !validated_historical_caller_handoff
+            {
+                errors.push(format!(
+                    "operation {} belongs to policy `{}` instead of installed policy `{}`; policy rotation requires a zero-unresolved-operation drain",
+                    operation.operation_id(),
+                    operation.policy_hash(),
+                    self.config.policy_hash
+                ));
+                continue;
+            }
             if operation.state() == AdmissionOperationState::CallerReserved {
                 match self.recover_caller_reserved_operation(
                     operation_store,
                     budget_store,
-                    &operation,
+                    operation,
                 ) {
                     Ok(true) => {
                         recovered = recovered.checked_add(1).ok_or_else(|| {
@@ -728,7 +779,7 @@ impl ChioKernel {
                 match self.reconcile_governed_active_response_commit(
                     operation_store,
                     approval_store,
-                    &operation,
+                    operation,
                 ) {
                     Ok(Some(_)) => {
                         recovered = recovered.checked_add(1).ok_or_else(|| {
@@ -753,7 +804,7 @@ impl ChioKernel {
                     operation_store,
                     budget_store,
                     approval_store,
-                    &operation,
+                    operation,
                 ) {
                     Ok(()) => {
                         recovered = recovered.checked_add(1).ok_or_else(|| {
@@ -817,28 +868,21 @@ impl ChioKernel {
                 )),
             }
         }
-        if overflowed_bound {
-            errors.push(format!(
-                "admission recovery backlog exceeds the bounded {MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation scan"
-            ));
-        }
-        let mut remaining = operation_store.list_unresolved(
-            Some(kind),
-            MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION
-                .checked_add(1)
-                .ok_or_else(|| {
-                    KernelError::Internal(
-                        "admission recovery verification limit overflowed usize".to_string(),
-                    )
-                })?,
-        )?;
-        if remaining.len() > MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION {
-            errors.push(format!(
-                "post-recovery admission inventory exceeds the bounded {MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation scan"
-            ));
-        }
-        remaining.truncate(MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION);
-        for operation in remaining {
+        for expected in &operations {
+            let Some(operation) = operation_store.load(expected.operation_id())? else {
+                errors.push(format!(
+                    "operation {} disappeared during post-recovery verification",
+                    expected.operation_id()
+                ));
+                continue;
+            };
+            if matches!(
+                operation.state(),
+                AdmissionOperationState::Completed
+                    | AdmissionOperationState::CompensatedBeforeDispatch
+            ) {
+                continue;
+            }
             let retained_governed_dispatch = kind == AdmissionOperationKind::GovernedActiveResponse
                 && operation.state() == AdmissionOperationState::DispatchCommitted
                 && operation.dispatch_state() == AdmissionDispatchState::Committed;
@@ -848,6 +892,23 @@ impl ChioKernel {
                     operation.operation_id(),
                     operation.state().as_str(),
                     operation.coordinator_authority_id()
+                ));
+                continue;
+            }
+            let validated_historical_caller_handoff = operation.state()
+                == AdmissionOperationState::CallerReserved
+                && operation.dispatch_state() == AdmissionDispatchState::Committed
+                && self
+                    .validate_caller_reserved_handoff_with_store(operation_store, &operation)
+                    .is_ok();
+            if operation.policy_hash() != self.config.policy_hash
+                && !validated_historical_caller_handoff
+            {
+                errors.push(format!(
+                    "operation {} belongs to policy `{}` instead of installed policy `{}`; policy rotation requires a zero-unresolved-operation drain",
+                    operation.operation_id(),
+                    operation.policy_hash(),
+                    self.config.policy_hash
                 ));
                 continue;
             }
@@ -893,6 +954,27 @@ impl ChioKernel {
                     operation.coordinator_authority_id()
                 ));
             }
+        }
+        match self.recover_terminal_receipt_outboxes_with_store(
+            operation_store,
+            kind,
+            Some(expected_coordinator_authority_id),
+        ) {
+            Ok(post_recovered) => {
+                recovered = recovered.checked_add(post_recovered).ok_or_else(|| {
+                    KernelError::Internal(
+                        "post-recovery terminal receipt count overflowed usize".to_string(),
+                    )
+                })?;
+            }
+            Err(error) => errors.push(format!(
+                "post-recovery terminal receipt drain failed: {error}"
+            )),
+        }
+        if more_remaining {
+            errors.push(format!(
+                "more nonterminal admission operations remain after the bounded {MAX_ADMISSION_CLEANUP_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation recovery batch"
+            ));
         }
         if errors.is_empty() {
             Ok(recovered)
@@ -1107,10 +1189,10 @@ impl ChioKernel {
     }
 
     /// Retain a durably issued caller reservation while its exact stamped hold
-    /// remains open. Only a TTL-reaped `Expired` hold proves the reaper won the
-    /// close race and may conservatively terminalize the operation. Other closed
-    /// states can be transiently visible while reconciliation commits its exact
-    /// terminal operation and outbox, so recovery leaves them untouched.
+    /// remains open. Any closed hold proves the spend authority has already made
+    /// an irreversible terminal decision. Cold recovery must therefore close the
+    /// still-nonterminal operation conservatively when the exact signed terminal
+    /// receipt did not commit before the previous runtime stopped.
     /// Returns true when this call terminalized the operation and false when the
     /// live reservation remains intentionally unresolved.
     fn recover_caller_reserved_operation(
@@ -1129,6 +1211,7 @@ impl ChioKernel {
                 operation.state().as_str()
             )));
         }
+        self.validate_caller_reserved_handoff_with_store(operation_store, operation)?;
         let hold_id = operation.budget_hold_id().ok_or_else(|| {
             KernelError::Internal(format!(
                 "caller reservation operation {} has no budget hold",
@@ -1159,7 +1242,7 @@ impl ChioKernel {
                 operation.operation_id()
             )));
         }
-        let hold = budget_store.get_budget_hold(hold_id)?.ok_or_else(|| {
+        let mut hold = budget_store.get_budget_hold(hold_id)?.ok_or_else(|| {
             KernelError::Internal(format!(
                 "caller reservation operation {} lost its exact budget hold",
                 operation.operation_id()
@@ -1182,10 +1265,25 @@ impl ChioKernel {
                     operation.operation_id()
                 )));
             }
-            return Ok(false);
-        }
-        if hold.disposition != BudgetHoldDispositionView::Expired {
-            return Ok(false);
+            match self.recover_caller_reserved_handoff_delivery_with_store(
+                operation_store,
+                operation,
+                current_unix_timestamp(),
+            ) {
+                Ok(()) => return Ok(false),
+                Err(KernelError::GuardDenied(_)) => {
+                    hold = budget_store.get_budget_hold(hold_id)?.ok_or_else(|| {
+                        KernelError::Internal(format!(
+                            "caller reservation operation {} lost its exact budget hold during delivery recovery",
+                            operation.operation_id()
+                        ))
+                    })?;
+                    if hold.disposition.is_open() {
+                        return Ok(false);
+                    }
+                }
+                Err(error) => return Err(error),
+            }
         }
         let disposition = hold.disposition.as_str();
         let reason = format!(
@@ -1237,11 +1335,11 @@ impl ChioKernel {
                 AdmissionOperationState::CapturePending
                 | AdmissionOperationState::CallerReservationCapturePending,
             ) => self.recover_capture_pending_operation(
-                    operation_store,
-                    budget_store,
-                    approval_store,
-                    operation,
-                ),
+                operation_store,
+                budget_store,
+                approval_store,
+                operation,
+            ),
             (AdmissionOperationKind::ToolDispatch, AdmissionOperationState::DispatchCommitted) => {
                 self.commit_recovery_replay_reservations(
                     operation_store,
@@ -1321,6 +1419,14 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let caller_reservation =
             operation.state() == AdmissionOperationState::CallerReservationCapturePending;
+        if caller_reservation {
+            return self.recover_caller_reservation_capture_pending_handoff(
+                operation_store,
+                budget_store,
+                approval_store,
+                operation,
+            );
+        }
         let snapshot = self.load_recovery_budget_snapshot(operation_store, operation)?;
         if !caller_reservation
             || operation.approval_set_hash().is_some()
@@ -1490,7 +1596,7 @@ impl ChioKernel {
         )))
     }
 
-    fn load_recovery_budget_snapshot(
+    pub(super) fn load_recovery_budget_snapshot(
         &self,
         operation_store: &dyn AdmissionOperationStore,
         operation: &AdmissionOperation,
@@ -1591,7 +1697,7 @@ impl ChioKernel {
         Ok(())
     }
 
-    fn compensate_recovery_capture_denial(
+    pub(super) fn compensate_recovery_capture_denial(
         &self,
         operation_store: &dyn AdmissionOperationStore,
         budget_store: &dyn BudgetStore,

@@ -61,7 +61,7 @@ impl SqliteBudgetStore {
             request.operation_id.clone(),
             request.request_binding_hash.clone(),
         )?;
-        validate_payment_journal_authorization_binding(
+        super::trait_impl::validate_payment_journal_authorization_binding(
             journal,
             Some(&admission_operation),
             request.authority.as_ref(),
@@ -79,7 +79,7 @@ impl SqliteBudgetStore {
         )?;
         if matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)) {
             if let Some(journal) = journal {
-                insert_payment_journal_tx(&transaction, journal, true)?;
+                super::trait_impl::insert_payment_journal_tx(&transaction, journal, true)?;
             }
         }
         transaction.commit()?;

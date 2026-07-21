@@ -55,6 +55,7 @@ pub enum CreditEvaluatorError {
 /// the receipt's content/policy hashes so a downstream auditor can
 /// confirm the IOU references the same bytes the kernel signed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct IouEnvelopeBody {
     /// Schema tag (`chio.credit.iou-envelope.v1`).
     pub schema: String,
@@ -83,15 +84,17 @@ pub struct IouEnvelopeBody {
     pub amount_units: u64,
     /// ISO 4217 currency code.
     pub currency: String,
-    /// Issuer public key, expected to match the kernel signing
-    /// identity that produced the underlying receipt.
+    /// Credit-account issuer public key. This signer is independent from the
+    /// current or historical kernel key that signed the underlying receipt;
+    /// callers verify receipt trust against a separate explicit key set before
+    /// minting the IOU.
     pub issuer_key: PublicKey,
 }
 
 /// Signed IOU envelope. Produced by [`CreditEvaluatorHook::evaluate`]
 /// after a finalized receipt is observed, and persisted by the
 /// store binding.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct IouEnvelope {
     /// Body that was signed.
     #[serde(flatten)]
@@ -103,10 +106,64 @@ pub struct IouEnvelope {
     pub signature: Signature,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IouEnvelopeWire {
+    schema: String,
+    iou_id: String,
+    receipt_id: String,
+    receipt_timestamp: u64,
+    #[serde(default)]
+    tenant_id: Option<String>,
+    tool_server: String,
+    tool_name: String,
+    capability_id: String,
+    amount_units: u64,
+    currency: String,
+    issuer_key: PublicKey,
+    #[serde(default)]
+    algorithm: Option<SigningAlgorithm>,
+    signature: Signature,
+}
+
+impl<'de> Deserialize<'de> for IouEnvelope {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = IouEnvelopeWire::deserialize(deserializer)?;
+        Ok(Self {
+            body: IouEnvelopeBody {
+                schema: wire.schema,
+                iou_id: wire.iou_id,
+                receipt_id: wire.receipt_id,
+                receipt_timestamp: wire.receipt_timestamp,
+                tenant_id: wire.tenant_id,
+                tool_server: wire.tool_server,
+                tool_name: wire.tool_name,
+                capability_id: wire.capability_id,
+                amount_units: wire.amount_units,
+                currency: wire.currency,
+                issuer_key: wire.issuer_key,
+            },
+            algorithm: wire.algorithm,
+            signature: wire.signature,
+        })
+    }
+}
+
 impl IouEnvelope {
     /// Verify the IOU envelope signature against the embedded issuer
-    /// key. Returns `Ok(true)` when the signature is valid.
+    /// key. Returns `Ok(true)` only when the declared/default algorithm,
+    /// issuer-key algorithm, and signature algorithm agree and the signature
+    /// is cryptographically valid.
     pub fn verify_signature(&self) -> Result<bool, CreditEvaluatorError> {
+        let declared_algorithm = self.algorithm.unwrap_or_default();
+        if declared_algorithm != self.signature.algorithm()
+            || declared_algorithm != self.body.issuer_key.algorithm()
+        {
+            return Ok(false);
+        }
         self.body
             .issuer_key
             .verify_canonical(&self.body, &self.signature)

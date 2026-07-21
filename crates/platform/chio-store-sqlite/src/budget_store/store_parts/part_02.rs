@@ -766,6 +766,7 @@ impl SqliteBudgetStore {
                     remaining_exposure_units,
                     invocation_count_debited,
                     disposition,
+                    reserved_until,
                     authority_id,
                     lease_id,
                     lease_epoch,
@@ -778,7 +779,7 @@ impl SqliteBudgetStore {
                 |row| {
                     let disposition = row.get::<_, String>(6)?;
                     let authority =
-                        sqlite_budget_event_authority(row.get(7)?, row.get(8)?, row.get(9)?)?;
+                        sqlite_budget_event_authority(row.get(8)?, row.get(9)?, row.get(10)?)?;
                     Ok(SqliteBudgetHold {
                         hold_id: row.get(0)?,
                         capability_id: row.get(1)?,
@@ -804,9 +805,10 @@ impl SqliteBudgetStore {
                                 )),
                             )
                         })?,
+                        reserved_until: row.get(7)?,
                         authority,
-                        operation_id: row.get(10)?,
-                        request_binding_hash: row.get(11)?,
+                        operation_id: row.get(11)?,
+                        request_binding_hash: row.get(12)?,
                     })
                 },
             )

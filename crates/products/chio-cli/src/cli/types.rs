@@ -515,6 +515,98 @@ mod cli_env_tests {
     }
 
     #[test]
+    fn settle_drive_requires_at_least_one_trusted_kernel_public_key() {
+        let parsed = parse_cli([
+            "chio",
+            "settle",
+            "drive",
+            "--iou-issuer-seed-file",
+            "iou-issuer.seed",
+        ]);
+        assert!(parsed.is_err(), "settle drive must fail closed without a trust root");
+    }
+
+    #[test]
+    fn settle_drive_requires_an_existing_iou_issuer_seed_argument() {
+        let parsed = parse_cli([
+            "chio",
+            "settle",
+            "drive",
+            "--trusted-kernel-pubkey",
+            "current.pub",
+        ]);
+        assert!(
+            parsed.is_err(),
+            "settle drive must require explicit IOU signing custody"
+        );
+    }
+
+    #[test]
+    fn settle_drive_accepts_current_and_historical_kernel_public_keys() {
+        let parsed = parse_cli([
+            "chio",
+            "settle",
+            "drive",
+            "--iou-issuer-seed-file",
+            "iou-issuer.seed",
+            "--trusted-kernel-pubkey",
+            "current.pub",
+            "--trusted-kernel-pubkey",
+            "historical.pub",
+            "--trusted-iou-issuer-pubkey",
+            "old-iou.pub",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+
+        match parsed.command {
+            Commands::Settle {
+                command:
+                    SettleCommands::Drive {
+                        iou_issuer_seed_file,
+                        trusted_kernel_pubkeys,
+                        trusted_iou_issuer_pubkeys,
+                        ..
+                    },
+            } => {
+                assert_eq!(iou_issuer_seed_file, PathBuf::from("iou-issuer.seed"));
+                assert_eq!(
+                    trusted_kernel_pubkeys,
+                    vec![PathBuf::from("current.pub"), PathBuf::from("historical.pub")]
+                );
+                assert_eq!(
+                    trusted_iou_issuer_pubkeys,
+                    vec![PathBuf::from("old-iou.pub")]
+                );
+            }
+            _ => panic!("expected settle drive command"),
+        }
+    }
+
+    #[test]
+    fn settle_status_and_drive_reject_unbounded_counts() {
+        assert!(parse_cli([
+            "chio",
+            "settle",
+            "status",
+            "--limit",
+            "0",
+        ])
+        .is_err());
+        assert!(parse_cli([
+            "chio",
+            "settle",
+            "drive",
+            "--iou-issuer-seed-file",
+            "iou.seed",
+            "--trusted-kernel-pubkey",
+            "kernel.pub",
+            "--batch",
+            "4097",
+        ])
+        .is_err());
+    }
+
+    #[test]
     fn broker_product_configuration_is_explicit_and_global_for_mcp_runtimes() {
         let parsed_stdio = parse_cli([
             "chio",
@@ -758,7 +850,7 @@ pub(crate) enum Commands {
     ///
     /// Lists pending IOU envelopes (minted but not yet settled),
     /// settled receipts (rows in `settlement_reconciliations` whose
-    /// state is `settled`), and dead-lettered settlements (rows in
+    /// state is `reconciled`), and dead-lettered settlements (rows in
     /// `settle_dead_letters`).
     Settle {
         #[command(subcommand)]

@@ -1,3 +1,5 @@
+macro_rules! sqlite_budget_store_main_extensions {
+    () => {
 fn list_open_holds_older_than(
     &self,
     older_than_unix_ms: u64,
@@ -98,6 +100,10 @@ fn expire_open_hold(&self, hold_id: &str) -> Result<bool, BudgetStoreError> {
     )?;
     transaction.commit()?;
     Ok(true)
+}
+
+fn recover_unstamped_caller_reservations(&self) -> Result<usize, BudgetStoreError> {
+    SqliteBudgetStore::recover_unstamped_caller_reservations(self)
 }
 
 fn open_hold_count(&self) -> Result<u64, BudgetStoreError> {
@@ -308,6 +314,23 @@ fn mark_hold_reserved(
     )
 }
 
+fn mark_invocation_hold_reserved(
+    &self,
+    hold_id: &str,
+    capability_id: &str,
+    grant_index: usize,
+    reserved_until_unix_secs: i64,
+    envelope: &ReservedHoldEnvelope,
+) -> Result<(), BudgetStoreError> {
+    self.mark_invocation_hold_reserved_until(
+        hold_id,
+        capability_id,
+        grant_index,
+        reserved_until_unix_secs,
+        envelope,
+    )
+}
+
 fn mark_admission_operation_hold_reserved(
     &self,
     hold_id: &str,
@@ -347,4 +370,6 @@ fn reserve_invocation_hold(
 
 fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
     SqliteBudgetStore::reap_expired_reserved_holds(self, now_unix_secs)
+}
+    };
 }

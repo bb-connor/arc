@@ -1062,6 +1062,7 @@ fn reject_volatile_database_path(path: &Path) -> Result<(), ApprovalStoreError> 
 mod tests {
     use super::*;
     use chio_core::crypto::Keypair;
+    use chio_test_support::prelude::*;
 
     #[test]
     fn open_colocated_creates_parent_dirs_for_a_file_uri_with_query() {
@@ -1209,6 +1210,59 @@ mod tests {
             .store_pending(&sample_request("adopt-1", "hash-adopt"))
             .unwrap();
         assert!(store.get_pending("adopt-1").unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn receipt_colocated_approval_pool_rejects_post_open_path_rebinding() {
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let directory = chio_test_support::private_fs::private_tempdir(
+            "receipt-colocated-approval-rebind",
+        )
+        .test_expect("create private receipt approval directory");
+        let directory = fs::canonicalize(directory.path()).unwrap();
+        let path = directory.join("receipt-approval.sqlite3");
+        let displaced = directory.join("receipt-approval-displaced.sqlite3");
+        let replacement = directory.join("receipt-approval-replacement.sqlite3");
+        let receipt_store = crate::SqliteReceiptStore::open(&path).unwrap();
+        let approval_store =
+            SqliteApprovalStore::open_colocated_with_receipt_store_handle(&receipt_store).unwrap();
+        match &approval_store.pool {
+            ApprovalConnectionPool::ReceiptBound(pool) => assert!(pool.try_get().is_some()),
+            ApprovalConnectionPool::Standalone(_) => {
+                panic!("co-located approval authority must retain the receipt-bound pool")
+            }
+        }
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&replacement)
+            .unwrap();
+
+        fs::rename(&path, &displaced).unwrap();
+        fs::rename(&replacement, &path).unwrap();
+
+        let rejected = match &approval_store.pool {
+            ApprovalConnectionPool::ReceiptBound(pool) => pool.try_get().is_none(),
+            ApprovalConnectionPool::Standalone(_) => false,
+        };
+        assert!(
+            rejected,
+            "the approval authority must check the receipt descriptor on pool checkout"
+        );
+        assert_eq!(
+            fs::metadata(&path).unwrap().len(),
+            0,
+            "a rejected replacement must not receive approval schema mutations"
+        );
+
+        fs::rename(&path, &replacement).unwrap();
+        fs::rename(&displaced, &path).unwrap();
+        drop(approval_store);
+        drop(receipt_store);
     }
 
     #[test]

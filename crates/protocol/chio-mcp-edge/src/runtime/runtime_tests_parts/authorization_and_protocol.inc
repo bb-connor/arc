@@ -1381,7 +1381,7 @@ fn direct_tool_server_events_are_forwarded_through_the_edge() {
             "id": 2,
             "method": "resources/subscribe",
             "params": {
-                "uri": "repo://docs/roadmap"
+                "uri": "repo://docs/architecture"
             }
         }))
         .unwrap();
@@ -1392,7 +1392,7 @@ fn direct_tool_server_events_are_forwarded_through_the_edge() {
         elicitation_id: "elicit-async".to_string(),
     });
     server.push_event(ToolServerEvent::ResourceUpdated {
-        uri: "repo://docs/roadmap".to_string(),
+        uri: "repo://docs/architecture".to_string(),
     });
     server.push_event(ToolServerEvent::ResourcesListChanged);
     server.push_event(ToolServerEvent::ToolsListChanged);

@@ -266,6 +266,8 @@ pub trait SupplementalAdmissionRegistrar: Send + Sync {
 
     /// Materialize and retain the exact broker dispatch only after the
     /// admission operation is durably ReadyToDispatch and before capture.
+    /// Exact retries for one admission operation must return the original
+    /// preparation without creating another dispatch or credential instance.
     fn prepare_dispatch(&self, admission_operation_id: &str) -> Result<(), SupplementalQuotaError>;
 
     fn release_admission(&self, admission_operation_id: &str)

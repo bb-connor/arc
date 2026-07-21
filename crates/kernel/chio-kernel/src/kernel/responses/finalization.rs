@@ -2,6 +2,7 @@ use super::*;
 
 pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) charge_result: Option<BudgetChargeResult>,
+    pub(crate) admission_operation: Option<BudgetAdmissionOperationBinding>,
     pub(crate) reported_cost: Option<ToolInvocationCost>,
     pub(crate) payment_authorization: Option<PaymentAuthorization>,
     pub(crate) cap: &'a CapabilityToken,

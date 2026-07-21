@@ -2,7 +2,26 @@ use super::*;
 
 use std::collections::HashMap;
 
-use chio_kernel::budget_store::{BudgetReconcileHoldRequest, BudgetReverseHoldRequest};
+use chio_kernel::budget_store::{
+    BudgetReconcileHoldRequest, BudgetReverseHoldRequest,
+    CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
+    CALLER_NO_PAYMENT_RESERVATION_RECOVERY_EVENT_SUFFIX,
+};
+
+fn admission_operation_binding(
+    operation_id: Option<String>,
+    request_binding_hash: Option<String>,
+) -> Result<Option<BudgetAdmissionOperationBinding>, BudgetStoreError> {
+    match (operation_id, request_binding_hash) {
+        (None, None) => Ok(None),
+        (Some(operation_id), Some(request_binding_hash)) => {
+            BudgetAdmissionOperationBinding::new(operation_id, request_binding_hash).map(Some)
+        }
+        _ => Err(BudgetStoreError::Invariant(
+            "budget hold has an incomplete admission operation binding".to_string(),
+        )),
+    }
+}
 
 /// Outcome of a startup reap pass over orphaned open holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,15 +30,223 @@ pub struct ReapSummary {
     pub reversed: usize,
 }
 
-/// An open reserved hold past its TTL deadline:
-/// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
-type ExpiredReservedHold = (String, String, u32, u64, Option<BudgetEventAuthority>);
+/// An open reserved hold past its TTL deadline.
+struct ExpiredReservedHold {
+    hold_id: String,
+    capability_id: String,
+    grant_index: u32,
+    remaining_exposure_units: u64,
+    authority: Option<BudgetEventAuthority>,
+    admission_operation: Option<BudgetAdmissionOperationBinding>,
+    composite: bool,
+}
 
 /// A hold still `open` at startup:
-/// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
-type OpenHold = (String, String, u32, u64, Option<BudgetEventAuthority>);
+/// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority,
+/// admission_operation)`.
+type OpenHold = (
+    String,
+    String,
+    u32,
+    u64,
+    Option<BudgetEventAuthority>,
+    Option<BudgetAdmissionOperationBinding>,
+);
 
 impl SqliteBudgetStore {
+    /// Reverse legacy no-payment caller reservations interrupted after their
+    /// authorization transaction but before the nonce TTL stamp. The
+    /// authorization event is the durable intent marker, so any rail-moving
+    /// path, ordinary dispatch hold, or operation-owned composite hold is outside
+    /// this recovery lane.
+    pub fn recover_unstamped_caller_reservations(&self) -> Result<usize, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let candidates = {
+            let mut statement = transaction.prepare(
+                "SELECT base.hold_id, base.capability_id, base.grant_index, \
+                        base.remaining_exposure_units, base.invocation_count_debited, \
+                        base.authority_id, base.lease_id, base.lease_epoch, event.event_seq \
+                 FROM budget_authorization_holds AS base \
+                 JOIN budget_mutation_events AS event \
+                   ON event.hold_id = base.hold_id \
+                  AND event.capability_id = base.capability_id \
+                  AND event.grant_index = base.grant_index \
+                  AND event.event_id = base.hold_id || ?1 \
+                 WHERE base.disposition = 'open' AND base.reserved_until IS NULL \
+                   AND base.operation_id IS NULL AND base.request_binding_hash IS NULL \
+                   AND base.remaining_exposure_units = base.authorized_exposure_units \
+                   AND base.invocation_count_debited = 1 \
+                   AND NOT EXISTS (SELECT 1 FROM budget_composite_holds AS composite \
+                                   WHERE composite.hold_id = base.hold_id) \
+                   AND event.kind = ?2 AND event.allowed = 1 \
+                   AND event.exposure_units = base.authorized_exposure_units \
+                   AND event.realized_spend_units = 0 \
+                   AND event.authority_id IS base.authority_id \
+                   AND event.lease_id IS base.lease_id \
+                   AND event.lease_epoch IS base.lease_epoch \
+                 ORDER BY base.created_at ASC, base.hold_id ASC",
+            )?;
+            let rows = statement.query_map(
+                params![
+                    CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
+                    BudgetMutationKind::AuthorizeExposure.as_str(),
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        budget_usize_from_row(row, 2, "caller reservation grant index")?,
+                        budget_u64_from_row(row, 3, "caller reservation exposure")?,
+                        row.get::<_, bool>(4)?,
+                        sqlite_budget_event_authority(row.get(5)?, row.get(6)?, row.get(7)?)?,
+                        budget_u64_from_row(row, 8, "caller reservation authorization sequence")?,
+                    ))
+                },
+            )?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+
+        for (
+            hold_id,
+            capability_id,
+            grant_index,
+            remaining,
+            invocation_count_debited,
+            authority,
+            authorize_event_seq,
+        ) in &candidates
+        {
+            let grant_index_sql = i64::try_from(*grant_index).map_err(|_| {
+                BudgetStoreError::Overflow(
+                    "caller reservation recovery grant index exceeds SQLite INTEGER".to_string(),
+                )
+            })?;
+            let current: Option<(u32, u64, u64)> = transaction
+                .query_row(
+                    "SELECT invocation_count, total_cost_exposed, total_cost_realized_spend \
+                     FROM capability_grant_budgets \
+                     WHERE capability_id = ?1 AND grant_index = ?2",
+                    params![capability_id, grant_index_sql],
+                    |row| {
+                        Ok((
+                            budget_u32_from_row(row, 0, "invocation_count")?,
+                            budget_u64_from_row(row, 1, "total_cost_exposed")?,
+                            budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
+                        ))
+                    },
+                )
+                .optional()?;
+            let Some((invocation_count, total_cost_exposed, total_cost_realized_spend)) = current
+            else {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "caller reservation hold `{hold_id}` lost its grant usage during recovery"
+                )));
+            };
+            if *invocation_count_debited && invocation_count == 0 {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "caller reservation hold `{hold_id}` lost its invocation debit during recovery"
+                )));
+            }
+            let total_cost_exposed_after =
+                total_cost_exposed.checked_sub(*remaining).ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "caller reservation hold `{hold_id}` exceeds its grant exposure during recovery"
+                    ))
+                })?;
+            let invocation_count_after = if *invocation_count_debited {
+                invocation_count - 1
+            } else {
+                invocation_count
+            };
+            let compatibility_maximum = if *invocation_count_debited {
+                SqliteBudgetStore::stage_compatibility_invocation_reverse(
+                    &transaction,
+                    capability_id,
+                    *grant_index,
+                    invocation_count,
+                )?
+            } else {
+                None
+            };
+            let event_seq = allocate_budget_replication_seq(&transaction)?;
+            let now = unix_now();
+            let usage_changed = transaction.execute(
+                "UPDATE capability_grant_budgets \
+                 SET total_cost_exposed = ?1, invocation_count = ?2, \
+                     updated_at = ?3, seq = ?4 \
+                 WHERE capability_id = ?5 AND grant_index = ?6",
+                params![
+                    sqlite_integer_from_u64(
+                        total_cost_exposed_after,
+                        "caller reservation recovered exposure",
+                    )?,
+                    i64::from(invocation_count_after),
+                    now,
+                    sqlite_integer_from_u64(event_seq, "caller reservation recovery sequence")?,
+                    capability_id,
+                    grant_index_sql,
+                ],
+            )?;
+            if usage_changed != 1 {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "caller reservation hold `{hold_id}` lost its grant usage during recovery"
+                )));
+            }
+            let hold_changed = transaction.execute(
+                "UPDATE budget_authorization_holds \
+                 SET disposition = 'reversed', remaining_exposure_units = 0, updated_at = ?1 \
+                 WHERE hold_id = ?2 AND disposition = 'open' AND reserved_until IS NULL \
+                   AND operation_id IS NULL AND request_binding_hash IS NULL \
+                   AND remaining_exposure_units = authorized_exposure_units \
+                   AND invocation_count_debited = 1 \
+                   AND NOT EXISTS (SELECT 1 FROM budget_composite_holds AS composite \
+                                   WHERE composite.hold_id = budget_authorization_holds.hold_id)",
+                params![now, hold_id],
+            )?;
+            if hold_changed != 1 {
+                return Err(BudgetStoreError::Conflict(format!(
+                    "caller reservation hold `{hold_id}` changed during startup recovery"
+                )));
+            }
+            if let Some(maximum) = compatibility_maximum {
+                SqliteBudgetStore::persist_compatibility_invocation_capture(
+                    &transaction,
+                    capability_id,
+                    *grant_index,
+                    Some(maximum),
+                    invocation_count_after,
+                    event_seq,
+                )?;
+            }
+            let recovery_event_id = format!(
+                "{hold_id}{CALLER_NO_PAYMENT_RESERVATION_RECOVERY_EVENT_SUFFIX}{authorize_event_seq}"
+            );
+            SqliteBudgetStore::append_mutation_event(
+                &transaction,
+                Some(&recovery_event_id),
+                Some(hold_id),
+                authority.as_ref(),
+                capability_id,
+                *grant_index,
+                BudgetMutationKind::ReverseExposure,
+                None,
+                event_seq,
+                Some(event_seq),
+                *remaining,
+                0,
+                None,
+                None,
+                None,
+                invocation_count_after,
+                total_cost_exposed_after,
+                total_cost_realized_spend,
+            )?;
+        }
+        transaction.commit()?;
+        Ok(candidates.len())
+    }
+
     /// Reconcile or reverse every hold still `open` at startup. Holds present in
     /// `realized_by_hold` (arbitrated by the ADR-0013 durable receipt log) are
     /// reconciled to their realized spend; holds absent from it (never durably
@@ -36,7 +263,9 @@ impl SqliteBudgetStore {
             reconciled: 0,
             reversed: 0,
         };
-        for (hold_id, capability_id, grant_index, exposure, authority) in open_holds {
+        for (hold_id, capability_id, grant_index, exposure, authority, admission_operation) in
+            open_holds
+        {
             // Kernel-authored holds carry a BudgetEventAuthority lease that the
             // reconcile/reverse authority check enforces. Present each hold's stored
             // authority so orphaned kernel holds are reclaimed rather than rejected;
@@ -52,6 +281,7 @@ impl SqliteBudgetStore {
                         hold_id: Some(hold_id.clone()),
                         event_id: Some(format!("{hold_id}:reap-reconcile")),
                         authority,
+                        admission_operation,
                     })?;
                     summary.reconciled += 1;
                 }
@@ -63,6 +293,7 @@ impl SqliteBudgetStore {
                         hold_id: Some(hold_id.clone()),
                         event_id: Some(format!("{hold_id}:reap-reverse")),
                         authority,
+                        admission_operation,
                     })?;
                     summary.reversed += 1;
                 }
@@ -89,52 +320,212 @@ impl SqliteBudgetStore {
     ) -> Result<usize, BudgetStoreError> {
         let expired = self.list_expired_reserved_holds(now_unix_secs)?;
         let mut settled = 0usize;
-        for (hold_id, capability_id, grant_index, remaining, authority) in expired {
-            self.reconcile_budget_hold(BudgetReconcileHoldRequest {
-                capability_id,
-                grant_index: grant_index as usize,
-                exposed_cost_units: remaining,
-                realized_spend_units: remaining,
-                hold_id: Some(hold_id.clone()),
-                event_id: Some(format!("{hold_id}:ttl-reap-settle")),
-                authority,
-            })?;
+        for hold in expired {
+            if hold.composite {
+                self.reap_expired_composite_hold(&hold, now_unix_secs)?;
+            } else {
+                self.reconcile_budget_hold(BudgetReconcileHoldRequest {
+                    capability_id: hold.capability_id,
+                    grant_index: hold.grant_index as usize,
+                    exposed_cost_units: hold.remaining_exposure_units,
+                    realized_spend_units: hold.remaining_exposure_units,
+                    hold_id: Some(hold.hold_id.clone()),
+                    event_id: Some(format!("{}:ttl-reap-settle", hold.hold_id)),
+                    authority: hold.authority,
+                    admission_operation: hold.admission_operation.clone(),
+                })?;
+                self.mark_hold_expired_after_worst_case(
+                    &hold.hold_id,
+                    now_unix_secs,
+                    hold.admission_operation.as_ref(),
+                    false,
+                    false,
+                )?;
+            }
             settled += 1;
         }
         Ok(settled)
     }
 
+    /// Settle a captured operation-owned reservation at worst-case and project
+    /// its terminal `expired` disposition in one SQLite transaction. The kernel
+    /// terminalizes `CallerReserved` only after observing `Expired`, so committing
+    /// a merely `Reconciled` intermediate state would strand the operation after a
+    /// process crash and prevent any later TTL pass from selecting the closed hold.
+    fn reap_expired_composite_hold(
+        &self,
+        hold: &ExpiredReservedHold,
+        now_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        let admission_operation = hold.admission_operation.as_ref().ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "composite budget hold `{}` omits admission ownership",
+                hold.hold_id
+            ))
+        })?;
+        let zero_exposure = hold.remaining_exposure_units == 0;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if !zero_exposure {
+            Self::settle_composite_budget_hold_in_transaction(
+                &transaction,
+                BudgetReconcileHoldRequest {
+                    capability_id: hold.capability_id.clone(),
+                    grant_index: hold.grant_index as usize,
+                    exposed_cost_units: hold.remaining_exposure_units,
+                    realized_spend_units: hold.remaining_exposure_units,
+                    hold_id: Some(hold.hold_id.clone()),
+                    event_id: Some(format!("{}:ttl-reap-settle", hold.hold_id)),
+                    authority: hold.authority.clone(),
+                    admission_operation: Some(admission_operation.clone()),
+                },
+                false,
+            )?;
+        }
+        Self::mark_hold_expired_after_worst_case_in_transaction(
+            &transaction,
+            &hold.hold_id,
+            now_unix_secs,
+            Some(admission_operation),
+            true,
+            zero_exposure,
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
     /// Open reserved holds past their expiry:
-    /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
+    /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority,
+    /// admission_operation)`.
     fn list_expired_reserved_holds(
         &self,
         now_unix_secs: i64,
     ) -> Result<Vec<ExpiredReservedHold>, BudgetStoreError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
-            "SELECT hold_id, capability_id, grant_index, remaining_exposure_units, \
-             authority_id, lease_id, lease_epoch \
-             FROM budget_authorization_holds \
-             WHERE disposition = 'open' AND reserved_until IS NOT NULL AND reserved_until <= ?1",
+            "SELECT base.hold_id, base.capability_id, base.grant_index, \
+                    base.remaining_exposure_units, base.authority_id, base.lease_id, \
+                    base.lease_epoch, base.operation_id, base.request_binding_hash, \
+                    CASE WHEN composite.hold_id IS NULL THEN 0 ELSE 1 END \
+             FROM budget_authorization_holds AS base \
+             LEFT JOIN budget_composite_holds AS composite ON composite.hold_id = base.hold_id \
+             WHERE base.disposition = 'open' AND base.reserved_until IS NOT NULL \
+               AND base.reserved_until <= ?1 \
+               AND (composite.hold_id IS NULL OR composite.invocation_state = 'captured')",
         )?;
         let rows = statement.query_map([now_unix_secs], |row| {
             let authority = sqlite_budget_event_authority(row.get(4)?, row.get(5)?, row.get(6)?)?;
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)? as u32,
-                row.get::<_, i64>(3)? as u64,
+                budget_u32_from_row(row, 2, "grant_index")?,
+                budget_u64_from_row(row, 3, "remaining_exposure_units")?,
                 authority,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, i64>(9)? != 0,
             ))
         })?;
         let mut holds = Vec::new();
         for row in rows {
-            holds.push(row?);
+            let row = row?;
+            let admission_operation = admission_operation_binding(row.5, row.6)?;
+            if row.7 && admission_operation.is_none() {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "composite budget hold `{}` omits admission ownership",
+                    row.0
+                )));
+            }
+            holds.push(ExpiredReservedHold {
+                hold_id: row.0,
+                capability_id: row.1,
+                grant_index: row.2,
+                remaining_exposure_units: row.3,
+                authority: row.4,
+                admission_operation,
+                composite: row.7,
+            });
         }
         Ok(holds)
+    }
+
+    fn mark_hold_expired_after_worst_case(
+        &self,
+        hold_id: &str,
+        now_unix_secs: i64,
+        admission_operation: Option<&BudgetAdmissionOperationBinding>,
+        composite: bool,
+        was_zero_exposure_composite: bool,
+    ) -> Result<(), BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        Self::mark_hold_expired_after_worst_case_in_transaction(
+            &transaction,
+            hold_id,
+            now_unix_secs,
+            admission_operation,
+            composite,
+            was_zero_exposure_composite,
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    fn mark_hold_expired_after_worst_case_in_transaction(
+        transaction: &rusqlite::Transaction<'_>,
+        hold_id: &str,
+        now_unix_secs: i64,
+        admission_operation: Option<&BudgetAdmissionOperationBinding>,
+        composite: bool,
+        was_zero_exposure_composite: bool,
+    ) -> Result<(), BudgetStoreError> {
+        let expected_disposition = if was_zero_exposure_composite {
+            "open"
+        } else {
+            "reconciled"
+        };
+        let updated_at = unix_now();
+        let affected = transaction.execute(
+            "UPDATE budget_authorization_holds SET disposition = 'expired', updated_at = ?4 \
+             WHERE hold_id = ?1 AND disposition = ?2 AND reserved_until IS NOT NULL \
+               AND reserved_until <= ?3",
+            params![hold_id, expected_disposition, now_unix_secs, updated_at],
+        )?;
+        if affected != 1 {
+            return Err(BudgetStoreError::Conflict(format!(
+                "reserved budget hold `{hold_id}` changed during TTL reap"
+            )));
+        }
+        if composite {
+            let operation = admission_operation.ok_or_else(|| {
+                BudgetStoreError::Invariant(format!(
+                    "composite budget hold `{hold_id}` omits admission ownership"
+                ))
+            })?;
+            let expected_monetary_state = if was_zero_exposure_composite {
+                BudgetMonetaryHoldState::None
+            } else {
+                BudgetMonetaryHoldState::Reconciled
+            };
+            let affected = transaction.execute(
+                "UPDATE budget_composite_holds SET updated_at = ?4 \
+                 WHERE hold_id = ?1 AND operation_id = ?2 AND request_binding_hash = ?3 \
+                   AND invocation_state = 'captured' AND monetary_state = ?5",
+                params![
+                    hold_id,
+                    operation.operation_id(),
+                    operation.request_binding_hash(),
+                    updated_at,
+                    expected_monetary_state.as_str(),
+                ],
+            )?;
+            if affected != 1 {
+                return Err(BudgetStoreError::Conflict(format!(
+                    "composite budget hold `{hold_id}` changed during TTL reap"
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// Stamp an open hold with a TTL reaper deadline, the grant currency, and the
@@ -149,10 +540,7 @@ impl SqliteBudgetStore {
         payment_reference: Option<&str>,
         envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let connection = self.connection()?;
         let affected = connection.execute(
             "UPDATE budget_authorization_holds \
              SET reserved_until = ?2, reserved_currency = ?3, reserved_payment_reference = ?4, \
@@ -177,6 +565,324 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
+    /// Stamp an existing atomic invocation-only hold with its caller nonce TTL.
+    /// The authorization transaction already created the zero-exposure hold and
+    /// debited the invocation, so this method only records reservation lineage.
+    pub fn mark_invocation_hold_reserved_until(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        type InvocationReservationRow = (
+            String,
+            usize,
+            u64,
+            u64,
+            bool,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+        );
+
+        if envelope.budget_total.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "invocation-only reservation must not carry a monetary budget total".to_string(),
+            ));
+        }
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let row: Option<InvocationReservationRow> = transaction
+            .query_row(
+                "SELECT capability_id, grant_index, authorized_exposure_units, \
+                        remaining_exposure_units, invocation_count_debited, disposition, \
+                        operation_id, request_binding_hash, reserved_until, reserved_currency, \
+                        reserved_payment_reference, reserved_budget_total, \
+                        reserved_delegation_depth, reserved_root_budget_holder \
+                 FROM budget_authorization_holds WHERE hold_id = ?1",
+                params![hold_id],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        budget_usize_from_row(row, 1, "invocation reservation grant index")?,
+                        budget_u64_from_row(row, 2, "invocation reservation exposure")?,
+                        budget_u64_from_row(row, 3, "invocation reservation remaining exposure")?,
+                        row.get(4)?,
+                        row.get(5)?,
+                        row.get(6)?,
+                        row.get(7)?,
+                        row.get(8)?,
+                        row.get(9)?,
+                        row.get(10)?,
+                        row.get(11)?,
+                        row.get(12)?,
+                        row.get(13)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some(row) = row else {
+            return Err(BudgetStoreError::Invariant(format!(
+                "missing invocation budget hold `{hold_id}`"
+            )));
+        };
+        if row.0 != capability_id || row.1 != grant_index {
+            return Err(BudgetStoreError::Conflict(format!(
+                "invocation budget hold `{hold_id}` belongs to a different capability or grant"
+            )));
+        }
+        if row.2 != 0
+            || row.3 != 0
+            || !row.4
+            || row.5 != "open"
+            || row.6.is_some()
+            || row.7.is_some()
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` is not an open zero-exposure invocation hold"
+            )));
+        }
+        if row.9.is_some() || row.10.is_some() || row.11.is_some() {
+            return Err(BudgetStoreError::Invariant(format!(
+                "invocation budget hold `{hold_id}` carries monetary reservation metadata"
+            )));
+        }
+        let delegation_depth = i64::from(envelope.delegation_depth);
+        let exact_retry = row.8 == Some(reserved_until_unix_secs)
+            && row.12 == Some(delegation_depth)
+            && row.13.as_deref() == Some(envelope.root_budget_holder.as_str());
+        if row.8.is_some() {
+            if exact_retry {
+                transaction.rollback()?;
+                return Ok(());
+            }
+            return Err(BudgetStoreError::Conflict(format!(
+                "invocation budget hold `{hold_id}` was already stamped with different reservation terms"
+            )));
+        }
+        let grant_index = sqlite_integer_from_u64(
+            u64::try_from(grant_index).map_err(|_| {
+                BudgetStoreError::Overflow(
+                    "invocation reservation grant index exceeds u64".to_string(),
+                )
+            })?,
+            "invocation reservation grant index",
+        )?;
+        let affected = transaction.execute(
+            "UPDATE budget_authorization_holds \
+             SET reserved_until = ?4, reserved_currency = NULL, \
+                 reserved_payment_reference = NULL, reserved_budget_total = NULL, \
+                 reserved_delegation_depth = ?5, reserved_root_budget_holder = ?6 \
+             WHERE hold_id = ?1 AND capability_id = ?2 AND grant_index = ?3 \
+               AND authorized_exposure_units = 0 AND remaining_exposure_units = 0 \
+               AND invocation_count_debited = 1 AND disposition = 'open' \
+               AND operation_id IS NULL AND request_binding_hash IS NULL \
+               AND reserved_until IS NULL",
+            params![
+                hold_id,
+                capability_id,
+                grant_index,
+                reserved_until_unix_secs,
+                delegation_depth,
+                envelope.root_budget_holder,
+            ],
+        )?;
+        if affected != 1 {
+            return Err(BudgetStoreError::Conflict(format!(
+                "invocation budget hold `{hold_id}` changed during reservation stamp"
+            )));
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    /// Stamp an existing operation-owned composite hold without creating a
+    /// compatibility hold or changing its immutable admission owner.
+    pub fn mark_admission_operation_hold_reserved_until(
+        &self,
+        hold_id: &str,
+        admission_operation: &BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        type ReservationRow = (
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            String,
+            i64,
+            String,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+        );
+
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let row: Option<ReservationRow> = transaction
+            .query_row(
+                r#"
+                SELECT authorization.operation_id, authorization.request_binding_hash,
+                       composite.operation_id, composite.request_binding_hash,
+                       base.operation_id, base.request_binding_hash,
+                       composite.invocation_state, composite.monetary_state,
+                       base.authorized_exposure_units, base.disposition,
+                       base.reserved_until, base.reserved_currency,
+                       base.reserved_payment_reference, base.reserved_budget_total,
+                       base.reserved_delegation_depth, base.reserved_root_budget_holder
+                FROM budget_composite_authorizations AS authorization
+                JOIN budget_composite_holds AS composite
+                  ON composite.hold_id = authorization.hold_id
+                JOIN budget_authorization_holds AS base
+                  ON base.hold_id = authorization.hold_id
+                WHERE authorization.hold_id = ?1
+                "#,
+                params![hold_id],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                        row.get(6)?,
+                        row.get(7)?,
+                        row.get(8)?,
+                        row.get(9)?,
+                        row.get(10)?,
+                        row.get(11)?,
+                        row.get(12)?,
+                        row.get(13)?,
+                        row.get(14)?,
+                        row.get(15)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some(row) = row else {
+            return Err(BudgetStoreError::Invariant(format!(
+                "missing operation-owned composite budget hold `{hold_id}`"
+            )));
+        };
+        let operation_id = admission_operation.operation_id();
+        let request_binding_hash = admission_operation.request_binding_hash();
+        if row.0 != operation_id
+            || row.1 != request_binding_hash
+            || row.2 != operation_id
+            || row.3 != request_binding_hash
+            || row.4.as_deref() != Some(operation_id)
+            || row.5.as_deref() != Some(request_binding_hash)
+        {
+            return Err(BudgetStoreError::Conflict(format!(
+                "composite budget hold `{hold_id}` belongs to a different admission operation binding"
+            )));
+        }
+        let invocation_state =
+            BudgetInvocationReservationState::parse(&row.6).ok_or_else(|| {
+                BudgetStoreError::Invariant(format!(
+                    "composite budget hold `{hold_id}` has unknown invocation state `{}`",
+                    row.6
+                ))
+            })?;
+        let monetary_state = BudgetMonetaryHoldState::parse(&row.7).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "composite budget hold `{hold_id}` has unknown monetary state `{}`",
+                row.7
+            ))
+        })?;
+        let authorized_exposure_units = u64::try_from(row.8).map_err(|_| {
+            BudgetStoreError::Invariant(format!(
+                "composite budget hold `{hold_id}` has negative authorized exposure"
+            ))
+        })?;
+        if !matches!(
+            invocation_state,
+            BudgetInvocationReservationState::Authorized
+                | BudgetInvocationReservationState::Captured
+        ) || !matches!(
+            monetary_state,
+            BudgetMonetaryHoldState::None | BudgetMonetaryHoldState::Exposed
+        ) || row.9 != "open"
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "composite budget hold `{hold_id}` is not open for caller reservation"
+            )));
+        }
+        if (authorized_exposure_units == 0) != currency.is_none()
+            || currency.is_some_and(str::is_empty)
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "composite budget hold `{hold_id}` has an invalid reserved currency"
+            )));
+        }
+        let budget_total = envelope
+            .budget_total
+            .map(|value| sqlite_integer_from_u64(value, "reserved budget total"))
+            .transpose()?;
+        let delegation_depth = i64::from(envelope.delegation_depth);
+        let exact_retry = row.10 == Some(reserved_until_unix_secs)
+            && row.11.as_deref() == currency
+            && row.12.as_deref() == payment_reference
+            && row.13 == budget_total
+            && row.14 == Some(delegation_depth)
+            && row.15.as_deref() == Some(envelope.root_budget_holder.as_str());
+        if row.10.is_some() {
+            if exact_retry {
+                transaction.rollback()?;
+                return Ok(());
+            }
+            return Err(BudgetStoreError::Conflict(format!(
+                "composite budget hold `{hold_id}` was already stamped with different reservation terms"
+            )));
+        }
+        let affected = transaction.execute(
+            r#"
+            UPDATE budget_authorization_holds
+            SET reserved_until = ?4, reserved_currency = ?5,
+                reserved_payment_reference = ?6, reserved_budget_total = ?7,
+                reserved_delegation_depth = ?8, reserved_root_budget_holder = ?9
+            WHERE hold_id = ?1 AND operation_id = ?2 AND request_binding_hash = ?3
+              AND disposition = 'open' AND reserved_until IS NULL
+            "#,
+            params![
+                hold_id,
+                operation_id,
+                request_binding_hash,
+                reserved_until_unix_secs,
+                currency,
+                payment_reference,
+                budget_total,
+                delegation_depth,
+                envelope.root_budget_holder,
+            ],
+        )?;
+        if affected != 1 {
+            return Err(BudgetStoreError::Conflict(format!(
+                "composite budget hold `{hold_id}` changed during reservation stamp"
+            )));
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
     /// Adopt an already-debited invocation into a durable zero-exposure reserved
     /// hold, stamped with the TTL deadline and no currency. The invocation was
     /// already counted by `try_increment`, so this only records the open hold
@@ -191,10 +897,7 @@ impl SqliteBudgetStore {
         reserved_until_unix_secs: i64,
         envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let connection = self.connection()?;
         let now = unix_now();
         let inserted = connection.execute(
             "INSERT OR IGNORE INTO budget_authorization_holds ( \
@@ -230,10 +933,7 @@ impl SqliteBudgetStore {
         &self,
         hold_id: &str,
     ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let connection = self.connection()?;
         connection
             .query_row(
                 "SELECT hold_id, capability_id, grant_index, authorized_exposure_units, \
@@ -251,6 +951,7 @@ impl SqliteBudgetStore {
                             HoldDisposition::Released => BudgetHoldDispositionView::Released,
                             HoldDisposition::Reversed => BudgetHoldDispositionView::Reversed,
                             HoldDisposition::Reconciled => BudgetHoldDispositionView::Reconciled,
+                            HoldDisposition::Captured => BudgetHoldDispositionView::Captured,
                             HoldDisposition::Expired => BudgetHoldDispositionView::Expired,
                         })
                         .ok_or_else(|| {
@@ -268,19 +969,31 @@ impl SqliteBudgetStore {
                     Ok(BudgetHoldSnapshot {
                         hold_id: row.get::<_, String>(0)?,
                         capability_id: row.get::<_, String>(1)?,
-                        grant_index: row.get::<_, i64>(2)? as usize,
-                        authorized_exposure_units: row.get::<_, i64>(3)? as u64,
-                        remaining_exposure_units: row.get::<_, i64>(4)? as u64,
+                        grant_index: budget_usize_from_row(row, 2, "grant_index")?,
+                        authorized_exposure_units: budget_u64_from_row(
+                            row,
+                            3,
+                            "authorized_exposure_units",
+                        )?,
+                        remaining_exposure_units: budget_u64_from_row(
+                            row,
+                            4,
+                            "remaining_exposure_units",
+                        )?,
                         disposition,
                         reserved_until: row.get::<_, Option<i64>>(6)?,
                         reserved_currency: row.get::<_, Option<String>>(10)?,
                         reserved_payment_reference: row.get::<_, Option<String>>(11)?,
-                        reserved_budget_total: row
-                            .get::<_, Option<i64>>(12)?
-                            .map(|value| value as u64),
-                        reserved_delegation_depth: row
-                            .get::<_, Option<i64>>(13)?
-                            .map(|value| value as u32),
+                        reserved_budget_total: optional_budget_u64_from_row(
+                            row,
+                            12,
+                            "reserved_budget_total",
+                        )?,
+                        reserved_delegation_depth: optional_budget_u32_from_row(
+                            row,
+                            13,
+                            "reserved_delegation_depth",
+                        )?,
                         reserved_root_budget_holder: row.get::<_, Option<String>>(14)?,
                         authority,
                     })
@@ -302,10 +1015,7 @@ impl SqliteBudgetStore {
     pub(super) fn list_open_delegated_reserved_holds(
         &self,
     ) -> Result<Vec<String>, BudgetStoreError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "SELECT hold_id FROM budget_authorization_holds \
              WHERE disposition = 'open' AND reserved_until IS NOT NULL \
@@ -319,8 +1029,8 @@ impl SqliteBudgetStore {
         Ok(ids)
     }
 
-    /// Whether any hold id begins with `budget-hold:{request_id}:`, regardless of
-    /// disposition or the capability id and grant index encoded after it. The
+    /// Whether any hold id begins with `budget-hold:{request_id}:`, except a
+    /// startup-recovered caller reservation that never reached its TTL stamp. The
     /// mediated pre-execution gate derives each hold id from
     /// (request_id, capability id, grant index), so a replay of one request_id
     /// under a different capability token must still be seen as taken. `request_id`
@@ -334,15 +1044,34 @@ impl SqliteBudgetStore {
     ) -> Result<bool, BudgetStoreError> {
         let prefix = format!("budget-hold:{request_id}:");
         let pattern = Self::sqlite_like_prefix_pattern(&prefix);
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let connection = self.connection()?;
         Ok(connection
             .query_row(
-                "SELECT 1 FROM budget_authorization_holds \
-                 WHERE hold_id LIKE ?1 ESCAPE '\\' LIMIT 1",
-                params![pattern],
+                "SELECT 1 FROM budget_authorization_holds AS base \
+                 WHERE base.hold_id LIKE ?1 ESCAPE '\\' \
+                   AND NOT EXISTS ( \
+                       SELECT 1 FROM budget_mutation_events AS recovery \
+                       WHERE recovery.hold_id = base.hold_id \
+                         AND substr(recovery.event_id, 1, length(base.hold_id || ?2)) \
+                             = base.hold_id || ?2 \
+                         AND recovery.kind = ?3 AND recovery.allowed IS NULL \
+                         AND NOT EXISTS ( \
+                             SELECT 1 FROM budget_mutation_events AS reauthorization \
+                             WHERE reauthorization.hold_id = base.hold_id \
+                               AND reauthorization.event_id = base.hold_id || ?4 \
+                               AND reauthorization.kind = ?5 \
+                               AND reauthorization.allowed = 1 \
+                               AND reauthorization.event_seq > recovery.event_seq \
+                         ) \
+                   ) \
+                 LIMIT 1",
+                params![
+                    pattern,
+                    CALLER_NO_PAYMENT_RESERVATION_RECOVERY_EVENT_SUFFIX,
+                    BudgetMutationKind::ReverseExposure.as_str(),
+                    CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
+                    BudgetMutationKind::AuthorizeExposure.as_str(),
+                ],
                 |_| Ok(()),
             )
             .optional()?
@@ -353,13 +1082,10 @@ impl SqliteBudgetStore {
     /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
     /// A hold with inconsistent authority lease columns is rejected fail-closed.
     pub(super) fn list_open_holds(&self) -> Result<Vec<OpenHold>, BudgetStoreError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "SELECT hold_id, capability_id, grant_index, remaining_exposure_units, \
-             authority_id, lease_id, lease_epoch \
+             authority_id, lease_id, lease_epoch, operation_id, request_binding_hash \
              FROM budget_authorization_holds WHERE disposition = 'open'",
         )?;
         let rows = statement.query_map([], |row| {
@@ -367,14 +1093,24 @@ impl SqliteBudgetStore {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)? as u32,
-                row.get::<_, i64>(3)? as u64,
+                budget_u32_from_row(row, 2, "grant_index")?,
+                budget_u64_from_row(row, 3, "remaining_exposure_units")?,
                 authority,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
             ))
         })?;
         let mut holds = Vec::new();
         for row in rows {
-            holds.push(row?);
+            let row = row?;
+            holds.push((
+                row.0,
+                row.1,
+                row.2,
+                row.3,
+                row.4,
+                admission_operation_binding(row.5, row.6)?,
+            ));
         }
         Ok(holds)
     }
@@ -471,6 +1207,7 @@ mod tests {
                 hold_id: Some("hold-done".to_string()),
                 event_id: Some("hold-done:reconcile".to_string()),
                 authority: None,
+                admission_operation: None,
             })
             .unwrap();
 
@@ -497,7 +1234,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .disposition,
-            BudgetHoldDispositionView::Reconciled
+            BudgetHoldDispositionView::Expired
         );
         // cap-b not-yet-expired reserved hold untouched.
         assert_eq!(
@@ -732,6 +1469,7 @@ mod tests {
                 hold_id: Some("hold-inv".to_string()),
                 event_id: Some("hold-inv:reverse".to_string()),
                 authority: snapshot.authority,
+                admission_operation: None,
             })
             .unwrap();
         assert_eq!(
@@ -911,6 +1649,7 @@ mod tests {
                 hold_id: Some("hold-c-closed".to_string()),
                 event_id: Some("hold-c-closed:reconcile".to_string()),
                 authority: None,
+                admission_operation: None,
             })
             .unwrap();
 

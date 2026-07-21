@@ -1,6 +1,12 @@
+include!("main_extensions.inc");
+
 impl BudgetStore for SqliteBudgetStore {
     fn authority_profile(&self) -> chio_kernel::BudgetStoreProfile {
         self.authority_profile
+    }
+
+    fn supports_durable_atomic_payment_journal(&self) -> bool {
+        self.authority_profile == chio_kernel::BudgetStoreProfile::SingleNodeDurable
     }
 
     fn try_increment(
@@ -1190,7 +1196,7 @@ impl BudgetStore for SqliteBudgetStore {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
-    include!("main_extensions.inc");
+    sqlite_budget_store_main_extensions!();
 }
 
 include!("main_extension_helpers.inc");

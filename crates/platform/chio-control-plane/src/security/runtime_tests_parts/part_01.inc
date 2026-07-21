@@ -436,9 +436,12 @@ fn kernel_with_keypair(keypair: Keypair) -> ChioKernel {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: 64,
         retention_config: None,
         memory_budget: MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     })
 }
 
@@ -453,8 +456,10 @@ fn kernel() -> ChioKernel {
 }
 
 fn install_contextual_receipt_store(kernel: &mut ChioKernel) -> TempDir {
-    let directory =
-        tempfile::tempdir().unwrap_or_else(|error| panic!("create receipt directory: {error}"));
+    let directory = chio_test_support::private_fs::private_tempdir(
+        "control-plane-contextual-receipts-",
+    )
+    .unwrap_or_else(|error| panic!("create receipt directory: {error}"));
     let store = Arc::new(
         SqliteReceiptStore::open(directory.path().join("receipts.sqlite3"))
             .unwrap_or_else(|error| panic!("open receipt store: {error}")),
@@ -1428,8 +1433,10 @@ fn enforce_mode_atomically_activates_the_complete_authority_bundle() {
 #[test]
 fn enforce_runtime_routes_real_issuance_through_freeze_admission_and_contextual_store() {
     let authorities = ProductionAuthorityFixture::new(true, true, 1);
-    let receipt_directory =
-        tempfile::tempdir().unwrap_or_else(|error| panic!("create receipt directory: {error}"));
+    let receipt_directory = chio_test_support::private_fs::private_tempdir(
+        "control-plane-issuance-receipts-",
+    )
+    .unwrap_or_else(|error| panic!("create receipt directory: {error}"));
     let receipt_store = Arc::new(
         SqliteReceiptStore::open(receipt_directory.path().join("receipts.sqlite3"))
             .unwrap_or_else(|error| panic!("open receipt store: {error}")),

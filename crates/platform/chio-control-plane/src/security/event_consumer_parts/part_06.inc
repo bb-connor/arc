@@ -521,9 +521,12 @@
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
             memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         });
         kernel
             .set_active_response_submission_authority(submission_authority.public_key())
@@ -585,7 +588,9 @@
     }
 
     fn real_adapter_fixture() -> RealAdapterFixture {
-        let directory = tempfile::tempdir()
+        let directory = chio_test_support::private_fs::private_tempdir(
+            "control-plane-real-adapter-",
+        )
             .unwrap_or_else(|error| panic!("create real adapter directory: {error}"));
         let paths = RealAdapterPaths::in_directory(directory.path());
         let now_unix_seconds = real_adapter_now_unix_seconds();

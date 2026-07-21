@@ -904,6 +904,22 @@ pub struct OpenHoldSummary {
     pub created_at_unix_ms: u64,
 }
 
+/// Suffix on the atomic authorization event for a legacy no-payment hold
+/// created by the caller-reservation path. Durable stores use this committed
+/// marker to recover the narrow crash window before the execution-nonce TTL is
+/// stamped. A path that can move rail funds must never emit this marker.
+pub const CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX: &str =
+    ":caller-reservation-no-payment-authorize";
+
+/// Suffix on the atomic recovery event that reverses a no-payment authorization
+/// which crashed before its caller-reservation TTL stamp. The request-id replay
+/// probe treats only this terminal marker family as safe to retry. It extends
+/// the authorization event id with the rollback namespace required by durable
+/// authorization replacement; durable stores append the recovered
+/// authorization sequence to distinguish repeated crash-recovery cycles.
+pub const CALLER_NO_PAYMENT_RESERVATION_RECOVERY_EVENT_SUFFIX: &str =
+    ":caller-reservation-no-payment-authorize:rollback:crash-reverse:";
+
 /// Durable, operation-bound input for authorize-then-reverse recovery.
 ///
 /// Recovery deliberately persists the complete verified quota projection, not

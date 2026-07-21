@@ -29,6 +29,67 @@ use crate::supplemental_quota::{
 };
 
 const ORDINARY_COORDINATOR_LEASE_EPOCH: u64 = 1;
+const ORDINARY_REQUEST_FINGERPRINT_SCHEMA: &str = "chio.ordinary-request-fingerprint.v1";
+const ORDINARY_REQUEST_FINGERPRINT_DOMAIN: &[u8] = b"chio.ordinary-request-fingerprint.v1\0";
+const MAX_ORDINARY_DESTINATION_IDENTIFIER_BYTES: usize = 512;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OrdinaryRequestFingerprintBody<'a> {
+    schema: &'static str,
+    request_id: &'a str,
+    capability_id: &'a str,
+    capability_subject: &'a str,
+    capability_digest: &'a str,
+    server_id: &'a str,
+    tool_name: &'a str,
+    agent_id: &'a str,
+    arguments_digest: &'a str,
+    dpop_digest: Option<&'a str>,
+    model_metadata_digest: Option<&'a str>,
+    federated_origin_kernel_id: Option<&'a str>,
+    governed_intent_digest: Option<&'a str>,
+    threshold_proposal_digest: Option<&'a str>,
+    approval_token_digests: &'a [String],
+    supplemental_authorization_reference: Option<&'a str>,
+    supplemental_authorization_digest: Option<&'a str>,
+    execution_nonce_reference: Option<&'a str>,
+    execution_nonce_digest: Option<&'a str>,
+    declassification_grant_digest: Option<&'a str>,
+    trusted_tenant_id: Option<&'a str>,
+    caller_receipt_metadata_digest: Option<&'a str>,
+    policy_hash: &'a str,
+}
+
+fn normalized_ordinary_destination_identifier<'a>(
+    value: &'a str,
+    label: &str,
+) -> Result<&'a str, KernelError> {
+    let normalized = value.trim();
+    if normalized.is_empty()
+        || normalized != value
+        || normalized.len() > MAX_ORDINARY_DESTINATION_IDENTIFIER_BYTES
+        || normalized.bytes().any(|byte| byte == 0)
+    {
+        return Err(KernelError::GuardDenied(format!(
+            "{label} is empty, oversized, padded, or contains NUL"
+        )));
+    }
+    Ok(normalized)
+}
+
+fn canonical_ordinary_request_component_digest<T: Serialize>(
+    value: &T,
+    label: &str,
+) -> Result<String, KernelError> {
+    canonical_json_bytes(value)
+        .map(|canonical| sha256_hex(&canonical))
+        .map_err(|error| {
+            KernelError::GuardDenied(format!(
+                "{label} failed canonical ordinary request binding: {error}"
+            ))
+        })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OrdinaryProtocolCaptureMode {
@@ -36,6 +97,12 @@ enum OrdinaryProtocolCaptureMode {
     ThresholdDispatch,
     CallerReservationOrdinary,
     CallerReservationThreshold,
+}
+
+#[allow(clippy::large_enum_variant)]
+enum OrdinaryProtocolCaptureOutcome {
+    DispatchMetadata(serde_json::Value),
+    CallerReservation(CallerReservationCaptureOutcome),
 }
 
 impl OrdinaryProtocolCaptureMode {
@@ -78,7 +145,7 @@ impl OrdinaryProtocolCaptureMode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct BudgetInvocationCaptureReceiptProjection {
+pub(super) struct BudgetInvocationCaptureReceiptProjection {
     operation_id: String,
     hold_id: String,
     event_id: String,
@@ -91,7 +158,7 @@ struct BudgetInvocationCaptureReceiptProjection {
 }
 
 impl BudgetInvocationCaptureReceiptProjection {
-    fn from_capture(
+    pub(super) fn from_capture(
         operation_id: &str,
         authorized: &AuthorizedBudgetHold,
         captured: &crate::budget_store::BudgetHoldMutationDecision,
@@ -160,6 +227,7 @@ impl BudgetInvocationCaptureReceiptProjection {
 }
 
 pub(crate) struct OrdinaryAdmissionMutation {
+    pub(super) preexisting_operation: bool,
     pub(super) operation_id: String,
     pub(super) admission_operation: BudgetAdmissionOperationBinding,
     pub(super) grant_index: usize,
@@ -187,18 +255,25 @@ impl OrdinaryAdmissionMutation {
         &self.operation_id
     }
 
+    pub(super) fn preexisting_operation(&self) -> bool {
+        self.preexisting_operation
+    }
+
     pub(crate) fn admission_operation(&self) -> &BudgetAdmissionOperationBinding {
         &self.admission_operation
     }
 }
 
 impl ChioKernel {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn coordinate_ordinary_protocol_admission(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
         grant_index: usize,
         grant: &ToolGrant,
+        caller_reservation: bool,
+        caller_receipt_metadata: Option<&serde_json::Value>,
         now: u64,
     ) -> Result<PreExecutionBudgetMutation, KernelError> {
         self.validate_protocol_admission_runtime(cap, request)?;
@@ -294,11 +369,12 @@ impl ChioKernel {
         let supplemental_digest = supplemental_artifact
             .as_ref()
             .map(OpaqueSignedSupplementalQuota::digest);
-        let request_binding_hash = self.ordinary_request_binding_hash(
+        let request_binding_hash = self.ordinary_request_binding_hash_for_policy(
             request,
-            &arguments_digest,
             &hold_id,
             supplemental_digest.as_deref(),
+            caller_receipt_metadata,
+            &self.config.policy_hash,
         )?;
         let supplemental = match supplemental_artifact.as_ref() {
             Some(artifact) => Some(
@@ -386,7 +462,9 @@ impl ChioKernel {
             prepared.request_binding_hash().to_string(),
         )?;
         authorization.admission_operation = Some(budget_operation.clone());
-        if self.payment_journal_active() {
+        if self.payment_journal_active()
+            && (!caller_reservation || Self::is_governed_mustprepay_request(request))
+        {
             let payment_terms = Self::mustprepay_quoted_amount(request)
                 .or_else(|| self.ordinary_payment_charge_terms(grant));
             if let Some((amount_units, currency)) = payment_terms {
@@ -426,10 +504,11 @@ impl ChioKernel {
         let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
             KernelError::Internal("durable admission operation store is unavailable".to_string())
         })?;
-        let mut operation = match operation_store.create_prepared(prepared)? {
-            AdmissionOperationCreateOutcome::Created(operation)
-            | AdmissionOperationCreateOutcome::Existing(operation) => operation,
-        };
+        let (mut operation, preexisting_operation) =
+            match operation_store.create_prepared(prepared)? {
+                AdmissionOperationCreateOutcome::Created(operation) => (operation, false),
+                AdmissionOperationCreateOutcome::Existing(operation) => (operation, true),
+            };
         self.journal_budget_cleanup(
             &operation,
             &authorization,
@@ -586,7 +665,9 @@ impl ChioKernel {
             &authorized,
             budget_operation.clone(),
         );
-        if self.payment_adapter.is_some() {
+        if self.payment_adapter.is_some()
+            && (!caller_reservation || Self::is_governed_mustprepay_request(request))
+        {
             let payment_terms = charge
                 .as_ref()
                 .map(|charge| (charge.cost_charged, charge.currency.clone()))
@@ -602,6 +683,7 @@ impl ChioKernel {
         }
         let authorization_artifact_digests = supplemental_digest.into_iter().collect();
         let mutation = OrdinaryAdmissionMutation {
+            preexisting_operation,
             operation_id: operation.operation_id().to_string(),
             admission_operation: budget_operation,
             grant_index,
@@ -677,12 +759,13 @@ impl ChioKernel {
         self.validate_protocol_budget_admission_profiles()
     }
 
-    fn ordinary_request_binding_hash(
+    pub(super) fn ordinary_request_binding_hash_for_policy(
         &self,
         request: &ToolCallRequest,
-        arguments_digest: &str,
         hold_id: &str,
         supplemental_digest: Option<&str>,
+        caller_receipt_metadata: Option<&serde_json::Value>,
+        policy_hash: &str,
     ) -> Result<String, KernelError> {
         let governed_intent_hash = request
             .governed_intent
@@ -704,10 +787,12 @@ impl ChioKernel {
                     .map_err(|error| KernelError::GuardDenied(error.to_string()))?,
             );
         }
+        let request_fingerprint =
+            self.ordinary_request_fingerprint_hash(request, policy_hash, caller_receipt_metadata)?;
         AdmissionRequestBindingInput::from_unordered_approval_token_digests(
             AdmissionRequestBindingParts {
-                action_hash: arguments_digest.to_string(),
-                policy_hash: self.config.policy_hash.clone(),
+                action_hash: request_fingerprint,
+                policy_hash: policy_hash.to_string(),
                 governed_intent_hash,
                 threshold_proposal_hash,
                 verified_approval_set_hash: None,
@@ -726,6 +811,135 @@ impl ChioKernel {
         )
         .and_then(|binding| binding.derive_hash())
         .map_err(|error| KernelError::Internal(error.to_string()))
+    }
+
+    pub(super) fn ordinary_request_fingerprint_hash(
+        &self,
+        request: &ToolCallRequest,
+        policy_hash: &str,
+        caller_receipt_metadata: Option<&serde_json::Value>,
+    ) -> Result<String, KernelError> {
+        let server_id = normalized_ordinary_destination_identifier(
+            &request.server_id,
+            "ordinary request server_id",
+        )?;
+        let tool_name = normalized_ordinary_destination_identifier(
+            &request.tool_name,
+            "ordinary request tool_name",
+        )?;
+        let capability_subject = request.capability.subject.to_hex();
+        let capability_digest = canonical_ordinary_request_component_digest(
+            &request.capability,
+            "authorizing capability",
+        )?;
+        let arguments_digest =
+            canonical_ordinary_request_component_digest(&request.arguments, "tool arguments")?;
+        let dpop_digest = request
+            .dpop_proof
+            .as_ref()
+            .map(|proof| canonical_ordinary_request_component_digest(proof, "DPoP proof"))
+            .transpose()?;
+        let model_metadata_digest = request
+            .model_metadata
+            .as_ref()
+            .map(|metadata| canonical_ordinary_request_component_digest(metadata, "model metadata"))
+            .transpose()?;
+        let governed_intent_digest = request
+            .governed_intent
+            .as_ref()
+            .map(chio_core::capability::governance::GovernedTransactionIntent::binding_hash)
+            .transpose()
+            .map_err(|error| {
+                KernelError::GuardDenied(format!(
+                    "governed intent failed ordinary request binding: {error}"
+                ))
+            })?;
+        let threshold_proposal_digest = request
+            .threshold_approval_proposal
+            .as_ref()
+            .map(|proposal| {
+                canonical_ordinary_request_component_digest(proposal, "threshold proposal")
+            })
+            .transpose()?;
+        let mut approval_token_digests = request
+            .normalized_approval_tokens()?
+            .iter()
+            .map(|token| {
+                token
+                    .token_digest()
+                    .map_err(|error| KernelError::GuardDenied(error.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        approval_token_digests.sort_unstable();
+        let supplemental_authorization_reference = request
+            .supplemental_authorization
+            .as_ref()
+            .map(chio_core::OpaqueSupplementalAuthorization::reference);
+        let supplemental_authorization_digest = request
+            .supplemental_authorization
+            .as_ref()
+            .map(|authorization| sha256_hex(authorization.artifact()));
+        let execution_nonce_reference = request
+            .execution_nonce
+            .as_ref()
+            .map(crate::execution_nonce::SignedExecutionNonce::nonce_id);
+        let execution_nonce_digest = request
+            .execution_nonce
+            .as_ref()
+            .map(|nonce| {
+                canonical_ordinary_request_component_digest(nonce, "presented execution nonce")
+            })
+            .transpose()?;
+        let declassification_grant_digest = request
+            .declassification_grant
+            .as_ref()
+            .map(|grant| {
+                canonical_ordinary_request_component_digest(grant, "declassification grant")
+            })
+            .transpose()?;
+        let caller_receipt_metadata_digest = caller_receipt_metadata
+            .map(|metadata| {
+                canonical_ordinary_request_component_digest(metadata, "caller receipt metadata")
+            })
+            .transpose()?;
+        let trusted_tenant_id = self
+            .receipt_tenant_id_for_request(Some(&request.request_id))
+            .unwrap_or_else(current_scoped_receipt_tenant_id);
+        let canonical = canonical_json_bytes(&OrdinaryRequestFingerprintBody {
+            schema: ORDINARY_REQUEST_FINGERPRINT_SCHEMA,
+            request_id: &request.request_id,
+            capability_id: &request.capability.id,
+            capability_subject: &capability_subject,
+            capability_digest: &capability_digest,
+            server_id,
+            tool_name,
+            agent_id: &request.agent_id,
+            arguments_digest: &arguments_digest,
+            dpop_digest: dpop_digest.as_deref(),
+            model_metadata_digest: model_metadata_digest.as_deref(),
+            federated_origin_kernel_id: request.federated_origin_kernel_id.as_deref(),
+            governed_intent_digest: governed_intent_digest.as_deref(),
+            threshold_proposal_digest: threshold_proposal_digest.as_deref(),
+            approval_token_digests: &approval_token_digests,
+            supplemental_authorization_reference,
+            supplemental_authorization_digest: supplemental_authorization_digest.as_deref(),
+            execution_nonce_reference,
+            execution_nonce_digest: execution_nonce_digest.as_deref(),
+            declassification_grant_digest: declassification_grant_digest.as_deref(),
+            trusted_tenant_id: trusted_tenant_id.as_deref(),
+            caller_receipt_metadata_digest: caller_receipt_metadata_digest.as_deref(),
+            policy_hash,
+        })
+        .map_err(|error| {
+            KernelError::GuardDenied(format!(
+                "ordinary request fingerprint canonicalization failed: {error}"
+            ))
+        })?;
+        let mut domain_separated =
+            Vec::with_capacity(ORDINARY_REQUEST_FINGERPRINT_DOMAIN.len() + canonical.len());
+        domain_separated.extend_from_slice(ORDINARY_REQUEST_FINGERPRINT_DOMAIN);
+        domain_separated.extend_from_slice(&canonical);
+        Ok(sha256_hex(&domain_separated))
     }
 
     pub(super) fn ordinary_budget_charge(
@@ -781,7 +995,16 @@ impl ChioKernel {
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
     ) -> Result<serde_json::Value, KernelError> {
-        self.commit_protocol_capture(cap, mutation, OrdinaryProtocolCaptureMode::InlineDispatch)
+        match self.commit_protocol_capture(
+            cap,
+            mutation,
+            OrdinaryProtocolCaptureMode::InlineDispatch,
+        )? {
+            OrdinaryProtocolCaptureOutcome::DispatchMetadata(metadata) => Ok(metadata),
+            OrdinaryProtocolCaptureOutcome::CallerReservation(_) => Err(KernelError::Internal(
+                "ordinary dispatch returned a caller reservation capture".to_string(),
+            )),
+        }
     }
 
     pub(super) fn commit_threshold_protocol_dispatch(
@@ -789,11 +1012,16 @@ impl ChioKernel {
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
     ) -> Result<serde_json::Value, KernelError> {
-        self.commit_protocol_capture(
+        match self.commit_protocol_capture(
             cap,
             mutation,
             OrdinaryProtocolCaptureMode::ThresholdDispatch,
-        )
+        )? {
+            OrdinaryProtocolCaptureOutcome::DispatchMetadata(metadata) => Ok(metadata),
+            OrdinaryProtocolCaptureOutcome::CallerReservation(_) => Err(KernelError::Internal(
+                "threshold dispatch returned a caller reservation capture".to_string(),
+            )),
+        }
     }
 
     /// Capture an operation-owned composite admission for a caller-mediated
@@ -805,24 +1033,34 @@ impl ChioKernel {
         &self,
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
-    ) -> Result<serde_json::Value, KernelError> {
-        self.commit_protocol_capture(
+    ) -> Result<CallerReservationCaptureOutcome, KernelError> {
+        match self.commit_protocol_capture(
             cap,
             mutation,
             OrdinaryProtocolCaptureMode::CallerReservationOrdinary,
-        )
+        )? {
+            OrdinaryProtocolCaptureOutcome::CallerReservation(capture) => Ok(capture),
+            OrdinaryProtocolCaptureOutcome::DispatchMetadata(_) => Err(KernelError::Internal(
+                "ordinary caller reservation returned dispatch metadata".to_string(),
+            )),
+        }
     }
 
     pub(super) fn commit_threshold_protocol_caller_reservation(
         &self,
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
-    ) -> Result<serde_json::Value, KernelError> {
-        self.commit_protocol_capture(
+    ) -> Result<CallerReservationCaptureOutcome, KernelError> {
+        match self.commit_protocol_capture(
             cap,
             mutation,
             OrdinaryProtocolCaptureMode::CallerReservationThreshold,
-        )
+        )? {
+            OrdinaryProtocolCaptureOutcome::CallerReservation(capture) => Ok(capture),
+            OrdinaryProtocolCaptureOutcome::DispatchMetadata(_) => Err(KernelError::Internal(
+                "threshold caller reservation returned dispatch metadata".to_string(),
+            )),
+        }
     }
 
     fn commit_protocol_capture(
@@ -830,7 +1068,7 @@ impl ChioKernel {
         cap: &CapabilityToken,
         mutation: &OrdinaryAdmissionMutation,
         mode: OrdinaryProtocolCaptureMode,
-    ) -> Result<serde_json::Value, KernelError> {
+    ) -> Result<OrdinaryProtocolCaptureOutcome, KernelError> {
         let mut operation = self.load_ordinary_admission(mutation.operation_id())?;
         if operation.state() == AdmissionOperationState::BudgetAuthorized {
             operation = self.ordinary_admission_transition(
@@ -874,8 +1112,7 @@ impl ChioKernel {
             mode,
             OrdinaryProtocolCaptureMode::CallerReservationOrdinary
                 | OrdinaryProtocolCaptureMode::CallerReservationThreshold
-        )
-            && operation.approval_set_hash().is_some()
+        ) && operation.approval_set_hash().is_some()
         {
             if let Err(error) = self.commit_threshold_approval(operation.operation_id()) {
                 self.reverse_ordinary_protocol_admission_from_capture_pending(
@@ -1055,15 +1292,24 @@ impl ChioKernel {
             OrdinaryProtocolCaptureMode::ThresholdDispatch => {}
             OrdinaryProtocolCaptureMode::CallerReservationOrdinary
             | OrdinaryProtocolCaptureMode::CallerReservationThreshold => {
-                operation = self.ordinary_admission_transition(
-                    &operation,
+                let reserved = operation.transition_checked(
                     AdmissionOperationState::CallerReserved,
                     AdmissionDispatchState::Committed,
+                    operation.coordinator_lease_epoch(),
                     None,
                 )?;
+                return Ok(OrdinaryProtocolCaptureOutcome::CallerReservation(
+                    CallerReservationCaptureOutcome {
+                        current: operation,
+                        reserved,
+                        capture_metadata,
+                    },
+                ));
             }
         }
-        Ok(self.ordinary_admission_receipt_metadata(mutation, &operation, capture_metadata))
+        Ok(OrdinaryProtocolCaptureOutcome::DispatchMetadata(
+            self.ordinary_admission_receipt_metadata(mutation, &operation, capture_metadata),
+        ))
     }
 
     pub(super) fn bind_threshold_dispatch_receipt_operation(
@@ -1168,7 +1414,7 @@ impl ChioKernel {
         Ok(reversed)
     }
 
-    fn ordinary_admission_receipt_metadata(
+    pub(super) fn ordinary_admission_receipt_metadata(
         &self,
         mutation: &OrdinaryAdmissionMutation,
         operation: &AdmissionOperation,
@@ -1462,8 +1708,7 @@ impl ChioKernel {
             current.state(),
             AdmissionOperationState::CapturePending
                 | AdmissionOperationState::CallerReservationCapturePending
-        )
-            && !capture_cannot_have_committed
+        ) && !capture_cannot_have_committed
         {
             return Ok(None);
         }
@@ -1500,7 +1745,10 @@ impl ChioKernel {
 
 impl From<AdmissionOperationError> for KernelError {
     fn from(error: AdmissionOperationError) -> Self {
-        Self::Internal(format!("admission operation failed: {error}"))
+        match error {
+            AdmissionOperationError::Conflict(reason) => Self::CallerReservationConflict(reason),
+            error => Self::Internal(format!("admission operation failed: {error}")),
+        }
     }
 }
 

@@ -1,13 +1,13 @@
 use super::*;
 
 #[cfg(test)]
-pub(crate) struct StubToolServer {
+pub(crate) struct FixtureToolServer {
     pub(crate) id: String,
 }
 
 #[cfg(test)]
 #[async_trait::async_trait]
-impl chio_kernel::ToolServerConnection for StubToolServer {
+impl chio_kernel::ToolServerConnection for FixtureToolServer {
     fn server_id(&self) -> &str {
         &self.id
     }
@@ -31,13 +31,13 @@ impl chio_kernel::ToolServerConnection for StubToolServer {
 }
 
 #[cfg(test)]
-pub(crate) struct StubSqlResultToolServer {
+pub(crate) struct FixtureSqlResultToolServer {
     pub(crate) id: String,
 }
 
 #[cfg(test)]
 #[async_trait::async_trait]
-impl chio_kernel::ToolServerConnection for StubSqlResultToolServer {
+impl chio_kernel::ToolServerConnection for FixtureSqlResultToolServer {
     fn server_id(&self) -> &str {
         &self.id
     }
@@ -61,14 +61,14 @@ impl chio_kernel::ToolServerConnection for StubSqlResultToolServer {
 }
 
 #[cfg(test)]
-pub(crate) struct StubStreamingToolServer {
+pub(crate) struct FixtureStreamingToolServer {
     pub(super) id: String,
     pub(super) incomplete: bool,
 }
 
 #[cfg(test)]
 #[async_trait::async_trait]
-impl chio_kernel::ToolServerConnection for StubStreamingToolServer {
+impl chio_kernel::ToolServerConnection for FixtureStreamingToolServer {
     fn server_id(&self) -> &str {
         &self.id
     }

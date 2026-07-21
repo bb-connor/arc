@@ -24,6 +24,12 @@ use crate::SettlementError;
 
 /// Schema string emitted on the wire for [`DeadLetterRecord`] frames.
 pub const SETTLE_DEAD_LETTER_SCHEMA: &str = "chio.settle.dead-letter.v1";
+pub const DEAD_LETTER_RECEIPT_ID_MAX_BYTES: usize = 512;
+pub const DEAD_LETTER_REASON_MAX_BYTES: usize = 2_048;
+pub const DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES: usize = 2_048;
+pub const DEAD_LETTER_MAX_ATTEMPTS: u32 = MAX_RETRIES + 1;
+pub const DEAD_LETTER_REASON_DIGEST_PREFIX: &str = "settlement_failure:sha256:";
+pub const DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX: &str = "settlement_pipeline_error:sha256:";
 
 /// Bound on the number of retries before a transient failure is
 /// downgraded to a permanent dead-letter row. The total attempt count
@@ -50,6 +56,22 @@ const MAX_BACKOFF_CAP_MS: u64 = 86_400_000;
 
 /// Upper bound [`RetryPolicy::validate`] enforces on `backoff_multiplier`.
 const MAX_BACKOFF_MULTIPLIER: u32 = 16;
+
+fn sanitized_dead_letter_diagnostic(prefix: &str, value: &str) -> String {
+    format!(
+        "{prefix}{}",
+        chio_core::crypto::sha256_hex(value.as_bytes())
+    )
+}
+
+fn is_sanitized_dead_letter_diagnostic(value: &str, prefix: &str) -> bool {
+    value.strip_prefix(prefix).is_some_and(|digest| {
+        digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
 
 /// Documented retry envelope for the settlement observer slot.
 ///
@@ -210,21 +232,20 @@ pub fn classify_attempt(
         SettlementOutcome::Permanent { reason, .. } => RetryDecision::DeadLetter {
             reason: reason.clone(),
         },
-        SettlementOutcome::Retryable { reason, .. } => {
-            if attempt >= policy.max_retries {
-                RetryDecision::DeadLetter {
-                    reason: format!(
-                        "retry envelope exhausted after {attempts} attempts: {reason}",
-                        attempts = attempt + 1,
-                    ),
-                }
-            } else {
-                RetryDecision::Retry {
-                    attempt: attempt + 1,
-                    backoff: policy.backoff_for(attempt),
-                }
-            }
-        }
+        SettlementOutcome::Retryable { reason, .. } => match attempt.checked_add(1) {
+            Some(next_attempt) if attempt < policy.max_retries => RetryDecision::Retry {
+                attempt: next_attempt,
+                backoff: policy.backoff_for(attempt),
+            },
+            Some(completed_attempts) => RetryDecision::DeadLetter {
+                reason: format!(
+                    "retry envelope exhausted after {completed_attempts} attempts: {reason}"
+                ),
+            },
+            None => RetryDecision::DeadLetter {
+                reason: format!("retry counter exceeds the supported range: {reason}"),
+            },
+        },
     }
 }
 
@@ -246,13 +267,27 @@ pub struct DeadLetterRecord {
     /// Number of attempts that ran before the failure was sealed in.
     /// Always at least one (the original call).
     pub attempts: u32,
-    /// Operator-visible reason, lifted verbatim from the outcome.
+    /// Sanitized diagnostic category and digest of the outcome reason.
     pub reason: String,
-    /// Optional structured error string from the underlying pipeline.
-    /// Populated when the dead letter was triggered by a
-    /// [`SettlementError`]; otherwise `None`.
+    /// Optional sanitized digest of an underlying pipeline error.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pipeline_error: Option<String>,
+}
+
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum DeadLetterRecordError {
+    #[error("dead-letter schema is invalid")]
+    InvalidSchema,
+    #[error("dead-letter receipt id must be nonempty and at most {DEAD_LETTER_RECEIPT_ID_MAX_BYTES} bytes")]
+    InvalidReceiptId,
+    #[error("dead-letter finalized_at exceeds the signed SQLite integer range")]
+    FinalizedAtOutOfRange,
+    #[error("dead-letter attempts must be in 1..={DEAD_LETTER_MAX_ATTEMPTS}")]
+    AttemptsOutOfRange,
+    #[error("dead-letter reason is not a bounded sanitized diagnostic")]
+    InvalidReason,
+    #[error("dead-letter pipeline error is not a bounded sanitized diagnostic")]
+    InvalidPipelineError,
 }
 
 impl DeadLetterRecord {
@@ -264,12 +299,13 @@ impl DeadLetterRecord {
         attempts: u32,
         reason: impl Into<String>,
     ) -> Self {
+        let reason = reason.into();
         Self {
             schema: SETTLE_DEAD_LETTER_SCHEMA.to_string(),
             receipt_id: receipt_id.into(),
             finalized_at,
-            attempts: attempts.max(1),
-            reason: reason.into(),
+            attempts,
+            reason: sanitized_dead_letter_diagnostic(DEAD_LETTER_REASON_DIGEST_PREFIX, &reason),
             pipeline_error: None,
         }
     }
@@ -279,8 +315,47 @@ impl DeadLetterRecord {
     /// `chio-settle/ops.rs`.
     #[must_use]
     pub fn with_pipeline_error(mut self, error: &SettlementError) -> Self {
-        self.pipeline_error = Some(error.to_string());
+        self.pipeline_error = Some(sanitized_dead_letter_diagnostic(
+            DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX,
+            &error.to_string(),
+        ));
         self
+    }
+
+    pub fn validate(&self) -> Result<(), DeadLetterRecordError> {
+        if self.schema != SETTLE_DEAD_LETTER_SCHEMA {
+            return Err(DeadLetterRecordError::InvalidSchema);
+        }
+        if self.receipt_id.trim().is_empty()
+            || self.receipt_id.len() > DEAD_LETTER_RECEIPT_ID_MAX_BYTES
+        {
+            return Err(DeadLetterRecordError::InvalidReceiptId);
+        }
+        if i64::try_from(self.finalized_at).is_err() {
+            return Err(DeadLetterRecordError::FinalizedAtOutOfRange);
+        }
+        if self.attempts == 0 || self.attempts > DEAD_LETTER_MAX_ATTEMPTS {
+            return Err(DeadLetterRecordError::AttemptsOutOfRange);
+        }
+        if self.reason.len() > DEAD_LETTER_REASON_MAX_BYTES
+            || !is_sanitized_dead_letter_diagnostic(&self.reason, DEAD_LETTER_REASON_DIGEST_PREFIX)
+        {
+            return Err(DeadLetterRecordError::InvalidReason);
+        }
+        if self
+            .pipeline_error
+            .as_deref()
+            .is_some_and(|pipeline_error| {
+                pipeline_error.len() > DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES
+                    || !is_sanitized_dead_letter_diagnostic(
+                        pipeline_error,
+                        DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX,
+                    )
+            })
+        {
+            return Err(DeadLetterRecordError::InvalidPipelineError);
+        }
+        Ok(())
     }
 }
 
@@ -481,18 +556,71 @@ mod tests {
     }
 
     #[test]
-    fn dead_letter_record_with_pipeline_error_carries_error_string() {
-        let record = DeadLetterRecord::new("rcpt-1", 100, 3, "policy denied")
-            .with_pipeline_error(&SettlementError::Rpc("connection refused".to_string()));
-        assert_eq!(record.attempts, 3);
-        assert_eq!(record.schema, SETTLE_DEAD_LETTER_SCHEMA);
-        let pipeline = require_some(record.pipeline_error.as_deref(), "pipeline error attached");
-        assert!(pipeline.contains("connection refused"));
+    fn retry_classifier_rejects_an_overflowed_attempt_counter() {
+        let policy = RetryPolicy::default();
+        let outcome = SettlementOutcome::retryable("rpc lag");
+        match classify_attempt(&policy, u32::MAX, &outcome) {
+            RetryDecision::DeadLetter { reason } => {
+                assert!(reason.contains("exceeds the supported range"));
+            }
+            other => panic!("expected dead letter, got {other:?}"),
+        }
     }
 
     #[test]
-    fn dead_letter_record_attempts_floor_is_one() {
+    fn dead_letter_record_digests_untrusted_diagnostics() {
+        let secret = "credential-é-SEED-7f4a";
+        let record = DeadLetterRecord::new("rcpt-1", 100, 3, format!("policy denied {secret}"))
+            .with_pipeline_error(&SettlementError::Rpc(format!(
+                "connection refused {secret}"
+            )));
+        assert_eq!(record.attempts, 3);
+        assert_eq!(record.schema, SETTLE_DEAD_LETTER_SCHEMA);
+        assert!(record.reason.starts_with(DEAD_LETTER_REASON_DIGEST_PREFIX));
+        assert!(!record.reason.contains(secret));
+        let pipeline = require_some(record.pipeline_error.as_deref(), "pipeline error attached");
+        assert!(pipeline.starts_with(DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX));
+        assert!(!pipeline.contains(secret));
+        assert!(record.validate().is_ok());
+    }
+
+    #[test]
+    fn dead_letter_record_validation_rejects_invalid_ranges_and_raw_text() {
         let record = DeadLetterRecord::new("rcpt-x", 0, 0, "permanent");
-        assert_eq!(record.attempts, 1);
+        assert_eq!(
+            record.validate(),
+            Err(DeadLetterRecordError::AttemptsOutOfRange)
+        );
+
+        let mut record = DeadLetterRecord::new("rcpt-x", u64::MAX, 1, "permanent");
+        assert_eq!(
+            record.validate(),
+            Err(DeadLetterRecordError::FinalizedAtOutOfRange)
+        );
+        record.finalized_at = 0;
+        record.attempts = DEAD_LETTER_MAX_ATTEMPTS.saturating_add(1);
+        assert_eq!(
+            record.validate(),
+            Err(DeadLetterRecordError::AttemptsOutOfRange)
+        );
+        record.attempts = 1;
+        record.receipt_id = "r".repeat(DEAD_LETTER_RECEIPT_ID_MAX_BYTES + 1);
+        assert_eq!(
+            record.validate(),
+            Err(DeadLetterRecordError::InvalidReceiptId)
+        );
+        record.receipt_id = "rcpt-x".to_string();
+        record.reason = "raw credential".to_string();
+        assert_eq!(record.validate(), Err(DeadLetterRecordError::InvalidReason));
+        record.reason =
+            sanitized_dead_letter_diagnostic(DEAD_LETTER_REASON_DIGEST_PREFIX, "reason");
+        record.pipeline_error = Some("raw pipeline error".to_string());
+        assert_eq!(
+            record.validate(),
+            Err(DeadLetterRecordError::InvalidPipelineError)
+        );
+        record.pipeline_error = None;
+        record.schema = "chio.settle.dead-letter.v0".to_string();
+        assert_eq!(record.validate(), Err(DeadLetterRecordError::InvalidSchema));
     }
 }

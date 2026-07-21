@@ -70,6 +70,7 @@ fn budget_store_profile_reflects_instance_durability() {
         memory.authority_profile(),
         BudgetStoreProfile::EphemeralLocal
     );
+    assert!(!memory.supports_durable_atomic_payment_journal());
     assert!(SqliteBudgetStore::open(":memory:").is_err());
     assert!(SqliteBudgetStore::open("file::memory:?cache=shared").is_err());
     assert!(SqliteBudgetStore::open("file:budget?mode=memory&cache=shared").is_err());
@@ -297,6 +298,252 @@ fn composite_authorize_input(
         .unwrap(),
         authorization_artifact_digests: Vec::new(),
     }
+}
+
+#[test]
+fn operation_owned_reservation_stamp_is_exact_restart_durable_and_reapable() {
+    let path = unique_db_path("chio-composite-reservation-stamp");
+    let hold_id = "hold-composite-reservation-stamp";
+    let binding = composite_admission_binding(hold_id);
+    let envelope = ReservedHoldEnvelope {
+        budget_total: Some(1_000),
+        delegation_depth: 2,
+        root_budget_holder: "root-capability".to_string(),
+    };
+    {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        let decision = store
+            .authorize_composite_hold(composite_authorize_input(
+                hold_id,
+                "event-composite-reservation-authorize",
+                2,
+            ))
+            .unwrap();
+        assert!(matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)));
+        store
+            .mark_admission_operation_hold_reserved(
+                hold_id,
+                &binding,
+                1_234,
+                Some("USD"),
+                Some("payment-reference"),
+                &envelope,
+            )
+            .unwrap();
+        store
+            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                capability_id: "leaf".to_string(),
+                grant_index: 0,
+                hold_id: Some(hold_id.to_string()),
+                event_id: Some("event-composite-reservation-capture".to_string()),
+                authority: None,
+                admission_operation: Some(binding.clone()),
+            })
+            .unwrap();
+    }
+    {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        let snapshot = store.get_budget_hold(hold_id).unwrap().unwrap();
+        assert_eq!(snapshot.disposition, BudgetHoldDispositionView::Open);
+        assert_eq!(snapshot.reserved_until, Some(1_234));
+        assert_eq!(snapshot.reserved_currency.as_deref(), Some("USD"));
+        assert_eq!(
+            snapshot.reserved_payment_reference.as_deref(),
+            Some("payment-reference")
+        );
+        assert_eq!(snapshot.reserved_budget_total, Some(1_000));
+        assert_eq!(snapshot.reserved_delegation_depth, Some(2));
+        assert_eq!(
+            snapshot.reserved_root_budget_holder.as_deref(),
+            Some("root-capability")
+        );
+        store
+            .mark_admission_operation_hold_reserved(
+                hold_id,
+                &binding,
+                1_234,
+                Some("USD"),
+                Some("payment-reference"),
+                &envelope,
+            )
+            .unwrap();
+        assert!(matches!(
+            store.mark_admission_operation_hold_reserved(
+                hold_id,
+                &alternate_operation_binding(hold_id),
+                1_234,
+                Some("USD"),
+                Some("payment-reference"),
+                &envelope,
+            ),
+            Err(BudgetStoreError::Conflict(_))
+        ));
+        assert_eq!(store.reap_expired_reserved_holds(1_234).unwrap(), 1);
+        let expired = store.get_budget_hold(hold_id).unwrap().unwrap();
+        assert_eq!(expired.disposition, BudgetHoldDispositionView::Expired);
+        assert_eq!(expired.reserved_until, Some(1_234));
+        assert_eq!(expired.reserved_currency.as_deref(), Some("USD"));
+        assert_eq!(store.reap_expired_reserved_holds(1_234).unwrap(), 0);
+        assert_eq!(
+            store.get_usage("leaf", 0).unwrap().unwrap().total_cost_realized_spend,
+            100
+        );
+    }
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn operation_owned_expiry_rolls_back_settlement_when_expired_marker_fails() {
+    let path = unique_db_path("chio-composite-reservation-expiry-atomicity");
+    let hold_id = "hold-composite-reservation-expiry-atomicity";
+    let binding = composite_admission_binding(hold_id);
+    {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        let decision = store
+            .authorize_composite_hold(composite_authorize_input(
+                hold_id,
+                "event-composite-reservation-expiry-atomicity-authorize",
+                2,
+            ))
+            .unwrap();
+        assert!(matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)));
+        store
+            .mark_admission_operation_hold_reserved(
+                hold_id,
+                &binding,
+                1_234,
+                Some("USD"),
+                None,
+                &ReservedHoldEnvelope {
+                    budget_total: Some(1_000),
+                    delegation_depth: 0,
+                    root_budget_holder: "root-capability".to_string(),
+                },
+            )
+            .unwrap();
+        store
+            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                capability_id: "leaf".to_string(),
+                grant_index: 0,
+                hold_id: Some(hold_id.to_string()),
+                event_id: Some(
+                    "event-composite-reservation-expiry-atomicity-capture".to_string(),
+                ),
+                authority: None,
+                admission_operation: Some(binding),
+            })
+            .unwrap();
+        store
+            .connection()
+            .unwrap()
+            .execute_batch(
+                r#"
+                CREATE TRIGGER fail_composite_expired_marker
+                BEFORE UPDATE OF disposition ON budget_authorization_holds
+                WHEN NEW.hold_id = 'hold-composite-reservation-expiry-atomicity'
+                     AND NEW.disposition = 'expired'
+                BEGIN
+                    SELECT RAISE(ABORT, 'injected composite expired marker failure');
+                END;
+                "#,
+            )
+            .unwrap();
+
+        let error = store
+            .reap_expired_reserved_holds(1_234)
+            .expect_err("the injected expired marker failure must abort the TTL transaction");
+        assert!(error
+            .to_string()
+            .contains("injected composite expired marker failure"));
+    }
+
+    // Reopen after the failed transaction. Worst-case settlement and its event
+    // must have rolled back with the Expired marker, leaving the reservation
+    // selected by a later TTL pass rather than stranded as merely Reconciled.
+    {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        let snapshot = store.get_budget_hold(hold_id).unwrap().unwrap();
+        assert_eq!(snapshot.disposition, BudgetHoldDispositionView::Open);
+        assert_eq!(snapshot.remaining_exposure_units, 100);
+        let usage = store.get_usage("leaf", 0).unwrap().unwrap();
+        assert_eq!(usage.total_cost_exposed, 100);
+        assert_eq!(usage.total_cost_realized_spend, 0);
+
+        store
+            .connection()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_composite_expired_marker;")
+            .unwrap();
+        assert_eq!(store.reap_expired_reserved_holds(1_234).unwrap(), 1);
+        let expired = store.get_budget_hold(hold_id).unwrap().unwrap();
+        assert_eq!(expired.disposition, BudgetHoldDispositionView::Expired);
+        assert_eq!(expired.remaining_exposure_units, 0);
+        let usage = store.get_usage("leaf", 0).unwrap().unwrap();
+        assert_eq!(usage.total_cost_exposed, 0);
+        assert_eq!(usage.total_cost_realized_spend, 100);
+    }
+    {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        assert_eq!(
+            store.get_budget_hold(hold_id).unwrap().unwrap().disposition,
+            BudgetHoldDispositionView::Expired
+        );
+        assert_eq!(store.reap_expired_reserved_holds(1_234).unwrap(), 0);
+    }
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn zero_exposure_operation_owned_reservation_reaps_without_legacy_fallback() {
+    let path = unique_db_path("chio-zero-composite-reservation-stamp");
+    let hold_id = "hold-zero-composite-reservation-stamp";
+    let binding = composite_admission_binding(hold_id);
+    let mut request = composite_authorize_input(
+        hold_id,
+        "event-zero-composite-reservation-authorize",
+        2,
+    );
+    request.requested_exposure_units = 0;
+    request.max_cost_per_invocation = None;
+    request.max_total_cost_units = None;
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let decision = store.authorize_composite_hold(request).unwrap();
+    assert!(matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)));
+    store
+        .mark_admission_operation_hold_reserved(
+            hold_id,
+            &binding,
+            2_345,
+            None,
+            None,
+            &ReservedHoldEnvelope {
+                budget_total: None,
+                delegation_depth: 0,
+                root_budget_holder: "root-capability".to_string(),
+            },
+        )
+        .unwrap();
+    store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "leaf".to_string(),
+            grant_index: 0,
+            hold_id: Some(hold_id.to_string()),
+            event_id: Some("event-zero-composite-reservation-capture".to_string()),
+            authority: None,
+            admission_operation: Some(binding),
+        })
+        .unwrap();
+    let snapshot = store.get_budget_hold(hold_id).unwrap().unwrap();
+    assert_eq!(snapshot.authorized_exposure_units, 0);
+    assert_eq!(snapshot.remaining_exposure_units, 0);
+    assert_eq!(snapshot.disposition, BudgetHoldDispositionView::Open);
+    assert_eq!(snapshot.reserved_until, Some(2_345));
+    assert_eq!(snapshot.reserved_currency, None);
+    assert_eq!(store.reap_expired_reserved_holds(2_345).unwrap(), 1);
+    let expired = store.get_budget_hold(hold_id).unwrap().unwrap();
+    assert_eq!(expired.disposition, BudgetHoldDispositionView::Expired);
+    assert_eq!(expired.reserved_until, Some(2_345));
+    let _ = fs::remove_file(path);
 }
 
 fn ownership_composite_authorize_input(

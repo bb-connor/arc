@@ -2,9 +2,9 @@
 //! existing `chio-settle/ops.rs` pipeline.
 //!
 //! This exposes a kernel-evaluator observer surface for the
-//! `chio-settle` crate (the async-kernel post-dispatch slot). The hook
-//! is invoked once a receipt has been
-//! signed and durably stored; failure-to-settle never blocks dispatch
+//! `chio-settle` crate (the async-kernel observer slot). The hook is invoked
+//! at least once after a receipt has been signed and durably stored;
+//! failure-to-settle never blocks dispatch
 //! (the kernel observer slot consumes the [`SettlementHookError`] and
 //! routes it to the retry/dead-letter machinery when a settlement
 //! retry store is installed; otherwise the outcome is logged and
@@ -246,7 +246,16 @@ pub enum SettlementHookError {
 ///   batching is necessary (see [`SettlementObservation::ordering_key`]).
 /// - Be safe to call concurrently from a tokio runtime; the kernel
 ///   observer slot does not serialize calls.
+/// - Be idempotent by [`SettlementObservation::receipt_id`]. A process crash
+///   after `observe` returns but before durable outbox acknowledgement causes
+///   the same observation to be delivered again.
 pub trait SettlementHook: Send + Sync {
+    /// Explicitly attest that `observe` is idempotent by receipt id. The kernel
+    /// refuses to install hooks that retain the conservative default.
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        false
+    }
+
     /// Observe a finalized receipt and route it through the settlement
     /// pipeline. See the trait-level docs for ordering and failure
     /// semantics.
@@ -348,6 +357,10 @@ mod tests {
     fn settlement_hook_is_object_safe() {
         struct NoopHook;
         impl SettlementHook for NoopHook {
+            fn supports_receipt_id_idempotency(&self) -> bool {
+                true
+            }
+
             fn observe(
                 &self,
                 observation: &SettlementObservation,

@@ -30,6 +30,7 @@ enum BudgetHoldDisposition {
     Reversed,
     Reconciled,
     Captured,
+    Expired,
 }
 
 impl BudgetHoldDisposition {
@@ -39,6 +40,8 @@ impl BudgetHoldDisposition {
             Self::Released => BudgetHoldDispositionView::Released,
             Self::Reversed => BudgetHoldDispositionView::Reversed,
             Self::Reconciled => BudgetHoldDispositionView::Reconciled,
+            Self::Captured => BudgetHoldDispositionView::Captured,
+            Self::Expired => BudgetHoldDispositionView::Expired,
         }
     }
 }
@@ -157,6 +160,13 @@ struct CompositeBudgetHoldState {
     remaining_exposure_units: u64,
     authority: Option<BudgetEventAuthority>,
     admission_operation: Option<super::BudgetAdmissionOperationBinding>,
+    reserved_until: Option<i64>,
+    reserved_currency: Option<String>,
+    reserved_payment_reference: Option<String>,
+    reserved_budget_total: Option<u64>,
+    reserved_delegation_depth: Option<u32>,
+    reserved_root_budget_holder: Option<String>,
+    expired: bool,
 }
 
 impl CompositeBudgetHoldState {

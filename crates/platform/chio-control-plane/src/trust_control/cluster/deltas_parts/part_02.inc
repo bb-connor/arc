@@ -87,7 +87,8 @@ pub(crate) fn budget_mutation_record_from_view(
         | BudgetMutationKind::CaptureExposure
         | BudgetMutationKind::ReverseExposure
         | BudgetMutationKind::ReleaseExposure
-        | BudgetMutationKind::ReconcileSpend => BudgetInvocationReservationState::Absent,
+        | BudgetMutationKind::ReconcileSpend
+        | BudgetMutationKind::ExpireHold => BudgetInvocationReservationState::Absent,
     };
     let monetary_state = match kind {
         BudgetMutationKind::AuthorizeExposure | BudgetMutationKind::ReserveInvocations
@@ -99,6 +100,7 @@ pub(crate) fn budget_mutation_record_from_view(
         BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
         BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
         BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,
+        BudgetMutationKind::ExpireHold => BudgetMonetaryHoldState::Released,
         BudgetMutationKind::IncrementInvocation
         | BudgetMutationKind::ReserveInvocations
         | BudgetMutationKind::CaptureInvocations
@@ -349,6 +351,25 @@ mod deltas_tests {
             updated_at: 3,
             seq: 3,
         }
+    }
+
+    #[test]
+    fn expired_hold_delta_preserves_terminal_projection_states() {
+        let mut event = storm_event(7);
+        event.kind = BudgetMutationKind::ExpireHold.as_str().to_string();
+        event.hold_id = Some("hold-expired-delta".to_string());
+        event.exposure_units = 5;
+        event.realized_spend_units = 0;
+        event.total_cost_exposed_after = 0;
+        event.total_cost_realized_spend_after = 0;
+
+        let record = budget_mutation_record_from_view(&event).test_unwrap();
+        assert_eq!(record.kind, BudgetMutationKind::ExpireHold);
+        assert_eq!(
+            record.invocation_state,
+            BudgetInvocationReservationState::Absent
+        );
+        assert_eq!(record.monetary_state, BudgetMonetaryHoldState::Released);
     }
 
     fn storm_usage(seq: u64) -> BudgetUsageView {

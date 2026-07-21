@@ -2,7 +2,6 @@
 mod tests {
     use std::fs;
     use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
         scope::{ChioScope, Operation, ToolGrant},
@@ -26,11 +25,7 @@ mod tests {
     use crate::receipt_store::SqliteReceiptStore;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .test_expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        chio_test_support::private_fs::unique_sqlite_path(prefix)
     }
 
     /// Build a test CapabilityToken with the given ID and subject/issuer keypairs.

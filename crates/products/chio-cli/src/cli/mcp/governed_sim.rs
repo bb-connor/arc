@@ -11,8 +11,8 @@ use super::payment_config::PaymentAdapterConfig;
 
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-    MeteredSettlementMode,
+    GovernedToolInvocationIntentBody, GovernedTransactionIntent, MeteredBillingContext,
+    MeteredBillingQuote, MeteredSettlementMode,
 };
 use chio_core::capability::scope::{Constraint, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
@@ -174,7 +174,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let intent = GovernedTransactionIntent {
+    let intent = GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "governed-sim-intent-1".to_string(),
         server_id: SIM_SERVER_ID.to_string(),
         tool_name: SIM_TOOL_NAME.to_string(),
@@ -204,7 +204,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         call_chain: None,
         autonomy: None,
         context: None,
-    };
+    });
 
     let intent_hash = intent
         .binding_hash()
@@ -216,6 +216,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
             approver: kernel_kp.public_key(),
             subject: agent_kp.public_key(),
             governed_intent_hash: intent_hash,
+            threshold_proposal_hash: None,
             request_id: "governed-sim-req-1".to_string(),
             issued_at: now.saturating_sub(1),
             expires_at: now + SIM_TTL_SECS,
@@ -232,12 +233,16 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         server_id: SIM_SERVER_ID.to_string(),
         agent_id: agent_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
+        supplemental_authorization: None,
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: Some(intent),
         approval_token: Some(approval_token),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel

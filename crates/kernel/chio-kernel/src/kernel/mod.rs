@@ -20,6 +20,7 @@ mod admission_coordinator;
 mod admission_terminal_receipt;
 mod approval_cleanup;
 mod budget_sweep;
+mod caller_reservation_handoff;
 mod dispatch_intent;
 mod error;
 mod kernel_drop_guard;
@@ -71,6 +72,9 @@ pub use active_response_policy::{
 pub use budget_sweep::{
     BudgetHoldSweepHandle, DEFAULT_HOLD_EXPIRY_HORIZON_SECS, DEFAULT_HOLD_SWEEP_INTERVAL_SECS,
 };
+pub use caller_reservation_handoff::{
+    CallerReservationAuthorizationOutcome, CallerReservationReplayProbe,
+};
 pub use construction::KernelBuildError;
 pub use dispatch_intent::DefaultDispatchIntentReconciler;
 pub use error::{HotPathStage, KernelError, OverloadResource, StructuredErrorReport};
@@ -86,6 +90,9 @@ pub use payment_reconcile::{
 };
 pub use security_runtime::{GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus};
 
+use caller_reservation_handoff::{
+    CallerReservationCaptureOutcome, PrepareCallerReservationHandoff,
+};
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
 pub(crate) use kernel_scopes::{
     current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,
@@ -1088,9 +1095,28 @@ impl BudgetChargeResult {
     }
 }
 
+/// Result of an atomic invocation-only caller reservation.
+///
+/// Unlike [`BudgetChargeResult`], this mutation carries no monetary envelope.
+/// The budget store has already committed both the invocation debit and its
+/// zero-exposure hold, and the response path only stamps that existing hold.
+#[derive(Clone)]
+pub(crate) struct BudgetInvocationReservationResult {
+    grant_index: usize,
+    budget_hold_id: String,
+    authorize_metadata: BudgetCommitMetadata,
+}
+
+impl BudgetInvocationReservationResult {
+    fn reverse_event_id(&self) -> String {
+        format!("{}:reverse", self.budget_hold_id)
+    }
+}
+
 pub(crate) enum PreExecutionBudgetMutation {
     None,
     Invocation { grant_index: usize },
+    InvocationReservation(Box<BudgetInvocationReservationResult>),
     Charge(Box<BudgetChargeResult>),
     Admission(Box<OrdinaryAdmissionMutation>),
 }
@@ -1100,14 +1126,25 @@ impl PreExecutionBudgetMutation {
         match self {
             Self::Charge(charge) => Some(charge),
             Self::Admission(admission) => admission.charge_result(),
-            Self::None | Self::Invocation { .. } => None,
+            Self::None | Self::Invocation { .. } | Self::InvocationReservation(_) => None,
         }
     }
 
     pub(super) fn ordinary_admission(&self) -> Option<&OrdinaryAdmissionMutation> {
         match self {
             Self::Admission(admission) => Some(admission.as_ref()),
-            Self::None | Self::Invocation { .. } | Self::Charge(_) => None,
+            Self::None
+            | Self::Invocation { .. }
+            | Self::InvocationReservation(_)
+            | Self::Charge(_) => None,
+        }
+    }
+
+    pub(super) fn admission_operation_binding(&self) -> Option<&BudgetAdmissionOperationBinding> {
+        match self {
+            Self::Admission(admission) => Some(admission.admission_operation()),
+            Self::Charge(charge) => charge.admission_operation.as_ref(),
+            Self::None | Self::Invocation { .. } | Self::InvocationReservation(_) => None,
         }
     }
 }

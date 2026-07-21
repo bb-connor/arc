@@ -2638,6 +2638,7 @@ dependencies = [
  "chio-manifest",
  "chio-metrics-spec",
  "chio-openapi",
+ "chio-security-types",
  "chio-store-sqlite",
  "chio-test-support",
  "chrono",
@@ -3272,6 +3273,7 @@ dependencies = [
  "chio-manifest",
  "chio-security-types",
  "chio-store-sqlite",
+ "chio-test-support",
  "futures",
  "serde",
  "serde_json",
@@ -3669,6 +3671,7 @@ dependencies = [
  "chio-http-session",
  "chio-kernel",
  "chio-store-sqlite",
+ "chio-test-support",
  "glob",
  "lru 0.16.3",
  "rand 0.8.5",
@@ -3724,6 +3727,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -4055,6 +4059,7 @@ dependencies = [
  "chio-kernel",
  "chio-mercury-core",
  "chio-store-sqlite",
+ "chio-test-support",
  "chrono",
  "clap 4.6.0",
  "serde",
@@ -4477,6 +4482,7 @@ dependencies = [
  "chio-store-sqlite",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]
@@ -4656,6 +4662,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "thiserror 1.0.69",
  "tracing",
@@ -4724,6 +4731,10 @@ dependencies = [
 [[package]]
 name = "chio-test-support"
 version = "0.1.0"
+dependencies = [
+ "rustix",
+ "tempfile",
+]
 
 [[package]]
 name = "chio-three-vendor-example"
@@ -4764,6 +4775,7 @@ dependencies = [
  "chio-kernel",
  "chio-metrics-spec",
  "chio-store-sqlite",
+ "chio-test-support",
  "chrono",
  "hex",
  "http 1.4.0",

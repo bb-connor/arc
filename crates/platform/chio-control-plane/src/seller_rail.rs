@@ -98,6 +98,7 @@ mod tests {
                 approver: kp.public_key(),
                 subject: kp.public_key(),
                 governed_intent_hash: "test-intent-hash".to_string(),
+                threshold_proposal_hash: None,
                 request_id: "req-seller-rail-1".to_string(),
                 issued_at: TEST_ISSUED_AT,
                 expires_at: TEST_EXPIRES_AT,

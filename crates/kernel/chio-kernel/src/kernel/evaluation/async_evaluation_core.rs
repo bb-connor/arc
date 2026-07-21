@@ -3,7 +3,8 @@ use super::evaluation_helpers::{
 };
 use super::*;
 use crate::kernel::admission_coordinator::{
-    ThresholdDispatchPermit, ThresholdToolAdmissionContext,
+    ThresholdCallerReservationHandoffContext, ThresholdDispatchPermit, ThresholdPaymentMode,
+    ThresholdToolAdmissionContext,
 };
 
 impl ChioKernel {
@@ -15,6 +16,29 @@ impl ChioKernel {
         session_id: Option<&SessionId>,
         security_context: Option<&SecurityInvocationContext>,
         preflight_disposition: PreflightHoldDisposition,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context_tracking_replay(
+            request,
+            session_filesystem_roots,
+            extra_metadata,
+            session_id,
+            security_context,
+            preflight_disposition,
+            None,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn evaluate_tool_call_async_with_session_context_tracking_replay(
+        &self,
+        request: &ToolCallRequest,
+        session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
+        session_id: Option<&SessionId>,
+        security_context: Option<&SecurityInvocationContext>,
+        preflight_disposition: PreflightHoldDisposition,
+        caller_reservation_replayed: Option<&std::sync::atomic::AtomicBool>,
     ) -> Result<ToolCallResponse, KernelError> {
         request.validate()?;
         self.validate_security_invocation_context_binding(request, security_context, session_id)?;
@@ -283,9 +307,38 @@ impl ChioKernel {
             }
         };
 
-        // DPoP enforcement before budget charge: if any matching grant requires
-        // DPoP, verify the proof now so an attacker cannot drain the budget with
-        // a valid capability token but missing or invalid DPoP proof.
+        let reserving_preflight = matches!(
+            preflight_disposition,
+            PreflightHoldDisposition::ReserveForCaller
+        ) && self.execution_nonce_preflight_required(request);
+        if reserving_preflight {
+            self.ensure_caller_reservation_handoff_replay_read_ready(request)?;
+            match self.probe_caller_reservation_handoff_after_authentication(
+                request,
+                extra_metadata.as_ref(),
+            )? {
+                CallerReservationReplayProbe::Absent => {
+                    self.ensure_caller_reservation_handoff_publication_ready(request)?;
+                }
+                CallerReservationReplayProbe::Conflict => {
+                    return Err(KernelError::CallerReservationConflict(
+                        "request id is already bound to a different or non-replayable caller reservation"
+                            .to_string(),
+                    ))
+                }
+                CallerReservationReplayProbe::Replayed(response) => {
+                    if let Some(replayed) = caller_reservation_replayed {
+                        replayed.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                    return Ok(response);
+                }
+            }
+        }
+
+        // DPoP enforcement happens only after the exact replay gate. An exact
+        // caller-reservation retry carries the already-consumed original proof
+        // in its frozen request and must replay without consuming it again. An
+        // absent request still verifies and consumes DPoP before any mutation.
         if matching_grants
             .iter()
             .any(|m| m.grant.dpop_required == Some(true))
@@ -309,10 +362,6 @@ impl ChioKernel {
         // server ids (unbounded growth). Every other path, including a
         // ReserveForCaller request that falls through to dispatch because no nonce
         // preflight is required, still requires registration exactly as before.
-        let reserving_preflight = matches!(
-            preflight_disposition,
-            PreflightHoldDisposition::ReserveForCaller
-        ) && self.execution_nonce_preflight_required(request);
         if !reserving_preflight {
             if let Err(e) = self.ensure_registered_tool_target(request) {
                 let msg = e.to_string();
@@ -468,7 +517,12 @@ impl ChioKernel {
         let verified_governed_approval = validated_governed_admission
             .as_ref()
             .and_then(|admission| admission.verified_governed_approval.as_ref());
-        if verified_governed_approval.is_some() && self.execution_nonce_preflight_required(request)
+        if verified_governed_approval.is_some()
+            && self.execution_nonce_preflight_required(request)
+            && matches!(
+                preflight_disposition,
+                PreflightHoldDisposition::ReverseForRetry
+            )
         {
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                 self.build_execution_nonce_preflight_allow_response_after_cleanup(
@@ -484,6 +538,7 @@ impl ChioKernel {
             });
         }
 
+        let caller_receipt_metadata = extra_metadata.clone();
         let mut _threshold_dispatch_intent_scope = None;
         let (mut extra_metadata, budget_mutation, mut threshold_dispatch_permit) = if let Some(
             verified_approval,
@@ -492,6 +547,11 @@ impl ChioKernel {
         {
             let protocol_admission =
                 self.prepare_threshold_protocol_admission(request, cap, matched_grant_index, now)?;
+            let request_fingerprint_hash = self.ordinary_request_fingerprint_hash(
+                request,
+                &self.config.policy_hash,
+                caller_receipt_metadata.as_ref(),
+            )?;
             let prepared = crate::threshold_approval::prepare_governed_tool_admission_operation(
                 crate::threshold_approval::GovernedToolAdmissionOperationInput {
                     coordinator_authority_id: &format!("kernel:{}", self.public_key().to_hex()),
@@ -499,7 +559,7 @@ impl ChioKernel {
                     capability_id: &cap.id,
                     authorization_capability_hash: verified_approval
                         .authorization_capability_hash(),
-                    arguments: &request.arguments,
+                    request_fingerprint_hash: &request_fingerprint_hash,
                     governed_intent_hash: verified_approval.governed_intent_hash(),
                     policy_hash: &self.config.policy_hash,
                     verified_approval,
@@ -556,10 +616,9 @@ impl ChioKernel {
             // before entering that coordinator. Keep the request-scoped handle
             // alive across every terminal response below so the first committed
             // receipt consumes it.
-            let threshold_has_monetary = self
-                .ordinary_payment_charge_terms(matched_grant)
-                .is_some()
-                || Self::is_governed_mustprepay_request(request);
+            let threshold_has_monetary =
+                self.ordinary_payment_charge_terms(matched_grant).is_some()
+                    || Self::is_governed_mustprepay_request(request);
             match self.record_dispatch_intent_if_side_effecting(
                 request,
                 threshold_has_monetary,
@@ -567,10 +626,7 @@ impl ChioKernel {
             ) {
                 Ok(Some(handle)) => {
                     _threshold_dispatch_intent_scope = Some(
-                        self.scope_dispatch_intent_for_request(
-                            &request.request_id,
-                            Some(handle),
-                        ),
+                        self.scope_dispatch_intent_for_request(&request.request_id, Some(handle)),
                     );
                 }
                 Ok(None) => {}
@@ -600,6 +656,13 @@ impl ChioKernel {
                     );
                 }
             }
+            let threshold_runtime_metadata = if reserving_preflight {
+                self.release_runtime_admission_reservations_for_pre_dispatch_denial(
+                    threshold_runtime_metadata,
+                )
+            } else {
+                threshold_runtime_metadata
+            };
             let prepared_operation = prepared.operation().clone();
             let reserved = self.reserve_threshold_tool_admission(
                 ThresholdToolAdmissionContext {
@@ -608,17 +671,29 @@ impl ChioKernel {
                     grant_index: matched_grant_index,
                     grant: matched_grant,
                     now,
+                    payment_mode: if reserving_preflight {
+                        ThresholdPaymentMode::CallerReservation
+                    } else {
+                        ThresholdPaymentMode::Dispatch
+                    },
                 },
                 prepared,
                 protocol_admission,
+                reserving_preflight.then_some(ThresholdCallerReservationHandoffContext {
+                    runtime_response_metadata: threshold_runtime_metadata.as_ref(),
+                    caller_receipt_metadata: caller_receipt_metadata.as_ref(),
+                }),
             );
             let (permit, mutation) = match reserved {
                 Ok(reserved) => reserved,
                 Err(error) => {
-                    let mut deny_metadata = self
-                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                    let mut deny_metadata = if reserving_preflight {
+                        threshold_runtime_metadata
+                    } else {
+                        self.release_runtime_admission_reservations_for_pre_dispatch_denial(
                             threshold_runtime_metadata,
-                        );
+                        )
+                    };
                     if let Some(metadata) =
                         self.exact_compensated_threshold_admission_metadata(&prepared_operation)?
                     {
@@ -676,6 +751,8 @@ impl ChioKernel {
                 request,
                 cap,
                 std::slice::from_ref(&matched),
+                reserving_preflight,
+                caller_receipt_metadata.as_ref(),
             ) {
                 Ok(result) => result,
                 Err(error) => {
@@ -715,6 +792,17 @@ impl ChioKernel {
             return Err(KernelError::Internal(
                 "budget authority admitted a grant other than the validated grant".to_string(),
             ));
+        }
+        if threshold_dispatch_permit
+            .as_ref()
+            .is_some_and(ThresholdDispatchPermit::preexisting_operation)
+            || budget_mutation
+                .ordinary_admission()
+                .is_some_and(OrdinaryAdmissionMutation::preexisting_operation)
+        {
+            if let Some(replayed) = caller_reservation_replayed {
+                replayed.store(true, std::sync::atomic::Ordering::Release);
+            }
         }
 
         if let Some(verified_approval) = validated_governed_admission
@@ -782,6 +870,99 @@ impl ChioKernel {
                             budget_lease_acquired,
                         ),
                     PreflightHoldDisposition::ReserveForCaller => {
+                        let threshold_handoff_prepared = threshold_dispatch_permit.is_some();
+                        let extra_metadata = if threshold_handoff_prepared {
+                            extra_metadata
+                        } else {
+                            self.release_runtime_admission_reservations_for_pre_dispatch_denial(
+                                extra_metadata,
+                            )
+                        };
+                        if !threshold_handoff_prepared {
+                            if let PreExecutionBudgetMutation::Admission(admission) =
+                                &budget_mutation
+                            {
+                                let response_metadata = self.caller_reservation_response_metadata(
+                                    &budget_mutation,
+                                    extra_metadata.clone(),
+                                );
+                                if let Err(error) = self
+                                    .prepare_operation_owned_caller_reservation_handoff(
+                                        request,
+                                        now,
+                                        matched_grant_index,
+                                        admission,
+                                        response_metadata,
+                                        caller_receipt_metadata.as_ref(),
+                                    )
+                                {
+                                    let msg = error.to_string();
+                                    warn!(
+                                        request_id = %request.request_id,
+                                        reason = %redacted!(&msg),
+                                        "caller reservation handoff intent persistence failed"
+                                    );
+                                    return self.build_pre_dispatch_cleanup_deny_response(
+                                        PreDispatchCleanupDeny {
+                                            request,
+                                            reason: &msg,
+                                            timestamp: now,
+                                            matched_grant_index,
+                                            cap,
+                                            budget_mutation: &budget_mutation,
+                                            payment_authorization: None,
+                                            runtime_admission_metadata: extra_metadata,
+                                            budget_lease_acquired,
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                        // MustPrepay authorization and capture are external
+                        // financial effects. Operation-owned invocation capture is
+                        // also an irreversible admission effect. Journal and scope
+                        // the dispatch intent before either can run. The reserve or
+                        // denial receipt consumes the row. Threshold admission
+                        // installed its request-scoped intent before entering the
+                        // coordinator, so only the ordinary path writes one here.
+                        let _reserve_dispatch_intent_scope = if threshold_dispatch_permit
+                            .is_none()
+                            && (Self::is_governed_mustprepay_request(request)
+                                || budget_mutation.ordinary_admission().is_some())
+                        {
+                            let dispatch_intent = match self
+                                .record_dispatch_intent_if_side_effecting(request, true, now_unix_ms)
+                            {
+                                Ok(handle) => handle,
+                                Err(error) => {
+                                    let msg = error.to_string();
+                                    warn!(
+                                        request_id = %request.request_id,
+                                        reason = %redacted!(&msg),
+                                        "dispatch intent write failed; denying before reserve prepayment"
+                                    );
+                                    return self.build_pre_dispatch_cleanup_deny_response(
+                                        PreDispatchCleanupDeny {
+                                            request,
+                                            reason: &msg,
+                                            timestamp: now,
+                                            matched_grant_index,
+                                            cap,
+                                            budget_mutation: &budget_mutation,
+                                            payment_authorization: None,
+                                            runtime_admission_metadata: extra_metadata,
+                                            budget_lease_acquired,
+                                        },
+                                    );
+                                }
+                            };
+                            Some(self.scope_dispatch_intent_for_request(
+                                &request.request_id,
+                                dispatch_intent,
+                            ))
+                        } else {
+                            None
+                        };
                         // A governed MustPrepay intent must have prepaid before a
                         // reserved nonce is minted: this kernel never dispatches the
                         // tool on the reserve path, so there is no later point to
@@ -789,7 +970,14 @@ impl ChioKernel {
                         // releasing the admitted share) when the prepayment cannot be
                         // authorized or settled, so no nonce is handed out unpaid.
                         let settled_prepayment =
-                            match self.ensure_reserved_mustprepay_prepaid(request) {
+                            match self.ensure_reserved_mustprepay_prepaid(
+                                request,
+                                budget_mutation.charge_result(),
+                                budget_mutation.admission_operation_binding(),
+                                threshold_dispatch_permit
+                                    .as_ref()
+                                    .and_then(ThresholdDispatchPermit::payment_authorization),
+                            ) {
                                 Ok(settled_prepayment) => settled_prepayment,
                                 Err(error) => {
                                     let msg = error.to_string();
@@ -814,16 +1002,13 @@ impl ChioKernel {
                                 }
                             };
                         // A settled MustPrepay prepayment is captured before the
-                        // reservation is minted. Carry its rail reference onto the
+                        // reservation is issued. Carry its rail reference onto the
                         // reserved hold so the downstream reconcile receipt can name
-                        // the transaction that funded the spend. If minting the nonce,
-                        // stamping the reserved hold, or persisting the reserved
-                        // receipt fails, the hold is reversed but the captured
-                        // prepayment would otherwise stay charged for a reservation the
-                        // caller never received. Refund it on that tear-down so a
-                        // denied reservation leaves the payer net-unbilled; a
-                        // non-MustPrepay reserve has no captured prepayment and nothing
-                        // to carry or refund.
+                        // the transaction that funded the spend. A failure proven to
+                        // precede invocation capture compensates the hold and refunds
+                        // this prepayment. Once the operation is capture-pending or
+                        // caller-reserved, neither effect may be reversed from an
+                        // ambiguous acknowledgement.
                         let reserved_payment_reference = settled_prepayment
                             .as_ref()
                             .and_then(|prepayment| prepayment.payment_reference.clone());
@@ -834,18 +1019,32 @@ impl ChioKernel {
                                 matched_grant_index,
                                 budget_mutation: &budget_mutation,
                                 runtime_admission_metadata: extra_metadata,
+                                caller_receipt_metadata: caller_receipt_metadata.as_ref(),
                                 reserved_payment_reference,
                                 budget_lease_acquired,
+                                threshold_supplemental_prepared: threshold_dispatch_permit
+                                    .is_some(),
                             },
                         ) {
                             Ok(response) => Ok(response),
                             Err(error) => {
-                                if let Some(prepayment) = settled_prepayment.as_ref() {
-                                    self.refund_reserved_mustprepay_prepayment(
-                                        request,
-                                        cap,
-                                        &prepayment.authorization,
-                                    );
+                                let may_refund_prepayment = budget_mutation
+                                    .ordinary_admission()
+                                    .is_none_or(|admission| {
+                                        self.load_ordinary_admission(admission.operation_id())
+                                            .is_ok_and(|operation| {
+                                                operation.state()
+                                                    == AdmissionOperationState::CompensatedBeforeDispatch
+                                            })
+                                    });
+                                if may_refund_prepayment {
+                                    if let Some(prepayment) = settled_prepayment.as_ref() {
+                                        self.refund_reserved_mustprepay_prepayment(
+                                            request,
+                                            &budget_mutation,
+                                            prepayment,
+                                        );
+                                    }
                                 }
                                 Err(error)
                             }
@@ -868,44 +1067,38 @@ impl ChioKernel {
         // coordinator because that coordinator can authorize payment. Ordinary
         // admission reaches its first external effect here, after preflight.
         let _ordinary_dispatch_intent_scope = if threshold_dispatch_permit.is_none() {
-            let dispatch_intent =
-                match self.record_dispatch_intent_if_side_effecting(
-                    request,
-                    has_monetary,
-                    now_unix_ms,
-                ) {
-                    Ok(handle) => handle,
-                    Err(error) => {
-                        let msg = error.to_string();
-                        warn!(
-                            request_id = %request.request_id,
-                            reason = %redacted!(&msg),
-                            "dispatch intent write failed; denying before dispatch"
-                        );
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_pre_dispatch_cleanup_deny_response(
-                                    PreDispatchCleanupDeny {
-                                        request,
-                                        reason: &msg,
-                                        timestamp: now,
-                                        matched_grant_index,
-                                        cap,
-                                        budget_mutation: &budget_mutation,
-                                        payment_authorization: None,
-                                        runtime_admission_metadata: extra_metadata.clone(),
-                                        budget_lease_acquired,
-                                    },
-                                )
-                            },
-                        );
-                    }
-                };
-            Some(self.scope_dispatch_intent_for_request(
-                &request.request_id,
-                dispatch_intent,
-            ))
+            let dispatch_intent = match self.record_dispatch_intent_if_side_effecting(
+                request,
+                has_monetary,
+                now_unix_ms,
+            ) {
+                Ok(handle) => handle,
+                Err(error) => {
+                    let msg = error.to_string();
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&msg),
+                        "dispatch intent write failed; denying before dispatch"
+                    );
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                                request,
+                                reason: &msg,
+                                timestamp: now,
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                payment_authorization: None,
+                                runtime_admission_metadata: extra_metadata.clone(),
+                                budget_lease_acquired,
+                            })
+                        },
+                    );
+                }
+            };
+            Some(self.scope_dispatch_intent_for_request(&request.request_id, dispatch_intent))
         } else {
             None
         };
@@ -913,7 +1106,11 @@ impl ChioKernel {
         let payment_authorization = if let Some(permit) = threshold_dispatch_permit.as_ref() {
             permit.payment_authorization().cloned()
         } else {
-            match self.authorize_payment_if_needed(request, budget_mutation.charge_result()) {
+            match self.authorize_payment_if_needed(
+                request,
+                budget_mutation.charge_result(),
+                budget_mutation.admission_operation_binding(),
+            ) {
                 Ok(authorization) => authorization,
                 Err(error) => {
                     let msg = format!("payment authorization failed: {error}");
@@ -1241,7 +1438,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1269,7 +1466,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1294,8 +1491,7 @@ impl ChioKernel {
                                 cleanup_metadata.clone(),
                             ),
                         )
-                    },
-                );
+                    });
                 return response;
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
@@ -1303,7 +1499,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1335,13 +1531,14 @@ impl ChioKernel {
                                 cleanup_metadata.clone(),
                             ),
                         )
-                    });
+                    },
+                );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1379,7 +1576,7 @@ impl ChioKernel {
                 let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
-                    budget_mutation.charge_result(),
+                    &budget_mutation,
                     payment_authorization.as_ref(),
                     threshold_dispatch_permit.is_some(),
                 );
@@ -1415,6 +1612,7 @@ impl ChioKernel {
                     matched_grant_index,
                     FinalizeToolOutputCostContext {
                         charge_result: budget_mutation.charge_result().cloned(),
+                        admission_operation: budget_mutation.admission_operation_binding().cloned(),
                         reported_cost,
                         payment_authorization,
                         cap,

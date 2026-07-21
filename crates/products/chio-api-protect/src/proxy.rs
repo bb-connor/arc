@@ -13,7 +13,7 @@ use axum::routing::{any, get, post};
 use axum::Json;
 use axum::Router;
 use chio_http_serve::{CappedPeerAddr, MaxConnListener};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
@@ -35,7 +35,7 @@ use chio_http_core::{
     client_builder_with_contract, handle_append_threshold_approval_vote, handle_batch_respond,
     handle_create_threshold_approval_proposal, handle_deliver_threshold_approval_response,
     handle_get_approval, handle_get_threshold_approval_proposal, handle_list_pending,
-    handle_respond, http_status_metadata_decision, http_status_metadata_final, send_with_contract,
+    handle_respond, http_status_metadata_final, send_with_contract,
     AppendThresholdApprovalVoteRequest, ApprovalAdmin, ApprovalHandlerError, BatchRespondRequest,
     CallerIdentity, ChioHttpRequest, CreateThresholdApprovalProposalRequest,
     DeliverThresholdApprovalResponseRequest, EvaluateResponse, HealthResponse, HttpEgressContract,
@@ -83,8 +83,9 @@ pub(crate) use self::decision::*;
 pub(crate) use self::errors::*;
 pub(crate) use self::http::*;
 pub(crate) use self::mediated::{
-    build_budget_store, build_mediation_kernel, load_revocation_db_ids,
-    reap_expired_reserved_holds_once,
+    build_mediation_admission_authorities_with_paths, build_mediation_kernel,
+    load_revocation_store_ids, open_prepared_budget_store, prepare_budget_store,
+    reap_expired_reserved_holds_once, PreparedBudgetStore, REVOCATION_ACCELERATION_CACHE_MAX_IDS,
 };
 pub(crate) use self::receipts::*;
 pub(crate) use self::router::*;

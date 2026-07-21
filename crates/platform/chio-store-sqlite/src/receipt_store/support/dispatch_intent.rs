@@ -462,6 +462,37 @@ pub(crate) fn reconcile_dispatch_intent_tx(
     Ok(())
 }
 
+/// Move an orphaned monetary intent under the durable ownership of the exact
+/// nonterminal admission operation proved by the monetary reconciler. The
+/// dedicated state keeps the generic background reconciler, which only
+/// claims `open` rows, from later turning operation-owned work into a false
+/// dead letter. The parameter hash binds the transition to the exact claimed
+/// call, while the operation id remains available in the durable resolution
+/// detail until a terminal receipt consumes the row.
+pub(crate) fn defer_dispatch_intent_to_admission_operation_tx(
+    tx: &rusqlite::Transaction<'_>,
+    request_id: &str,
+    tenant_id: Option<&str>,
+    parameter_hash: &str,
+    operation_id: &str,
+) -> Result<(), ReceiptStoreError> {
+    if operation_id.is_empty() {
+        return Err(ReceiptStoreError::Conflict(
+            "cannot defer a dispatch intent to an empty admission operation id".to_string(),
+        ));
+    }
+    tx.execute(
+        "UPDATE chio_dispatch_intents \
+         SET state = 'deferred_to_admission_operation', \
+             resolution_detail = 'admission_operation_id=' || ?4 \
+         WHERE request_id = ?1 AND parameter_hash = ?3 \
+           AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+           AND state = 'open'",
+        rusqlite::params![request_id, tenant_id, parameter_hash, operation_id],
+    )?;
+    Ok(())
+}
+
 /// Delete an orphaned intent whose effect the reconciler PROVED never ran,
 /// so the request is safe to run again. The replay travels the normal
 /// pre-dispatch path and journals its own intent under the same (tenant,
@@ -485,15 +516,19 @@ pub(crate) fn release_dispatch_intent_for_replay_tx(
 }
 
 /// Bounded-path job for a reconciliation pass's resolution batch: applies
-/// every claimed row's outcome (dead-letter, monetary-reconciled, or
-/// release-for-replay) in one immediate transaction. The caller marks
+/// every claimed row's outcome (dead-letter, monetary-reconciled,
+/// admission-operation-deferred, or release-for-replay) in one immediate
+/// transaction. The caller marks
 /// `abandoned` when its response wait times out, and the job refuses to
 /// commit once marked, checked both before the transaction (cheap skip) and
 /// again immediately before commit, mirroring
 /// [`dispatch_intent_insert_job_unless_abandoned`]. The check matters more
-/// here than a plain bounded wait would suggest: each resolution write is
-/// guarded on `state = 'open'` alone (see [`dead_letter_dispatch_intent_tx`],
-/// [`reconcile_dispatch_intent_tx`], [`release_dispatch_intent_for_replay_tx`]),
+/// here than a plain bounded wait would suggest: resolution writes are
+/// guarded on `state = 'open'` (and the deferred transition also binds the
+/// exact parameter hash; see [`dead_letter_dispatch_intent_tx`],
+/// [`reconcile_dispatch_intent_tx`],
+/// [`defer_dispatch_intent_to_admission_operation_tx`],
+/// [`release_dispatch_intent_for_replay_tx`]),
 /// which cannot distinguish the orphan this pass claimed from a fresh intent
 /// a replay has since journaled under the same (tenant, request id) identity;
 /// a commit that lands after the caller gave up could resolve the wrong row.
@@ -502,6 +537,7 @@ pub(crate) fn release_dispatch_intent_for_replay_tx(
 pub(crate) fn dispatch_intent_resolution_batch_job(
     dead_letters: Vec<(String, Option<String>, String)>,
     reconciled: Vec<(String, Option<String>, String)>,
+    deferred_to_admission_operations: Vec<(String, Option<String>, String, String)>,
     replayable: Vec<(String, Option<String>)>,
     abandoned: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
@@ -522,6 +558,17 @@ pub(crate) fn dispatch_intent_resolution_batch_job(
         }
         for (request_id, tenant_id, detail) in &reconciled {
             reconcile_dispatch_intent_tx(&tx, request_id, tenant_id.as_deref(), detail)?;
+        }
+        for (request_id, tenant_id, parameter_hash, operation_id) in
+            &deferred_to_admission_operations
+        {
+            defer_dispatch_intent_to_admission_operation_tx(
+                &tx,
+                request_id,
+                tenant_id.as_deref(),
+                parameter_hash,
+                operation_id,
+            )?;
         }
         for (request_id, tenant_id) in &replayable {
             release_dispatch_intent_for_replay_tx(&tx, request_id, tenant_id.as_deref())?;

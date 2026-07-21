@@ -433,7 +433,6 @@ fn publication_core_matches(
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
         attenuation::{DelegationLink, DelegationLinkBody},
@@ -452,11 +451,7 @@ mod tests {
     use super::*;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        chio_test_support::private_fs::unique_sqlite_path(prefix)
     }
 
     fn capability_with_id(

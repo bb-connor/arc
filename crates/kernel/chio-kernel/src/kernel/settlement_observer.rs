@@ -1,6 +1,6 @@
 //! Settlement observer slot wired into the kernel evaluator.
 //!
-//! Plugs `chio-settle::SettlementHook` into the kernel's post-dispatch
+//! Plugs `chio-settle::SettlementHook` into the kernel's durable
 //! observer surface. The observer is consulted only after a receipt has
 //! been fully signed and durably stored: settlement is observer-only
 //! relative to the receipt bytes, and a hook failure NEVER blocks the
@@ -17,6 +17,49 @@ use chio_core::crypto::PublicKey;
 use chio_core::receipt::body::ChioReceipt;
 use chio_settle::{SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome};
 
+use crate::receipt_store::{
+    ReceiptStore, SettlementObserverOutboxClaimOutcome, SettlementObserverOutboxLease,
+};
+use crate::settlement_retry::{SettleAttemptRecord, SettlementRetryError, SettlementRetryStore};
+
+const SETTLEMENT_OBSERVER_RECOVERY_INTERVAL: std::time::Duration =
+    std::time::Duration::from_millis(250);
+const SETTLEMENT_OBSERVER_RECOVERY_LEASE_MS: u64 = 30_000;
+const SETTLEMENT_TRANSCRIPT_ID_MAX_BYTES: usize = 512;
+const SETTLEMENT_OUTCOME_REASON_MAX_BYTES: usize = 2_048;
+const SETTLEMENT_HOOK_INVOCATION_FAILED: &str = "settlement hook invocation failed";
+const SETTLEMENT_HOOK_INVALID_OUTCOME: &str = "settlement hook returned invalid outcome";
+const SETTLEMENT_HOOK_SKIPPED: &str = "settlement hook skipped receipt";
+const SETTLEMENT_HOOK_RETRYABLE: &str = "settlement hook requested retry";
+const SETTLEMENT_HOOK_PERMANENT: &str = "settlement hook reported permanent failure";
+const SETTLEMENT_RETRY_EXHAUSTED: &str = "settlement retry envelope exhausted";
+
+#[derive(Clone)]
+pub(super) struct SettlementReceiptTrustVerifier {
+    current_kernel_key: PublicKey,
+    resolver: Option<Arc<dyn crate::authority::AuthorityArtifactTrustResolver>>,
+}
+
+impl SettlementReceiptTrustVerifier {
+    pub(super) fn new(
+        current_kernel_key: PublicKey,
+        resolver: Option<Arc<dyn crate::authority::AuthorityArtifactTrustResolver>>,
+    ) -> Self {
+        Self {
+            current_kernel_key,
+            resolver,
+        }
+    }
+
+    fn verify(&self, receipt: &ChioReceipt) -> Result<bool, crate::KernelError> {
+        super::validation::verify_trusted_receipt_with_resolver(
+            receipt,
+            &self.current_kernel_key,
+            self.resolver.as_deref(),
+        )
+    }
+}
+
 /// Schema string emitted on the wire for settlement-observer status frames.
 /// Public so external observers can pin against the same identifier the
 /// kernel records.
@@ -25,11 +68,12 @@ pub const SETTLEMENT_OBSERVER_STATUS_SCHEMA: &str = "chio.settle.observer-status
 
 /// Status the kernel records for each settlement observer invocation.
 ///
-/// Settlement runs post-dispatch: regardless of which variant lands,
+/// Settlement runs after durable receipt append: regardless of which variant lands,
 /// the receipt has already been signed and persisted. The variants
 /// document only what the observer slot did with the hook's return,
 /// not whether the receipt committed (it always committed).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
 pub enum SettlementObserverStatus {
     /// No settlement hook is registered on this kernel; the observation
     /// was not produced.
@@ -37,16 +81,26 @@ pub enum SettlementObserverStatus {
     /// The receipt was either zero-priced or otherwise outside the
     /// marketplace surface; the kernel produced no observation. This
     /// is the steady-state for non-economic deployments.
-    Skipped { reason: String },
+    Skipped {
+        reason: String,
+    },
     /// The hook accepted the observation and returned an outcome
     /// classification. The downstream lifecycle is then driven by the
     /// retry policy and dead-letter machinery.
-    Observed { outcome: SettlementOutcome },
-    /// The hook surfaced an error. Settlement runs on the post-dispatch
-    /// task, so this is recorded but never propagated back to the
-    /// dispatch path. The error is routed through retry/dead-letter
-    /// classification.
-    HookFailed { error: String },
+    Observed {
+        outcome: SettlementOutcome,
+    },
+    /// The hook surfaced an error. The error is routed through durable
+    /// retry/dead-letter classification before delivery acknowledgement.
+    HookFailed {
+        error: String,
+    },
+    TrustFailed {
+        error: String,
+    },
+    IntegrityFailed {
+        error: String,
+    },
 }
 
 impl SettlementObserverStatus {
@@ -60,10 +114,79 @@ impl SettlementObserverStatus {
 
     /// Construct a `HookFailed` status from a [`SettlementHookError`].
     #[must_use]
-    pub fn hook_failed(err: &SettlementHookError) -> Self {
+    pub fn hook_failed(_error: &SettlementHookError) -> Self {
         Self::HookFailed {
-            error: err.to_string(),
+            error: SETTLEMENT_HOOK_INVOCATION_FAILED.to_string(),
         }
+    }
+
+    fn invalid_hook_outcome() -> Self {
+        Self::HookFailed {
+            error: SETTLEMENT_HOOK_INVALID_OUTCOME.to_string(),
+        }
+    }
+}
+
+fn valid_bounded_hook_text(value: &str, max_bytes: usize) -> bool {
+    !value.trim().is_empty() && value.len() <= max_bytes
+}
+
+pub(super) fn validate_and_sanitize_settlement_outcome(
+    outcome: &SettlementOutcome,
+) -> Result<SettlementOutcome, SettlementRetryError> {
+    match outcome {
+        SettlementOutcome::Accepted {
+            schema,
+            transcript_id,
+        } if schema == chio_settle::SETTLEMENT_OUTCOME_SCHEMA
+            && valid_bounded_hook_text(transcript_id, SETTLEMENT_TRANSCRIPT_ID_MAX_BYTES)
+            && !transcript_id.chars().any(char::is_control) =>
+        {
+            Ok(SettlementOutcome::accepted(transcript_id.clone()))
+        }
+        SettlementOutcome::Skipped { schema, reason }
+            if schema == chio_settle::SETTLEMENT_OUTCOME_SCHEMA
+                && valid_bounded_hook_text(reason, SETTLEMENT_OUTCOME_REASON_MAX_BYTES) =>
+        {
+            Ok(SettlementOutcome::skipped(SETTLEMENT_HOOK_SKIPPED))
+        }
+        SettlementOutcome::Retryable { schema, reason }
+            if schema == chio_settle::SETTLEMENT_OUTCOME_SCHEMA
+                && valid_bounded_hook_text(reason, SETTLEMENT_OUTCOME_REASON_MAX_BYTES) =>
+        {
+            Ok(SettlementOutcome::retryable(SETTLEMENT_HOOK_RETRYABLE))
+        }
+        SettlementOutcome::Permanent { schema, reason }
+            if schema == chio_settle::SETTLEMENT_OUTCOME_SCHEMA
+                && valid_bounded_hook_text(reason, SETTLEMENT_OUTCOME_REASON_MAX_BYTES) =>
+        {
+            Ok(SettlementOutcome::permanent(SETTLEMENT_HOOK_PERMANENT))
+        }
+        _ => Err(SettlementRetryError::Conflict(
+            SETTLEMENT_HOOK_INVALID_OUTCOME.to_string(),
+        )),
+    }
+}
+
+fn durable_settlement_reason(outcome: &SettlementOutcome, exhausted: bool) -> &'static str {
+    if exhausted {
+        return SETTLEMENT_RETRY_EXHAUSTED;
+    }
+    match outcome {
+        SettlementOutcome::Skipped { .. } => SETTLEMENT_HOOK_SKIPPED,
+        SettlementOutcome::Retryable { reason, .. }
+            if reason == SETTLEMENT_HOOK_INVOCATION_FAILED =>
+        {
+            SETTLEMENT_HOOK_INVOCATION_FAILED
+        }
+        SettlementOutcome::Retryable { reason, .. }
+            if reason == SETTLEMENT_HOOK_INVALID_OUTCOME =>
+        {
+            SETTLEMENT_HOOK_INVALID_OUTCOME
+        }
+        SettlementOutcome::Retryable { .. } => SETTLEMENT_HOOK_RETRYABLE,
+        SettlementOutcome::Permanent { .. } => SETTLEMENT_HOOK_PERMANENT,
+        SettlementOutcome::Accepted { .. } => "settlement outcome resolved",
     }
 }
 
@@ -173,9 +296,305 @@ pub fn run_observer(
     };
 
     match hook.observe(&observation) {
-        Ok(outcome) => SettlementObserverStatus::Observed { outcome },
+        Ok(outcome) => match validate_and_sanitize_settlement_outcome(&outcome) {
+            Ok(outcome) => SettlementObserverStatus::Observed { outcome },
+            Err(_) => SettlementObserverStatus::invalid_hook_outcome(),
+        },
         Err(error) => SettlementObserverStatus::hook_failed(&error),
     }
+}
+
+pub(super) fn route_staged_status(
+    retry_store: &dyn SettlementRetryStore,
+    retry_policy: &chio_settle::RetryPolicy,
+    receipt: &ChioReceipt,
+    status: &SettlementObserverStatus,
+) -> Result<(), SettlementRetryError> {
+    use chio_settle::RetryDecision;
+
+    let outcome = match status {
+        SettlementObserverStatus::Skipped { .. } => return retry_store.clear_attempt(&receipt.id),
+        SettlementObserverStatus::Observed { outcome } => {
+            validate_and_sanitize_settlement_outcome(outcome)?
+        }
+        SettlementObserverStatus::HookFailed { error } => {
+            let category = if error == SETTLEMENT_HOOK_INVALID_OUTCOME {
+                SETTLEMENT_HOOK_INVALID_OUTCOME
+            } else {
+                SETTLEMENT_HOOK_INVOCATION_FAILED
+            };
+            SettlementOutcome::retryable(category)
+        }
+        SettlementObserverStatus::NotRegistered => {
+            return Err(SettlementRetryError::Backend(
+                "settlement observer disappeared before staged delivery".to_string(),
+            ))
+        }
+        SettlementObserverStatus::TrustFailed { .. } => {
+            return Err(SettlementRetryError::Backend(
+                "settlement receipt trust validation failed".to_string(),
+            ))
+        }
+        SettlementObserverStatus::IntegrityFailed { .. } => {
+            return Err(SettlementRetryError::Backend(
+                "settlement receipt integrity validation failed".to_string(),
+            ))
+        }
+    };
+    match chio_settle::classify_attempt(retry_policy, 0, &outcome) {
+        RetryDecision::Skip { .. } => retry_store.clear_attempt(&receipt.id),
+        RetryDecision::Retry { attempt, backoff } => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_secs())
+                .unwrap_or(0);
+            retry_store
+                .insert_observer_attempt_if_absent(&SettleAttemptRecord {
+                    receipt_id: receipt.id.clone(),
+                    finalized_at: receipt.timestamp,
+                    attempts: attempt,
+                    next_visible_at: now.saturating_add(backoff.as_secs().max(1)),
+                    last_reason: Some(durable_settlement_reason(&outcome, false).to_string()),
+                })
+                .map(|_| ())
+        }
+        RetryDecision::DeadLetter { .. } => {
+            let record = chio_settle::DeadLetterRecord::new(
+                receipt.id.clone(),
+                receipt.timestamp,
+                1,
+                durable_settlement_reason(
+                    &outcome,
+                    matches!(outcome, SettlementOutcome::Retryable { .. }),
+                ),
+            );
+            retry_store.insert_dead_letter(&record)?;
+            retry_store.clear_attempt(&receipt.id)
+        }
+    }
+}
+
+pub(super) struct SettlementObserverRecoveryHandle {
+    stop: Arc<std::sync::atomic::AtomicBool>,
+    join: Option<std::thread::JoinHandle<()>>,
+}
+
+impl SettlementObserverRecoveryHandle {
+    pub(super) fn spawn(
+        receipt_store: Arc<dyn ReceiptStore>,
+        retry_store: Arc<dyn SettlementRetryStore>,
+        hook: Arc<dyn SettlementHook>,
+        retry_policy: chio_settle::RetryPolicy,
+        trust_verifier: SettlementReceiptTrustVerifier,
+    ) -> Self {
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_stop = Arc::clone(&stop);
+        let join = std::thread::spawn(move || {
+            while !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    drain_one_settlement_observer_outbox(
+                        receipt_store.as_ref(),
+                        retry_store.as_ref(),
+                        &hook,
+                        &retry_policy,
+                        &trust_verifier,
+                        worker_stop.as_ref(),
+                    )
+                }));
+                match outcome {
+                    Ok(Ok(true)) => continue,
+                    Ok(Ok(false)) => {}
+                    Ok(Err(error)) => tracing::warn!(
+                        reason = %chio_log_redact::redacted!(&error),
+                        "settlement-observer recovery remains pending"
+                    ),
+                    Err(_) => tracing::warn!("settlement-observer recovery panicked"),
+                }
+                let mut waited = std::time::Duration::ZERO;
+                let slice = std::time::Duration::from_millis(50);
+                while waited < SETTLEMENT_OBSERVER_RECOVERY_INTERVAL
+                    && !worker_stop.load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    std::thread::sleep(slice);
+                    waited += slice;
+                }
+            }
+        });
+        Self {
+            stop,
+            join: Some(join),
+        }
+    }
+}
+
+impl Drop for SettlementObserverRecoveryHandle {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Release);
+        // Dropping a JoinHandle detaches the worker. Store, resolver, and hook
+        // implementations are external authorities and may block indefinitely;
+        // composition changes must never wait on their return. The worker checks
+        // this stop flag after every blocking boundary and abandons any lease it
+        // owns before exiting.
+        let _ = self.join.take();
+    }
+}
+
+fn ensure_settlement_observer_recovery_running(
+    stop: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<(), String> {
+    if stop.is_some_and(|stop| stop.load(std::sync::atomic::Ordering::Acquire)) {
+        return Err("settlement-observer recovery stopped".to_string());
+    }
+    Ok(())
+}
+
+fn drain_one_settlement_observer_outbox(
+    receipt_store: &dyn ReceiptStore,
+    retry_store: &dyn SettlementRetryStore,
+    hook: &Arc<dyn SettlementHook>,
+    retry_policy: &chio_settle::RetryPolicy,
+    trust_verifier: &SettlementReceiptTrustVerifier,
+    stop: &std::sync::atomic::AtomicBool,
+) -> Result<bool, String> {
+    ensure_settlement_observer_recovery_running(Some(stop))?;
+    let now_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX))
+        .unwrap_or(0);
+    let receipt_id = receipt_store
+        .list_settlement_observer_outbox_receipt_ids(now_unix_ms, 1)
+        .map_err(|_| "settlement-observer outbox inventory failed".to_string())?
+        .into_iter()
+        .next();
+    ensure_settlement_observer_recovery_running(Some(stop))?;
+    let Some(receipt_id) = receipt_id else {
+        return Ok(false);
+    };
+    let claim_deadline_unix_ms = now_unix_ms
+        .checked_add(SETTLEMENT_OBSERVER_RECOVERY_LEASE_MS)
+        .ok_or_else(|| "settlement-observer recovery lease overflowed u64".to_string())?;
+    let claim_token = uuid::Uuid::now_v7().to_string();
+    let claim = receipt_store
+        .claim_settlement_observer_outbox(
+            &receipt_id,
+            &claim_token,
+            now_unix_ms,
+            claim_deadline_unix_ms,
+        )
+        .map_err(|_| "settlement-observer outbox claim failed".to_string())?;
+    let mut lease = match claim {
+        SettlementObserverOutboxClaimOutcome::Claimed(lease) => lease,
+        SettlementObserverOutboxClaimOutcome::Completed
+        | SettlementObserverOutboxClaimOutcome::Busy => return Ok(false),
+        SettlementObserverOutboxClaimOutcome::Missing => {
+            return Err("settlement-observer outbox row disappeared".to_string())
+        }
+    };
+    if let Err(error) = ensure_settlement_observer_recovery_running(Some(stop)) {
+        let _ = receipt_store.abandon_settlement_observer_outbox(
+            &lease.receipt_id,
+            lease.version,
+            &lease.claim_token,
+            &error,
+        );
+        return Err(error);
+    }
+    let result = deliver_claimed_settlement_observer_outbox(
+        receipt_store,
+        retry_store,
+        hook,
+        retry_policy,
+        trust_verifier,
+        Some(stop),
+        &mut lease,
+    );
+    if let Err(error) = &result {
+        let _ = receipt_store.abandon_settlement_observer_outbox(
+            &lease.receipt_id,
+            lease.version,
+            &lease.claim_token,
+            error,
+        );
+    }
+    result.map(|()| true)
+}
+
+pub(super) fn deliver_claimed_settlement_observer_outbox(
+    receipt_store: &dyn ReceiptStore,
+    retry_store: &dyn SettlementRetryStore,
+    hook: &Arc<dyn SettlementHook>,
+    retry_policy: &chio_settle::RetryPolicy,
+    trust_verifier: &SettlementReceiptTrustVerifier,
+    stop: Option<&std::sync::atomic::AtomicBool>,
+    lease: &mut SettlementObserverOutboxLease,
+) -> Result<(), String> {
+    let receipt = receipt_store
+        .load_chio_receipt(&lease.receipt_id)
+        .map_err(|_| "settlement-observer authoritative receipt lookup failed".to_string())?
+        .ok_or_else(|| {
+            "settlement-observer receipt is absent from authoritative storage".to_string()
+        })?;
+    ensure_settlement_observer_recovery_running(stop)?;
+    if receipt.id != lease.receipt_id || receipt.timestamp != lease.finalized_at {
+        return Err("settlement-observer outbox diverged from authoritative receipt".to_string());
+    }
+    if !receipt
+        .action
+        .verify_hash()
+        .map_err(|_| "settlement-observer action integrity check failed".to_string())?
+    {
+        return Err(
+            "settlement-observer authoritative receipt failed action integrity validation"
+                .to_string(),
+        );
+    }
+    if !trust_verifier
+        .verify(&receipt)
+        .map_err(|_| "settlement-observer receipt trust resolution failed".to_string())?
+    {
+        return Err(
+            "settlement-observer authoritative receipt failed trust validation".to_string(),
+        );
+    }
+    ensure_settlement_observer_recovery_running(stop)?;
+    let status = if let Some(staged) = lease.staged_status_json.as_deref() {
+        serde_json::from_str::<SettlementObserverStatus>(staged)
+            .map_err(|_| "settlement-observer staged status is invalid".to_string())?
+    } else {
+        let status = run_observer(
+            Some(hook),
+            &receipt,
+            std::slice::from_ref(&receipt.kernel_key),
+        );
+        ensure_settlement_observer_recovery_running(stop)?;
+        let status_json = serde_json::to_string(&status)
+            .map_err(|_| "settlement-observer status serialization failed".to_string())?;
+        *lease = receipt_store
+            .stage_settlement_observer_outbox_status(
+                &lease.receipt_id,
+                lease.version,
+                &lease.claim_token,
+                &status_json,
+            )
+            .map_err(|_| "settlement-observer status staging failed".to_string())?
+            .ok_or_else(|| "settlement-observer lease became stale before routing".to_string())?;
+        ensure_settlement_observer_recovery_running(stop)?;
+        status
+    };
+    route_staged_status(retry_store, retry_policy, &receipt, &status)
+        .map_err(|_| "settlement-observer durable outcome routing failed".to_string())?;
+    ensure_settlement_observer_recovery_running(stop)?;
+    if !receipt_store
+        .acknowledge_settlement_observer_outbox(
+            &lease.receipt_id,
+            lease.version,
+            &lease.claim_token,
+        )
+        .map_err(|_| "settlement-observer outbox acknowledgement failed".to_string())?
+    {
+        return Err("settlement-observer acknowledgement lost its fenced lease".to_string());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -233,6 +652,10 @@ mod tests {
 
     struct AcceptingHook;
     impl SettlementHook for AcceptingHook {
+        fn supports_receipt_id_idempotency(&self) -> bool {
+            true
+        }
+
         fn observe(
             &self,
             observation: &SettlementObservation,
@@ -246,11 +669,150 @@ mod tests {
 
     struct FailingHook;
     impl SettlementHook for FailingHook {
+        fn supports_receipt_id_idempotency(&self) -> bool {
+            true
+        }
+
         fn observe(
             &self,
             _observation: &SettlementObservation,
         ) -> Result<SettlementOutcome, SettlementHookError> {
-            Err(SettlementHookError::Transient("rpc lag".to_string()))
+            Err(SettlementHookError::Transient(
+                "rpc lag credential-é-SEED-observer".to_string(),
+            ))
+        }
+    }
+
+    struct StaticOutcomeHook(SettlementOutcome);
+
+    impl SettlementHook for StaticOutcomeHook {
+        fn supports_receipt_id_idempotency(&self) -> bool {
+            true
+        }
+
+        fn observe(
+            &self,
+            _observation: &SettlementObservation,
+        ) -> Result<SettlementOutcome, SettlementHookError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum DurableFailureMode {
+        ReceiptLookup,
+        StagedJson,
+    }
+
+    struct DurableFailureReceiptStore {
+        receipt: ChioReceipt,
+        mode: DurableFailureMode,
+        abandoned_error: std::sync::Mutex<Option<String>>,
+    }
+
+    impl ReceiptStore for DurableFailureReceiptStore {
+        fn append_chio_receipt(
+            &self,
+            _receipt: &ChioReceipt,
+        ) -> Result<(), crate::ReceiptStoreError> {
+            Ok(())
+        }
+
+        fn append_child_receipt(
+            &self,
+            _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+        ) -> Result<(), crate::ReceiptStoreError> {
+            Ok(())
+        }
+
+        fn load_chio_receipt(
+            &self,
+            _receipt_id: &str,
+        ) -> Result<Option<ChioReceipt>, crate::ReceiptStoreError> {
+            match self.mode {
+                DurableFailureMode::ReceiptLookup => Err(crate::ReceiptStoreError::Conflict(
+                    "credential-é-SEED-store".to_string(),
+                )),
+                DurableFailureMode::StagedJson => Ok(Some(self.receipt.clone())),
+            }
+        }
+
+        fn list_settlement_observer_outbox_receipt_ids(
+            &self,
+            _now_unix_ms: u64,
+            _limit: usize,
+        ) -> Result<Vec<String>, crate::ReceiptStoreError> {
+            Ok(vec![self.receipt.id.clone()])
+        }
+
+        fn claim_settlement_observer_outbox(
+            &self,
+            receipt_id: &str,
+            claim_token: &str,
+            _now_unix_ms: u64,
+            claim_deadline_unix_ms: u64,
+        ) -> Result<SettlementObserverOutboxClaimOutcome, crate::ReceiptStoreError> {
+            Ok(SettlementObserverOutboxClaimOutcome::Claimed(
+                SettlementObserverOutboxLease {
+                    receipt_id: receipt_id.to_string(),
+                    finalized_at: self.receipt.timestamp,
+                    claim_token: claim_token.to_string(),
+                    claim_deadline_unix_ms,
+                    version: 1,
+                    staged_status_json: matches!(self.mode, DurableFailureMode::StagedJson)
+                        .then(|| "{credential-é-SEED-serde".to_string()),
+                },
+            ))
+        }
+
+        fn abandon_settlement_observer_outbox(
+            &self,
+            _receipt_id: &str,
+            _expected_version: u64,
+            _claim_token: &str,
+            last_error: &str,
+        ) -> Result<bool, crate::ReceiptStoreError> {
+            *self.abandoned_error.lock().map_err(|_| {
+                crate::ReceiptStoreError::Conflict("abandon error lock poisoned".to_string())
+            })? = Some(last_error.to_string());
+            Ok(true)
+        }
+    }
+
+    struct DurableFailureRetryStore;
+
+    impl SettlementRetryStore for DurableFailureRetryStore {
+        fn load_attempt(
+            &self,
+            _receipt_id: &str,
+        ) -> Result<Option<SettleAttemptRecord>, SettlementRetryError> {
+            Ok(None)
+        }
+
+        fn upsert_attempt(
+            &self,
+            _record: &SettleAttemptRecord,
+        ) -> Result<(), SettlementRetryError> {
+            Ok(())
+        }
+
+        fn clear_attempt(&self, _receipt_id: &str) -> Result<(), SettlementRetryError> {
+            Ok(())
+        }
+
+        fn insert_dead_letter(
+            &self,
+            _record: &chio_settle::DeadLetterRecord,
+        ) -> Result<bool, SettlementRetryError> {
+            Ok(true)
+        }
+
+        fn due_attempts(
+            &self,
+            _now_unix_secs: u64,
+            _limit: usize,
+        ) -> Result<Vec<SettleAttemptRecord>, SettlementRetryError> {
+            Ok(Vec::new())
         }
     }
 
@@ -452,9 +1014,109 @@ mod tests {
             &receipt,
             std::slice::from_ref(&receipt.kernel_key),
         );
-        assert!(matches!(
+        assert_eq!(
             status,
-            SettlementObserverStatus::HookFailed { .. }
+            SettlementObserverStatus::HookFailed {
+                error: SETTLEMENT_HOOK_INVOCATION_FAILED.to_string(),
+            }
+        );
+        let status_json = serde_json::to_string(&status).expect("status serializes");
+        assert!(!status_json.contains("credential-é-SEED-observer"));
+    }
+
+    #[test]
+    fn run_observer_rejects_malformed_hook_outcomes_without_truncation() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "financial": {"cost_charged": 250, "currency": "USD"}
+            }),
+            Decision::Allow,
+        );
+        let malformed = [
+            SettlementOutcome::Accepted {
+                schema: "chio.settle.outcome.v0".to_string(),
+                transcript_id: "transcript".to_string(),
+            },
+            SettlementOutcome::accepted("   "),
+            SettlementOutcome::accepted("t".repeat(SETTLEMENT_TRANSCRIPT_ID_MAX_BYTES + 1)),
+            SettlementOutcome::retryable(""),
+            SettlementOutcome::permanent("r".repeat(SETTLEMENT_OUTCOME_REASON_MAX_BYTES + 1)),
+        ];
+        for outcome in malformed {
+            let hook: Arc<dyn SettlementHook> = Arc::new(StaticOutcomeHook(outcome));
+            assert_eq!(
+                run_observer(
+                    Some(&hook),
+                    &receipt,
+                    std::slice::from_ref(&receipt.kernel_key),
+                ),
+                SettlementObserverStatus::HookFailed {
+                    error: SETTLEMENT_HOOK_INVALID_OUTCOME.to_string(),
+                }
+            );
+        }
+
+        let transcript_id = "t".repeat(SETTLEMENT_TRANSCRIPT_ID_MAX_BYTES);
+        let hook: Arc<dyn SettlementHook> = Arc::new(StaticOutcomeHook(
+            SettlementOutcome::accepted(transcript_id.clone()),
         ));
+        assert_eq!(
+            run_observer(
+                Some(&hook),
+                &receipt,
+                std::slice::from_ref(&receipt.kernel_key),
+            ),
+            SettlementObserverStatus::Observed {
+                outcome: SettlementOutcome::accepted(transcript_id),
+            }
+        );
+    }
+
+    #[test]
+    fn durable_observer_failures_never_persist_raw_store_or_serde_errors() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "financial": {"cost_charged": 250, "currency": "USD"}
+            }),
+            Decision::Allow,
+        );
+        let hook: Arc<dyn SettlementHook> = Arc::new(AcceptingHook);
+        let retry_store = DurableFailureRetryStore;
+        let verifier = SettlementReceiptTrustVerifier::new(receipt.kernel_key.clone(), None);
+        for (mode, expected) in [
+            (
+                DurableFailureMode::ReceiptLookup,
+                "settlement-observer authoritative receipt lookup failed",
+            ),
+            (
+                DurableFailureMode::StagedJson,
+                "settlement-observer staged status is invalid",
+            ),
+        ] {
+            let store = DurableFailureReceiptStore {
+                receipt: receipt.clone(),
+                mode,
+                abandoned_error: std::sync::Mutex::new(None),
+            };
+            let stop = std::sync::atomic::AtomicBool::new(false);
+            let error = drain_one_settlement_observer_outbox(
+                &store,
+                &retry_store,
+                &hook,
+                &chio_settle::RetryPolicy::default(),
+                &verifier,
+                &stop,
+            )
+            .expect_err("delivery must remain pending");
+            assert_eq!(error, expected);
+            let abandoned = store
+                .abandoned_error
+                .lock()
+                .expect("abandoned error lock")
+                .clone()
+                .expect("abandon recorded");
+            assert_eq!(abandoned, expected);
+            assert!(!abandoned.contains("credential-é-SEED"));
+        }
     }
 }

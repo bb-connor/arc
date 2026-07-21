@@ -190,6 +190,7 @@ impl ChioKernel {
             Some(metadata),
             None,
             None,
+            PreflightHoldDisposition::ReverseForRetry,
         )
         .await
     }
@@ -217,6 +218,7 @@ impl ChioKernel {
             Some(metadata),
             None,
             Some(security_context),
+            PreflightHoldDisposition::ReverseForRetry,
         )
         .await
     }

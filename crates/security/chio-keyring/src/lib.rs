@@ -97,10 +97,7 @@ impl DurableSqliteFile {
         self.validate_path_binding(&self.path)
     }
 
-    pub(crate) fn validate_live_connection(
-        &self,
-        connection: &rusqlite::Connection,
-    ) -> Result<()> {
+    pub(crate) fn validate_live_connection(&self, connection: &rusqlite::Connection) -> Result<()> {
         self.validate()?;
         validate_sqlite_main_database_live_path_binding(connection)
     }

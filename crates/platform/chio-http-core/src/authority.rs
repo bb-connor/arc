@@ -687,7 +687,8 @@ impl HttpAuthority {
             arguments: binding.requested_arguments.clone(),
             model_metadata: input.model_metadata.cloned(),
             execution_nonce: input.execution_nonce.cloned(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: checked_unix_timestamp(chrono::Utc::now().timestamp())
+                .map_err(HttpAuthorityError::Kernel)?,
         };
 
         let content_hash = chio_request
@@ -893,7 +894,8 @@ impl HttpAuthority {
             actor_chain: Vec::new(),
             evidence: Vec::new(),
             response_status,
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: checked_unix_timestamp(chrono::Utc::now().timestamp())
+                .map_err(HttpAuthorityError::Kernel)?,
             content_hash: input.content_hash.unwrap_or_default().to_string(),
             policy_hash: self.policy_hash.clone(),
             trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
@@ -917,7 +919,8 @@ impl HttpAuthority {
         let route_selection = metadata_value(body.metadata.as_ref(), "route_selection").cloned();
         body.id = uuid::Uuid::now_v7().to_string();
         body.response_status = response_status;
-        body.timestamp = chrono::Utc::now().timestamp() as u64;
+        body.timestamp = checked_unix_timestamp(chrono::Utc::now().timestamp())
+            .map_err(HttpAuthorityError::Kernel)?;
         body.metadata = final_metadata(
             Some(&decision_receipt_id),
             kernel_receipt_id.as_deref(),
@@ -1007,9 +1010,8 @@ impl HttpAuthority {
         &self,
         nonce: &SignedExecutionNonce,
     ) -> Result<CapabilityToken, HttpAuthorityError> {
-        let now = chrono::Utc::now().timestamp();
-        let issued_at = u64::try_from(now.max(0))
-            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+        let issued_at = checked_unix_timestamp(chrono::Utc::now().timestamp())
+            .map_err(HttpAuthorityError::Kernel)?;
         let body = CapabilityTokenBody {
             id: nonce.nonce.bound_to.capability_id.clone(),
             issuer: self.keypair.public_key(),
@@ -1046,7 +1048,8 @@ impl HttpAuthority {
             actor_chain: Vec::new(),
             evidence: prepared.evidence.clone(),
             response_status,
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: checked_unix_timestamp(chrono::Utc::now().timestamp())
+                .map_err(HttpAuthorityError::Kernel)?,
             content_hash: prepared.content_hash.clone(),
             policy_hash: self.policy_hash.clone(),
             trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
@@ -1176,12 +1179,14 @@ fn presented_capability_revocation(
     for capability_id in std::iter::once(token.id.as_str()).chain(chain_ids) {
         match is_revoked(capability_id) {
             Ok(false) => {}
-            Ok(true) => {
-                return Ok(Some(format!(
-                    "presented capability {capability_id} has been revoked"
-                )))
+            Ok(true) => return Ok(Some("capability token has been revoked".to_string())),
+            Err(error) => {
+                tracing::warn!(
+                    error = %error,
+                    "capability revocation authority query failed"
+                );
+                return Err("capability revocation status unavailable".to_string());
             }
-            Err(error) => return Err(format!("capability revocation status unavailable: {error}")),
         }
     }
     Ok(None)
@@ -1263,14 +1268,15 @@ fn validate_capability_token(
     if !signature_valid {
         return Err("capability signature verification failed".to_string());
     }
-    if token.attenuation_proof.is_some() {
+    let now = checked_unix_timestamp(chrono::Utc::now().timestamp())?;
+    token
+        .validate_time(now)
+        .map_err(|e| format!("invalid capability token: {e}"))?;
+    if !token.delegation_chain.is_empty() || token.attenuation_proof.is_some() {
         return Err(
             "chain-binding requires a trust-root resolver on the HTTP authority path".to_string(),
         );
     }
-    token
-        .validate_time(chrono::Utc::now().timestamp() as u64)
-        .map_err(|e| format!("invalid capability token: {e}"))?;
 
     if let Some(requested_tool) = requested_tool {
         let matches = chio_kernel::capability_matches_request_with_model_metadata(
@@ -1289,6 +1295,10 @@ fn validate_capability_token(
         }
     }
     Ok(token)
+}
+
+fn checked_unix_timestamp(timestamp: i64) -> Result<u64, String> {
+    u64::try_from(timestamp).map_err(|_| "system clock is before the Unix epoch".to_string())
 }
 
 fn decision_metadata(

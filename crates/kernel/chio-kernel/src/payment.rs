@@ -677,10 +677,6 @@ impl PaymentAdapter for X402PaymentAdapter {
         true
     }
 
-    fn supports_operation_payment_mutations(&self) -> bool {
-        true
-    }
-
     fn authorize_for_operation(
         &self,
         operation_id: &str,
@@ -739,55 +735,6 @@ impl PaymentAdapter for X402PaymentAdapter {
                 )
             })
             .transpose()
-    }
-
-    fn capture_for_operation(
-        &self,
-        request: OperationPaymentCaptureRequest<'_>,
-    ) -> Result<PaymentResult, PaymentError> {
-        validate_payment_operation_binding(request.operation_id, request.request_binding_hash)?;
-        bind_operation_payment_result(
-            self.capture(
-                request.authorization_id,
-                request.amount_units,
-                request.currency,
-                request.reference,
-            )?,
-            request.operation_id,
-            request.request_binding_hash,
-        )
-    }
-
-    fn release_for_operation(
-        &self,
-        operation_id: &str,
-        request_binding_hash: &str,
-        authorization_id: &str,
-        reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        validate_payment_operation_binding(operation_id, request_binding_hash)?;
-        bind_operation_payment_result(
-            self.release(authorization_id, reference)?,
-            operation_id,
-            request_binding_hash,
-        )
-    }
-
-    fn refund_for_operation(
-        &self,
-        request: OperationPaymentRefundRequest<'_>,
-    ) -> Result<PaymentResult, PaymentError> {
-        validate_payment_operation_binding(request.operation_id, request.request_binding_hash)?;
-        bind_operation_payment_result(
-            self.refund(
-                request.transaction_id,
-                request.amount_units,
-                request.currency,
-                request.reference,
-            )?,
-            request.operation_id,
-            request.request_binding_hash,
-        )
     }
 
     fn settlement_state_for_operation(
@@ -925,10 +872,6 @@ impl PaymentAdapter for AcpPaymentAdapter {
         true
     }
 
-    fn supports_operation_payment_mutations(&self) -> bool {
-        true
-    }
-
     fn authorize_for_operation(
         &self,
         operation_id: &str,
@@ -987,55 +930,6 @@ impl PaymentAdapter for AcpPaymentAdapter {
                 )
             })
             .transpose()
-    }
-
-    fn capture_for_operation(
-        &self,
-        request: OperationPaymentCaptureRequest<'_>,
-    ) -> Result<PaymentResult, PaymentError> {
-        validate_payment_operation_binding(request.operation_id, request.request_binding_hash)?;
-        bind_operation_payment_result(
-            self.capture(
-                request.authorization_id,
-                request.amount_units,
-                request.currency,
-                request.reference,
-            )?,
-            request.operation_id,
-            request.request_binding_hash,
-        )
-    }
-
-    fn release_for_operation(
-        &self,
-        operation_id: &str,
-        request_binding_hash: &str,
-        authorization_id: &str,
-        reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        validate_payment_operation_binding(operation_id, request_binding_hash)?;
-        bind_operation_payment_result(
-            self.release(authorization_id, reference)?,
-            operation_id,
-            request_binding_hash,
-        )
-    }
-
-    fn refund_for_operation(
-        &self,
-        request: OperationPaymentRefundRequest<'_>,
-    ) -> Result<PaymentResult, PaymentError> {
-        validate_payment_operation_binding(request.operation_id, request.request_binding_hash)?;
-        bind_operation_payment_result(
-            self.refund(
-                request.transaction_id,
-                request.amount_units,
-                request.currency,
-                request.reference,
-            )?,
-            request.operation_id,
-            request.request_binding_hash,
-        )
     }
 
     fn settlement_state_for_operation(
@@ -1567,7 +1461,7 @@ mod tests {
         // a hold discovered through this query.
         let x402 = X402PaymentAdapter::new("http://127.0.0.1:1");
         assert!(x402.supports_operation_authorization_recovery());
-        assert!(x402.supports_operation_payment_mutations());
+        assert!(!x402.supports_operation_payment_mutations());
         match x402
             .settlement_state("req-x", Some("auth-x"))
             .expect("prepaid settlement state answers")
@@ -1588,6 +1482,8 @@ mod tests {
 
         let acp = AcpPaymentAdapter::new("http://127.0.0.1:1");
         assert_eq!(acp.rail_id(), "acp");
+        assert!(acp.supports_operation_authorization_recovery());
+        assert!(!acp.supports_operation_payment_mutations());
         match acp
             .settlement_state("req-a", Some("auth-a"))
             .expect("acp settlement state answers")

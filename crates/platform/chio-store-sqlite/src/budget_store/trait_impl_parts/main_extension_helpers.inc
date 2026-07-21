@@ -178,7 +178,7 @@ fn journal_now_unix_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn insert_payment_journal_tx(
+pub(super) fn insert_payment_journal_tx(
     transaction: &rusqlite::Transaction<'_>,
     entry: &chio_kernel::payment::PaymentJournalRecord,
     allow_idempotent_retry: bool,
@@ -231,6 +231,7 @@ fn insert_payment_journal_tx(
     )?;
     if changed == 0 {
         if allow_idempotent_retry {
+            #[allow(clippy::type_complexity)]
             let existing: Option<(
                 Option<String>,
                 Option<String>,
@@ -323,7 +324,7 @@ fn request_binding_hash_for_entry(
         .map(BudgetAdmissionOperationBinding::request_binding_hash)
 }
 
-fn validate_payment_journal_authorization_binding(
+pub(super) fn validate_payment_journal_authorization_binding(
     journal: Option<&chio_kernel::payment::PaymentJournalRecord>,
     admission_operation: Option<&BudgetAdmissionOperationBinding>,
     authority: Option<&BudgetEventAuthority>,

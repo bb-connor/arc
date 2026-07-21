@@ -302,14 +302,8 @@ mod receipt_operator_tests {
     use chio_kernel::ReceiptStore;
 
     fn unique_temp_path(name: &str, suffix: &str) -> std::path::PathBuf {
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
-        std::env::temp_dir().join(format!(
-            "chio-{name}-{}-{stamp}.{suffix}",
-            std::process::id()
-        ))
+        chio_test_support::private_fs::unique_sqlite_path(&format!("chio-{name}"))
+            .with_extension(suffix)
     }
 
     fn operator_sample_receipt() -> Result<chio_core::receipt::body::ChioReceipt, chio_core::Error>
@@ -555,8 +549,10 @@ mod receipt_operator_tests {
             accepted_total: 10,
             committed_total: 9,
             failed_total: 1,
+            timeout_total: 4,
             saturated_total: 2,
             inflight: 3,
+            timed_out_inflight: 1,
             queue_depth: 2,
             last_commit_unix_ms: Some(1234),
             first_accept_unix_ms: Some(1000),
@@ -581,7 +577,9 @@ mod receipt_operator_tests {
         assert!(health_output.contains("checkpoint_seq: 2"));
         assert!(health_output.contains("uncheckpointed_range: 9..=12"));
         assert!(health_output.contains("writer_accepted_total: 10"));
+        assert!(health_output.contains("writer_timeout_total: 4"));
         assert!(health_output.contains("writer_saturated_total: 2"));
+        assert!(health_output.contains("writer_timed_out_inflight: 1"));
         assert!(health_output.contains("db_size_bytes: 4096"));
         assert!(health_output.contains("checkpoint_error: projection drift"));
         assert!(health_output.contains("writer_last_error: writer lag"));

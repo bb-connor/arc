@@ -24,18 +24,17 @@ fn reap_orphaned_holds_is_reachable_through_budget_store_trait() {
     let store = SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap();
 
     let decision = store
-        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-            capability_id: "cap-reap-trait".to_string(),
-            grant_index: 0,
-            max_invocations: Some(5),
-            requested_exposure_units: 100,
-            max_cost_per_invocation: Some(100),
-            max_total_cost_units: Some(500),
-            hold_id: Some("hold-orphan-trait".to_string()),
-            event_id: Some("hold-orphan-trait:authorize".to_string()),
-            authority: None,
-            payment_journal: None,
-        })
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+            "cap-reap-trait".to_string(),
+            0,
+            Some(5),
+            100,
+            Some(100),
+            Some(500),
+            Some("hold-orphan-trait".to_string()),
+            Some("hold-orphan-trait:authorize".to_string()),
+            None,
+        ))
         .unwrap();
     assert!(matches!(
         decision,
@@ -68,18 +67,17 @@ fn open_hold_stays_reserved_without_reap() {
         Arc::new(SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap());
 
     let decision = store
-        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-            capability_id: "cap-noreap".to_string(),
-            grant_index: 0,
-            max_invocations: Some(5),
-            requested_exposure_units: 100,
-            max_cost_per_invocation: Some(100),
-            max_total_cost_units: Some(500),
-            hold_id: Some("hold-noreap".to_string()),
-            event_id: Some("hold-noreap:authorize".to_string()),
-            authority: None,
-            payment_journal: None,
-        })
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+            "cap-noreap".to_string(),
+            0,
+            Some(5),
+            100,
+            Some(100),
+            Some(500),
+            Some("hold-noreap".to_string()),
+            Some("hold-noreap:authorize".to_string()),
+            None,
+        ))
         .unwrap();
     assert!(matches!(
         decision,
@@ -93,6 +91,413 @@ fn open_hold_stays_reserved_without_reap() {
         100,
         "open hold must remain reserved when startup does not call reap_orphaned_holds"
     );
+}
+
+#[test]
+fn unstamped_caller_reservation_recovery_is_exact_atomic_and_restart_durable() {
+    use chio_kernel::budget_store::{
+        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetHoldDispositionView,
+        BudgetMutationKind, BudgetStore, ReservedHoldEnvelope,
+        CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
+        CALLER_NO_PAYMENT_RESERVATION_RECOVERY_EVENT_SUFFIX,
+    };
+
+    let path = unique_db_path("caller-reservation-crash-recovery");
+    let request_id = "retry-after-caller-reservation-crash";
+    let marked_hold = format!("budget-hold:{request_id}:cap-marked:0");
+    let ordinary_hold = "budget-hold:ordinary-request:cap-ordinary:0";
+    let stamped_hold = "budget-hold:stamped-request:cap-stamped:0";
+    let composite_hold = "budget-hold:composite-request:leaf:0";
+    let caller_event = |hold_id: &str| {
+        format!("{hold_id}{CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX}")
+    };
+    let legacy_request = |capability_id: &str,
+                          hold_id: &str,
+                          event_id: String,
+                          authority: &BudgetEventAuthority| {
+        BudgetAuthorizeHoldRequest::legacy(
+            capability_id.to_string(),
+            0,
+            Some(1),
+            100,
+            Some(100),
+            Some(100),
+            Some(hold_id.to_string()),
+            Some(event_id),
+            Some(authority.clone()),
+        )
+    };
+    let budget_authority = authority("budget-primary", "lease-recovery", 17);
+
+    {
+        let store = SqliteBudgetStore::open(&path).expect("open initial budget store");
+        for request in [
+            legacy_request(
+                "cap-marked",
+                &marked_hold,
+                caller_event(&marked_hold),
+                &budget_authority,
+            ),
+            legacy_request(
+                "cap-ordinary",
+                ordinary_hold,
+                format!("{ordinary_hold}:authorize"),
+                &budget_authority,
+            ),
+            legacy_request(
+                "cap-stamped",
+                stamped_hold,
+                caller_event(stamped_hold),
+                &budget_authority,
+            ),
+        ] {
+            assert!(matches!(
+                store.authorize_budget_hold(request).expect("authorize hold"),
+                BudgetAuthorizeHoldDecision::Authorized(_)
+            ));
+        }
+        store
+            .mark_hold_reserved(
+                stamped_hold,
+                9_000,
+                "USD",
+                None,
+                &ReservedHoldEnvelope::default(),
+            )
+            .expect("stamp caller reservation");
+
+        let mut composite = composite_authorize_input(
+            composite_hold,
+            &caller_event(composite_hold),
+            2,
+        );
+        composite.authority = Some(budget_authority.clone());
+        assert!(matches!(
+            store
+                .authorize_composite_hold(composite)
+                .expect("authorize composite hold"),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+
+        let marked_usage = store
+            .get_usage("cap-marked", 0)
+            .expect("read marked usage")
+            .expect("marked usage exists");
+        assert_eq!(marked_usage.invocation_count, 1);
+        assert_eq!(marked_usage.total_cost_exposed, 100);
+        assert_eq!(
+            store
+                .request_id_has_reserved_hold(request_id)
+                .expect("probe request id before recovery"),
+            Some(true)
+        );
+    }
+
+    {
+        let store = SqliteBudgetStore::open(&path).expect("reopen budget store");
+        assert_eq!(
+            store
+                .recover_unstamped_caller_reservations()
+                .expect("recover interrupted caller reservation"),
+            1
+        );
+        assert_eq!(
+            store
+                .recover_unstamped_caller_reservations()
+                .expect("repeat recovery"),
+            0,
+            "recovery must be idempotent"
+        );
+
+        let marked_usage = store
+            .get_usage("cap-marked", 0)
+            .expect("read recovered usage")
+            .expect("recovered usage exists");
+        assert_eq!(marked_usage.invocation_count, 0);
+        assert_eq!(marked_usage.total_cost_exposed, 0);
+        assert_eq!(marked_usage.total_cost_realized_spend, 0);
+        let marked = store
+            .get_budget_hold(&marked_hold)
+            .expect("read recovered hold")
+            .expect("recovered hold exists");
+        assert_eq!(marked.disposition, BudgetHoldDispositionView::Reversed);
+        assert_eq!(marked.remaining_exposure_units, 0);
+
+        let recovery_event_prefix =
+            format!("{marked_hold}{CALLER_NO_PAYMENT_RESERVATION_RECOVERY_EVENT_SUFFIX}");
+        let recovery_event = store
+            .list_mutation_events(32, Some("cap-marked"), Some(0))
+            .expect("read recovery events")
+            .into_iter()
+            .find(|event| event.event_id.starts_with(&recovery_event_prefix))
+            .expect("recovery event exists");
+        assert_eq!(recovery_event.kind, BudgetMutationKind::ReverseExposure);
+        assert_eq!(recovery_event.authority.as_ref(), Some(&budget_authority));
+        assert_eq!(recovery_event.usage_seq, Some(recovery_event.event_seq));
+        assert_eq!(recovery_event.invocation_count_after, 0);
+        assert_eq!(recovery_event.total_cost_exposed_after, 0);
+        assert_eq!(
+            store
+                .request_id_has_reserved_hold(request_id)
+                .expect("probe recovered request id"),
+            Some(false),
+            "the exact recovered request id must become retryable"
+        );
+
+        let ordinary = store
+            .get_budget_hold(ordinary_hold)
+            .expect("read ordinary hold")
+            .expect("ordinary hold exists");
+        assert_eq!(ordinary.disposition, BudgetHoldDispositionView::Open);
+        assert_eq!(ordinary.reserved_until, None);
+        assert_eq!(ordinary.remaining_exposure_units, 100);
+        let ordinary_usage = store
+            .get_usage("cap-ordinary", 0)
+            .expect("read ordinary usage")
+            .expect("ordinary usage exists");
+        assert_eq!(ordinary_usage.invocation_count, 1);
+        assert_eq!(ordinary_usage.total_cost_exposed, 100);
+
+        let stamped = store
+            .get_budget_hold(stamped_hold)
+            .expect("read stamped hold")
+            .expect("stamped hold exists");
+        assert_eq!(stamped.disposition, BudgetHoldDispositionView::Open);
+        assert_eq!(stamped.reserved_until, Some(9_000));
+        assert_eq!(stamped.remaining_exposure_units, 100);
+        let stamped_usage = store
+            .get_usage("cap-stamped", 0)
+            .expect("read stamped usage")
+            .expect("stamped usage exists");
+        assert_eq!(stamped_usage.invocation_count, 1);
+        assert_eq!(stamped_usage.total_cost_exposed, 100);
+
+        let composite = store
+            .get_budget_hold(composite_hold)
+            .expect("read composite hold")
+            .expect("composite hold exists");
+        assert_eq!(composite.disposition, BudgetHoldDispositionView::Open);
+        assert_eq!(composite.reserved_until, None);
+        assert_eq!(composite.remaining_exposure_units, 100);
+        let composite_binding = composite_admission_binding(composite_hold);
+        let persisted_composite_binding: (Option<String>, Option<String>) = store
+            .connection()
+            .expect("open composite ownership query")
+            .query_row(
+                "SELECT operation_id, request_binding_hash \
+                 FROM budget_authorization_holds WHERE hold_id = ?1",
+                params![composite_hold],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("read composite ownership");
+        assert_eq!(
+            persisted_composite_binding,
+            (
+                Some(composite_binding.operation_id().to_string()),
+                Some(composite_binding.request_binding_hash().to_string()),
+            )
+        );
+
+        assert!(matches!(
+            store
+                .authorize_budget_hold(legacy_request(
+                    "cap-marked",
+                    &marked_hold,
+                    caller_event(&marked_hold),
+                    &budget_authority,
+                ))
+                .expect("reauthorize exact recovered request"),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+        let retried_usage = store
+            .get_usage("cap-marked", 0)
+            .expect("read retried usage")
+            .expect("retried usage exists");
+        assert_eq!(retried_usage.invocation_count, 1);
+        assert_eq!(retried_usage.total_cost_exposed, 100);
+        let retried = store
+            .get_budget_hold(&marked_hold)
+            .expect("read retried hold")
+            .expect("retried hold exists");
+        assert_eq!(retried.disposition, BudgetHoldDispositionView::Open);
+        assert_eq!(retried.remaining_exposure_units, 100);
+        assert_eq!(
+            store
+                .request_id_has_reserved_hold(request_id)
+                .expect("probe request id after reauthorization"),
+            Some(true),
+            "a live reauthorization after recovery must make the request id taken again"
+        );
+        store
+            .mark_hold_reserved(
+                &marked_hold,
+                12_000,
+                "USD",
+                None,
+                &ReservedHoldEnvelope::default(),
+            )
+            .expect("stamp reauthorized caller reservation");
+        assert_eq!(
+            store
+                .get_budget_hold(&marked_hold)
+                .expect("read stamped retry")
+                .expect("stamped retry exists")
+                .reserved_until,
+            Some(12_000)
+        );
+        assert_eq!(
+            store
+                .recover_unstamped_caller_reservations()
+                .expect("recovery after retry stamp"),
+            0,
+            "a stamped retry must not be recovered"
+        );
+    }
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn unstamped_invocation_only_caller_reservation_recovers_its_atomic_zero_exposure_hold() {
+    use chio_kernel::budget_store::{
+        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetHoldDispositionView,
+        BudgetStore, CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
+    };
+
+    let path = unique_db_path("invocation-only-caller-reservation-crash-recovery");
+    let capability_id = "cap-invocation-only-reservation";
+    let hold_id = "budget-hold:invocation-only-crash:cap-invocation-only-reservation:0";
+    let authority = authority("budget-primary", "lease-invocation-only", 23);
+    let request = || {
+        BudgetAuthorizeHoldRequest::legacy(
+            capability_id.to_string(),
+            0,
+            Some(1),
+            0,
+            None,
+            None,
+            Some(hold_id.to_string()),
+            Some(format!(
+                "{hold_id}{CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX}"
+            )),
+            Some(authority.clone()),
+        )
+    };
+
+    {
+        let store = SqliteBudgetStore::open(&path).expect("open initial budget store");
+        assert!(matches!(
+            store
+                .authorize_budget_hold(request())
+                .expect("authorize invocation-only hold"),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+        let usage = store
+            .get_usage(capability_id, 0)
+            .expect("read invocation-only usage")
+            .expect("invocation-only usage exists");
+        assert_eq!(usage.invocation_count, 1);
+        assert_eq!(usage.total_cost_exposed, 0);
+    }
+
+    {
+        let store = SqliteBudgetStore::open(&path).expect("reopen budget store");
+        assert_eq!(
+            store
+                .recover_unstamped_caller_reservations()
+                .expect("recover invocation-only reservation"),
+            1
+        );
+        let usage = store
+            .get_usage(capability_id, 0)
+            .expect("read recovered invocation-only usage")
+            .expect("recovered invocation-only usage exists");
+        assert_eq!(usage.invocation_count, 0);
+        assert_eq!(usage.total_cost_exposed, 0);
+        let hold = store
+            .get_budget_hold(hold_id)
+            .expect("read recovered invocation-only hold")
+            .expect("recovered invocation-only hold exists");
+        assert_eq!(hold.disposition, BudgetHoldDispositionView::Reversed);
+        assert_eq!(hold.remaining_exposure_units, 0);
+        assert_eq!(
+            store
+                .recover_unstamped_caller_reservations()
+                .expect("repeat invocation-only recovery"),
+            0
+        );
+    }
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn atomic_invocation_only_caller_reservation_stamps_existing_hold_without_money_fields() {
+    use chio_kernel::budget_store::{
+        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetStore,
+        ReservedHoldEnvelope, CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
+    };
+
+    let path = unique_db_path("atomic-invocation-only-reservation-stamp");
+    let capability_id = "cap-atomic-invocation-stamp";
+    let hold_id = "budget-hold:atomic-invocation-stamp:cap-atomic-invocation-stamp:0";
+    let store = SqliteBudgetStore::open(&path).expect("open budget store");
+    assert!(matches!(
+        store
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+                capability_id.to_string(),
+                0,
+                Some(2),
+                0,
+                None,
+                None,
+                Some(hold_id.to_string()),
+                Some(format!(
+                    "{hold_id}{CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX}"
+                )),
+                Some(authority("budget-primary", "lease-invocation-stamp", 29)),
+            ))
+            .expect("authorize invocation-only hold"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    let envelope = ReservedHoldEnvelope {
+        budget_total: None,
+        delegation_depth: 2,
+        root_budget_holder: "root-invocation-stamp".to_string(),
+    };
+    store
+        .mark_invocation_hold_reserved(hold_id, capability_id, 0, 17_000, &envelope)
+        .expect("stamp atomic invocation-only hold");
+    store
+        .mark_invocation_hold_reserved(hold_id, capability_id, 0, 17_000, &envelope)
+        .expect("retry exact invocation-only stamp");
+
+    let snapshot = store
+        .get_budget_hold(hold_id)
+        .expect("read stamped invocation-only hold")
+        .expect("stamped invocation-only hold exists");
+    assert_eq!(snapshot.authorized_exposure_units, 0);
+    assert_eq!(snapshot.remaining_exposure_units, 0);
+    assert_eq!(snapshot.reserved_until, Some(17_000));
+    assert_eq!(snapshot.reserved_currency, None);
+    assert_eq!(snapshot.reserved_payment_reference, None);
+    assert_eq!(snapshot.reserved_budget_total, None);
+    assert_eq!(snapshot.reserved_delegation_depth, Some(2));
+    assert_eq!(
+        snapshot.reserved_root_budget_holder.as_deref(),
+        Some("root-invocation-stamp")
+    );
+    assert_eq!(
+        store
+            .recover_unstamped_caller_reservations()
+            .expect("stamped hold is not crash-recovered"),
+        0
+    );
+    assert!(store
+        .mark_invocation_hold_reserved(hold_id, capability_id, 0, 17_001, &envelope)
+        .is_err());
+
+    let _ = std::fs::remove_file(path);
 }
 
 #[test]
@@ -561,6 +966,7 @@ fn authorize_budget_hold_writes_journal_atomically() {
 
     let path = unique_db_path("hold-journal-atomic");
     let store = SqliteBudgetStore::open(&path).expect("open");
+    assert!(store.supports_durable_atomic_payment_journal());
     let journal = PaymentJournalRecord {
         request_id: "req-H".to_string(),
         capability_id: "cap".to_string(),
@@ -580,19 +986,20 @@ fn authorize_budget_hold_writes_journal_atomically() {
         created_at_unix_ms: 2_000,
         tenant_id: None,
     };
+    let mut authorize_request = BudgetAuthorizeHoldRequest::legacy(
+        "cap".to_string(),
+        0,
+        Some(10),
+        50,
+        Some(50),
+        Some(500),
+        Some("hold-req-H".to_string()),
+        Some("hold-req-H:authorize".to_string()),
+        None,
+    );
+    authorize_request.payment_journal = Some(journal);
     store
-        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-            capability_id: "cap".to_string(),
-            grant_index: 0,
-            max_invocations: Some(10),
-            requested_exposure_units: 50,
-            max_cost_per_invocation: Some(50),
-            max_total_cost_units: Some(500),
-            hold_id: Some("hold-req-H".to_string()),
-            event_id: Some("hold-req-H:authorize".to_string()),
-            authority: None,
-            payment_journal: Some(journal),
-        })
+        .authorize_budget_hold(authorize_request)
         .expect("authorize hold with journal");
     let rows = store
         .list_incomplete_payment_journal(u64::MAX)
@@ -608,19 +1015,20 @@ fn authorize_budget_hold_writes_journal_atomically() {
         amount_units: 10_000,
         ..rows[0].clone()
     };
+    let mut denied_request = BudgetAuthorizeHoldRequest::legacy(
+        "cap".to_string(),
+        0,
+        Some(10),
+        10_000,
+        Some(50),
+        Some(500),
+        Some("hold-req-D".to_string()),
+        Some("hold-req-D:authorize".to_string()),
+        None,
+    );
+    denied_request.payment_journal = Some(denied_journal);
     let decision = store
-        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-            capability_id: "cap".to_string(),
-            grant_index: 0,
-            max_invocations: Some(10),
-            requested_exposure_units: 10_000,
-            max_cost_per_invocation: Some(50),
-            max_total_cost_units: Some(500),
-            hold_id: Some("hold-req-D".to_string()),
-            event_id: Some("hold-req-D:authorize".to_string()),
-            authority: None,
-            payment_journal: Some(denied_journal),
-        })
+        .authorize_budget_hold(denied_request)
         .expect("denied authorize still returns a decision");
     assert!(matches!(
         decision,
@@ -637,23 +1045,25 @@ fn authorize_budget_hold_writes_journal_atomically() {
 
 #[test]
 fn expire_open_hold_releases_exposure_without_recording_spend() {
-    use chio_kernel::budget_store::{BudgetAuthorizeHoldRequest, BudgetMutationKind, BudgetStore};
+    use chio_kernel::budget_store::{
+        BudgetAuthorizeHoldRequest, BudgetInvocationReservationState, BudgetMonetaryHoldState,
+        BudgetMutationKind, BudgetStore,
+    };
 
     let path = unique_db_path("hold-sweep");
     let store = SqliteBudgetStore::open(&path).expect("open");
     store
-        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-            capability_id: "cap".to_string(),
-            grant_index: 0,
-            max_invocations: Some(10),
-            requested_exposure_units: 70,
-            max_cost_per_invocation: Some(70),
-            max_total_cost_units: Some(500),
-            hold_id: Some("hold-sweep-1".to_string()),
-            event_id: Some("hold-sweep-1:authorize".to_string()),
-            authority: None,
-            payment_journal: None,
-        })
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+            "cap".to_string(),
+            0,
+            Some(10),
+            70,
+            Some(70),
+            Some(500),
+            Some("hold-sweep-1".to_string()),
+            Some("hold-sweep-1:authorize".to_string()),
+            None,
+        ))
         .expect("authorize hold");
 
     let exposed_before = store
@@ -689,9 +1099,15 @@ fn expire_open_hold_releases_exposure_without_recording_spend() {
     let events = store
         .list_mutation_events(10, Some("cap"), Some(0))
         .expect("events");
-    assert!(events
+    let expire = events
         .iter()
-        .any(|event| event.kind == BudgetMutationKind::ExpireHold));
+        .find(|event| event.kind == BudgetMutationKind::ExpireHold)
+        .expect("expire mutation event");
+    assert_eq!(
+        expire.invocation_state,
+        BudgetInvocationReservationState::Absent
+    );
+    assert_eq!(expire.monetary_state, BudgetMonetaryHoldState::Released);
     assert_eq!(store.open_hold_count().expect("count after"), 0);
 
     let _ = std::fs::remove_file(&path);
@@ -705,17 +1121,18 @@ fn expire_open_hold_returns_the_invocation_slot() {
 
     let path = unique_db_path("hold-sweep-invocation");
     let store = SqliteBudgetStore::open(&path).expect("open");
-    let authorize = |hold: &str| BudgetAuthorizeHoldRequest {
-        capability_id: "cap".to_string(),
-        grant_index: 0,
-        max_invocations: Some(1),
-        requested_exposure_units: 70,
-        max_cost_per_invocation: Some(70),
-        max_total_cost_units: Some(500),
-        hold_id: Some(hold.to_string()),
-        event_id: Some(format!("{hold}:authorize")),
-        authority: None,
-        payment_journal: None,
+    let authorize = |hold: &str| {
+        BudgetAuthorizeHoldRequest::legacy(
+            "cap".to_string(),
+            0,
+            Some(1),
+            70,
+            Some(70),
+            Some(500),
+            Some(hold.to_string()),
+            Some(format!("{hold}:authorize")),
+            None,
+        )
     };
 
     assert!(matches!(

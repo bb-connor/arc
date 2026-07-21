@@ -579,12 +579,6 @@ pub struct KeyringAuthoritySigningBackend {
 }
 
 impl KeyringAuthoritySigningBackend {
-    pub fn new(_router: Arc<KeyringSigningRouter>) -> Result<Self> {
-        Err(KeyringError::StateInvariant(
-            "authority signing requires validated independent key-log services",
-        ))
-    }
-
     pub fn new_enterprise(
         router: Arc<KeyringSigningRouter>,
         independent_services: Arc<IndependentKeyLogServices>,

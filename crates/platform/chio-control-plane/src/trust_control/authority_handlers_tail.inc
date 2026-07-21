@@ -491,13 +491,9 @@ mod tests {
     use chio_test_support::prelude::*;
 
     fn unique_test_directory() -> PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
+        chio_test_support::private_fs::private_tempdir("chio-signed-capability-issuance-")
             .test_unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!("chio-signed-capability-issuance-{nonce}"));
-        std::fs::create_dir_all(&path).test_unwrap();
-        path
+            .keep()
     }
 
     fn test_state(

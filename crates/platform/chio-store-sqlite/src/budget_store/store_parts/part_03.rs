@@ -188,6 +188,13 @@ impl SqliteBudgetStore {
                   AND lease_id IS ?8
                   AND lease_epoch IS ?9
                   AND usage_seq = event_seq
+                  AND event_seq > (
+                      SELECT authorization.event_seq
+                      FROM budget_mutation_events AS authorization
+                      WHERE authorization.event_id = ?10
+                        AND authorization.kind = ?11
+                        AND authorization.allowed = 1
+                  )
                 LIMIT 1
                 "#,
                 params![
@@ -200,6 +207,8 @@ impl SqliteBudgetStore {
                     authority.map(|value| value.authority_id.as_str()),
                     authority.map(|value| value.lease_id.as_str()),
                     lease_epoch,
+                    event_id,
+                    BudgetMutationKind::AuthorizeExposure.as_str(),
                 ],
                 |_| Ok(()),
             )

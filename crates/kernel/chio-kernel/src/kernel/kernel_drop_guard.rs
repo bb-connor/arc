@@ -4,31 +4,14 @@ use tracing::warn;
 
 use crate::{
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationState, CapabilityToken,
-    ChildRequestReceipt, PaymentAuthorization, SecurityDispatchOutcomeHandle, ToolCallRequest,
+    ChildRequestReceipt, KernelError, PaymentAuthorization, SecurityDispatchOutcomeHandle,
+    ToolCallRequest,
 };
 
 use super::{
     current_unix_timestamp, merge_metadata_objects, scope_pre_invocation_guard_evidence,
     ChioKernel, PreExecutionBudgetMutation,
 };
-
-/// Builds a pending-reversal marker for a budget hold that could not be
-/// reversed on the spot. The returned value is recorded under the `budget_authority`
-/// key in receipt metadata as a durable audit breadcrumb of the failed on-the-spot
-/// reverse; the reaper locates open holds by scanning `disposition='open'` in the
-/// budget store, not by keying off this marker.
-///
-/// The `terminal.disposition` field is nested consistently with every other
-/// terminal disposition in this codebase ("reversed", "reconciled").
-pub(crate) fn pending_reversal_marker(hold_id: &str, reason: &str) -> serde_json::Value {
-    serde_json::json!({
-        "hold_id": hold_id,
-        "terminal": {
-            "disposition": "pending_reversal",
-            "reason": reason,
-        }
-    })
-}
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
 const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
@@ -205,7 +188,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
         let cleanup = self.kernel.release_post_dispatch_monetary_invocation(
             self.request,
             self.cap,
-            self.budget_mutation.charge_result(),
+            self.budget_mutation,
             self.payment_authorization,
             self.threshold_operation.is_some(),
         );
@@ -301,6 +284,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
         if matches!(
             self.budget_mutation,
             PreExecutionBudgetMutation::Invocation { .. }
+                | PreExecutionBudgetMutation::InvocationReservation(_)
         ) {
             if let Err(error) = self
                 .kernel
@@ -576,18 +560,5 @@ impl Drop for PostAdmissionDropGuard<'_> {
             );
         }
         drop(terminal_receipt_scope);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pending_reversal_marker_nests_disposition_under_terminal() {
-        let marker = pending_reversal_marker("budget-hold:req-x:cap-x:0", "store unavailable");
-        assert_eq!(marker["terminal"]["disposition"], "pending_reversal");
-        assert_eq!(marker["hold_id"], "budget-hold:req-x:cap-x:0");
-        assert_eq!(marker["terminal"]["reason"], "store unavailable");
     }
 }

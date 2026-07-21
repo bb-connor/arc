@@ -38,8 +38,9 @@ fn receipt_commit_actor_loop(
         // drain below, so both decrement exactly once per command.
         health.note_channel_dequeue();
         match command {
-            ReceiptCommitCommand::Append(request) => {
+            ReceiptCommitCommand::Append { request, inflight } => {
                 let mut requests = vec![*request];
+                let mut inflight_leases = vec![inflight];
                 let mut flushes = Vec::new();
                 let mut deferred: Option<ReceiptCommitCommand> = None;
                 while requests.len() < RECEIPT_GROUP_COMMIT_MAX_BATCH {
@@ -48,9 +49,12 @@ fn receipt_commit_actor_loop(
                         health.note_channel_dequeue();
                     }
                     match next {
-                        Ok(ReceiptCommitCommand::Append(request)) => requests.push(*request),
-                        Ok(ReceiptCommitCommand::Flush(response)) => {
-                            flushes.push(response);
+                        Ok(ReceiptCommitCommand::Append { request, inflight }) => {
+                            requests.push(*request);
+                            inflight_leases.push(inflight);
+                        }
+                        Ok(ReceiptCommitCommand::Flush { response, inflight }) => {
+                            flushes.push((response, inflight));
                             break;
                         }
                         Ok(other) => {
@@ -76,6 +80,21 @@ fn receipt_commit_actor_loop(
                     .iter()
                     .map(|request| request.response.clone())
                     .collect();
+                // An active signer can make the post-commit checkpoint catch-up
+                // synchronously occupy the sole writer after every append
+                // response has been delivered. Reserve actor activity BEFORE the
+                // batch releases its command leases, so there is no health window
+                // with `inflight == 0` while a stalled checkpoint build still owns
+                // the writer. This lease is actor work, not another accepted
+                // receipt, and is released after the catch-up attempt.
+                let checkpoint_activity = if checkpoint_signer
+                    .as_ref()
+                    .is_some_and(|signer| signer.max_batch > 0)
+                {
+                    Some(WriterInflightLease::acquire(&health).0)
+                } else {
+                    None
+                };
                 // The co-drained Flush waiters are NOT passed into
                 // `commit_receipt_batch`; they are released below, AFTER the
                 // checkpoint build, so a flush is a genuine checkpoint
@@ -90,6 +109,7 @@ fn receipt_commit_actor_loop(
                             &mut head_state,
                             incremental_verification,
                             requests,
+                            inflight_leases,
                             &health,
                         )
                     })) {
@@ -141,34 +161,53 @@ fn receipt_commit_actor_loop(
                         }
                     }
                 }
+                drop(checkpoint_activity);
                 // Release the co-drained Flush waiters now that owed checkpoints
                 // are built (the checkpoint barrier). An append error or a
                 // checkpoint-build failure reaches them as an Err; otherwise Ok.
-                for response in flushes {
+                for (response, inflight) in flushes {
                     let result = match &flush_barrier_error {
                         Some(error) => Err(receipt_store_error_snapshot(error)),
                         None => Ok(()),
                     };
+                    if result.is_ok() {
+                        health.note_maintenance_success();
+                    }
+                    inflight.release();
                     let _ = response.send(result);
                 }
                 if let Some(command) = deferred {
-                    handle_non_append_command(
-                        &pool,
-                        &mut head_state,
-                        incremental_verification,
-                        &health,
-                        &mut checkpoint_signer,
-                        &mut pending_flush_error,
-                        command,
-                    );
+                    match command {
+                        ReceiptCommitCommand::Shutdown { response } => {
+                            let _ = response.send(());
+                            return;
+                        }
+                        other => handle_non_append_command(
+                            &pool,
+                            &mut head_state,
+                            incremental_verification,
+                            &health,
+                            &mut checkpoint_signer,
+                            &mut pending_flush_error,
+                            other,
+                        ),
+                    }
                 }
             }
-            ReceiptCommitCommand::Flush(response) => {
+            ReceiptCommitCommand::Flush { response, inflight } => {
                 let result = match &pending_flush_error {
                     Some(error) => Err(receipt_store_error_snapshot(error)),
                     None => Ok(()),
                 };
+                if result.is_ok() {
+                    health.note_maintenance_success();
+                }
+                inflight.release();
                 let _ = response.send(result);
+            }
+            ReceiptCommitCommand::Shutdown { response } => {
+                let _ = response.send(());
+                return;
             }
             other => handle_non_append_command(
                 &pool,
@@ -225,7 +264,7 @@ fn handle_non_append_command(
     pool: &Pool<ReceiptConnectionManager>,
     head_state: &mut WriterHeadState,
     incremental_verification: bool,
-    health: &ReceiptCommitWriterHealth,
+    health: &Arc<ReceiptCommitWriterHealth>,
     checkpoint_signer: &mut Option<BackgroundCheckpointSigner>,
     pending_flush_error: &mut Option<ReceiptStoreError>,
     command: ReceiptCommitCommand,
@@ -234,25 +273,23 @@ fn handle_non_append_command(
         ReceiptCommitCommand::Write {
             job,
             appends_receipts,
+            inflight: inflight_lease,
         } => {
             // Hold the writer `inflight` count for the DURATION of this Write
             // job rather than releasing it immediately on dequeue, so a health
             // poll during a slow or stuck liability/checkpoint write reports
             // `inflight > 0`. The pre-send increment in
-            // `WriterHandle::run_write_kind` is adopted by this RAII guard.
+            // `WriterHandle::run_write_kind` is owned by this command lease.
             //
-            // The guard is released (`drop`) IMMEDIATELY BEFORE each
-            // `respond(...)` on every exit path, so a caller that observes its
-            // own response never sees itself still counted inflight. This
-            // mirrors the Append path, which decrements in `commit_receipt_batch`
-            // BEFORE fanning out its responses. The decrement stays deferred
-            // until each respond, so inflight remains up through the job body and
-            // the head resync (the response itself is deferred until then). The
-            // guard's Drop still backstops any exit that panics before a respond
-            // runs; `atomic_saturating_sub` keeps a rare overlap with the
-            // caller's recv-Err compensation (actor-thread death) from
-            // underflowing.
-            let inflight_guard = WriterInflightGuard::new(&health.inflight);
+            // `finish_write_response` first publishes the resync-adjusted
+            // committed/failed outcome and command-specific health state, then
+            // releases the lease, then delivers the prepared response. A caller
+            // that observes its response therefore sees terminal accounting and
+            // never sees itself still counted inflight. The lease stays live
+            // through the job body and head resync, while Drop backstops any
+            // panic before finalization. The caller's paired release handle
+            // shares the same exact-once state, so channel loss cannot consume
+            // another command's count.
             let mut connection = match pool.get() {
                 Ok(connection) => connection,
                 Err(error) => {
@@ -260,18 +297,14 @@ fn handle_non_append_command(
                     // gate on: send the pool error now (`Ok(())` = nothing to
                     // override). Count the failed outcome.
                     let respond = job(Err(ReceiptStoreError::Pool(error.to_string())));
-                    // Decrement before the response reaches the caller.
-                    drop(inflight_guard);
-                    record_write_job_outcome(health, respond(Ok(())));
+                    finish_write_response(health, inflight_lease, respond, Ok(()), || {});
                     return;
                 }
             };
             match head_state {
                 WriterHeadState::Poisoned(message) => {
                     let respond = job(Err(poisoned_head_error(message)));
-                    // Decrement before the response reaches the caller.
-                    drop(inflight_guard);
-                    record_write_job_outcome(health, respond(Ok(())));
+                    finish_write_response(health, inflight_lease, respond, Ok(()), || {});
                 }
                 WriterHeadState::Verified(head) => {
                     // Pre-check (fail-closed): same predecessor check the
@@ -310,9 +343,7 @@ fn handle_non_append_command(
                     if let Err(error) = pre_check {
                         publish_writer_head_poison(health, head_state, &error);
                         let respond = job(Err(error));
-                        // Decrement before the response reaches the caller.
-                        drop(inflight_guard);
-                        record_write_job_outcome(health, respond(Ok(())));
+                        finish_write_response(health, inflight_lease, respond, Ok(()), || {});
                         return;
                     }
                     // Capture the head's checkpoint position BEFORE the job
@@ -332,32 +363,46 @@ fn handle_non_append_command(
                     // cross-check cannot false-Conflict.
                     match resync_head_after_write(&connection, head) {
                         Ok(()) => {
-                            // Reconcile committed/failed for this writer-routed
-                            // job using the responder's resync-adjusted outcome
-                            // signal. Decrement before the response reaches the
-                            // caller; the post-response catch-up build below
-                            // reads no inflight state.
-                            drop(inflight_guard);
-                            record_write_job_outcome(health, respond(Ok(())));
-                            health.store_head_snapshot(head);
-                            // Clear a stale checkpoint error after a manual
-                            // recovery: a writer-routed
-                            // op such as `create_next_receipt_checkpoint` can
-                            // build/adopt the missing checkpoint inside the job,
-                            // advancing the head's checkpoint seq during the resync
-                            // above. `build_due_checkpoints_and_record` below then
-                            // finds nothing due (`Ok(false)`) and would leave a
-                            // prior background-build `last_error` in place, so
-                            // `receipt_store_health` keeps reporting the store
-                            // unhealthy after the repair. Clear it here when the
-                            // checkpoint chain actually advanced (clear only on
-                            // an actual advance, never on an idle refresh); a
-                            // real later build failure re-sets it below.
-                            if head.checkpoint_seq() > pre_checkpoint_seq {
-                                if let Ok(mut last_error) = health.last_error.lock() {
-                                    *last_error = None;
+                            // If a signer is active, checkpoint catch-up remains
+                            // synchronous after this Write response. Reserve an
+                            // actor-activity lease before finalization releases
+                            // the command lease, so a stalled builder cannot make
+                            // the sole writer appear idle to pre-dispatch health.
+                            let checkpoint_activity = if (incremental_verification
+                                || appends_receipts)
+                                && checkpoint_signer
+                                    .as_ref()
+                                    .is_some_and(|signer| signer.max_batch > 0)
+                            {
+                                Some(WriterInflightLease::acquire(health).0)
+                            } else {
+                                None
+                            };
+                            // Publish counters, the resynced head snapshot, and
+                            // any recovery error clear before releasing the lease
+                            // and delivering the caller response. The post-response
+                            // catch-up build below reads no inflight state.
+                            finish_write_response(
+                                health,
+                                inflight_lease,
+                                respond,
+                                Ok(()),
+                                || {
+                                    health.store_head_snapshot(head);
+                                    // Clear a stale checkpoint error after a
+                                    // manual recovery. A writer-routed op such as
+                                    // `create_next_receipt_checkpoint` can advance
+                                    // the checkpoint during resync while the due
+                                    // builder below finds no remaining work. Clear
+                                    // only on a real advance; a later build failure
+                                    // records a fresh error.
+                                    if head.checkpoint_seq() > pre_checkpoint_seq {
+                                        if let Ok(mut last_error) = health.last_error.lock() {
+                                            *last_error = None;
+                                        }
+                                    }
                                 }
-                            }
+                            );
                             // Writer-routed appends (child receipts, consuming
                             // auth) can cross the threshold too; no
                             // pending_flush_error guard here since a Write job is
@@ -388,39 +433,47 @@ fn handle_non_append_command(
                                     health,
                                 );
                             }
+                            drop(checkpoint_activity);
                         }
                         Err(error) => {
                             // Surface the resync failure to the caller: a write
                             // that returned `Ok` from its closure must NOT report
-                            // success when the head is now poisoned. Count the
-                            // failed outcome. Decrement before the response
-                            // reaches the caller.
+                            // success when the head is now poisoned. Publish the
+                            // poison and failed outcome before releasing the
+                            // lease and delivering the response.
                             publish_writer_head_poison(health, head_state, &error);
-                            drop(inflight_guard);
-                            record_write_job_outcome(health, respond(Err(error)));
+                            finish_write_response(
+                                health,
+                                inflight_lease,
+                                respond,
+                                Err(error),
+                                || {},
+                            );
                         }
                     }
                 }
             }
         }
-        ReceiptCommitCommand::Rotate { config, response } => {
-            // Unconditional decrement pairs with the pre-send increment in
-            // `SqliteReceiptStore::dispatch_rotate` (mirrors the Write arm's
-            // dequeue decrement above). It runs before every early return
-            // below, so no dequeue path (poisoned head, pool-acquire error,
-            // the panic-guarded rotation, success, or error) can leak the
-            // in-flight rotation writer.
-            atomic_saturating_sub(&health.inflight, 1);
+        ReceiptCommitCommand::Rotate {
+            config,
+            response,
+            inflight: inflight_lease,
+        } => {
+            // Adopt the pre-send increment for the full rotation. Releasing on
+            // dequeue would let a slow archive copy or locked delete disappear
+            // from writer health while it still owns the single writer.
             // Fail-closed: rotation deletes evidence, so it must never run on a
             // store whose chain integrity is unverified. Refuse on a poisoned
             // head (mirrors the Write arm) and point at the repair path.
             if let WriterHeadState::Poisoned(message) = head_state {
+                inflight_lease.release();
                 let _ = response.send(Err(poisoned_head_error(message)));
                 return;
             }
             let mut connection = match pool.get() {
                 Ok(connection) => connection,
                 Err(error) => {
+                    inflight_lease.release();
                     let _ = response.send(Err(ReceiptStoreError::Pool(error.to_string())));
                     return;
                 }
@@ -444,6 +497,7 @@ fn handle_non_append_command(
                 Ok(latest) => latest,
                 Err(error) => {
                     publish_writer_head_poison(health, head_state, &error);
+                    inflight_lease.release();
                     let _ = response.send(Err(error));
                     return;
                 }
@@ -460,6 +514,7 @@ fn handle_non_append_command(
             // evidence repair needs to recover. Refuse fail-closed instead.
             if let Err(error) = validate_claim_receipt_log_entries(&connection) {
                 publish_writer_head_poison(health, head_state, &error);
+                inflight_lease.release();
                 let _ = response.send(Err(error));
                 return;
             }
@@ -522,10 +577,15 @@ fn handle_non_append_command(
                     }
                     health.store_head_snapshot(head);
                 }
+                health.note_maintenance_success();
             }
+            inflight_lease.release();
             let _ = response.send(outcome);
         }
-        ReceiptCommitCommand::InstallSigner(signer) => {
+        ReceiptCommitCommand::InstallSigner {
+            signer,
+            inflight: inflight_lease,
+        } => {
             *checkpoint_signer = Some(signer);
             // Install-time catch-up. The store can
             // open on a DB that already has >= max_batch uncheckpointed
@@ -558,12 +618,19 @@ fn handle_non_append_command(
                     build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
                 }
             }
+            health.note_maintenance_success();
+            inflight_lease.release();
         }
-        ReceiptCommitCommand::ReseedHead(response) => {
+        ReceiptCommitCommand::ReseedHead {
+            response,
+            inflight: inflight_lease,
+        } => {
             let outcome = pool
                 .get()
                 .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
                 .and_then(|connection| {
+                    #[cfg(test)]
+                    test_hooks::block_during_reseed(&connection);
                     // Reseed always runs the FULL verification. This is the
                     // `chio receipt audit --repair`
                     // recovery path: it clears a poisoned head and must establish
@@ -628,20 +695,24 @@ fn handle_non_append_command(
                     Err(error)
                 }
             };
+            if result.is_ok() {
+                health.note_maintenance_success();
+            }
+            inflight_lease.release();
             let _ = response.send(result);
         }
         ReceiptCommitCommand::RetentionRepair {
             archive_path,
             response,
+            inflight: inflight_lease,
         } => {
-            // Unconditional decrement pairs with the pre-send increment in
-            // `SqliteReceiptStore::retention_repair` (mirrors the Rotate arm's
-            // dequeue decrement above).
-            atomic_saturating_sub(&health.inflight, 1);
+            // Retain the pre-send increment through the repair and the full
+            // verified-head reseed. Both steps own the single writer and must
+            // remain visible to the liveness classifier until completion.
             // Runs regardless of `head_state` (like ReseedHead): the whole
             // point of this command is to repair a store whose head is
             // already Poisoned by the drift the repair removes, so gating it
-            // on `WriterHeadState::Verified` (the Write arm's guard) would
+            // on `WriterHeadState::Verified` (the Write arm's head check) would
             // make it unusable on exactly the store it exists to fix.
             let repair_outcome = pool
                 .get()
@@ -684,17 +755,26 @@ fn handle_non_append_command(
                 }
                 Err(error) => Err(error),
             };
+            if outcome.is_ok() {
+                health.note_maintenance_success();
+            }
+            inflight_lease.release();
             let _ = response.send(outcome);
         }
         // Append/Flush are handled by the main loop; reaching here is
         // impossible by construction but must stay fail-safe.
-        ReceiptCommitCommand::Append(request) => {
+        ReceiptCommitCommand::Append { request, inflight } => {
+            inflight.release();
             let _ = request
                 .response
                 .send(Err(receipt_actor_unavailable_error()));
         }
-        ReceiptCommitCommand::Flush(response) => {
+        ReceiptCommitCommand::Flush { response, inflight } => {
+            inflight.release();
             let _ = response.send(Err(receipt_actor_unavailable_error()));
+        }
+        ReceiptCommitCommand::Shutdown { response } => {
+            let _ = response.send(());
         }
     }
 }
@@ -807,12 +887,12 @@ fn maybe_build_checkpoint(
             .checked_add(1)
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
         // O(b) Merkle build; predecessor digest comes from the cached head.
-        let checkpoint = chio_kernel::build_checkpoint_with_previous(
+        let checkpoint = chio_kernel::build_checkpoint_with_backend(
             checkpoint_seq,
             start_seq,
             end_seq,
             &receipt_bytes,
-            &signer.keypair,
+            signer.backend.as_ref(),
             head.latest_checkpoint.as_ref(),
         )
         .map_err(checkpoint_error_to_receipt_store)?;
@@ -826,6 +906,8 @@ fn maybe_build_checkpoint(
                 "injected test checkpoint build failure".to_string(),
             ));
         }
+        #[cfg(test)]
+        test_hooks::block_during_checkpoint_build(signer.max_batch);
         ensure_checkpoint_transparency_guards(connection)?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         // The insert returns the checkpoint now persisted at this seq: either
@@ -875,6 +957,7 @@ fn commit_receipt_batch(
     head_state: &mut WriterHeadState,
     incremental_verification: bool,
     requests: Vec<ReceiptCommitRequest>,
+    inflight_leases: Vec<WriterInflightLease>,
     health: &ReceiptCommitWriterHealth,
 ) -> Option<ReceiptStoreError> {
     let batch_outcome = match head_state {
@@ -924,7 +1007,13 @@ fn commit_receipt_batch(
     if failed > 0 {
         health.failed_total.fetch_add(failed, Ordering::SeqCst);
     }
-    atomic_saturating_sub(&health.inflight, results.len() as u64);
+    // Preserve the group-commit barrier: every command in the durable batch is
+    // released before any one caller can observe its response. Per-command
+    // release handles make each decrement exact-once without changing the batch-wide
+    // decrement-then-fan-out ordering.
+    for inflight in inflight_leases {
+        inflight.release();
+    }
     if let Ok(mut last_error) = health.last_error.lock() {
         *last_error = flush_error.as_ref().map(ToString::to_string);
     }
@@ -967,9 +1056,9 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
 ///   last commit and the start of the current backlog, so a writer that wedges
 ///   before its first commit is caught, while a writer resuming after an idle
 ///   period (an old last commit but freshly enqueued work) is measured from that
-///   fresh work rather than judged wedged the instant it accepts. A timed-out
-///   append leaves `inflight` elevated without advancing `failed_total` past
-///   `accepted_total`, which is exactly the `inflight` signal this reads.
+///   fresh work rather than judged wedged the instant it accepts. A bounded wait
+///   that times out marks its still-live command in `timed_out_inflight`, which
+///   reports Wedged immediately without claiming terminal failure.
 /// - `Saturated`: the commit channel is full right now (`queue_depth` has
 ///   reached the channel capacity), so the next send would be rejected. This
 ///   reads `queue_depth` rather than `inflight` so a drained but still-committing
@@ -992,19 +1081,12 @@ fn classify_writer_liveness(
     {
         return Liveness::Dead;
     }
-    // A bounded receipt operation that exceeded its budget is direct evidence the
-    // writer did not drain within budget, and it leaves `inflight` elevated. That
-    // is a stronger, earlier signal than the heuristic stall clock, so a still
-    // backlogged writer that has recorded a timeout is wedged immediately rather
-    // than admitted during the window between the operation budget and the stall
-    // threshold. A later successful batch flush clears `last_error`, so this
-    // self-heals once the writer catches up.
-    if counters.inflight > 0
-        && counters
-            .last_error
-            .as_deref()
-            .is_some_and(|error| error.contains("timed out"))
-    {
+    // A bounded receipt operation that exceeded its budget is direct evidence
+    // the writer did not drain within budget. Its command-scoped timeout marker
+    // is stronger and earlier than the heuristic stall clock, so admission stops
+    // immediately. Terminal lease release removes the marker whether the late
+    // command commits or fails, avoiding a stale global error string.
+    if counters.timed_out_inflight > 0 {
         return Liveness::Wedged;
     }
     let backlogged = counters.inflight > 0

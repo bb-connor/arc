@@ -706,18 +706,17 @@ impl ChioKernel {
                 .as_ref()
                 .map(|(amount, currency)| (*amount, currency.as_str()))
                 .or_else(|| charge.map(|charge| (charge.cost_charged, charge.currency.as_str())));
-            let binding = charge.and_then(|charge| charge.admission_operation.as_ref());
+            let binding = budget_mutation.admission_operation_binding();
             let unwind = || match (authorization.settled, binding, refund) {
-                (true, Some(binding), Some((amount_units, currency))) => {
-                    adapter.refund_for_operation(OperationPaymentRefundRequest {
+                (true, Some(binding), Some((amount_units, currency))) => adapter
+                    .refund_for_operation(OperationPaymentRefundRequest {
                         operation_id: binding.operation_id(),
                         request_binding_hash: binding.request_binding_hash(),
                         transaction_id: &authorization.authorization_id,
                         amount_units,
                         currency,
                         reference: &request.request_id,
-                    })
-                }
+                    }),
                 (true, None, Some((amount_units, currency))) => adapter.refund(
                     &authorization.authorization_id,
                     amount_units,
@@ -754,13 +753,14 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
-        charge_result: Option<&BudgetChargeResult>,
+        budget_mutation: &PreExecutionBudgetMutation,
         payment_authorization: Option<&PaymentAuthorization>,
         retain_operation_owned_budget: bool,
     ) -> Result<Option<BudgetReleaseHoldDecision>, PostDispatchCleanupFailure> {
         if retain_operation_owned_budget {
             return Ok(None);
         }
+        let charge_result = budget_mutation.charge_result();
         let failure = |step: &'static str, reason: String| {
             let mut hold_ids = vec![cap.id.clone()];
             if let Some(charge) = charge_result {
@@ -799,34 +799,33 @@ impl ChioKernel {
                 .or_else(|| {
                     charge_result.map(|charge| (charge.cost_charged, charge.currency.as_str()))
                 });
-            let binding = charge_result.and_then(|charge| charge.admission_operation.as_ref());
+            let binding = budget_mutation.admission_operation_binding();
             let release_payment = || match (authorization.settled, binding, refund) {
-                    (true, Some(binding), Some((amount_units, currency))) => {
-                        adapter.refund_for_operation(OperationPaymentRefundRequest {
-                            operation_id: binding.operation_id(),
-                            request_binding_hash: binding.request_binding_hash(),
-                            transaction_id: &authorization.authorization_id,
-                            amount_units,
-                            currency,
-                            reference: &request.request_id,
-                        })
-                    }
-                    (true, None, Some((amount_units, currency))) => adapter.refund(
-                        &authorization.authorization_id,
+                (true, Some(binding), Some((amount_units, currency))) => adapter
+                    .refund_for_operation(OperationPaymentRefundRequest {
+                        operation_id: binding.operation_id(),
+                        request_binding_hash: binding.request_binding_hash(),
+                        transaction_id: &authorization.authorization_id,
                         amount_units,
                         currency,
-                        &request.request_id,
-                    ),
-                    (false, Some(binding), _) => adapter.release_for_operation(
-                        binding.operation_id(),
-                        binding.request_binding_hash(),
-                        &authorization.authorization_id,
-                        &request.request_id,
-                    ),
-                    (false, None, _) | (true, _, None) => {
-                        adapter.release(&authorization.authorization_id, &request.request_id)
-                    }
-                };
+                        reference: &request.request_id,
+                    }),
+                (true, None, Some((amount_units, currency))) => adapter.refund(
+                    &authorization.authorization_id,
+                    amount_units,
+                    currency,
+                    &request.request_id,
+                ),
+                (false, Some(binding), _) => adapter.release_for_operation(
+                    binding.operation_id(),
+                    binding.request_binding_hash(),
+                    &authorization.authorization_id,
+                    &request.request_id,
+                ),
+                (false, None, _) | (true, _, None) => {
+                    adapter.release(&authorization.authorization_id, &request.request_id)
+                }
+            };
             let release_result = release_payment();
             let release_result = if binding.is_some() {
                 release_result.or_else(|_| release_payment())
@@ -856,28 +855,19 @@ impl ChioKernel {
         match (charge, cleanup) {
             (Some(charge), Ok(Some(released))) => self.merge_budget_receipt_metadata(
                 base,
-                self.budget_execution_receipt_metadata(charge, Some(("released", released))),
+                self.budget_execution_receipt_metadata(charge, Some(("released", released)), None),
             ),
             (Some(charge), Ok(None)) => self.merge_budget_receipt_metadata(
                 base,
-                self.budget_execution_receipt_metadata(charge, None),
+                self.budget_execution_receipt_metadata(charge, None, None),
             ),
             (Some(charge), Err(failure)) => {
                 let authorized = self.merge_budget_receipt_metadata(
                     base,
-                    self.budget_execution_receipt_metadata(charge, None),
-                );
-                let pending = merge_metadata_objects(
-                    authorized,
-                    Some(serde_json::json!({
-                        "budget_authority": super::kernel_drop_guard::pending_reversal_marker(
-                            &charge.budget_hold_id,
-                            &failure.reason,
-                        )
-                    })),
+                    self.budget_execution_receipt_metadata(charge, None, None),
                 );
                 merge_metadata_objects(
-                    pending,
+                    authorized,
                     Some(serde_json::json!({
                         "chio_runtime": {
                             "post_dispatch_cleanup_failed": true,
