@@ -78,7 +78,7 @@ capability bound to the prior process cannot authorize the replacement.
   contract and fail before connection when the target is not authorized.
 - Admin routes require same-origin or localhost origin checks plus a
   constant-time bearer comparison; an unset admin token denies every request.
-- Keep changes scoped to `chio-mcp-remote` unless dependent tests prove a compatibility update is required.
+- Cross-crate coupling is confined to the public entrypoint and wire contracts above.
 
 ## Dependents
 

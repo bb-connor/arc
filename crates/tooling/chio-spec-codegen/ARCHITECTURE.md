@@ -13,6 +13,9 @@ regeneration idempotent and diff-free. Byte-for-byte reproducibility is the
 core design constraint: identical input must render identical output so the
 `--check` drift lanes in CI are meaningful.
 
+Scope boundary: this crate transforms repository-tracked specifications into
+generated files and provides no runtime policy or authorization surface.
+
 ## Module map
 
 | Path | Responsibility |

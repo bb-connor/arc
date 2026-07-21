@@ -65,9 +65,8 @@ cryptographically adjacent to the same file identity that startup validated.
 Startup rejects cluster mode on platforms that cannot provide that binding.
 
 Do not combine `--peer-url` with `--authority-seed-file` or `--authority-db`.
-Authority snapshots are observational and do not provide a shared authority
-write or selector protocol. Clustered authority custody and issuance therefore
-fail closed until such a protocol is implemented.
+Authority snapshots are observational and cannot provide shared authority
+writes or selectors. Clustered authority custody and issuance are unsupported.
 
 The member URL set must exactly equal the normalized advertised URL plus the
 normalized peer URL set. Every member key must be a unique bare Ed25519 public

@@ -35,8 +35,8 @@ offline and deterministic.
 - Exposed in code as `chio_anthropic_tools_adapter::transport::ANTHROPIC_VERSION`.
 - Recorded in `Cargo.toml` under `[package.metadata.chio]`.
 
-Bumping the pin is a deliberate PR with a fixture re-record; CI never
-auto-bumps.
+Changing the pin requires a matching recorded fixture; automated checks reject
+unrecorded revisions.
 
 ## Public API
 
@@ -182,7 +182,7 @@ cargo build -p chio-anthropic-tools-adapter --features computer-use
 cargo test -p chio-anthropic-tools-adapter --features computer-use server_tools
 ```
 
-Both invocations must succeed in CI.
+All three commands must succeed.
 
 ## House rules
 

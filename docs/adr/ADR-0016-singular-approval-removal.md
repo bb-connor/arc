@@ -3,7 +3,6 @@
 - Status: Accepted
 - Decision date: 2026-07-14
 - Decision owner: protocol and kernel security lane
-- Related plan: `docs/superpowers/plans/2026-07-09-protocol-primitives.md`
 
 ## Context
 

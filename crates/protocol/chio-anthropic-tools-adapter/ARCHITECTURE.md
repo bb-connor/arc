@@ -18,6 +18,9 @@ kernel dispatch, manifest schema validation, generic HTTP/SSE parsing, or
 fixture replay; those live in `chio-kernel`, `chio-manifest`,
 `chio-provider-adapter-core`, and `chio-provider-conformance`.
 
+Trust boundary: provider bytes remain untrusted until the caller's verdict is
+applied, and denied or malformed tool blocks release no buffered bytes.
+
 ## Module map
 
 | Path | Responsibility |
