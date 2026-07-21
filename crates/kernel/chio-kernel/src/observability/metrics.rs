@@ -1,7 +1,8 @@
 //! Prometheus text exposition for guard metrics.
 
 use chio_metrics_spec::{
-    CHIO_GUARD_DENY_TOTAL, CHIO_GUARD_EVAL_DURATION_SECONDS, CHIO_GUARD_FUEL_CONSUMED_TOTAL,
+    CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL, CHIO_GUARD_DENY_TOTAL,
+    CHIO_GUARD_EVAL_DURATION_SECONDS, CHIO_GUARD_FUEL_CONSUMED_TOTAL,
     CHIO_GUARD_HOST_CALL_DURATION_SECONDS, CHIO_GUARD_MODULE_BYTES, CHIO_GUARD_RELOAD_TOTAL,
     CHIO_GUARD_VERDICT_TOTAL, CHIO_SETTLEMENT_UNRESOLVED_TOTAL, CHIO_SIGNING_QUEUE_BLOCK_TOTAL,
     GUARD_EVAL_DURATION_BUCKETS_SECONDS, GUARD_HOST_CALL_DURATION_BUCKETS_SECONDS,
@@ -117,6 +118,13 @@ const RUNTIME_METRIC_FAMILIES: &[GuardMetricFamily] = &[
         labels: &[],
         buckets: &[],
     },
+    GuardMetricFamily {
+        name: CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL,
+        help: "Total budget or payment holds retained after an ambiguous post-dispatch outcome, labeled by whether durable reconciliation is available.",
+        kind: PrometheusMetricKind::Counter,
+        labels: &["reconciliation"],
+        buckets: &[],
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,8 +151,9 @@ pub fn guard_metrics_endpoint(path: &str) -> Option<MetricsEndpointResponse> {
 /// families. The kernel renders the guard families and the two OTEL-drop
 /// families (whose sole producers are chio-wasm-guards and the OTLP ingress,
 /// which cannot be depended on by the kernel), the signing-queue block family,
-/// the settlement unresolved family, and receipt watchdog gauges. Every sample
-/// comes from its shared runtime family rather than a fixed zero.
+/// the settlement unresolved family, the ambiguous-dispatch retained-hold
+/// family, and receipt watchdog gauges. Every sample comes from its shared
+/// runtime family rather than a fixed zero.
 #[must_use]
 pub fn render_guard_metrics_prometheus() -> String {
     let mut output = String::new();
@@ -152,6 +161,7 @@ pub fn render_guard_metrics_prometheus() -> String {
     chio_metrics_spec::runtime::render_otel_drop_families(&mut output);
     chio_metrics_spec::runtime::families::SIGNING_QUEUE_BLOCK.render(&mut output);
     chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.render(&mut output);
+    chio_metrics_spec::runtime::families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.render(&mut output);
     chio_metrics_spec::runtime::render_receipt_watchdog_gauges(&mut output);
     output
 }

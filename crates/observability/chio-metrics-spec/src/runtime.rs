@@ -359,6 +359,15 @@ pub mod families {
         counter.preregister(&[]);
         counter
     });
+    pub static AMBIGUOUS_DISPATCH_RETAINED_HOLD: LazyLock<LabeledCounter> = LazyLock::new(|| {
+        let counter = LabeledCounter::new(
+            CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL,
+            &["reconciliation"],
+        );
+        counter.preregister(&["durable"]);
+        counter.preregister(&["none"]);
+        counter
+    });
 
     // Receipt-log watchdog gauges. Producer: the serve-mode watchdog loop
     // sampling ReceiptStoreHealthReport; renderer: the kernel /metrics endpoint.
@@ -382,6 +391,8 @@ pub fn preregister_known_label_sets() {
     families::SIGNING_QUEUE_BLOCK.preregister(&["byte_budget"]);
     families::SIGNING_QUEUE_BLOCK.preregister(&["oversized"]);
     families::SETTLEMENT_UNRESOLVED.preregister(&[]);
+    families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.preregister(&["durable"]);
+    families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.preregister(&["none"]);
     families::OTEL_INGRESS_DROP.preregister(&[]);
     families::OTEL_SINK_DROP.preregister(&[]);
     // DLQ/SOC/alert-dispatch known exporters and routes are seeded by the SIEM
@@ -617,6 +628,7 @@ mod tests {
         families::FAIL_OPEN_SUSPECTED.render(&mut out);
         families::DISPATCH_FAILURE.render(&mut out);
         families::SETTLEMENT_UNRESOLVED.render(&mut out);
+        families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.render(&mut out);
         assert!(
             out.contains("chio_fail_open_suspected_total{surface=\"tower\"} 0"),
             "{out}"
@@ -634,5 +646,15 @@ mod tests {
             "a deny must not be seeded on the dispatch-failure family: {out}"
         );
         assert!(out.contains("chio_settlement_unresolved_total 0"), "{out}");
+        assert!(
+            out.contains(
+                "chio_ambiguous_dispatch_retained_hold_total{reconciliation=\"durable\"} 0"
+            ),
+            "{out}"
+        );
+        assert!(
+            out.contains("chio_ambiguous_dispatch_retained_hold_total{reconciliation=\"none\"} 0"),
+            "{out}"
+        );
     }
 }

@@ -173,6 +173,12 @@ pub(crate) fn build_mediation_kernel(
         max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
+        // A money-bearing mediated deployment should enable durable admission (the
+        // durable receipt db path wired through evaluator.rs and proxy/state.rs) so
+        // that an ambiguous post-dispatch outcome has its retained budget or payment
+        // hold reconciled by the recovery sweep. The ephemeral log has no sweep, so
+        // any hold retained on this non-durable kernel is surfaced instead by
+        // chio_ambiguous_dispatch_retained_hold_total{reconciliation="none"}.
         allow_ephemeral_receipt_log: true,
         // Revocation is enforced sidecar-side over the durable revoked set (the
         // revoked-ancestor walk below); this kernel's internal store is

@@ -1,5 +1,6 @@
 chio_alert_dispatch_latency_seconds|histogram|route,outcome|0.25,0.5,1.0,2.5,5.0,10.0|PagerDuty or OpsGenie alert dispatch latency in seconds.
 chio_alert_dispatch_total|counter|route,outcome||Total PagerDuty or OpsGenie alert dispatch outcomes.
+chio_ambiguous_dispatch_retained_hold_total|counter|reconciliation||Total budget or payment holds retained after an ambiguous post-dispatch outcome, labeled by whether durable reconciliation is available.
 chio_anchor_round_latency_seconds|histogram|witness,outcome|0.1,0.5,1.0,2.5,5.0,10.0|Anchor round latency in seconds.
 chio_capability_revocation_lag_seconds|histogram|authority|1,5,15,30,60,120,300|Capability revocation propagation lag in seconds.
 chio_dispatch_failure_total|counter|surface,outcome||Total tool-dispatch failures that did not bypass mediation.

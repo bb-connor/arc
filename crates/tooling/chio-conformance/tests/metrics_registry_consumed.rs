@@ -1385,6 +1385,9 @@ fn drive_and_render(name: &str) -> Result<Option<String>, Box<dyn Error>> {
     } else if name == chio_metrics_spec::CHIO_RECEIPT_SECONDS_SINCE_LAST_CHECKPOINT {
         families::RECEIPT_CHECKPOINT_AGE_SECONDS.set(&[], 30);
         families::RECEIPT_CHECKPOINT_AGE_SECONDS.render(&mut out);
+    } else if name == chio_metrics_spec::CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL {
+        families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.incr(&["none"]);
+        families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.render(&mut out);
     } else {
         return existing_infra_driver(name);
     }

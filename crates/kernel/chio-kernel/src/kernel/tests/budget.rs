@@ -484,6 +484,66 @@ fn monetary_allow_receipt_contains_financial_metadata() {
     assert_eq!(usage.committed_cost_units().unwrap(), 75);
 }
 
+fn ambiguous_retained_hold_none_sample() -> u64 {
+    let mut out = String::new();
+    chio_metrics_spec::runtime::families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.render(&mut out);
+    out.lines()
+        .find_map(|line| {
+            line.strip_prefix(
+                "chio_ambiguous_dispatch_retained_hold_total{reconciliation=\"none\"} ",
+            )
+        })
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(0)
+}
+
+#[test]
+fn ambiguous_incomplete_on_non_durable_monetary_kernel_records_retained_hold() {
+    // A non-durable monetary kernel charges a budget hold before dispatch, then
+    // the tool returns RequestIncomplete. The post-dispatch outcome is ambiguous,
+    // so the hold is retained with no recovery sweep to reconcile it, and the
+    // retention is surfaced with reconciliation="none".
+    let mut kernel = make_kernel(make_monetary_config());
+    assert!(kernel.durable_admission_runtime.is_none());
+    kernel.register_tool_server(Box::new(IncompleteServer {
+        id: "broken".to_string(),
+    }));
+    let agent_kp = Keypair::generate();
+    let grant = make_monetary_grant("broken", "drop_stream", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let before = ambiguous_retained_hold_none_sample();
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-ambiguous-incomplete".to_string(),
+            capability: cap,
+            tool_name: "drop_stream".to_string(),
+            server_id: "broken".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+
+    let after = ambiguous_retained_hold_none_sample();
+    assert!(
+        after > before,
+        "an ambiguous incomplete outcome on a non-durable monetary kernel must advance \
+         the reconciliation=\"none\" retained-hold series: before={before}, after={after}"
+    );
+}
+
 #[test]
 fn nested_monetary_allow_uses_reported_cost() {
     let mut kernel = make_kernel(make_monetary_config());

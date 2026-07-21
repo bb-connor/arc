@@ -1192,9 +1192,12 @@ impl ChioKernel {
                     payment_authorization.as_ref(),
                     extra_metadata.clone(),
                 );
+                let retained = metadata.is_some() || payment_authorization.is_some();
+                self.note_retained_ambiguous_hold(retained);
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
+                    retained_hold = retained,
                     "tool call cancelled"
                 );
                 return self.with_pre_invocation_guard_evidence(
@@ -1218,9 +1221,12 @@ impl ChioKernel {
                     payment_authorization.as_ref(),
                     extra_metadata.clone(),
                 );
+                let retained = metadata.is_some() || payment_authorization.is_some();
+                self.note_retained_ambiguous_hold(retained);
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
+                    retained_hold = retained,
                     "tool call deadline expired"
                 );
                 // Runtime and financial reservations remain retained because
@@ -1245,9 +1251,12 @@ impl ChioKernel {
                     payment_authorization.as_ref(),
                     extra_metadata.clone(),
                 );
+                let retained = metadata.is_some() || payment_authorization.is_some();
+                self.note_retained_ambiguous_hold(retained);
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
+                    retained_hold = retained,
                     "tool call incomplete"
                 );
                 return self.with_pre_invocation_guard_evidence(
@@ -1272,7 +1281,9 @@ impl ChioKernel {
                     payment_authorization.as_ref(),
                     extra_metadata.clone(),
                 );
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
+                let retained = deny_metadata.is_some() || payment_authorization.is_some();
+                self.note_retained_ambiguous_hold(retained);
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), retained_hold = retained, "tool server error");
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {

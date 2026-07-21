@@ -116,6 +116,8 @@ macro_rules! describe {
 
 pub const CHIO_ALERT_DISPATCH_TOTAL: &str = "chio_alert_dispatch_total";
 pub const CHIO_ALERT_DISPATCH_LATENCY_SECONDS: &str = "chio_alert_dispatch_latency_seconds";
+pub const CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL: &str =
+    "chio_ambiguous_dispatch_retained_hold_total";
 pub const CHIO_ANCHOR_ROUND_LATENCY_SECONDS: &str = "chio_anchor_round_latency_seconds";
 pub const CHIO_CAPABILITY_REVOCATION_LAG_SECONDS: &str = "chio_capability_revocation_lag_seconds";
 pub const CHIO_DISPATCH_FAILURE_TOTAL: &str = "chio_dispatch_failure_total";
@@ -222,6 +224,12 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         help = "Total PagerDuty or OpsGenie alert dispatch outcomes.",
         kind = Counter,
         labels = ["route", "outcome"]
+    ),
+    describe!(
+        name = CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL,
+        help = "Total budget or payment holds retained after an ambiguous post-dispatch outcome, labeled by whether durable reconciliation is available.",
+        kind = Counter,
+        labels = ["reconciliation"]
     ),
     describe!(
         name = CHIO_ANCHOR_ROUND_LATENCY_SECONDS,

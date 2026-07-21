@@ -1180,6 +1180,25 @@ impl ChioKernel {
         }
     }
 
+    /// Record that an ambiguous post-dispatch outcome retained a budget or
+    /// payment hold. On a durable kernel the recovery sweep reconciles the hold
+    /// later; on a non-durable kernel there is no sweep, so the hold is retained
+    /// until an operator acts. The `reconciliation` label separates the two.
+    /// Only a genuine retention is counted; a pure deny that released everything
+    /// is not.
+    pub(crate) fn note_retained_ambiguous_hold(&self, retained: bool) {
+        if !retained {
+            return;
+        }
+        let reconciliation = if self.durable_admission_runtime.is_some() {
+            "durable"
+        } else {
+            "none"
+        };
+        chio_metrics_spec::runtime::families::AMBIGUOUS_DISPATCH_RETAINED_HOLD
+            .incr(&[reconciliation]);
+    }
+
     fn cumulative_approval_request_for_grant(
         &self,
         request: &ToolCallRequest,
