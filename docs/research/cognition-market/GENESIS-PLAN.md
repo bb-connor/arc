@@ -40,14 +40,18 @@ Stated up front because it gates two of the three mines. PR #974 is UNMERGED
 (GENESIS-PROGRAM section 0), and fee collection is declarative-only today (K1).
 Therefore:
 
-- The royalty LIVE FLOW (G2) and the operator-seat fee-share LIVE FLOW (G4) are
-  gated on real fee collection, which the finding-market plan builds at M2
-  (publication fee) and M5 (dispute fee), both of which assume #974 has merged
-  and been rebased (PLAN section 0).
+- The royalty and operator-seat fee-share LIVE FLOW (both G6) are gated on the
+  D7 clearing fee (a genesis-introduced category, ADR-0018 D7, owning
+  milestone G5) and on the collection machinery the finding-market plan builds
+  at M2 (publication fee) and M5 (dispute fee), all of which assume #974 has
+  merged and been rebased (PLAN section 0). The rights themselves are DECLARED
+  earlier (royalty at G2, seats at G4) with zero flow.
 - The Genesis ARTIFACT types (procurement list, royalty right, reliability
-  epoch, operator seat) are pure and depend only on `chio-core-types`; they can
-  be built now, exactly as the finding-market M0/M1 built the finding types
-  ahead of the kernel work.
+  epoch, operator seat) are pure and depend on `chio-core-types` plus
+  `chio-finding` (for the guarantee-class vocabulary), so G1a is executable
+  once finding M1 lands; G1a makes NO registry edits (registration waits for
+  each schema's owning milestone), which also keeps it clear of the
+  registry.json freeze PLAN section 0 imposes until #974 merges.
 
 ## 1. Dependency edges into the finding-market ladder (Q7)
 
@@ -58,10 +62,10 @@ Which finding-market milestone gates which mine:
 | Findings exist to be mined | M0, M1 | no coverage without a finding artifact |
 | Floor admission (BondBacked, publication-fee spam floor) | M2 | the bond-proof admission gate and publication-fee collection are M2 |
 | Real clearings (for CCV, royalty semantics, the genesis demo) | M3, M4 | the digest gate (M3) and the wedge purchase E2E (M4) are what make a clearing happen |
-| Audit outcomes (the input to `r`) | M5 | the challenge/audit lane and dispute-fee collection are M5 |
-| Retraction interaction with royalties | M6 | a retracted finding stops accruing forward (status feed is M6) |
+| Audit outcomes (the input to `r`) AND the floor path's sampled audits | M5 | the challenge/audit lane and dispute-fee collection are M5; G2's floor path samples audits, so G2 depends on M5 too (review finding GA-R3b) |
+| Retraction interaction with royalties | M6 | a retracted finding stops accruing forward (status feed is M6); consumed by G6 |
 | Cross-org operator seats / F6 neutrality in practice | M7 | the cross-org escrow operator model is decided at M7 |
-| Buyer SDK consuming `r` and the elicitation ceiling | M8 | the buyer helpers and pool-purchasing convention are M8 |
+| Buyer SDK consuming `r` and the elicitation ceiling | M8 | informational edge: the consumer is finding-M8's own SDK work reading G3's published epochs, not a Genesis milestone |
 | Release claims for Genesis surfaces | M9 | qualification, CLAIM_REGISTRY, RC entries are M9 |
 
 ## 2. Genesis milestone ladder
@@ -74,13 +78,13 @@ Stop-loss is explicit because the exhaustion boundary is real (GENESIS-PROGRAM
 | G | Name | One-line scope | Depends on | Executable when |
 |---|---|---|---|---|
 | G0 | Program spec | this design set + ADR-0018 (Proposed) | - | now (this branch) |
-| G1a | `chio-genesis` crate types | pure artifact types + fail-closed validators for the four families; register only procurement-list + royalty-right schemas | G0, finding M1 | now |
+| G1a | `chio-genesis` crate types | pure artifact types + fail-closed validators for the four families; NO schema registration (each registers at its owning milestone) | G0, finding M1 | after finding M1 |
 | G1b | Procurement list surface | governance publish + k-anonymity demand sourcing + control-plane search; staleness/removal | G1a, finding M2 | after M2 |
-| G2 | Coverage-mining floor path | off-chain pool custody convention; floor admission gate (demanded-uncovered + mode-A burn + BondBacked + audit sample); escrowed floor; royalty-right accrual (declared, zero live flow) | G1b, finding M2, M4 | after M4 |
-| G3 | Reliability epoch (r feed) | `chio.finding.reliability-epoch.v1`; stratified reliability computation; control-plane epoch surface; cron ticking | G2, finding M5 | after M5 |
+| G2 | Coverage-mining floor path | pool custody convention; floor admission gate (venue acceptance recipe + mode-A burn + BondBacked + class rule + sampled audit); release-by-default floor escrow; royalty-right registration + accrual (declared, zero live flow) | G1b, finding M2, M4, M5 | after M5 |
+| G3 | Reliability epoch (r feed) | `chio.genesis.reliability-epoch.v1`; stratified reliability computation; control-plane epoch surface; cron ticking | G2, finding M5 | after M5 |
 | G4 | Operator seats | `chio.genesis.operator-seat.v1`; charter per-vertical cap; Sanction revocation wiring; neutrality covenant | G1a, finding M2 (declare), M7 (cross-org) | after M2; cross-org after M7 |
-| G5 | CCV + genesis demonstration | CCV methodology + control-plane report; related-party exclusion; scripted first agent-to-agent trade as a public receipt-backed event | finding M4 | after M4 |
-| G6 | Royalty live flow + qualification + permissionless turn | settle royalty-leg generalization (D5); fee-split at collection; bounded-matrix + CLAIM_REGISTRY; permissionless-profile evaluation gated on wedge telemetry | finding M5, M9; #974 | after M5/M9 + fee collection |
+| G5 | Clearing fee (D7) + CCV + genesis demonstration | D7 clearing-fee introduction (fee-schedule extension, finding-market ratification); CCV methodology + control-plane report; related-party exclusion; scripted first agent-to-agent trade as a public receipt-backed event | finding M2, M4 | after M4 |
+| G6 | Royalty live flow + qualification + permissionless turn | settle royalty-leg generalization (D5); D7 fee-split at collection; retraction-stops-accrual wiring; bounded-matrix + CLAIM_REGISTRY; permissionless-profile evaluation gated on wedge telemetry | G5, finding M5, M6, M9; #974 | after G5 + M9 |
 
 ## 3. Per-milestone definition
 
@@ -91,22 +95,25 @@ THREAT-MODEL.md section 7 additions, this plan, README reading-order update. No
 wiring. Exit: docs gate green (`scripts/check-chio-owned-v1-only.sh` clean, no em
 dashes); ADR-0018 in the ADR index.
 
-### G1a `chio-genesis` crate types (executable now)
+### G1a `chio-genesis` crate types (after finding M1)
 
 - New leaf crate `crates/economy/chio-genesis` mirroring `chio-finding` style:
   pure types + fail-closed validators, no storage, no I/O.
 - Types: `ProcurementList` + entries, `RoyaltyRight`, `ReliabilityEpoch` + rows,
-  `OperatorSeat` + `GenesisVertical` enum, all `deny_unknown_fields`, inline
-  `SignedExportEnvelope` signature shape.
-- Register ONLY `chio.genesis.procurement-list.v1` and
-  `chio.genesis.royalty-right.v1` at this milestone (their owning milestones are
-  G1b/G2); the reliability-epoch and operator-seat schemas register at G3/G4
-  respectively (the #1025 discipline: no schema ahead of its milestone).
+  `OperatorSeat` + `GenesisVertical` enum, all `deny_unknown_fields`, INLINE
+  signature per the chio-finding convention (a `signature` field over the
+  canonical body with `signature` cleared; NO `SignedExportEnvelope` wrapper,
+  ADR-0018 D1).
+- NO schema registration here (review findings GA-R9/GA-R4b: registering ahead
+  of an owning milestone is the exact #1025 M0 anti-pattern, and it would also
+  touch `registry.json` inside the pre-#974 freeze). Each schema registers at
+  its owning milestone: procurement-list at G1b, royalty-right at G2,
+  reliability-epoch at G3, operator-seat at G4.
 - Content-addressed id (`compute_*_id`) and validators mirror `chio-finding`'s
   `compute_finding_id` / `validate`.
-- Exit: workspace gate green; registered schemas accepted by
-  `validate_signed_artifact_schema`; golden fixture per registered family
-  validates against schema and struct; negative `.v999` fixtures reject.
+- Exit: workspace gate green; unit tests cover every fail-closed rejection per
+  family; unregistered draft fixtures (including `.v999` negatives) round-trip
+  and reject as specified; zero edits under `spec/schemas/`.
 
 ### G1b Procurement list surface (after finding M2)
 
@@ -123,43 +130,58 @@ dashes); ADR-0018 in the ADR index.
   seller-signed publish, admits a descriptor only after `k` distinct clusters,
   and removes a saturated descriptor; gate green.
 
-### G2 Coverage-mining floor path (after finding M4)
+### G2 Coverage-mining floor path (after finding M5)
 
 - Off-chain pool custody convention: the bonded venue operator holds the pool;
   a runbook documents the custody and the receipt-auditable outflow (no
   on-chain pool; K1/K10, GENESIS-ARCHITECTURE 4).
 - Floor custody per admitted floor rides the existing escrow terminal states
   (GENESIS-PROGRAM 4.1): depositor = pool operator, beneficiary = seller,
-  deadline = audit-window end plus cadence margin; release via the
-  operator-signed path binding the passed audit's receipt hash
-  (`releaseWithSignature`, `contracts/src/ChioEscrow.sol:199-228`); deadline
-  `refund` returns the floor to the pool otherwise. Non-EVM profile: the same
-  shape as a settle-mediated hold.
-- Floor admission gate (all five): demanded-uncovered descriptor match against
-  the G1b list; the descriptor's `required_guarantee_class` satisfied
-  (launch: `deterministic_replay` only, the determinism rule); mode-A
-  proof-of-burn (evidence receipts verify fail-closed and cost is checkable);
-  `BondBacked` slashable listing (the M2 gate); passed audit sample.
+  deadline = audit-window end plus cadence margin; floors RELEASE BY DEFAULT
+  at window end via the operator-signed path binding the admission receipt
+  hash, or early on a sampled passed audit's receipt hash
+  (`releaseWithSignature`, `contracts/src/ChioEscrow.sol:199-228`); a sampled
+  FAILING audit blocks the signature and the deadline `refund` returns the
+  floor to the pool. Non-EVM profile: the same shape as a settle-mediated
+  hold.
+- Floor admission gate (all five): descriptor match against the G1b list
+  INCLUDING the entry's pinned context and venue-authored acceptance recipe
+  (the audit executes the venue's recipe, never the seller's; GA-R4); the
+  descriptor's `required_guarantee_class` satisfied (launch:
+  `deterministic_replay` only, the determinism rule); mode-A proof-of-burn
+  (evidence receipts verify fail-closed and cost is checkable); `BondBacked`
+  slashable listing (the M2 gate); the sampled-audit window per the custody
+  bullet (the sampled audit IS an ordinary M5 challenge run by the venue,
+  which is why G2 depends on M5).
+- Contested-descriptor ordering: among concurrently admissible findings the
+  floor goes to the earlier ANCHORED COMMITMENT (anchor order as tie rule),
+  reusing MECHANISMS 3's settled ordering; one floor per descriptor per
+  coverage epoch (a stale-then-uncovered descriptor may earn a new floor).
 - Floor amount: `min(schedule(d), kappa * evidence_cost_verified)`; a mode-B
-  finding's cost caps at 0 (no floor until audited); at most one floor per
-  descriptor (K5).
-- Royalty-right accrual: mint a `chio.genesis.royalty-right.v1` at floor
-  admission (declared table, zero live flow until G6/M5); non-transferable.
-- Audit-bounty top-up bound published with the schedule:
-  `bounty_topup <= beta * bond`, `beta <= 0.5`, and never exceeding metered
-  replay cost plus a bounded premium (the GA9 self-slash-farming bound,
-  GENESIS-PROGRAM 4.2).
+  finding's cost caps at 0 (no floor until audited).
+- Royalty-right registration (its owning milestone) and accrual: mint a
+  `chio.genesis.royalty-right.v1` at EITHER admission door (floor admission,
+  or royalty-only admission for non-replayable classes); declared table, zero
+  live flow until G6; non-transferable with change-of-control lapse.
+- Audit-bounty top-up rules published with the schedule: top-ups pay ONLY the
+  venue-ASSIGNED auditor of a scheduled random audit (assignment seeded from
+  epoch-root randomness), under the JOINT bound `s + beta <= 0.8` where `s` is
+  the challenger slash share (binding for zero-harmed-party slashes), with the
+  top-up never exceeding metered replay cost plus a bounded premium (the GA9
+  self-slash-farming bounds, GENESIS-PROGRAM 4.2).
 - Exit: an integration test admits a floor only on the full gate, denies a
-  duplicate-descriptor second floor, denies a mode-B floor pre-audit, denies a
-  `metered_attested` floor at launch, escrows the floor and releases it on a
-  passing audit's receipt hash (deadline-refunding to the pool on a failing or
-  absent audit); gate green. Stop-loss: G2's exit report includes the first
-  hit-conversion, conversion-efficiency, and security-self-funding-ratio
-  readings against the 9.1 thresholds.
+  same-epoch duplicate-descriptor second floor, denies a mode-B floor, denies
+  a `metered_attested` floor at launch, mints a royalty-only right through the
+  second door, releases an UNSAMPLED floor by default at window end, releases
+  a sampled-passing floor early on the audit receipt, and deadline-refunds a
+  sampled-failing floor to the pool; a self-slash ring simulation nets
+  negative under the published `s + beta` bound; gate green. Stop-loss: G2's
+  exit report includes the first hit-conversion, conversion-efficiency, and
+  security-self-funding-ratio readings against the 9.1 thresholds.
 
 ### G3 Reliability epoch / r feed (after finding M5)
 
-- `chio.finding.reliability-epoch.v1` registered here (its owning milestone);
+- `chio.genesis.reliability-epoch.v1` registered here (its owning milestone);
   rows `{ corpus, seller, guarantee_class, r_bps, n, decayed }`.
 - Reliability computation: a stratified wrapper over `compute_reliability`
   (`chio-reputation/src/compare.rs:160`) scoped to audit receipts, per
@@ -183,8 +205,15 @@ dashes); ADR-0018 in the ADR index.
   issue, and enforces a neutrality-violation Sanction that flips the seat to
   revoked; gate green.
 
-### G5 CCV + genesis demonstration (after finding M4)
+### G5 Clearing fee (D7) + CCV + genesis demonstration (after finding M4)
 
+- D7 clearing-fee introduction (ADR-0018 D7): a small ad-valorem venue take on
+  each finding purchase, collected at reveal settlement as an ordinary
+  metered/settled charge (the M2 publication-fee machinery pattern), with
+  `operator_spread` retained and the remainder the splittable base; shipped as
+  a fee-schedule extension RATIFIED by the finding-market fee-schedule owners
+  (a cross-program dependency, not assumed). No fee, no CCV, no royalty
+  denominator.
 - CCV computation over settlement receipts: net-of-spread, dedup by
   `(finding_id, buyer_cluster)`, related-party exclusion via `root_budget_holder`
   (`chio-core-types/src/receipt/economics.rs:33`); control-plane
@@ -207,8 +236,8 @@ dashes); ADR-0018 in the ADR index.
   splits per the royalty table; forward-only.
 - Qualification: bounded-matrix entries + feature-flag removal for qualified
   surfaces; CLAIM_REGISTRY approved-claim rows plus `audited_assumption` rows for
-  the new trusted roles (subsidy-pool operator, reliability-oracle operator,
-  royalty-split operator; T5/T6/T7); ADR-0018 Proposed -> Accepted.
+  the new trusted roles (subsidy-pool operator T5, royalty-split operator T6,
+  reliability-oracle operator T7); ADR-0018 Proposed -> Accepted.
 - Permissionless turn: evaluated only here and only if wedge telemetry shows
   coverage converts (the adverse-selection residual, 9.2); the permissionless
   Sybil hardening (GA3 residual) and an on-chain pool (the deferred ADR-0015

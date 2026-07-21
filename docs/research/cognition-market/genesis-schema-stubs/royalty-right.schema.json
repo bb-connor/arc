@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio.world/schemas/chio-genesis/v1/royalty-right.schema.json",
   "title": "Chio Genesis Royalty Right (Proposed stub)",
-  "description": "PROPOSED spec-shaped stub, deliberately located in the research tree, NOT in spec/schemas/. It documents the intended shape of the make-or-break Q2 artifact (a signed, non-transferable, forward-flowing claim on a fraction of the clearing fee that future hits to a finding generate). Registration into spec/schemas/registry.json, chio-core-types, and MANIFEST.sha256 happens at milestone G1a (docs/research/cognition-market/GENESIS-PLAN.md); it is intentionally unregistered here so the canonical schema manifest is untouched by a research proposal. Design: GENESIS-ARCHITECTURE.md section 3.2, ADR-0018 D2.",
+  "description": "PROPOSED spec-shaped stub, deliberately located in the research tree, NOT in spec/schemas/. It documents the intended shape of the make-or-break Q2 artifact (a signed, non-transferable, forward-flowing claim on a fraction of the clearing fee that future hits to a finding generate). Registration into spec/schemas/registry.json, chio-core-types, and MANIFEST.sha256 happens at milestone G2 (the royalty right's owning milestone) (docs/research/cognition-market/GENESIS-PLAN.md); it is intentionally unregistered here so the canonical schema manifest is untouched by a research proposal. Design: GENESIS-ARCHITECTURE.md section 3.2, ADR-0018 D2.",
   "type": "object",
   "additionalProperties": false,
   "required": [

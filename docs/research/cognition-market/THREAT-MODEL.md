@@ -317,17 +317,23 @@ profile in parentheses where different.
   VERIFIED cost, never driven by cost (GENESIS-PROGRAM 4.1); it is paid at most
   once per demanded-uncovered descriptor (an inventory unit), never per listing
   (K5); a mode-B (projected) `evidence_cost` gates NOTHING (`kappa * 0 = 0`), so
-  unverifiable cost earns no floor; and the floor is escrowed pending an audit
-  sample. To extract a floor a "farmer" must therefore produce a real,
-  audit-passing finding on a demanded-uncovered descriptor, which is exactly the
-  coverage the program wants to buy. Residual: low; the attack degenerates into
-  honest coverage of demanded descriptors.
+  unverifiable cost earns no floor; the floor is escrowed with release by
+  default and a sampled-audit refund path; and, decisively (review finding
+  GA-R4), floor-bearing procurement entries pin a VENUE-AUTHORED acceptance
+  recipe that the audit executes, so a trivially-satisfiable seller-authored
+  predicate cannot pass its own vacuous replay, capture the floor, and lock
+  the descriptor out of subsidy. To extract a floor a "farmer" must produce a
+  finding that satisfies the venue's own acceptance predicate on a demanded
+  descriptor, which is exactly the coverage the program wants to buy.
+  Residual: low; the attack degenerates into honest coverage of demanded
+  descriptors.
 - **GA2. Wash trading to inflate CCV or farm royalties** (self-buy own
   inventory). Mitigated: CCV counts the clearing fee NET OF SPREAD, deduplicated
   by `(finding_id, buyer_cluster)`, EXCLUDING related-party clusters detected by
   shared `root_budget_holder` / `delegation_depth`
   (`chio-core-types/src/receipt/economics.rs:33`) and shared operator/funding
-  (GENESIS-PROGRAM 7); royalties are funded ONLY from real clearing fees, so a
+  (GENESIS-PROGRAM 7); royalties are funded ONLY from real D7 clearing fees
+  (the genesis-introduced per-clearing category, ADR-0018 D7), so a
   self-paid fee nets to a pure loss (the fee is burned, principal round-trips
   out) and earns no CCV credit and no net royalty. Residual: a patient adversary
   can pay real fees to fake demand at a cost equal to the fees burned; bounded by
@@ -347,11 +353,15 @@ profile in parentheses where different.
   their own inventory so the pool subsidizes it). Mitigated: the list is
   published by the venue GOVERNANCE operator and is seller-read-only (sellers
   cannot admit descriptors, GENESIS-ARCHITECTURE 3.1.2); a descriptor is admitted
-  only after at least `k_anonymity_floor` DISTINCT buyer clusters have queried it
-  (`root_budget_holder` distinctness), so manufacturing demand requires running
-  `k` distinct funded buyer clusters. Residual: a buyer-cluster ring can still
-  manufacture `k` queries; bounded by the cost of `k` funded clusters and
-  detectable by the same related-party clustering (GA2). Medium.
+  only after at least `k_anonymity_floor` DISTINCT identified consortium member
+  orgs have SIGNED demand nominations for it (the launch signal; raw search
+  telemetry gates nothing because searches are stateless, unpriced, and
+  unattributable, review finding GA-R5), so manufacturing demand requires `k`
+  distinct member identities, which consortium admission controls. Residual: a
+  ring of `k` colluding member orgs can still steer admission; bounded by
+  membership control and detectable by related-party clustering (GA2) on the
+  subsequent subsidized trades. Medium (higher under any future
+  authenticated-telemetry profile until that surface is designed).
 - **GA6. Pool-exhaustion griefing** (drive floor payouts to drain the bounded
   pool before organic demand arrives). Mitigated: floors pay only for
   demanded-uncovered coverage that passes audit, so a griefer who extracts floors
@@ -381,18 +391,26 @@ profile in parentheses where different.
   (the R&D instance), carried as the r-manipulation residual.
 - **GA9. Self-slash bounty farming** (a ring lists a fraudulent finding under
   one identity and audit-challenges it under another, farming the pool's
-  bounty top-up). Mitigated by SIZING, not detection: the ring pays the
-  listing bond (slashed to harmed parties or the community fund, never back
-  to the ring, ADR-0015 D4 posture), publication fees, and the metered burn,
-  and forfeits the escrowed floor (a failed audit returns the floor to the
-  pool, GENESIS-PROGRAM 4.1); it collects only the top-up. The program rule
-  `bounty_topup <= beta * bond` with `beta <= 0.5`, plus the top-up never
-  exceeding the auditor's metered replay cost plus a bounded premium, keeps
-  ring EV strictly negative (GENESIS-PROGRAM 4.2). The failed-challenge
-  forfeit variant (a seller fake-challenging itself) is already analyzed in
-  MECHANISMS 9 item 5 and is unchanged by the top-up. Residual: low while the
-  beta bound holds; the bound is a published program parameter, so violating
-  it is a visible governance failure, not a silent drift.
+  bounty top-up). The naive defense (a top-up cap alone) is INSUFFICIENT
+  (review finding GA-R1): the ring's challenger identity is a successful
+  challenger, so under the settled challenge economics it ALSO receives the
+  predeclared challenger slash share `s` (MECHANISMS 5), and for a
+  subsidized-but-unsold finding there are NO harmed buyers, making the
+  harmed-parties-first bound on `s` vacuous; with `s + beta > 1` the ring
+  nets positive at bond scale. Mitigated by TWO published rules
+  (GENESIS-PROGRAM 4.2): (1) top-ups pay ONLY the venue-ASSIGNED auditor
+  drawn from the randomized published schedule (epoch-root-seeded), so a
+  ring collects `beta` only by winning the assignment lottery at its share
+  of the auditor pool, and a voluntary self-selected challenger gets no
+  top-up; (2) the JOINT bound `s + beta <= 0.8`, binding specifically for
+  zero-harmed-party slashes, so even an assignment-winning ring nets
+  `(s + beta - 1) * bond - costs < 0`. The ring additionally forfeits its
+  escrowed floor (its scheme requires the failing audit that refunds the
+  floor to the pool) and its metered burn. The failed-challenge forfeit
+  variant (a seller fake-challenging itself) is already analyzed in
+  MECHANISMS 9 item 5 and is unchanged. Residual: low while both published
+  bounds hold; violating either is a visible governance failure, not silent
+  drift.
 
 ### Operator seats (Q5)
 
@@ -436,7 +454,7 @@ profile in parentheses where different.
 |---|---|---|---|
 | Exhaustion before demand: bounded pool empties before organic clearing self-sustains (Q1) | both | high | economics sizing + leading indicators (GENESIS-PROGRAM 9.1) + per-mine stop-loss gates (GENESIS-PLAN) |
 | r-manipulation on `metered_attested` findings (Q4/GA5) | R&D | high | class-stratified r + guarantee-class discount; open research (same as S2) |
-| Adverse selection on exhaust: subsidizing low-demand or negative-P_max coverage (Q6) | R&D | medium-high | procurement-list demanded-only admission; wedge-first sequencing; abandonment expected (Homestead precedent, GENESIS-PROGRAM 8.3) |
+| Adverse selection on exhaust: subsidizing low-demand or negative-P_max coverage (Q6) | R&D | medium-high | procurement-list demanded-only admission; wedge-first sequencing; abandonment expected (Homestead precedent, GENESIS-PROGRAM 8.4) |
 | Royalty operator mis-split trust (Q2/T6) | both | medium | signed table + challengeable mis-split; F6 neutrality (K3) |
 | Off-chain subsidy-pool custody trust (Q1/T5) | both | medium | bonded operator + receipt-auditable outflow; permissionless needs an on-chain fund (deferred ADR-0015 Follow-up A, K1/K10) |
 | Sybil across mines under the permissionless profile (GA3) | permissionless | medium-high | bonds + reputation only; a primary reason permissionless is deferred |

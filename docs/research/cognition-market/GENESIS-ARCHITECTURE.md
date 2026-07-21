@@ -27,7 +27,7 @@ program reuses these unchanged:
 
 | Need | Existing primitive | Path |
 |---|---|---|
-| Signed artifact envelope | `SignedExportEnvelope<T>` (canonical JSON, Ed25519) | `chio-core-types/src/receipt/lineage.rs:407` |
+| Canonical signing pair (inline-signature convention) | `Keypair::sign_canonical` / `PublicKey::verify_canonical` (the pair `SignedExportEnvelope` uses; genesis artifacts sign INLINE per the chio-finding convention, never the envelope wrapper, so registered schemas validate artifacts as-serialized) | `chio-core-types/src/receipt/lineage.rs:420-434` (pattern source) |
 | Signed numeric aggregate over receipts (the r-feed template) | `SignedPortableReputationSummary` (`effective_score: f64`, `window`) | `chio-credentials/src/portable_reputation.rs:224` |
 | Time-decayed reliability rate over integrity-gated receipts | `compute_reliability` / `ReliabilityMetrics` | `chio-reputation/src/compare.rs:160`, `src/model.rs:250` |
 | Signed governance charter with an operator allowlist | `SignedGenericGovernanceCharter`, `allowed_listing_operator_ids` | `chio-governance/src/generic.rs:181`; `chio-open-market/src/fee_schedule.rs:32` |
@@ -55,11 +55,17 @@ PROTOCOL.md section). All register at their OWNING milestone, never ahead of it
 (the #1025 M0 lesson: schemas ahead of their milestone are speculative public
 surface).
 
-| Schema | Kind | Owning milestone |
+All four sign INLINE (the chio-finding convention: a `signature` field over
+the canonical body with `signature` cleared, verified against the embedded
+authority key; NO `SignedExportEnvelope` wrapper, because the registered
+schema must validate the artifact exactly as serialized, the same reason the
+M0/M1 plan rejects the envelope for registered families).
+
+| Schema | Kind | Owning milestone (registration happens HERE, never earlier) |
 |---|---|---|
-| `chio.genesis.procurement-list.v1` | signed demanded-descriptor list | G1 |
+| `chio.genesis.procurement-list.v1` | signed demanded-descriptor list | G1b |
 | `chio.genesis.royalty-right.v1` | signed forward-flow fee-split entry | G2 |
-| `chio.finding.reliability-epoch.v1` | signed r statistic over audits | G3 |
+| `chio.genesis.reliability-epoch.v1` | signed r statistic over audits | G3 |
 | `chio.genesis.operator-seat.v1` | signed capped non-transferable seat | G4 |
 
 ### 3.1 `chio.genesis.procurement-list.v1` (Q3)
@@ -75,7 +81,7 @@ reported, `chio-listing/src/discovery.rs:68`).
 | `list_id` | string | content-addressed over the body with id/signature cleared |
 | `governing_operator_id` | string | the venue governance operator that admits descriptors (NOT sellers, to defuse Goodhart, Q6) |
 | `epoch` | u64 | monotone; each republish is a new epoch |
-| `entries` | array | demanded descriptors, each `{ topic, context_sha256?, demand_bucket, coverage_state, required_guarantee_class, floor_schedule_ref, admitted_at, stale_after }` |
+| `entries` | array | demanded descriptors, each `{ topic, context_sha256?, demand_bucket, coverage_state, required_guarantee_class, acceptance_recipe_sha256?, floor_schedule_ref, admitted_at, stale_after }`; FLOOR-BEARING entries MUST pin both `context_sha256` and a VENUE-authored `acceptance_recipe_sha256` (the audit executes the venue's recipe, not the seller's; GENESIS-PROGRAM 4.1, review finding GA-R4) |
 | `k_anonymity_floor` | u32 | minimum distinct buyer clusters that must have queried a descriptor before it is listed (privacy gate; see 3.1.1) |
 | `issued_at` / `expires_at` | u64 | validity window |
 | `signature` | inline sig | over canonical body, verifiable against the governance charter signer |
@@ -91,15 +97,27 @@ a pinned-deterministic recipe requirement until the M9 replication rules for
 stochastic recipes exist).
 
 **3.1.1 Sourcing demand without leaking buyer intent (net-new, Q3).** There is
-no telemetry store and no query-privacy layer. The design:
+no telemetry store and no query-privacy layer, and raw listing-search traffic
+CANNOT be the launch demand signal (review finding GA-R5: the search surface is
+stateless and public, queries produce no receipts, and `root_budget_holder`
+exists only on receipt financial metadata, so search-based "k distinct
+clusters" would be free to forge with k anonymous queries and the entire pool
+allocation would key off an unpriced signal). The design, launch profile
+first:
 
-- The venue governance operator, which already mediates queries (it runs the
-  listing search surface, `chio-control-plane` `/v1/public/registry/listings/search`),
-  aggregates query counts per descriptor across buyers. A descriptor is admitted
-  to the list only after at least `k_anonymity_floor` DISTINCT buyer clusters
-  (by `root_budget_holder`, `chio-core-types/src/receipt/economics.rs:33`) have
-  queried it. Below `k`, the descriptor is not listed, so no single buyer's
-  intent is exposed.
+- LAUNCH (consortium): demand admission evidence is a SIGNED MEMBER DEMAND
+  NOMINATION: an identified consortium member org signs a nomination naming
+  the descriptor, optionally referencing evidence (a CI-failure receipt or a
+  metered local re-derivation attempt). A descriptor is admitted only after at
+  least `k_anonymity_floor` DISTINCT member orgs have nominated it. Sybil
+  resistance is consortium identity itself (the GA3 launch posture), the
+  signal is attributable and auditable, and its implicit price is membership.
+- LATER (authenticated-telemetry profile): once queries become authenticated,
+  receipt-producing actions (an undesigned surface with its own X1/X2
+  leakage-ledger obligations, flagged, not assumed), the same `k` rule can run
+  over query telemetry with clusters keyed by `root_budget_holder`
+  (`chio-core-types/src/receipt/economics.rs:33`). Until that surface exists,
+  search telemetry gates nothing.
 - The list publishes coarse `demand_bucket`s, never raw counts or per-buyer
   data. This is the leakage-ledger discipline (THREAT-MODEL X1/X2) applied to
   demand: the descriptor topic is already a deliberate leak in the finding
@@ -113,7 +131,7 @@ no telemetry store and no query-privacy layer. The design:
 
 **3.1.2 Governance, capture, staleness (Q3).** Descriptors are admitted by the
 venue governance operator, never by sellers: a seller that could add descriptors
-would manufacture demand for its own inventory (Goodhart; THREAT-MODEL G4). The
+would manufacture demand for its own inventory (Goodhart; THREAT-MODEL GA4). The
 list is seller-read-only. Staleness: each entry has `stale_after`; entries decay
 out on the half-life idiom, and `saturated` entries are removed so the pool stops
 subsidizing solved descriptors. Removal is a new epoch (monotone), so the removal
@@ -127,7 +145,8 @@ Proposed spec-shaped JSON schema stub for this artifact (deliberately located in
 the research tree, unregistered, so the canonical schema manifest is untouched by
 a research proposal) lives at
 [genesis-schema-stubs/royalty-right.schema.json](genesis-schema-stubs/royalty-right.schema.json),
-with a `.v999` negative fixture beside it; registration happens at G1a.
+with a `.v999` negative fixture beside it; registration happens at G2 (the
+family's owning milestone).
 
 | Field | Type | Semantics |
 |---|---|---|
@@ -135,33 +154,38 @@ with a `.v999` negative fixture beside it; registration happens at G1a.
 | `right_id` | string | content-addressed |
 | `finding_id` | string | the finding whose hits generate the fee this right shares |
 | `beneficiary` | pubkey | the genesis seller/auditor key; NON-transferable (bound here) |
-| `share_bps` | u32 | basis points of the clearing fee (net of operator spread) this right receives |
+| `share_bps` | u32 | basis points of the D7 clearing fee (net of operator spread) this right receives; jointly capped with seat shares by the published carve-out cap (GENESIS-PROGRAM 4.2) |
 | `step_down_schedule` | `[u32; N]` | published bps steps keyed by elapsed genesis time (the `TIER_DISCOUNT_PER_HUNDRED` idiom) |
 | `granted_by` | string | the governance charter that granted it (the split authority) |
+| `issued_at` | u64 | grant time (schedule steps key off elapsed time from here) |
 | `expires_at` | u64 | genesis clock `T_g`; after which the share is 0 |
 | `signature` | inline sig | over canonical body, verifiable against `granted_by` charter signer |
 
 **Enforcement (Q2, honest limits in GENESIS-PROGRAM 5).** The right is a CLAIM,
-not a transfer. It is realized only at fee-collection time, which does not exist
-until M2/M5 build collection (K1). When it exists:
+not a transfer. Its denominator is the D7 clearing fee, a genesis-INTRODUCED
+category absent from the settled fee taxonomy (GENESIS-PROGRAM 5; ADR-0018
+D7): it is realized only once D7 lands (G5) on the M2/M5 collection machinery
+(K1). When it exists:
 
 - the operator collecting a clearing fee on a hit to `finding_id` computes
   `leg = fee_net_of_spread * effective_share_bps(now) / 10_000` and pays it to
   `beneficiary` as an ordinary single-beneficiary release
   (`chio-settle/src/evm/prepare.rs:1027`), OR batches accrued legs over an epoch
   through the exact-sum distribution shape generalized beyond impair
-  (`bond_distribution_hash`, `src/evm/prepare.rs:971`; the generalization is an
-  M-gated settle extension, GENESIS-PLAN G2);
+  (`bond_distribution_hash`, `src/evm/prepare.rs:971`; the generalization is a
+  G6-gated settle extension, GENESIS-PLAN);
 - forward-only (K2): the fee split is a new fee on a new hit; it never claws back
   settled seller revenue;
 - non-transferable by construction (the beneficiary is bound in the artifact and
-  there is no transfer operation); this is the anti-token guarantee
-  (GENESIS-PROGRAM 5);
+  there is no transfer operation), with a CHANGE-OF-CONTROL LAPSE: validity is
+  conditioned on continuity of control of the beneficiary org, and change of
+  control lapses the right unless the charter re-grants it (GENESIS-PROGRAM 5;
+  review finding GA-R6); this is the anti-token guarantee;
 - a mis-split is challengeable: the right and the fee receipt are both signed, so
   an operator that applies the wrong share produces evidence-invalid settlement
   (the challenge lane, ARCHITECTURE 4.3).
 
-### 3.3 `chio.finding.reliability-epoch.v1` (the r feed, Q4)
+### 3.3 `chio.genesis.reliability-epoch.v1` (the r feed, Q4)
 
 The signed `r` statistic buyer pricing consumes. NEW, but a re-key of the
 `SignedPortableReputationSummary` PATTERN rather than a novel construct; NOT a
@@ -170,7 +194,7 @@ per-key value, `chio-revocation-oracle/src/sparse_merkle.rs:89-97`).
 
 | Field | Type | Semantics |
 |---|---|---|
-| `schema` | string | `chio.finding.reliability-epoch.v1` |
+| `schema` | string | `chio.genesis.reliability-epoch.v1` (genesis namespace: the program owns its introduction and its schema root; a `chio.finding.*` successor can be ratified if the finding-market owners adopt it post-genesis, review finding GA-R13) |
 | `epoch_id` | string | content-addressed |
 | `feed_operator_id` | string | the reliability-oracle operator (a genesis vertical, Q5) |
 | `epoch` | u64 | monotone |
@@ -178,7 +202,7 @@ per-key value, `chio-revocation-oracle/src/sparse_merkle.rs:89-97`).
 | `rows` | array | each `{ corpus, seller, guarantee_class, r_bps, n, decayed }` |
 | `signed_root` | ref | optional anchoring ref through the existing anchor lanes (K9) |
 | `issued_at` | u64 | |
-| `signature` | inline sig | `SignedExportEnvelope` shape |
+| `signature` | inline sig | chio-finding convention (section 3 preamble); the `SignedPortableReputationSummary` precedent this artifact follows is its WINDOWED-AGGREGATE shape, not its envelope |
 
 `r_bps` is the time-decayed audit success rate for the `(corpus, seller,
 guarantee_class)` triple, computed exactly as `compute_reliability`
@@ -209,7 +233,7 @@ roles / capped-slot primitive exists (the `RosterPolicy` is unsigned config,
 | `operator_id` | string | the seated operator; NON-transferable (bound here) |
 | `fee_share_bps` | u32 | basis points of the vertical's clearing fee (realized only once collection exists, K1) |
 | `neutrality_covenant_ref` | string | the F6 neutrality obligation this seat accepts (K3) |
-| `revocation_rule_ref` | string | predeclared decision rule that fires seat revocation on violation |
+| `revocation_rule_ref` | string | predeclared decision rule that fires seat revocation on violation; change-of-control LAPSE is a named trigger beside it (continuity-of-control condition, GENESIS-PROGRAM 4.3) |
 | `granted_by` | string | the governance charter that granted it (also carries the per-vertical cap) |
 | `expires_at` | u64 | genesis clock |
 | `signature` | inline sig | verifiable against `granted_by` |
@@ -238,13 +262,15 @@ that K7 forbids. The pool is therefore:
 - paid out per admitted floor through the EXISTING escrow terminal states, no
   new custody primitive (GENESIS-PROGRAM 4.1): each admitted floor is an escrow
   with depositor = pool operator, beneficiary = seller, deadline = audit-window
-  end plus cadence margin; a passed audit's receipt hash is bound into the
+  end plus cadence margin; floors RELEASE BY DEFAULT at window end via the
   operator-signed release digest (`releaseWithSignature`,
-  `contracts/src/ChioEscrow.sol:199-228`, consumed single-use) and the seller
-  releases; a failed or absent audit means the deadline `refund`
-  (`ChioEscrow.sol:268`) returns the floor to the pool. In the non-EVM
-  consortium profile the same contract SHAPE runs as a settle-mediated hold;
-  the mapping, not the chain, is the design;
+  `contracts/src/ChioEscrow.sol:199-228`, consumed single-use) binding the
+  admission receipt hash, or early on a sampled passed audit's receipt hash; a
+  sampled FAILING audit means no signature and the deadline `refund`
+  (`ChioEscrow.sol:268`) returns the floor to the pool (GENESIS-PROGRAM 4.1,
+  review finding GA-R2). In the non-EVM consortium profile the same contract
+  SHAPE runs as a settle-mediated hold; the mapping, not the chain, is the
+  design;
 - disciplined by the ADMISSION GATE (descriptor match, mode-A burn, audit
   sample), not by an on-chain recipient allowlist (which does not exist, K1/K10
   gap);
@@ -253,7 +279,7 @@ that K7 forbids. The pool is therefore:
   9.1) are computable.
 
 This is an honest limit (the pool trusts the operator), recorded in GENESIS-
-PROGRAM 9.4 and THREAT-MODEL (G-series). It is the same trust posture the wider
+PROGRAM 9.4 and THREAT-MODEL (GA-series). It is the same trust posture the wider
 program already accepts for the venue operator (T1/T3).
 
 ## 5. CCV is a computed metric, not a wire artifact (Q8)
@@ -262,10 +288,13 @@ CCV (GENESIS-PROGRAM 7) is computed over settlement receipts, not stored as a
 signed good:
 
 ```
-CCV = sum over arm's-length clearings of (clearing fee net of operator spread),
-      dedup by (finding_id, buyer_cluster),
+CCV = sum over arm's-length clearings of (D7 clearing fee net of operator
+      spread), dedup by (finding_id, buyer_cluster),
       exclude related-party clusters (shared root_budget_holder / operator).
 ```
+
+The D7 clearing fee is genesis-introduced (GENESIS-PROGRAM 5; ADR-0018 D7) and
+lands at the SAME milestone as this methodology (G5): no fee, no CCV.
 
 It reuses `root_budget_holder` / `delegation_depth`
 (`chio-core-types/src/receipt/economics.rs:33`) for related-party detection (the
@@ -299,8 +328,27 @@ const, route, handler), all ship-dark behind a cargo feature until qualified
   (governance) and enumeration.
 - `GET /v1/genesis/ccv` - the computed CCV report (methodology-pinned).
 
+- `POST /v1/genesis/demand-nominations` - signed member demand nominations
+  (the launch demand signal, 3.1.1), restricted to identified consortium
+  member keys.
+
 Epoch ticking for the reliability feed and procurement-list republish run on
 operator cron (K9; `AnchorAutomationJob` idiom), not a daemon.
+
+**What operating a genesis vertical actually entails (Q5, on today's
+surfaces).** A seat is an obligation set, not a title; per vertical, against
+the shipped deployment surfaces:
+
+| Vertical | Standing duties on today's surfaces | Key facts |
+|---|---|---|
+| Mediating kernel | run the kernel as the neutral reveal mediator (F6); publish checkpoint cadence and keep escrow deadlines derivable from it; maintain the operator settlement key in the identity registry | one control-plane deployment = one operator identity (server-side from config, `chio-control-plane/src/trust_control/report_validation.rs:403`); `EscrowTerms.operator` names it (`IChioEscrow.sol:7`) |
+| Registry | host listing publish/search and the finding index; enforce namespace-owner signatures; run `BondBacked` admission | three-step surface pattern (ARCHITECTURE 8.1); `chio-listing/src/util.rs:27`; `trust_activation.rs` seam |
+| Status oracle | run the finding-status oracle instance; tick epochs and anchor roots on cron; honor freshness windows | no job daemon exists (K9); `AnchorAutomationJob` descriptors + operator cron (`chio-anchor/src/automation.rs:37`) |
+| Reliability oracle | schedule the published-rate random audits (assignment seeded from epoch randomness); compute and sign reliability epochs; publish `n` and class strata; step audit rates down on evidence | GENESIS-PROGRAM 4.2; the stratified `compute_reliability` wrapper (section 8 crate map) |
+
+All four inherit: cron-driven cadence (K9), a posted operator bond, the F6
+neutrality covenant, receipt-visible operations (every duty leaves signed
+artifacts), and the seat's revocation and change-of-control rules (3.4).
 
 CLI: a `chio genesis` family (`procurement`, `royalty`, `reliability`, `seat`,
 `ccv`) following the documented clap pattern (ARCHITECTURE 8.3).
@@ -311,8 +359,8 @@ CLI: a `chio genesis` family (`procurement`, `royalty`, `reliability`, `seat`,
 |---|---|---|
 | `crates/economy/chio-genesis` (NEW) | new leaf crate | the four artifact types + pure fail-closed validators; no storage; mirrors `chio-finding` style |
 | `crates/core/chio-core-types` | extend (additive) | four schema-registry rows in `signed_artifact.rs`; reuse `AttestationWindow`, `MonetaryAmount` |
-| `crates/trust/chio-reputation` | reuse | `compute_reliability` math consumed by the reliability-epoch builder (stratified wrapper) |
-| `crates/economy/chio-settle` | extend (thin, M-gated) | generalize `bond_distribution_hash` beyond impair for batched royalty legs (G2); royalty-leg release preparation |
+| `crates/trust/chio-reputation` | extend (thin) | `compute_reliability` is crate-private (`fn`, `src/compare.rs:160`), so the reliability-epoch builder needs either a visibility export or a re-derivation of its published decay formula (review finding GA-R14) |
+| `crates/economy/chio-settle` | extend (thin, G6-gated) | generalize `bond_distribution_hash` beyond impair for batched royalty legs; royalty-leg release preparation |
 | `crates/economy/chio-open-market` | reuse | fee schedule + bond classes (the floor escrow and audit bond ride these) |
 | `crates/trust/chio-governance` | reuse/extend | charter carries per-vertical seat caps + procurement admit authority; Sanction case revokes seats |
 | `crates/platform/chio-control-plane` | extend | procurement / reliability-epoch / seat / CCV surfaces per section 7 |
@@ -329,7 +377,7 @@ CLI: a `chio genesis` family (`procurement`, `royalty`, `reliability`, `seat`,
 | Operator seats | governance-granted, small cap | auction or reputation-gated (a later ADR; auction risks the token boundary and is out of scope now) |
 | Subsidy pool custody | one bonded venue operator | multi-operator or on-chain fund (needs the deferred ADR-0015 Follow-up A allowlist, K1/K10) |
 | r-feed trust | one reliability-oracle operator | anchored multi-operator with equivocation slashing |
-| Sybil resistance | consortium membership (identity is gated) | bonds + reputation tiers only (harder; THREAT-MODEL G6) |
+| Sybil resistance | consortium membership (identity is gated) | bonds + reputation tiers only (harder; THREAT-MODEL GA3) |
 
 The permissionless column is a PROFILE, not the launch, and every cell that
 hardens under it is flagged in the threat model. The launch profile leans on
