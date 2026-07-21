@@ -36,7 +36,7 @@ program reuses these unchanged:
 | Step-down basis-point schedule idiom | `TIER_DISCOUNT_PER_HUNDRED: [u32; 4]` | `chio-appraisal/src/marketplace_pricing.rs:148` |
 | Single-beneficiary settlement release | `prepare_dual_sign_release` (full), `ChioEscrow` | `chio-settle/src/evm/prepare.rs:1027`; `contracts/src/interfaces/IChioEscrow.sol:7` |
 | Multi-party exact-sum distribution (slash-only today) | `bond_distribution_hash` / `validate_bond_impair_distribution` | `chio-settle/src/evm/prepare.rs:971-1020` |
-| Epoch root signing/anchoring cadence (operator-cron) | `AnchorAutomationJob` + `assess_*` | `chio-anchor/src/automation.rs:35` |
+| Epoch root signing/anchoring cadence (operator-cron) | `AnchorAutomationJob` + `assess_*` | `chio-anchor/src/automation.rs:37` |
 | Decaying topic-keyed signal (procurement staleness idiom) | pheromone deposit/decay | `chio-pheromone/src/lib.rs` (deposit), `src/validation.rs:782` (`strength_at`) |
 | Wash/related-party signal | `root_budget_holder` / `delegation_depth` on financial metadata | `chio-core-types/src/receipt/economics.rs:33` |
 | Descriptor search / listing publication | `chio-listing` discovery + namespace-owner signature | `chio-listing/src/discovery.rs:291`, `src/util.rs:27` |
@@ -75,7 +75,7 @@ reported, `chio-listing/src/discovery.rs:68`).
 | `list_id` | string | content-addressed over the body with id/signature cleared |
 | `governing_operator_id` | string | the venue governance operator that admits descriptors (NOT sellers, to defuse Goodhart, Q6) |
 | `epoch` | u64 | monotone; each republish is a new epoch |
-| `entries` | array | demanded descriptors, each `{ topic, context_sha256?, demand_bucket, coverage_state, floor_schedule_ref, admitted_at, stale_after }` |
+| `entries` | array | demanded descriptors, each `{ topic, context_sha256?, demand_bucket, coverage_state, required_guarantee_class, floor_schedule_ref, admitted_at, stale_after }` |
 | `k_anonymity_floor` | u32 | minimum distinct buyer clusters that must have queried a descriptor before it is listed (privacy gate; see 3.1.1) |
 | `issued_at` / `expires_at` | u64 | validity window |
 | `signature` | inline sig | over canonical body, verifiable against the governance charter signer |
@@ -83,7 +83,12 @@ reported, `chio-listing/src/discovery.rs:68`).
 `demand_bucket` is a coarse bucket (not a raw count) so the list does not leak
 per-buyer intent. `coverage_state` is `uncovered` / `partial` / `saturated`,
 computed from the finding index; a `saturated` descriptor stops paying a floor
-(K5) and is a removal candidate.
+(K5) and is a removal candidate. `required_guarantee_class` carries the launch
+determinism rule (GENESIS-PROGRAM 4.1): a floor is payable on this descriptor
+only for findings of the named class, and at launch that class is
+`deterministic_replay` (an ML non-convergence descriptor is listable only with
+a pinned-deterministic recipe requirement until the M9 replication rules for
+stochastic recipes exist).
 
 **3.1.1 Sourcing demand without leaking buyer intent (net-new, Q3).** There is
 no telemetry store and no query-privacy layer. The design:
@@ -193,7 +198,7 @@ corpus. It is the same signing envelope and the same reliability math, re-keyed.
 
 The capped, non-transferable genesis seat. NEW because no seat / roster-with-
 roles / capped-slot primitive exists (the `RosterPolicy` is unsigned config,
-`chio-control-plane/.../liability.rs:11`, and its referenced
+`chio-control-plane/src/trust_control/capital_and_liability/liability.rs:11`, and its referenced
 `AdjudicationJurisdictionReceipt` type is absent from the repo).
 
 | Field | Type | Semantics |
@@ -230,8 +235,16 @@ that K7 forbids. The pool is therefore:
 
 - an OFF-CHAIN, pre-funded budget in the settlement numeraire, custodied by the
   genesis venue operator (bonded, F6-neutral, Q5);
-- paid out per admitted floor as an ordinary receipt-backed transfer on the
-  existing single-beneficiary release path;
+- paid out per admitted floor through the EXISTING escrow terminal states, no
+  new custody primitive (GENESIS-PROGRAM 4.1): each admitted floor is an escrow
+  with depositor = pool operator, beneficiary = seller, deadline = audit-window
+  end plus cadence margin; a passed audit's receipt hash is bound into the
+  operator-signed release digest (`releaseWithSignature`,
+  `contracts/src/ChioEscrow.sol:199-228`, consumed single-use) and the seller
+  releases; a failed or absent audit means the deadline `refund`
+  (`ChioEscrow.sol:268`) returns the floor to the pool. In the non-EVM
+  consortium profile the same contract SHAPE runs as a settle-mediated hold;
+  the mapping, not the chain, is the design;
 - disciplined by the ADMISSION GATE (descriptor match, mode-A burn, audit
   sample), not by an on-chain recipient allowlist (which does not exist, K1/K10
   gap);

@@ -194,9 +194,10 @@ penalty `= 0.35 * 300 = $105 >> $30`, so `P_max < 0` and no rational buyer
 purchases. This is the adverse-selection-on-exhaust residual (section 9),
 falling straight out of the model: the R&D null is structurally the hard case,
 which is why the wedge (verified fixes and failing-test findings for major OSS
-ecosystems, plus ML non-convergence sweeps where the sweep IS replay-checkable)
-launches first. The program does not solve R&D-null pricing; it sequences
-around it.
+ecosystems, plus ML non-convergence sweeps ONLY where the recipe is pinned
+deterministic; the launch determinism rule in 4.1 makes this a floor-admission
+condition, not an aspiration) launches first. The program does not solve
+R&D-null pricing; it sequences around it.
 
 ### 3.3 The demand-curve-investment claim, pressure-tested and corrected
 
@@ -257,7 +258,7 @@ constraints and are redesigned:
    `floor = evidence_cost`, the program pays full production cost, which (a)
    subsidizes behavior/volume (violates hard constraint 2), and (b) invites
    burn-farming: run expensive useless work to farm a cost-proportional floor
-   (THREAT-MODEL G2). Redesign: the floor is driven by the descriptor's
+   (THREAT-MODEL GA1). Redesign: the floor is driven by the descriptor's
    demand-and-coverage priority on the procurement list, capped by a fraction
    of VERIFIED cost, never driven by cost.
 
@@ -282,16 +283,44 @@ constraints and are redesigned:
    because only demanded-uncovered descriptors admit a floor and each admits at
    most one.
 
-**Admission gate for a floor payment (all four required):**
+**Admission gate for a floor payment (all five required):**
 
 - descriptor match against the procurement list (demanded), and the descriptor
   is currently uncovered (`h_pool(d) < saturation`);
 - mode-A proof-of-burn: the finding's evidence receipts verify fail-closed and
   the metered cost is checkable (ARCHITECTURE F2 mode A);
 - the finding is `BondBacked` and slashable (F1 admission, `slashable: true`);
-- it survives an audit sample (Q4): a floor is escrowed at listing and released
-  after the audit window clears, or clawed to the pool on a failed audit (this
-  is pool-side custody, not seller-revenue clawback, so it does not violate K2).
+- **the finding's guarantee class is audit-verifiable at launch**, i.e.
+  `deterministic_replay`: the floor's own release condition is a passed audit,
+  and an audit can mechanically verify only a replayable claim. This settles
+  the "ML non-convergence sweeps" launch-wedge input against the settled
+  guarantee-class taxonomy (ADR-0017 D3; ARCHITECTURE 10 classes R&D nulls as
+  mostly `metered_attested` with replay "only when re-runnable"): a
+  non-convergence sweep earns a floor ONLY when its recipe is pinned
+  deterministic (seeds, framework determinism flags, committed replay recipe);
+  otherwise it may list, unsubsidized, earning royalty only, until the M9
+  replication decision rules for stochastic recipes exist. Floors never pay for
+  claims the audit lane cannot check;
+- it survives an audit sample (Q4): the floor is escrowed at admission and
+  released on a passed audit, or returned to the pool otherwise (pool-side
+  custody, not seller-revenue clawback, so K2 is untouched).
+
+**Floor custody rides the existing escrow terminal states (no new custody
+primitive).** Verified against the contract: `ChioEscrow` releases either
+against Merkle-proven receipt evidence or against an operator settlement
+signature whose signed digest BINDS a `receiptHash` consumed single-use
+(`releaseWithSignature`, `contracts/src/ChioEscrow.sol:199-228`), and refunds
+the depositor after the deadline (`refund`, `ChioEscrow.sol:268`). The floor
+escrow is exactly this shape: depositor = the pool operator, beneficiary = the
+seller, `maxAmount` = the floor, `deadline` = audit-window end plus the
+checkpoint-cadence margin (the F6 timing lesson); a PASSED audit produces the
+audit receipt whose hash the operator signs into the release digest, and the
+seller releases; a failed or absent audit means no release and the deadline
+refund returns the floor to the pool. Two predeclared price-free terminal
+states, unchanged (ADR-0015 D2). The trust residual (an operator that refuses
+to sign a passed audit's release) is T5, receipt-visible. In the non-EVM
+consortium profile the same contract shape runs as a settle-mediated hold; the
+mapping, not the chain, is the design.
 
 The royalty is reward type (b) and is designed in Q2. It pays for value: a
 finding that gets hits earns a share of the clearing fees those hits generate;
@@ -321,6 +350,32 @@ machinery.
   bought yet attracts no burned buyer to challenge it), so the pool funds
   audits of subsidized inventory specifically, at the published rate, to
   establish `r` on inventory that would otherwise be un-sampled.
+
+- **Top-up sizing has a hard upper bound from self-slash farming.** A ring
+  that plays both sides (list a fraudulent finding under one identity,
+  audit-challenge it under another) pays: the listing bond `B_bond` (slashed
+  to harmed parties or the community fund, NEVER back to the ring, ADR-0015
+  D4), publication fees, the metered burn, and it forfeits the escrowed floor
+  (a failed audit returns the floor to the pool, 4.1). It collects: the audit
+  bounty top-up. Ring EV stays negative iff the top-up is strictly less than
+  what the ring burns, so the program rule is `bounty_topup <= beta * B_bond`
+  with `beta <= 0.5` (modeling default, sensitivity in the threat row), and
+  the top-up never exceeds the auditor's metered replay cost plus a bounded
+  premium. The related self-CHALLENGE analysis (a seller fake-challenging
+  itself to farm failed-challenge forfeits) is already in MECHANISMS 9 item 5
+  and carries over unchanged; the new term here is the pool-funded top-up,
+  and this bound is what keeps it from becoming a self-slash faucet
+  (THREAT-MODEL GA9).
+
+- **The audit budget is the pool's structural tail risk, not a rounding
+  item.** The standing published-rate surveillance of the LIVE corpus scales
+  with the coverage the program itself builds, and the runway model (9.1,
+  conclusion 2) shows it, not the floor line, is what exhausts pools:
+  self-sustain requires the security-self-funding inequality
+  `f * X >= (alpha_new * a + alpha_corpus * C) * c_a`. Audit-rate schedules
+  must therefore be published WITH their step-down conditions (accumulating
+  per-class reliability evidence lets `alpha_corpus` fall), exactly as the
+  floor publishes its decay.
 
 - **The r feed cannot reuse the revocation oracle's tree (confirmed,
   confidence: high).** The status-oracle machinery
@@ -367,7 +422,7 @@ evidence is, `chio-market/src/insurance_flow.rs:390-414`). Each epoch publishes
 feeds the `guarantee_class_bps` and the elicitation ceiling (MECHANISMS 2),
 never a proof (K8): buyers weight it, they do not treat it as verification.
 
-**Manipulation of `r` itself (catalog in THREAT-MODEL G-series; summary):**
+**Manipulation of `r` itself (catalog in THREAT-MODEL GA-series; summary):**
 
 - Auditor-seller collusion (auditor always passes): for `deterministic_replay`,
   the audit is a mediated re-run whose receipt is independently checkable, so a
@@ -396,14 +451,14 @@ implies today:
 
 - There is no per-request operator identity: a control-plane deployment
   authenticates with a single shared `service_token`
-  (`chio-control-plane/src/trust_control/service_runtime/report_validation.rs:403`)
+  (`chio-control-plane/src/trust_control/report_validation.rs:403`)
   and derives the operator identity server-side from config
   (`config.advertise_url`), so one deployment == one operator. There is no
   multi-operator seat table inside a control plane.
 - There is no signed operator-roster-with-roles primitive. `validate_against_roster`
   takes a plaintext `&[String]` roster (`chio-market/src/claim.rs:409`), sourced
   from an UNSIGNED `RosterPolicy` config file
-  (`chio-control-plane/.../capital_and_liability/liability.rs:11`), and its
+  (`chio-control-plane/src/trust_control/capital_and_liability/liability.rs:11`), and its
   `roster_anchor` points at a `chio-trust-market-context::AdjudicationJurisdictionReceipt`
   type that DOES NOT EXIST in the repo (dangling reference). The only roles that
   exist are registry-publishing roles `GenericRegistryPublisherRole { Origin,
@@ -612,19 +667,20 @@ reported and single-source figures are flagged inline.
 ### 8.1 Liquidity mining and the mercenary-capital failure (why not to pay for behavior)
 
 - Liquidity mining reliably attracts capital that leaves when rewards stop.
-  Industry measurement puts average liquidity-miner tenure around 14 to 15 days
-  and roughly half of incentivized capital exiting within about two weeks of
-  entering [report, self-reported industry figures, FLAGGED]. The SushiSwap
+  The best available measurement is Nansen's June 2021 on-chain study of
+  MasterChef-style farms: 42 percent of addresses entering a farm on launch
+  day exit within 24 hours, and roughly 70 percent are gone by day three
+  [report; analyst measurement over on-chain data, single firm]. The SushiSwap
   "vampire attack" on Uniswap (August 2020) is the canonical land-grab: an
   aggressive per-block token emission (rewards reported up to ~1000 percent APR)
   drained a reported ~55 percent (~$810M) of a rival's liquidity in under two
   weeks, after which mercenary capital rotated onward [news/vendor, self-reported
   figures, FLAGGED]. The lesson this program takes: emissions that pay for the
-  BEHAVIOR of showing up buy volume that evaporates. The Genesis floor pays for
-  INVENTORY (a covered demanded descriptor, a durable asset), gated on burn and
-  audit, one floor per descriptor; there is no per-participation or per-volume
-  emission and no token to rotate. This is the hard-constraint-2 discipline with
-  a live cautionary tale attached.
+  BEHAVIOR of showing up buy volume that evaporates in days. The Genesis floor
+  pays for INVENTORY (a covered demanded descriptor, a durable asset), gated on
+  burn and audit, one floor per descriptor; there is no per-participation or
+  per-volume emission and no token to rotate. This is the hard-constraint-2
+  discipline with a measured cautionary tale attached.
 
 ### 8.2 Two-part tariff (the floor-plus-royalty structure)
 
@@ -638,7 +694,26 @@ reported and single-source figures are flagged inline.
   large fixed floor would exclude low-`P_max` demanded descriptors, while a
   royalty-heavy split lets value sort itself.
 
-### 8.3 Land grants and homesteading (grant on improvement, vest on use, expire)
+### 8.3 Advance market commitments (the procurement list's closest precedent)
+
+- Kremer and Glennerster proposed, and the 2007 pneumococcal pilot deployed,
+  the Advance Market Commitment: donors pledge a BOUNDED fund from which a
+  specified per-unit subsidy is paid on delivered supply meeting a published
+  specification, until the fund exhausts, with suppliers keeping a long-run
+  per-unit revenue tail [paper/report; $1.5B pilot, launched 2007]. The
+  structural mapping to the Genesis coverage mine is exact: bounded pool =
+  AMC fund; procurement-list entry = the published product specification;
+  floor paid on audit-passed delivery = the per-unit subsidy on verified
+  supply; royalty = the long-run tail; pool exhaustion = the AMC's designed
+  end state. Two AMC design lessons adopted: pay on VERIFIED DELIVERY against
+  a pre-published spec (never on effort or claims), and keep the demanded
+  spec under the buyer coalition's control, not suppliers' (the pilot's
+  target product profile), which is the Q3 anti-Goodhart governance rule.
+  The pilot's choice to fund MULTIPLE suppliers rather than an exclusive
+  winner (competition against supply interruption) is the AMC-side echo of
+  K5's no-exclusive-slots rule.
+
+### 8.4 Land grants, homesteading, and the railroad fraud (grant on verified output, and its failure mode)
 
 - Homestead Act of 1862 [tertiary/report]. Free grants of up to 160 acres
   conditioned on "proving up": five years of residency plus IMPROVEMENT
@@ -653,8 +728,22 @@ reported and single-source figures are flagged inline.
   claimant. The abandonment statistic is the cautionary quantity: a program that
   grants without a proving-up requirement gets dead claims, which is the adverse-
   selection residual (section 9).
+- Pacific Railway Act of 1862 and Credit Mobilier [tertiary/report]. The
+  transcontinental subsidy was OUTPUT-VERIFIED (government bonds per completed
+  mile of track, terrain-tiered at $16k/$32k/$48k per mile) and was still
+  farmed: Union Pacific routed construction through Credit Mobilier, a
+  RELATED-PARTY construction company its own promoters owned, paying it
+  roughly $93.5M for work later estimated near $50M, extracting the subsidy
+  through self-dealing prices rather than fake track. The lesson is the
+  sharpest one in this survey: verifying the OUTPUT is not enough; the
+  subsidy must also police WHO is on both sides of the priced transaction and
+  what the claimed cost is. That is precisely why the Genesis design pairs
+  its output gates with related-party clustering (GA2/GA8, shared
+  `root_budget_holder` detection) and caps the floor by VERIFIED cost with
+  `kappa < 1` rather than reimbursing claimed cost (GA1). Credit Mobilier is
+  the Genesis program's canonical failure to design against.
 
-### 8.4 References
+### 8.5 References
 
 All URLs retrieved 2026-07-21.
 
@@ -664,12 +753,23 @@ All URLs retrieved 2026-07-21.
 2. [tertiary] Homestead Act (1862), overview and proving-up requirements.
    https://www.nps.gov/articles/the-homestead-act.htm ;
    https://www.archives.gov/education/lessons/homestead-act
-3. [news] SushiSwap vampire attack, mechanics and liquidity-migration figures
+3. [report] Nansen. "All Hail MasterChef: Analysing Yield Farming Activity."
+   June 2021 (42 percent day-one exit within 24h; ~70 percent by day three).
+   https://www.nansen.ai/research/all-hail-masterchef-analysing-yield-farming-activity
+4. [news] SushiSwap vampire attack, mechanics and liquidity-migration figures
    (self-reported/analyst, FLAGGED). https://finematics.com/vampire-attack-sushiswap-explained/
-4. [report, self-reported industry figures, FLAGGED] Mercenary-capital retention
-   in liquidity mining (average tenure and early-exit share). Industry analyses
-   compiled 2021-2025; figures are directional, not audited.
-5. Bug-bounty economics, agent-payment rails, credence-goods markets, peer-
+5. [paper] Kremer, Levin, Snyder. "Advance Market Commitments: Insights from
+   Theory and Experience." AEA Papers and Proceedings, 2020 (NBER w26775).
+   https://www.nber.org/papers/w26775
+6. [paper] Kremer, Levin, Snyder. "Designing Advance Market Commitments for
+   New Vaccines." Management Science, 2021 (NBER w28168).
+   https://www.nber.org/papers/w28168
+7. [tertiary/report] Pacific Railway Act (1862): per-mile subsidy structure.
+   https://www.archives.gov/milestone-documents/pacific-railway-act ;
+   Credit Mobilier payments vs estimated cost: Gilder Lehrman Institute,
+   "Financing the Transcontinental Railroad."
+   https://www.gilderlehrman.org/history-resources/essays/financing-transcontinental-railroad
+8. Bug-bounty economics, agent-payment rails, credence-goods markets, peer-
    prediction, and data-market prior art: see MECHANISMS section 10 (items
    8-45), referenced here rather than duplicated. The load-bearing ones for the
    Genesis program are Gao-Wright-Leyton-Brown (limited-ground-truth audits
@@ -688,27 +788,82 @@ bonded verified-cognition market, and is bounded by the 2026-07-21 survey date.
 
 ## 9. Honest limits (mandatory sections)
 
-### 9.1 The exhaustion boundary (Q1) and its leading indicators
+### 9.1 The exhaustion boundary (Q1): three regimes, and which cost actually drives it
 
-The pool is bounded (`B0`) and outflows at rate
-`dB/dt = -[a(t) * b(t) + u(t)]` (admission rate times floor plus audit top-up).
-The market is self-sustaining once organic clearing fees fund continued
-coverage without the pool, at a coverage-of-demand threshold `g*`. The failure
-is EXHAUSTION BEFORE DEMAND: `B0 < integral_0^{T(g*)} [a*b + u] dt`, the pool
-empties before coverage-of-demand reaches `g*`.
+Modeled as a monthly recurrence (every parameter a labeled modeling
+assumption; the value of the model is the STRUCTURE of the boundary, not the
+numbers). State: demanded-uncovered descriptors `U(t)`, covered live corpus
+`C(t)`, pool balance `B(t)`. Flows: demand inflow `lambda_d`; staleness `mu` on
+`C`; queries `q(t) = Q_max * logistic((t - t_d)/s_d)` (a ramp delayed by
+`t_d`); clearings `X = q * (C/(C+U)) * p_clear`; venue fee `f` per clearing;
+seller price `~4f`. Supply: genesis capacity `cap_g` while the pool is solvent;
+organic listings respond to per-finding lifetime value vs listing cost
+(threshold response with capacity `A_o`). Spend: floors
+`(admissions) * b0 * decay^t`, and audits
+`(alpha_new * admissions + alpha_corpus * C) * c_a`, where `alpha_corpus` is
+the PUBLISHED-RATE STANDING SURVEILLANCE of the live corpus (MECHANISMS 5
+audits listed findings, not only new admissions); fee inflow funds audits
+first, the pool tops up the shortfall, and floors always come from the pool.
 
-Illustrative sizing (modeling assumptions, order-of-magnitude, wide sensitivity):
-demanded-uncovered descriptors at launch `N_demand = 500` to `5,000` (from CI-
-failure telemetry across target OSS ecosystems); floor `b = $2` to `$10`
-declining over `T_g`; audit top-up on `10` to `30` percent of subsidized
-findings at `$2` to `$20` metered replay each; genesis window `T_g = 6` to `18`
-months. One full coverage pass at `N_demand = 2,000`, avg floor `$6`, 20 percent
-audit at `$10`: floor spend `~$12k`, audit `~$4k`, plus decay/re-coverage churn
-`x2` to `x3`, so a wedge genesis pool on the order of `$30k` to `$150k`. The pool
-is DELIBERATELY small because negatives are exhaust (production cost is sunk;
-the floor pays only the listing margin). These numbers are modeling assumptions;
-the real `N_demand` and floor come from the telemetry the M-gates produce, and
-the sizing must be recomputed against that telemetry before any pool is funded.
+The recurrence admits THREE regimes, not two:
+
+- **SELF-SUSTAIN**: organic supply covers demand inflow (`a_o >= lambda_d`)
+  AND fees cover the security bill (`f * X >= (alpha_new * a + alpha_corpus *
+  C) * c_a`), sustained. The program exits.
+- **EXHAUST**: `B(t)` hits the month's committed spend before self-sustain.
+- **ZOMBIE**: the pool survives the horizon but organic supply and fees never
+  take over; coverage is high, the market is permanently subsidy-dependent.
+  The exit criterion is organic takeover, NOT pool solvency.
+
+Simulation results (36-month horizon; base parameters: `B0 = $75k`,
+`N0 = 2,000` demanded descriptors, `lambda_d = 150`/month, `mu = 5%`/month,
+`cap_g = 300`/month, `b0 = $6` with `decay = 0.93`, `alpha_new = 20%`,
+`alpha_corpus = 1%`/month, `c_a = $10`, `Q_max = 6,000` queries/month ramping
+at `t_d = 8` months, `p_clear = 0.35`, `f = $0.40`; reproducible from the
+recurrence above):
+
+| Scenario | Verdict | Coverage g(12) | Cumulative floors (36m) | Pool-funded audits (36m) |
+|---|---|---|---|---|
+| base | SELF-SUSTAIN month 13 | 95% | $20.5k | $6.5k |
+| optimistic (early, strong demand) | SELF-SUSTAIN month 6 | 94% | $22.0k | $4.4k |
+| pessimistic (demand at month 16, weak clearing) | ZOMBIE | 95% | $19.9k | $20.4k |
+| no-demand | ZOMBIE | 95% | $19.9k | $20.3k |
+| half pool ($37.5k) | SELF-SUSTAIN month 13 | 95% | $20.5k | $6.5k |
+| tenth pool ($7.5k) | EXHAUST month 2 | 87% | $5.7k | $2.1k |
+| costly audit (c_a $40, corpus rate 2%) | EXHAUST month 17 | 95% | $18.0k | $58.0k |
+| no floor decay | SELF-SUSTAIN month 13 | 95% | $43.5k | $6.5k |
+| big book (N0 10k, lambda_d 600) | EXHAUST month 20 | 40% | $43.5k | $33.7k |
+
+Three structural conclusions, which survive parameter variation and are the
+actual content of this section:
+
+1. **The floor is self-bounding by schedule construction.** With a geometric
+   step-down, worst-case cumulative floor outlay is bounded by
+   `b0 * admission_capacity / (1 - decay)` regardless of duration (~$20k at
+   base; only ~2x that even with NO decay). The declining schedule is not just
+   a land-grab clock; it is a hard cap on floor exposure. Floors are never the
+   exhaustion driver.
+2. **The standing audit cost is the exhaustion driver, and it scales with the
+   program's own success.** `alpha_corpus * C * c_a` grows with the covered
+   corpus the program builds; the better coverage mining works, the bigger the
+   monthly security bill the pool carries until fees arrive. The costly-audit
+   scenario exhausts even the base pool. Self-sustain therefore requires the
+   SECURITY-SELF-FUNDING INEQUALITY `f * X >= (alpha_new * a + alpha_corpus *
+   C) * c_a`, and that inequality (not the floor schedule) is what sizes both
+   the pool and the ongoing participation fee (MECHANISMS 6). The corpus audit
+   rate must be tunable downward as per-class reliability data accumulates, or
+   the fee must price it.
+3. **The zombie regime is a real failure the two-outcome framing misses.** A
+   pool that survives while nothing organic happens is not success; it is
+   subsidy-dependence. The stop-loss gates and indicator 3 below exist for it.
+
+Pool sizing consistent with the model: a wedge genesis pool on the order of
+`$30k` to `$150k` (deliberately small, because negatives are exhaust: production
+cost is sunk and the floor pays only the listing margin), with the caveat that
+the pool's tail exposure is the audit line, not the floor line. The real
+`N_demand`, floor, and audit-cost parameters come from the telemetry the
+M-gates produce; the sizing must be recomputed against that telemetry before
+any pool is funded.
 
 Leading indicators (observable from receipts and telemetry; alarm thresholds are
 modeling assumptions to be tuned on data):
@@ -720,7 +875,9 @@ modeling assumptions to be tuned on data):
    while CCV stays flat: coverage is not converting to demand; the `P_max` cap
    is not clearing.
 3. Organic listing share = (unsubsidized admitted) / (total admitted). Alarm if
-   flat or declining: the market is not becoming self-sustaining.
+   flat or declining: the market is not becoming self-sustaining. This is the
+   ZOMBIE-regime detector: high coverage with a flat organic share is
+   subsidy-dependence, not success.
 4. Conversion efficiency eta = (organic clearing-fee inflow) / (pool floor
    outflow). Alarm if eta stays near 0 while `B/B0` falls below a runway
    threshold: runway is burning without conversion.
@@ -728,6 +885,11 @@ modeling assumptions to be tuned on data):
    buyers dominate: `P_max` is not real for buyers.
 6. Runway months = `B(t)` / current outflow. Cross-reference against the `T(g*)`
    estimate; alarm if runway < estimated time-to-self-sustaining.
+7. Security-self-funding ratio = (fee inflow) / (total audit spend at the
+   published rates). Alarm while below 1 with the corpus still growing: the
+   standing audit bill (the actual exhaustion driver, conclusion 2 above) is
+   uncovered, and either the corpus audit rate must step down on reliability
+   evidence or the participation fee must rise.
 
 The boundary is real and the program can hit it. The mitigation is not a
 guarantee of success; it is early detection plus stop-loss (GENESIS-PLAN gates
@@ -786,9 +948,12 @@ sequencing (Q7) and the threat model.
 - **Coverage mining** pays a small **floor** (from the bounded, off-chain,
   operator-custodied **subsidy pool**, settlement numeraire) per covered
   demanded descriptor, gated on mode-A proof-of-burn plus descriptor match plus
-  audit, on a **published declining schedule** expiring at `T_g`; plus a
-  **royalty** (reward type b, from **future clearing fees**, not the pool),
-  non-transferable, forward-only, stepping down on schedule.
+  an audit-verifiable guarantee class (`deterministic_replay` at launch) plus a
+  passed audit, escrowed on the existing two-terminal-state escrow (release on
+  the audit receipt, deadline-refund to the pool), on a **published declining
+  schedule** expiring at `T_g`; plus a **royalty** (reward type b, from
+  **future clearing fees**, not the pool), non-transferable, forward-only,
+  stepping down on schedule.
 - **Audit mining** pays **slashed bonds plus protocol bounties** (pool top-up
   for subsidized findings), and its output is the signed **reliability epoch**
   (`r`) that buyer pricing consumes.

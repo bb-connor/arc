@@ -79,7 +79,7 @@ Stop-loss is explicit because the exhaustion boundary is real (GENESIS-PROGRAM
 | G2 | Coverage-mining floor path | off-chain pool custody convention; floor admission gate (demanded-uncovered + mode-A burn + BondBacked + audit sample); escrowed floor; royalty-right accrual (declared, zero live flow) | G1b, finding M2, M4 | after M4 |
 | G3 | Reliability epoch (r feed) | `chio.finding.reliability-epoch.v1`; stratified reliability computation; control-plane epoch surface; cron ticking | G2, finding M5 | after M5 |
 | G4 | Operator seats | `chio.genesis.operator-seat.v1`; charter per-vertical cap; Sanction revocation wiring; neutrality covenant | G1a, finding M2 (declare), M7 (cross-org) | after M2; cross-org after M7 |
-| G5 | CCV + genesis demonstration | CCV methodology + control-plane report; related-party exclusion; scripted first arm-to-arm trade as a public receipt-backed event | finding M4 | after M4 |
+| G5 | CCV + genesis demonstration | CCV methodology + control-plane report; related-party exclusion; scripted first agent-to-agent trade as a public receipt-backed event | finding M4 | after M4 |
 | G6 | Royalty live flow + qualification + permissionless turn | settle royalty-leg generalization (D5); fee-split at collection; bounded-matrix + CLAIM_REGISTRY; permissionless-profile evaluation gated on wedge telemetry | finding M5, M9; #974 | after M5/M9 + fee collection |
 
 ## 3. Per-milestone definition
@@ -126,23 +126,36 @@ dashes); ADR-0018 in the ADR index.
 ### G2 Coverage-mining floor path (after finding M4)
 
 - Off-chain pool custody convention: the bonded venue operator holds the pool;
-  every floor payout is an ordinary receipt-backed single-beneficiary release; a
-  runbook documents the custody and the receipt-auditable outflow (no on-chain
-  pool; K1/K10, GENESIS-ARCHITECTURE 4).
-- Floor admission gate (all four): demanded-uncovered descriptor match against
-  the G1b list; mode-A proof-of-burn (evidence receipts verify fail-closed and
-  cost is checkable); `BondBacked` slashable listing (the M2 gate); passed audit
-  sample.
+  a runbook documents the custody and the receipt-auditable outflow (no
+  on-chain pool; K1/K10, GENESIS-ARCHITECTURE 4).
+- Floor custody per admitted floor rides the existing escrow terminal states
+  (GENESIS-PROGRAM 4.1): depositor = pool operator, beneficiary = seller,
+  deadline = audit-window end plus cadence margin; release via the
+  operator-signed path binding the passed audit's receipt hash
+  (`releaseWithSignature`, `contracts/src/ChioEscrow.sol:199-228`); deadline
+  `refund` returns the floor to the pool otherwise. Non-EVM profile: the same
+  shape as a settle-mediated hold.
+- Floor admission gate (all five): demanded-uncovered descriptor match against
+  the G1b list; the descriptor's `required_guarantee_class` satisfied
+  (launch: `deterministic_replay` only, the determinism rule); mode-A
+  proof-of-burn (evidence receipts verify fail-closed and cost is checkable);
+  `BondBacked` slashable listing (the M2 gate); passed audit sample.
 - Floor amount: `min(schedule(d), kappa * evidence_cost_verified)`; a mode-B
   finding's cost caps at 0 (no floor until audited); at most one floor per
   descriptor (K5).
 - Royalty-right accrual: mint a `chio.genesis.royalty-right.v1` at floor
   admission (declared table, zero live flow until G6/M5); non-transferable.
+- Audit-bounty top-up bound published with the schedule:
+  `bounty_topup <= beta * bond`, `beta <= 0.5`, and never exceeding metered
+  replay cost plus a bounded premium (the GA9 self-slash-farming bound,
+  GENESIS-PROGRAM 4.2).
 - Exit: an integration test admits a floor only on the full gate, denies a
-  duplicate-descriptor second floor, denies a mode-B floor pre-audit, escrows the
-  floor and releases it after a passing audit (clawing to the pool on a failing
-  audit); gate green. Stop-loss: G2's exit report includes the first
-  hit-conversion and conversion-efficiency readings against the 9.1 thresholds.
+  duplicate-descriptor second floor, denies a mode-B floor pre-audit, denies a
+  `metered_attested` floor at launch, escrows the floor and releases it on a
+  passing audit's receipt hash (deadline-refunding to the pool on a failing or
+  absent audit); gate green. Stop-loss: G2's exit report includes the first
+  hit-conversion, conversion-efficiency, and security-self-funding-ratio
+  readings against the 9.1 thresholds.
 
 ### G3 Reliability epoch / r feed (after finding M5)
 
@@ -198,7 +211,7 @@ dashes); ADR-0018 in the ADR index.
   royalty-split operator; T5/T6/T7); ADR-0018 Proposed -> Accepted.
 - Permissionless turn: evaluated only here and only if wedge telemetry shows
   coverage converts (the adverse-selection residual, 9.2); the permissionless
-  Sybil hardening (G3 residual) and an on-chain pool (the deferred ADR-0015
+  Sybil hardening (GA3 residual) and an on-chain pool (the deferred ADR-0015
   Follow-up A allowlist) are its prerequisites.
 
 ## 4. Verification and formal hooks
@@ -227,13 +240,14 @@ dashes); ADR-0018 in the ADR index.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Exhaustion before demand (Q1) | unknown | program value | leading indicators (9.1) wired into G2/G5 exit reports; per-mine stop-loss |
+| Exhaustion before demand (Q1) | unknown | program value | leading indicators (9.1) wired into G2/G5 exit reports; per-mine stop-loss; the exhaustion driver is the standing audit bill, so audit-rate step-downs are published with the schedule |
+| Zombie regime: pool survives but organic supply/fees never take over (9.1 conclusion 3) | unknown | program value | exit criterion is organic takeover, not pool solvency; organic-listing-share and security-self-funding indicators alarm it; genesis window `T_g` hard-stops indefinite subsidy |
 | Fee collection (M2/M5) or #974 slips | medium | royalty + seat live flow slips | artifacts declare against the table with zero flow until collection lands; G1a/G4 declaration work is independent |
 | Demanded-descriptor telemetry too thin to source a list (Q3) | medium | G1b weak | k-anonymity floor tunable; wedge contexts (CI failures) are dense; fall back to curated seed descriptors with the same admission gate |
 | Adverse selection subsidizes dead R&D inventory (Q6) | high for R&D | pool waste | wedge-first; R&D coverage gated on wedge conversion telemetry; abandonment expected |
-| Permissionless Sybil (G3) | high (permissionless) | limits the later profile | permissionless deferred to G6 with explicit Sybil hardening prerequisites |
-| Operator-seat neutrality abuse (G7) | medium | trust in seated verticals | covenant + Sanction/deactivate revocation; equivocation anchoring |
-| CCV gamed by self-dealing (G8) | medium | headline-metric integrity | related-party exclusion + genesis-demo labeling; CCV from first external trade |
+| Permissionless Sybil (GA3) | high (permissionless) | limits the later profile | permissionless deferred to G6 with explicit Sybil hardening prerequisites |
+| Operator-seat neutrality abuse (GA7) | medium | trust in seated verticals | covenant + Sanction/deactivate revocation; equivocation anchoring |
+| CCV gamed by self-dealing (GA8) | medium | headline-metric integrity | related-party exclusion + genesis-demo labeling; CCV from first external trade |
 
 ## 7. Plan maintenance rules
 

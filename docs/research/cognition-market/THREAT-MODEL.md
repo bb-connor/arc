@@ -311,7 +311,7 @@ profile in parentheses where different.
 
 ### Subsidy-side (Q6)
 
-- **G1. Burn-farming the floor** (do expensive but useless work to farm a
+- **GA1. Burn-farming the floor** (do expensive but useless work to farm a
   cost-proportional bounty). Mitigated by DESIGN, not just detection: the floor
   is driven by the procurement-list demand schedule and CAPPED by a fraction of
   VERIFIED cost, never driven by cost (GENESIS-PROGRAM 4.1); it is paid at most
@@ -322,7 +322,7 @@ profile in parentheses where different.
   audit-passing finding on a demanded-uncovered descriptor, which is exactly the
   coverage the program wants to buy. Residual: low; the attack degenerates into
   honest coverage of demanded descriptors.
-- **G2. Wash trading to inflate CCV or farm royalties** (self-buy own
+- **GA2. Wash trading to inflate CCV or farm royalties** (self-buy own
   inventory). Mitigated: CCV counts the clearing fee NET OF SPREAD, deduplicated
   by `(finding_id, buyer_cluster)`, EXCLUDING related-party clusters detected by
   shared `root_budget_holder` / `delegation_depth`
@@ -333,7 +333,7 @@ profile in parentheses where different.
   can pay real fees to fake demand at a cost equal to the fees burned; bounded by
   that cost, and the related-party filter strips the obvious clusters. Medium
   (the wash-at-metering-cost residual, C1-adjacent).
-- **G3. Sybil across the three mines** (many identities farming floors, audits,
+- **GA3. Sybil across the three mines** (many identities farming floors, audits,
   or seats). Consortium launch: identity is gated by membership, so Sybil is an
   admission-control problem the consortium already owns; per-identity publication
   fees and `BondBacked` slashable admission
@@ -343,7 +343,7 @@ profile in parentheses where different.
   to bonds plus reputation tiers only, which is materially harder (no identity
   gate). Residual: low (consortium); medium-high (permissionless), which is a
   primary reason permissionless is deferred (GENESIS-ARCHITECTURE 9).
-- **G4. Procurement-list capture / Goodhart** (sellers manufacture demand for
+- **GA4. Procurement-list capture / Goodhart** (sellers manufacture demand for
   their own inventory so the pool subsidizes it). Mitigated: the list is
   published by the venue GOVERNANCE operator and is seller-read-only (sellers
   cannot admit descriptors, GENESIS-ARCHITECTURE 3.1.2); a descriptor is admitted
@@ -351,8 +351,8 @@ profile in parentheses where different.
   (`root_budget_holder` distinctness), so manufacturing demand requires running
   `k` distinct funded buyer clusters. Residual: a buyer-cluster ring can still
   manufacture `k` queries; bounded by the cost of `k` funded clusters and
-  detectable by the same related-party clustering (G2). Medium.
-- **G6. Pool-exhaustion griefing** (drive floor payouts to drain the bounded
+  detectable by the same related-party clustering (GA2). Medium.
+- **GA6. Pool-exhaustion griefing** (drive floor payouts to drain the bounded
   pool before organic demand arrives). Mitigated: floors pay only for
   demanded-uncovered coverage that passes audit, so a griefer who extracts floors
   is producing the exact coverage the program wants; the per-descriptor cap and
@@ -366,7 +366,7 @@ profile in parentheses where different.
 
 ### Metric and reliability (Q4)
 
-- **G5. r-feed manipulation** (auditor-seller collusion, selective challenging,
+- **GA5. r-feed manipulation** (auditor-seller collusion, selective challenging,
   audit-rate gaming). Mitigated: `r` is computed over VENUE-SCHEDULED RANDOM
   audits, not challenger-selected challenges, so selection bias is controlled by
   the schedule; for `deterministic_replay` an audit is a mediated re-run whose
@@ -379,10 +379,24 @@ profile in parentheses where different.
   metering floor and reputation, both of which an honest-cost fabricator defeats
   (S2). Severity: low for `deterministic_replay`; HIGH for `metered_attested`
   (the R&D instance), carried as the r-manipulation residual.
+- **GA9. Self-slash bounty farming** (a ring lists a fraudulent finding under
+  one identity and audit-challenges it under another, farming the pool's
+  bounty top-up). Mitigated by SIZING, not detection: the ring pays the
+  listing bond (slashed to harmed parties or the community fund, never back
+  to the ring, ADR-0015 D4 posture), publication fees, and the metered burn,
+  and forfeits the escrowed floor (a failed audit returns the floor to the
+  pool, GENESIS-PROGRAM 4.1); it collects only the top-up. The program rule
+  `bounty_topup <= beta * bond` with `beta <= 0.5`, plus the top-up never
+  exceeding the auditor's metered replay cost plus a bounded premium, keeps
+  ring EV strictly negative (GENESIS-PROGRAM 4.2). The failed-challenge
+  forfeit variant (a seller fake-challenging itself) is already analyzed in
+  MECHANISMS 9 item 5 and is unchanged by the top-up. Residual: low while the
+  beta bound holds; the bound is a published program parameter, so violating
+  it is a visible governance failure, not a silent drift.
 
 ### Operator seats (Q5)
 
-- **G7. Seat neutrality violation** (a seated genesis operator self-deals:
+- **GA7. Seat neutrality violation** (a seated genesis operator self-deals:
   front-runs reveals it mediates, biases the reliability epoch it signs, or
   favors its own listings). Mitigated: the seat binds an explicit F6 neutrality
   covenant and a predeclared revocation rule (`chio.genesis.operator-seat.v1`,
@@ -394,9 +408,9 @@ profile in parentheses where different.
   purchases; equivocation on the reliability epoch is detectable by anchoring
   (O3 logic). Residual: detection lag; a seated operator can misbehave until the
   case enforces (medium), the same institutional-trust residual as O4.
-- **G8. Genesis self-dealing counted as CCV** (our own seed swarms trade with
+- **GA8. Genesis self-dealing counted as CCV** (our own seed swarms trade with
   each other and inflate the headline metric). Mitigated: the related-party
-  exclusion (G2) drops our own buyer-seller clusters, and the scripted first
+  exclusion (GA2) drops our own buyer-seller clusters, and the scripted first
   trade is explicitly labeled the GENESIS DEMONSTRATION (self-dealing, excluded);
   CCV counts only from the first external arm's-length clearing
   (GENESIS-PROGRAM 7). Residual: low.
@@ -421,12 +435,12 @@ profile in parentheses where different.
 | Risk | Instance | Severity | Owner of residual |
 |---|---|---|---|
 | Exhaustion before demand: bounded pool empties before organic clearing self-sustains (Q1) | both | high | economics sizing + leading indicators (GENESIS-PROGRAM 9.1) + per-mine stop-loss gates (GENESIS-PLAN) |
-| r-manipulation on `metered_attested` findings (Q4/G5) | R&D | high | class-stratified r + guarantee-class discount; open research (same as S2) |
+| r-manipulation on `metered_attested` findings (Q4/GA5) | R&D | high | class-stratified r + guarantee-class discount; open research (same as S2) |
 | Adverse selection on exhaust: subsidizing low-demand or negative-P_max coverage (Q6) | R&D | medium-high | procurement-list demanded-only admission; wedge-first sequencing; abandonment expected (Homestead precedent, GENESIS-PROGRAM 8.3) |
 | Royalty operator mis-split trust (Q2/T6) | both | medium | signed table + challengeable mis-split; F6 neutrality (K3) |
 | Off-chain subsidy-pool custody trust (Q1/T5) | both | medium | bonded operator + receipt-auditable outflow; permissionless needs an on-chain fund (deferred ADR-0015 Follow-up A, K1/K10) |
-| Sybil across mines under the permissionless profile (G3) | permissionless | medium-high | bonds + reputation only; a primary reason permissionless is deferred |
-| Procurement capture via manufactured demand (G4) | both | medium | governance-published list + k-anonymity floor + related-party detection |
+| Sybil across mines under the permissionless profile (GA3) | permissionless | medium-high | bonds + reputation only; a primary reason permissionless is deferred |
+| Procurement capture via manufactured demand (GA4) | both | medium | governance-published list + k-anonymity floor + related-party detection |
 
 ### Invariant-candidate additions (extend section 6)
 

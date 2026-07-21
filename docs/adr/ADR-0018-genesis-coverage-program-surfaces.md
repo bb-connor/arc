@@ -36,7 +36,7 @@ without new wire surface:
 - The revocation oracle is set-membership only and cannot carry a per-key numeric
   `r` (`chio-revocation-oracle/src/sparse_merkle.rs:89-97`).
 - No signed operator-roster-with-roles or capped-seat primitive exists; the
-  `RosterPolicy` is unsigned config (`chio-control-plane/.../liability.rs:11`)
+  `RosterPolicy` is unsigned config (`chio-control-plane/src/trust_control/capital_and_liability/liability.rs:11`)
   and its referenced anchor type is absent from the repo.
 
 ## Decision
@@ -126,11 +126,20 @@ only terminal states remain release or refund.
 No treasury / pool / fund-balance primitive exists, and building an on-chain pool
 that pays later-discovered recipients would be new contract surface the program
 forbids. The subsidy pool is a bounded, pre-funded, OFF-CHAIN budget in the
-settlement numeraire, custodied by the bonded, F6-neutral venue operator, paid
-out per admitted floor as an ordinary receipt-backed release. The "buys inventory
-or security, never behavior" discipline lives in the ADMISSION GATE (procurement-
-list descriptor match, mode-A proof-of-burn, `BondBacked` slashable listing,
-audit sample), not in an on-chain recipient allowlist. This inherits the same
+settlement numeraire, custodied by the bonded, F6-neutral venue operator. Floor
+custody rides the EXISTING escrow terminal states: each admitted floor is an
+escrow (depositor = pool operator, beneficiary = seller, deadline = audit-window
+end plus cadence margin) released via the operator-signed path whose digest
+binds the passed audit's receipt hash (`releaseWithSignature`,
+`contracts/src/ChioEscrow.sol:199-228`), with the deadline refund returning the
+floor to the pool on a failed or absent audit; no new custody primitive and no
+third terminal state (ADR-0015 D2 posture unchanged). Floors are payable at
+launch only for findings whose guarantee class the audit lane can mechanically
+verify (`deterministic_replay`; the launch determinism rule, GENESIS-PROGRAM
+4.1). The "buys inventory or security, never behavior" discipline lives in the
+ADMISSION GATE (procurement-list descriptor match plus required guarantee class,
+mode-A proof-of-burn, `BondBacked` slashable listing, audit sample), not in an
+on-chain recipient allowlist. This inherits the same
 operator-trust posture the program already accepts (T1/T3) and the same (prose-
 level, not code-level) ADR-0015 D4 recipient discipline (see Consequences).
 
