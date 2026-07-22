@@ -118,6 +118,9 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     });
+    // This command is an explicit local payment simulation. Production kernels
+    // keep the safe default and require durable admission before financial dispatch.
+    kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     kernel.register_tool_server(Box::new(SimFlatCostServer));
 
     match args.payment_adapter.as_str() {

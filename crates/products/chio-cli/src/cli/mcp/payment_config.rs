@@ -205,6 +205,7 @@ mod tests {
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         });
+        kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
 
         kernel.register_tool_server(Box::new(FlatCostServer { cost_units: 75 }));
 
