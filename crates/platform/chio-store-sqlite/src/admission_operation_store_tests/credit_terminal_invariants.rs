@@ -1,6 +1,9 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_credit::obligation::CreditExposureReservationRecordV1;
-use chio_kernel::admission_operation::verified_pre_dispatch_compensation_projection;
+use chio_kernel::admission_operation::{
+    verified_pre_dispatch_compensation_projection,
+    verified_released_pre_dispatch_compensation_projection_for_test,
+};
 
 use super::*;
 
@@ -284,6 +287,46 @@ fn acquired_credit_rejects_unproven_compensation_before_store_mutation(
         },
     )?;
     assert_eq!(counts, (0, 0, 0));
+    Ok(())
+}
+
+#[test]
+fn verified_predispatch_projection_releases_reserved_credit_atomically(
+) -> CreditAuthorizationTestResult {
+    let fixture = fixture();
+    let authorities = CreditAuthorityFixture::new()?;
+    let now = now_ms();
+    let (operation, _) = authorized_credit_operation(&fixture, &authorities, "release", now)?;
+    let recovery = claim(&fixture, &operation, "sqlite-credit-authorizer", now + 6);
+    let context = AdmissionProjectionContext {
+        operation_id: operation.binding().operation_id().clone(),
+        request_id: operation.replay_key().request_id,
+        expected_operation_version: operation.version(),
+        trusted_time_unix_ms: now + 7,
+        coordinator_lease_id: recovery.coordinator_lease_id().clone(),
+        coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
+        store_fence: recovery.store_fence().clone(),
+    };
+    let projection = verified_released_pre_dispatch_compensation_projection_for_test(
+        &operation,
+        context,
+        serde_json::json!({"policy": "sqlite-credit-release-v1"}),
+    )?;
+    let terminal = fixture.store.commit_terminal_projection(&projection)?;
+
+    assert_eq!(
+        terminal.state,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let released = fixture
+        .store
+        .load_credit_exposure_reservation(operation.binding().operation_id().as_str())?
+        .ok_or("released credit reservation disappeared")?;
+    assert_eq!(
+        released.state(),
+        CreditExposureReservationStateV1::ReleasedBeforeDispatch
+    );
+    assert_eq!(account_state(&fixture)?, (1, 0, 0, 9, 9));
     Ok(())
 }
 

@@ -1341,6 +1341,14 @@ impl AdmissionTerminalProjection {
     }
 
     #[must_use]
+    pub fn pre_dispatch_release_proof(&self) -> Option<&VerifiedPreDispatchNoEffect> {
+        match self {
+            Self::CompensatedBeforeDispatch { proof, .. } => Some(proof),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn requires_anchored_economic_commit(&self) -> bool {
         matches!(
             self,

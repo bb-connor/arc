@@ -652,6 +652,7 @@ pub(crate) fn apply_credit_exposure_terminal_tx(
     transaction: &Transaction<'_>,
     operation: &AdmissionOperationV1,
     projection_digest: &AdmissionDigest,
+    pre_dispatch_release_proof: Option<&chio_kernel::tool_outcome::VerifiedPreDispatchNoEffect>,
     fence: &StoreMutationFence,
     trusted_now_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
@@ -753,9 +754,32 @@ pub(crate) fn apply_credit_exposure_terminal_tx(
             )?;
         }
         AdmissionOperationState::CompensatedBeforeDispatch => {
-            return Err(invariant(
-                "credit exposure release requires verified pre-dispatch no-effect evidence",
-            ));
+            let proof = pre_dispatch_release_proof.ok_or_else(|| {
+                invariant(
+                    "credit exposure release requires verified pre-dispatch no-effect evidence",
+                )
+            })?;
+            if proof.operation_id() != operation.binding().operation_id() {
+                return Err(invariant(
+                    "credit exposure release proof names a different operation",
+                ));
+            }
+            let released = current
+                .prepare_released_before_dispatch_from_kernel_projection(
+                    proof.operation_id().as_str(),
+                    next_version,
+                    next_version,
+                )
+                .map_err(credit_error)?;
+            transition_credit_exposure_tx(
+                transaction,
+                &released,
+                CreditExposureReservationStateV1::ReleasedBeforeDispatch,
+                operation.state(),
+                projection_digest,
+                fence,
+                trusted_now_unix_ms,
+            )?;
         }
         _ => {
             return Err(invariant(

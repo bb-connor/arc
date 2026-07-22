@@ -127,6 +127,7 @@ enum ReleaseParticipantV1 {
     Nonce,
     OutcomeEligibility,
     Payment,
+    CreditExposure,
     Channel,
     Transport,
 }
@@ -140,6 +141,7 @@ impl ReleaseParticipantV1 {
             Self::Nonce => "nonce",
             Self::OutcomeEligibility => "outcome-eligibility",
             Self::Payment => "payment",
+            Self::CreditExposure => "credit-exposure",
             Self::Channel => "channel",
             Self::Transport => "transport",
         }
@@ -487,6 +489,9 @@ fn participant_attachments(
         ReleaseParticipantV1::Nonce => &[AdmissionAttachmentKind::ExecutionNonce],
         ReleaseParticipantV1::OutcomeEligibility => &[AdmissionAttachmentKind::OutcomeEligibility],
         ReleaseParticipantV1::Payment => &[AdmissionAttachmentKind::PaymentParticipant],
+        ReleaseParticipantV1::CreditExposure => {
+            &[AdmissionAttachmentKind::CreditExposureReservation]
+        }
         ReleaseParticipantV1::Channel => &[AdmissionAttachmentKind::ChannelReservation],
         ReleaseParticipantV1::Transport => &[],
     };
@@ -505,6 +510,7 @@ struct PreDispatchParticipantDispositionsV1 {
     nonce: VerifiedParticipantNoEffectV1,
     outcome_eligibility: VerifiedParticipantNoEffectV1,
     payment: VerifiedParticipantNoEffectV1,
+    credit_exposure: VerifiedParticipantNoEffectV1,
     channel: VerifiedParticipantNoEffectV1,
     transport: VerifiedParticipantNoEffectV1,
 }
@@ -519,6 +525,7 @@ impl PreDispatchParticipantDispositionsV1 {
         nonce: VerifiedParticipantNoEffectV1,
         outcome_eligibility: VerifiedParticipantNoEffectV1,
         payment: VerifiedParticipantNoEffectV1,
+        credit_exposure: VerifiedParticipantNoEffectV1,
         channel: VerifiedParticipantNoEffectV1,
         transport: VerifiedParticipantNoEffectV1,
     ) -> Self {
@@ -529,6 +536,7 @@ impl PreDispatchParticipantDispositionsV1 {
             nonce,
             outcome_eligibility,
             payment,
+            credit_exposure,
             channel,
             transport,
         }
@@ -583,6 +591,13 @@ impl PreDispatchParticipantDispositionsV1 {
             verification_store_fence,
             verified_at_unix_ms,
         )?;
+        self.credit_exposure.validate_for(
+            operation,
+            ReleaseParticipantV1::CreditExposure,
+            required.credit_exposure,
+            verification_store_fence,
+            verified_at_unix_ms,
+        )?;
         self.channel.validate_for(
             operation,
             ReleaseParticipantV1::Channel,
@@ -612,6 +627,10 @@ fn required_release_participants(operation: &AdmissionOperationV1) -> Vec<Releas
             ReleaseParticipantV1::OutcomeEligibility,
         ),
         (required.payment, ReleaseParticipantV1::Payment),
+        (
+            required.credit_exposure,
+            ReleaseParticipantV1::CreditExposure,
+        ),
         (required.channel, ReleaseParticipantV1::Channel),
         (true, ReleaseParticipantV1::Transport),
     ]
@@ -688,6 +707,11 @@ struct UntrustedPreDispatchNoEffectWireV1(
 );
 
 impl VerifiedPreDispatchNoEffect {
+    #[must_use]
+    pub fn operation_id(&self) -> &AdmissionOperationId {
+        &self.snapshot.operation_id
+    }
+
     pub(crate) fn from_canonical_record_verified(
         bytes: &[u8],
         operation: &AdmissionOperationV1,
@@ -748,6 +772,10 @@ impl VerifiedPreDispatchNoEffect {
                 requirements.outcome_eligibility,
             )?,
             payment: participant(ReleaseParticipantV1::Payment, requirements.payment)?,
+            credit_exposure: participant(
+                ReleaseParticipantV1::CreditExposure,
+                requirements.credit_exposure,
+            )?,
             channel,
             transport: VerifiedParticipantNoEffectV1::NotDispatched {
                 evidence: VerifiedParticipantNoEffectEvidenceV1::from_verified_source(
@@ -824,6 +852,10 @@ impl VerifiedPreDispatchNoEffect {
                 requirements.outcome_eligibility,
             )?,
             payment: participant(ReleaseParticipantV1::Payment, requirements.payment)?,
+            credit_exposure: participant(
+                ReleaseParticipantV1::CreditExposure,
+                requirements.credit_exposure,
+            )?,
             channel: participant(ReleaseParticipantV1::Channel, requirements.channel)?,
             transport: VerifiedParticipantNoEffectV1::NotDispatched {
                 evidence: VerifiedParticipantNoEffectEvidenceV1::from_verified_source(

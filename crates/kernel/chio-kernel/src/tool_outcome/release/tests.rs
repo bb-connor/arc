@@ -95,6 +95,7 @@ fn no_effect_dispositions(
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
+        VerifiedParticipantNoEffectV1::NotRequired,
         not_dispatched(operation),
     )
 }
@@ -151,6 +152,71 @@ fn prepared_channel_operation(
         effect_class: SideEffectClass::Monetary,
     })?;
     AdmissionOperationV1::prepare(binding, 7)
+}
+
+#[test]
+fn released_predispatch_manifest_covers_reserved_credit_exposure(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::ToolDispatch,
+        namespace: AuthenticatedRequestNamespace::for_local_system(id(
+            "credit-release-coordinator",
+        ))?,
+        request_id: id("request-credit-release"),
+        capability_id: id("credit-release-capability"),
+        authorization_capability_hash: admission_digest("credit-release-authorization"),
+        request_binding: AdmissionRequestBindingV1::new(
+            admission_digest("credit-release-request"),
+            AdmissionParticipantRequirements {
+                broker_attempt: true,
+                budget_capture: true,
+                obligation: true,
+                credit_exposure: true,
+                ..AdmissionParticipantRequirements::NONE
+            },
+        )?,
+        policy_hash: admission_digest("credit-release-policy"),
+        effect_class: SideEffectClass::Monetary,
+    })?;
+    let prepared = AdmissionOperationV1::prepare(binding, 7)?;
+    let broker = advance(
+        &prepared,
+        AdmissionOperationState::BrokerAttemptRegistered,
+        vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+            &prepared,
+            "credit-release-attempt",
+        ))],
+    );
+    let attached = advance(
+        &broker,
+        AdmissionOperationState::BudgetAuthorized,
+        vec![
+            AdmissionAttachment::BudgetHoldId(id("credit-release-hold")),
+            AdmissionAttachment::CreditExposureReservationDigest(admission_digest(
+                "credit-release-reservation",
+            )),
+        ],
+    );
+    let proof = VerifiedPreDispatchNoEffect::from_qualified_released_operation_snapshot(
+        &attached,
+        &projection_context(&attached),
+        serde_json::json!({"policy": "credit-release-v1"}),
+    )?;
+
+    assert!(proof
+        .snapshot
+        .participant_manifest
+        .required_participants
+        .contains(&ReleaseParticipantV1::CreditExposure));
+    assert!(matches!(
+        proof
+            .snapshot
+            .participant_manifest
+            .participant_dispositions
+            .credit_exposure,
+        VerifiedParticipantNoEffectV1::ReleasedBeforeDispatch { .. }
+    ));
+    Ok(())
 }
 
 #[test]
@@ -804,6 +870,7 @@ fn predispatch_manifest_binds_required_participants_and_exact_attachments() {
             VerifiedParticipantNoEffectV1::NotRequired,
             VerifiedParticipantNoEffectV1::NotRequired,
             VerifiedParticipantNoEffectV1::NotRequired,
+            VerifiedParticipantNoEffectV1::NotRequired,
             not_dispatched(&budget),
         )
     };
@@ -871,6 +938,7 @@ fn predispatch_release_rejects_evidence_and_future_time_substitution() {
     let dispositions = PreDispatchParticipantDispositionsV1::from_verified_parts(
         VerifiedParticipantNoEffectV1::NotRequired,
         budget_evidence,
+        VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,

@@ -144,6 +144,7 @@ impl SqliteAdmissionOperationStore {
                 transaction,
                 &stored.operation,
                 &manifest.projection_digest()?,
+                verified.pre_dispatch_release_proof(),
                 &context.store_fence,
                 apply_time_unix_ms,
             )?;
@@ -233,6 +234,7 @@ impl SqliteAdmissionOperationStore {
             transaction,
             updated,
             &manifest.projection_digest()?,
+            verified.pre_dispatch_release_proof(),
             &self.serving_owner.fence,
             apply_time_unix_ms,
         )?;

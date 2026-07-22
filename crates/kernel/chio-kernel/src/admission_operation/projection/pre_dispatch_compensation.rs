@@ -47,6 +47,15 @@ pub(crate) fn verified_released_pre_dispatch_compensation_projection(
     pre_dispatch_compensation_projection(operation, context, proof)
 }
 
+#[cfg(any(test, feature = "admission-test-support"))]
+pub fn verified_released_pre_dispatch_compensation_projection_for_test(
+    operation: &AdmissionOperationV1,
+    context: AdmissionProjectionContext,
+    verifier_policy: serde_json::Value,
+) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
+    verified_released_pre_dispatch_compensation_projection(operation, context, verifier_policy)
+}
+
 fn pre_dispatch_compensation_projection(
     operation: &AdmissionOperationV1,
     context: AdmissionProjectionContext,

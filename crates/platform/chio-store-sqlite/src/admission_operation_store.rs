@@ -642,6 +642,7 @@ impl SqliteAdmissionOperationStore {
                 transaction,
                 &stored.operation,
                 canonical.projection_digest(),
+                projection.pre_dispatch_release_proof(),
                 &context.store_fence,
                 context.trusted_time_unix_ms,
             )?;
@@ -713,6 +714,7 @@ impl SqliteAdmissionOperationStore {
             transaction,
             &updated,
             canonical.projection_digest(),
+            projection.pre_dispatch_release_proof(),
             &context.store_fence,
             context.trusted_time_unix_ms,
         )?;
