@@ -1,4 +1,137 @@
 use super::*;
+use chio_core::canonical::canonical_json_bytes;
+use chio_core::crypto::{PublicKey, Signature};
+use chio_core::sha256_hex;
+use hmac::{Hmac, Mac};
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+use subtle::ConstantTimeEq;
+
+const BUDGET_ANCHOR_GENESIS_DIGEST: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BudgetSnapshotAnchorCommitment {
+    pub schema: String,
+    pub commit_sequence: u64,
+    pub previous_chain_digest: String,
+    pub chain_digest: String,
+    pub anchor_set_digest: String,
+    pub leader_url: String,
+    pub election_term: u64,
+    pub committed_at: u64,
+    pub signer_public_key: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SignedBudgetSnapshotAnchorCommitment {
+    pub body: BudgetSnapshotAnchorCommitment,
+    pub signature: Signature,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BudgetSnapshotAnchorProvenance {
+    pub schema: String,
+    pub chain: Vec<SignedBudgetSnapshotAnchorCommitment>,
+    pub cluster_authenticator: String,
+}
+
+#[derive(Serialize)]
+struct AnchorSetDigestBody<'a> {
+    schema: &'static str,
+    anchors: Vec<AnchorDigestRecord<'a>>,
+}
+
+#[derive(Serialize)]
+struct AnchorDigestRecord<'a> {
+    capability_id: &'a str,
+    grant_index: u32,
+    invocation_count: u32,
+    updated_at: i64,
+    seq: u64,
+    total_cost_exposed: u64,
+    total_cost_realized_spend: u64,
+}
+
+#[derive(Serialize)]
+struct AnchorChainDigestBody<'a> {
+    schema: &'static str,
+    commit_sequence: u64,
+    previous_chain_digest: &'a str,
+    anchor_set_digest: &'a str,
+    leader_url: &'a str,
+    election_term: u64,
+    committed_at: u64,
+    signer_public_key: &'a str,
+}
+
+#[derive(Serialize)]
+struct AnchorAuthenticatorBody<'a> {
+    scheme: &'static str,
+    chain: &'a [SignedBudgetSnapshotAnchorCommitment],
+}
+
+pub fn budget_snapshot_anchor_set_digest(
+    anchors: &[BudgetUsageRecord],
+) -> Result<String, BudgetStoreError> {
+    let mut canonical_anchors = anchors.to_vec();
+    canonical_anchors.sort_by(|left, right| {
+        (&left.capability_id, left.grant_index).cmp(&(&right.capability_id, right.grant_index))
+    });
+    let anchors = canonical_anchors
+        .iter()
+        .map(|anchor| AnchorDigestRecord {
+            capability_id: &anchor.capability_id,
+            grant_index: anchor.grant_index,
+            invocation_count: anchor.invocation_count,
+            updated_at: anchor.updated_at,
+            seq: anchor.seq,
+            total_cost_exposed: anchor.total_cost_exposed,
+            total_cost_realized_spend: anchor.total_cost_realized_spend,
+        })
+        .collect();
+    let bytes = canonical_json_bytes(&AnchorSetDigestBody {
+        schema: "chio.budget-snapshot-anchor-set.v1",
+        anchors,
+    })
+    .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+    Ok(sha256_hex(&bytes))
+}
+
+pub fn budget_snapshot_anchor_chain_digest(
+    body: &BudgetSnapshotAnchorCommitment,
+) -> Result<String, BudgetStoreError> {
+    let bytes = canonical_json_bytes(&AnchorChainDigestBody {
+        schema: "chio.budget-snapshot-anchor-chain.v1",
+        commit_sequence: body.commit_sequence,
+        previous_chain_digest: &body.previous_chain_digest,
+        anchor_set_digest: &body.anchor_set_digest,
+        leader_url: &body.leader_url,
+        election_term: body.election_term,
+        committed_at: body.committed_at,
+        signer_public_key: &body.signer_public_key,
+    })
+    .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+    Ok(sha256_hex(&bytes))
+}
+
+pub fn budget_snapshot_anchor_authenticator(
+    service_token: &str,
+    chain: &[SignedBudgetSnapshotAnchorCommitment],
+) -> Result<String, BudgetStoreError> {
+    let bytes = canonical_json_bytes(&AnchorAuthenticatorBody {
+        scheme: "chio.cluster-budget-anchor-auth.v1",
+        chain,
+    })
+    .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+    let mut authenticator = Hmac::<Sha256>::new_from_slice(service_token.as_bytes())
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+    authenticator.update(&bytes);
+    Ok(hex::encode(authenticator.finalize().into_bytes()))
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BudgetStoreSnapshot {
@@ -17,6 +150,7 @@ struct BudgetImportBatch<'a> {
     abandoned_seq_ranges: &'a [(u64, u64)],
     covered_head: Option<u64>,
     origin_ack_heads: Option<&'a [(String, u64)]>,
+    allow_verified_anchor_install: bool,
 }
 
 impl SqliteBudgetStore {
@@ -87,6 +221,7 @@ impl SqliteBudgetStore {
                 abandoned_seq_ranges: &[],
                 covered_head: None,
                 origin_ack_heads: None,
+                allow_verified_anchor_install: false,
             },
             "budget snapshot import",
         )
@@ -108,6 +243,7 @@ impl SqliteBudgetStore {
                 abandoned_seq_ranges,
                 covered_head: Some(covered_head),
                 origin_ack_heads: None,
+                allow_verified_anchor_install: false,
             },
             "budget snapshot import",
         )
@@ -128,12 +264,79 @@ impl SqliteBudgetStore {
             abandoned_seq_ranges: &validated.abandoned_seq_ranges,
             covered_head: Some(validated.covered_head),
             origin_ack_heads: Some(&validated.origin_ack_heads),
+            allow_verified_anchor_install: false,
         };
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         Self::validate_exact_snapshot_usage_anchors(&transaction, batch.anchors)?;
         Self::validate_local_snapshot_subset(&transaction, &validated)?;
         Self::apply_import_batch(&transaction, &batch)?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn import_budget_snapshot_with_anchor_provenance(
+        &self,
+        snapshot: &BudgetStoreSnapshot,
+        provenance: &BudgetSnapshotAnchorProvenance,
+        expected_leader_url: &str,
+        expected_election_term: u64,
+        cluster_service_token: &str,
+    ) -> Result<(), BudgetStoreError> {
+        const OPERATION: &str = "verified budget snapshot import";
+        self.require_standalone_mutation(OPERATION)?;
+        let head = verify_budget_snapshot_anchor_provenance(
+            snapshot,
+            provenance,
+            expected_leader_url,
+            expected_election_term,
+            cluster_service_token,
+        )?;
+        let validated = Self::validate_budget_snapshot_in_isolation(snapshot)?;
+        let batch = BudgetImportBatch {
+            usages: &validated.usages,
+            events: &validated.mutation_events,
+            anchors: &validated.usage_history_anchors,
+            abandoned_seq_ranges: &validated.abandoned_seq_ranges,
+            covered_head: Some(validated.covered_head),
+            origin_ack_heads: Some(&validated.origin_ack_heads),
+            allow_verified_anchor_install: true,
+        };
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection)?;
+        verify_local_anchor_provenance_continuity(&transaction, provenance)?;
+        Self::validate_local_snapshot_subset(&transaction, &validated)?;
+        Self::apply_import_batch(&transaction, &batch)?;
+        let local = Self::snapshot_usage_history_anchors(&transaction)?;
+        if local != validated.usage_history_anchors {
+            return Err(BudgetStoreError::Invariant(
+                "verified budget snapshot history anchor set is not exact".to_string(),
+            ));
+        }
+        transaction.execute(
+            r#"
+            INSERT INTO budget_snapshot_anchor_provenance (
+                leader_url, commit_sequence, chain_digest, anchor_set_digest,
+                election_term, signer_public_key, committed_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(leader_url) DO UPDATE SET
+                commit_sequence = excluded.commit_sequence,
+                chain_digest = excluded.chain_digest,
+                anchor_set_digest = excluded.anchor_set_digest,
+                election_term = excluded.election_term,
+                signer_public_key = excluded.signer_public_key,
+                committed_at = excluded.committed_at
+            "#,
+            params![
+                &head.leader_url,
+                budget_u64_to_sqlite(head.commit_sequence, "anchor_commit_sequence")?,
+                &head.chain_digest,
+                &head.anchor_set_digest,
+                budget_u64_to_sqlite(head.election_term, "anchor_election_term")?,
+                &head.signer_public_key,
+                budget_u64_to_sqlite(head.committed_at, "anchor_committed_at")?,
+            ],
+        )?;
         transaction.commit()?;
         Ok(())
     }
@@ -151,6 +354,7 @@ impl SqliteBudgetStore {
                 abandoned_seq_ranges: &[],
                 covered_head: None,
                 origin_ack_heads: None,
+                allow_verified_anchor_install: false,
             },
             "budget delta import",
         )
@@ -174,7 +378,11 @@ impl SqliteBudgetStore {
         transaction: &rusqlite::Transaction<'_>,
         batch: &BudgetImportBatch<'_>,
     ) -> Result<(), BudgetStoreError> {
-        Self::install_snapshot_usage_anchors(transaction, batch.anchors)?;
+        Self::install_snapshot_usage_anchors(
+            transaction,
+            batch.anchors,
+            batch.allow_verified_anchor_install,
+        )?;
         for event in batch.events {
             Self::import_mutation_record_in_transaction(transaction, event)?;
         }
@@ -214,6 +422,7 @@ impl SqliteBudgetStore {
                 abandoned_seq_ranges: &snapshot.abandoned_seq_ranges,
                 covered_head: Some(snapshot.covered_head),
                 origin_ack_heads: Some(&snapshot.origin_ack_heads),
+                allow_verified_anchor_install: false,
             },
             "budget snapshot validation",
         )?;
@@ -301,7 +510,7 @@ impl SqliteBudgetStore {
         transaction: &rusqlite::Transaction<'_>,
         anchors: &[BudgetUsageRecord],
     ) -> Result<(), BudgetStoreError> {
-        Self::install_snapshot_usage_anchors(transaction, anchors)?;
+        Self::install_snapshot_usage_anchors(transaction, anchors, false)?;
         let local = Self::snapshot_usage_history_anchors(transaction)?;
         let mut incoming = anchors.to_vec();
         incoming.sort_by(|left, right| {
@@ -641,4 +850,127 @@ fn snapshot_proves_usage(snapshot: &BudgetStoreSnapshot, usage: &BudgetUsageReco
                 && event.total_cost_exposed_after == usage.total_cost_exposed
                 && event.total_cost_realized_spend_after == usage.total_cost_realized_spend
         })
+}
+
+fn verify_budget_snapshot_anchor_provenance<'a>(
+    snapshot: &BudgetStoreSnapshot,
+    provenance: &'a BudgetSnapshotAnchorProvenance,
+    expected_leader_url: &str,
+    expected_election_term: u64,
+    cluster_service_token: &str,
+) -> Result<&'a BudgetSnapshotAnchorCommitment, BudgetStoreError> {
+    if expected_leader_url.is_empty()
+        || expected_election_term == 0
+        || cluster_service_token.is_empty()
+        || provenance.chain.is_empty()
+        || provenance.schema != "chio.budget-snapshot-anchor-provenance.v1"
+    {
+        return Err(BudgetStoreError::Invariant(
+            "budget snapshot anchor provenance trust context is incomplete".to_string(),
+        ));
+    }
+    let expected_authenticator =
+        budget_snapshot_anchor_authenticator(cluster_service_token, &provenance.chain)?;
+    if !bool::from(
+        provenance
+            .cluster_authenticator
+            .as_bytes()
+            .ct_eq(expected_authenticator.as_bytes()),
+    ) {
+        return Err(BudgetStoreError::Invariant(
+            "budget snapshot anchor provenance cluster authentication failed".to_string(),
+        ));
+    }
+    let expected_anchor_digest =
+        budget_snapshot_anchor_set_digest(&snapshot.usage_history_anchors)?;
+    let mut previous_digest = BUDGET_ANCHOR_GENESIS_DIGEST;
+    for (index, signed) in provenance.chain.iter().enumerate() {
+        let expected_sequence = u64::try_from(index)
+            .ok()
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "budget snapshot anchor provenance sequence overflowed".to_string(),
+                )
+            })?;
+        let body = &signed.body;
+        if body.schema != "chio.budget-snapshot-anchor-commitment.v1"
+            || body.commit_sequence != expected_sequence
+            || body.previous_chain_digest != previous_digest
+            || body.election_term == 0
+            || body.leader_url.is_empty()
+            || body.signer_public_key.is_empty()
+            || budget_snapshot_anchor_chain_digest(body)? != body.chain_digest
+        {
+            return Err(BudgetStoreError::Invariant(
+                "budget snapshot anchor provenance chain is invalid".to_string(),
+            ));
+        }
+        let signer = PublicKey::from_hex(&body.signer_public_key)
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        if !signer
+            .verify_canonical(body, &signed.signature)
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?
+        {
+            return Err(BudgetStoreError::Invariant(
+                "budget snapshot anchor provenance signature is invalid".to_string(),
+            ));
+        }
+        previous_digest = &body.chain_digest;
+    }
+    let head = provenance.chain.last().ok_or_else(|| {
+        BudgetStoreError::Invariant("budget snapshot anchor provenance is empty".to_string())
+    })?;
+    if head.body.leader_url != expected_leader_url
+        || head.body.election_term != expected_election_term
+        || head.body.anchor_set_digest != expected_anchor_digest
+    {
+        return Err(BudgetStoreError::Invariant(
+            "budget snapshot anchor provenance is not bound to the elected leader, term, and exact anchor set"
+                .to_string(),
+        ));
+    }
+    Ok(&head.body)
+}
+
+fn verify_local_anchor_provenance_continuity(
+    transaction: &rusqlite::Transaction<'_>,
+    provenance: &BudgetSnapshotAnchorProvenance,
+) -> Result<(), BudgetStoreError> {
+    let head = provenance.chain.last().ok_or_else(|| {
+        BudgetStoreError::Invariant("budget snapshot anchor provenance is empty".to_string())
+    })?;
+    let local = transaction
+        .query_row(
+            r#"
+            SELECT commit_sequence, chain_digest
+            FROM budget_snapshot_anchor_provenance
+            WHERE leader_url = ?1
+            "#,
+            params![&head.body.leader_url],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()?;
+    let Some((local_sequence, local_digest)) = local else {
+        return Ok(());
+    };
+    let local_sequence = local_sequence.max(0) as u64;
+    let index = usize::try_from(local_sequence.saturating_sub(1)).map_err(|_| {
+        BudgetStoreError::Invariant(
+            "persisted budget snapshot anchor provenance sequence is invalid".to_string(),
+        )
+    })?;
+    let committed = provenance.chain.get(index).ok_or_else(|| {
+        BudgetStoreError::Invariant(
+            "budget snapshot anchor provenance rewinds the persisted leader chain".to_string(),
+        )
+    })?;
+    if committed.body.commit_sequence != local_sequence
+        || committed.body.chain_digest != local_digest
+    {
+        return Err(BudgetStoreError::Invariant(
+            "budget snapshot anchor provenance forks the persisted leader chain".to_string(),
+        ));
+    }
+    Ok(())
 }

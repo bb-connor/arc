@@ -1848,6 +1848,16 @@ explicit multi-dimensional budget profiles. Budget utilization rows expose
 named `dimensions.invocations` and `dimensions.money` usage blocks, while
 settlement backlog rows pair signed `financial.settlement_status` with mutable
 sidecar reconciliation state keyed by `receipt_id`.
+
+Cluster snapshots that carry immutable pre-upgrade budget usage anchors MUST
+also carry `chio.budget-snapshot-anchor-provenance.v1`. The provenance binds the
+canonical anchor-set digest into an append-only authority commitment chain,
+signs every chain entry with the serving leader's authority key, and
+authenticates the complete inclusion chain with the configured cluster service
+trust root. A follower MUST accept a previously absent wire anchor only from its
+locally elected leader, at the exact local election term, after verifying the
+chain from its genesis digest and preserving any previously accepted head.
+Ordinary snapshot imports remain unable to create migration anchors.
 `/v1/reports/metered-billing` and `/v1/metered-billing/reconcile` apply the
 same pattern to post-execution metered-cost evidence for governed
 non-payment-rail tools.

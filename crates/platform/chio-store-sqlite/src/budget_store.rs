@@ -50,7 +50,11 @@ mod store;
 mod trait_impl;
 
 pub use reaper::ReapSummary;
-pub use snapshot::BudgetStoreSnapshot;
+pub use snapshot::{
+    budget_snapshot_anchor_authenticator, budget_snapshot_anchor_chain_digest,
+    budget_snapshot_anchor_set_digest, BudgetSnapshotAnchorCommitment,
+    BudgetSnapshotAnchorProvenance, BudgetStoreSnapshot, SignedBudgetSnapshotAnchorCommitment,
+};
 pub(crate) use store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 
 #[cfg(test)]

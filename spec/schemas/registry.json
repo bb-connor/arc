@@ -35,6 +35,12 @@
       "schemaFile": "spec/schemas/chio-wire/v1/capability/aggregate-budget-root.schema.json"
     },
     {
+      "schema": "chio.budget-snapshot-anchor-provenance.v1",
+      "artifactKind": "budget_snapshot_anchor_provenance",
+      "introducedBy": "economic-state-continuity-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust-control/budget-snapshot-anchor-provenance.schema.json"
+    },
+    {
       "schema": "chio.attest.buyer-attestation-explanation.v1",
       "artifactKind": "chio_attest_buyer_attestation_explanation",
       "introducedBy": "chio-final-architecture/v1",

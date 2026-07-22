@@ -97,6 +97,7 @@ pub(crate) fn cluster_replication_heads(
 pub(crate) fn build_cluster_state_snapshot(
     state: &TrustServiceState,
 ) -> Result<ClusterStateSnapshotResponse, CliError> {
+    let generated_at = unix_timestamp_now();
     let consensus = cluster_consensus_view(state);
     let authority_lease = cluster_authority_lease_view(state);
     let authority = if let Some(path) = state.config.authority_db_path.as_deref() {
@@ -131,6 +132,7 @@ pub(crate) fn build_cluster_state_snapshot(
     let (
         budgets,
         budget_usage_history_anchors,
+        budget_anchor_provenance,
         budget_mutation_events,
         budget_abandoned_seq_ranges,
         budget_covered_head,
@@ -140,6 +142,46 @@ pub(crate) fn build_cluster_state_snapshot(
         .map_err(|error| CliError::cli_other_error(error.to_string()))?
     {
         let snapshot = store.export_budget_snapshot()?;
+        let budget_anchor_provenance = if snapshot.usage_history_anchors.is_empty() {
+            None
+        } else {
+            let self_url = cluster_self_url(state);
+            let leader_url = current_leader_url(state);
+            if self_url.is_some() && self_url == leader_url {
+                let leader_url = leader_url.ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "budget snapshot anchor provenance requires an elected leader".to_string(),
+                    )
+                })?;
+                let authority_path =
+                    state.config.authority_db_path.as_deref().ok_or_else(|| {
+                        CliError::cli_other_error(
+                            "budget snapshot anchor provenance requires --authority-db".to_string(),
+                        )
+                    })?;
+                let anchor_set_digest =
+                    budget_snapshot_anchor_set_digest(&snapshot.usage_history_anchors)?;
+                let authority = SqliteCapabilityAuthority::open(authority_path)?;
+                let chain = authority.commit_budget_snapshot_anchor_set(
+                    &anchor_set_digest,
+                    &leader_url,
+                    consensus
+                        .as_ref()
+                        .map(|view| view.election_term)
+                        .unwrap_or(0),
+                    generated_at,
+                )?;
+                let cluster_authenticator =
+                    budget_snapshot_anchor_authenticator(&state.config.service_token, &chain)?;
+                Some(BudgetSnapshotAnchorProvenance {
+                    schema: "chio.budget-snapshot-anchor-provenance.v1".to_string(),
+                    chain,
+                    cluster_authenticator,
+                })
+            } else {
+                None
+            }
+        };
         (
             snapshot.usages.into_iter().map(budget_usage_view).collect(),
             snapshot
@@ -147,6 +189,7 @@ pub(crate) fn build_cluster_state_snapshot(
                 .into_iter()
                 .map(budget_usage_view)
                 .collect(),
+            budget_anchor_provenance,
             snapshot
                 .mutation_events
                 .into_iter()
@@ -171,6 +214,7 @@ pub(crate) fn build_cluster_state_snapshot(
         (
             Vec::new(),
             Vec::new(),
+            None,
             Vec::new(),
             Vec::new(),
             0,
@@ -194,7 +238,7 @@ pub(crate) fn build_cluster_state_snapshot(
     };
 
     Ok(ClusterStateSnapshotResponse {
-        generated_at: unix_timestamp_now(),
+        generated_at,
         election_term: consensus
             .as_ref()
             .map(|view| view.election_term)
@@ -208,6 +252,7 @@ pub(crate) fn build_cluster_state_snapshot(
         lineage,
         budgets,
         budget_usage_history_anchors,
+        budget_anchor_provenance,
         budget_mutation_events,
         budget_abandoned_seq_ranges,
         budget_origin_ack_heads,
@@ -231,6 +276,7 @@ pub(crate) fn apply_cluster_snapshot(
         lineage,
         budgets,
         budget_usage_history_anchors,
+        budget_anchor_provenance,
         budget_mutation_events,
         budget_abandoned_seq_ranges,
         budget_origin_ack_heads,
@@ -304,9 +350,35 @@ pub(crate) fn apply_cluster_snapshot(
                 .map(|head| (head.origin_id.clone(), head.event_seq))
                 .collect(),
         };
-        store
-            .import_budget_snapshot(&budget_snapshot)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        if let Some(provenance) = budget_anchor_provenance.as_ref() {
+            let elected_leader = current_leader_url(state).ok_or_else(|| {
+                CliError::cli_other_error(
+                    "budget snapshot anchor provenance arrived without an elected leader"
+                        .to_string(),
+                )
+            })?;
+            let local_term = cluster_consensus_view(state)
+                .map(|view| view.election_term)
+                .unwrap_or(0);
+            if peer_url != elected_leader {
+                return Err(CliError::cli_other_error(format!(
+                    "budget snapshot anchor provenance came from `{peer_url}`, not elected leader `{elected_leader}`"
+                )));
+            }
+            store
+                .import_budget_snapshot_with_anchor_provenance(
+                    &budget_snapshot,
+                    provenance,
+                    &elected_leader,
+                    local_term,
+                    &state.config.service_token,
+                )
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        } else {
+            store
+                .import_budget_snapshot(&budget_snapshot)
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        }
         for event in &budget_mutation_events {
             budget_cursor = Some(merge_budget_cursor(
                 budget_cursor,

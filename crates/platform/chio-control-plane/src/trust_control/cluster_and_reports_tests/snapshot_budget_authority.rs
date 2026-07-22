@@ -1,6 +1,103 @@
 use super::*;
 
 #[test]
+fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
+    let source_budget_db = unique_temp_path("cluster-source-legacy-budget", "sqlite3");
+    let target_budget_db = unique_temp_path("cluster-target-legacy-budget", "sqlite3");
+    let source_authority_db = unique_temp_path("cluster-source-anchor-authority", "sqlite3");
+    let target_authority_db = unique_temp_path("cluster-target-anchor-authority", "sqlite3");
+    let mut source_state = state_with_cluster(
+        "http://node-a",
+        &["http://node-b"],
+        None,
+        None,
+        Some(source_budget_db.clone()),
+    );
+    source_state.config.authority_db_path = Some(source_authority_db.clone());
+    let mut target_state = state_with_cluster(
+        "http://node-b",
+        &["http://node-a"],
+        None,
+        None,
+        Some(target_budget_db.clone()),
+    );
+    target_state.config.authority_db_path = Some(target_authority_db.clone());
+    update_peer_reachable(&source_state, "http://node-b");
+    update_peer_reachable(&target_state, "http://node-a");
+    assert_eq!(
+        current_leader_url(&source_state).as_deref(),
+        Some("http://node-a")
+    );
+    assert_eq!(
+        current_leader_url(&target_state).as_deref(),
+        Some("http://node-a")
+    );
+
+    drop(SqliteBudgetStore::open(&source_budget_db).test_unwrap());
+    let source_connection = rusqlite::Connection::open(&source_budget_db).test_unwrap();
+    source_connection
+        .execute(
+            "INSERT INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+            [],
+        )
+        .test_unwrap();
+    source_connection
+        .execute(
+            r#"
+            INSERT INTO capability_grant_budgets (
+                capability_id, grant_index, invocation_count, updated_at, seq,
+                total_cost_exposed, total_cost_realized_spend
+            ) VALUES ('cap-pre-upgrade', 0, 3, 1717171717, 42, 55, 21)
+            "#,
+            [],
+        )
+        .test_unwrap();
+    source_connection
+        .execute(
+            r#"
+            INSERT INTO budget_usage_history_anchors (
+                capability_id, grant_index, invocation_count, updated_at, seq,
+                total_cost_exposed, total_cost_realized_spend, anchored_schema_version
+            ) VALUES ('cap-pre-upgrade', 0, 3, 1717171717, 42, 55, 21, 6)
+            "#,
+            [],
+        )
+        .test_unwrap();
+    source_connection
+        .execute("DELETE FROM budget_usage_anchor_migration_gate", [])
+        .test_unwrap();
+    drop(source_connection);
+
+    let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
+    assert_eq!(snapshot.budget_usage_history_anchors.len(), 1);
+    assert!(snapshot.budget_anchor_provenance.is_some());
+    apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+
+    let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
+    let imported = target_store
+        .get_usage("cap-pre-upgrade", 0)
+        .test_unwrap()
+        .test_expect("fresh follower imported the leader-committed baseline");
+    assert_eq!(imported.invocation_count, 3);
+    assert_eq!(
+        target_store.list_usage_history_anchors().test_unwrap(),
+        vec![imported]
+    );
+
+    drop(target_store);
+    drop(source_state);
+    drop(target_state);
+    for path in [
+        source_budget_db,
+        target_budget_db,
+        source_authority_db,
+        target_authority_db,
+    ] {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+#[test]
 fn snapshot_preserves_exact_budget_origin_heads_and_next_delta() {
     let source_budget_db = unique_temp_path("cluster-source-budget-origin", "sqlite3");
     let target_budget_db = unique_temp_path("cluster-target-budget-origin", "sqlite3");

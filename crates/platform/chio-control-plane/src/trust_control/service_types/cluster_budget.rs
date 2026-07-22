@@ -84,6 +84,11 @@ pub(crate) struct ClusterStateSnapshotResponse {
     /// retained mutation stream starts after an imported usage baseline.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_usage_history_anchors: Vec<BudgetUsageView>,
+    /// Authenticated, leader-signed inclusion chain for the exact immutable
+    /// migration-anchor set. Required before a fresh follower may install wire
+    /// anchors that are not already present in its local budget database.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) budget_anchor_provenance: Option<BudgetSnapshotAnchorProvenance>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_mutation_events: Vec<BudgetMutationEventView>,
     /// Abandoned/tombstoned budget event_seqs (rolled-back-then-re-appended

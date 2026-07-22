@@ -1,4 +1,4 @@
-8d105f174734841c9b045a138bd3d21acf6b1ee6f10e2ee28d06a4913538bbd4  spec/schemas/MANIFEST.sha256
+3d01b4ae0ac31e2333ef157f3a4a89030c3e92cb546299c0c0ff7bbaec132f91  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -391,6 +391,7 @@ ff4f655a0f0c7afda5c0674f3afde1e3961f1d58292584ed39f8bb5b96e30c8b  spec/schemas/c
 9b9fad84c47fc9c921647d99674ef033a44fc4b0c1679228d36f1b271545716c  spec/schemas/chio-wire/v1/result/ok.schema.json
 0f05eefed9afbfc5f46d82920deb7672876b04b23a32ab4dc59b0b5e21c6bc3b  spec/schemas/chio-wire/v1/result/stream_complete.schema.json
 79e13f78d1cff7910455dbf7998154d363acc9449bc4b0b30b6da7556b264313  spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
+262724dab8df388e44c1ad127c5831c8371893c7c083d1671d7dc8c7bb6f5805  spec/schemas/chio-wire/v1/trust-control/budget-snapshot-anchor-provenance.schema.json
 33a84d19445de5074f554f66ff838acb72bc002772b5dcf82ad53abccb4dc656  spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json
 47661110b2674673ca5f1401271af6a0de8a2f465440ac964553ce6be1f9e0ae  spec/schemas/chio-wire/v1/trust-control/lease.schema.json
 63540f55a91b96cf071cece6b3465e8c3bba82512a91a5f83b05affc757033f4  spec/schemas/chio-wire/v1/trust-control/terminate.schema.json
@@ -398,4 +399,4 @@ ff4f655a0f0c7afda5c0674f3afde1e3961f1d58292584ed39f8bb5b96e30c8b  spec/schemas/c
 3374b9d40520b66cae420da1f9c8bb07fed6bfbd62ae918615e2f88b6e1b7700  spec/schemas/chio-workflow/v1/preflight-report.schema.json
 f109672e496e5e3bb56c5a3d61ed882b922d8bbade45899975d1852921f7890e  spec/schemas/financial-credential-defs.v1.schema.json
 049d7788253b57ddf472ebed0e8e6cb1a26e2249e9645e9e18cfdc3606a2b669  spec/schemas/fiscal-defs.v1.schema.json
-6524b5dd0fca3e903ecadc0581eabbd4a1990ac180dfd43f181943bc3fe3e354  spec/schemas/registry.json
+76f4adab502924d8faf0ea6bc679a689e4f261ac33c215370aeb98e99c9891b7  spec/schemas/registry.json

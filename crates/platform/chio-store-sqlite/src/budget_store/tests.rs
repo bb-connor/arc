@@ -735,15 +735,122 @@ fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
     assert!(error
         .to_string()
         .contains("no identical locally migration-anchored state"));
-    assert!(
-        error
-            .to_string()
-            .contains("copying the leader's already-migrated budget database file directly"),
-        "the refusal must name the supported bootstrap path: {error}"
-    );
+    assert!(error
+        .to_string()
+        .contains("elected-leader snapshot path with verified anchor provenance"));
     assert!(store.get_usage("cap-anchor-only", 0).unwrap().is_none());
     assert!(store.list_usage_history_anchors().unwrap().is_empty());
     assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn elected_leader_provenance_bootstraps_a_fresh_pre_upgrade_follower() {
+    let path = unique_db_path("chio-budget-verified-anchor-bootstrap");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let usage = usage_record("cap-legacy-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
+    let snapshot = BudgetStoreSnapshot {
+        usages: vec![usage.clone()],
+        usage_history_anchors: vec![usage.clone()],
+        mutation_events: Vec::new(),
+        abandoned_seq_ranges: Vec::new(),
+        covered_head: 0,
+        origin_ack_heads: Vec::new(),
+    };
+    let keypair = chio_core::crypto::Keypair::generate();
+    let mut body = BudgetSnapshotAnchorCommitment {
+        schema: "chio.budget-snapshot-anchor-commitment.v1".to_string(),
+        commit_sequence: 1,
+        previous_chain_digest: "0000000000000000000000000000000000000000000000000000000000000000"
+            .to_string(),
+        chain_digest: String::new(),
+        anchor_set_digest: budget_snapshot_anchor_set_digest(std::slice::from_ref(&usage)).unwrap(),
+        leader_url: "https://leader.example".to_string(),
+        election_term: 9,
+        committed_at: 1_717_171_718,
+        signer_public_key: keypair.public_key().to_hex(),
+    };
+    body.chain_digest = budget_snapshot_anchor_chain_digest(&body).unwrap();
+    let signature = keypair.sign_canonical(&body).unwrap().0;
+    let chain = vec![SignedBudgetSnapshotAnchorCommitment { body, signature }];
+    let provenance = BudgetSnapshotAnchorProvenance {
+        schema: "chio.budget-snapshot-anchor-provenance.v1".to_string(),
+        cluster_authenticator: budget_snapshot_anchor_authenticator("cluster-secret", &chain)
+            .unwrap(),
+        chain,
+    };
+
+    store
+        .import_budget_snapshot_with_anchor_provenance(
+            &snapshot,
+            &provenance,
+            "https://leader.example",
+            9,
+            "cluster-secret",
+        )
+        .unwrap();
+
+    assert_eq!(
+        store.get_usage("cap-legacy-anchor", 0).unwrap(),
+        Some(usage.clone())
+    );
+    assert_eq!(store.list_usage_history_anchors().unwrap(), vec![usage]);
+    assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn anchor_provenance_rejects_wrong_cluster_root_before_install() {
+    let path = unique_db_path("chio-budget-anchor-wrong-root");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let usage = usage_record("cap-forged-anchor", 0, 1, 10, 1, 0, 0);
+    let snapshot = BudgetStoreSnapshot {
+        usages: vec![usage.clone()],
+        usage_history_anchors: vec![usage],
+        mutation_events: Vec::new(),
+        abandoned_seq_ranges: Vec::new(),
+        covered_head: 0,
+        origin_ack_heads: Vec::new(),
+    };
+    let keypair = chio_core::crypto::Keypair::generate();
+    let mut body = BudgetSnapshotAnchorCommitment {
+        schema: "chio.budget-snapshot-anchor-commitment.v1".to_string(),
+        commit_sequence: 1,
+        previous_chain_digest: "0000000000000000000000000000000000000000000000000000000000000000"
+            .to_string(),
+        chain_digest: String::new(),
+        anchor_set_digest: budget_snapshot_anchor_set_digest(&snapshot.usage_history_anchors)
+            .unwrap(),
+        leader_url: "https://leader.example".to_string(),
+        election_term: 2,
+        committed_at: 11,
+        signer_public_key: keypair.public_key().to_hex(),
+    };
+    body.chain_digest = budget_snapshot_anchor_chain_digest(&body).unwrap();
+    let chain = vec![SignedBudgetSnapshotAnchorCommitment {
+        signature: keypair.sign_canonical(&body).unwrap().0,
+        body,
+    }];
+    let provenance = BudgetSnapshotAnchorProvenance {
+        schema: "chio.budget-snapshot-anchor-provenance.v1".to_string(),
+        cluster_authenticator: budget_snapshot_anchor_authenticator("wrong-secret", &chain)
+            .unwrap(),
+        chain,
+    };
+
+    let error = store
+        .import_budget_snapshot_with_anchor_provenance(
+            &snapshot,
+            &provenance,
+            "https://leader.example",
+            2,
+            "cluster-secret",
+        )
+        .expect_err("a different cluster trust root must not install anchors");
+    assert!(error.to_string().contains("cluster authentication failed"));
+    assert!(store.list_usage_history_anchors().unwrap().is_empty());
 
     let _ = fs::remove_file(path);
 }

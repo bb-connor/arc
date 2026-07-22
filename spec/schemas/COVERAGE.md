@@ -114,14 +114,15 @@ JSON-RPC framing used by the hosted MCP HTTP edge. See `jsonrpc/README.md`.
 | `jsonrpc/request.schema.json`     |    46 |
 | `jsonrpc/response.schema.json`    |    67 |
 
-### trust-control (4)
+### trust-control (5)
 
-Trust-control plane messages: lease, heartbeat, terminate, and attestation.
+Trust-control plane messages: lease, heartbeat, terminate, attestation, and budget snapshot anchor provenance.
 See `trust-control/README.md`.
 
 | File                                  | Lines |
 |---------------------------------------|-------|
 | `trust-control/attestation.schema.json` |  88 |
+| `trust-control/budget-snapshot-anchor-provenance.schema.json` |  62 |
 | `trust-control/heartbeat.schema.json` |    41 |
 | `trust-control/lease.schema.json`     |    64 |
 | `trust-control/terminate.schema.json` |    52 |

@@ -687,6 +687,7 @@ mod tests {
             lineage: Vec::new(),
             budgets: Vec::new(),
             budget_usage_history_anchors: Vec::new(),
+            budget_anchor_provenance: None,
             budget_mutation_events: vec![view],
             budget_abandoned_seq_ranges: Vec::new(),
             budget_origin_ack_heads: Vec::new(),

@@ -2,7 +2,8 @@ use super::*;
 
 mod state_invariants;
 
-const COMPOSITE_SCHEMA_VERSION: i32 = 8;
+const COMPOSITE_SCHEMA_VERSION: i32 = 9;
+const BUDGET_USAGE_ANCHOR_SCHEMA_VERSION: i32 = 6;
 
 pub(super) fn ensure_composite_budget_schema(
     transaction: &rusqlite::Transaction<'_>,
@@ -575,6 +576,22 @@ pub(super) fn ensure_composite_budget_schema(
         VALUES (1, 0)
         ON CONFLICT(singleton) DO NOTHING;
 
+        CREATE TABLE IF NOT EXISTS budget_snapshot_anchor_provenance (
+            leader_url TEXT PRIMARY KEY CHECK (leader_url <> ''),
+            commit_sequence INTEGER NOT NULL CHECK (commit_sequence > 0),
+            chain_digest TEXT NOT NULL CHECK (
+                length(chain_digest) = 64
+                AND chain_digest NOT GLOB '*[^0-9a-f]*'
+            ),
+            anchor_set_digest TEXT NOT NULL CHECK (
+                length(anchor_set_digest) = 64
+                AND anchor_set_digest NOT GLOB '*[^0-9a-f]*'
+            ),
+            election_term INTEGER NOT NULL CHECK (election_term > 0),
+            signer_public_key TEXT NOT NULL CHECK (signer_public_key <> ''),
+            committed_at INTEGER NOT NULL CHECK (committed_at >= 0)
+        );
+
         CREATE TRIGGER IF NOT EXISTS budget_usage_history_anchor_insert_fenced
         BEFORE INSERT ON budget_usage_history_anchors
         WHEN NOT EXISTS (
@@ -747,26 +764,28 @@ pub(super) fn ensure_composite_budget_schema(
                   AND authorization_outcome IS NOT 'denied';
             "#,
         )?;
-        transaction.execute(
-            "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
-            [],
-        )?;
-        transaction.execute(
-            r#"
-            INSERT INTO budget_usage_history_anchors (
-                capability_id, grant_index, invocation_count, updated_at, seq,
-                total_cost_exposed, total_cost_realized_spend,
-                anchored_schema_version
-            )
-            SELECT capability_id, grant_index, invocation_count, updated_at, seq,
-                   total_cost_exposed, total_cost_realized_spend, 6
-            FROM capability_grant_budgets
-            WHERE seq > 0
-            ON CONFLICT(capability_id, grant_index) DO NOTHING
-            "#,
-            [],
-        )?;
-        transaction.execute("DELETE FROM budget_usage_anchor_migration_gate", [])?;
+        if on_disk_schema_version < BUDGET_USAGE_ANCHOR_SCHEMA_VERSION {
+            transaction.execute(
+                "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+                [],
+            )?;
+            transaction.execute(
+                r#"
+                INSERT INTO budget_usage_history_anchors (
+                    capability_id, grant_index, invocation_count, updated_at, seq,
+                    total_cost_exposed, total_cost_realized_spend,
+                    anchored_schema_version
+                )
+                SELECT capability_id, grant_index, invocation_count, updated_at, seq,
+                       total_cost_exposed, total_cost_realized_spend, 6
+                FROM capability_grant_budgets
+                WHERE seq > 0
+                ON CONFLICT(capability_id, grant_index) DO NOTHING
+                "#,
+                [],
+            )?;
+            transaction.execute("DELETE FROM budget_usage_anchor_migration_gate", [])?;
+        }
         transaction.execute(
             r#"
             UPDATE budget_authorization_holds

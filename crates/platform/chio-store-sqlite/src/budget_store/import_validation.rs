@@ -34,6 +34,7 @@ impl SqliteBudgetStore {
     pub(super) fn install_snapshot_usage_anchors(
         transaction: &rusqlite::Transaction<'_>,
         anchors: &[BudgetUsageRecord],
+        allow_verified_install: bool,
     ) -> Result<(), BudgetStoreError> {
         let mut identities = BTreeMap::new();
         for anchor in anchors {
@@ -53,9 +54,39 @@ impl SqliteBudgetStore {
                         anchor.capability_id, anchor.grant_index
                     )));
                 }
+            } else if allow_verified_install {
+                transaction.execute(
+                    "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+                    [],
+                )?;
+                transaction.execute(
+                    r#"
+                    INSERT INTO budget_usage_history_anchors (
+                        capability_id, grant_index, invocation_count, updated_at, seq,
+                        total_cost_exposed, total_cost_realized_spend,
+                        anchored_schema_version
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 6)
+                    "#,
+                    params![
+                        &anchor.capability_id,
+                        i64::from(anchor.grant_index),
+                        i64::from(anchor.invocation_count),
+                        anchor.updated_at,
+                        budget_u64_to_sqlite(anchor.seq, "anchor_seq")?,
+                        budget_u64_to_sqlite(
+                            anchor.total_cost_exposed,
+                            "anchor_total_cost_exposed"
+                        )?,
+                        budget_u64_to_sqlite(
+                            anchor.total_cost_realized_spend,
+                            "anchor_total_cost_realized_spend"
+                        )?,
+                    ],
+                )?;
+                transaction.execute("DELETE FROM budget_usage_anchor_migration_gate", [])?;
             } else {
                 return Err(BudgetStoreError::Invariant(format!(
-                    "budget history anchor `{}` grant {} has no identical locally migration-anchored state; provision a fresh follower by copying the leader's already-migrated budget database file directly, because a pre-upgrade baseline imported over the snapshot wire path cannot carry verifiable anchor provenance",
+                    "budget history anchor `{}` grant {} has no identical locally migration-anchored state; a fresh follower must use the elected-leader snapshot path with verified anchor provenance",
                     anchor.capability_id, anchor.grant_index
                 )));
             }

@@ -28,6 +28,8 @@ use crate::session::{CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, CHIO_SESSION_ANCHOR_SCH
 pub const CHIO_ANCHOR_BATCH_V1_SCHEMA: &str = "chio.anchor_batch.v1";
 pub const CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA: &str = "chio.anchor-inclusion-proof.v1";
 pub const CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA: &str = "chio.anchor-proof-bundle.v1";
+pub const CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA: &str =
+    "chio.budget-snapshot-anchor-provenance.v1";
 pub const CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA: &str = "chio.bilateral-signature-slice.v1";
 pub const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA: &str =
     "chio.frost.authorization-slot-checkpoint.v1";
@@ -249,6 +251,13 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         AGGREGATE_BUDGET_ROOT_SCHEMA,
         Some(("aggregate_budget_root_binding", "protocol-primitives-v1")),
+    ),
+    (
+        CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA,
+        Some((
+            "budget_snapshot_anchor_provenance",
+            "economic-state-continuity-v1",
+        )),
     ),
     (
         CHIO_CAPABILITIES_SCHEMA,
