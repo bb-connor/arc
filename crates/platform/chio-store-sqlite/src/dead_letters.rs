@@ -16,10 +16,11 @@
 //! receipt-store database that already holds other tables.
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_settle::DeadLetterRecord;
+use chio_settle::{DeadLetterRecord, SETTLE_DEAD_LETTER_SCHEMA};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
+use serde::Deserialize;
 use thiserror::Error;
 
 /// SQL migration applied by [`SqliteDeadLetterStore::open_with_pool`]
@@ -72,6 +73,11 @@ struct StoredDeadLetterRow {
     reason: String,
     pipeline_error: Option<String>,
     canonical: String,
+}
+
+#[derive(Deserialize)]
+struct DeadLetterSchemaProbe {
+    schema: String,
 }
 
 /// SQLite-backed dead-letter store. Wraps an existing connection pool
@@ -141,6 +147,13 @@ fn decode_stored_dead_letter(
                 "persisted attempts is outside the u32 range".to_string(),
             )
         })?;
+    let schema: DeadLetterSchemaProbe = serde_json::from_str(&row.canonical)
+        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
+    if schema.schema != SETTLE_DEAD_LETTER_SCHEMA {
+        return Err(DeadLetterStoreError::InvalidRecord(
+            "unsupported persisted settlement dead-letter schema".to_string(),
+        ));
+    }
     let record: DeadLetterRecord = serde_json::from_str(&row.canonical)
         .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
     let (_, canonical) = encode_dead_letter(&record)?;
