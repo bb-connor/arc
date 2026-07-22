@@ -264,6 +264,16 @@ pub(crate) async fn handle_issue_open_market_penalty(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    // A fiscal penalty is authoritative against the active fee-schedule binding.
+    // Followers can hold a stale resolver or still be in fallback, so governed
+    // issuance must run on the leader before any validation or signing occurs.
+    if state.fiscal_runtime.is_some() {
+        match forward_post_to_leader(&state, OPEN_MARKET_PENALTY_ISSUE_PATH, &request).await {
+            Ok(Some(response)) => return response,
+            Ok(None) => {}
+            Err(response) => return response,
+        }
+    }
     match service_runtime::issuance::issue_signed_open_market_penalty(
         &state.config,
         &request,

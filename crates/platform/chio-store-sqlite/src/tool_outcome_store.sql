@@ -40,9 +40,10 @@ BEGIN
     SELECT RAISE(ABORT, 'tool outcome blob requires a payload');
 END;
 
--- The only permitted update is compaction: clearing the payload of an already
--- recorded blob. Identity, size and provenance stay immutable, and a payload can
--- never be restored or rewritten once cleared.
+-- The only permitted updates flip payload retention state: compaction clears an
+-- already recorded payload, and rehydration restores digest- and size-verified
+-- canonical bytes supplied by a later owner. Identity, size and provenance stay
+-- immutable, and a retained payload can never be rewritten in place.
 CREATE TRIGGER IF NOT EXISTS tool_outcome_blobs_immutable
 BEFORE UPDATE ON tool_outcome_blobs
 WHEN NEW.digest <> OLD.digest
@@ -51,8 +52,8 @@ WHEN NEW.digest <> OLD.digest
   OR NEW.store_uuid <> OLD.store_uuid
   OR NEW.store_lease_id <> OLD.store_lease_id
   OR NEW.store_owner_epoch <> OLD.store_owner_epoch
-  OR OLD.canonical_bytes IS NULL
-  OR NEW.canonical_bytes IS NOT NULL
+  OR (OLD.canonical_bytes IS NULL AND NEW.canonical_bytes IS NULL)
+  OR (OLD.canonical_bytes IS NOT NULL AND NEW.canonical_bytes IS NOT NULL)
 BEGIN
     SELECT RAISE(ABORT, 'tool outcome blob is immutable');
 END;

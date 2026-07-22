@@ -567,6 +567,62 @@ fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
 }
 
 #[test]
+fn reinserting_verified_bytes_rehydrates_a_compacted_blob() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let committed = committed(&fixture, "compaction-rehydrate", begun_at);
+    let at = begun_at + 20;
+    let (blob, outcome) = returned_value(
+        &committed,
+        fixture.fence.clone(),
+        at,
+        serde_json::json!({"completed": true}),
+        None,
+    )
+    .expect("returned outcome");
+    let bytes = blob.bytes().to_vec();
+    let lease = claim(&fixture, &committed, at);
+    let inserted = fixture
+        .outcomes
+        .record_tool_returned(&committed, &lease, &blob, &outcome, &fixture.fence, at + 1)
+        .expect("record tool return");
+    let (_, finalizing) = inserted.into_parts();
+    let operation_id = finalizing.binding().operation_id().clone();
+    let digest = outcome.raw_output_digest().as_str().to_owned();
+
+    mark_operation_terminal(&fixture, &operation_id);
+    fixture
+        .outcomes
+        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
+        .expect("compact terminal blob");
+    assert!(!blob_state(&fixture, &digest).1, "blob starts compacted");
+
+    let rehydrated_at = begun_at + 300;
+    let mut connection = fixture.outcomes.connection().expect("connection");
+    let transaction = fixture
+        .outcomes
+        .begin_write(&mut connection, &fixture.fence, rehydrated_at)
+        .expect("begin rehydration write");
+    insert_blob_bytes_tx(&transaction, &digest, &bytes, &fixture.fence, rehydrated_at)
+        .expect("rehydrate verified bytes");
+    fixture
+        .outcomes
+        .commit_write(transaction)
+        .expect("commit rehydration");
+    drop(connection);
+
+    assert!(blob_state(&fixture, &digest).1, "blob payload is restored");
+    assert!(
+        fixture
+            .outcomes
+            .load_raw_invocation_by_operation(&operation_id)
+            .expect("load rehydrated invocation")
+            .is_some(),
+        "the newly supplied canonical bytes can be loaded"
+    );
+}
+
+#[test]
 fn compaction_is_refused_while_an_owning_operation_is_live() {
     let fixture = fixture();
     let begun_at = now_ms();

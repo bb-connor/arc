@@ -22,7 +22,7 @@ use crate::admission_operation_store::{
 use crate::serving_owner::SqliteServingOwner;
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
-pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 1;
+pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 2;
 const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
     "tool_outcomes",
     "admission_operations",
@@ -541,6 +541,12 @@ pub(crate) fn initialize_tool_outcome_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    // Version 2 permits a compacted payload to be restored when a later owner
+    // supplies the same digest- and size-verified canonical bytes. Recreate the
+    // trigger transactionally before applying the canonical schema definition.
+    transaction
+        .execute_batch("DROP TRIGGER IF EXISTS tool_outcome_blobs_immutable;")
+        .map_err(sqlite_error)?;
     transaction
         .execute_batch(TOOL_OUTCOME_SCHEMA)
         .map_err(sqlite_error)?;
@@ -776,7 +782,10 @@ fn insert_blob_bytes_tx(
                 digest, blob_size_bytes, canonical_bytes, recorded_at_unix_ms,
                 store_uuid, store_lease_id, store_owner_epoch
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            ON CONFLICT(digest) DO NOTHING
+            ON CONFLICT(digest) DO UPDATE SET
+                canonical_bytes = excluded.canonical_bytes
+            WHERE tool_outcome_blobs.canonical_bytes IS NULL
+              AND tool_outcome_blobs.blob_size_bytes = excluded.blob_size_bytes
             "#,
             params![
                 digest,
@@ -789,20 +798,25 @@ fn insert_blob_bytes_tx(
             ],
         )
         .map_err(sqlite_error)?;
-    let stored: Option<Vec<u8>> = transaction
+    let (stored_size, stored): (i64, Option<Vec<u8>>) = transaction
         .query_row(
-            "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
+            "SELECT blob_size_bytes, canonical_bytes
+             FROM tool_outcome_blobs WHERE digest = ?1",
             [digest],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(sqlite_error)?;
+    if stored_size != size {
+        return Err(invariant(
+            "content-addressed blob size does not match its digest",
+        ));
+    }
     match stored {
         Some(stored) if stored == bytes => Ok(()),
         Some(_) => Err(invariant("content-addressed blob digest collision")),
-        // The row already existed and was compacted under retention. Its digest
-        // matched these bytes above, so the compacted row holds the same content
-        // and stays compacted rather than being repopulated.
-        None => Ok(()),
+        None => Err(invariant(
+            "content-addressed blob remained compacted after verified rehydration",
+        )),
     }
 }
 
