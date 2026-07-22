@@ -368,7 +368,9 @@ fn mobile_and_cpp_enforce_negotiated_aggregate_root_evidence() -> TestResult {
     assert_eq!(verdict["verdict"], "deny");
     assert!(verdict["reason"]
         .as_str()
-        .is_some_and(|reason| reason.contains("aggregate invocation enforcement is unavailable")));
+        .is_some_and(|reason| reason.contains(
+            "capability feature unsupported on this runtime: aggregate invocation enforcement"
+        )));
     Ok(())
 }
 
@@ -431,7 +433,7 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         (
             "valid",
             Some(&root),
-            "cumulative approval enforcement is unavailable",
+            "capability feature unsupported on this runtime: cumulative approval enforcement",
         ),
         ("missing", None, "direct-root"),
         (
