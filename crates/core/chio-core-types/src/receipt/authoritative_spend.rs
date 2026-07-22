@@ -8,6 +8,7 @@
 use crate::crypto::PublicKey;
 use crate::receipt::body::ChioReceipt;
 use crate::receipt::kinds::{BoundaryClass, ReceiptKind, TrustLevel};
+use alloc::string::{String, ToString};
 
 /// Receipt-profile identifier for a fully authoritative mediated-spend receipt.
 pub const MEDIATED_SPEND_PROFILE: &str = "chio.mediated_spend.v1";

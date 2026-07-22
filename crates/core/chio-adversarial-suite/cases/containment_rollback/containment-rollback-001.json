@@ -83,8 +83,8 @@
         "minimum_caught": 1,
         "mutant": {
           "genre": "BinaryOperator",
-          "original": "!=",
-          "replacement": "==",
+          "original": "||",
+          "replacement": "&&",
           "occurrence": 1
         },
         "outcomes": {

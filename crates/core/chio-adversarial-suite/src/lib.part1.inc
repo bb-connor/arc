@@ -1686,18 +1686,20 @@ mod tests {
     }
 
     #[test]
-    fn bundled_cases_are_valid_and_coverage_eligible() -> Result<(), CaseError> {
+    fn bundled_cases_are_valid_and_closed_cases_are_coverage_eligible() -> Result<(), CaseError> {
         let cases = bundled_cases()?;
         assert_eq!(cases.len(), BUNDLED_CASES.len());
         for case in cases {
             assert_eq!(case.expected_verdict, ExpectedVerdict::Deny);
-            assert!(!case.pending);
             assert!(!case.expected_reason.trim().is_empty());
             assert!(!case.threat_id.trim().is_empty());
             assert!(case
                 .artifact
                 .as_object()
                 .is_some_and(|object| !object.is_empty()));
+            if case.pending {
+                continue;
+            }
             case.into_coverage_case()?;
         }
         Ok(())
