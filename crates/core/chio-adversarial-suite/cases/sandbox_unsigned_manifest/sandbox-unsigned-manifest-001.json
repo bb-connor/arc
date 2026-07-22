@@ -22,7 +22,7 @@
         "id": "sandbox_unsigned_manifest",
         "control_id": "manifest_signature_control",
         "package": "chio-manifest",
-        "source": "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+        "source": "crates/platform/chio-manifest/src/lib.rs",
         "function": "verify_manifest",
         "minimum_caught": 1,
         "mutant": {

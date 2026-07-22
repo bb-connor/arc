@@ -22,7 +22,7 @@
         "id": "broker_parent_double_charge",
         "control_id": "quota_identity_control",
         "package": "chio-store-sqlite",
-        "source": "crates/platform/chio-store-sqlite/src/budget_store/composite_parts/part_02.rs",
+        "source": "crates/platform/chio-store-sqlite/src/budget_store/composite.rs",
         "function": "SqliteBudgetStore::authorize_composite_hold_in_transaction_unchecked",
         "minimum_caught": 1,
         "mutant": {

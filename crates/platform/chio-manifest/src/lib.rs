@@ -22,3 +22,21 @@ include!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/lib_parts/part_01.inc"
 ));
+
+/// Verify a signed manifest against a known public key.
+pub fn verify_manifest(
+    signed: &SignedManifest,
+    public_key: &PublicKey,
+) -> Result<(), ManifestError> {
+    validate_manifest(&signed.manifest)?;
+    ensure_embedded_public_key_matches(&signed.manifest, &signed.signer_key)?;
+    if signed.signer_key != *public_key {
+        return Err(ManifestError::VerificationFailed);
+    }
+    let valid = public_key.verify_canonical(&signed.manifest, &signed.signature)?;
+    if valid {
+        Ok(())
+    } else {
+        Err(ManifestError::VerificationFailed)
+    }
+}

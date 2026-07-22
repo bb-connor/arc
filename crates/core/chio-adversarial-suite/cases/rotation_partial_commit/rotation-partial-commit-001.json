@@ -23,7 +23,7 @@
         "id": "rotation_partial_commit",
         "control_id": "atomic_rotation_control",
         "package": "chio-keyring",
-        "source": "crates/security/chio-keyring/src/sqlite_parts/part_02.rs",
+        "source": "crates/security/chio-keyring/src/sqlite.rs",
         "function": "persist_state",
         "minimum_caught": 1,
         "mutant": {

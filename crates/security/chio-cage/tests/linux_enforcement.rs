@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read, Write};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -630,13 +631,22 @@ fn fully_enforced_child_exposes_authenticated_stdio_and_exact_argv() {
 
 #[test]
 fn target_exec_has_no_leaked_control_or_resource_descriptors() {
-    let record = launch(
+    let source = std::fs::File::open("/dev/null").test_unwrap();
+    // SAFETY: fcntl receives a live descriptor and creates an independent descriptor.
+    let ambient_fd = unsafe { libc::fcntl(source.as_raw_fd(), libc::F_DUPFD, 192) };
+    assert!(
+        (192..255).contains(&ambient_fd),
+        "ambient descriptor must occupy an unnamed cage slot"
+    );
+    // SAFETY: successful F_DUPFD returned a fresh descriptor owned by this test.
+    let ambient = unsafe { OwnedFd::from_raw_fd(ambient_fd) };
+    let child = launch(
         compiled(&required_path("CHIO_CAGE_TEST_FD_LEAK")),
         CageLaunchOptions::default(),
     )
-    .test_unwrap()
-    .wait()
     .test_unwrap();
+    drop(ambient);
+    let record = child.wait().test_unwrap();
     assert_eq!(
         record.exit.as_ref().and_then(|exit| exit.exit_code),
         Some(0)

@@ -22,7 +22,7 @@
         "id": "broker_orphan_hold",
         "control_id": "compensated_release_outbox_control",
         "package": "chio-control-plane",
-        "source": "crates/platform/chio-control-plane/src/security/broker_parts/part_01.inc",
+        "source": "crates/platform/chio-control-plane/src/security/broker.rs",
         "function": "AuthoritativeBrokerExecutionAdapter::release_admission",
         "minimum_caught": 1,
         "mutant": {

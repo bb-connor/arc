@@ -15,7 +15,7 @@
         "test_source": "crates/security/chio-cage/src/launch/linux_parts/part_02.rs",
         "target_kind": "lib",
         "required_target_os": "linux",
-        "test_name": "launch::linux::tests::helper_identity_control_rejects_same_bytes_different_identity"
+        "test_name": "launch::platform::tests::helper_identity_control_rejects_same_bytes_different_identity"
       }
     ],
     "campaigns": [
@@ -23,7 +23,7 @@
         "id": "sandbox_helper_substitution",
         "control_id": "helper_identity_control",
         "package": "chio-cage",
-        "source": "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc",
+        "source": "crates/security/chio-cage/src/launch/linux.rs",
         "function": "helper_identity_and_binding_match",
         "minimum_caught": 1,
         "mutant": {

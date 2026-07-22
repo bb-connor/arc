@@ -34,7 +34,7 @@
         "id": "sandbox_fd_leak",
         "control_id": "descriptor_closure_control",
         "package": "chio-cage",
-        "source": "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc",
+        "source": "crates/security/chio-cage/src/launch/linux.rs",
         "function": "close_unnamed_descriptors",
         "minimum_caught": 1,
         "mutant": {
@@ -49,7 +49,7 @@
         "id": "sandbox_env_leak",
         "control_id": "environment_allowlist_control",
         "package": "chio-cage",
-        "source": "crates/security/chio-cage/src/lib_parts/part_01.rs",
+        "source": "crates/security/chio-cage/src/lib.rs",
         "function": "is_credential_or_injection_name",
         "minimum_caught": 1,
         "mutant": {
