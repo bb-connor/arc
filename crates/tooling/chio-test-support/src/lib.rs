@@ -310,6 +310,15 @@ pub mod private_fs {
 
     #[cfg(unix)]
     fn reap_stale_sqlite_roots(base: &Path) -> io::Result<()> {
+        let mut remove_entry = remove_sqlite_root_entry;
+        reap_stale_sqlite_roots_with(base, &mut remove_entry)
+    }
+
+    #[cfg(unix)]
+    fn reap_stale_sqlite_roots_with(
+        base: &Path,
+        remove_entry: &mut impl FnMut(&Path) -> io::Result<()>,
+    ) -> io::Result<()> {
         for entry in fs::read_dir(base)? {
             let entry = match entry {
                 Ok(entry) => entry,
@@ -323,6 +332,18 @@ pub mod private_fs {
             let lease_path = candidate.join(SQLITE_ROOT_LEASE_FILE);
             let lease = match open_existing_private_lock_file(&lease_path) {
                 Ok(lease) => lease,
+                // Initialization publishes no usable path before the lease is
+                // created. While the per-UID setup lock is held, an empty,
+                // exact-authority root with no lease can therefore only be an
+                // initializer that died in that narrow window. `remove_dir`
+                // deliberately refuses a non-empty root, so missing a lease
+                // never broadens recursive deletion authority.
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    if is_private_sqlite_root(&candidate) {
+                        let _ = fs::remove_dir(&candidate);
+                    }
+                    continue;
+                }
                 Err(_) => continue,
             };
             match rustix::fs::flock(&lease, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
@@ -330,7 +351,12 @@ pub mod private_fs {
                     if is_private_sqlite_root(&candidate)
                         && validate_private_lock_file(&lease_path, &lease).is_ok()
                     {
-                        let _ = fs::remove_dir_all(candidate);
+                        let _ = remove_sqlite_root_preserving_lease(
+                            &candidate,
+                            &lease_path,
+                            &lease,
+                            remove_entry,
+                        );
                     }
                 }
                 Err(error)
@@ -340,6 +366,79 @@ pub mod private_fs {
             }
         }
         Ok(())
+    }
+
+    #[cfg(unix)]
+    fn remove_sqlite_root_preserving_lease(
+        candidate: &Path,
+        lease_path: &Path,
+        lease: &fs::File,
+        remove_entry: &mut impl FnMut(&Path) -> io::Result<()>,
+    ) -> io::Result<()> {
+        // Remove every payload entry before the lease. If traversal fails after
+        // making partial progress, the still-linked lease preserves both the
+        // deletion authority and the next process's ability to retry.
+        for entry in fs::read_dir(candidate)? {
+            let entry = entry?;
+            if entry.file_name() == std::ffi::OsStr::new(SQLITE_ROOT_LEASE_FILE) {
+                continue;
+            }
+            remove_entry(&entry.path())?;
+        }
+
+        if !is_private_sqlite_root(candidate) {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "private SQLite test root changed during reap",
+            ));
+        }
+        validate_private_lock_file(lease_path, lease)?;
+
+        // The lease is the final directory entry. If the final rmdir loses a
+        // race or otherwise fails, restore a fresh valid lease so the next pass
+        // remains authorized to retry. A crash between these two operations
+        // leaves an empty missing-lease directory, which the narrow remove_dir
+        // recovery path above can safely finish.
+        fs::remove_file(lease_path)?;
+        match fs::remove_dir(candidate) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => {
+                let _ = restore_reaper_lease(candidate, lease_path);
+                Err(error)
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn remove_sqlite_root_entry(path: &Path) -> io::Result<()> {
+        let metadata = fs::symlink_metadata(path)?;
+        if metadata.file_type().is_dir() {
+            fs::remove_dir_all(path)
+        } else {
+            fs::remove_file(path)
+        }
+    }
+
+    #[cfg(unix)]
+    fn restore_reaper_lease(candidate: &Path, lease_path: &Path) -> io::Result<()> {
+        if !is_private_sqlite_root(candidate) {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "private SQLite test root changed before lease restoration",
+            ));
+        }
+        match create_private_lock_file(lease_path) {
+            Ok(lease) => {
+                drop(lease);
+                Ok(())
+            }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                drop(open_existing_private_lock_file(lease_path)?);
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
     }
 
     #[cfg(unix)]
@@ -479,14 +578,20 @@ pub mod private_fs {
 
     #[cfg(all(test, unix))]
     mod tests {
-        use std::io;
+        use std::io::{self, Read};
         use std::os::unix::fs::{symlink, PermissionsExt};
+        use std::process::{Command, Stdio};
+        use std::time::Duration;
 
         use super::{
             acquire_sqlite_root_setup_lock, create_private_lock_file,
             open_existing_private_lock_file, private_tempdir, reap_stale_sqlite_roots,
-            sqlite_root_setup_lock_path, SQLITE_ROOT_LEASE_FILE, SQLITE_ROOT_PREFIX,
+            reap_stale_sqlite_roots_with, remove_sqlite_root_entry, sqlite_root_setup_lock_path,
+            SQLITE_ROOT_LEASE_FILE, SQLITE_ROOT_PREFIX,
         };
+
+        const REAPER_CHILD_BASE_ENV: &str = "CHIO_TEST_SUPPORT_REAPER_CHILD_BASE";
+        const REAPER_CHILD_READY_ENV: &str = "CHIO_TEST_SUPPORT_REAPER_CHILD_READY";
 
         #[test]
         fn active_sqlite_root_is_preserved() -> io::Result<()> {
@@ -514,6 +619,130 @@ pub mod private_fs {
             reap_stale_sqlite_roots(base.path())?;
 
             assert!(!candidate.exists());
+            Ok(())
+        }
+
+        #[test]
+        fn empty_missing_lease_root_is_reclaimed_without_deleting_nonempty_root() -> io::Result<()>
+        {
+            let base = private_tempdir("chio-reaper-missing-lease-")?;
+            let empty = create_candidate(base.path(), "empty")?;
+            let nonempty = create_candidate(base.path(), "nonempty")?;
+            let payload = nonempty.join("receipt.sqlite3");
+            std::fs::write(&payload, b"retained")?;
+
+            reap_stale_sqlite_roots(base.path())?;
+
+            assert!(!empty.exists());
+            assert!(nonempty.is_dir());
+            assert_eq!(std::fs::read(payload)?, b"retained");
+            Ok(())
+        }
+
+        #[test]
+        fn partial_reap_failure_preserves_lease_for_retry() -> io::Result<()> {
+            let base = private_tempdir("chio-reaper-retry-")?;
+            let candidate = create_candidate(base.path(), "partial")?;
+            let lease_path = candidate.join(SQLITE_ROOT_LEASE_FILE);
+            drop(create_private_lock_file(&lease_path)?);
+            std::fs::write(candidate.join("first.sqlite3"), b"first")?;
+            std::fs::write(candidate.join("second.sqlite3"), b"second")?;
+
+            let mut removals = 0_u8;
+            reap_stale_sqlite_roots_with(base.path(), &mut |path| {
+                removals = removals.saturating_add(1);
+                if removals == 2 {
+                    return Err(io::Error::other("injected partial reap failure"));
+                }
+                remove_sqlite_root_entry(path)
+            })?;
+
+            assert_eq!(removals, 2);
+            assert!(candidate.is_dir());
+            drop(open_existing_private_lock_file(&lease_path)?);
+
+            reap_stale_sqlite_roots(base.path())?;
+            assert!(!candidate.exists());
+            Ok(())
+        }
+
+        #[test]
+        fn subprocess_death_releases_root_for_reclamation() -> io::Result<()> {
+            let base = private_tempdir("chio-reaper-subprocess-")?;
+            let ready = base.path().join("child-ready");
+            let executable = std::env::current_exe()?;
+            let mut child = Command::new(executable)
+                .arg("private_fs::tests::sqlite_root_lease_subprocess_child")
+                .arg("--exact")
+                .arg("--nocapture")
+                .env(REAPER_CHILD_BASE_ENV, base.path())
+                .env(REAPER_CHILD_READY_ENV, &ready)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::inherit())
+                .spawn()?;
+
+            let active_check = (|| -> io::Result<std::path::PathBuf> {
+                for _ in 0..500 {
+                    if ready.is_file() {
+                        let pid = std::fs::read_to_string(&ready)?;
+                        let candidate = base
+                            .path()
+                            .join(format!("{SQLITE_ROOT_PREFIX}child-{}", pid.trim()));
+                        reap_stale_sqlite_roots(base.path())?;
+                        if !candidate.is_dir() {
+                            return Err(io::Error::other(
+                                "reaper removed a root whose subprocess still held the lease",
+                            ));
+                        }
+                        return Ok(candidate);
+                    }
+                    if let Some(status) = child.try_wait()? {
+                        return Err(io::Error::other(format!(
+                            "lease subprocess exited before publishing readiness: {status}"
+                        )));
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "lease subprocess did not publish readiness",
+                ))
+            })();
+
+            // Always terminate and join the helper, including when its active
+            // lease check failed, so this regression cannot strand a process.
+            let _ = child.kill();
+            let _ = child.wait();
+            let candidate = active_check?;
+
+            reap_stale_sqlite_roots(base.path())?;
+            assert!(!candidate.exists());
+            Ok(())
+        }
+
+        #[test]
+        fn sqlite_root_lease_subprocess_child() -> io::Result<()> {
+            let Some(base) = std::env::var_os(REAPER_CHILD_BASE_ENV) else {
+                return Ok(());
+            };
+            let ready = std::env::var_os(REAPER_CHILD_READY_ENV).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "missing child-ready path")
+            })?;
+            let base = std::path::PathBuf::from(base);
+            let candidate = create_candidate(&base, &format!("child-{}", std::process::id()))?;
+            let lease = create_private_lock_file(&candidate.join(SQLITE_ROOT_LEASE_FILE))?;
+            rustix::fs::flock(&lease, rustix::fs::FlockOperation::LockExclusive)
+                .map_err(io::Error::from)?;
+            std::fs::write(candidate.join("receipt.sqlite3"), b"durable test payload")?;
+            std::fs::write(ready, std::process::id().to_string())?;
+
+            // The parent retains the write end of this pipe while checking that
+            // the live lease is preserved, then kills this process. Process death
+            // releases the flock without a cooperative unlock.
+            let mut byte = [0_u8; 1];
+            let _ = std::io::stdin().read(&mut byte)?;
+            drop(lease);
             Ok(())
         }
 
