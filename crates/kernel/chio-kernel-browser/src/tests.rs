@@ -589,10 +589,16 @@ fn negotiated_aggregate_family_requires_matching_root_and_evaluation_denies() ->
     )
     .map_err(|error| std::io::Error::other(error.message))?;
     assert_eq!(verdict.verdict, "deny");
-    assert!(verdict
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("aggregate invocation enforcement is unavailable")));
+    assert!(
+        verdict
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains(
+                "capability feature unsupported on this runtime: aggregate invocation enforcement"
+            )),
+        "unexpected aggregate denial: {:?}",
+        verdict.reason
+    );
     Ok(())
 }
 
@@ -637,7 +643,7 @@ fn negotiated_cumulative_family_requires_matching_root_in_verify_and_evaluate() 
         (
             "valid",
             Some(root.clone()),
-            "cumulative approval enforcement is unavailable",
+            "capability feature unsupported on this runtime: cumulative approval enforcement",
         ),
         ("missing", None, "direct-root"),
         (

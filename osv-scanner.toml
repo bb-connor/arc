@@ -28,3 +28,7 @@ reason = "qs (transitive via express in TS SDK example/conformance); prototype-p
 [[IgnoredVulns]]
 id = "GHSA-866g-f22w-33x8"
 reason = "@ai-sdk/provider-utils (dev-only peer test lock for ai-sdk wrapper); patched provider-utils line requires ai@6 while package peer range remains <6; track for peer-range upgrade"
+
+[[IgnoredVulns]]
+id = "GHSA-f88m-g3jw-g9cj"
+reason = "sharp is pinned below 0.35 by dev-only miniflare and Next SDK test/build tooling; no shipped runtime processes untrusted images; remove when upstream adopts sharp >=0.35"
