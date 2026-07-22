@@ -568,7 +568,8 @@ pub struct ChioKernel {
         Option<Arc<dyn crate::admission_capture_authority::AdmissionCaptureAuthority>>,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
     /// Fallible source snapshotted before a capability authority can sign.
-    pub(super) capability_authority_clock: Arc<dyn chio_keyring::TrustedClock>,
+    pub(super) capability_authority_clock:
+        Arc<dyn crate::authority::CapabilityAuthorityClock>,
     pub(super) authority_signing_backend: Arc<dyn chio_core::crypto::SigningBackend>,
     pub(super) authority_signing_used: Arc<AtomicBool>,
     pub(super) authority_backend_topology_locked: bool,

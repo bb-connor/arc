@@ -16,13 +16,28 @@ import sys
 
 path, *entries = sys.argv[1:]
 edges = [entry for entry in entries if "=" in entry]
-names = {entry for entry in entries if "=" not in entry}
+manifest_paths = {}
+names = set()
+for entry in entries:
+    if "=" in entry:
+        continue
+    if "@" in entry:
+        name, manifest_path = entry.split("@", maxsplit=1)
+        names.add(name)
+        manifest_paths[name] = manifest_path
+    else:
+        names.add(entry)
 names.update(
     name
     for edge in edges
     for name in edge.split("=", maxsplit=1)
 )
-packages = [{"name": name, "id": f"path+file:///{name}#0.1.0"} for name in sorted(names)]
+packages = []
+for name in sorted(names):
+    package = {"name": name, "id": f"path+file:///{name}#0.1.0"}
+    if name in manifest_paths:
+        package["manifest_path"] = manifest_paths[name]
+    packages.append(package)
 nodes = []
 for name in sorted(names):
     package_id = f"path+file:///{name}#0.1.0"
@@ -43,6 +58,9 @@ required_packages=(
   chio-security-kernel
   chio-decoy
   chio-quarantine
+  chio-keyring
+  chio-secret-broker
+  chio-cage
 )
 
 run_checker() {
@@ -83,7 +101,10 @@ write_metadata "$omitted_inventory" \
   chio-security-types \
   chio-flow \
   chio-security-kernel \
-  chio-decoy
+  chio-decoy \
+  chio-keyring \
+  chio-secret-broker \
+  chio-cage
 assert_rc "$(run_checker "$omitted_inventory" "$work/omitted-inventory.out" "$work/omitted-inventory.err")" 1 \
   "an inventory omitting one required security package fails"
 grep -F 'required security package is missing: chio-quarantine' \
@@ -91,6 +112,7 @@ grep -F 'required security package is missing: chio-quarantine' \
 
 valid="$work/valid.json"
 write_metadata "$valid" \
+  "${required_packages[@]}" \
   'chio-core-types=chio-security-types' \
   'chio-flow=chio-core-types' \
   'chio-decoy=chio-core-types' \
@@ -105,10 +127,33 @@ assert_rc "$(run_checker "$valid" "$work/valid.out" "$work/valid.err")" 0 \
   "the required dependency direction passes"
 grep -F 'security dependency check passed' "$work/valid.out" >/dev/null
 
+runtime_composition="$work/runtime-composition.json"
+write_metadata "$runtime_composition" \
+  "${required_packages[@]}" \
+  'chio-runtime-harness@/workspace/crates/kernel/chio-runtime-harness/Cargo.toml' \
+  'chio-store-sqlite@/workspace/crates/platform/chio-store-sqlite/Cargo.toml' \
+  'chio-runtime-harness=chio-store-sqlite' \
+  'chio-store-sqlite=chio-keyring'
+assert_rc "$(run_checker "$runtime_composition" "$work/runtime-composition.out" "$work/runtime-composition.err")" 0 \
+  "runtime composition may reach keyring through the SQLite store"
+grep -F 'security dependency check passed' "$work/runtime-composition.out" >/dev/null
+
 assert_rejected_edge chio-kernel chio-flow \
   "kernel cannot reach a security engine"
 assert_rejected_edge chio-guards chio-decoy \
   "guards cannot reach a security engine"
+assert_rejected_edge chio-kernel chio-keyring \
+  "kernel cannot reach the authority transparency engine"
+assert_rejected_edge chio-kernel chio-secret-broker \
+  "kernel cannot reach the secret broker"
+assert_rejected_edge chio-kernel chio-cage \
+  "kernel cannot reach the native cage"
+assert_rejected_edge chio-guards chio-keyring \
+  "guards cannot reach the authority transparency engine"
+assert_rejected_edge chio-guards chio-secret-broker \
+  "guards cannot reach the secret broker"
+assert_rejected_edge chio-guards chio-cage \
+  "guards cannot reach the native cage"
 assert_rejected_edge chio-flow chio-kernel \
   "a pure flow engine cannot reach kernel"
 assert_rejected_edge chio-decoy chio-guards \
@@ -146,6 +191,16 @@ write_metadata "$transitive" \
 assert_rc "$(run_checker "$transitive" "$work/transitive.out" "$work/transitive.err")" 1 \
   "transitive reachability is rejected"
 grep -F 'chio-kernel reaches forbidden dependency chio-flow' "$work/transitive.err" >/dev/null
+
+enterprise_transitive="$work/enterprise-transitive.json"
+write_metadata "$enterprise_transitive" \
+  "${required_packages[@]}" \
+  'chio-guards=authority-clock-adapter' \
+  'authority-clock-adapter=chio-keyring'
+assert_rc "$(run_checker "$enterprise_transitive" "$work/enterprise-transitive.out" "$work/enterprise-transitive.err")" 1 \
+  "guards cannot transitively reach an enterprise engine"
+grep -F 'chio-guards reaches forbidden dependency chio-keyring' \
+  "$work/enterprise-transitive.err" >/dev/null
 
 core_transitive="$work/core-transitive.json"
 write_metadata "$core_transitive" \

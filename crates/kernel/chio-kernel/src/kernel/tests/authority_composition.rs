@@ -294,10 +294,12 @@ struct FailingAuthorityCompositionClock {
     calls: std::sync::atomic::AtomicUsize,
 }
 
-impl chio_keyring::TrustedClock for FailingAuthorityCompositionClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
+impl crate::authority::CapabilityAuthorityClock for FailingAuthorityCompositionClock {
+    fn now_unix_millis(
+        &self,
+    ) -> Result<u64, crate::authority::CapabilityAuthorityClockError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        Err(chio_keyring::KeyringError::InvalidTimeOrdering)
+        Err(crate::authority::CapabilityAuthorityClockError::Unavailable)
     }
 }
 
@@ -315,14 +317,16 @@ impl SequencedAuthorityCompositionClock {
     }
 }
 
-impl chio_keyring::TrustedClock for SequencedAuthorityCompositionClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
+impl crate::authority::CapabilityAuthorityClock for SequencedAuthorityCompositionClock {
+    fn now_unix_millis(
+        &self,
+    ) -> Result<u64, crate::authority::CapabilityAuthorityClockError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.readings
             .lock()
-            .map_err(|_| chio_keyring::KeyringError::Synchronization)?
+            .map_err(|_| crate::authority::CapabilityAuthorityClockError::Unavailable)?
             .pop_front()
-            .ok_or(chio_keyring::KeyringError::InvalidTimeOrdering)
+            .ok_or(crate::authority::CapabilityAuthorityClockError::Unavailable)
     }
 }
 
@@ -572,7 +576,7 @@ fn governed_capability_clock_failure_happens_before_signing() {
     let public_key = signer.public_key();
     let backend = Arc::new(AtomicIdentitySigningBackend {
         signer,
-        advertised_public_key: public_key,
+        advertised_public_key: public_key.clone(),
         identity_calls: std::sync::atomic::AtomicUsize::new(0),
         expected_identity_calls: std::sync::atomic::AtomicUsize::new(0),
         canonical_calls: std::sync::atomic::AtomicUsize::new(0),
@@ -580,11 +584,54 @@ fn governed_capability_clock_failure_happens_before_signing() {
     let clock = Arc::new(FailingAuthorityCompositionClock {
         calls: std::sync::atomic::AtomicUsize::new(0),
     });
-    let kernel = ChioKernel::new_with_validated_authority_backend_and_clock(
+    let kernel = ChioKernel::new_with_authority_signing_runtime_and_clock(
         config,
         backend.clone(),
+        Arc::new(FixedArtifactTrustResolver { key: public_key }),
         clock.clone(),
-    );
+    )
+    .unwrap();
+    let subject = make_keypair();
+
+    let error = kernel
+        .issue_capability(&subject.public_key(), ChioScope::default(), 300)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        KernelError::CapabilityIssuanceFailed(reason)
+            if reason.contains("capability authority clock is unavailable")
+    ));
+    assert_eq!(clock.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.identity_calls.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.expected_identity_calls.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.canonical_calls.load(Ordering::SeqCst), 0);
+    assert!(!kernel.authority_signing_used.load(Ordering::Acquire));
+}
+
+#[test]
+fn external_authority_runtime_forwards_supplied_clock_and_fails_before_signing() {
+    let config = make_config();
+    let signer = Ed25519Backend::new(make_keypair());
+    let public_key = signer.public_key();
+    assert_ne!(public_key, config.keypair.public_key());
+    let backend = Arc::new(AtomicIdentitySigningBackend {
+        signer,
+        advertised_public_key: public_key.clone(),
+        identity_calls: std::sync::atomic::AtomicUsize::new(0),
+        expected_identity_calls: std::sync::atomic::AtomicUsize::new(0),
+        canonical_calls: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let clock = Arc::new(FailingAuthorityCompositionClock {
+        calls: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let kernel = ChioKernel::new_with_external_authority_signing_runtime_and_clock(
+        config,
+        backend.clone(),
+        Arc::new(FixedArtifactTrustResolver { key: public_key }),
+        clock.clone(),
+    )
+    .unwrap();
     let subject = make_keypair();
 
     let error = kernel
@@ -608,14 +655,17 @@ fn governed_capability_issuance_respects_the_fixed_runtime_clock() {
     let config = make_config();
     let backend: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(config.keypair.clone()));
+    let public_key = backend.public_key();
     let clock = Arc::new(FailingAuthorityCompositionClock {
         calls: std::sync::atomic::AtomicUsize::new(0),
     });
-    let kernel = ChioKernel::new_with_validated_authority_backend_and_clock(
+    let kernel = ChioKernel::new_with_authority_signing_runtime_and_clock(
         config,
         backend,
+        Arc::new(FixedArtifactTrustResolver { key: public_key }),
         clock.clone(),
-    );
+    )
+    .unwrap();
     let subject = make_keypair();
     let _runtime = crate::scope_fixed_runtime_for_current_thread(420, Vec::new());
 
@@ -637,15 +687,18 @@ fn governed_capability_issuance_uses_one_clock_snapshot_across_clock_jumps() {
         let config = make_config();
         let backend: Arc<dyn SigningBackend> =
             Arc::new(Ed25519Backend::new(config.keypair.clone()));
+        let public_key = backend.public_key();
         let clock = Arc::new(SequencedAuthorityCompositionClock::new([
             120_000,
             later_reading,
         ]));
-        let kernel = ChioKernel::new_with_validated_authority_backend_and_clock(
+        let kernel = ChioKernel::new_with_authority_signing_runtime_and_clock(
             config,
             backend,
+            Arc::new(FixedArtifactTrustResolver { key: public_key }),
             clock.clone(),
-        );
+        )
+        .unwrap();
         let subject = make_keypair();
 
         let capability = kernel

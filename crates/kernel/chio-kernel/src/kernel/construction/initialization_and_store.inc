@@ -205,13 +205,30 @@ impl ChioKernel {
     /// artifact-time trust resolver as one atomic authority topology.
     ///
     /// The resolver is installed before the kernel is returned, and signer
-    /// replacement is permanently locked. This is the only public custom
-    /// authority construction path, so a custom signer cannot be published
-    /// without an artifact verifier in the same topology transaction.
+    /// replacement is permanently locked. This constructor and its
+    /// clock-injecting variant are the only public custom authority
+    /// construction paths, so a custom signer cannot be published without an
+    /// artifact verifier in the same topology transaction.
     pub fn new_with_authority_signing_runtime(
         config: KernelConfig,
         backend: Arc<dyn chio_core::crypto::SigningBackend>,
         resolver: Arc<dyn crate::authority::AuthorityArtifactTrustResolver>,
+    ) -> Result<Self, KernelError> {
+        Self::new_with_authority_signing_runtime_and_clock(
+            config,
+            backend,
+            resolver,
+            Arc::new(crate::authority::SystemCapabilityAuthorityClock),
+        )
+    }
+
+    /// Construct an atomic custom authority topology with a composition-owned
+    /// issuance clock. Clock failures deny capability issuance before signing.
+    pub fn new_with_authority_signing_runtime_and_clock(
+        config: KernelConfig,
+        backend: Arc<dyn chio_core::crypto::SigningBackend>,
+        resolver: Arc<dyn crate::authority::AuthorityArtifactTrustResolver>,
+        capability_authority_clock: Arc<dyn crate::authority::CapabilityAuthorityClock>,
     ) -> Result<Self, KernelError> {
         if backend.public_key() != config.keypair.public_key() {
             return Err(KernelError::Internal(
@@ -219,7 +236,11 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
-        let mut kernel = Self::new_with_validated_authority_backend(config, backend);
+        let mut kernel = Self::new_with_validated_authority_backend_and_clock(
+            config,
+            backend,
+            capability_authority_clock,
+        );
         kernel.set_authority_artifact_trust_resolver(resolver)?;
         kernel.lock_authority_signing_backend_topology();
         Ok(kernel)
@@ -240,13 +261,34 @@ impl ChioKernel {
         backend: Arc<dyn chio_core::crypto::SigningBackend>,
         resolver: Arc<dyn crate::authority::AuthorityArtifactTrustResolver>,
     ) -> Result<Self, KernelError> {
+        Self::new_with_external_authority_signing_runtime_and_clock(
+            config,
+            backend,
+            resolver,
+            Arc::new(crate::authority::SystemCapabilityAuthorityClock),
+        )
+    }
+
+    /// Construct an atomic external authority topology with a
+    /// composition-owned issuance clock. Clock failures deny capability
+    /// issuance before signing.
+    pub fn new_with_external_authority_signing_runtime_and_clock(
+        config: KernelConfig,
+        backend: Arc<dyn chio_core::crypto::SigningBackend>,
+        resolver: Arc<dyn crate::authority::AuthorityArtifactTrustResolver>,
+        capability_authority_clock: Arc<dyn crate::authority::CapabilityAuthorityClock>,
+    ) -> Result<Self, KernelError> {
         let public_key = backend.public_key();
         if public_key.algorithm() != backend.algorithm() {
             return Err(KernelError::Internal(
                 "external authority backend algorithm does not match its public key".to_string(),
             ));
         }
-        let mut kernel = Self::new_with_validated_authority_backend(config, backend);
+        let mut kernel = Self::new_with_validated_authority_backend_and_clock(
+            config,
+            backend,
+            capability_authority_clock,
+        );
         kernel.set_authority_artifact_trust_resolver(resolver)?;
         kernel.lock_authority_signing_backend_topology();
         Ok(kernel)
@@ -259,14 +301,14 @@ impl ChioKernel {
         Self::new_with_validated_authority_backend_and_clock(
             config,
             backend,
-            Arc::new(chio_keyring::SystemTrustedClock),
+            Arc::new(crate::authority::SystemCapabilityAuthorityClock),
         )
     }
 
     pub(super) fn new_with_validated_authority_backend_and_clock(
         config: KernelConfig,
         backend: Arc<dyn chio_core::crypto::SigningBackend>,
-        capability_authority_clock: Arc<dyn chio_keyring::TrustedClock>,
+        capability_authority_clock: Arc<dyn crate::authority::CapabilityAuthorityClock>,
     ) -> Self {
         info!("initializing Chio kernel");
         let checkpoint_batch_size = config.checkpoint_batch_size;

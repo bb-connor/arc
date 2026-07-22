@@ -3772,7 +3772,6 @@ dependencies = [
  "chio-federation",
  "chio-guards",
  "chio-kernel-core",
- "chio-keyring",
  "chio-link",
  "chio-log-redact",
  "chio-manifest",

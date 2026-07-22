@@ -5,9 +5,9 @@ use chio_core::capability::{
 };
 use chio_core::crypto::{Keypair, PublicKey, Signature, SigningBackend, SigningOutcome};
 use chio_core::{CanonicalBytes, CanonicalJsonWitness};
-use chio_keyring::{SystemTrustedClock, TrustedClock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{NoContext, Timestamp, Uuid};
 
 use crate::KernelError;
@@ -120,29 +120,58 @@ pub trait AuthorityArtifactTrustResolver: Send + Sync {
     ) -> Result<Option<PublicKey>, String>;
 }
 
+/// Fallible wall-clock port used only for capability authority issuance.
+/// A clock error denies issuance before the authority signing backend is used.
+pub trait CapabilityAuthorityClock: Send + Sync {
+    fn now_unix_millis(&self) -> Result<u64, CapabilityAuthorityClockError>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum CapabilityAuthorityClockError {
+    #[error("system time precedes the Unix epoch")]
+    BeforeUnixEpoch,
+    #[error("clock reading is outside the supported numeric range")]
+    NumericRange,
+    #[error("clock source is unavailable")]
+    Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SystemCapabilityAuthorityClock;
+
+impl CapabilityAuthorityClock for SystemCapabilityAuthorityClock {
+    fn now_unix_millis(&self) -> Result<u64, CapabilityAuthorityClockError> {
+        let duration = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| CapabilityAuthorityClockError::BeforeUnixEpoch)?;
+        u64::try_from(duration.as_millis())
+            .map_err(|_| CapabilityAuthorityClockError::NumericRange)
+    }
+}
+
 pub struct LocalCapabilityAuthority {
     keypair: Keypair,
-    clock: Arc<dyn TrustedClock>,
+    clock: Arc<dyn CapabilityAuthorityClock>,
 }
 
 impl LocalCapabilityAuthority {
     pub fn new(keypair: Keypair) -> Self {
-        Self::new_with_clock(keypair, Arc::new(SystemTrustedClock))
+        Self::new_with_clock(keypair, Arc::new(SystemCapabilityAuthorityClock))
     }
 
-    pub fn new_with_clock(keypair: Keypair, clock: Arc<dyn TrustedClock>) -> Self {
+    pub fn new_with_clock(keypair: Keypair, clock: Arc<dyn CapabilityAuthorityClock>) -> Self {
         Self { keypair, clock }
     }
 }
 
 pub(crate) fn capability_authority_now_unix_secs(
-    clock: &dyn TrustedClock,
+    clock: &dyn CapabilityAuthorityClock,
 ) -> Result<u64, KernelError> {
     if let Some(now) = crate::fixed_runtime_unix_secs_for_current_thread() {
         return Ok(now);
     }
     clock
-        .now()
+        .now_unix_millis()
         .map(|now_unix_ms| now_unix_ms / 1_000)
         .map_err(|error| {
             KernelError::CapabilityIssuanceFailed(format!(
@@ -192,7 +221,7 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
 
 pub struct GovernedCapabilityAuthority {
     backend: Arc<dyn SigningBackend>,
-    clock: Arc<dyn TrustedClock>,
+    clock: Arc<dyn CapabilityAuthorityClock>,
 }
 
 pub(crate) struct TrackedAuthoritySigningBackend {
@@ -255,7 +284,10 @@ impl SigningBackend for TrackedAuthoritySigningBackend {
 }
 
 impl GovernedCapabilityAuthority {
-    pub(crate) fn new(backend: Arc<dyn SigningBackend>, clock: Arc<dyn TrustedClock>) -> Self {
+    pub(crate) fn new(
+        backend: Arc<dyn SigningBackend>,
+        clock: Arc<dyn CapabilityAuthorityClock>,
+    ) -> Self {
         Self { backend, clock }
     }
 }
