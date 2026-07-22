@@ -567,19 +567,29 @@ pub(crate) mod test_hooks {
     }
 
     /// When set, `maybe_build_checkpoint` returns a fail-closed `Err` (a
-    /// NON-panic checkpoint-build failure) for a signer using
-    /// `FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH`, proving a build failure is
-    /// surfaced to a co-drained flush waiter (the flush-as-checkpoint
-    /// barrier). It uses a DISTINCT marker from
+    /// NON-panic checkpoint-build failure) for a signer using either dedicated
+    /// failure marker, proving build failures are surfaced and checkpoint debt
+    /// never regresses across signer replacement. Both use values distinct from
     /// `PANIC_DURING_CHECKPOINT_BUILD` so the two process-global flags cannot
     /// interfere across the crate's parallel tests.
     pub(crate) static FAIL_CHECKPOINT_BUILD: AtomicBool = AtomicBool::new(false);
 
+    static FAIL_CHECKPOINT_BUILD_TEST_LOCK: Mutex<()> = Mutex::new(());
+
     pub(crate) const FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH: u64 = 7;
+    pub(crate) const FAIL_CHECKPOINT_BUILD_SECONDARY_MARKER_MAX_BATCH: u64 = 6;
 
     pub(crate) fn fail_checkpoint_build(max_batch: u64) -> bool {
-        max_batch == FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH
+        (max_batch == FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH
+            || max_batch == FAIL_CHECKPOINT_BUILD_SECONDARY_MARKER_MAX_BATCH)
             && FAIL_CHECKPOINT_BUILD.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn checkpoint_build_failure_test_lock() -> std::sync::MutexGuard<'static, ()> {
+        match FAIL_CHECKPOINT_BUILD_TEST_LOCK.lock() {
+            Ok(lock) => lock,
+            Err(poisoned) => poisoned.into_inner(),
+        }
     }
 
     /// Hold a checkpoint build after the signed body exists but before its

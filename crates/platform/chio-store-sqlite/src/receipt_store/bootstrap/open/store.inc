@@ -16,10 +16,13 @@ impl SqliteReceiptStore {
         configure_sqlite_connection(&mut connection)?;
         self.database_identity_file
             .validate_live_connection(&connection)?;
-        Ok(SqliteReceiptBoundConnection {
+        let state = Arc::new(SqliteReceiptBoundConnectionState::new(
             connection,
-            database_identity_file: Arc::clone(&self.database_identity_file),
-        })
+            Arc::clone(&self.database_identity_file),
+        ));
+        self.receipt_commit_actor
+            .register_bound_connection(&state)?;
+        Ok(SqliteReceiptBoundConnection { state })
     }
 
     /// Clone the store's descriptor-validating reader pool for a co-located

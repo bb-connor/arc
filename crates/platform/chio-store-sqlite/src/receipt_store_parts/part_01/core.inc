@@ -3,8 +3,7 @@ use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError, Weak};
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -228,22 +227,129 @@ impl ReceiptDatabaseIdentityFile {
     }
 }
 
+struct SqliteReceiptBoundConnectionState {
+    inner: Mutex<Option<SqliteReceiptBoundConnectionInner>>,
+    revoked: AtomicBool,
+}
+
+struct SqliteReceiptBoundConnectionInner {
+    connection: Connection,
+    database_identity_file: Arc<ReceiptDatabaseIdentityFile>,
+}
+
+impl SqliteReceiptBoundConnectionState {
+    fn new(
+        connection: Connection,
+        database_identity_file: Arc<ReceiptDatabaseIdentityFile>,
+    ) -> Self {
+        Self {
+            inner: Mutex::new(Some(SqliteReceiptBoundConnectionInner {
+                connection,
+                database_identity_file,
+            })),
+            revoked: AtomicBool::new(false),
+        }
+    }
+
+    fn revoke(&self) -> Result<(), BoundConnectionRevokeError> {
+        self.revoked.store(true, Ordering::SeqCst);
+        match self.inner.try_lock() {
+            Ok(mut inner) => {
+                inner.take();
+                Ok(())
+            }
+            Err(TryLockError::WouldBlock) => Err(BoundConnectionRevokeError::ActiveOperation),
+            Err(TryLockError::Poisoned(poisoned)) => {
+                let mut inner = poisoned.into_inner();
+                inner.take();
+                Err(BoundConnectionRevokeError::Poisoned)
+            }
+        }
+    }
+}
+
+enum BoundConnectionRevokeError {
+    ActiveOperation,
+    Poisoned,
+}
+
+/// A validated lease on one co-located SQLite connection.
+///
+/// The guard holds the connection state's operation lock for its entire
+/// lifetime. Store shutdown never waits for this lock: it either revokes and
+/// drops the connection or fails closed if an operation is still using it.
+pub struct SqliteReceiptConnectionGuard<'a> {
+    inner: MutexGuard<'a, Option<SqliteReceiptBoundConnectionInner>>,
+    revoked: &'a AtomicBool,
+}
+
+impl std::ops::Deref for SqliteReceiptConnectionGuard<'_> {
+    type Target = Connection;
+
+    fn deref(&self) -> &Self::Target {
+        match self.inner.as_ref() {
+            Some(inner) => &inner.connection,
+            None => panic!("revoked SQLite receipt connection escaped validation"),
+        }
+    }
+}
+
+impl Drop for SqliteReceiptConnectionGuard<'_> {
+    fn drop(&mut self) {
+        if self.revoked.load(Ordering::SeqCst) {
+            self.inner.take();
+        }
+    }
+}
+
 /// One external SQLite connection bound to a live receipt-store identity.
 ///
 /// Callers must obtain the connection through [`Self::validated_connection`]
 /// for every operation. That gate rechecks the retained parent descriptor,
 /// directory entry, file descriptor, and SQLite main-file handle before the
-/// caller can read or write co-located tables.
+/// caller can read or write co-located tables. The returned guard also prevents
+/// a concurrent successful store close while that operation remains active.
 pub struct SqliteReceiptBoundConnection {
-    connection: Connection,
-    database_identity_file: Arc<ReceiptDatabaseIdentityFile>,
+    state: Arc<SqliteReceiptBoundConnectionState>,
 }
 
 impl SqliteReceiptBoundConnection {
-    pub fn validated_connection(&self) -> Result<&Connection, ReceiptStoreError> {
-        self.database_identity_file
-            .validate_live_connection(&self.connection)?;
-        Ok(&self.connection)
+    pub fn validated_connection(
+        &self,
+    ) -> Result<SqliteReceiptConnectionGuard<'_>, ReceiptStoreError> {
+        if self.state.revoked.load(Ordering::SeqCst) {
+            return Err(ReceiptStoreError::Conflict(
+                "co-located SQLite receipt connection was revoked by store close".to_string(),
+            ));
+        }
+        let mut inner = self.state.inner.lock().map_err(|_| {
+            ReceiptStoreError::Conflict(
+                "co-located SQLite receipt connection operation lock is poisoned".to_string(),
+            )
+        })?;
+        if self.state.revoked.load(Ordering::SeqCst) {
+            inner.take();
+            return Err(ReceiptStoreError::Conflict(
+                "co-located SQLite receipt connection was revoked by store close".to_string(),
+            ));
+        }
+        let live = inner.as_ref().ok_or_else(|| {
+            ReceiptStoreError::Conflict(
+                "co-located SQLite receipt connection was revoked by store close".to_string(),
+            )
+        })?;
+        live.database_identity_file
+            .validate_live_connection(&live.connection)?;
+        if self.state.revoked.load(Ordering::SeqCst) {
+            inner.take();
+            return Err(ReceiptStoreError::Conflict(
+                "co-located SQLite receipt connection was revoked by store close".to_string(),
+            ));
+        }
+        Ok(SqliteReceiptConnectionGuard {
+            inner,
+            revoked: &self.state.revoked,
+        })
     }
 }
 
@@ -591,12 +697,19 @@ struct ReceiptCommitActor {
     database_identity_file: Option<Arc<ReceiptDatabaseIdentityFile>>,
 }
 
+#[derive(Clone)]
+struct OwedCheckpointFailure {
+    message: String,
+    required_checkpointed_entry_seq: u64,
+}
+
 struct ReceiptCommitWriterHealth {
     /// Serializes command publication with the consuming close transition.
     /// Commands that acquire this gate before close are ordered before its
     /// flush barrier; later publications fail without entering the channel.
     send_gate: Mutex<()>,
     closing: AtomicBool,
+    bound_connections: Mutex<Vec<Weak<SqliteReceiptBoundConnectionState>>>,
     accepted_total: AtomicU64,
     committed_total: AtomicU64,
     failed_total: AtomicU64,
@@ -632,6 +745,10 @@ struct ReceiptCommitWriterHealth {
     /// a fresh anchor.
     backlog_started_unix_ms: AtomicU64,
     last_error: Mutex<Option<String>>,
+    /// A background checkpoint attempt failed while work was due. Shutdown
+    /// retries this work and cannot report success until the error is cleared
+    /// by a successful build or verified no-op adoption.
+    owed_checkpoint_error: Mutex<Option<OwedCheckpointFailure>>,
     // Last background-retention rotation failure, set by the kernel maintenance
     // worker via `record_retention_rotation_outcome` and cleared on the next
     // successful rotation. Surfaced by `receipt_store_health` so a silently
@@ -657,6 +774,7 @@ impl Default for ReceiptCommitWriterHealth {
         Self {
             send_gate: Mutex::new(()),
             closing: AtomicBool::new(false),
+            bound_connections: Mutex::new(Vec::new()),
             accepted_total: AtomicU64::new(0),
             committed_total: AtomicU64::new(0),
             failed_total: AtomicU64::new(0),
@@ -670,6 +788,7 @@ impl Default for ReceiptCommitWriterHealth {
             first_accept_unix_ms: AtomicU64::new(0),
             backlog_started_unix_ms: AtomicU64::new(0),
             last_error: Mutex::new(None),
+            owed_checkpoint_error: Mutex::new(None),
             retention_error: Mutex::new(None),
             head_checkpoint_seq: AtomicU64::new(0),
             head_checkpointed_entry_seq: AtomicU64::new(0),
@@ -686,6 +805,44 @@ impl Default for ReceiptCommitWriterHealth {
 }
 
 impl ReceiptCommitWriterHealth {
+    fn owed_checkpoint_error(&self) -> Result<Option<OwedCheckpointFailure>, ReceiptStoreError> {
+        self.owed_checkpoint_error
+            .lock()
+            .map(|error| error.clone())
+            .map_err(|_| {
+                ReceiptStoreError::Conflict(
+                    "sqlite receipt checkpoint failure state is poisoned".to_string(),
+                )
+            })
+    }
+
+    fn record_owed_checkpoint_error(
+        &self,
+        error: &ReceiptStoreError,
+        required_checkpointed_entry_seq: u64,
+    ) {
+        if let Ok(mut owed_error) = self.owed_checkpoint_error.lock() {
+            if owed_error.as_ref().is_none_or(|existing| {
+                required_checkpointed_entry_seq > existing.required_checkpointed_entry_seq
+            }) {
+                *owed_error = Some(OwedCheckpointFailure {
+                    message: error.to_string(),
+                    required_checkpointed_entry_seq,
+                });
+            }
+        }
+    }
+
+    fn resolve_owed_checkpoint_error(&self, checkpointed_entry_seq: u64) {
+        if let Ok(mut owed_error) = self.owed_checkpoint_error.lock() {
+            if owed_error.as_ref().is_some_and(|failure| {
+                checkpointed_entry_seq >= failure.required_checkpointed_entry_seq
+            }) {
+                *owed_error = None;
+            }
+        }
+    }
+
     /// Record the first accepted receipt for operator display. Backlog timing is
     /// established by `reserve_inflight` before a command is published to the
     /// actor, including maintenance commands that do not count as receipts.
@@ -841,6 +998,12 @@ enum ReceiptCommitCommand {
         response: mpsc::SyncSender<Result<(), ReceiptStoreError>>,
         inflight: WriterInflightLease,
     },
+    /// Final flush barrier. In addition to draining accepted writes, retries
+    /// any checkpoint work still owed by the verified writer head.
+    ShutdownFlush {
+        response: mpsc::SyncSender<Result<(), ReceiptStoreError>>,
+        inflight: WriterInflightLease,
+    },
     /// Drain-complete termination used by callers that own a temporary
     /// receipt authority and must not remove its directory while the writer
     /// still retains SQLite handles.
@@ -984,6 +1147,67 @@ impl ReceiptCommitActor {
     /// reseeds, which the thread flag alone cannot see.
     fn writer_serving_closed(&self) -> bool {
         self.writer.health().is_serving_closed() || self.health.head_poisoned.load(Ordering::SeqCst)
+    }
+
+    fn register_bound_connection(
+        &self,
+        state: &Arc<SqliteReceiptBoundConnectionState>,
+    ) -> Result<(), ReceiptStoreError> {
+        let _send_gate = self.health.send_gate.lock().map_err(|_| {
+            ReceiptStoreError::Conflict(
+                "sqlite receipt store close gate is poisoned".to_string(),
+            )
+        })?;
+        if self.health.closing.load(Ordering::SeqCst) {
+            return Err(ReceiptStoreError::Conflict(
+                "sqlite receipt store is closing".to_string(),
+            ));
+        }
+        let mut connections = self.health.bound_connections.lock().map_err(|_| {
+            ReceiptStoreError::Conflict(
+                "sqlite receipt store bound-connection registry is poisoned".to_string(),
+            )
+        })?;
+        connections.retain(|connection| connection.strong_count() > 0);
+        connections.push(Arc::downgrade(state));
+        Ok(())
+    }
+
+    fn revoke_bound_connections(&self) -> Result<(), ReceiptStoreError> {
+        let (states, registry_poisoned) = match self.health.bound_connections.lock() {
+            Ok(mut connections) => {
+                let states = connections.iter().filter_map(Weak::upgrade).collect::<Vec<_>>();
+                connections.clear();
+                (states, false)
+            }
+            Err(poisoned) => {
+                let mut connections = poisoned.into_inner();
+                let states = connections.iter().filter_map(Weak::upgrade).collect::<Vec<_>>();
+                connections.clear();
+                (states, true)
+            }
+        };
+        let mut active_operations = 0_u64;
+        let mut poisoned_connections = 0_u64;
+        for state in states {
+            match state.revoke() {
+                Ok(()) => {}
+                Err(BoundConnectionRevokeError::ActiveOperation) => {
+                    active_operations = active_operations.saturating_add(1);
+                }
+                Err(BoundConnectionRevokeError::Poisoned) => {
+                    poisoned_connections = poisoned_connections.saturating_add(1);
+                }
+            }
+        }
+        if registry_poisoned || active_operations > 0 || poisoned_connections > 0 {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "sqlite receipt store close could not revoke all co-located connections: \
+                 active_operations={active_operations}, poisoned_connections={poisoned_connections}, \
+                 registry_poisoned={registry_poisoned}"
+            )));
+        }
+        Ok(())
     }
 
     /// The supervised writer's severity and cumulative restart count, for the
@@ -1141,19 +1365,30 @@ impl ReceiptCommitActor {
             Err(poisoned) => poisoned.into_inner(),
         };
         self.health.closing.store(true, Ordering::SeqCst);
-        let enqueued = self.enqueue_flush();
+        // Revoke direct co-located writers before publishing the final actor
+        // barrier. A successful close therefore has one linearization order:
+        // no new direct operations, then all previously accepted actor work,
+        // then the checkpoint/WAL report.
+        let bound_connection_barrier = self.revoke_bound_connections();
+        let enqueued = self.enqueue_shutdown_flush();
         drop(send_gate);
-        let EnqueuedWriterJob {
-            result,
-            inflight_release,
-        } = enqueued?;
-        match result.recv() {
-            Ok(outcome) => outcome,
-            Err(_) => {
-                inflight_release.release();
-                self.health.note_writer_unavailable();
-                Err(self.writer_dead_error())
-            }
+        let actor_barrier = match enqueued {
+            Ok(EnqueuedWriterJob {
+                result,
+                inflight_release,
+            }) => match result.recv() {
+                Ok(outcome) => outcome,
+                Err(_) => {
+                    inflight_release.release();
+                    self.health.note_writer_unavailable();
+                    Err(self.writer_dead_error())
+                }
+            },
+            Err(error) => Err(error),
+        };
+        match bound_connection_barrier {
+            Err(error) => Err(error),
+            Ok(()) => actor_barrier,
         }
     }
 
@@ -1177,6 +1412,17 @@ impl ReceiptCommitActor {
     }
 
     fn enqueue_flush(&self) -> Result<EnqueuedWriterJob<()>, ReceiptStoreError> {
+        self.enqueue_flush_command(false)
+    }
+
+    fn enqueue_shutdown_flush(&self) -> Result<EnqueuedWriterJob<()>, ReceiptStoreError> {
+        self.enqueue_flush_command(true)
+    }
+
+    fn enqueue_flush_command(
+        &self,
+        retry_owed_checkpoints: bool,
+    ) -> Result<EnqueuedWriterJob<()>, ReceiptStoreError> {
         if let Some(database_identity_file) = self.database_identity_file.as_ref() {
             database_identity_file.validate()?;
         }
@@ -1184,10 +1430,12 @@ impl ReceiptCommitActor {
         let (inflight, inflight_release, _previous_inflight) =
             WriterInflightLease::acquire(&self.health);
         self.health.note_channel_send();
-        match self.sender.try_send(ReceiptCommitCommand::Flush {
-            response,
-            inflight,
-        }) {
+        let command = if retry_owed_checkpoints {
+            ReceiptCommitCommand::ShutdownFlush { response, inflight }
+        } else {
+            ReceiptCommitCommand::Flush { response, inflight }
+        };
+        match self.sender.try_send(command) {
             Ok(()) => {}
             Err(mpsc::TrySendError::Full(_)) => {
                 inflight_release.release();

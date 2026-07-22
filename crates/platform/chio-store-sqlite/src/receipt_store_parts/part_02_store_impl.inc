@@ -1287,8 +1287,10 @@ impl SqliteReceiptStore {
         self.flush_report(wal_checkpoint)
     }
 
-    /// Flush every accepted receipt write, stop and join the writer actor, and
-    /// release all SQLite handles before returning.
+    /// Flush every accepted receipt write and stop and join the writer actor.
+    /// A successful result has revoked and released every registered co-located
+    /// connection. An active direct-operation guard makes close fail without
+    /// waiting; no successful WAL report is produced in that case.
     pub fn close(self) -> Result<ReceiptFlushReport, ReceiptStoreError> {
         let flush = self
             .receipt_commit_actor

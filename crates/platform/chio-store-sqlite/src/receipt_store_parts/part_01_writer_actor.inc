@@ -54,7 +54,11 @@ fn receipt_commit_actor_loop(
                             inflight_leases.push(inflight);
                         }
                         Ok(ReceiptCommitCommand::Flush { response, inflight }) => {
-                            flushes.push((response, inflight));
+                            flushes.push((response, inflight, false));
+                            break;
+                        }
+                        Ok(ReceiptCommitCommand::ShutdownFlush { response, inflight }) => {
+                            flushes.push((response, inflight, true));
                             break;
                         }
                         Ok(other) => {
@@ -143,9 +147,10 @@ fn receipt_commit_actor_loop(
                 // THIS batch via `flush_barrier_error`. It is deliberately NOT
                 // written back into `pending_flush_error`: that keeps the build
                 // error scoped to this batch's barrier and preserves the
-                // established contract of a later STANDALONE flush (which
-                // reflects append durability; background-build health is already
-                // surfaced through `last_error`/`receipt_store_health`).
+                // established contract of a later ordinary standalone flush,
+                // which reflects append durability. The final shutdown flush is
+                // different: it retries any recorded owed checkpoint work and
+                // fails close if the retry still fails.
                 let mut flush_barrier_error = pending_flush_error
                     .as_ref()
                     .map(receipt_store_error_snapshot);
@@ -165,9 +170,15 @@ fn receipt_commit_actor_loop(
                 // Release the co-drained Flush waiters now that owed checkpoints
                 // are built (the checkpoint barrier). An append error or a
                 // checkpoint-build failure reaches them as an Err; otherwise Ok.
-                for (response, inflight) in flushes {
+                for (response, inflight, retry_owed_checkpoints) in flushes {
                     let result = match &flush_barrier_error {
                         Some(error) => Err(receipt_store_error_snapshot(error)),
+                        None if retry_owed_checkpoints => retry_owed_checkpoints_for_shutdown(
+                            &pool,
+                            &mut head_state,
+                            &checkpoint_signer,
+                            &health,
+                        ),
                         None => Ok(()),
                     };
                     if result.is_ok() {
@@ -198,6 +209,22 @@ fn receipt_commit_actor_loop(
                 let result = match &pending_flush_error {
                     Some(error) => Err(receipt_store_error_snapshot(error)),
                     None => Ok(()),
+                };
+                if result.is_ok() {
+                    health.note_maintenance_success();
+                }
+                inflight.release();
+                let _ = response.send(result);
+            }
+            ReceiptCommitCommand::ShutdownFlush { response, inflight } => {
+                let result = match &pending_flush_error {
+                    Some(error) => Err(receipt_store_error_snapshot(error)),
+                    None => retry_owed_checkpoints_for_shutdown(
+                        &pool,
+                        &mut head_state,
+                        &checkpoint_signer,
+                        &health,
+                    ),
                 };
                 if result.is_ok() {
                     health.note_maintenance_success();
@@ -773,6 +800,10 @@ fn handle_non_append_command(
             inflight.release();
             let _ = response.send(Err(receipt_actor_unavailable_error()));
         }
+        ReceiptCommitCommand::ShutdownFlush { response, inflight } => {
+            inflight.release();
+            let _ = response.send(Err(receipt_actor_unavailable_error()));
+        }
         ReceiptCommitCommand::Shutdown { response } => {
             let _ = response.send(());
         }
@@ -807,6 +838,7 @@ fn build_due_checkpoints_and_record(
     match result {
         Ok(built) => {
             health.store_head_snapshot(head);
+            health.resolve_owed_checkpoint_error(head.checkpointed_entry_seq());
             // Recovery signal: a prior background
             // checkpoint build may have set `last_error`. A later SUCCESSFUL
             // build is reached here through a writer-routed op (a `Write` job
@@ -826,8 +858,51 @@ fn build_due_checkpoints_and_record(
             if let Ok(mut last_error) = health.last_error.lock() {
                 *last_error = Some(error.to_string());
             }
+            let checkpointed_entry_seq = head.checkpointed_entry_seq();
+            let uncheckpointed_entries = head
+                .claim_log_max_seq
+                .saturating_sub(checkpointed_entry_seq);
+            let owed_batches = if signer.max_batch == 0 {
+                0
+            } else {
+                uncheckpointed_entries / signer.max_batch
+            };
+            let owed_target = (owed_batches > 0).then(|| {
+                checkpointed_entry_seq
+                    .saturating_add(owed_batches.saturating_mul(signer.max_batch))
+            });
+            if let Some(required_checkpointed_entry_seq) = owed_target {
+                health.record_owed_checkpoint_error(&error, required_checkpointed_entry_seq);
+            }
             Some(error)
         }
+    }
+}
+
+fn retry_owed_checkpoints_for_shutdown(
+    pool: &Pool<ReceiptConnectionManager>,
+    head_state: &mut WriterHeadState,
+    checkpoint_signer: &Option<BackgroundCheckpointSigner>,
+    health: &ReceiptCommitWriterHealth,
+) -> Result<(), ReceiptStoreError> {
+    let Some(owed_error) = health.owed_checkpoint_error()? else {
+        return Ok(());
+    };
+    let WriterHeadState::Verified(head) = head_state else {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "sqlite receipt store close refused with owed checkpoint work through entry {}: {}",
+            owed_error.required_checkpointed_entry_seq, owed_error.message
+        )));
+    };
+    match build_due_checkpoints_and_record(pool, head, checkpoint_signer, health) {
+        Some(error) => Err(error),
+        None => match health.owed_checkpoint_error()? {
+            Some(error) => Err(ReceiptStoreError::Conflict(format!(
+                "sqlite receipt store close refused with owed checkpoint work through entry {}: {}",
+                error.required_checkpointed_entry_seq, error.message
+            ))),
+            None => Ok(()),
+        },
     }
 }
 

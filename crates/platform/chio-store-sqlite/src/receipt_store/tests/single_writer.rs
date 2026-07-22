@@ -45,6 +45,156 @@ fn graceful_close_drains_the_writer_before_private_directory_cleanup(
     Ok(())
 }
 
+#[test]
+fn close_revokes_idle_bound_connections_and_releases_their_handles(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-bound-close-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let store = SqliteReceiptStore::open(&path)?;
+    let bound = store.open_bound_colocated_connection()?;
+    let identity = {
+        let inner = bound
+            .state
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("bound connection lock is poisoned"))?;
+        let live = inner
+            .as_ref()
+            .ok_or("bound connection must be live before close")?;
+        std::sync::Arc::downgrade(&live.database_identity_file)
+    };
+
+    let report = store.close()?;
+    assert_eq!(report.latest_committed_entry_seq, 0);
+    let error = bound
+        .validated_connection()
+        .err()
+        .ok_or("a bound connection retained across close must be revoked")?;
+    assert!(
+        error.to_string().contains("revoked by store close"),
+        "unexpected post-close bound connection error: {error}"
+    );
+    let inner = bound
+        .state
+        .inner
+        .lock()
+        .map_err(|_| std::io::Error::other("bound connection lock is poisoned"))?;
+    assert!(inner.is_none(), "close must remove the revocable inner");
+    drop(inner);
+    assert!(
+        identity.upgrade().is_none(),
+        "close must drop the retained database and parent descriptors"
+    );
+
+    // Keep the public wrapper alive while removing the directory. It now owns
+    // only an empty revocation state.
+    directory.close()?;
+    assert!(!path.exists());
+    drop(bound);
+    Ok(())
+}
+
+#[test]
+fn close_fails_without_waiting_for_an_active_bound_connection_guard(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-bound-active-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let store = SqliteReceiptStore::open(&path)?;
+    let bound = store.open_bound_colocated_connection()?;
+    let active_guard = bound.validated_connection()?;
+    let (result_tx, result_rx) = std::sync::mpsc::channel();
+    let closer = std::thread::spawn(move || {
+        let _ = result_tx.send(store.close());
+    });
+
+    let close_result = match result_rx.recv_timeout(std::time::Duration::from_secs(2)) {
+        Ok(result) => result,
+        Err(error) => {
+            drop(active_guard);
+            drop(bound);
+            let _ = closer.join();
+            return Err(std::io::Error::other(format!(
+                "close waited for an active bound connection guard: {error}"
+            ))
+            .into());
+        }
+    };
+    closer
+        .join()
+        .map_err(|_| std::io::Error::other("receipt close thread panicked"))?;
+    let error = close_result
+        .err()
+        .ok_or("close must fail while a bound connection operation is active")?;
+    assert!(
+        error.to_string().contains("active_operations=1"),
+        "unexpected active bound connection error: {error}"
+    );
+    let post_close_error = bound
+        .validated_connection()
+        .err()
+        .ok_or("new bound operations must be rejected after failed close")?;
+    assert!(post_close_error
+        .to_string()
+        .contains("revoked by store close"));
+
+    drop(active_guard);
+    drop(bound);
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn close_revokes_direct_writes_before_publishing_the_final_actor_barrier(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_fs::private_tempdir("receipt-close-order-")?;
+    let path = directory.path().join("receipts.sqlite3");
+    let store = SqliteReceiptStore::open(&path)?;
+    let bound = store.open_bound_colocated_connection()?;
+    let handle = store.writer_handle();
+    let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let blocker = std::thread::spawn(move || {
+        handle.run_write(move |_connection| -> Result<(), ReceiptStoreError> {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv();
+            Ok(())
+        })
+    });
+    started_rx.recv()?;
+
+    let close_job = std::thread::spawn(move || store.close());
+    let revoke_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while !bound.state.revoked.load(Ordering::SeqCst) && std::time::Instant::now() < revoke_deadline
+    {
+        std::thread::yield_now();
+    }
+    if !bound.state.revoked.load(Ordering::SeqCst) {
+        let _ = release_tx.send(());
+        let _ = blocker.join();
+        let _ = close_job.join();
+        return Err("close did not revoke direct writers before its actor barrier".into());
+    }
+
+    let error = bound
+        .validated_connection()
+        .err()
+        .ok_or("a direct write started after close established revocation")?;
+    assert!(error.to_string().contains("revoked by store close"));
+
+    release_tx.send(())?;
+    blocker
+        .join()
+        .map_err(|_| "blocking writer thread panicked")??;
+    let report = close_job
+        .join()
+        .map_err(|_| "receipt close thread panicked")??;
+    assert_eq!(report.latest_committed_entry_seq, 0);
+
+    directory.close()?;
+    drop(bound);
+    Ok(())
+}
+
 /// A panic inside a Write-routed job (one of
 /// the ~30 rerouted write families: lineage, liability, underwriting,
 /// reconciliation, capability, federated, IOU, checkpoint, reseed) must not

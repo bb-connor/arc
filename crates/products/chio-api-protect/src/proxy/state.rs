@@ -483,7 +483,9 @@ impl SqliteReceiptStore {
         Ok(Self { connection })
     }
 
-    fn validated_connection(&self) -> Result<&Connection, ProtectError> {
+    fn validated_connection(
+        &self,
+    ) -> Result<chio_store_sqlite::SqliteReceiptConnectionGuard<'_>, ProtectError> {
         self.connection
             .validated_connection()
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))
@@ -658,7 +660,7 @@ fn canonical_receipt_json(receipt: &impl Serialize) -> Result<String, ProtectErr
 }
 
 fn append_exact_receipt(
-    connection: &Connection,
+    connection: impl std::ops::Deref<Target = Connection>,
     table: &str,
     receipt_id: &str,
     receipt_json: &str,
@@ -1814,6 +1816,28 @@ mod receipt_persistence_security_tests {
         assert!(error
             .to_string()
             .contains("signer, or signature validation"));
+    }
+
+    #[test]
+    fn direct_api_receipt_writes_are_revoked_by_platform_store_close() {
+        let directory = chio_test_support::private_fs::private_tempdir("api-protect-bound-close-")
+            .test_unwrap();
+        let path = directory.path().join("receipts.sqlite3");
+        let platform_store = chio_store_sqlite::SqliteReceiptStore::open(&path).test_unwrap();
+        let mut api_store = SqliteReceiptStore::open_bound(&platform_store).test_unwrap();
+        let signer = Keypair::generate();
+        let receipt = signed_http_receipt(&signer, "req-before-close");
+        api_store.append(&receipt).test_unwrap();
+
+        platform_store.close().test_unwrap();
+
+        let error = api_store.append(&receipt).test_unwrap_err();
+        assert!(
+            error.to_string().contains("revoked by store close"),
+            "unexpected post-close API receipt error: {error}"
+        );
+        directory.close().test_unwrap();
+        drop(api_store);
     }
 
     #[cfg(unix)]
