@@ -90,6 +90,9 @@ pub fn mediation_kernel(
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     });
+    // These conformance fixtures isolate authoritative in-memory budget and
+    // nonce semantics. Production financial dispatch requires durable admission.
+    kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     kernel.set_budget_store_handle(budget);
     let nonce_cfg = ExecutionNonceConfig {
         require_nonce,
