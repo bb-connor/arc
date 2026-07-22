@@ -955,7 +955,9 @@ fn make_config() -> KernelConfig {
 }
 
 fn make_kernel(config: KernelConfig) -> ChioKernel {
-    ChioKernel::new(config)
+    let mut kernel = ChioKernel::new(config);
+    kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
+    kernel
 }
 
 fn make_signed_receipt(kp: &Keypair, id: &str) -> ChioReceipt {

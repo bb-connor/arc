@@ -841,6 +841,37 @@ impl ChioKernel {
             });
         }
 
+        // A financial hold may not cross the tool-server dispatch boundary unless
+        // a durable admission operation can arbitrate an ambiguous outcome after a
+        // crash, cancellation, or deadline. This check uses the grant actually
+        // selected above, rather than classifying the whole candidate set: a free
+        // fallback must stay free, while a paid fallback may not inherit the
+        // ephemeral escape from another candidate. Reserve-for-caller mediation
+        // returns before this point and does not dispatch on this kernel.
+        if !self.unsafe_ephemeral_financial_dispatch
+            && durable_admission.is_none()
+            && (budget_mutation.charge_result().is_some()
+                || Self::is_governed_mustprepay_request(request))
+        {
+            let reason = "financial tool dispatch requires durable admission coverage";
+            warn!(request_id = %request.request_id, reason, "financial dispatch denied");
+            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                    request,
+                    reason,
+                    timestamp: now,
+                    matched_grant_index,
+                    cap,
+                    budget_mutation: &budget_mutation,
+                    payment_authorization: None,
+                    durable_operation: None,
+                    runtime_admission_metadata: extra_metadata,
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                    budget_lease_acquired,
+                })
+            });
+        }
+
         if budget_mutation.charge_result().is_none() {
             if let Err(error) = self.reserve_presented_execution_nonce(request) {
                 let msg = error.to_string();

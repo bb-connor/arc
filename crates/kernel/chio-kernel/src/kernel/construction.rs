@@ -226,6 +226,7 @@ impl ChioKernel {
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             durable_admission_runtime: None,
+            unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
@@ -678,6 +679,16 @@ impl ChioKernel {
             &self.config.keypair.public_key().to_hex(),
         )?);
         Ok(())
+    }
+
+    /// Enable legacy financial dispatch without durable admission recovery.
+    ///
+    /// This is an unsafe development compatibility switch. Ambiguous connector
+    /// outcomes can retain budget or rail holds permanently because no recovery
+    /// operation survives restart. Production deployments should install a
+    /// qualified durable admission store instead.
+    pub fn enable_unsafe_ephemeral_financial_dispatch_for_development(&mut self) {
+        self.unsafe_ephemeral_financial_dispatch = true;
     }
 
     pub fn set_channel_terminal_authority(

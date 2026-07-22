@@ -498,12 +498,11 @@ fn ambiguous_retained_hold_none_sample() -> u64 {
 }
 
 #[test]
-fn ambiguous_incomplete_on_non_durable_monetary_kernel_records_retained_hold() {
-    // A non-durable monetary kernel charges a budget hold before dispatch, then
-    // the tool returns RequestIncomplete. The post-dispatch outcome is ambiguous,
-    // so the hold is retained with no recovery sweep to reconcile it, and the
-    // retention is surfaced with reconciliation="none".
-    let mut kernel = make_kernel(make_monetary_config());
+fn non_durable_monetary_kernel_denies_before_ambiguous_dispatch() {
+    // A non-durable monetary kernel must reverse the provisional budget hold and
+    // deny before dispatch. It therefore cannot reach RequestIncomplete or add
+    // an unrecoverable retained-hold sample.
+    let mut kernel = ChioKernel::new(make_monetary_config());
     assert!(kernel.durable_admission_runtime.is_none());
     kernel.register_tool_server(Box::new(IncompleteServer {
         id: "broken".to_string(),
@@ -535,13 +534,28 @@ fn ambiguous_incomplete_on_non_durable_monetary_kernel_records_retained_hold() {
         })
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("requires durable admission coverage")),
+        "the denial must identify the missing financial durability boundary: {:?}",
+        response.reason
+    );
 
     let after = ambiguous_retained_hold_none_sample();
-    assert!(
-        after > before,
-        "an ambiguous incomplete outcome on a non-durable monetary kernel must advance \
-         the reconciliation=\"none\" retained-hold series: before={before}, after={after}"
+    assert_eq!(
+        after, before,
+        "pre-dispatch denial must not record an ambiguous retained hold"
     );
+    let usage = kernel
+        .budget_store
+        .get_usage(&response.receipt.capability_id, 0)
+        .unwrap()
+        .expect("the reversible mutation history retains a zeroed usage projection");
+    assert_eq!(usage.invocation_count, 0);
+    assert_eq!(usage.total_cost_exposed, 0);
+    assert_eq!(usage.total_cost_realized_spend, 0);
 }
 
 #[test]
