@@ -18,7 +18,7 @@ use super::{
     credit_facility_scope_digest, validate_digest, validate_money, validate_text, ObligationAtomV1,
     ObligationCreditElectionV1, SignedCreditFacilityBindV1, VerifiedCreditFacilityBindV1,
 };
-
+mod kernel_projection;
 const AUTHORITY_CONFIGURATION_DIGEST_DOMAIN: &[u8] =
     b"chio.credit.authority-configuration.digest.v1\0";
 const AUTHORITY_CATALOG_DIGEST_DOMAIN: &[u8] = b"chio.credit.authority-catalog.digest.v1\0";
@@ -1393,30 +1393,6 @@ impl CreditExposureReservationRecordV1 {
         next_resource_fence: u64,
     ) -> Result<Self, CreditAdmissionError> {
         proof.validate_for(&self.operation_id)?;
-        self.transition(
-            CreditExposureReservationStateV1::ReleasedBeforeDispatch,
-            next_account_version,
-            next_resource_fence,
-        )
-    }
-
-    /// Prepare a release authorized by a qualified kernel terminal projection.
-    ///
-    /// The persistence boundary must first verify that the projection contains a
-    /// complete pre-dispatch no-effect proof for this exact operation. This
-    /// method keeps the credit state transition and its dense account-version
-    /// rules in the owning crate while allowing that kernel proof to serve as the
-    /// release authority instead of an economic-continuity effect slot.
-    pub fn prepare_released_before_dispatch_from_kernel_projection(
-        &self,
-        verified_operation_id: &str,
-        next_account_version: u64,
-        next_resource_fence: u64,
-    ) -> Result<Self, CreditAdmissionError> {
-        validate_admission_digest("operation_id", verified_operation_id)?;
-        if self.operation_id != verified_operation_id {
-            return Err(CreditAdmissionError::OperationConflict);
-        }
         self.transition(
             CreditExposureReservationStateV1::ReleasedBeforeDispatch,
             next_account_version,
