@@ -497,6 +497,7 @@ fn ambiguous_retained_hold_none_sample() -> u64 {
         .unwrap_or(0)
 }
 
+#[path = "budget/non_durable_financial_dispatch.rs"]
 mod non_durable_financial_dispatch;
 
 #[test]
