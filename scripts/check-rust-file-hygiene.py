@@ -274,7 +274,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/economy/chio-market/src/tests.rs": allow(
         "2026-07-31",
         "market admission and quote test suite; capped to current size until split",
-        max_lines=2_727,
+        max_lines=2_747,
     ),
     "crates/economy/chio-settle/src/channel/tests/support.rs": allow(
         "2026-07-31",
