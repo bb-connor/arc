@@ -484,6 +484,30 @@ name = "crypto-bigint"
 name = "crypto-common"
 
 [[bans.skip]]
+# last-checked = 2026-07-23. Sigstore 0.14's maintained TUF/OCI stack uses
+# the cipher 0.5 family while the existing AES, PKCS, and iroh stacks remain
+# on cipher 0.4. Neither side can be unified without replacing an upstream
+# cryptographic implementation.
+name = "cipher"
+
+[[bans.skip]]
+name = "inout"
+
+[[bans.skip]]
+name = "pbkdf2"
+
+[[bans.skip]]
+name = "salsa20"
+
+[[bans.skip]]
+name = "scrypt"
+
+[[bans.skip]]
+# last-checked = 2026-07-23. Sigstore 0.14 requires jsonwebtoken 10 while
+# the OIDC and hosted-auth surfaces remain on the jsonwebtoken 9 API.
+name = "jsonwebtoken"
+
+[[bans.skip]]
 name = "darling"
 
 [[bans.skip]]
