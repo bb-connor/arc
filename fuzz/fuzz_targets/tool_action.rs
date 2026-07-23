@@ -192,13 +192,8 @@ fn generated_case(input: &ToolActionInput) -> GeneratedToolAction {
 }
 
 fn aggregate_budget(selector: u8) -> Option<AggregateInvocationBudget> {
-    let scope = match selector % 3 {
-        0 => return None,
-        1 => AggregateInvocationScope::Capability,
-        _ => AggregateInvocationScope::DelegationFamily,
-    };
-    Some(AggregateInvocationBudget {
-        scope,
+    (selector % 3 == 1).then_some(AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
         max_invocations: u32::from(selector),
         root_binding: None,
     })
@@ -233,7 +228,12 @@ fn capability(
         delegation_chain: Vec::new(),
         aggregate_invocation_budget: aggregate_budget(budget_selector),
     };
-    match CapabilityToken::sign(body, issuer) {
+    let signed = if budget_selector % 3 == 2 {
+        CapabilityToken::sign_aggregate_family_root(body, u32::from(budget_selector), issuer)
+    } else {
+        CapabilityToken::sign(body, issuer)
+    };
+    match signed {
         Ok(token) => token,
         Err(error) => panic!("tool-action capability should sign: {error}"),
     }
