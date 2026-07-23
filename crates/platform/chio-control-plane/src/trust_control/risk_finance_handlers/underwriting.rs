@@ -1,4 +1,5 @@
 use super::*;
+use crate::trust_control::report_rendering::forward_post_to_leader;
 
 pub(crate) async fn handle_underwriting_policy_input(
     State(state): State<TrustServiceState>,
@@ -183,6 +184,17 @@ pub(crate) async fn handle_issue_underwriting_decision(
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
+    }
+
+    // Fiscal underwriting resolves the premium against the active schedule. A
+    // follower can be stale or in fallback, so governed issuance must run on the
+    // elected leader before resolution, signing, or persistence.
+    if state.fiscal_runtime.is_some() {
+        match forward_post_to_leader(&state, UNDERWRITING_DECISION_ISSUE_PATH, &request).await {
+            Ok(Some(response)) => return response,
+            Ok(None) => {}
+            Err(response) => return response,
+        }
     }
 
     let receipt_db_path = match state.config.receipt_db_path.as_deref() {

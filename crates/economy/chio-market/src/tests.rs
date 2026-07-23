@@ -2247,7 +2247,33 @@ fn parametric_evidence_accepts_gapped_sequences_from_a_multi_subject_source() {
 }
 
 #[test]
-fn parametric_evidence_rejects_duplicate_and_descending_source_sequences() {
+fn parametric_evidence_accepts_source_sequences_independent_of_query_order() {
+    let fixture = sample_parametric_fixture();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify parametric policy",
+    );
+    let window = require_ok(
+        verified.body().window_at(1_700_010_500),
+        "derive policy window",
+    );
+    let signer = crate::crypto::Keypair::from_seed(&[51; 32]);
+
+    let late_append = interleaved_evidence_fixture(&window, [5, 3], &signer);
+    let corpus = verify_sample_corpus(&verified, &window, &late_append);
+    let range = &corpus.manifest().ranges[0];
+    assert_eq!(
+        range.sequence_range,
+        Some(InclusiveSequenceRange { first: 3, last: 5 })
+    );
+    match require_ok(verified.evaluate_trigger(&corpus), "evaluate trigger") {
+        VerifiedTriggerVerdictV1::Fired(_) => {}
+        VerifiedTriggerVerdictV1::NotFired => panic!("late-append corpus did not fire"),
+    }
+}
+
+#[test]
+fn parametric_evidence_rejects_duplicate_source_sequences() {
     let fixture = sample_parametric_fixture();
     let verified = require_ok(
         VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
@@ -2262,13 +2288,7 @@ fn parametric_evidence_rejects_duplicate_and_descending_source_sequences() {
     let duplicate = interleaved_evidence_fixture(&window, [3, 3], &signer);
     assert_eq!(
         evidence_verification_error(&verified, &window, duplicate.proof, &duplicate.registry),
-        ParametricContractError::IncompleteEvidenceBoundaries
-    );
-
-    let descending = interleaved_evidence_fixture(&window, [5, 3], &signer);
-    assert_eq!(
-        evidence_verification_error(&verified, &window, descending.proof, &descending.registry),
-        ParametricContractError::IncompleteEvidenceBoundaries
+        ParametricContractError::InvalidField("corpus.expected_count")
     );
 }
 

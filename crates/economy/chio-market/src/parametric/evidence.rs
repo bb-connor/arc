@@ -649,14 +649,11 @@ fn verify_source_range(
         proof.selected_member_root == derived_member_root,
         "corpus.selected_member_root",
     )?;
-    let sequence_range =
-        members
-            .first()
-            .zip(members.last())
-            .map(|(first, last)| InclusiveSequenceRange {
-                first: first.sequence,
-                last: last.sequence,
-            });
+    let first_sequence = members.iter().map(|member| member.sequence).min();
+    let last_sequence = members.iter().map(|member| member.sequence).max();
+    let sequence_range = first_sequence
+        .zip(last_sequence)
+        .map(|(first, last)| InclusiveSequenceRange { first, last });
     let range = EvidenceSourceRangeV1 {
         source_kind: checkpoint.source_kind,
         source_id: checkpoint.source_id.clone(),
@@ -706,9 +703,7 @@ fn verify_range_members(
         }
     }
     for pair in proof.members.windows(2) {
-        if pair[0].proof.leaf_index.checked_add(1) != Some(pair[1].proof.leaf_index)
-            || pair[0].member.sequence >= pair[1].member.sequence
-        {
+        if pair[0].proof.leaf_index.checked_add(1) != Some(pair[1].proof.leaf_index) {
             return Err(ParametricContractError::IncompleteEvidenceBoundaries);
         }
     }
