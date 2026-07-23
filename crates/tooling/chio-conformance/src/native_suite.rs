@@ -306,6 +306,7 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     },
                     None,
                 )),
+                execution_nonce: None,
             }]
         }
         AgentMessage::ToolCallRequest {
@@ -352,6 +353,7 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     Decision::Allow,
                     metadata,
                 )),
+                execution_nonce: None,
             }]
         }
         AgentMessage::ToolCallRequest {
@@ -378,6 +380,7 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                     Decision::Allow,
                     None,
                 )),
+                execution_nonce: None,
             }]
         }
     }
@@ -1272,6 +1275,7 @@ fn build_governed_request() -> AgentMessage {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        execution_nonce: None,
     }
 }
 
@@ -1292,6 +1296,7 @@ fn build_revoked_request() -> AgentMessage {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        execution_nonce: None,
     }
 }
 

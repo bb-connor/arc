@@ -24,6 +24,9 @@
     },
     "supplemental_authorization": {
       "$ref": "../capability/supplemental-authorization.schema.json"
+    },
+    "execution_nonce": {
+      "$ref": "../kernel/execution_nonce.schema.json"
     }
   },
   "allOf": [

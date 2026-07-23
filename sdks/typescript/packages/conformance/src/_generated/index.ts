@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 71fc01e44624984c1a22e15a655118a29fd25c99c12bcc60b410dd9c8ce392c5
+// Schema SHA: d149c5f2c9cf4b8ff71d0050fc5756757a1d46693ba673467a65c8b3ce38995b
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -124,6 +124,7 @@ export namespace Agent_ToolCallRequest {
     approval_tokens?: ChioGovernedApprovalToken[];
     threshold_approval_proposal?: ChioThresholdApprovalProposal;
     supplemental_authorization?: ChioOpaqueSupplementalAuthorization;
+    execution_nonce?: ChioSignedExecutionNonce;
   };
   /**
    * A Chio capability token with typed caveats, attenuation fields, attenuation proof, budget share, and hybrid signing support folded into the unreleased v1 wire shape.
@@ -416,6 +417,25 @@ export namespace Agent_ToolCallRequest {
      * Opaque authenticated extension bytes. Adapters must not interpret these bytes as quota authority.
      */
     signed_extension: string;
+  }
+  export interface ChioSignedExecutionNonce {
+    nonce: {
+      schema: "chio.execution_nonce.v1";
+      nonce_id: string;
+      issued_at: number;
+      expires_at: number;
+      bound_to: {
+        subject_id: string;
+        request_id: string;
+        capability_id: string;
+        tool_server: string;
+        tool_name: string;
+        parameter_hash: string;
+      };
+      reserved_hold_id?: string;
+      reserving_request_id?: string;
+    };
+    signature: string;
   }
 }
 
@@ -1658,6 +1678,30 @@ export namespace Kernel_CombinedCaptureMetadata {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/execution_nonce.schema.json
+export namespace Kernel_ExecutionNonce {
+  export interface ChioSignedExecutionNonce {
+    nonce: {
+      schema: "chio.execution_nonce.v1";
+      nonce_id: string;
+      issued_at: number;
+      expires_at: number;
+      bound_to: {
+        subject_id: string;
+        request_id: string;
+        capability_id: string;
+        tool_server: string;
+        tool_name: string;
+        parameter_hash: string;
+      };
+      reserved_hold_id?: string;
+      reserving_request_id?: string;
+    };
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/kernel/heartbeat.schema.json
 export namespace Kernel_Heartbeat {
   export interface ChioKernelMessageHeartbeat {
@@ -1860,6 +1904,7 @@ export namespace Kernel_ToolCallResponse {
               };
         };
     receipt: ChioReceiptRecord;
+    execution_nonce?: ChioSignedExecutionNonce;
   }
   /**
    * Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
@@ -1909,6 +1954,25 @@ export namespace Kernel_ToolCallResponse {
     issuer_public_key_hex: string;
     message_count: 14;
     signature_hex: string;
+  }
+  export interface ChioSignedExecutionNonce {
+    nonce: {
+      schema: "chio.execution_nonce.v1";
+      nonce_id: string;
+      issued_at: number;
+      expires_at: number;
+      bound_to: {
+        subject_id: string;
+        request_id: string;
+        capability_id: string;
+        tool_server: string;
+        tool_name: string;
+        parameter_hash: string;
+      };
+      reserved_hold_id?: string;
+      reserving_request_id?: string;
+    };
+    signature: string;
   }
 }
 

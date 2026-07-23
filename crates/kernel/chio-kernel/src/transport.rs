@@ -229,6 +229,7 @@ mod tests {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         // Serialize to a buffer (using canonical JSON, same as KernelMessage path).
@@ -266,6 +267,7 @@ mod tests {
                 value: serde_json::json!({"output": "world"}),
             },
             receipt: Box::new(receipt),
+            execution_nonce: None,
         };
 
         // Use a shared buffer as the "pipe".
@@ -284,6 +286,7 @@ mod tests {
                 id,
                 result,
                 receipt,
+                ..
             } => Some((id, result, receipt)),
             _ => None,
         }

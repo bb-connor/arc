@@ -10,12 +10,99 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::canonical_json_bytes;
 use crate::capability::governance::{
     GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal,
 };
 use crate::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use crate::capability::token::CapabilityToken;
+use crate::crypto::{PublicKey, Signature};
 use crate::receipt::body::ChioReceipt;
+
+/// Fields that bind an execution nonce to one tool invocation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NonceBinding {
+    pub subject_id: String,
+    #[serde(default)]
+    pub request_id: String,
+    pub capability_id: String,
+    pub tool_server: String,
+    pub tool_name: String,
+    pub parameter_hash: String,
+}
+
+/// Signable body of a kernel-issued execution nonce.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionNonce {
+    pub schema: String,
+    pub nonce_id: String,
+    pub issued_at: i64,
+    pub expires_at: i64,
+    pub bound_to: NonceBinding,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserved_hold_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserving_request_id: Option<String>,
+}
+
+/// Kernel-signed execution nonce carried across agent/kernel transports.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignedExecutionNonce {
+    pub nonce: ExecutionNonce,
+    pub signature: Signature,
+}
+
+impl SignedExecutionNonce {
+    #[must_use]
+    pub fn nonce_id(&self) -> &str {
+        &self.nonce.nonce_id
+    }
+
+    #[must_use]
+    pub fn expires_at(&self) -> i64 {
+        self.nonce.expires_at
+    }
+
+    #[must_use]
+    pub fn reserved_hold_id(&self) -> Option<&str> {
+        self.nonce.reserved_hold_id.as_deref()
+    }
+
+    #[must_use]
+    pub fn reserving_request_id(&self) -> Option<&str> {
+        self.nonce.reserving_request_id.as_deref()
+    }
+}
+
+impl crate::receipt::authoritative_spend::PresentedNonceView for SignedExecutionNonce {
+    fn nonce_id(&self) -> &str {
+        &self.nonce.nonce_id
+    }
+
+    fn bound_capability_id(&self) -> &str {
+        &self.nonce.bound_to.capability_id
+    }
+
+    fn bound_tool_server(&self) -> &str {
+        &self.nonce.bound_to.tool_server
+    }
+
+    fn bound_tool_name(&self) -> &str {
+        &self.nonce.bound_to.tool_name
+    }
+
+    fn bound_parameter_hash(&self) -> &str {
+        &self.nonce.bound_to.parameter_hash
+    }
+
+    fn bound_reserved_hold_id(&self) -> Option<&str> {
+        self.nonce.reserved_hold_id.as_deref()
+    }
+
+    fn verify_signed_by(&self, key: &PublicKey) -> bool {
+        canonical_json_bytes(&self.nonce).is_ok_and(|bytes| key.verify(&bytes, &self.signature))
+    }
+}
 
 /// Messages sent from the Agent to the Kernel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +135,9 @@ pub enum AgentMessage {
         /// Opaque authorization extension carried through to the kernel.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         supplemental_authorization: Option<Box<OpaqueSupplementalAuthorization>>,
+        /// Kernel-issued nonce from a strict execution preflight for this request.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        execution_nonce: Option<Box<SignedExecutionNonce>>,
     },
     /// Request a listing of the agent's current capabilities.
     ListCapabilities,
@@ -106,6 +196,9 @@ pub enum KernelMessage {
         result: ToolCallResult,
         /// Signed receipt attesting to the decision.
         receipt: Box<ChioReceipt>,
+        /// Kernel-issued nonce that must be presented on the exact retry.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        execution_nonce: Option<Box<SignedExecutionNonce>>,
     },
     /// Response to a ListCapabilities request.
     CapabilityList {
@@ -289,6 +382,7 @@ mod tests {
             approval_tokens,
             threshold_approval_proposal,
             supplemental_authorization: None,
+            execution_nonce: None,
         }
     }
 
@@ -362,6 +456,7 @@ mod tests {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let json = serde_json::to_string_pretty(&msg).unwrap();
@@ -407,6 +502,7 @@ mod tests {
                 value: serde_json::json!({"output": "world"}),
             },
             receipt: Box::new(make_receipt(&kp)),
+            execution_nonce: None,
         };
 
         let json = serde_json::to_string_pretty(&msg).unwrap();
@@ -417,10 +513,12 @@ mod tests {
                 id,
                 result,
                 receipt,
+                execution_nonce,
             } => {
                 assert_eq!(id, "req-001");
                 assert!(matches!(result, ToolCallResult::Ok { .. }));
                 assert!(receipt.verify_signature().unwrap());
+                assert!(execution_nonce.is_none());
             }
             _ => panic!("wrong variant"),
         }

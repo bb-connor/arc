@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 4de65bcc4d3a0925b25ee40b381b5f8f4ca900e43c07debad9fee70824a63a04
+# Schema sha256: 63696e53010dca489dd90f0f71166c42511e6e9734e364a6e3cd564e8d04693b
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -29,7 +29,7 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "4de65bcc4d3a0925b25ee40b381b5f8f4ca900e43c07debad9fee70824a63a04"
+SCHEMA_SHA256 = "63696e53010dca489dd90f0f71166c42511e6e9734e364a6e3cd564e8d04693b"
 
 from .agent import Body as AgentBody, Body3, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent, MaxAmount, OrderedEffect
 from .anchor import Body as AnchorBody, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3
@@ -37,7 +37,7 @@ from .capability import AggregateRootPublicKey, AggregateRootSignature, Aggregat
 from .error import ChioToolcallerrorCapabilityDenied, ChioToolcallerrorCapabilityExpired, ChioToolcallerrorCapabilityRevoked, ChioToolcallerrorInternalError, ChioToolcallerrorPolicyDenied, ChioToolcallerrorToolServerError, Detail as ErrorDetail
 from .federation import CapabilityLeaseRef, ChioBilateralDsseSignatureSliceEnvelope, ChioBilateralDsseSignatureSliceStatement, CoSign, CrossOrgVisibility, Digest as FederationDigest, GovernanceReceiptRef, HashRecord, JointDisposition, KernelIdentity, PolicyEvaluationSummary, PolicyVerdict, Predicate, Signature, SubjectItem, Verdict as FederationVerdict
 from .jsonrpc import ChioJsonRpc20Notification, ChioJsonRpc20Request, ChioJsonRpc20Response, ChioJsonRpc20Response1, ChioJsonRpc20Response2, Error as JsonrpcError
-from .kernel import ChioCombinedAdmissionCaptureMetadata, ChioKernelmessageCapabilityList, ChioKernelmessageCapabilityRevoked, ChioKernelmessageHeartbeat, ChioKernelmessageToolCallChunk, ChioKernelmessageToolCallResponse, Detail as KernelDetail, Error as KernelError, Error10, Error11, Error12, Error13, Error9, QuotaKey, Result, Result1, Result2, Result3, Result4
+from .kernel import BoundTo, ChioCombinedAdmissionCaptureMetadata, ChioKernelmessageCapabilityList, ChioKernelmessageCapabilityRevoked, ChioKernelmessageHeartbeat, ChioKernelmessageToolCallChunk, ChioKernelmessageToolCallResponse, ChioSignedExecutionNonce, Detail as KernelDetail, Error as KernelError, Error10, Error11, Error12, Error13, Error9, Nonce, QuotaKey, Result, Result1, Result2, Result3, Result4
 from .provenance import ChioProvenanceAttestationBundle, ChioProvenanceCallChainContext, ChioProvenanceStamp, ChioProvenanceVerdictLink, ChioProvenanceVerdictLink1, ChioProvenanceVerdictLink2, ChioProvenanceVerdictLink3, ChioProvenanceVerdictLink4, CredentialKind as ProvenanceCredentialKind, EvidenceClass as ProvenanceEvidenceClass, Scheme as ProvenanceScheme, Statement, Tier as ProvenanceTier, Verdict as ProvenanceVerdict, WorkloadIdentity as ProvenanceWorkloadIdentity
 from .receipt import ActorRef, Algorithm as ReceiptAlgorithm, BbsReceiptSignature, BoundaryClass, ChioDurableAdmissionReceiptMetadata, ChioReceiptLineageStatement, ChioReceiptMerkleInclusionProof, ChioReceiptRecord, CompensationStatus, Decision as ReceiptDecision, Decision1, Decision2, Decision3, Decision4, Digest as ReceiptDigest, DispatchCommit, EvidenceClass as ReceiptEvidenceClass, GuardEvidence, Identifier, ObservationOutcome, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, ReceiptKind, RedactionMode, RelationKind, SessionAnchorReference, StoreFence, ToolCallAction, ToolOrigin, TrustLevel
 from .result import ChioToolcallresultCancelled, ChioToolcallresultErr, ChioToolcallresultIncomplete, ChioToolcallresultOk, ChioToolcallresultStreamComplete, Detail as ResultDetail, Error as ResultError, Error1, Error2, Error3, Error4, Error5
@@ -63,6 +63,7 @@ __all__ = [
     "AttenuationWitness",
     "BbsReceiptSignature",
     "Body3",
+    "BoundTo",
     "BoundaryClass",
     "BudgetSnapshotAnchorProvenance",
     "CapabilityAlgorithm",
@@ -120,6 +121,7 @@ __all__ = [
     "ChioReceiptMerkleInclusionProof",
     "ChioReceiptRecord",
     "ChioScope",
+    "ChioSignedExecutionNonce",
     "ChioThresholdApprovalProposal",
     "ChioToolcallerrorCapabilityDenied",
     "ChioToolcallerrorCapabilityExpired",
@@ -186,6 +188,7 @@ __all__ = [
     "LegacyApprovalConstraint",
     "MaxAmount",
     "MonetaryAmount",
+    "Nonce",
     "ObservationOutcome",
     "Operation",
     "OrderedEffect",

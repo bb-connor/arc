@@ -8,7 +8,10 @@ use chio_core_types::{
         token::{CapabilityToken, CapabilityTokenBody},
     },
     crypto::Keypair,
-    message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult},
+    message::{
+        AgentMessage, ExecutionNonce, KernelMessage, NonceBinding, SignedExecutionNonce,
+        ToolCallError, ToolCallResult,
+    },
     receipt::{
         body::{ChioReceipt, ChioReceiptBody},
         decision::{Decision, ToolCallAction},
@@ -346,6 +349,29 @@ fn make_receipt_body(kp: &Keypair, decision: Decision) -> ChioReceiptBody {
     }
 }
 
+fn make_execution_nonce(kp: &Keypair) -> SignedExecutionNonce {
+    SignedExecutionNonce {
+        nonce: ExecutionNonce {
+            schema: "chio.execution_nonce.v1".to_string(),
+            nonce_id: "nonce-wire-001".to_string(),
+            issued_at: 1_000,
+            expires_at: 1_030,
+            bound_to: NonceBinding {
+                subject_id: "agent-wire-001".to_string(),
+                request_id: "req-wire-001".to_string(),
+                capability_id: "cap-wire-001".to_string(),
+                tool_server: "srv".to_string(),
+                tool_name: "echo".to_string(),
+                parameter_hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                    .to_string(),
+            },
+            reserved_hold_id: None,
+            reserving_request_id: None,
+        },
+        signature: kp.sign(b"wire-execution-nonce"),
+    }
+}
+
 #[test]
 fn wire_protocol_schema_cases_validate_live_serialization() {
     let kp = Keypair::from_seed(&[7; 32]);
@@ -362,6 +388,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        execution_nonce: Some(Box::new(make_execution_nonce(&kp))),
     };
 
     let result_ok = ToolCallResult::Ok {
@@ -425,6 +452,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                 id: "req-wire-001".to_string(),
                 result: result_ok.clone(),
                 receipt: Box::new(make_receipt(&kp, Decision::Allow)),
+                execution_nonce: Some(Box::new(make_execution_nonce(&kp))),
             }),
         ),
         (
@@ -433,6 +461,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                 id: "req-wire-002".to_string(),
                 result: result_stream_complete.clone(),
                 receipt: Box::new(make_receipt(&kp, Decision::Allow)),
+                execution_nonce: None,
             }),
         ),
         (
@@ -446,6 +475,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "operator cancelled".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -459,6 +489,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "upstream stream interrupted".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -473,6 +504,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "signature mismatch".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -487,6 +519,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "capability expired".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -501,6 +534,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "capability revoked".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -515,6 +549,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "path is forbidden".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -529,6 +564,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "upstream 500".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -543,6 +579,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                         reason: "receipt signing failed".to_string(),
                     },
                 )),
+                execution_nonce: None,
             }),
         ),
         (
@@ -658,6 +695,7 @@ fn tool_call_response_schema_rejects_allow_shaped_trace_receipts() {
             chunks_received: 0,
         },
         receipt: Box::new(make_receipt(&kp, Decision::Allow)),
+        execution_nonce: None,
     });
 
     {

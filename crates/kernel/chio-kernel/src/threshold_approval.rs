@@ -90,6 +90,7 @@ pub trait ThresholdApprovalCollectorStore: Send + Sync {
         proposal_id: &str,
         expected_version: u64,
         token: &GovernedApprovalToken,
+        replaced_token_id: Option<&str>,
         next_state: ThresholdApprovalCollectorState,
         updated_at: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError>;
@@ -212,7 +213,7 @@ impl ThresholdApprovalCollector {
             .store
             .get(proposal_id)?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
-        if record.state != ThresholdApprovalCollectorState::Collecting {
+        if record.state.is_terminal() {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal no longer accepts updates".to_string(),
             ));
@@ -274,36 +275,58 @@ impl ThresholdApprovalCollector {
         let digest = token
             .artifact_digest()
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
+        let mut replaced_token_id = None;
         for existing in &record.tokens {
             let existing_digest = existing.artifact_digest().map_err(|error| {
                 ThresholdApprovalCollectorStoreError::Serialization(error.to_string())
             })?;
-            if existing.id == token.id
-                || existing.approver == token.approver
-                || existing_digest == digest
-            {
+            if existing.id == token.id || existing_digest == digest {
                 return Err(ThresholdApprovalCollectorStoreError::Conflict(
                     "threshold approval token id, digest, and signer must be unique".to_string(),
                 ));
             }
+            if existing.approver == token.approver {
+                if existing.validate_time(now).is_ok() {
+                    return Err(ThresholdApprovalCollectorStoreError::Conflict(
+                        "threshold approval token id, digest, and signer must be unique"
+                            .to_string(),
+                    ));
+                }
+                replaced_token_id = Some(existing.id.as_str());
+            }
         }
-        let count = record.tokens.len().checked_add(1).ok_or_else(|| {
-            ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval token count overflowed".to_string(),
-            )
-        })?;
+        let active_count = record
+            .tokens
+            .iter()
+            .filter(|existing| {
+                Some(existing.id.as_str()) != replaced_token_id
+                    && existing.validate_time(now).is_ok()
+            })
+            .count()
+            .checked_add(1)
+            .ok_or_else(|| {
+                ThresholdApprovalCollectorStoreError::Conflict(
+                    "threshold approval token count overflowed".to_string(),
+                )
+            })?;
         let threshold = usize::try_from(record.requirement.threshold).map_err(|_| {
             ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval quorum does not fit this platform".to_string(),
             )
         })?;
-        let next_state = if count >= threshold {
+        let next_state = if active_count >= threshold {
             ThresholdApprovalCollectorState::Ready
         } else {
             ThresholdApprovalCollectorState::Collecting
         };
-        self.store
-            .append_token(proposal_id, record.version, &token, next_state, now)
+        self.store.append_token(
+            proposal_id,
+            record.version,
+            &token,
+            replaced_token_id,
+            next_state,
+            now,
+        )
     }
 
     pub fn deliver(
@@ -329,20 +352,20 @@ impl ThresholdApprovalCollector {
                 "threshold approval proposal is stale for the active policy".to_string(),
             ));
         }
-        // A token may expire well before the proposal deadline, so the set that was
-        // quorate at submission is not necessarily quorate now. Re-check every token
-        // and the quorum count rather than delivering a set the kernel will reject.
-        for token in &record.tokens {
-            token.validate_time(now).map_err(|error| {
-                ThresholdApprovalCollectorStoreError::Conflict(error.to_string())
-            })?;
-        }
+        // A token may expire well before the proposal deadline. Ignore superseded
+        // or expired history and deliver only the currently valid set.
+        let valid_tokens = record
+            .tokens
+            .iter()
+            .filter(|token| token.validate_time(now).is_ok())
+            .cloned()
+            .collect::<Vec<_>>();
         let threshold = usize::try_from(record.requirement.threshold).map_err(|_| {
             ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval quorum does not fit this platform".to_string(),
             )
         })?;
-        if record.tokens.len() < threshold {
+        if valid_tokens.len() < threshold {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval quorum is no longer satisfied".to_string(),
             ));
@@ -355,7 +378,7 @@ impl ThresholdApprovalCollector {
         )?;
         Ok(CollectedThresholdApprovalSet {
             proposal: delivered.proposal,
-            tokens: delivered.tokens,
+            tokens: valid_tokens,
         })
     }
 
@@ -433,6 +456,7 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
         proposal_id: &str,
         expected_version: u64,
         token: &GovernedApprovalToken,
+        replaced_token_id: Option<&str>,
         next_state: ThresholdApprovalCollectorState,
         updated_at: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
@@ -442,14 +466,25 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
         let record = proposals.get_mut(proposal_id).ok_or_else(|| {
             ThresholdApprovalCollectorStoreError::NotFound(proposal_id.to_string())
         })?;
-        if record.version != expected_version
-            || record.state != ThresholdApprovalCollectorState::Collecting
-        {
+        if record.version != expected_version || record.state.is_terminal() {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal changed concurrently".to_string(),
             ));
         }
-        record.tokens.push(token.clone());
+        if let Some(replaced_token_id) = replaced_token_id {
+            let existing = record
+                .tokens
+                .iter_mut()
+                .find(|existing| existing.id == replaced_token_id)
+                .ok_or_else(|| {
+                    ThresholdApprovalCollectorStoreError::Conflict(
+                        "threshold approval replacement token disappeared".to_string(),
+                    )
+                })?;
+            *existing = token.clone();
+        } else {
+            record.tokens.push(token.clone());
+        }
         record.state = next_state;
         record.version = record.version.checked_add(1).ok_or_else(|| {
             ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
@@ -727,7 +762,7 @@ mod tests {
     // set that was quorate at submission can hold expired tokens by delivery time
     // while the proposal itself is still valid.
     #[test]
-    fn delivery_rejects_a_quorum_whose_tokens_expired_after_submission() {
+    fn ready_proposal_accepts_replacement_for_an_expired_token() {
         let fixture = fixture();
         let proposal = proposal(&fixture, "expiring");
         fixture
@@ -753,7 +788,7 @@ mod tests {
             .collector
             .submit_token(
                 "expiring",
-                token_expiring_at(&proposal, &fixture.bob, "token-bob", 120),
+                token_expiring_at(&proposal, &fixture.bob, "token-bob", 199),
                 110,
             )
             .unwrap();
@@ -762,10 +797,38 @@ mod tests {
         // The proposal deadline is 200, so only the tokens have lapsed here.
         let expired = fixture.collector.deliver("expiring", 150).unwrap_err();
         assert!(
-            expired.to_string().contains("capability expired"),
+            expired
+                .to_string()
+                .contains("quorum is no longer satisfied"),
             "delivery must reject lapsed tokens; got: {expired}"
         );
         let stored = fixture.collector.get_proposal("expiring").unwrap().unwrap();
         assert_eq!(stored.state, ThresholdApprovalCollectorState::Ready);
+
+        let refreshed = fixture
+            .collector
+            .submit_token(
+                "expiring",
+                token_expiring_at(&proposal, &fixture.alice, "token-alice-fresh", 199),
+                150,
+            )
+            .unwrap();
+        assert_eq!(refreshed.state, ThresholdApprovalCollectorState::Ready);
+        assert_eq!(refreshed.tokens.len(), 2);
+        assert!(refreshed
+            .tokens
+            .iter()
+            .any(|token| token.id == "token-alice-fresh"));
+        assert!(!refreshed
+            .tokens
+            .iter()
+            .any(|token| token.id == "token-alice"));
+
+        let delivered = fixture.collector.deliver("expiring", 151).unwrap();
+        assert_eq!(delivered.tokens.len(), 2);
+        assert!(delivered
+            .tokens
+            .iter()
+            .any(|token| token.id == "token-alice-fresh"));
     }
 }

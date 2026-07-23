@@ -187,6 +187,7 @@ mod tests {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         }
     }
 

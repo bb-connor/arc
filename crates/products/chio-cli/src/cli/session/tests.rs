@@ -754,6 +754,7 @@ capabilities:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -770,6 +771,105 @@ capabilities:
                 assert!(matches!(result, ToolCallResult::Ok { .. }));
             }
             _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn session_transport_round_trips_strict_execution_nonce_retry() {
+        let yaml = r#"
+kernel:
+  allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
+capabilities:
+  default:
+    tools:
+      - server: "srv-a"
+        tool: "read_file"
+        operations: [invoke]
+        ttl: 300
+"#;
+        let policy = policy::parse_policy(yaml).unwrap();
+        let kp = Keypair::generate();
+        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        kernel.register_tool_server(Box::new(StubToolServer {
+            id: "srv-a".to_string(),
+        }));
+        let mut nonce_config = chio_kernel::ExecutionNonceConfig::default();
+        nonce_config.require_nonce = true;
+        kernel.set_execution_nonce_store(
+            nonce_config.clone(),
+            Box::new(chio_kernel::InMemoryExecutionNonceStore::from_config(
+                &nonce_config,
+            )),
+        );
+
+        let agent_kp = Keypair::generate();
+        let default_capabilities = policy::build_default_capabilities(
+            &policy.capabilities,
+            policy.kernel.max_capability_ttl,
+        )
+        .unwrap();
+        let caps =
+            issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+                .unwrap();
+        let agent_id = agent_kp.public_key().to_hex();
+        let session_id = open_ready_session(&mut kernel, &agent_id, caps.clone());
+        let mut message = AgentMessage::ToolCallRequest {
+            id: "req-strict-session-nonce".to_string(),
+            capability_token: Box::new(caps[0].clone()),
+            server_id: "srv-a".to_string(),
+            tool: "read_file".to_string(),
+            params: Box::new(serde_json::json!({"path": "/app/src/main.rs"})),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            execution_nonce: None,
+        };
+        let mut stats = SessionStats::default();
+
+        let preflight = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+        let nonce = match preflight {
+            KernelMessage::ToolCallResponse {
+                result: ToolCallResult::Ok { value },
+                execution_nonce: Some(nonce),
+                ..
+            } => {
+                assert_eq!(value, serde_json::Value::Null);
+                nonce
+            }
+            other => panic!("expected nonce preflight response, got {other:?}"),
+        };
+        let AgentMessage::ToolCallRequest {
+            execution_nonce, ..
+        } = &mut message
+        else {
+            panic!("expected tool-call request");
+        };
+        *execution_nonce = Some(nonce);
+
+        let retry = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+        match retry {
+            KernelMessage::ToolCallResponse {
+                result: ToolCallResult::Ok { value },
+                ..
+            } => assert_eq!(value["tool"], "read_file"),
+            other => panic!("expected executed retry response, got {other:?}"),
         }
     }
 
@@ -819,6 +919,7 @@ capabilities:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -875,6 +976,7 @@ capabilities:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -888,6 +990,7 @@ capabilities:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1007,6 +1110,7 @@ extensions:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1080,6 +1184,7 @@ guards:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -1093,6 +1198,7 @@ guards:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1161,6 +1267,7 @@ capabilities:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1222,6 +1329,7 @@ capabilities:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1281,6 +1389,7 @@ capabilities:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1352,6 +1461,7 @@ guards:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1425,6 +1535,7 @@ guards:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1504,6 +1615,7 @@ guards:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1601,6 +1713,7 @@ guards:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1701,6 +1814,7 @@ guards:
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            execution_nonce: None,
         };
 
         let mut stats = SessionStats::default();

@@ -90,6 +90,7 @@ pub(crate) fn handle_agent_message(
                             error: ToolCallError::InternalError(e.to_string()),
                         },
                         receipt: Box::new(receipt),
+                        execution_nonce: None,
                     }],
                     Err(sign_err) => {
                         error!(
@@ -175,6 +176,7 @@ fn reject_conflicting_authorization(
                 },
             },
             receipt: Box::new(receipt),
+            execution_nonce: None,
         }],
         Err(sign_err) => {
             error!(
@@ -204,6 +206,7 @@ pub(crate) fn normalize_agent_message(
             approval_tokens,
             threshold_approval_proposal,
             supplemental_authorization,
+            execution_nonce,
         } => (
             OperationContext::new(
                 session_id.clone(),
@@ -220,7 +223,9 @@ pub(crate) fn normalize_agent_message(
                 approval_tokens: approval_tokens.clone(),
                 threshold_approval_proposal: threshold_approval_proposal.as_deref().cloned(),
                 supplemental_authorization: supplemental_authorization.as_deref().cloned(),
-                execution_nonce: None,
+                execution_nonce: execution_nonce
+                    .as_deref()
+                    .and_then(|nonce| serde_json::to_value(nonce).ok()),
                 model_metadata: None,
                 extra_metadata: None,
             })),

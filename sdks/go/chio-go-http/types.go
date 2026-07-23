@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 95456408c359352ccd77358096e747f879bb983a3022dc4a61cb14d504a41e36
+// Schema content SHA-256: 6aef2fbc7a838c2166d6041b744d14f06a8e19873ed12cba7fdc0ac4b702a501
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -342,6 +342,11 @@ const (
 // Defines values for KernelCombinedCaptureMetadataSchema.
 const (
 	KernelCombinedCaptureMetadataSchemaChioAdmissionCaptureMetadataV1 KernelCombinedCaptureMetadataSchema = "chio.admission-capture-metadata.v1"
+)
+
+// Defines values for KernelExecutionNonceNonceSchema.
+const (
+	KernelExecutionNonceNonceSchemaChioExecutionNonceV1 KernelExecutionNonceNonceSchema = "chio.execution_nonce.v1"
 )
 
 // Defines values for KernelHeartbeatType.
@@ -1663,6 +1668,30 @@ type KernelCombinedCaptureMetadata struct {
 // KernelCombinedCaptureMetadataSchema defines model for KernelCombinedCaptureMetadata.Schema.
 type KernelCombinedCaptureMetadataSchema string
 
+// KernelExecutionNonce defines model for KernelExecutionNonce.
+type KernelExecutionNonce struct {
+	Nonce struct {
+		BoundTo struct {
+			CapabilityId  string `json:"capability_id"`
+			ParameterHash string `json:"parameter_hash"`
+			RequestId     string `json:"request_id"`
+			SubjectId     string `json:"subject_id"`
+			ToolName      string `json:"tool_name"`
+			ToolServer    string `json:"tool_server"`
+		} `json:"bound_to"`
+		ExpiresAt          int64                           `json:"expires_at"`
+		IssuedAt           int64                           `json:"issued_at"`
+		NonceId            string                          `json:"nonce_id"`
+		ReservedHoldId     *string                         `json:"reserved_hold_id,omitempty"`
+		ReservingRequestId *string                         `json:"reserving_request_id,omitempty"`
+		Schema             KernelExecutionNonceNonceSchema `json:"schema"`
+	} `json:"nonce"`
+	Signature string `json:"signature"`
+}
+
+// KernelExecutionNonceNonceSchema defines model for KernelExecutionNonce.Nonce.Schema.
+type KernelExecutionNonceNonceSchema string
+
 // KernelHeartbeat defines model for KernelHeartbeat.
 type KernelHeartbeat struct {
 	Type KernelHeartbeatType `json:"type"`
@@ -1684,7 +1713,8 @@ type KernelToolCallChunkType string
 
 // KernelToolCallResponse defines model for KernelToolCallResponse.
 type KernelToolCallResponse struct {
-	Id string `json:"id"`
+	ExecutionNonce *KernelExecutionNonce `json:"execution_nonce,omitempty"`
+	Id             string                `json:"id"`
 
 	// Receipt A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
 	Receipt ReceiptRecord                 `json:"receipt"`

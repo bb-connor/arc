@@ -55,6 +55,7 @@ fn observation(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        execution_nonce: None,
     };
     let canonical = canonical_json_string(&params).expect("canonical params");
     let parameter_hash = sha256_hex(canonical.as_bytes());

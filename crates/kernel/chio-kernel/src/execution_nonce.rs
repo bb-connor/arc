@@ -35,13 +35,14 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_core::crypto::{Keypair, PublicKey};
 use lru::LruCache;
-use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 use uuid::Uuid;
 
 use crate::KernelError;
+
+pub use chio_core_types::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
 
 /// Schema identifier for Chio execution nonces.
 pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
@@ -55,127 +56,6 @@ pub const DEFAULT_EXECUTION_NONCE_STORE_CAPACITY: usize = 16_384;
 #[must_use]
 pub fn is_supported_execution_nonce_schema(schema: &str) -> bool {
     schema == EXECUTION_NONCE_SCHEMA
-}
-
-// ---------------------------------------------------------------------------
-// NonceBinding
-// ---------------------------------------------------------------------------
-
-/// Fields that tie a nonce to one specific tool invocation.
-///
-/// All six fields are in the signed body, so any mismatch during verify
-/// means either the nonce was minted for a different call or the nonce was
-/// tampered with after issuance.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct NonceBinding {
-    /// Hex-encoded subject (agent) public key, taken from `capability.subject`.
-    pub subject_id: String,
-    /// Stable idempotency identity of the tool request.
-    #[serde(default)]
-    pub request_id: String,
-    /// ID of the capability that authorized this invocation.
-    pub capability_id: String,
-    /// Tool server that is expected to execute the call.
-    pub tool_server: String,
-    /// Tool name that is expected to execute.
-    pub tool_name: String,
-    /// SHA-256 hex of the canonical JSON of the evaluated arguments.
-    pub parameter_hash: String,
-}
-
-// ---------------------------------------------------------------------------
-// ExecutionNonce (signable body)
-// ---------------------------------------------------------------------------
-
-/// The signable body of an execution nonce.
-///
-/// This is the canonical-JSON-serialized message the kernel signs. Every
-/// field is covered by the signature; none are mutable after issuance.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ExecutionNonce {
-    /// Schema identifier. Must equal `EXECUTION_NONCE_SCHEMA`.
-    pub schema: String,
-    /// Unique nonce identifier (UUIDv7 hex).
-    pub nonce_id: String,
-    /// Unix timestamp (seconds) when the kernel issued this nonce.
-    pub issued_at: i64,
-    /// Unix timestamp (seconds) when this nonce expires.
-    /// Default: `issued_at + 30`. Configurable via `ExecutionNonceConfig`.
-    pub expires_at: i64,
-    /// Invocation binding: subject, capability, server, tool, parameter hash.
-    pub bound_to: NonceBinding,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reserved_hold_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reserving_request_id: Option<String>,
-}
-
-// ---------------------------------------------------------------------------
-// SignedExecutionNonce
-// ---------------------------------------------------------------------------
-
-/// A kernel-signed execution nonce ready for transmission on an allow verdict.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SignedExecutionNonce {
-    /// The nonce body that was signed.
-    pub nonce: ExecutionNonce,
-    /// Ed25519 signature over `canonical_json_bytes(&nonce)` produced by the
-    /// kernel's receipt-signing key.
-    pub signature: Signature,
-}
-
-impl SignedExecutionNonce {
-    /// Convenience accessor for the nonce identifier.
-    #[must_use]
-    pub fn nonce_id(&self) -> &str {
-        &self.nonce.nonce_id
-    }
-
-    /// Convenience accessor for the expiry.
-    #[must_use]
-    pub fn expires_at(&self) -> i64 {
-        self.nonce.expires_at
-    }
-
-    #[must_use]
-    pub fn reserved_hold_id(&self) -> Option<&str> {
-        self.nonce.reserved_hold_id.as_deref()
-    }
-
-    #[must_use]
-    pub fn reserving_request_id(&self) -> Option<&str> {
-        self.nonce.reserving_request_id.as_deref()
-    }
-}
-
-impl chio_core_types::receipt::authoritative_spend::PresentedNonceView for SignedExecutionNonce {
-    fn nonce_id(&self) -> &str {
-        &self.nonce.nonce_id
-    }
-
-    fn bound_capability_id(&self) -> &str {
-        &self.nonce.bound_to.capability_id
-    }
-
-    fn bound_tool_server(&self) -> &str {
-        &self.nonce.bound_to.tool_server
-    }
-
-    fn bound_tool_name(&self) -> &str {
-        &self.nonce.bound_to.tool_name
-    }
-
-    fn bound_parameter_hash(&self) -> &str {
-        &self.nonce.bound_to.parameter_hash
-    }
-
-    fn bound_reserved_hold_id(&self) -> Option<&str> {
-        self.nonce.reserved_hold_id.as_deref()
-    }
-
-    fn verify_signed_by(&self, key: &PublicKey) -> bool {
-        canonical_json_bytes(&self.nonce).is_ok_and(|bytes| key.verify(&bytes, &self.signature))
-    }
 }
 
 // ---------------------------------------------------------------------------

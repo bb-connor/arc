@@ -667,6 +667,7 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
         proposal_id: &str,
         expected_version: u64,
         token: &chio_core::capability::governance::GovernedApprovalToken,
+        replaced_token_id: Option<&str>,
         next_state: ThresholdApprovalCollectorState,
         updated_at: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
@@ -685,19 +686,36 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
             .map(decode_collector)
             .transpose()?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
-        if record.version != expected_version
-            || record.state != ThresholdApprovalCollectorState::Collecting
-        {
+        if record.version != expected_version || record.state.is_terminal() {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal changed concurrently".to_string(),
             ));
         }
+        let previous_state = collector_state_name(record.state);
         let token_digest = token.artifact_digest().map_err(|error| {
             ThresholdApprovalCollectorStoreError::Serialization(error.to_string())
         })?;
         let token_json = encode_collector(token)?;
-        transaction
-            .execute(
+        let write_result = if let Some(replaced_token_id) = replaced_token_id {
+            transaction.execute(
+                r#"
+                UPDATE chio_threshold_approval_collector_votes
+                SET token_id = ?1, approver_fingerprint = ?2,
+                    canonical_token_digest = ?3, token_json = ?4, received_at = ?5
+                WHERE proposal_id = ?6 AND token_id = ?7
+                "#,
+                params![
+                    &token.id,
+                    token.approver.to_hex(),
+                    token_digest,
+                    token_json,
+                    i64::try_from(updated_at).map_err(collector_error)?,
+                    proposal_id,
+                    replaced_token_id,
+                ],
+            )
+        } else {
+            transaction.execute(
                 r#"
                 INSERT INTO chio_threshold_approval_collector_votes (
                     proposal_id, token_id, approver_fingerprint,
@@ -713,25 +731,44 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
                     i64::try_from(updated_at).map_err(collector_error)?,
                 ],
             )
-            .map_err(|error| {
-                if matches!(
-                    &error,
-                    rusqlite::Error::SqliteFailure(
-                        rusqlite::ffi::Error {
-                            code: rusqlite::ErrorCode::ConstraintViolation,
-                            ..
-                        },
-                        _
-                    )
-                ) {
+        };
+        let changed_vote = write_result.map_err(|error| {
+            if matches!(
+                &error,
+                rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error {
+                        code: rusqlite::ErrorCode::ConstraintViolation,
+                        ..
+                    },
+                    _
+                )
+            ) {
+                ThresholdApprovalCollectorStoreError::Conflict(
+                    "threshold approval token id, digest, or signer is not unique".to_string(),
+                )
+            } else {
+                collector_error(error)
+            }
+        })?;
+        if changed_vote != 1 {
+            return Err(ThresholdApprovalCollectorStoreError::Conflict(
+                "threshold approval replacement token disappeared".to_string(),
+            ));
+        }
+        if let Some(replaced_token_id) = replaced_token_id {
+            let existing = record
+                .tokens
+                .iter_mut()
+                .find(|existing| existing.id == replaced_token_id)
+                .ok_or_else(|| {
                     ThresholdApprovalCollectorStoreError::Conflict(
-                        "threshold approval token id, digest, or signer is not unique".to_string(),
+                        "threshold approval replacement token disappeared".to_string(),
                     )
-                } else {
-                    collector_error(error)
-                }
-            })?;
-        record.tokens.push(token.clone());
+                })?;
+            *existing = token.clone();
+        } else {
+            record.tokens.push(token.clone());
+        }
         record.state = next_state;
         record.version = record.version.checked_add(1).ok_or_else(|| {
             ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
@@ -743,7 +780,7 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
                 r#"
                 UPDATE chio_threshold_approval_collectors
                 SET state = ?1, version = ?2, updated_at = ?3, record_json = ?4
-                WHERE proposal_id = ?5 AND version = ?6 AND state = 'collecting'
+                WHERE proposal_id = ?5 AND version = ?6 AND state = ?7
                 "#,
                 params![
                     collector_state_name(next_state),
@@ -752,6 +789,7 @@ impl ThresholdApprovalCollectorStore for SqliteApprovalStore {
                     record_json,
                     proposal_id,
                     i64::try_from(expected_version).map_err(collector_error)?,
+                    previous_state,
                 ],
             )
             .map_err(collector_error)?;
@@ -1042,7 +1080,7 @@ mod tests {
             &authority,
         )
         .unwrap();
-        let make_token = |approver: &Keypair, id: &str| {
+        let make_token = |approver: &Keypair, id: &str, expires_at: u64| {
             GovernedApprovalToken::sign(
                 GovernedApprovalTokenBody {
                     id: id.to_string(),
@@ -1052,7 +1090,7 @@ mod tests {
                     request_id: proposal.body.request_id.clone(),
                     threshold_proposal_hash: Some(proposal.artifact_digest().unwrap()),
                     issued_at: 101,
-                    expires_at: 199,
+                    expires_at,
                     decision: GovernedApprovalDecision::Approved,
                 },
                 approver,
@@ -1084,7 +1122,11 @@ mod tests {
                 .unwrap()
                 .is_some());
             collector
-                .submit_token("durable-proposal", make_token(&alice, "token-alice"), 110)
+                .submit_token(
+                    "durable-proposal",
+                    make_token(&alice, "token-alice", 120),
+                    110,
+                )
                 .unwrap();
         }
 
@@ -1098,7 +1140,7 @@ mod tests {
             let recovered = collector.get_proposal("durable-proposal").unwrap().unwrap();
             assert_eq!(recovered.tokens.len(), 1);
             let ready = collector
-                .submit_token("durable-proposal", make_token(&bob, "token-bob"), 111)
+                .submit_token("durable-proposal", make_token(&bob, "token-bob", 199), 111)
                 .unwrap();
             assert_eq!(ready.state, ThresholdApprovalCollectorState::Ready);
         }
@@ -1112,8 +1154,22 @@ mod tests {
             );
             let ready = collector.get_proposal("durable-proposal").unwrap().unwrap();
             assert_eq!(ready.state, ThresholdApprovalCollectorState::Ready);
-            let delivered = collector.deliver("durable-proposal", 112).unwrap();
+            assert!(collector.deliver("durable-proposal", 150).is_err());
+            let refreshed = collector
+                .submit_token(
+                    "durable-proposal",
+                    make_token(&alice, "token-alice-fresh", 199),
+                    150,
+                )
+                .unwrap();
+            assert_eq!(refreshed.state, ThresholdApprovalCollectorState::Ready);
+            assert_eq!(refreshed.tokens.len(), 2);
+            let delivered = collector.deliver("durable-proposal", 151).unwrap();
             assert_eq!(delivered.tokens.len(), 2);
+            assert!(delivered
+                .tokens
+                .iter()
+                .any(|token| token.id == "token-alice-fresh"));
         }
 
         let store = Arc::new(SqliteApprovalStore::open(&path).unwrap());

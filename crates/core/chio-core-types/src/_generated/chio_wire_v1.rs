@@ -1463,6 +1463,95 @@ pub mod agent_tool_call_request {
     ///      },
     ///      "additionalProperties": false
     ///    },
+    ///    "execution_nonce": {
+    ///      "title": "Chio signed execution nonce",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "nonce",
+    ///        "signature"
+    ///      ],
+    ///      "properties": {
+    ///        "nonce": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "bound_to",
+    ///            "expires_at",
+    ///            "issued_at",
+    ///            "nonce_id",
+    ///            "schema"
+    ///          ],
+    ///          "properties": {
+    ///            "bound_to": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "capability_id",
+    ///                "parameter_hash",
+    ///                "request_id",
+    ///                "subject_id",
+    ///                "tool_name",
+    ///                "tool_server"
+    ///              ],
+    ///              "properties": {
+    ///                "capability_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "parameter_hash": {
+    ///                  "type": "string",
+    ///                  "pattern": "^[0-9a-f]{64}$"
+    ///                },
+    ///                "request_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "subject_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "tool_name": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "tool_server": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "expires_at": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "issued_at": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "nonce_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "reserved_hold_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "reserving_request_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "schema": {
+    ///              "const": "chio.execution_nonce.v1"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "signature": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
     ///    "governed_intent": {
     ///      "title": "Chio Governed Transaction Intent",
     ///      "type": "object",
@@ -1754,6 +1843,8 @@ pub mod agent_tool_call_request {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         pub approval_tokens: ::std::vec::Vec<ChioGovernedApprovalToken>,
         pub capability_token: ChioCapabilityToken,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub execution_nonce: ::std::option::Option<ChioSignedExecutionNonce>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub governed_intent: ::std::option::Option<ChioGovernedTransactionIntent>,
         pub id: ChioAgentMessageToolCallRequestId,
@@ -5840,6 +5931,1078 @@ pub mod agent_tool_call_request {
                 prompt_grants: Default::default(),
                 resource_grants: Default::default(),
             }
+        }
+    }
+    ///`ChioSignedExecutionNonce`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio signed execution nonce",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "nonce",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "nonce": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "bound_to",
+    ///        "expires_at",
+    ///        "issued_at",
+    ///        "nonce_id",
+    ///        "schema"
+    ///      ],
+    ///      "properties": {
+    ///        "bound_to": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "capability_id",
+    ///            "parameter_hash",
+    ///            "request_id",
+    ///            "subject_id",
+    ///            "tool_name",
+    ///            "tool_server"
+    ///          ],
+    ///          "properties": {
+    ///            "capability_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "parameter_hash": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "request_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "subject_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "tool_name": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "tool_server": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "expires_at": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "issued_at": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "nonce_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "reserved_hold_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "reserving_request_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.execution_nonce.v1"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedExecutionNonce {
+        pub nonce: ChioSignedExecutionNonceNonce,
+        pub signature: ChioSignedExecutionNonceSignature,
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonce> for ChioSignedExecutionNonce {
+        fn from(value: &ChioSignedExecutionNonce) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedExecutionNonceNonce`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "bound_to",
+    ///    "expires_at",
+    ///    "issued_at",
+    ///    "nonce_id",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "bound_to": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "capability_id",
+    ///        "parameter_hash",
+    ///        "request_id",
+    ///        "subject_id",
+    ///        "tool_name",
+    ///        "tool_server"
+    ///      ],
+    ///      "properties": {
+    ///        "capability_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "parameter_hash": {
+    ///          "type": "string",
+    ///          "pattern": "^[0-9a-f]{64}$"
+    ///        },
+    ///        "request_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "subject_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "tool_name": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "tool_server": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "expires_at": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "issued_at": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "nonce_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "reserved_hold_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "reserving_request_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.execution_nonce.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedExecutionNonceNonce {
+        pub bound_to: ChioSignedExecutionNonceNonceBoundTo,
+        pub expires_at: u64,
+        pub issued_at: u64,
+        pub nonce_id: ChioSignedExecutionNonceNonceNonceId,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub reserved_hold_id: ::std::option::Option<ChioSignedExecutionNonceNonceReservedHoldId>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub reserving_request_id:
+            ::std::option::Option<ChioSignedExecutionNonceNonceReservingRequestId>,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonce> for ChioSignedExecutionNonceNonce {
+        fn from(value: &ChioSignedExecutionNonceNonce) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundTo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_id",
+    ///    "parameter_hash",
+    ///    "request_id",
+    ///    "subject_id",
+    ///    "tool_name",
+    ///    "tool_server"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "parameter_hash": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "request_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "subject_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "tool_name": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "tool_server": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedExecutionNonceNonceBoundTo {
+        pub capability_id: ChioSignedExecutionNonceNonceBoundToCapabilityId,
+        pub parameter_hash: ChioSignedExecutionNonceNonceBoundToParameterHash,
+        pub request_id: ChioSignedExecutionNonceNonceBoundToRequestId,
+        pub subject_id: ChioSignedExecutionNonceNonceBoundToSubjectId,
+        pub tool_name: ChioSignedExecutionNonceNonceBoundToToolName,
+        pub tool_server: ChioSignedExecutionNonceNonceBoundToToolServer,
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundTo>
+        for ChioSignedExecutionNonceNonceBoundTo
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundTo) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToCapabilityId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToCapabilityId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToCapabilityId>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToCapabilityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToCapabilityId>
+        for ChioSignedExecutionNonceNonceBoundToCapabilityId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToCapabilityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToCapabilityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToCapabilityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToParameterHash`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToParameterHash(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToParameterHash>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToParameterHash) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToParameterHash>
+        for ChioSignedExecutionNonceNonceBoundToParameterHash
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToParameterHash) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToParameterHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToParameterHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToRequestId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToRequestId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToRequestId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToRequestId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToRequestId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToRequestId>
+        for ChioSignedExecutionNonceNonceBoundToRequestId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToRequestId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToRequestId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToRequestId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToSubjectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToSubjectId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToSubjectId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToSubjectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToSubjectId>
+        for ChioSignedExecutionNonceNonceBoundToSubjectId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToSubjectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToSubjectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToSubjectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToToolName`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToToolName(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToToolName {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToToolName> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToToolName) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToToolName>
+        for ChioSignedExecutionNonceNonceBoundToToolName
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToToolName) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToToolName {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToToolName {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolName
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolName
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToToolName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToToolServer`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToToolServer(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToToolServer {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToToolServer>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToToolServer) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToToolServer>
+        for ChioSignedExecutionNonceNonceBoundToToolServer
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToToolServer) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToToolServer {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToToolServer {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolServer
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolServer
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToToolServer {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceNonceId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceNonceId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceNonceId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceNonceId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceNonceId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceNonceId>
+        for ChioSignedExecutionNonceNonceNonceId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceNonceId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceNonceId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceNonceId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedExecutionNonceNonceNonceId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedExecutionNonceNonceNonceId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceNonceId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceReservedHoldId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceReservedHoldId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceReservedHoldId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceReservedHoldId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceReservedHoldId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceReservedHoldId>
+        for ChioSignedExecutionNonceNonceReservedHoldId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceReservedHoldId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceReservedHoldId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceReservedHoldId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceReservedHoldId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceReservedHoldId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceReservedHoldId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceReservingRequestId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceReservingRequestId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceReservingRequestId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceReservingRequestId>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceReservingRequestId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceReservingRequestId>
+        for ChioSignedExecutionNonceNonceReservingRequestId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceReservingRequestId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceReservingRequestId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceReservingRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceReservingRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceReservingRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceReservingRequestId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceSignature> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceSignature>
+        for ChioSignedExecutionNonceSignature
+    {
+        fn from(value: &ChioSignedExecutionNonceSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedExecutionNonceSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedExecutionNonceSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`ChioThresholdApprovalProposal`
@@ -24585,6 +25748,95 @@ pub mod kernel_tool_call_response {
     ///    "type"
     ///  ],
     ///  "properties": {
+    ///    "execution_nonce": {
+    ///      "title": "Chio signed execution nonce",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "nonce",
+    ///        "signature"
+    ///      ],
+    ///      "properties": {
+    ///        "nonce": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "bound_to",
+    ///            "expires_at",
+    ///            "issued_at",
+    ///            "nonce_id",
+    ///            "schema"
+    ///          ],
+    ///          "properties": {
+    ///            "bound_to": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "capability_id",
+    ///                "parameter_hash",
+    ///                "request_id",
+    ///                "subject_id",
+    ///                "tool_name",
+    ///                "tool_server"
+    ///              ],
+    ///              "properties": {
+    ///                "capability_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "parameter_hash": {
+    ///                  "type": "string",
+    ///                  "pattern": "^[0-9a-f]{64}$"
+    ///                },
+    ///                "request_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "subject_id": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "tool_name": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                },
+    ///                "tool_server": {
+    ///                  "type": "string",
+    ///                  "minLength": 1
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "expires_at": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "issued_at": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "nonce_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "reserved_hold_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "reserving_request_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "schema": {
+    ///              "const": "chio.execution_nonce.v1"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "signature": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
     ///    "id": {
     ///      "type": "string",
     ///      "minLength": 1
@@ -24981,6 +26233,8 @@ pub mod kernel_tool_call_response {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioKernelMessageToolCallResponse {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub execution_nonce: ::std::option::Option<ChioSignedExecutionNonce>,
         pub id: ChioKernelMessageToolCallResponseId,
         pub receipt: ChioReceiptRecord,
         pub result: ChioKernelMessageToolCallResponseResult,
@@ -27488,6 +28742,1078 @@ pub mod kernel_tool_call_response {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
+        }
+    }
+    ///`ChioSignedExecutionNonce`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio signed execution nonce",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "nonce",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "nonce": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "bound_to",
+    ///        "expires_at",
+    ///        "issued_at",
+    ///        "nonce_id",
+    ///        "schema"
+    ///      ],
+    ///      "properties": {
+    ///        "bound_to": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "capability_id",
+    ///            "parameter_hash",
+    ///            "request_id",
+    ///            "subject_id",
+    ///            "tool_name",
+    ///            "tool_server"
+    ///          ],
+    ///          "properties": {
+    ///            "capability_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "parameter_hash": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "request_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "subject_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "tool_name": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "tool_server": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "expires_at": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "issued_at": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "nonce_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "reserved_hold_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "reserving_request_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.execution_nonce.v1"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedExecutionNonce {
+        pub nonce: ChioSignedExecutionNonceNonce,
+        pub signature: ChioSignedExecutionNonceSignature,
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonce> for ChioSignedExecutionNonce {
+        fn from(value: &ChioSignedExecutionNonce) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedExecutionNonceNonce`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "bound_to",
+    ///    "expires_at",
+    ///    "issued_at",
+    ///    "nonce_id",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "bound_to": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "capability_id",
+    ///        "parameter_hash",
+    ///        "request_id",
+    ///        "subject_id",
+    ///        "tool_name",
+    ///        "tool_server"
+    ///      ],
+    ///      "properties": {
+    ///        "capability_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "parameter_hash": {
+    ///          "type": "string",
+    ///          "pattern": "^[0-9a-f]{64}$"
+    ///        },
+    ///        "request_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "subject_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "tool_name": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "tool_server": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "expires_at": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "issued_at": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "nonce_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "reserved_hold_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "reserving_request_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.execution_nonce.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedExecutionNonceNonce {
+        pub bound_to: ChioSignedExecutionNonceNonceBoundTo,
+        pub expires_at: u64,
+        pub issued_at: u64,
+        pub nonce_id: ChioSignedExecutionNonceNonceNonceId,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub reserved_hold_id: ::std::option::Option<ChioSignedExecutionNonceNonceReservedHoldId>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub reserving_request_id:
+            ::std::option::Option<ChioSignedExecutionNonceNonceReservingRequestId>,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonce> for ChioSignedExecutionNonceNonce {
+        fn from(value: &ChioSignedExecutionNonceNonce) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundTo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_id",
+    ///    "parameter_hash",
+    ///    "request_id",
+    ///    "subject_id",
+    ///    "tool_name",
+    ///    "tool_server"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "parameter_hash": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "request_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "subject_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "tool_name": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "tool_server": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedExecutionNonceNonceBoundTo {
+        pub capability_id: ChioSignedExecutionNonceNonceBoundToCapabilityId,
+        pub parameter_hash: ChioSignedExecutionNonceNonceBoundToParameterHash,
+        pub request_id: ChioSignedExecutionNonceNonceBoundToRequestId,
+        pub subject_id: ChioSignedExecutionNonceNonceBoundToSubjectId,
+        pub tool_name: ChioSignedExecutionNonceNonceBoundToToolName,
+        pub tool_server: ChioSignedExecutionNonceNonceBoundToToolServer,
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundTo>
+        for ChioSignedExecutionNonceNonceBoundTo
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundTo) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToCapabilityId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToCapabilityId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToCapabilityId>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToCapabilityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToCapabilityId>
+        for ChioSignedExecutionNonceNonceBoundToCapabilityId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToCapabilityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToCapabilityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToCapabilityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToCapabilityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToParameterHash`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToParameterHash(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToParameterHash>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToParameterHash) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToParameterHash>
+        for ChioSignedExecutionNonceNonceBoundToParameterHash
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToParameterHash) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToParameterHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToParameterHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToParameterHash {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToRequestId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToRequestId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToRequestId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToRequestId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToRequestId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToRequestId>
+        for ChioSignedExecutionNonceNonceBoundToRequestId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToRequestId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToRequestId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToRequestId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToSubjectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToSubjectId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToSubjectId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToSubjectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToSubjectId>
+        for ChioSignedExecutionNonceNonceBoundToSubjectId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToSubjectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToSubjectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToSubjectId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToSubjectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToToolName`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToToolName(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToToolName {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToToolName> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToToolName) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToToolName>
+        for ChioSignedExecutionNonceNonceBoundToToolName
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToToolName) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToToolName {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToToolName {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolName
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolName
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToToolName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceBoundToToolServer`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceBoundToToolServer(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceBoundToToolServer {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceBoundToToolServer>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceBoundToToolServer) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceBoundToToolServer>
+        for ChioSignedExecutionNonceNonceBoundToToolServer
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceBoundToToolServer) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceBoundToToolServer {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceBoundToToolServer {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolServer
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceBoundToToolServer
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceBoundToToolServer {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceNonceId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceNonceId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceNonceId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceNonceId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceNonceId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceNonceId>
+        for ChioSignedExecutionNonceNonceNonceId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceNonceId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceNonceId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceNonceId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedExecutionNonceNonceNonceId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedExecutionNonceNonceNonceId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceNonceId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceReservedHoldId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceReservedHoldId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceReservedHoldId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceReservedHoldId> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceNonceReservedHoldId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceReservedHoldId>
+        for ChioSignedExecutionNonceNonceReservedHoldId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceReservedHoldId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceReservedHoldId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceReservedHoldId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceReservedHoldId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceReservedHoldId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceReservedHoldId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceNonceReservingRequestId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceNonceReservingRequestId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceNonceReservingRequestId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceNonceReservingRequestId>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedExecutionNonceNonceReservingRequestId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceNonceReservingRequestId>
+        for ChioSignedExecutionNonceNonceReservingRequestId
+    {
+        fn from(value: &ChioSignedExecutionNonceNonceReservingRequestId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceNonceReservingRequestId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceNonceReservingRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedExecutionNonceNonceReservingRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedExecutionNonceNonceReservingRequestId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceNonceReservingRequestId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedExecutionNonceSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedExecutionNonceSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedExecutionNonceSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedExecutionNonceSignature> for ::std::string::String {
+        fn from(value: ChioSignedExecutionNonceSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedExecutionNonceSignature>
+        for ChioSignedExecutionNonceSignature
+    {
+        fn from(value: &ChioSignedExecutionNonceSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedExecutionNonceSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedExecutionNonceSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedExecutionNonceSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedExecutionNonceSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedExecutionNonceSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).

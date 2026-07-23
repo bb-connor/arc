@@ -14,8 +14,9 @@ pub struct ReapSummary {
 }
 
 /// An open reserved hold past its TTL deadline:
-/// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
-type ExpiredReservedHold = (String, String, u32, u64, Option<BudgetEventAuthority>);
+/// `(hold_id, capability_id, grant_index, remaining_exposure_units,
+/// invocation_captured, authority)`.
+type ExpiredReservedHold = (String, String, u32, u64, bool, Option<BudgetEventAuthority>);
 
 /// A hold still `open` at startup:
 /// `(hold_id, capability_id, grant_index, remaining_exposure_units,
@@ -149,15 +150,17 @@ impl SqliteBudgetStore {
     ) -> Result<usize, BudgetStoreError> {
         let expired = self.list_expired_reserved_holds(now_unix_secs)?;
         let mut settled = 0usize;
-        for (hold_id, capability_id, grant_index, remaining, authority) in expired {
-            self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-                capability_id: capability_id.clone(),
-                grant_index: grant_index as usize,
-                hold_id: hold_id.clone(),
-                event_id: format!("{hold_id}:ttl-reap-capture-invocation"),
-                trusted_time: None,
-                authority: authority.clone(),
-            })?;
+        for (hold_id, capability_id, grant_index, remaining, captured, authority) in expired {
+            if !captured {
+                self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                    capability_id: capability_id.clone(),
+                    grant_index: grant_index as usize,
+                    hold_id: hold_id.clone(),
+                    event_id: format!("{hold_id}:ttl-reap-capture-invocation"),
+                    trusted_time: None,
+                    authority: authority.clone(),
+                })?;
+            }
             if remaining > 0 {
                 self.reconcile_budget_hold(BudgetReconcileHoldRequest {
                     capability_id,
@@ -187,17 +190,18 @@ impl SqliteBudgetStore {
             .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
         let mut statement = connection.prepare(
             "SELECT hold_id, capability_id, grant_index, remaining_exposure_units, \
-             authority_id, lease_id, lease_epoch \
+             invocation_captured, authority_id, lease_id, lease_epoch \
              FROM budget_authorization_holds \
              WHERE disposition = 'open' AND reserved_until IS NOT NULL AND reserved_until <= ?1",
         )?;
         let rows = statement.query_map([now_unix_secs], |row| {
-            let authority = sqlite_budget_event_authority(row.get(4)?, row.get(5)?, row.get(6)?)?;
+            let authority = sqlite_budget_event_authority(row.get(5)?, row.get(6)?, row.get(7)?)?;
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, i64>(2)? as u32,
                 row.get::<_, i64>(3)? as u64,
+                row.get::<_, i64>(4)? > 0,
                 authority,
             ))
         })?;
@@ -647,6 +651,41 @@ mod tests {
                 .disposition,
             BudgetHoldDispositionView::Reconciled
         );
+    }
+
+    #[test]
+    fn ttl_reaper_settles_expired_hold_after_invocation_capture() {
+        use chio_kernel::budget_store::BudgetHoldDispositionView;
+
+        let store = open_temp_store();
+        authorize(&store, "hold-captured-expired", "cap-captured-expired");
+        store
+            .mark_hold_reserved_until(
+                "hold-captured-expired",
+                100,
+                "USD",
+                None,
+                &ReservedHoldEnvelope::default(),
+            )
+            .unwrap();
+        capture_invocation(&store, "hold-captured-expired", "cap-captured-expired");
+
+        let settled = store.reap_expired_reserved_holds(1_000).unwrap();
+        assert_eq!(settled, 1);
+        let hold = store
+            .budget_hold_snapshot("hold-captured-expired")
+            .unwrap()
+            .unwrap();
+        assert_eq!(hold.disposition, BudgetHoldDispositionView::Reconciled);
+        assert_eq!(
+            store
+                .get_usage("cap-captured-expired", 0)
+                .unwrap()
+                .unwrap()
+                .total_cost_realized_spend,
+            100
+        );
+        assert_eq!(store.reap_expired_reserved_holds(1_000).unwrap(), 0);
     }
 
     #[test]
