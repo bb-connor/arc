@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn budget_backend_error_compensates_durable_admission_before_dispatch() {
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_invocations = Some(1);
+    let (kernel, request, store, invocations) = durable_admission_fixture_with_grants(
+        "durable-budget-authorization-error",
+        vec![grant],
+    );
+    store.fail_next_budget_authorization();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("budget backend failure should produce a deny receipt");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("authorization backend unavailable")));
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn durable_monetary_guard_denial_closes_unstarted_payment() {
     struct DenyAll;
 

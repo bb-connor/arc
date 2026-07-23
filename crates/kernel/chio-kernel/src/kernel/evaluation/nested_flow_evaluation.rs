@@ -494,10 +494,18 @@ impl ChioKernel {
                     grant_index,
                     proposal,
                 }) => {
-                    let (runtime_admission_metadata, _) = self
+                    let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             runtime_admission_metadata,
                         );
+                    if !runtime_release_confirmed {
+                        budget_error = Some(KernelError::DurableAdmission(
+                            "runtime admission reservation retained on pending approval"
+                                .to_string(),
+                        ));
+                        budget_error_metadata = runtime_admission_metadata;
+                        break;
+                    }
                     return self.with_pre_invocation_guard_evidence(
                         &pre_invocation_guard_evidence,
                         || {
@@ -524,10 +532,19 @@ impl ChioKernel {
                 }
                 Err(error) => {
                     let msg = error.to_string();
-                    let (runtime_admission_metadata, _) = self
+                    let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             runtime_admission_metadata,
                         );
+                    if runtime_release_confirmed {
+                        self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                            None,
+                            None,
+                        )?;
+                    }
                     return self.with_pre_invocation_guard_evidence(
                         &pre_invocation_guard_evidence,
                         || {

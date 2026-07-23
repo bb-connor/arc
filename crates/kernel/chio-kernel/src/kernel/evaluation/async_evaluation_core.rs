@@ -595,10 +595,19 @@ impl ChioKernel {
                 }
                 Err(error) => {
                     let msg = error.to_string();
-                    let (runtime_metadata, _) = self
+                    let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             runtime_metadata,
                         );
+                    if runtime_release_confirmed {
+                        self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                            None,
+                            None,
+                        )?;
+                    }
                     let receipt_metadata = self.merge_budget_receipt_metadata(
                         runtime_metadata,
                         self.budget_backend_receipt_metadata()?,

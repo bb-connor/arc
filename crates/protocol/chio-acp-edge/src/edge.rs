@@ -81,11 +81,13 @@ fn reject_request_bound_artifacts_without_stable_request_id(
     if execution.approval_token.is_none()
         && execution.approval_tokens.is_empty()
         && execution.supplemental_authorization.is_none()
+        && execution.execution_nonce.is_none()
     {
         return Ok(());
     }
     Err(AcpEdgeError::InvalidRequest(
-        "ACP approval tokens and supplemental authorization require invoke_with_request_id"
+        "ACP request-bound authorization artifacts and execution nonces require \
+         invoke_with_request_id or start_stream_with_request_id"
             .to_string(),
     ))
 }
@@ -898,10 +900,39 @@ impl ChioAcpEdge {
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
         validate_execution_context(execution)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
+        self.start_stream_task_with_optional_request_id(capability_id, arguments, execution, None)
+    }
+
+    /// Start an authoritative deferred task under the caller's stable request ID.
+    pub fn start_stream_with_request_id(
+        &self,
+        request_id: &str,
+        capability_id: &str,
+        arguments: Value,
+        execution: &AcpKernelExecutionContext,
+    ) -> Result<AcpInvocationTask, AcpEdgeError> {
+        validate_execution_context(execution)?;
+        self.start_stream_task_with_optional_request_id(
+            capability_id,
+            arguments,
+            execution,
+            Some(request_id),
+        )
+    }
+
+    fn start_stream_task_with_optional_request_id(
+        &self,
+        capability_id: &str,
+        arguments: Value,
+        execution: &AcpKernelExecutionContext,
+        request_id: Option<&str>,
+    ) -> Result<AcpInvocationTask, AcpEdgeError> {
         let binding = self.capability_binding(capability_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
         let expires_at_ms = current_unix_millis().saturating_add(DEFERRED_ACP_TASK_TTL_MILLIS);
+        let kernel_request_id =
+            request_id.map_or_else(|| format!("acp-stream-{task_id}"), str::to_string);
         let request = Self::build_execution_request(
             capability_id,
             arguments,
@@ -910,7 +941,7 @@ impl ChioAcpEdge {
             binding.target_protocol,
             AcpRequestIds {
                 origin_request_id: task_id.clone(),
-                kernel_request_id: format!("acp-stream-{task_id}"),
+                kernel_request_id,
             },
         )?;
         let task = AcpInvocationTask {

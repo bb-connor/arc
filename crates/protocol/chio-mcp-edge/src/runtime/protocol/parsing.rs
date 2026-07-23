@@ -119,34 +119,76 @@ pub(in crate::runtime) fn build_operation_context(
         params: &'a Value,
     }
 
-    // JSON-RPC only requires an id to be unique among a client's in-flight
-    // requests, so a client may legally reuse one after the earlier request has
-    // settled. The method and params are folded in so two distinct operations do
-    // not collide on the same session lineage record. `_meta` is excluded because
-    // it carries per-attempt transport data (execution nonce, progress token),
-    // which keeps a strict-nonce retry on its preflight's request id.
-    let mut identity_params = params.clone();
-    if let Some(object) = identity_params.as_object_mut() {
-        object.remove("_meta");
-    }
-    let identity = ExternalRequestIdentity {
-        domain: "CHIO-MCP-EXTERNAL-REQUEST-ID-V2",
-        session_id: session_id.as_str(),
-        jsonrpc_id: id,
-        method,
-        params: &identity_params,
+    let request_id = if let Some(request_id) = parse_request_stable_request_id(id, params)? {
+        request_id
+    } else {
+        // JSON-RPC only requires an id to be unique among a client's in-flight
+        // requests, so a client may legally reuse one after the earlier request has
+        // settled. The method and params are folded in so two distinct operations do
+        // not collide on the same session lineage record. `_meta` is excluded because
+        // it carries per-attempt transport data (execution nonce, progress token),
+        // which keeps a strict-nonce retry on its preflight's request id.
+        let mut identity_params = params.clone();
+        if let Some(object) = identity_params.as_object_mut() {
+            object.remove("_meta");
+        }
+        let identity = ExternalRequestIdentity {
+            domain: "CHIO-MCP-EXTERNAL-REQUEST-ID-V2",
+            session_id: session_id.as_str(),
+            jsonrpc_id: id,
+            method,
+            params: &identity_params,
+        };
+        let canonical = canonical_json_bytes(&identity).map_err(|error| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_REQUEST,
+                &format!("failed to canonicalize MCP request identity: {error}"),
+            )
+        })?;
+        RequestId::new(format!("mcp-edge-req-{}", sha256_hex(&canonical)))
     };
-    let canonical = canonical_json_bytes(&identity).map_err(|error| {
-        jsonrpc_error(
-            id.clone(),
-            JSONRPC_INVALID_REQUEST,
-            &format!("failed to canonicalize MCP request identity: {error}"),
-        )
-    })?;
-    let request_id = RequestId::new(format!("mcp-edge-req-{}", sha256_hex(&canonical)));
     let mut context = OperationContext::new(session_id, request_id, agent_id.to_string());
     context.progress_token = parse_progress_token(id, params)?;
     Ok(context)
+}
+
+pub(in crate::runtime) fn parse_request_stable_request_id(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<RequestId>, Value> {
+    const MAX_REQUEST_ID_BYTES: usize = 2_048;
+
+    let Some(meta) = params.get("_meta") else {
+        return Ok(None);
+    };
+    let Some(meta) = meta.as_object() else {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta must be an object",
+        ));
+    };
+    let Some(request_id) = meta.get("chioRequestId") else {
+        return Ok(None);
+    };
+    let Some(request_id) = request_id.as_str() else {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta.chioRequestId must be a string",
+        ));
+    };
+    let request_id = parse_protocol_identifier(request_id, "_meta.chioRequestId")
+        .map_err(|message| jsonrpc_error(id.clone(), JSONRPC_INVALID_PARAMS, message.as_str()))?;
+    if request_id.len() > MAX_REQUEST_ID_BYTES {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta.chioRequestId must be at most 2048 bytes",
+        ));
+    }
+    Ok(Some(RequestId::new(request_id)))
 }
 
 pub(in crate::runtime) fn parse_request_model_metadata(

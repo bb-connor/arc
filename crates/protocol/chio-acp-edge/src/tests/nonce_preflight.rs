@@ -152,7 +152,7 @@ fn generated_request_id_rejects_threshold_approvals() {
 }
 
 #[test]
-fn invoke_strict_nonce_preflight_is_not_success_and_returns_retry_metadata() {
+fn strict_nonce_retries_require_and_accept_stable_request_ids() {
     let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
@@ -181,8 +181,16 @@ fn invoke_strict_nonce_preflight_is_not_success_and_returns_retry_metadata() {
         model_metadata: None,
     };
 
+    let request_id = "acp-strict-nonce-retry";
+    let arguments = json!({"path": "/tmp"});
     let result = edge
-        .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
+        .invoke_with_request_id(
+            request_id,
+            "read_file",
+            arguments.clone(),
+            &kernel,
+            &execution,
+        )
         .test_unwrap();
 
     assert!(!result.success);
@@ -202,4 +210,34 @@ fn invoke_strict_nonce_preflight_is_not_success_and_returns_retry_metadata() {
     assert!(metadata["chio"]["executionNonce"]["nonce"]["nonce_id"]
         .as_str()
         .is_some());
+    let execution_nonce = serde_json::from_value(metadata["chio"]["executionNonce"].clone())
+        .test_expect("preflight metadata should contain a signed execution nonce");
+    let retry_execution = AcpKernelExecutionContext {
+        execution_nonce: Some(execution_nonce),
+        ..execution.clone()
+    };
+
+    let generated_error = edge
+        .invoke("read_file", arguments.clone(), &kernel, &retry_execution)
+        .test_expect_err("generated invoke IDs must reject execution nonces");
+    assert!(generated_error
+        .to_string()
+        .contains("invoke_with_request_id"));
+    let mcp_error = edge
+        .invoke_with_mcp_target("read_file", arguments.clone(), &kernel, &retry_execution)
+        .test_expect_err("generated MCP-target IDs must reject execution nonces");
+    assert!(mcp_error.to_string().contains("invoke_with_request_id"));
+
+    edge.start_stream_with_request_id(request_id, "read_file", arguments.clone(), &retry_execution)
+        .test_expect("stable stream IDs should accept execution nonces");
+    let retry = edge
+        .invoke_with_request_id(
+            request_id,
+            "read_file",
+            arguments,
+            &kernel,
+            &retry_execution,
+        )
+        .test_expect("stable invoke retry should execute");
+    assert!(retry.success, "{:?}", retry.error);
 }

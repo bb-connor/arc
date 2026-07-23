@@ -133,6 +133,7 @@ struct TestAdmissionOperationStore {
     fail_next_evaluation_finalization: std::sync::atomic::AtomicBool,
     fail_next_terminal_projection: std::sync::atomic::AtomicBool,
     fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool,
+    fail_next_budget_authorization: std::sync::atomic::AtomicBool,
     budget: std::sync::Arc<crate::budget_store::InMemoryBudgetStore>,
     state: std::sync::Mutex<TestAdmissionState>,
 }
@@ -147,6 +148,7 @@ impl TestAdmissionOperationStore {
             fail_next_evaluation_finalization: std::sync::atomic::AtomicBool::new(false),
             fail_next_terminal_projection: std::sync::atomic::AtomicBool::new(false),
             fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool::new(false),
+            fail_next_budget_authorization: std::sync::atomic::AtomicBool::new(false),
             budget: std::sync::Arc::new(crate::budget_store::InMemoryBudgetStore::new()),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
@@ -231,6 +233,11 @@ impl TestAdmissionOperationStore {
 
     fn fail_next_payment_settlement_intent(&self) {
         self.fail_next_payment_settlement_intent
+            .store(true, Ordering::SeqCst);
+    }
+
+    fn fail_next_budget_authorization(&self) {
+        self.fail_next_budget_authorization
             .store(true, Ordering::SeqCst);
     }
 
@@ -838,6 +845,16 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
                     error.to_string(),
                 )
             })?;
+        }
+        if self
+            .fail_next_budget_authorization
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err(
+                crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                    "authorization backend unavailable".to_owned(),
+                ),
+            );
         }
         let request_for_replay = request.clone();
         let decision =

@@ -1303,8 +1303,8 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: ACP approval tokens and supplemental authorization require \
-             invoke_with_request_id"
+            "invalid request: ACP request-bound authorization artifacts and execution nonces \
+             require invoke_with_request_id or start_stream_with_request_id"
         );
 
         edge.invoke_with_request_id(
@@ -1350,8 +1350,8 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: ACP approval tokens and supplemental authorization require \
-             invoke_with_request_id"
+            "invalid request: ACP request-bound authorization artifacts and execution nonces \
+             require invoke_with_request_id or start_stream_with_request_id"
         );
 
         edge.invoke_with_request_id(

@@ -81,12 +81,13 @@ fn reject_request_bound_artifacts_without_stable_request_id(
     if execution.approval_token.is_none()
         && execution.approval_tokens.is_empty()
         && execution.supplemental_authorization.is_none()
+        && execution.execution_nonce.is_none()
     {
         return Ok(());
     }
     Err(A2aEdgeError::InvalidRequest(
-        "A2A approval tokens and supplemental authorization require \
-         handle_send_message_with_request_id"
+        "A2A request-bound authorization artifacts and execution nonces require \
+         handle_send_message_with_request_id or handle_stream_message_with_request_id"
             .to_string(),
     ))
 }
@@ -464,10 +465,39 @@ impl ChioA2aEdge {
     ) -> Result<TaskResponse, A2aEdgeError> {
         validate_execution_context(execution)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
+        self.handle_stream_message_with_optional_request_id(skill_id, request, execution, None)
+    }
+
+    /// Start an authoritative deferred task under the caller's stable request ID.
+    pub fn handle_stream_message_with_request_id(
+        &mut self,
+        request_id: &str,
+        skill_id: &str,
+        request: &SendMessageRequest,
+        execution: &A2aKernelExecutionContext,
+    ) -> Result<TaskResponse, A2aEdgeError> {
+        validate_execution_context(execution)?;
+        self.handle_stream_message_with_optional_request_id(
+            skill_id,
+            request,
+            execution,
+            Some(request_id),
+        )
+    }
+
+    fn handle_stream_message_with_optional_request_id(
+        &mut self,
+        skill_id: &str,
+        request: &SendMessageRequest,
+        execution: &A2aKernelExecutionContext,
+        request_id: Option<&str>,
+    ) -> Result<TaskResponse, A2aEdgeError> {
         let binding = self.resolve_skill_binding(skill_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
         let expires_at_ms = unix_now_millis().saturating_add(DEFERRED_A2A_TASK_TTL_MILLIS);
+        let kernel_request_id =
+            request_id.map_or_else(|| format!("a2a-stream-{task_id}"), str::to_string);
         let orchestrated_request = Self::build_execution_request(
             binding,
             skill_id,
@@ -475,7 +505,7 @@ impl ChioA2aEdge {
             extract_arguments_from_message(&request.message)?,
             execution,
             task_id.clone(),
-            format!("a2a-stream-{task_id}"),
+            kernel_request_id,
         )?;
 
         let response = TaskResponse {

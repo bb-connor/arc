@@ -296,12 +296,26 @@ impl ChioMcpEdge {
             .get("arguments")
             .cloned()
             .unwrap_or_else(|| json!({}));
+        let stable_request_id = parse_request_stable_request_id(id, params)?;
         let model_metadata = parse_request_model_metadata(id, params)?;
         let execution_nonce = parse_request_execution_nonce(id, params)?;
         let governed_intent = parse_request_governed_intent(id, params)?;
         let (approval_token, approval_tokens, threshold_approval_proposal) =
             parse_request_approval_artifacts(id, params)?;
         let supplemental_authorization = parse_request_supplemental_authorization(id, params)?;
+        if stable_request_id.is_none()
+            && (approval_token.is_some()
+                || !approval_tokens.is_empty()
+                || threshold_approval_proposal.is_some()
+                || supplemental_authorization.is_some())
+        {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "MCP approval artifacts and supplemental authorization require \
+                 _meta.chioRequestId",
+            ));
+        }
         let extra_metadata = parse_request_extra_metadata(id, params)?;
 
         let Some(&tool_index) = self.tool_index.get(tool_name) else {

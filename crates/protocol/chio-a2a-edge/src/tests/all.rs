@@ -1085,8 +1085,8 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: A2A approval tokens and supplemental authorization require \
-             handle_send_message_with_request_id"
+            "invalid request: A2A request-bound authorization artifacts and execution nonces \
+             require handle_send_message_with_request_id or handle_stream_message_with_request_id"
         );
     }
 
@@ -1124,8 +1124,8 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: A2A approval tokens and supplemental authorization require \
-             handle_send_message_with_request_id"
+            "invalid request: A2A request-bound authorization artifacts and execution nonces \
+             require handle_send_message_with_request_id or handle_stream_message_with_request_id"
         );
     }
 

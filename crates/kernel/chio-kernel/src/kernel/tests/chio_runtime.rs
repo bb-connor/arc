@@ -1913,6 +1913,120 @@ fn chio_runtime_release_failure_surfaces_cleanup_failure_on_pending_approval() {
 }
 
 #[test]
+fn nested_runtime_release_failure_denies_pending_approval() {
+    let request_id = "req-chio-runtime-nested-release-failure-pending";
+    let (mut kernel, mut request, _store, invocations) =
+        durable_admission_fixture(request_id);
+    let approver_a = CoreKeypair::generate();
+    let approver_b = CoreKeypair::generate();
+    let requirement = ThresholdApprovalRequirement::new(
+        kernel.config.policy_hash.clone(),
+        2,
+        vec![
+            ThresholdApproverIdentity {
+                identifier: "approver-a".to_owned(),
+                public_key: approver_a.public_key(),
+            },
+            ThresholdApproverIdentity {
+                identifier: "approver-b".to_owned(),
+                public_key: approver_b.public_key(),
+            },
+        ],
+        "cumulative-approval-directory-v1".to_owned(),
+        300,
+    )
+    .expect("threshold requirement");
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement,
+    )));
+    let mut body = request.capability.body();
+    body.scope.grants[0]
+        .constraints
+        .push(Constraint::RequireCumulativeApprovalAbove {
+            threshold: MonetaryAmount {
+                units: 100,
+                currency: "USD".to_owned(),
+            },
+            approval_budget_id: "budget-nested-pending-release".to_owned(),
+            approval_budget_epoch: 7,
+            cumulative_approval_root_binding: None,
+        });
+    request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
+        .expect("cumulative capability must sign");
+    request.governed_intent = Some(GovernedTransactionIntent {
+        id: "cumulative-approval-nested-release-intent".to_owned(),
+        server_id: request.server_id.clone(),
+        tool_name: request.tool_name.clone(),
+        purpose: "authorize a bounded ledger mutation".to_owned(),
+        max_amount: Some(MonetaryAmount {
+            units: 100,
+            currency: "USD".to_owned(),
+        }),
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: None,
+        body: Default::default(),
+    });
+
+    let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
+    let releases = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(FailingReleaseRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: request_id,
+        admission_id: "adm-nested-release-failure-pending",
+        lease_id: "lease-nested-release-failure-pending",
+    }));
+
+    let session_id = kernel
+        .open_session(
+            request.agent_id.clone(),
+            vec![request.capability.clone()],
+        )
+        .expect("nested session should open");
+    kernel
+        .activate_session(&session_id)
+        .expect("nested session should activate");
+    let context = make_operation_context(&session_id, request_id, &request.agent_id);
+    let operation = ToolCallOperation {
+        capability: request.capability,
+        server_id: request.server_id,
+        tool_name: request.tool_name,
+        arguments: request.arguments,
+        governed_intent: request.governed_intent,
+        approval_token: request.approval_token,
+        approval_tokens: request.approval_tokens,
+        threshold_approval_proposal: request.threshold_approval_proposal,
+        supplemental_authorization: request.supplemental_authorization,
+        execution_nonce: None,
+        model_metadata: request.model_metadata,
+        extra_metadata: None,
+    };
+    let mut client = NoopNestedFlowClient;
+    let response = kernel
+        .evaluate_tool_call_operation_with_nested_flow_client(&context, &operation, &mut client)
+        .expect("nested pending-approval evaluation");
+
+    assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
+    assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let metadata = response
+        .receipt
+        .metadata
+        .expect("cleanup-failure metadata present");
+    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
+    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
+    assert_eq!(
+        metadata["chio_runtime"]["reserved_destructive_lease_id"],
+        "lease-nested-release-failure-pending"
+    );
+}
+
+#[test]
 fn exhausted_grant_receipt_retains_failed_runtime_release_evidence(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());

@@ -215,6 +215,10 @@ impl ChioMcpEdge {
                 "errorRegistry": {
                     "schema": CHIO_ERROR_REGISTRY_SCHEMA,
                     "path": "spec/errors/chio-error-registry.v1.json",
+                },
+                "requestIdentity": {
+                    "stableRequestIdMetaField": "chioRequestId",
+                    "requestBoundArtifactsRequireStableId": true,
                 }
             }),
         );
