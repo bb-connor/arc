@@ -44,6 +44,7 @@ pub struct RequestEvaluator {
     revocation_backend: &'static str,
 }
 
+#[derive(Clone)]
 pub(crate) struct DurableAdmissionStores {
     pub(crate) store: Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
     pub(crate) outcome_store: Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,

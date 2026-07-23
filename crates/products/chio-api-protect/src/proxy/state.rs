@@ -655,7 +655,7 @@ impl ProtectProxy {
             self.config.trusted_capability_issuers.clone(),
             durable_receipt_store,
             revocation_store.clone(),
-            durable_admission,
+            durable_admission.clone(),
             self.config.allow_ephemeral_receipts,
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
@@ -762,6 +762,7 @@ impl ProtectProxy {
                 &trusted_capability_issuers,
                 Vec::new(),
                 payment_adapter,
+                durable_admission,
             )?)),
             None => None,
         };

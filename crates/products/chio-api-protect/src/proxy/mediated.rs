@@ -15,59 +15,9 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
-/// A configured budget store together with whether it supports the pre-execution
-/// hold APIs the mediated reservation path depends on.
-///
-/// The local SQLite store implements `get_budget_hold`, `mark_hold_reserved`, and
-/// `reap_expired_reserved_holds`, so a reserved hold can be resolved by nonce on
-/// `/v1/reconcile` and reclaimed by the TTL reaper. The remote control-plane
-/// store forwards only charge/reverse/reconcile and falls back to the no-op trait
-/// defaults for those hold APIs, so a reservation minted against it could never
-/// be reconciled by nonce or reaped. Tracking hold-capability at the point of
-/// construction lets the mediated routes fail closed rather than mint an
-/// unreconcilable reserved nonce.
-pub(crate) struct ConfiguredBudgetStore {
-    pub(crate) store: Arc<dyn BudgetStore>,
-    pub(crate) hold_capable: bool,
-}
-
-/// Build the sidecar's budget store, preferring the hold-capable local SQLite
-/// store (`--budget-db`) over the remote control-plane store (`--control-url`)
-/// when both are configured; falling back to the remote store; else `None` (the
-/// mediated route then denies fail-closed).
-///
-/// Only the local SQLite store is hold-capable. The mediated authorization and
-/// reconcile routes need a hold-capable store to persist and resolve a durable
-/// reserved hold, so when both are configured the local store is chosen and
-/// mediation keeps working; a remote-only deployment stays not hold-capable and
-/// those routes reject fail-closed rather than mint an unreconcilable reserved
-/// nonce.
-pub(crate) fn build_budget_store(
-    config: &ProtectConfig,
-) -> Result<Option<ConfiguredBudgetStore>, ProtectError> {
-    if let Some(path) = config.budget_db.as_deref() {
-        let store = chio_store_sqlite::budget_store::SqliteBudgetStore::open(path)
-            .map_err(|error| ProtectError::Config(error.to_string()))?;
-        return Ok(Some(ConfiguredBudgetStore {
-            store: Arc::new(store),
-            hold_capable: true,
-        }));
-    }
-    if let Some(control_url) = config.control_url.as_deref() {
-        let token = config.control_token.as_deref().unwrap_or("");
-        let store =
-            chio_control_plane::trust_control::service_runtime::budget::build_remote_budget_store(
-                control_url,
-                token,
-            )
-            .map_err(|error| ProtectError::Config(error.to_string()))?;
-        return Ok(Some(ConfiguredBudgetStore {
-            store: Arc::from(store),
-            hold_capable: false,
-        }));
-    }
-    Ok(None)
-}
+#[path = "mediated/budget_configuration.rs"]
+mod budget_configuration;
+pub(crate) use budget_configuration::build_budget_store;
 
 /// Load the durable revocation store's revoked capability ids so operator
 /// revocations recorded through `chio trust revoke --revocation-db <path>` are
@@ -155,6 +105,7 @@ pub(crate) fn build_mediation_kernel(
     trusted_capability_issuers: &[PublicKey],
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    durable_admission: Option<DurableAdmissionStores>,
 ) -> Result<ChioKernel, ProtectError> {
     let mut ca_public_keys = vec![signer.public_key()];
     for issuer in trusted_capability_issuers {
@@ -190,6 +141,15 @@ pub(crate) fn build_mediation_kernel(
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     });
     kernel.set_budget_store_handle(budget_store);
+    if let Some(durable) = durable_admission {
+        kernel
+            .set_durable_admission_store(durable.store, durable.outcome_store, durable.fence)
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "failed to install durable admission stores on the mediation kernel: {error}"
+                ))
+            })?;
+    }
     let nonce_cfg = ExecutionNonceConfig {
         require_nonce: true,
         ..ExecutionNonceConfig::default()
@@ -262,9 +222,9 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// alongside `governed_intent` so an approval-gated grant can be authorized.
     #[serde(default)]
     approval_token: Option<GovernedApprovalToken>,
-    /// Optional threshold approval token set and the signed proposal binding it.
-    /// Both are forwarded together; the kernel requires every token and the
-    /// proposal to name this exact `request_id`.
+    /// Reserved threshold approval fields. The mediated product does not yet
+    /// configure a threshold policy resolver, so either field is rejected at the
+    /// HTTP boundary instead of being advertised as an unusable kernel feature.
     #[serde(default)]
     approval_tokens: Vec<GovernedApprovalToken>,
     #[serde(default)]
@@ -273,8 +233,9 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// `dpop_required` can verify the proof instead of denying fail-closed.
     #[serde(default)]
     dpop_proof: Option<DpopProof>,
-    /// Opaque signed extension forwarded unchanged to the kernel's installed
-    /// supplemental authorization verifier.
+    /// Reserved opaque extension. The mediated product has no configured
+    /// supplemental verifier, so presenting this field is rejected at the HTTP
+    /// boundary.
     #[serde(default)]
     supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
     /// A signed execution nonce. This endpoint MINTS nonces; it does not settle
@@ -304,6 +265,18 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
                 .into_response();
         }
     };
+    if parsed.supplemental_authorization.is_some() {
+        return sidecar_bad_request(
+            "supplemental_authorization is unavailable: no supplemental verifier is configured",
+        )
+        .into_response();
+    }
+    if !parsed.approval_tokens.is_empty() || parsed.threshold_approval_proposal.is_some() {
+        return sidecar_bad_request(
+            "threshold approvals are unavailable on the mediated endpoint: no threshold policy resolver is configured",
+        )
+        .into_response();
+    }
     // This endpoint is a pre-execution authorization gate: it mints an execution
     // nonce for the caller to present downstream. It does not consume or settle a
     // presented nonce. Reject one fail-closed so a caller cannot mistake this for
@@ -324,8 +297,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         );
     };
     // A mediated reservation requires a hold-capable budget store. The remote
-    // control-plane store forwards only charge/reverse/reconcile and falls back to
-    // the no-op hold-API defaults, so a reservation minted against it could never
+    // control-plane store forwards only charge/reverse/reconcile and rejects the
+    // unsupported hold APIs, so a reservation minted against it could never
     // be reconciled by nonce or reclaimed by the TTL reaper. Reject fail-closed
     // rather than mint an unreconcilable reserved nonce.
     if !state.mediation_hold_capable {
@@ -516,9 +489,9 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         execution_nonce: None,
         governed_intent: parsed.governed_intent,
         approval_token: parsed.approval_token,
-        approval_tokens: parsed.approval_tokens,
-        threshold_approval_proposal: parsed.threshold_approval_proposal,
-        supplemental_authorization: parsed.supplemental_authorization,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -744,8 +717,15 @@ mod tests {
         trusted_capability_issuers: &[PublicKey],
     ) -> Arc<ChioKernel> {
         Arc::new(
-            build_mediation_kernel(signer, budget, trusted_capability_issuers, Vec::new(), None)
-                .test_unwrap(),
+            build_mediation_kernel(
+                signer,
+                budget,
+                trusted_capability_issuers,
+                Vec::new(),
+                None,
+                None,
+            )
+            .test_unwrap(),
         )
     }
 
@@ -926,6 +906,7 @@ mod tests {
                 &trusted_capability_issuers,
                 Vec::new(),
                 payment_adapter,
+                None,
             )
             .test_unwrap(),
         );
@@ -3157,7 +3138,8 @@ mod tests {
         let budget: Arc<dyn BudgetStore> =
             Arc::new(chio_kernel::budget_store::InMemoryBudgetStore::new());
         let kernel =
-            build_mediation_kernel(&signer, Arc::clone(&budget), &[], Vec::new(), None).unwrap();
+            build_mediation_kernel(&signer, Arc::clone(&budget), &[], Vec::new(), None, None)
+                .unwrap();
         // Strict nonce mode is what routes every mediated request through the
         // authorization-reserve path. DPoP verification state is installed here
         // too; the `mediated_dpop_capability_requires_valid_proof` integration

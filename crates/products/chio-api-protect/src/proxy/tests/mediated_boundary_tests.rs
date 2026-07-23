@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_authorization_forwards_supplemental_authorization_fail_closed() {
+async fn mediated_authorization_rejects_unconfigured_supplemental_authorization() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -18,14 +18,13 @@ async fn mediated_authorization_forwards_supplemental_authorization_fail_closed(
         "supplemental_authorization": { "signed_extension": "signed-extension" }
     });
 
-    let (_, json) = post_evaluate(Arc::clone(&state), &body).await;
+    let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
 
-    assert_eq!(json["status"], "deny", "{json}");
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(
-        json["receipt"]["decision"]["reason"]
+        json["message"]
             .as_str()
-            .is_some_and(|reason| reason
-                .contains("supplemental authorization requires an installed verifier")),
+            .is_some_and(|reason| reason.contains("no supplemental verifier is configured")),
         "{json}"
     );
     let usage = budget.get_usage(&cap_id, 0).unwrap();
@@ -33,7 +32,7 @@ async fn mediated_authorization_forwards_supplemental_authorization_fail_closed(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_authorization_forwards_threshold_approval_set() {
+async fn mediated_authorization_rejects_threshold_approval_without_policy_runtime() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let approver = Keypair::generate();
@@ -57,9 +56,9 @@ async fn mediated_authorization_forwards_threshold_approval_set() {
         &approver,
     )
     .unwrap();
-    // The token set is sent without its signed proposal. The kernel rejects that
-    // pairing, so a denial naming the missing proposal proves the set reached the
-    // kernel instead of being dropped at the sidecar boundary.
+    // The mediated product does not install a threshold requirement resolver, so
+    // it rejects the advertised fields at the boundary instead of forwarding a
+    // request the kernel cannot authorize.
     let body = serde_json::json!({
         "capability": cap,
         "tool_server": "cost-srv",
@@ -69,12 +68,13 @@ async fn mediated_authorization_forwards_threshold_approval_set() {
         "approval_tokens": [approval_token]
     });
 
-    let (_, json) = post_evaluate(Arc::clone(&state), &body).await;
+    let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
 
-    assert_ne!(json["status"], "authorized", "{json}");
-    let rendered = json.to_string();
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(
-        rendered.contains("threshold approval tokens have no signed proposal"),
+        json["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("no threshold policy resolver is configured")),
         "{json}"
     );
 }

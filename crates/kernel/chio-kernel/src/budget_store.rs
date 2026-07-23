@@ -1055,38 +1055,28 @@ pub trait BudgetStore: Send + Sync {
 
     fn mark_hold_reserved(
         &self,
-        hold_id: &str,
-        reserved_until_unix_secs: i64,
-        currency: &str,
-        payment_reference: Option<&str>,
-        envelope: &ReservedHoldEnvelope,
+        _hold_id: &str,
+        _reserved_until_unix_secs: i64,
+        _currency: &str,
+        _payment_reference: Option<&str>,
+        _envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
-        let _ = (
-            hold_id,
-            reserved_until_unix_secs,
-            currency,
-            payment_reference,
-            envelope,
-        );
-        Ok(())
+        Err(BudgetStoreError::Invariant(
+            "budget store does not support durable monetary hold reservation".to_string(),
+        ))
     }
 
     fn reserve_invocation_hold(
         &self,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        reserved_until_unix_secs: i64,
-        envelope: &ReservedHoldEnvelope,
+        _hold_id: &str,
+        _capability_id: &str,
+        _grant_index: usize,
+        _reserved_until_unix_secs: i64,
+        _envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
-        let _ = (
-            hold_id,
-            capability_id,
-            grant_index,
-            reserved_until_unix_secs,
-            envelope,
-        );
-        Ok(())
+        Err(BudgetStoreError::Invariant(
+            "budget store does not support durable invocation hold reservation".to_string(),
+        ))
     }
 
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {

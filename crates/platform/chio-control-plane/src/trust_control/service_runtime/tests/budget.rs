@@ -6,6 +6,7 @@ use super::super::errors::{
 };
 use super::super::issuance::ensure_signed_by_trusted_authority;
 use super::support::{assert_json_post, StaticResponseServer};
+use chio_kernel::budget_store::ReservedHoldEnvelope;
 use chio_test_support::prelude::*;
 
 #[test]
@@ -552,6 +553,25 @@ fn remote_budget_store_rejects_oversized_grant_before_network_io(
     for error in [legacy.err(), rich.err()] {
         assert!(error.is_some_and(|error| error.to_string().contains("exceeds u32 range")));
     }
+    Ok(())
+}
+
+#[test]
+fn remote_budget_store_rejects_unsupported_hold_persistence_before_minting_nonce(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let store = build_remote_budget_store("http://127.0.0.1:1", "secret")?;
+    let envelope = ReservedHoldEnvelope::default();
+
+    let monetary = store.mark_hold_reserved("hold-budget", 100, "USD", None, &envelope);
+    let invocation =
+        store.reserve_invocation_hold("hold-invocation", "cap-budget", 0, 100, &envelope);
+
+    assert!(monetary.as_ref().is_err_and(|error| error
+        .to_string()
+        .contains("durable monetary hold reservation")));
+    assert!(invocation.as_ref().is_err_and(|error| error
+        .to_string()
+        .contains("durable invocation hold reservation")));
     Ok(())
 }
 
