@@ -36283,6 +36283,504 @@ pub mod trust_control_attestation {
         }
     }
 }
+pub mod trust_control_budget_snapshot_anchor_provenance {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///Leader-signed inclusion chain authenticating the exact immutable migration-anchor set carried by a trust-control cluster budget snapshot.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust-control/budget-snapshot-anchor-provenance/v1",
+    ///  "title": "Budget Snapshot Anchor Provenance",
+    ///  "description": "Leader-signed inclusion chain authenticating the exact immutable migration-anchor set carried by a trust-control cluster budget snapshot.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "chain",
+    ///    "clusterAuthenticator",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "chain": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/signedCommitment"
+    ///      },
+    ///      "minItems": 1
+    ///    },
+    ///    "clusterAuthenticator": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.budget-snapshot-anchor-provenance.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct BudgetSnapshotAnchorProvenance {
+        pub chain: ::std::vec::Vec<SignedCommitment>,
+        #[serde(rename = "clusterAuthenticator")]
+        pub cluster_authenticator: BudgetSnapshotAnchorProvenanceClusterAuthenticator,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&BudgetSnapshotAnchorProvenance> for BudgetSnapshotAnchorProvenance {
+        fn from(value: &BudgetSnapshotAnchorProvenance) -> Self {
+            value.clone()
+        }
+    }
+    ///`BudgetSnapshotAnchorProvenanceClusterAuthenticator`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BudgetSnapshotAnchorProvenanceClusterAuthenticator(::std::string::String);
+    impl ::std::ops::Deref for BudgetSnapshotAnchorProvenanceClusterAuthenticator {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BudgetSnapshotAnchorProvenanceClusterAuthenticator>
+        for ::std::string::String
+    {
+        fn from(value: BudgetSnapshotAnchorProvenanceClusterAuthenticator) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BudgetSnapshotAnchorProvenanceClusterAuthenticator>
+        for BudgetSnapshotAnchorProvenanceClusterAuthenticator
+    {
+        fn from(value: &BudgetSnapshotAnchorProvenanceClusterAuthenticator) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BudgetSnapshotAnchorProvenanceClusterAuthenticator {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BudgetSnapshotAnchorProvenanceClusterAuthenticator {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for BudgetSnapshotAnchorProvenanceClusterAuthenticator
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for BudgetSnapshotAnchorProvenanceClusterAuthenticator
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BudgetSnapshotAnchorProvenanceClusterAuthenticator {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Commitment`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "anchorSetDigest",
+    ///    "chainDigest",
+    ///    "commitSequence",
+    ///    "committedAt",
+    ///    "electionTerm",
+    ///    "leaderUrl",
+    ///    "previousChainDigest",
+    ///    "schema",
+    ///    "signerPublicKey"
+    ///  ],
+    ///  "properties": {
+    ///    "anchorSetDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "chainDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "commitSequence": {
+    ///      "type": "integer",
+    ///      "minimum": 1.0
+    ///    },
+    ///    "committedAt": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "electionTerm": {
+    ///      "type": "integer",
+    ///      "minimum": 1.0
+    ///    },
+    ///    "leaderUrl": {
+    ///      "type": "string",
+    ///      "format": "uri",
+    ///      "minLength": 1
+    ///    },
+    ///    "previousChainDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.budget-snapshot-anchor-commitment.v1"
+    ///    },
+    ///    "signerPublicKey": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Commitment {
+        #[serde(rename = "anchorSetDigest")]
+        pub anchor_set_digest: Digest,
+        #[serde(rename = "chainDigest")]
+        pub chain_digest: Digest,
+        #[serde(rename = "commitSequence")]
+        pub commit_sequence: ::std::num::NonZeroU64,
+        #[serde(rename = "committedAt")]
+        pub committed_at: u64,
+        #[serde(rename = "electionTerm")]
+        pub election_term: ::std::num::NonZeroU64,
+        #[serde(rename = "leaderUrl")]
+        pub leader_url: ::std::string::String,
+        #[serde(rename = "previousChainDigest")]
+        pub previous_chain_digest: Digest,
+        pub schema: ::serde_json::Value,
+        #[serde(rename = "signerPublicKey")]
+        pub signer_public_key: CommitmentSignerPublicKey,
+    }
+    impl ::std::convert::From<&Commitment> for Commitment {
+        fn from(value: &Commitment) -> Self {
+            value.clone()
+        }
+    }
+    ///`CommitmentSignerPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CommitmentSignerPublicKey(::std::string::String);
+    impl ::std::ops::Deref for CommitmentSignerPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CommitmentSignerPublicKey> for ::std::string::String {
+        fn from(value: CommitmentSignerPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CommitmentSignerPublicKey> for CommitmentSignerPublicKey {
+        fn from(value: &CommitmentSignerPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CommitmentSignerPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CommitmentSignerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSignerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSignerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CommitmentSignerPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Digest(::std::string::String);
+    impl ::std::ops::Deref for Digest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for ::std::string::String {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Digest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Digest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SignedCommitment`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "body",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "body": {
+    ///      "$ref": "#/$defs/commitment"
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SignedCommitment {
+        pub body: Commitment,
+        pub signature: SignedCommitmentSignature,
+    }
+    impl ::std::convert::From<&SignedCommitment> for SignedCommitment {
+        fn from(value: &SignedCommitment) -> Self {
+            value.clone()
+        }
+    }
+    ///`SignedCommitmentSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SignedCommitmentSignature(::std::string::String);
+    impl ::std::ops::Deref for SignedCommitmentSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SignedCommitmentSignature> for ::std::string::String {
+        fn from(value: SignedCommitmentSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SignedCommitmentSignature> for SignedCommitmentSignature {
+        fn from(value: &SignedCommitmentSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SignedCommitmentSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SignedCommitmentSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SignedCommitmentSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SignedCommitmentSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SignedCommitmentSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
 pub mod trust_control_heartbeat {
     /// Error types.
     pub mod error {

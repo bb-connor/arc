@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 4ff5148b3a12744ad4d9a846c25199c074809d56a888edbc8f505f5c77bf73b8
+// Schema content SHA-256: 95456408c359352ccd77358096e747f879bb983a3022dc4a61cb14d504a41e36
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -709,6 +709,16 @@ const (
 // Defines values for TrustControlAttestationWorkloadIdentityScheme.
 const (
 	TrustControlAttestationWorkloadIdentitySchemeSpiffe TrustControlAttestationWorkloadIdentityScheme = "spiffe"
+)
+
+// Defines values for TrustControlBudgetSnapshotAnchorProvenanceSchema.
+const (
+	TrustControlBudgetSnapshotAnchorProvenanceSchemaChioBudgetSnapshotAnchorProvenanceV1 TrustControlBudgetSnapshotAnchorProvenanceSchema = "chio.budget-snapshot-anchor-provenance.v1"
+)
+
+// Defines values for TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema.
+const (
+	TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchemaChioBudgetSnapshotAnchorCommitmentV1 TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema = "chio.budget-snapshot-anchor-commitment.v1"
 )
 
 // Defines values for TrustControlTerminateReason.
@@ -2447,6 +2457,41 @@ type TrustControlAttestationWorkloadIdentityCredentialKind string
 
 // TrustControlAttestationWorkloadIdentityScheme Identity scheme Chio recognized from the upstream evidence. Mirrors `WorkloadIdentityScheme` in `crates/core/chio-core-types`.
 type TrustControlAttestationWorkloadIdentityScheme string
+
+// TrustControlBudgetSnapshotAnchorProvenance Leader-signed inclusion chain authenticating the exact immutable migration-anchor set carried by a trust-control cluster budget snapshot.
+type TrustControlBudgetSnapshotAnchorProvenance struct {
+	Chain                []TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment `json:"chain"`
+	ClusterAuthenticator string                                                       `json:"clusterAuthenticator"`
+	Schema               TrustControlBudgetSnapshotAnchorProvenanceSchema             `json:"schema"`
+}
+
+// TrustControlBudgetSnapshotAnchorProvenanceSchema defines model for TrustControlBudgetSnapshotAnchorProvenance.Schema.
+type TrustControlBudgetSnapshotAnchorProvenanceSchema string
+
+// TrustControlBudgetSnapshotAnchorProvenanceCommitment defines model for TrustControlBudgetSnapshotAnchorProvenanceCommitment.
+type TrustControlBudgetSnapshotAnchorProvenanceCommitment struct {
+	AnchorSetDigest     TrustControlBudgetSnapshotAnchorProvenanceDigest           `json:"anchorSetDigest"`
+	ChainDigest         TrustControlBudgetSnapshotAnchorProvenanceDigest           `json:"chainDigest"`
+	CommitSequence      int64                                                      `json:"commitSequence"`
+	CommittedAt         int64                                                      `json:"committedAt"`
+	ElectionTerm        int64                                                      `json:"electionTerm"`
+	LeaderUrl           string                                                     `json:"leaderUrl"`
+	PreviousChainDigest TrustControlBudgetSnapshotAnchorProvenanceDigest           `json:"previousChainDigest"`
+	Schema              TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema `json:"schema"`
+	SignerPublicKey     string                                                     `json:"signerPublicKey"`
+}
+
+// TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema defines model for TrustControlBudgetSnapshotAnchorProvenanceCommitment.Schema.
+type TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema string
+
+// TrustControlBudgetSnapshotAnchorProvenanceDigest defines model for TrustControlBudgetSnapshotAnchorProvenanceDigest.
+type TrustControlBudgetSnapshotAnchorProvenanceDigest = string
+
+// TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment defines model for TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment.
+type TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment struct {
+	Body      TrustControlBudgetSnapshotAnchorProvenanceCommitment `json:"body"`
+	Signature string                                               `json:"signature"`
+}
 
 // TrustControlHeartbeat One trust-control heartbeat used to refresh a held authority lease before it expires. The heartbeat names the lease being refreshed (`leaseId` plus `leaseEpoch`), the leader URL claiming continued ownership, and the unix-millisecond observation timestamp at which the heartbeat was issued. The contract is anchored by `spec/PROTOCOL.md` section 9 (the `/v1/internal/cluster/status` cluster lease lifecycle). Wire field names are camelCase to match the lease projection.
 type TrustControlHeartbeat struct {

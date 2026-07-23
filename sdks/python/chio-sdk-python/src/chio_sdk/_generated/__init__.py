@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b261c2c851aa63df2638fe74c53b0a52d0dc0dc3799e18c6f4f14d84fc309598
+# Schema sha256: 4de65bcc4d3a0925b25ee40b381b5f8f4ca900e43c07debad9fee70824a63a04
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -29,7 +29,7 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "b261c2c851aa63df2638fe74c53b0a52d0dc0dc3799e18c6f4f14d84fc309598"
+SCHEMA_SHA256 = "4de65bcc4d3a0925b25ee40b381b5f8f4ca900e43c07debad9fee70824a63a04"
 
 from .agent import Body as AgentBody, Body3, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent, MaxAmount, OrderedEffect
 from .anchor import Body as AnchorBody, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3
@@ -41,7 +41,7 @@ from .kernel import ChioCombinedAdmissionCaptureMetadata, ChioKernelmessageCapab
 from .provenance import ChioProvenanceAttestationBundle, ChioProvenanceCallChainContext, ChioProvenanceStamp, ChioProvenanceVerdictLink, ChioProvenanceVerdictLink1, ChioProvenanceVerdictLink2, ChioProvenanceVerdictLink3, ChioProvenanceVerdictLink4, CredentialKind as ProvenanceCredentialKind, EvidenceClass as ProvenanceEvidenceClass, Scheme as ProvenanceScheme, Statement, Tier as ProvenanceTier, Verdict as ProvenanceVerdict, WorkloadIdentity as ProvenanceWorkloadIdentity
 from .receipt import ActorRef, Algorithm as ReceiptAlgorithm, BbsReceiptSignature, BoundaryClass, ChioDurableAdmissionReceiptMetadata, ChioReceiptLineageStatement, ChioReceiptMerkleInclusionProof, ChioReceiptRecord, CompensationStatus, Decision as ReceiptDecision, Decision1, Decision2, Decision3, Decision4, Digest as ReceiptDigest, DispatchCommit, EvidenceClass as ReceiptEvidenceClass, GuardEvidence, Identifier, ObservationOutcome, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, ReceiptKind, RedactionMode, RelationKind, SessionAnchorReference, StoreFence, ToolCallAction, ToolOrigin, TrustLevel
 from .result import ChioToolcallresultCancelled, ChioToolcallresultErr, ChioToolcallresultIncomplete, ChioToolcallresultOk, ChioToolcallresultStreamComplete, Detail as ResultDetail, Error as ResultError, Error1, Error2, Error3, Error4, Error5
-from .trust_control import ChioTrustControlAuthorityLease, ChioTrustControlLeaseHeartbeat, ChioTrustControlLeaseTermination, ChioTrustControlRuntimeAttestationEvidence, CredentialKind as TrustControlCredentialKind, Reason, Scheme as TrustControlScheme, Tier as TrustControlTier, WorkloadIdentity as TrustControlWorkloadIdentity
+from .trust_control import BudgetSnapshotAnchorProvenance, ChioTrustControlAuthorityLease, ChioTrustControlLeaseHeartbeat, ChioTrustControlLeaseTermination, ChioTrustControlRuntimeAttestationEvidence, Commitment, CredentialKind as TrustControlCredentialKind, Digest as TrustControlDigest, Reason, Scheme as TrustControlScheme, SignedCommitment, Tier as TrustControlTier, WorkloadIdentity as TrustControlWorkloadIdentity
 
 CapabilityToken = ChioCapabilitytoken
 Decision = ReceiptDecision
@@ -64,6 +64,7 @@ __all__ = [
     "BbsReceiptSignature",
     "Body3",
     "BoundaryClass",
+    "BudgetSnapshotAnchorProvenance",
     "CapabilityAlgorithm",
     "CapabilityBody",
     "CapabilityConstraint",
@@ -137,6 +138,7 @@ __all__ = [
     "ChioTrustControlRuntimeAttestationEvidence",
     "ChioVerifiedApprovalSetBody",
     "CoSign",
+    "Commitment",
     "CompensationStatus",
     "Constraint",
     "CrossOrgVisibility",
@@ -222,6 +224,7 @@ __all__ = [
     "ScopeAttenuation",
     "SessionAnchorReference",
     "Signature",
+    "SignedCommitment",
     "Statement",
     "StoreFence",
     "SubjectItem",
@@ -233,6 +236,7 @@ __all__ = [
     "ToolGrant",
     "ToolOrigin",
     "TrustControlCredentialKind",
+    "TrustControlDigest",
     "TrustControlScheme",
     "TrustControlTier",
     "TrustControlWorkloadIdentity",

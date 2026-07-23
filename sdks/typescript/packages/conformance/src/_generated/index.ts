@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 495b1a67118a92cb60874dc7e98f894ebad28435accef8ef9dba53a2dfbdbbc0
+// Schema SHA: 71fc01e44624984c1a22e15a655118a29fd25c99c12bcc60b410dd9c8ce392c5
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -2633,6 +2633,39 @@ export namespace TrustControl_Attestation {
     claims?: {
       [k: string]: unknown;
     };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/budget-snapshot-anchor-provenance.schema.json
+export namespace TrustControl_BudgetSnapshotAnchorProvenance {
+  export type Digest = string;
+
+  /**
+   * Leader-signed inclusion chain authenticating the exact immutable migration-anchor set carried by a trust-control cluster budget snapshot.
+   */
+  export interface BudgetSnapshotAnchorProvenance {
+    schema: "chio.budget-snapshot-anchor-provenance.v1";
+    /**
+     * @minItems 1
+     */
+    chain: [SignedCommitment, ...SignedCommitment[]];
+    clusterAuthenticator: string;
+  }
+  export interface SignedCommitment {
+    body: Commitment;
+    signature: string;
+  }
+  export interface Commitment {
+    schema: "chio.budget-snapshot-anchor-commitment.v1";
+    commitSequence: number;
+    previousChainDigest: Digest;
+    chainDigest: Digest;
+    anchorSetDigest: Digest;
+    leaderUrl: string;
+    electionTerm: number;
+    committedAt: number;
+    signerPublicKey: string;
   }
 }
 
