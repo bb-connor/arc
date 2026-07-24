@@ -828,7 +828,7 @@ impl ChioKernel {
         request: &crate::governed_active_response::GovernedActiveResponseRequest,
         governed_intent_hash: &str,
         trusted_now_unix_ms: u64,
-    ) -> Result<DurableToolAdmission, KernelError> {
+    ) -> Result<(DurableToolAdmission, bool), KernelError> {
         let runtime = self.durable_runtime()?;
         if !runtime
             .store
@@ -890,12 +890,12 @@ impl ChioKernel {
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let operation = match runtime
+        let (operation, created_by_this_attempt) = match runtime
             .store
             .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
             .map_err(durable_store_error)?
         {
-            AdmissionBeginResult::Created(operation) => operation,
+            AdmissionBeginResult::Created(operation) => (operation, true),
             AdmissionBeginResult::ExactReplay { operation, .. }
                 if matches!(
                     operation.state(),
@@ -905,7 +905,7 @@ impl ChioKernel {
                         | AdmissionOperationState::DispatchCommitted
                 ) =>
             {
-                operation
+                (operation, false)
             }
             AdmissionBeginResult::ExactReplay { operation, .. } => {
                 return Err(KernelError::DurableAdmission(format!(
@@ -922,11 +922,14 @@ impl ChioKernel {
                 )));
             }
         };
-        Ok(DurableToolAdmission {
-            operation,
-            aggregate_quota: None,
-            supplemental_quota: None,
-        })
+        Ok((
+            DurableToolAdmission {
+                operation,
+                aggregate_quota: None,
+                supplemental_quota: None,
+            },
+            created_by_this_attempt,
+        ))
     }
 
     fn durable_post_return_plan(&self) -> Result<DurablePostReturnPlan, KernelError> {

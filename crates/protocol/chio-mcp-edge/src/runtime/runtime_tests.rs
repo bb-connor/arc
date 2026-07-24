@@ -1137,6 +1137,31 @@ fn tools_call_jsonrpc_path_records_receipt_write_allow() {
 }
 
 #[test]
+fn tools_call_allows_sequential_reuse_of_an_identical_jsonrpc_id_and_body() {
+    let mut edge = make_edge_with_config(10, false);
+    initialize_edge(&mut edge);
+    let request = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "read_file",
+            "arguments": { "path": "/tmp/demo.txt" }
+        }
+    });
+
+    let first = edge
+        .handle_jsonrpc(request.clone())
+        .expect("first tools/call response");
+    let second = edge
+        .handle_jsonrpc(request)
+        .expect("second tools/call response");
+
+    assert_eq!(first["result"]["isError"], false, "{first}");
+    assert_eq!(second["result"]["isError"], false, "{second}");
+}
+
+#[test]
 fn tools_call_jsonrpc_preserves_governed_swarm_context() {
     let _metrics_guard = metrics_test_guard();
     let mut edge = make_edge_with_config(10, false);
@@ -4285,7 +4310,7 @@ fn create_message_denies_tool_use_when_not_negotiated() {
 }
 
 #[test]
-fn external_request_identity_is_stable_and_session_scoped() {
+fn external_request_identity_is_unique_without_a_caller_stable_id() {
     let first = build_operation_context(
         &json!(41),
         SessionId::new("stable-session-a"),
@@ -4319,7 +4344,7 @@ fn external_request_identity_is_stable_and_session_scoped() {
     )
     .unwrap();
 
-    assert_eq!(first.request_id, replay.request_id);
+    assert_ne!(first.request_id, replay.request_id);
     assert_ne!(first.request_id, other_session.request_id);
     assert_ne!(first.request_id, other_request.request_id);
     assert!(first.request_id.as_str().starts_with("mcp-edge-req-"));
@@ -4449,7 +4474,7 @@ fn external_request_identity_separates_reused_jsonrpc_ids() {
 }
 
 #[test]
-fn external_request_identity_ignores_per_attempt_meta() {
+fn execution_nonce_retry_uses_the_nonce_bound_request_identity() {
     let session_id = SessionId::new("nonce-retry-session");
     let preflight = build_operation_context(
         &json!(7),
@@ -4459,7 +4484,7 @@ fn external_request_identity_ignores_per_attempt_meta() {
         &json!({ "name": "read_file", "arguments": { "path": "/tmp/demo.txt" } }),
     )
     .unwrap();
-    let retry = build_operation_context(
+    let retry = build_operation_context_for_retry(
         &json!(7),
         session_id.clone(),
         "agent",
@@ -4469,6 +4494,7 @@ fn external_request_identity_ignores_per_attempt_meta() {
             "arguments": { "path": "/tmp/demo.txt" },
             "_meta": { "chioExecutionNonce": { "nonce": "opaque" } }
         }),
+        Some(preflight.request_id.as_str()),
     )
     .unwrap();
 

@@ -583,6 +583,75 @@ fn current_schema_reopen_rejects_assignment_results_without_evidence_columns() -
 }
 
 #[test]
+fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTestResult {
+    let fixture = fixture();
+    let Fixture {
+        _temp,
+        database,
+        lock_root,
+        authority,
+        store,
+        ..
+    } = fixture;
+    drop(store);
+    drop(authority);
+
+    let connection = Connection::open(&database)?;
+    connection.execute_batch(
+        r#"
+        DROP TRIGGER threshold_approval_tokens_immutable;
+        DROP TRIGGER threshold_approval_tokens_no_delete;
+        ALTER TABLE threshold_approval_tokens
+            RENAME TO threshold_approval_tokens_v9;
+        CREATE TABLE threshold_approval_tokens (
+            token_id TEXT NOT NULL PRIMARY KEY
+                CHECK (length(token_id) BETWEEN 1 AND 512),
+            proposal_id TEXT NOT NULL,
+            approver_fingerprint TEXT NOT NULL
+                CHECK (approver_fingerprint <> ''),
+            canonical_token_digest TEXT NOT NULL UNIQUE CHECK (
+                length(canonical_token_digest) = 64
+                AND canonical_token_digest NOT GLOB '*[^0-9a-f]*'
+            ),
+            token_json BLOB NOT NULL
+                CHECK (length(token_json) BETWEEN 1 AND 262144),
+            UNIQUE (proposal_id, approver_fingerprint),
+            UNIQUE (proposal_id, canonical_token_digest),
+            FOREIGN KEY (proposal_id)
+                REFERENCES threshold_approval_proposals(proposal_id)
+        );
+        DROP TABLE threshold_approval_tokens_v9;
+        UPDATE chio_store_schema_versions
+        SET version = 8
+        WHERE store_key = 'admission_operation';
+        "#,
+    )?;
+    drop(connection);
+
+    SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let store = authority.admission_operation_store();
+    let connection = store.connection()?;
+    let primary_key_columns: String = connection.query_row(
+        r#"
+        SELECT group_concat(name, ',')
+        FROM (
+            SELECT name
+            FROM pragma_table_info('threshold_approval_tokens')
+            WHERE pk > 0
+            ORDER BY pk
+        )
+        "#,
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(primary_key_columns, "proposal_id,token_id");
+    verify_admission_operation_invariants(&connection)?;
+    drop(_temp);
+    Ok(())
+}
+
+#[test]
 fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
     let fixture = fixture();
     let operation = prepared_operation(

@@ -443,6 +443,31 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         .to_string()
         .contains("body hash"));
 
+    let mut mismatched_effects = fixture.request(
+        "active-response-mismatched-effects",
+        vec![GovernedResponseEffect::RestrictEgress],
+        vec![make_grant(
+            ACTIVE_RESPONSE_SERVER_ID,
+            GovernedResponseEffect::RestrictEgress.tool_name(),
+        )],
+    );
+    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
+        &mut mismatched_effects.governed_intent.body
+    else {
+        panic!("active-response body");
+    };
+    plan.canonical_plan_body["effects"] = serde_json::json!([
+        GovernedResponseEffect::RestrictEgress,
+        GovernedResponseEffect::SuspendSession
+    ]);
+    plan.plan_body_hash =
+        GovernedResponsePlanIntentBody::plan_body_hash(&plan.canonical_plan_body).unwrap();
+    assert!(kernel
+        .admit_governed_active_response_at(&mismatched_effects, now, now * 1_000)
+        .unwrap_err()
+        .to_string()
+        .contains("effects do not match"));
+
     let mut raw_plan_hash = request.clone();
     let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
         &raw_plan_hash.governed_intent.body
@@ -519,7 +544,7 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         Err(KernelError::CapabilityRevoked(id)) if id == revoked.operator_capability.id
     ));
 
-    let mut admitted = kernel
+    let admitted = kernel
         .admit_governed_active_response_at(&request, now, now * 1_000)
         .unwrap();
     assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
@@ -544,6 +569,27 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         admitted.approval_set_hash()
     );
     let operation_id = admitted.operation_id().to_owned();
+    let mut mismatched_approval_set = request.clone();
+    mismatched_approval_set.approval_tokens = mismatched_approval_set
+        .approval_tokens
+        .iter()
+        .zip([&approver_a, &approver_b])
+        .enumerate()
+        .map(|(index, (token, approver))| {
+            let mut body = token.body();
+            body.id = format!("replacement-active-response-token-{index}");
+            GovernedApprovalToken::sign(body, approver).unwrap()
+        })
+        .collect();
+    assert!(kernel
+        .admit_governed_active_response_at(&mismatched_approval_set, now, now * 1_000)
+        .unwrap_err()
+        .to_string()
+        .contains("retained approval reservation"));
+    let mut admitted = kernel
+        .admit_governed_active_response_at(&request, now, now * 1_000)
+        .expect("mismatched replay must not compensate retained admission");
+    assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
     assert_eq!(
         kernel
             .commit_governed_active_response_dispatch_at(&mut admitted, now * 1_000)

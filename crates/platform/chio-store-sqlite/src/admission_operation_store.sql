@@ -251,14 +251,15 @@ CREATE TABLE IF NOT EXISTS threshold_approval_proposals (
 );
 
 CREATE TABLE IF NOT EXISTS threshold_approval_tokens (
-    token_id TEXT NOT NULL PRIMARY KEY CHECK (length(token_id) BETWEEN 1 AND 512),
     proposal_id TEXT NOT NULL,
+    token_id TEXT NOT NULL CHECK (length(token_id) BETWEEN 1 AND 512),
     approver_fingerprint TEXT NOT NULL CHECK (approver_fingerprint <> ''),
     canonical_token_digest TEXT NOT NULL UNIQUE CHECK (
         length(canonical_token_digest) = 64
         AND canonical_token_digest NOT GLOB '*[^0-9a-f]*'
     ),
     token_json BLOB NOT NULL CHECK (length(token_json) BETWEEN 1 AND 262144),
+    PRIMARY KEY (proposal_id, token_id),
     UNIQUE (proposal_id, approver_fingerprint),
     UNIQUE (proposal_id, canonical_token_digest),
     FOREIGN KEY (proposal_id) REFERENCES threshold_approval_proposals(proposal_id)

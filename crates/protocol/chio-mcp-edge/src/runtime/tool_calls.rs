@@ -352,8 +352,17 @@ impl ChioMcpEdge {
             }
         };
 
-        let context =
-            build_operation_context(id, session_id.clone(), &self.agent_id, "tools/call", params)?;
+        let nonce_bound_request_id = execution_nonce
+            .as_ref()
+            .map(|nonce| nonce.nonce.bound_to.request_id.as_str());
+        let context = build_operation_context_for_retry(
+            id,
+            session_id.clone(),
+            &self.agent_id,
+            "tools/call",
+            params,
+            nonce_bound_request_id,
+        )?;
         let execution_nonce = execution_nonce
             .map(serde_json::to_value)
             .transpose()

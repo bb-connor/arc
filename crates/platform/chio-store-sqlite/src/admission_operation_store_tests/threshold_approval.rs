@@ -129,7 +129,7 @@ fn transition(
 }
 
 #[test]
-fn threshold_replay_reservation_is_atomic_unique_and_retained() {
+fn threshold_replay_reservation_scopes_token_ids_to_each_proposal() {
     let fixture = fixture();
     let now = now_ms();
     let created_at = now / 1_000;
@@ -189,18 +189,31 @@ fn threshold_replay_reservation_is_atomic_unique_and_retained() {
         .store
         .begin(&second, &fixture.fence, now + 2)
         .expect("begin second");
-    let conflicting_reservation = replay_reservation(
+    let second_reservation = replay_reservation(
         "threshold-proposal-b",
         "threshold-request-b",
         ["threshold-token-a", "threshold-token-b"],
         created_at,
     );
-    let conflict =
-        reserve(&fixture, &second, &conflicting_reservation, now + 3).expect_err("replay conflict");
-    assert!(matches!(
-        conflict,
-        AdmissionOperationStoreError::Invariant(_)
-    ));
+    let second_reserved =
+        reserve(&fixture, &second, &second_reservation, now + 3).expect("reserve second");
+    assert_eq!(
+        second_reserved.state(),
+        AdmissionOperationState::ApprovalReserved
+    );
+    let connection = fixture.store.connection().expect("connection");
+    let scoped_token_count: i64 = connection
+        .query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM threshold_approval_tokens
+            WHERE token_id IN ('threshold-token-a', 'threshold-token-b')
+            "#,
+            [],
+            |row| row.get(0),
+        )
+        .expect("scoped token count");
+    assert_eq!(scoped_token_count, 4);
 }
 
 #[test]

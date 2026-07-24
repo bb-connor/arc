@@ -110,43 +110,40 @@ pub(in crate::runtime) fn build_operation_context(
     method: &str,
     params: &Value,
 ) -> Result<OperationContext, Value> {
-    #[derive(Serialize)]
-    struct ExternalRequestIdentity<'a> {
-        domain: &'static str,
-        session_id: &'a str,
-        jsonrpc_id: &'a Value,
-        method: &'a str,
-        params: &'a Value,
-    }
+    build_operation_context_for_retry(id, session_id, agent_id, method, params, None)
+}
 
+pub(in crate::runtime) fn build_operation_context_for_retry(
+    id: &Value,
+    session_id: SessionId,
+    agent_id: &str,
+    _method: &str,
+    params: &Value,
+    nonce_bound_request_id: Option<&str>,
+) -> Result<OperationContext, Value> {
     let request_id = if let Some(request_id) = parse_request_stable_request_id(id, params)? {
         request_id
-    } else {
-        // JSON-RPC only requires an id to be unique among a client's in-flight
-        // requests, so a client may legally reuse one after the earlier request has
-        // settled. The method and params are folded in so two distinct operations do
-        // not collide on the same session lineage record. `_meta` is excluded because
-        // it carries per-attempt transport data (execution nonce, progress token),
-        // which keeps a strict-nonce retry on its preflight's request id.
-        let mut identity_params = params.clone();
-        if let Some(object) = identity_params.as_object_mut() {
-            object.remove("_meta");
-        }
-        let identity = ExternalRequestIdentity {
-            domain: "CHIO-MCP-EXTERNAL-REQUEST-ID-V2",
-            session_id: session_id.as_str(),
-            jsonrpc_id: id,
-            method,
-            params: &identity_params,
-        };
-        let canonical = canonical_json_bytes(&identity).map_err(|error| {
-            jsonrpc_error(
+    } else if let Some(request_id) = nonce_bound_request_id {
+        let request_id = parse_protocol_identifier(request_id, "execution nonce request id")
+            .map_err(|message| {
+                jsonrpc_error(id.clone(), JSONRPC_INVALID_PARAMS, message.as_str())
+            })?;
+        if request_id.len() > 2_048 {
+            return Err(jsonrpc_error(
                 id.clone(),
-                JSONRPC_INVALID_REQUEST,
-                &format!("failed to canonicalize MCP request identity: {error}"),
-            )
-        })?;
-        RequestId::new(format!("mcp-edge-req-{}", sha256_hex(&canonical)))
+                JSONRPC_INVALID_PARAMS,
+                "execution nonce request id must be at most 2048 bytes",
+            ));
+        }
+        RequestId::new(request_id)
+    } else {
+        // JSON-RPC only requires an id to be unique while a request is in
+        // flight, so a client may legally reuse the same id, method, and params
+        // after a response. Give every ordinary fallback request a fresh
+        // kernel identity. Strict-nonce retries take the branch above and reuse
+        // the request identity cryptographically bound into the presented
+        // nonce.
+        RequestId::new(format!("mcp-edge-req-{}", Uuid::new_v4().simple()))
     };
     let mut context = OperationContext::new(session_id, request_id, agent_id.to_string());
     context.progress_token = parse_progress_token(id, params)?;

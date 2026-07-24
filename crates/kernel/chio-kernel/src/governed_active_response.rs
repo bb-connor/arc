@@ -185,19 +185,22 @@ impl ChioKernel {
             approval_set_hash: approval_set_hash.clone(),
             threshold_replay: Some(verified.replay),
         };
-        let mut admission = self.begin_durable_active_response_admission(
-            request,
-            &governed_intent_hash,
-            trusted_now_unix_ms,
-        )?;
+        let (mut admission, created_by_this_attempt) = self
+            .begin_durable_active_response_admission(
+                request,
+                &governed_intent_hash,
+                trusted_now_unix_ms,
+            )?;
         if let Err(error) =
             self.reserve_durable_approval_set(&mut admission, &reservation, trusted_now_unix_ms)
         {
-            let _ = self.compensate_durable_admission_before_dispatch(
-                admission.operation(),
-                serde_json::json!({"cause": "active-response-approval-reservation-failed"}),
-                trusted_now_unix_ms,
-            );
+            if created_by_this_attempt {
+                let _ = self.compensate_durable_admission_before_dispatch(
+                    admission.operation(),
+                    serde_json::json!({"cause": "active-response-approval-reservation-failed"}),
+                    trusted_now_unix_ms,
+                );
+            }
             return Err(error);
         }
         Ok(GovernedActiveResponseAdmission {

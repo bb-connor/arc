@@ -38,6 +38,7 @@ use chio_manifest::{LatencyHint, ToolDefinition};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::{json, Value};
+use uuid::Uuid;
 
 #[path = "runtime/discovery.rs"]
 mod discovery;

@@ -109,6 +109,29 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
+        let plan_body_effects = plan
+            .canonical_plan_body
+            .get("effects")
+            .ok_or_else(|| {
+                KernelError::GovernedTransactionDenied(
+                    "active-response plan body must contain an effects list".to_string(),
+                )
+            })
+            .and_then(|effects| {
+                serde_json::from_value::<
+                    Vec<chio_core::capability::governance::GovernedResponseEffect>,
+                >(effects.clone())
+                .map_err(|_| {
+                    KernelError::GovernedTransactionDenied(
+                        "active-response plan body effects list is invalid".to_string(),
+                    )
+                })
+            })?;
+        if plan_body_effects != plan.ordered_effects {
+            return Err(KernelError::GovernedTransactionDenied(
+                "active-response plan body effects do not match ordered effects".to_string(),
+            ));
+        }
         for effect in &plan.ordered_effects {
             let covered = cap.scope.grants.iter().any(|grant| {
                 grant.server_id == ACTIVE_RESPONSE_SERVER_ID

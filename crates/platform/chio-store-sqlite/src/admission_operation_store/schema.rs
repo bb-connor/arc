@@ -16,6 +16,9 @@ pub(crate) fn initialize_admission_operation_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    if on_disk < 9 && table_exists(&transaction, "threshold_approval_tokens")? {
+        migrate_threshold_approval_token_scope(&transaction)?;
+    }
     if obligation_disposition_references_terminal_projection(&transaction)? {
         migrate_obligation_lifecycle_foundation(&transaction)?;
     }
@@ -42,6 +45,65 @@ pub(crate) fn initialize_admission_operation_schema(
     .map_err(|error| invariant(error.to_string()))?;
     verify_admission_operation_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
+}
+
+fn table_exists(
+    transaction: &Transaction<'_>,
+    table_name: &str,
+) -> Result<bool, AdmissionOperationStoreError> {
+    transaction
+        .query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM sqlite_master
+                WHERE type = 'table' AND name = ?1
+            )
+            "#,
+            [table_name],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+fn migrate_threshold_approval_token_scope(
+    transaction: &Transaction<'_>,
+) -> Result<(), AdmissionOperationStoreError> {
+    transaction
+        .execute_batch(
+            r#"
+            DROP TRIGGER IF EXISTS threshold_approval_tokens_immutable;
+            DROP TRIGGER IF EXISTS threshold_approval_tokens_no_delete;
+            ALTER TABLE threshold_approval_tokens
+                RENAME TO threshold_approval_tokens_v8;
+            CREATE TABLE threshold_approval_tokens (
+                proposal_id TEXT NOT NULL,
+                token_id TEXT NOT NULL
+                    CHECK (length(token_id) BETWEEN 1 AND 512),
+                approver_fingerprint TEXT NOT NULL
+                    CHECK (approver_fingerprint <> ''),
+                canonical_token_digest TEXT NOT NULL UNIQUE CHECK (
+                    length(canonical_token_digest) = 64
+                    AND canonical_token_digest NOT GLOB '*[^0-9a-f]*'
+                ),
+                token_json BLOB NOT NULL
+                    CHECK (length(token_json) BETWEEN 1 AND 262144),
+                PRIMARY KEY (proposal_id, token_id),
+                UNIQUE (proposal_id, approver_fingerprint),
+                UNIQUE (proposal_id, canonical_token_digest),
+                FOREIGN KEY (proposal_id)
+                    REFERENCES threshold_approval_proposals(proposal_id)
+            );
+            INSERT INTO threshold_approval_tokens (
+                proposal_id, token_id, approver_fingerprint,
+                canonical_token_digest, token_json
+            )
+            SELECT proposal_id, token_id, approver_fingerprint,
+                   canonical_token_digest, token_json
+            FROM threshold_approval_tokens_v8;
+            DROP TABLE threshold_approval_tokens_v8;
+            "#,
+        )
+        .map_err(sqlite_error)
 }
 
 fn obligation_disposition_references_terminal_projection(
