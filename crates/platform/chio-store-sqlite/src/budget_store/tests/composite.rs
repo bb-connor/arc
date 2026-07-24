@@ -486,6 +486,137 @@ fn every_quota_participant_exhausts_atomically_and_maximum_is_immutable() {
 }
 
 #[test]
+fn zero_limit_aggregate_quota_persists_and_replays_a_durable_denial() {
+    let path = unique_db_path("chio-composite-zero-limit-denial");
+    let request = authorize_request("zero-limit", 0, 0);
+    let store = reopen(&path);
+    let denied = store
+        .authorize_budget_hold(owned(&store, request.clone()))
+        .expect("zero-limit quota must produce a durable decision");
+    assert!(matches!(denied, BudgetAuthorizeHoldDecision::Denied(_)));
+    assert_eq!(
+        store
+            .authorize_budget_hold(owned(&store, request.clone()))
+            .expect("zero-limit denial replay"),
+        denied
+    );
+    {
+        let connection = store.connection().expect("inspect zero-limit denial");
+        let (event_quotas, live_quotas, holds): (i64, i64, i64) = connection
+            .query_row(
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM budget_event_quota_members
+                     WHERE event_id = 'event-zero-limit-authorize'
+                       AND max_invocations = 0),
+                    (SELECT COUNT(*) FROM budget_invocation_quotas),
+                    (SELECT COUNT(*) FROM budget_authorization_holds)
+                "#,
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("zero-limit projection counts");
+        assert_eq!(event_quotas, 3);
+        assert_eq!(live_quotas, 0);
+        assert_eq!(holds, 0);
+    }
+    drop(store);
+
+    let reopened = reopen(&path);
+    assert_eq!(
+        reopened
+            .authorize_budget_hold(owned(&reopened, request))
+            .expect("zero-limit denial replay after restart"),
+        denied
+    );
+    drop(reopened);
+    let _ = fs::remove_dir_all(path);
+}
+
+#[test]
+fn v9_event_quota_projection_migrates_without_losing_history() {
+    let path = unique_db_path("chio-composite-v9-event-quota");
+    let request = authorize_request("v9-event-quota", 0, 2);
+    let store = reopen(&path);
+    let authorized = store
+        .authorize_budget_hold(owned(&store, request.clone()))
+        .expect("seed v9 quota event");
+    assert!(matches!(
+        authorized,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    drop(store);
+
+    let database = path.join("authority.sqlite3");
+    let connection = Connection::open(&database).expect("open v10 database for downgrade fixture");
+    connection
+        .execute_batch(
+            r#"
+            PRAGMA foreign_keys = OFF;
+            DROP TRIGGER IF EXISTS budget_event_quota_bounds_insert;
+            ALTER TABLE budget_event_quota_members
+                RENAME TO budget_event_quota_members_v10;
+            CREATE TABLE budget_event_quota_members (
+                event_id TEXT NOT NULL,
+                profile TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                grant_index INTEGER NOT NULL,
+                max_invocations INTEGER NOT NULL CHECK (max_invocations > 0),
+                reserved_before INTEGER NOT NULL CHECK (reserved_before >= 0),
+                captured_before INTEGER NOT NULL CHECK (
+                    captured_before >= 0 AND reserved_before <= max_invocations
+                    AND captured_before <= max_invocations - reserved_before
+                ),
+                reserved_after INTEGER NOT NULL CHECK (reserved_after >= 0),
+                captured_after INTEGER NOT NULL CHECK (
+                    captured_after >= 0 AND reserved_after <= max_invocations
+                    AND captured_after <= max_invocations - reserved_after
+                ),
+                PRIMARY KEY (event_id, profile, owner_id, grant_index),
+                FOREIGN KEY (event_id) REFERENCES budget_mutation_events(event_id),
+                CHECK (owner_id <> ''),
+                CHECK (
+                    (profile = 'chio.grant-invocation.v1' AND grant_index >= 0)
+                    OR
+                    (profile IN (
+                        'chio.aggregate-capability-invocation.v1',
+                        'chio.aggregate-family-invocation.v1',
+                        'chio.broker-capability-execution.v1'
+                    ) AND grant_index = -1)
+                )
+            );
+            INSERT INTO budget_event_quota_members
+            SELECT * FROM budget_event_quota_members_v10;
+            DROP TABLE budget_event_quota_members_v10;
+            PRAGMA foreign_keys = ON;
+            "#,
+        )
+        .expect("install v9 event quota table");
+    crate::stamp_schema_version(&connection, "budget", 9).expect("stamp v9 budget schema");
+    drop(connection);
+
+    let migrated = reopen(&path);
+    let table_sql: String = migrated
+        .connection()
+        .expect("inspect migrated quota table")
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'budget_event_quota_members'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("load event quota table definition");
+    assert!(table_sql.contains("max_invocations >= 0"));
+    assert_eq!(
+        migrated
+            .authorize_budget_hold(owned(&migrated, request))
+            .expect("replay authorization after v9 migration"),
+        authorized
+    );
+    drop(migrated);
+    let _ = fs::remove_dir_all(path);
+}
+
+#[test]
 fn provision_refuses_populated_legacy_budget_state() {
     let path = unique_db_path("chio-composite-legacy-quota");
     secure_create_dir_all(&path, "create legacy authority root");

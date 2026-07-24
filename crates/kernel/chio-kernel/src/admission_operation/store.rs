@@ -75,6 +75,12 @@ pub trait AdmissionOperationStore: Send + Sync {
         current_store_fence: &StoreMutationFence,
     ) -> Result<(), AdmissionOperationStoreError>;
 
+    /// Lists non-terminal operations that require startup recovery work.
+    ///
+    /// Quiescent `ApprovalRequired` operations must be excluded before applying
+    /// `limit`: they are waiting for external approval rather than recovery, and
+    /// allowing them to occupy a page can starve later operations that do need
+    /// reconciliation.
     fn list_recoverable(
         &self,
         not_after_unix_ms: u64,

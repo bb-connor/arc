@@ -1,7 +1,8 @@
 use super::*;
 
 /// Budget-store schema revision. Bump on every schema-affecting change.
-pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 9;
+pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 10;
+const BUDGET_INVOCATION_CAPTURE_SCHEMA_VERSION: i32 = 2;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
@@ -201,7 +202,7 @@ impl SqliteBudgetStore {
                     .to_string(),
             ));
         }
-        if on_disk_schema_version < BUDGET_STORE_SUPPORTED_SCHEMA_VERSION {
+        if on_disk_schema_version < BUDGET_INVOCATION_CAPTURE_SCHEMA_VERSION {
             migration.execute(
                 r#"
                 UPDATE budget_authorization_holds

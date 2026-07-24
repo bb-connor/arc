@@ -170,8 +170,12 @@ fn project_mutation_event(
     event.monetary_state_after = required_monetary_state(&event.event_id, row.11.as_deref())?;
     event.cumulative_approval_set_digest = row.12;
 
-    let (quota_usages, quota_mutations) =
-        load_quota_projection(transaction, &event.event_id, contract.expected_quota_count)?;
+    let (quota_usages, quota_mutations) = load_quota_projection(
+        transaction,
+        &event.event_id,
+        contract.expected_quota_count,
+        event.authorization_outcome == Some(BudgetAuthorizationOutcome::Denied),
+    )?;
     event.invocation_quota_usages = quota_usages;
     let reports_reservation_mutation = matches!(
         event.kind,
@@ -251,6 +255,7 @@ fn load_quota_projection(
     transaction: &Transaction<'_>,
     event_id: &str,
     expected_count: usize,
+    allow_zero_maximum: bool,
 ) -> Result<
     (
         Vec<BudgetInvocationQuotaUsage>,
@@ -302,7 +307,7 @@ fn load_quota_projection(
             })
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
-        if maximum == 0
+        if (!allow_zero_maximum && maximum == 0)
             || counts[0]
                 .checked_add(counts[1])
                 .is_none_or(|sum| sum > maximum)

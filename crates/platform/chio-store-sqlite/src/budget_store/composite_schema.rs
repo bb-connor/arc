@@ -2,7 +2,7 @@ use super::*;
 
 mod state_invariants;
 
-const COMPOSITE_SCHEMA_VERSION: i32 = 9;
+const COMPOSITE_SCHEMA_VERSION: i32 = 10;
 const BUDGET_USAGE_ANCHOR_SCHEMA_VERSION: i32 = 6;
 
 pub(super) fn ensure_composite_budget_schema(
@@ -358,7 +358,7 @@ pub(super) fn ensure_composite_budget_schema(
             profile TEXT NOT NULL,
             owner_id TEXT NOT NULL,
             grant_index INTEGER NOT NULL,
-            max_invocations INTEGER NOT NULL CHECK (max_invocations > 0),
+            max_invocations INTEGER NOT NULL CHECK (max_invocations >= 0),
             reserved_before INTEGER NOT NULL CHECK (reserved_before >= 0),
             captured_before INTEGER NOT NULL CHECK (
                 captured_before >= 0 AND reserved_before <= max_invocations
@@ -676,7 +676,15 @@ pub(super) fn ensure_composite_budget_schema(
 
         CREATE TRIGGER IF NOT EXISTS budget_event_quota_bounds_insert
         BEFORE INSERT ON budget_event_quota_members
-        WHEN NEW.max_invocations <= 0
+        WHEN NEW.max_invocations < 0
+          OR (
+              NEW.max_invocations = 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM budget_mutation_events
+                  WHERE event_id = NEW.event_id
+                    AND authorization_outcome = 'denied'
+              )
+          )
           OR NEW.reserved_before < 0 OR NEW.captured_before < 0
           OR NEW.reserved_after < 0 OR NEW.captured_after < 0
           OR NEW.reserved_before > NEW.max_invocations
@@ -751,6 +759,7 @@ pub(super) fn ensure_composite_budget_schema(
         END;
         "#,
     )?;
+    migrate_zero_limit_denied_event_quotas(transaction, on_disk_schema_version)?;
     ensure_cumulative_operation_composite_fk(transaction)?;
 
     if on_disk_schema_version < COMPOSITE_SCHEMA_VERSION {
@@ -832,6 +841,100 @@ pub(super) fn ensure_composite_budget_schema(
         backfill_legacy_event_lifecycle(transaction)?;
         backfill_projection_contracts(transaction)?;
     }
+    Ok(())
+}
+
+fn migrate_zero_limit_denied_event_quotas(
+    transaction: &rusqlite::Transaction<'_>,
+    on_disk_schema_version: i32,
+) -> Result<(), BudgetStoreError> {
+    if on_disk_schema_version >= COMPOSITE_SCHEMA_VERSION {
+        return Ok(());
+    }
+    let table_sql: String = transaction.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'budget_event_quota_members'",
+        [],
+        |row| row.get(0),
+    )?;
+    transaction.execute_batch("DROP TRIGGER IF EXISTS budget_event_quota_bounds_insert;")?;
+    if table_sql.contains("max_invocations > 0") {
+        transaction.execute_batch(
+            r#"
+            ALTER TABLE budget_event_quota_members
+                RENAME TO budget_event_quota_members_v9;
+            CREATE TABLE budget_event_quota_members (
+                event_id TEXT NOT NULL,
+                profile TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                grant_index INTEGER NOT NULL,
+                max_invocations INTEGER NOT NULL CHECK (max_invocations >= 0),
+                reserved_before INTEGER NOT NULL CHECK (reserved_before >= 0),
+                captured_before INTEGER NOT NULL CHECK (
+                    captured_before >= 0 AND reserved_before <= max_invocations
+                    AND captured_before <= max_invocations - reserved_before
+                ),
+                reserved_after INTEGER NOT NULL CHECK (reserved_after >= 0),
+                captured_after INTEGER NOT NULL CHECK (
+                    captured_after >= 0 AND reserved_after <= max_invocations
+                    AND captured_after <= max_invocations - reserved_after
+                ),
+                PRIMARY KEY (event_id, profile, owner_id, grant_index),
+                FOREIGN KEY (event_id) REFERENCES budget_mutation_events(event_id),
+                CHECK (owner_id <> ''),
+                CHECK (
+                    (profile = 'chio.grant-invocation.v1' AND grant_index >= 0)
+                    OR
+                    (profile IN (
+                        'chio.aggregate-capability-invocation.v1',
+                        'chio.aggregate-family-invocation.v1',
+                        'chio.broker-capability-execution.v1'
+                    ) AND grant_index = -1)
+                )
+            );
+            INSERT INTO budget_event_quota_members (
+                event_id, profile, owner_id, grant_index, max_invocations,
+                reserved_before, captured_before, reserved_after, captured_after
+            )
+            SELECT event_id, profile, owner_id, grant_index, max_invocations,
+                   reserved_before, captured_before, reserved_after, captured_after
+            FROM budget_event_quota_members_v9;
+            DROP TABLE budget_event_quota_members_v9;
+            "#,
+        )?;
+    }
+    transaction.execute_batch(
+        r#"
+        CREATE TRIGGER budget_event_quota_bounds_insert
+        BEFORE INSERT ON budget_event_quota_members
+        WHEN NEW.max_invocations < 0
+          OR (
+              NEW.max_invocations = 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM budget_mutation_events
+                  WHERE event_id = NEW.event_id
+                    AND authorization_outcome = 'denied'
+              )
+          )
+          OR NEW.reserved_before < 0 OR NEW.captured_before < 0
+          OR NEW.reserved_after < 0 OR NEW.captured_after < 0
+          OR NEW.reserved_before > NEW.max_invocations
+          OR NEW.captured_before > NEW.max_invocations - NEW.reserved_before
+          OR NEW.reserved_after > NEW.max_invocations
+          OR NEW.captured_after > NEW.max_invocations - NEW.reserved_after
+          OR NEW.owner_id = ''
+          OR NOT (
+              (NEW.profile = 'chio.grant-invocation.v1' AND NEW.grant_index >= 0)
+              OR (NEW.profile IN (
+                  'chio.aggregate-capability-invocation.v1',
+                  'chio.aggregate-family-invocation.v1',
+                  'chio.broker-capability-execution.v1'
+              ) AND NEW.grant_index = -1)
+          )
+        BEGIN
+            SELECT RAISE(ABORT, 'budget event quota is outside durable bounds');
+        END;
+        "#,
+    )?;
     Ok(())
 }
 
@@ -1477,17 +1580,28 @@ pub(crate) fn verify_budget_projection_invariants(
                        reserved_invocations AS reserved_before,
                        captured_invocations AS captured_before,
                        reserved_invocations AS reserved_after,
-                       captured_invocations AS captured_after
+                       captured_invocations AS captured_after,
+                       NULL AS authorization_outcome
                 FROM budget_invocation_quotas
                 UNION ALL
-                SELECT 'event-quota', event_id || ':' || owner_id,
-                       profile, owner_id, grant_index, max_invocations,
-                       reserved_before, captured_before,
-                       reserved_after, captured_after
-                FROM budget_event_quota_members
+                SELECT 'event-quota', member.event_id || ':' || member.owner_id,
+                       member.profile, member.owner_id, member.grant_index,
+                       member.max_invocations, member.reserved_before,
+                       member.captured_before, member.reserved_after,
+                       member.captured_after, event.authorization_outcome
+                FROM budget_event_quota_members AS member
+                JOIN budget_mutation_events AS event
+                  ON event.event_id = member.event_id
             )
             SELECT owner_kind, owner_id FROM quotas
-            WHERE quota_owner = '' OR max_invocations <= 0
+            WHERE quota_owner = '' OR max_invocations < 0
+               OR (
+                   max_invocations = 0
+                   AND (
+                       owner_kind <> 'event-quota'
+                       OR authorization_outcome IS NOT 'denied'
+                   )
+               )
                OR reserved_before < 0 OR captured_before < 0
                OR reserved_after < 0 OR captured_after < 0
                OR reserved_before > max_invocations

@@ -331,6 +331,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
                        recovery_store_lease_id, recovery_store_owner_epoch
                 FROM admission_operations
                 WHERE terminal = 0
+                  AND state <> 'approval_required'
                   AND (recovery_expires_at_unix_ms IS NULL
                        OR recovery_expires_at_unix_ms <= ?1
                        OR recovery_store_uuid <> ?2

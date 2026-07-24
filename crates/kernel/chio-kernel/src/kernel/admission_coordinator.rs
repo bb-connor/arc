@@ -442,7 +442,14 @@ impl ChioKernel {
                             )
                         })?;
                     }
-                    AdmissionOperationState::ApprovalRequired => {}
+                    AdmissionOperationState::ApprovalRequired => {
+                        deferred_failure.get_or_insert_with(|| {
+                            KernelError::DurableAdmission(
+                                "admission recovery store returned a quiescent approval-required operation"
+                                    .to_owned(),
+                            )
+                        });
+                    }
                     AdmissionOperationState::Finalizing => {
                         let mut admission = DurableToolAdmission {
                             operation,

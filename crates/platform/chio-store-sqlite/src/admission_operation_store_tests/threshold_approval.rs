@@ -299,7 +299,7 @@ fn prepared_approval_and_budget_operation(
 }
 
 #[test]
-fn an_operation_needing_budget_and_approval_persists_the_approval_required_state() {
+fn approval_required_operations_are_persisted_but_excluded_from_recovery_pages() {
     let fixture = fixture();
     let now = now_ms();
     let created_at = now / 1_000;
@@ -385,4 +385,23 @@ fn an_operation_needing_budget_and_approval_persists_the_approval_required_state
         )
         .expect("persisted state");
     assert_eq!(state, "approval_required");
+    drop(connection);
+
+    let later = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "recoverable-after-approval-required",
+        "recoverable-after-approval-required-capability",
+    );
+    fixture
+        .store
+        .begin(&later, &fixture.fence, now + 5)
+        .expect("begin later recoverable operation");
+    assert_eq!(
+        fixture
+            .store
+            .list_recoverable(now + 6, 1)
+            .expect("recovery page must pass pending approval"),
+        vec![later]
+    );
 }

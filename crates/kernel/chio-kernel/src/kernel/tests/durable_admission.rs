@@ -412,6 +412,9 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
             .iter()
             .filter(|operation| !operation.state().is_terminal())
             .filter(|operation| {
+                operation.state() != AdmissionOperationState::ApprovalRequired
+            })
+            .filter(|operation| {
                 !state.claim.as_ref().is_some_and(|claim| {
                     claim.operation_id() == operation.binding().operation_id()
                         && claim.expires_at_unix_ms() > not_after_unix_ms
