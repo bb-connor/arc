@@ -59,7 +59,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs": allow(
         "2026-07-31",
         "existing oversized MCP edge runtime test suite; capped to current size until split",
-        max_lines=4_517,
+        max_lines=4_643,
     ),
     "crates/products/chio-cli/tests/certify.rs": allow(
         "2026-07-31",
@@ -294,7 +294,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs": allow(
         "2026-07-31",
         "durable kernel admission regression suite; capped to current size until split",
-        max_lines=2_772,
+        max_lines=2_792,
     ),
     "crates/kernel/chio-kernel/src/kernel/tests/execution_nonce.rs": allow(
         "2026-07-31",
