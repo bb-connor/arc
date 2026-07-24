@@ -29,6 +29,7 @@ use crate::governed_active_response::{
     GovernedActiveResponseDispatchCommit, GovernedActiveResponseRequest,
 };
 use crate::threshold_approval::ThresholdApprovalRequirementResolver;
+use chio_log_redact::redacted;
 use chio_core::capability::governance::{
     GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntentBody,
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
@@ -577,7 +578,9 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         .enumerate()
         .map(|(index, (token, approver))| {
             let mut body = token.body();
-            body.id = format!("replacement-active-response-token-{index}");
+            let replacement_token_id =
+                redacted!(format!("replacement-active-response-token-{index}")).to_string();
+            body.id = replacement_token_id;
             GovernedApprovalToken::sign(body, approver).unwrap()
         })
         .collect();
