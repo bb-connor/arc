@@ -1455,6 +1455,7 @@ mod mustprepay_gate_tests {
                     expires_at: None,
                 },
                 max_billed_units: None,
+                verified_outcome: None,
             }),
             runtime_attestation: None,
             call_chain: None,

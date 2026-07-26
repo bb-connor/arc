@@ -10,11 +10,13 @@
 
 mod automation;
 mod ccip;
+pub mod channel;
 mod config;
 mod evm;
 mod hook;
 mod observe;
 mod ops;
+mod outcome_store;
 mod payments;
 mod retry;
 mod solana;
@@ -39,21 +41,26 @@ pub use config::{
 };
 pub use evm::{
     build_failure_receipt, build_reversal_receipt, confirm_transaction, estimate_call_gas,
-    finalize_bond_lock, finalize_escrow_dispatch, prepare_bond_expiry, prepare_bond_impair,
-    prepare_bond_lock, prepare_bond_proof_root_publication, prepare_bond_release,
-    prepare_dual_sign_release, prepare_erc20_approval, prepare_escrow_refund,
-    prepare_merkle_release, prepare_merkle_release_root_publication, prepare_web3_escrow_dispatch,
-    read_bond_snapshot, read_escrow_snapshot, scale_chio_amount_to_token_minor_units,
-    static_validate_call, submit_call, BondLockRequest, DualSignReleaseInput,
-    EscrowDispatchRequest, EscrowExecutionAmount, EscrowSnapshot, EvmBondSnapshot, EvmLogEntry,
-    EvmSignature, EvmTransactionReceipt, PreparedBondExpiry, PreparedBondImpair, PreparedBondLock,
-    PreparedBondProofRoot, PreparedBondRelease, PreparedDualSignRelease, PreparedErc20Approval,
-    PreparedEscrowCreate, PreparedEscrowRefund, PreparedEvmCall, PreparedMerkleRelease,
+    finalize_bond_lock, finalize_escrow_dispatch, prepare_authorized_channel_merkle_release,
+    prepare_bond_expiry, prepare_bond_impair, prepare_bond_lock,
+    prepare_bond_proof_root_publication, prepare_bond_release, prepare_dual_sign_release,
+    prepare_erc20_approval, prepare_escrow_refund, prepare_merkle_release,
+    prepare_merkle_release_root_publication, prepare_web3_escrow_dispatch, read_bond_snapshot,
+    read_escrow_snapshot, scale_chio_amount_to_token_minor_units,
+    scale_token_minor_units_to_chio_amount, static_validate_call, submit_call, BondLockRequest,
+    DualSignReleaseInput, EscrowDispatchRequest, EscrowExecutionAmount, EscrowSnapshot,
+    EvmBondSnapshot, EvmLogEntry, EvmSignature, EvmTransactionReceipt,
+    PreparedAuthorizedChannelMerkleReleaseV1, PreparedBondExpiry, PreparedBondImpair,
+    PreparedBondLock, PreparedBondProofRoot, PreparedBondRelease, PreparedDualSignRelease,
+    PreparedErc20Approval, PreparedEscrowCreate, PreparedEscrowRefund, PreparedEvmCall,
+    PreparedEvmSubmission, PreparedMerkleRelease, PreparedRootPublication,
     SettlementAnchorContentBinding,
 };
 pub use hook::{
-    SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
-    SETTLEMENT_OBSERVATION_SCHEMA, SETTLEMENT_OUTCOME_SCHEMA,
+    SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
+    SettlementFailureReason, SettlementHook, SettlementHookError, SettlementIdempotencyKey,
+    SettlementObservation, SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
+    SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
     inspect_finality, inspect_finality_for_receipt, observe_bond, project_escrow_execution_receipt,
@@ -70,6 +77,12 @@ pub use ops::{
     SettlementOperationKind, SettlementRecoveryRecord, SettlementRuntime, SettlementRuntimeReport,
     SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
+pub use outcome_store::{
+    validate_settlement_claim, SettlementAttemptClaim, SettlementClaimValidationError,
+    SettlementOutcomeStore, SettlementRoute, SettlementRouteError, SettlementRouteErrorClass,
+    SettlementRoutingInput, SettlementStoreBinding, MAX_SETTLEMENT_CLAIM_BATCH,
+    MAX_SETTLEMENT_LEASE_MS, MAX_SETTLEMENT_WORKER_ID_BYTES,
+};
 pub use payments::{
     approval_binding_from_governed, build_x402_payment_requirements, evaluate_circle_nanopayment,
     prepare_paymaster_compatibility, prepare_transfer_with_authorization,
@@ -81,8 +94,8 @@ pub use payments::{
     DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
-    classify_attempt, DeadLetterRecord, DeadLetterRecordError, RetryDecision, RetryPolicy,
-    RetryPolicyError, DEAD_LETTER_MAX_ATTEMPTS, DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX,
+    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, RetryPolicyError,
+    DEAD_LETTER_MAX_ATTEMPTS, DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX,
     DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES, DEAD_LETTER_REASON_DIGEST_PREFIX,
     DEAD_LETTER_REASON_MAX_BYTES, DEAD_LETTER_RECEIPT_ID_MAX_BYTES, DEFAULT_BACKOFF_CAP_MS,
     DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS, DEFAULT_MAX_RETRIES,

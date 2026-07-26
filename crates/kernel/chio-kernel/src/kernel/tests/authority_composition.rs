@@ -234,6 +234,7 @@ impl chio_settle::SettlementHook for CountingSettlementHook {
     fn observe(
         &self,
         observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(chio_settle::SettlementOutcome::accepted(format!(
@@ -758,8 +759,10 @@ fn bound_authority_runtime_blocks_untrusted_settlement_observation_then_recovers
 
     assert!(matches!(
         kernel.run_settlement_observer(&receipt),
-        settlement_observer::SettlementObserverStatus::TrustFailed { error }
-            if error.contains("authority trust resolution failed")
+        settlement_observer::SettlementObserverStatus::HookFailed {
+            class: chio_settle::SettlementFailureClass::Permanent,
+            reason,
+        } if reason.code() == chio_settle::SettlementFailureCode::UntrustedReceiptSigner
     ));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 

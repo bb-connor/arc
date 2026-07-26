@@ -54,6 +54,7 @@ inout 0.1.4 0.2.2
 itertools 0.10.5 0.13.0 0.14.0
 jni 0.21.1 0.22.4
 jni-sys 0.3.1 0.4.1
+jsonwebtoken 9.3.1 10.4.0
 lru 0.16.3 0.18.0
 matchit 0.7.3 0.8.4
 mio 0.8.11 1.1.1

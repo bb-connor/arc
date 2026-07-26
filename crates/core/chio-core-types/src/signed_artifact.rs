@@ -26,6 +26,28 @@ pub const CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA: &str = "chio.bilateral-signa
 pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
 pub const CHIO_TRANSACTION_EVIDENCE_GRAPH_V1_SCHEMA: &str = "chio.transaction.evidence-graph.v1";
 pub const CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA: &str = "chio.transaction.claim-set.v1";
+pub const CHIO_OUTCOME_PREDICATE_V1_SCHEMA: &str = "chio.outcome.predicate.v1";
+pub const CHIO_OUTCOME_PRICING_V1_SCHEMA: &str = "chio.outcome.pricing.v1";
+pub const CHIO_OUTCOME_SLA_V1_SCHEMA: &str = "chio.outcome.sla.v1";
+pub const CHIO_OUTCOME_ELIGIBILITY_V1_SCHEMA: &str = "chio.outcome.eligibility.v1";
+pub const CHIO_OUTCOME_DELIVERY_CHECKPOINT_V1_SCHEMA: &str = "chio.outcome.delivery-checkpoint.v1";
+pub const CHIO_OUTCOME_DELIVERY_ACKNOWLEDGEMENT_V1_SCHEMA: &str =
+    "chio.outcome.delivery-acknowledgement.v1";
+pub const CHIO_OUTCOME_DELIVERY_NONACCEPTANCE_V1_SCHEMA: &str =
+    "chio.outcome.delivery-nonacceptance.v1";
+pub const CHIO_OUTCOME_OUTPUT_PROVENANCE_V1_SCHEMA: &str = "chio.outcome.output-provenance.v1";
+pub const CHIO_OUTCOME_CONTRACTUAL_ZERO_V1_SCHEMA: &str = "chio.outcome.contractual-zero.v1";
+pub const CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA: &str = "chio.credit.facility-bind.v1";
+pub const CHIO_CHANNEL_RELEASE_AUTHORIZATION_V1_SCHEMA: &str =
+    "chio.channel.release-authorization.v1";
+pub const CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA: &str = "chio.credit.receivable-iou-envelope.v1";
+pub const CHIO_FACTOR_ASSIGNMENT_BIND_AUTHORIZATION_V1_SCHEMA: &str =
+    "chio.factor.assignment-bind-authorization.v1";
+pub const CHIO_FACTOR_ASSIGNMENT_AGREEMENT_V1_SCHEMA: &str = "chio.factor.assignment-agreement.v1";
+pub const CHIO_FACTOR_ASSIGNMENT_ACKNOWLEDGEMENT_V1_SCHEMA: &str =
+    "chio.factor.assignment-acknowledgement.v1";
+pub const CHIO_FACTOR_ASSIGNMENT_NOT_APPLIED_V1_SCHEMA: &str =
+    "chio.factor.assignment-not-applied.v1";
 pub const CHIO_TRANSACTION_VERIFIER_POLICY_V1_SCHEMA: &str = "chio.transaction.verifier-policy.v1";
 pub const CHIO_TRANSACTION_VERIFIER_REPORT_V1_SCHEMA: &str = "chio.transaction.verifier-report.v1";
 pub const CHIO_TRANSACTION_RUNTIME_SECURITY_REPORT_V1_SCHEMA: &str =
@@ -208,6 +230,82 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA,
         Some(("bilateral_dsse_signature_slice", "federation-dsse-slice")),
+    ),
+    (
+        CHIO_CHANNEL_RELEASE_AUTHORIZATION_V1_SCHEMA,
+        Some(("channel_release_authorization", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA,
+        Some(("credit_facility_bind", "credit-admission-v1")),
+    ),
+    (
+        CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
+        Some(("credit_iou_envelope", "receivables-factoring-v1")),
+    ),
+    (
+        CHIO_FACTOR_ASSIGNMENT_BIND_AUTHORIZATION_V1_SCHEMA,
+        Some((
+            "factor_assignment_bind_authorization",
+            "receivables-factoring-v1",
+        )),
+    ),
+    (
+        CHIO_FACTOR_ASSIGNMENT_AGREEMENT_V1_SCHEMA,
+        Some(("factor_assignment_agreement", "receivables-factoring-v1")),
+    ),
+    (
+        CHIO_FACTOR_ASSIGNMENT_ACKNOWLEDGEMENT_V1_SCHEMA,
+        Some((
+            "factor_assignment_acknowledgement",
+            "receivables-factoring-v1",
+        )),
+    ),
+    (
+        CHIO_FACTOR_ASSIGNMENT_NOT_APPLIED_V1_SCHEMA,
+        Some(("factor_assignment_not_applied", "receivables-factoring-v1")),
+    ),
+    (
+        CHIO_OUTCOME_PREDICATE_V1_SCHEMA,
+        Some(("outcome_predicate", "verified-outcome-pricing-v1")),
+    ),
+    (
+        CHIO_OUTCOME_PRICING_V1_SCHEMA,
+        Some(("outcome_pricing", "verified-outcome-pricing-v1")),
+    ),
+    (
+        CHIO_OUTCOME_SLA_V1_SCHEMA,
+        Some(("outcome_sla", "verified-outcome-pricing-v1")),
+    ),
+    (
+        CHIO_OUTCOME_ELIGIBILITY_V1_SCHEMA,
+        Some(("outcome_eligibility", "verified-outcome-pricing-v1")),
+    ),
+    (
+        CHIO_OUTCOME_DELIVERY_CHECKPOINT_V1_SCHEMA,
+        Some(("outcome_delivery_checkpoint", "verified-outcome-pricing-v1")),
+    ),
+    (
+        CHIO_OUTCOME_DELIVERY_ACKNOWLEDGEMENT_V1_SCHEMA,
+        Some((
+            "outcome_delivery_acknowledgement",
+            "verified-outcome-pricing-v1",
+        )),
+    ),
+    (
+        CHIO_OUTCOME_DELIVERY_NONACCEPTANCE_V1_SCHEMA,
+        Some((
+            "outcome_delivery_nonacceptance",
+            "verified-outcome-pricing-v1",
+        )),
+    ),
+    (
+        CHIO_OUTCOME_OUTPUT_PROVENANCE_V1_SCHEMA,
+        Some(("outcome_output_provenance", "verified-outcome-pricing-v1")),
+    ),
+    (
+        CHIO_OUTCOME_CONTRACTUAL_ZERO_V1_SCHEMA,
+        Some(("outcome_contractual_zero", "verified-outcome-pricing-v1")),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),

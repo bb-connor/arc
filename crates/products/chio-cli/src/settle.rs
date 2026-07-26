@@ -34,7 +34,7 @@ pub const DEFAULT_SETTLE_STATUS_LIMIT: usize = 256;
 pub const MAX_SETTLE_STATUS_LIMIT: usize = 4_096;
 const MAX_STATUS_CANONICAL_BYTES: i64 = 65_536;
 const MAX_STATUS_RECEIPT_BYTES: i64 = 1_048_576;
-const MAX_STATUS_RETRY_ATTEMPTS: u32 = chio_settle::DEAD_LETTER_MAX_ATTEMPTS - 1;
+const MAX_STATUS_RETRY_ATTEMPTS: u32 = 32;
 
 /// Errors surfaced by the `chio settle status` command.
 #[derive(Debug, thiserror::Error)]
@@ -483,7 +483,8 @@ fn validate_status_iou(
         || envelope.body.schema != chio_core::credit::IOU_ENVELOPE_SCHEMA
         || envelope.body.receipt_id != row.receipt_id
         || envelope.body.iou_id != row.iou_id
-        || envelope.body.iou_id != chio_core::credit::derive_iou_id(&receipt.id)
+        || envelope.body.iou_id
+            != chio_core::credit::local_account::derive_iou_id(&receipt.id)
         || i64::try_from(envelope.body.receipt_timestamp).ok() != Some(row.receipt_timestamp)
         || envelope.body.tenant_id != row.tenant_id
         || i64::try_from(envelope.body.amount_units).ok() != Some(row.amount_units)
@@ -891,14 +892,30 @@ fn list_dead_lettered(
                 "dead-letter {receipt_id} is not canonical JSON"
             )));
         }
-        record.validate().map_err(|error| {
-            SettleStatusError::Integrity(format!("dead-letter {receipt_id} is invalid: {error}"))
-        })?;
+        if !record.has_supported_schema()
+            || record.receipt_id.trim().is_empty()
+            || record.attempts == 0
+            || record.attempts > MAX_STATUS_RETRY_ATTEMPTS.saturating_add(1)
+        {
+            return Err(SettleStatusError::Integrity(format!(
+                "dead-letter {receipt_id} is invalid"
+            )));
+        }
+        let reason_projection =
+            chio_core::canonical::canonical_json_bytes(&record.reason).map_err(|error| {
+                SettleStatusError::Integrity(format!(
+                    "dead-letter {receipt_id} reason is invalid: {error}"
+                ))
+            })?;
+        let reason_projection = format!(
+            "settlement_failure:sha256:{}",
+            chio_core::sha256_hex(&reason_projection)
+        );
         if record.receipt_id != receipt_id
             || i64::try_from(record.finalized_at).ok() != Some(finalized_at)
             || i64::from(record.attempts) != attempts
-            || record.reason != reason
-            || record.pipeline_error != pipeline_error
+            || reason_projection != reason
+            || pipeline_error.is_some()
         {
             return Err(SettleStatusError::Integrity(format!(
                 "dead-letter {receipt_id} projections do not match canonical bytes"
@@ -1501,7 +1518,10 @@ pub fn run_settlement_drive_with_iou_trust(
             dead_letter_attempt(
                 &retry_store,
                 &lease,
-                "finalized receipt absent from authoritative storage",
+                chio_settle::SettlementFailureReason::from_detail(
+                    chio_settle::SettlementFailureCode::InvalidObservation,
+                    "finalized receipt absent from authoritative storage",
+                ),
             )?;
             report.dead_lettered += 1;
             continue;
@@ -1530,7 +1550,10 @@ pub fn run_settlement_drive_with_iou_trust(
             dead_letter_attempt(
                 &retry_store,
                 &lease,
-                "receipt signer is outside the configured kernel trust set",
+                chio_settle::SettlementFailureReason::from_detail(
+                    chio_settle::SettlementFailureCode::UntrustedReceiptSigner,
+                    "receipt signer is outside the configured kernel trust set",
+                ),
             )?;
             report.dead_lettered += 1;
             continue;
@@ -1552,11 +1575,23 @@ pub fn run_settlement_drive_with_iou_trust(
             &receipt,
             trusted_kernel_keys,
         );
-        let Some(observation) = observation else {
-            return Err(SettleStatusError::Integrity(format!(
-                "receipt {} minted an IOU but could not produce a settlement observation",
-                receipt.id
-            )));
+        let observation = match observation {
+            chio_kernel::settlement_observer::SettlementObservationBuild::Observation(
+                observation,
+            ) => observation,
+            chio_kernel::settlement_observer::SettlementObservationBuild::Skipped(reason) => {
+                return Err(SettleStatusError::Integrity(format!(
+                    "receipt {} minted an IOU but settlement skipped it as {reason:?}",
+                    receipt.id
+                )));
+            }
+            chio_kernel::settlement_observer::SettlementObservationBuild::Permanent(reason) => {
+                return Err(SettleStatusError::Integrity(format!(
+                    "receipt {} minted an IOU but settlement rejected it as {}",
+                    receipt.id,
+                    reason.code().as_str()
+                )));
+            }
         };
         match runtime.drive(&observation, attempt.attempts) {
             chio_settle::SettlementDriveStep::Settle { transcript_id } => {
@@ -1589,7 +1624,7 @@ pub fn run_settlement_drive_with_iou_trust(
                     attempts,
                     next_visible_at: now_unix_secs
                         .saturating_add(backoff.as_secs().max(1)),
-                    last_reason: Some(reason),
+                    last_reason: Some(reason.code().as_str().to_string()),
                 };
                 let rescheduled = retry_store
                     .reschedule_claimed_attempt(&lease, &next)
@@ -1604,7 +1639,7 @@ pub fn run_settlement_drive_with_iou_trust(
                 break;
             }
             chio_settle::SettlementDriveStep::DeadLetter { reason } => {
-                dead_letter_attempt(&retry_store, &lease, &reason)?;
+                dead_letter_attempt(&retry_store, &lease, reason)?;
                 report.dead_lettered += 1;
             }
             chio_settle::SettlementDriveStep::Skip { .. } => {
@@ -1736,7 +1771,7 @@ fn lost_lease_error(receipt_id: &str, operation: &str) -> SettleStatusError {
 fn dead_letter_attempt(
     retry_store: &chio_store_sqlite::SqliteSettlementRetryStore,
     lease: &chio_kernel::settlement_retry::SettleAttemptLease,
-    reason: &str,
+    reason: chio_settle::SettlementFailureReason,
 ) -> Result<(), SettleStatusError> {
     use chio_kernel::settlement_retry::SettlementRetryStore;
     let attempt = &lease.record;

@@ -42,6 +42,7 @@ fn make_mustprepay_intent(
                 expires_at: Some(now + 300),
             },
             max_billed_units: Some(15),
+            verified_outcome: None,
         }),
         runtime_attestation: None,
         call_chain: None,

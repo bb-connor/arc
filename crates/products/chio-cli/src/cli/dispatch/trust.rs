@@ -69,6 +69,7 @@ pub(crate) fn dispatch_trust(
                 certification_discovery_file,
                 certification_public_metadata_ttl_seconds,
                 roster_policy_file,
+                ..
         } => cmd_trust_serve(
             listen,
             &service_token,

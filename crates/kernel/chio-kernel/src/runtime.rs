@@ -129,6 +129,49 @@ impl ToolCallRequest {
             None => &self.approval_tokens,
         })
     }
+
+    /// Return the canonical digest of the one-of-one approval token or the
+    /// verified threshold approval set carried by this request.
+    pub fn approval_artifact_digest(&self) -> Result<Option<String>, chio_core::Error> {
+        if self.approval_token.is_some() && !self.approval_tokens.is_empty() {
+            return Err(chio_core::Error::CanonicalJson(
+                "request supplies both singular and threshold approval tokens".to_string(),
+            ));
+        }
+        if let Some(token) = self.approval_token.as_ref() {
+            return token.token_digest().map(Some);
+        }
+        if self.approval_tokens.is_empty() {
+            return if self.threshold_approval_proposal.is_none() {
+                Ok(None)
+            } else {
+                Err(chio_core::Error::CanonicalJson(
+                    "threshold approval proposal has no approval tokens".to_string(),
+                ))
+            };
+        }
+        if self.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+            return Err(chio_core::Error::CanonicalJson(format!(
+                "threshold approval set exceeds {MAX_THRESHOLD_APPROVAL_TOKENS} tokens"
+            )));
+        }
+        let proposal = self.threshold_approval_proposal.as_ref().ok_or_else(|| {
+            chio_core::Error::CanonicalJson(
+                "threshold approval tokens have no signed proposal".to_string(),
+            )
+        })?;
+        let token_digests = self
+            .approval_tokens
+            .iter()
+            .map(GovernedApprovalToken::token_digest)
+            .collect::<Result<Vec<_>, chio_core::Error>>()?;
+        chio_core::capability::threshold_approval::VerifiedApprovalSetBody::new(
+            token_digests,
+            proposal,
+        )?
+        .approval_set_hash()
+        .map(Some)
+    }
 }
 
 /// The kernel's response to a tool call request.

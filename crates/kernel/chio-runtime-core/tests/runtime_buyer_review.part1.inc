@@ -307,6 +307,7 @@ fn buyer_fixture() -> Result<BuyerFixture, Box<dyn std::error::Error>> {
         mode: "receipt_backed".to_string(),
         consistency_model: "totally_ordered".to_string(),
         co_sign: "bilateral_required".to_string(),
+        co_sign_quorum: None,
         required_evidence: vec![
             "governance_receipt".to_string(),
             "bilateral_invocation".to_string(),

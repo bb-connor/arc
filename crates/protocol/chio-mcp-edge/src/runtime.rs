@@ -21,6 +21,7 @@ use chio_core::session::{
     ResourceTemplateDefinition, RootDefinition, SessionAuthContext, SessionId, SessionOperation,
     SessionTransport, TaskOwnershipSnapshot, ToolCallOperation,
 };
+use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_cross_protocol::discovery::DiscoveryProtocol;
 use chio_cross_protocol::error::BridgeError;
 use chio_cross_protocol::execution::{

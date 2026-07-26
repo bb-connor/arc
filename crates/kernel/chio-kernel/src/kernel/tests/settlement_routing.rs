@@ -400,9 +400,10 @@ impl chio_settle::SettlementHook for RetryableSettlementHook {
     fn observe(
         &self,
         _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
         Ok(chio_settle::SettlementOutcome::retryable(
-            "rail temporarily unavailable credential-é-SEED-retry",
+            "rail temporarily unavailable credential-é-SEED-retry".into(),
         ))
     }
 }
@@ -417,6 +418,7 @@ impl chio_settle::SettlementHook for FailingSettlementHook {
     fn observe(
         &self,
         _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
         Err(chio_settle::SettlementHookError::Transient(
             "settlement rpc endpoint unreachable credential-é-SEED-hook".to_string(),
@@ -437,6 +439,7 @@ impl chio_settle::SettlementHook for RoutingCountingSettlementHook {
     fn observe(
         &self,
         _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
         self.calls
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -479,6 +482,7 @@ impl chio_settle::SettlementHook for BlockingSettlementHook {
     fn observe(
         &self,
         _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
         self.calls
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -1080,7 +1084,7 @@ fn permanent_outcome_dead_letters_exactly_once() {
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(kernel.recover_settlement_observer_outboxes().unwrap(), 1);
 
-    let outcome = chio_settle::SettlementOutcome::permanent("payee unresolvable");
+    let outcome = chio_settle::SettlementOutcome::permanent("payee unresolvable".into());
     kernel
         .classify_and_persist(&response.receipt, &outcome)
         .expect("permanent outcome dead-letters");

@@ -54,7 +54,7 @@ pub(crate) fn cmd_market_info(
         currency: currency.to_owned(),
     };
     let report = crate::market::market_info(catalog, &context, reference, publisher_revoked)
-        .map_err(|err| CliError::Other(format!("market info: {err}")))?;
+            .map_err(|err| CliError::Other(format!("market info: {err}")))?;
     let mut stdout = std::io::stdout();
     if json {
         write_pretty_json_line(&mut stdout, &report, "market info")?;
@@ -82,9 +82,14 @@ pub(crate) fn cmd_market_install(
         tier,
         currency: currency.to_owned(),
     };
-    let record =
-        crate::market::market_install(catalog, bundle_dir, &context, reference, publisher_revoked)
-            .map_err(|err| CliError::Other(format!("market install: {err}")))?;
+    let record = crate::market::market_install(
+        catalog,
+        bundle_dir,
+        &context,
+        reference,
+        publisher_revoked,
+    )
+    .map_err(|err| CliError::Other(format!("market install: {err}")))?;
     let mut stdout = std::io::stdout();
     if json {
         write_pretty_json_line(&mut stdout, &record, "market install")?;

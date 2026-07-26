@@ -2652,6 +2652,7 @@ name = "chio-appraisal"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-fiscal",
  "chio-test-support",
  "serde",
  "serde_json",
@@ -3225,9 +3226,12 @@ dependencies = [
  "arbitrary",
  "base64 0.22.1",
  "chio-core",
+ "chio-credit",
  "chio-did",
+ "chio-fincred",
  "chio-reputation",
  "chio-revocation-oracle",
+ "chio-spec-validate",
  "chio-test-support",
  "chrono",
  "dudect-bencher",
@@ -3245,8 +3249,16 @@ version = "0.1.0"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
+ "chio-did",
+ "chio-federation",
+ "chio-fincred",
+ "chio-spec-validate",
  "chio-underwriting",
+ "frost-ed25519",
+ "hex",
  "proptest",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3350,7 +3362,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "bs58",
- "chio-core",
+ "chio-core-types",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3498,7 +3510,11 @@ dependencies = [
  "chio-open-market",
  "chio-pheromone",
  "chio-revocation-oracle",
+ "chio-spec-validate",
+ "frost-ed25519",
  "hex",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -3513,10 +3529,15 @@ dependencies = [
  "chio-core-types",
  "chio-federation",
  "chio-governance",
+ "frost-core",
+ "frost-ed25519",
  "hex",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -3545,6 +3566,27 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "chio-fincred"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+]
+
+[[package]]
+name = "chio-fiscal"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-listing",
+ "chio-test-support",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3894,7 +3936,10 @@ name = "chio-listing"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-spec-validate",
  "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3942,6 +3987,8 @@ dependencies = [
  "chio-appraisal",
  "chio-core-types",
  "chio-credit",
+ "chio-fiscal",
+ "chio-spec-validate",
  "chio-underwriting",
  "serde",
  "serde_json",
@@ -3999,6 +4046,7 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -4071,6 +4119,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chrono",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -4116,6 +4165,7 @@ name = "chio-open-market"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-fiscal",
  "chio-governance",
  "chio-listing",
  "chio-test-support",
@@ -4567,8 +4617,10 @@ dependencies = [
  "chio-core",
  "chio-credit",
  "chio-egress-contract",
+ "chio-federation",
  "chio-kernel",
  "chio-link",
+ "chio-spec-validate",
  "chio-test-support",
  "chio-web3",
  "chio-web3-bindings",
@@ -4580,6 +4632,7 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 1.0.69",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -4818,7 +4871,9 @@ version = "0.1.0"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
+ "chio-fiscal",
  "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5173,6 +5228,12 @@ dependencies = [
  "libc",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "const-crc32-nostd"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "808ac43170e95b11dd23d78aa9eaac5bea45776a602955552c4e833f3f0f823d"
 
 [[package]]
 name = "const-hex"
@@ -5677,6 +5738,7 @@ dependencies = [
  "curve25519-dalek-derive",
  "digest 0.10.7",
  "fiat-crypto 0.2.9",
+ "rand_core 0.6.4",
  "rustc_version 0.4.1",
  "subtle",
  "zeroize",
@@ -5831,7 +5893,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc2776f0c61eca1ca32528f85548abd1a4be8fb53d1b21c013e4f18da1e7090"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -5953,6 +6015,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "derive-getters"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74ef43543e701c01ad77d3a5922755c6a1d71b22d942cb8042be4994b380caff"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -6166,6 +6239,15 @@ dependencies = [
  "base64 0.21.7",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "document-features"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61"
+dependencies = [
+ "litrs",
 ]
 
 [[package]]
@@ -6697,6 +6779,55 @@ checksum = "0f158e3ff0a1b334408dc9fb811cd99b446986f4d8b741bb08f9df1604085ae7"
 dependencies = [
  "lazy_static",
  "num",
+]
+
+[[package]]
+name = "frost-core"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81ef2787af391c7e8bedc037a3b9ea03dde803fbd93e778e6bb369547800e5cd"
+dependencies = [
+ "byteorder",
+ "const-crc32-nostd",
+ "derive-getters",
+ "document-features",
+ "hex",
+ "itertools 0.14.0",
+ "postcard",
+ "rand_core 0.6.4",
+ "serde",
+ "serdect 0.2.0",
+ "thiserror 2.0.18",
+ "visibility",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
+name = "frost-ed25519"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df345f704e41812a3ab238331a393126f76996c176d204296e289efe946c57f0"
+dependencies = [
+ "curve25519-dalek 4.1.3",
+ "document-features",
+ "frost-core",
+ "frost-rerandomized",
+ "rand_core 0.6.4",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "frost-rerandomized"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f4c5cedd2426728adef2c0b1720f57676354c473836d1ccc50d0f0d1c91942b"
+dependencies = [
+ "derive-getters",
+ "document-features",
+ "frost-core",
+ "hex",
+ "rand_core 0.6.4",
 ]
 
 [[package]]
@@ -8606,6 +8737,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 
 [[package]]
+name = "litrs"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9352,7 +9489,7 @@ version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51e219e79014df21a225b1860a479e2dcd7cbd9130f4defd4bd0e191ea31d67d"
 dependencies = [
- "base64 0.21.7",
+ "base64 0.22.1",
  "chrono",
  "getrandom 0.2.17",
  "http 1.4.0",
@@ -14243,6 +14380,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "visibility"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d674d135b4a8c1d7e813e2f8d1c9a58308aee4a680323066025e53132218bd91"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "vsimd"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16010,6 +16158,7 @@ version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
 dependencies = [
+ "serde",
  "zeroize_derive",
 ]
 

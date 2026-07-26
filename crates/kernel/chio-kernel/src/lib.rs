@@ -433,8 +433,8 @@ pub use payment::{
     X402PaymentAdapter,
 };
 pub use post_invocation::{
-    PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationInspection,
-    PostInvocationPipeline, PostInvocationVerdict,
+    PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
+    PostInvocationInspection, PostInvocationPipeline, PostInvocationVerdict,
 };
 pub use provider_verdict::{
     canonical_invocation_bytes, verdict_result_from_response, ProviderVerdictError,
@@ -534,7 +534,7 @@ pub use kernel::evaluator::ToolEvaluator;
 /// without reaching into crate-private module paths.
 pub mod settlement_observer {
     pub use crate::kernel::settlement_observer::{
-        build_observation, run_observer, SettlementObserverStatus,
+        build_observation, run_observer, SettlementObservationBuild, SettlementObserverStatus,
         SETTLEMENT_OBSERVER_STATUS_SCHEMA,
     };
 }

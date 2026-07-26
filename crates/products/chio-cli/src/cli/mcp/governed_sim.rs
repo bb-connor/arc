@@ -199,6 +199,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
                 expires_at: Some(now + SIM_TTL_SECS),
             },
             max_billed_units: Some(2),
+            verified_outcome: None,
         }),
         runtime_attestation: None,
         call_chain: None,

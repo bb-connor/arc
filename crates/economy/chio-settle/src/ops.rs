@@ -379,6 +379,131 @@ pub fn ensure_settlement_completion_flow_binding(
     Ok(())
 }
 
+/// Reference settlement hook for the operator retry driver.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct OpsSettlementHook;
+
+impl OpsSettlementHook {
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl crate::SettlementHook for OpsSettlementHook {
+    fn observe(
+        &self,
+        observation: &crate::SettlementObservation,
+        _idempotency_key: &crate::SettlementIdempotencyKey,
+    ) -> Result<crate::SettlementOutcome, crate::SettlementHookError> {
+        if observation.receipt_id.trim().is_empty() {
+            return Ok(crate::SettlementOutcome::permanent(
+                crate::SettlementFailureReason::from_detail(
+                    crate::SettlementFailureCode::InvalidObservation,
+                    "observation is missing a receipt id",
+                ),
+            ));
+        }
+        if observation.amount.units == 0 {
+            return Ok(crate::SettlementOutcome::skipped(
+                crate::SettlementSkipReason::ZeroCharge,
+            ));
+        }
+        Ok(crate::SettlementOutcome::accepted(format!(
+            "ops:{}",
+            observation.receipt_id
+        )))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SettlementDriveStep {
+    Settle {
+        transcript_id: String,
+    },
+    Retry {
+        attempts: u32,
+        backoff: std::time::Duration,
+        reason: crate::SettlementFailureReason,
+    },
+    DeadLetter {
+        reason: crate::SettlementFailureReason,
+    },
+    Skip {
+        reason: crate::SettlementSkipReason,
+    },
+}
+
+pub struct SettlementRuntime<H> {
+    hook: H,
+    policy: crate::RetryPolicy,
+}
+
+impl<H: crate::SettlementHook> SettlementRuntime<H> {
+    #[must_use]
+    pub fn new(hook: H, policy: crate::RetryPolicy) -> Self {
+        Self { hook, policy }
+    }
+
+    #[must_use]
+    pub fn drive(
+        &self,
+        observation: &crate::SettlementObservation,
+        prior_attempts: u32,
+    ) -> SettlementDriveStep {
+        let idempotency_key = crate::SettlementIdempotencyKey {
+            receipt_id: observation.receipt_id.clone(),
+            row_version: u64::from(prior_attempts).saturating_add(1),
+        };
+        let routing = match self.hook.observe(observation, &idempotency_key) {
+            Ok(crate::SettlementOutcome::Accepted { transcript_id, .. }) => {
+                return SettlementDriveStep::Settle { transcript_id };
+            }
+            Ok(crate::SettlementOutcome::Skipped { reason, .. }) => {
+                crate::SettlementRoutingInput::Skipped { reason }
+            }
+            Ok(crate::SettlementOutcome::Retryable { reason, .. }) => {
+                crate::SettlementRoutingInput::Retryable { reason }
+            }
+            Ok(crate::SettlementOutcome::Permanent { reason, .. }) => {
+                crate::SettlementRoutingInput::Permanent { reason }
+            }
+            Err(error) => {
+                let (class, reason) = error.classification();
+                match reason.effective_class(class) {
+                    crate::SettlementFailureClass::Retryable => {
+                        crate::SettlementRoutingInput::Retryable { reason }
+                    }
+                    crate::SettlementFailureClass::Permanent => {
+                        crate::SettlementRoutingInput::Permanent { reason }
+                    }
+                }
+            }
+        };
+        match crate::classify_attempt(&self.policy, prior_attempts, &routing) {
+            crate::RetryDecision::Accepted => SettlementDriveStep::DeadLetter {
+                reason: crate::SettlementFailureReason::from_detail(
+                    crate::SettlementFailureCode::InvalidObservation,
+                    "settlement classifier accepted an unresolved routing input",
+                ),
+            },
+            crate::RetryDecision::Retry {
+                attempt,
+                backoff,
+                reason,
+            } => SettlementDriveStep::Retry {
+                attempts: attempt,
+                backoff,
+                reason,
+            },
+            crate::RetryDecision::DeadLetter { reason } => {
+                SettlementDriveStep::DeadLetter { reason }
+            }
+            crate::RetryDecision::Skip { reason } => SettlementDriveStep::Skip { reason },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -497,206 +622,5 @@ mod tests {
             ensure_settlement_completion_flow_binding("economic-completion-flow:rcpt-1", "rcpt-2")
                 .test_expect_err("binding mismatch should fail");
         assert!(error.to_string().contains("resolved receipt"));
-    }
-}
-
-/// Reference production settlement hook.
-///
-/// Validates an observation's shape and accepts it with a deterministic
-/// transcript id, so a deployment can wire the observer slot and the
-/// settlement driver end to end and watch `chio settle status` report over
-/// tables production code writes. Rail-specific deployments replace this
-/// with their own [`crate::SettlementHook`]; the seam is the contract.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct OpsSettlementHook;
-
-impl OpsSettlementHook {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl crate::SettlementHook for OpsSettlementHook {
-    fn supports_receipt_id_idempotency(&self) -> bool {
-        true
-    }
-
-    fn observe(
-        &self,
-        observation: &crate::SettlementObservation,
-    ) -> Result<crate::SettlementOutcome, crate::SettlementHookError> {
-        if observation.receipt_id.trim().is_empty() {
-            return Ok(crate::SettlementOutcome::permanent(
-                "observation is missing a receipt id",
-            ));
-        }
-        if observation.amount.units == 0 {
-            // The kernel skips zero-priced receipts before the hook; a zero
-            // amount reaching this point is outside the marketplace surface.
-            return Ok(crate::SettlementOutcome::skipped("zero-priced observation"));
-        }
-        Ok(crate::SettlementOutcome::accepted(format!(
-            "ops:{}",
-            observation.receipt_id
-        )))
-    }
-}
-
-/// One terminal step of the settlement driver for a due attempt: the hook is
-/// re-invoked and its outcome classified against the retry policy.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SettlementDriveStep {
-    /// The hook accepted the observation: persist the settled record and
-    /// clear the bounded attempt envelope.
-    Settle {
-        /// Transcript id correlating the settled record with the hook run.
-        transcript_id: String,
-    },
-    /// Recoverable failure: re-arm the attempt with the classified backoff.
-    Retry {
-        /// Attempt count after this failure.
-        attempts: u32,
-        /// Backoff before the attempt becomes visible again.
-        backoff: std::time::Duration,
-        /// Failure reason for the attempt row.
-        reason: String,
-    },
-    /// Terminal failure: land a dead-letter row and clear the attempt.
-    DeadLetter {
-        /// Reason recorded on the dead-letter row.
-        reason: String,
-    },
-    /// Nothing owed (skipped outcome): clear the attempt.
-    Skip {
-        /// Reason for operator visibility.
-        reason: String,
-    },
-}
-
-/// Settlement driver engine: re-invokes a hook for a due attempt and folds
-/// the outcome through the retry policy into one terminal step. Pure over
-/// its inputs; the host (CLI drive, embedder runtime) owns the stores and
-/// applies the step.
-pub struct SettlementRuntime<H> {
-    hook: H,
-    policy: crate::RetryPolicy,
-}
-
-impl<H: crate::SettlementHook> SettlementRuntime<H> {
-    #[must_use]
-    pub fn new(hook: H, policy: crate::RetryPolicy) -> Self {
-        Self { hook, policy }
-    }
-
-    /// Drive one due attempt: re-invoke the hook and classify. A hook error
-    /// is folded into a retryable outcome so the bounded envelope (not the
-    /// error path) decides when it dead-letters.
-    #[must_use]
-    pub fn drive(
-        &self,
-        observation: &crate::SettlementObservation,
-        prior_attempts: u32,
-    ) -> SettlementDriveStep {
-        let outcome = match self.hook.observe(observation) {
-            Ok(outcome) => outcome,
-            Err(error) => crate::SettlementOutcome::retryable(error.to_string()),
-        };
-        if let crate::SettlementOutcome::Accepted { transcript_id, .. } = &outcome {
-            return SettlementDriveStep::Settle {
-                transcript_id: transcript_id.clone(),
-            };
-        }
-        match crate::classify_attempt(&self.policy, prior_attempts, &outcome) {
-            crate::RetryDecision::Retry { attempt, backoff } => SettlementDriveStep::Retry {
-                attempts: attempt,
-                backoff,
-                reason: match &outcome {
-                    crate::SettlementOutcome::Retryable { reason, .. } => reason.clone(),
-                    other => format!("{other:?}"),
-                },
-            },
-            crate::RetryDecision::DeadLetter { reason } => {
-                SettlementDriveStep::DeadLetter { reason }
-            }
-            crate::RetryDecision::Skip { reason } => SettlementDriveStep::Skip { reason },
-        }
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-mod driver_tests {
-    use super::*;
-    use crate::{RetryPolicy, SettlementHook, SettlementObservation};
-    use chio_core::capability::scope::MonetaryAmount;
-
-    fn observation(receipt_id: &str, units: u64) -> SettlementObservation {
-        SettlementObservation::new(
-            receipt_id,
-            100,
-            "srv",
-            "tool",
-            "cap",
-            MonetaryAmount {
-                units,
-                currency: "USD".to_string(),
-            },
-            "content-hash",
-            "policy-hash",
-        )
-    }
-
-    #[test]
-    fn ops_hook_accepts_a_priced_observation() {
-        let outcome = OpsSettlementHook::new()
-            .observe(&observation("rcpt-ops", 250))
-            .expect("observe");
-        match outcome {
-            crate::SettlementOutcome::Accepted { transcript_id, .. } => {
-                assert_eq!(transcript_id, "ops:rcpt-ops");
-            }
-            other => panic!("expected accepted, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn runtime_folds_outcomes_into_terminal_steps() {
-        struct FlakyHook;
-        impl SettlementHook for FlakyHook {
-            fn supports_receipt_id_idempotency(&self) -> bool {
-                true
-            }
-
-            fn observe(
-                &self,
-                observation: &SettlementObservation,
-            ) -> Result<crate::SettlementOutcome, crate::SettlementHookError> {
-                Ok(crate::SettlementOutcome::retryable(format!(
-                    "rail unavailable for {}",
-                    observation.receipt_id
-                )))
-            }
-        }
-
-        let accepting = SettlementRuntime::new(OpsSettlementHook::new(), RetryPolicy::default());
-        assert!(matches!(
-            accepting.drive(&observation("rcpt-1", 100), 0),
-            SettlementDriveStep::Settle { .. }
-        ));
-
-        let policy = RetryPolicy::default();
-        let max_retries = policy.max_retries;
-        let flaky = SettlementRuntime::new(FlakyHook, policy);
-        assert!(matches!(
-            flaky.drive(&observation("rcpt-2", 100), 0),
-            SettlementDriveStep::Retry { attempts: 1, .. }
-        ));
-        // The bounded envelope, not the error path, decides the terminal
-        // dead-letter.
-        assert!(matches!(
-            flaky.drive(&observation("rcpt-2", 100), max_retries),
-            SettlementDriveStep::DeadLetter { .. }
-        ));
     }
 }

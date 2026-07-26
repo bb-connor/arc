@@ -1982,6 +1982,102 @@
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json"
     },
     {
+      "schema": "chio.channel.release-authorization.v1",
+      "artifactKind": "channel_release_authorization",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-release-authorization.v1.json"
+    },
+    {
+      "schema": "chio.credit.facility-bind.v1",
+      "artifactKind": "credit_facility_bind",
+      "introducedBy": "credit-admission-v1",
+      "schemaFile": "spec/schemas/chio-economy/credit-facility-bind.v1.json"
+    },
+    {
+      "schema": "chio.credit.receivable-iou-envelope.v1",
+      "artifactKind": "credit_iou_envelope",
+      "introducedBy": "receivables-factoring-v1",
+      "schemaFile": "spec/schemas/chio-economy/receivable-iou-envelope.v1.json"
+    },
+    {
+      "schema": "chio.factor.assignment-bind-authorization.v1",
+      "artifactKind": "factor_assignment_bind_authorization",
+      "introducedBy": "receivables-factoring-v1",
+      "schemaFile": "spec/schemas/chio-economy/factor-assignment-bind-authorization.v1.json"
+    },
+    {
+      "schema": "chio.factor.assignment-agreement.v1",
+      "artifactKind": "factor_assignment_agreement",
+      "introducedBy": "receivables-factoring-v1",
+      "schemaFile": "spec/schemas/chio-economy/factor-assignment-agreement.v1.json"
+    },
+    {
+      "schema": "chio.factor.assignment-acknowledgement.v1",
+      "artifactKind": "factor_assignment_acknowledgement",
+      "introducedBy": "receivables-factoring-v1",
+      "schemaFile": "spec/schemas/chio-economy/factor-assignment-acknowledgement.v1.json"
+    },
+    {
+      "schema": "chio.factor.assignment-not-applied.v1",
+      "artifactKind": "factor_assignment_not_applied",
+      "introducedBy": "receivables-factoring-v1",
+      "schemaFile": "spec/schemas/chio-economy/factor-assignment-not-applied.v1.json"
+    },
+    {
+      "schema": "chio.outcome.predicate.v1",
+      "artifactKind": "outcome_predicate",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/predicate.schema.json"
+    },
+    {
+      "schema": "chio.outcome.pricing.v1",
+      "artifactKind": "outcome_pricing",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/pricing.schema.json"
+    },
+    {
+      "schema": "chio.outcome.sla.v1",
+      "artifactKind": "outcome_sla",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/sla.schema.json"
+    },
+    {
+      "schema": "chio.outcome.eligibility.v1",
+      "artifactKind": "outcome_eligibility",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/eligibility.schema.json"
+    },
+    {
+      "schema": "chio.outcome.delivery-checkpoint.v1",
+      "artifactKind": "outcome_delivery_checkpoint",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/delivery-checkpoint.schema.json"
+    },
+    {
+      "schema": "chio.outcome.delivery-acknowledgement.v1",
+      "artifactKind": "outcome_delivery_acknowledgement",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/delivery-acknowledgement.schema.json"
+    },
+    {
+      "schema": "chio.outcome.delivery-nonacceptance.v1",
+      "artifactKind": "outcome_delivery_nonacceptance",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/delivery-nonacceptance.schema.json"
+    },
+    {
+      "schema": "chio.outcome.output-provenance.v1",
+      "artifactKind": "outcome_output_provenance",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/output-provenance.schema.json"
+    },
+    {
+      "schema": "chio.outcome.contractual-zero.v1",
+      "artifactKind": "outcome_contractual_zero",
+      "introducedBy": "verified-outcome-pricing-v1",
+      "schemaFile": "spec/schemas/chio-outcome/v1/contractual-zero.schema.json"
+    },
+    {
       "schema": "chio.comptroller.surface-report.v1",
       "artifactKind": "chio_comptroller_surface_report",
       "introducedBy": "chio-comptroller-surface/v1",

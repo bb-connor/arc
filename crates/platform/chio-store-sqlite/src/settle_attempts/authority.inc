@@ -9,7 +9,7 @@ use crate::dead_letters::{
 };
 
 pub(crate) const MAX_SETTLEMENT_RETRY_BATCH: usize = 4_096;
-const MAX_SETTLEMENT_RETRY_ATTEMPTS: u32 = chio_settle::DEAD_LETTER_MAX_ATTEMPTS - 1;
+const MAX_SETTLEMENT_RETRY_ATTEMPTS: u32 = 32;
 const _: () = assert!(MAX_SETTLEMENT_RETRY_ATTEMPTS == 32);
 
 const SETTLE_ATTEMPTS_MIGRATION: &str = r#"
@@ -727,7 +727,7 @@ fn validate_authoritative_settlement_obligation_on_connection(
             "authoritative settlement receipt has no positive financial obligation".to_string(),
         ));
     }
-    if envelope.body.iou_id != chio_credit::derive_iou_id(&receipt.id)
+    if envelope.body.iou_id != chio_credit::local_account::derive_iou_id(&receipt.id)
         || envelope.body.receipt_id != receipt.id
         || envelope.body.receipt_timestamp != receipt.timestamp
         || envelope.body.tenant_id != receipt.tenant_id
@@ -1517,9 +1517,8 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
     ) -> Result<bool, SettlementRetryError> {
         validate_attempt_record(&lease.record)?;
         validate_claim_token(&lease.claim_token)?;
-        record.validate().map_err(|error| {
-            SettlementRetryError::Conflict(format!("invalid dead-letter record: {error}"))
-        })?;
+        crate::dead_letters::validate_dead_letter_record(record)
+            .map_err(|error| SettlementRetryError::Conflict(error.to_string()))?;
         let expected_attempts = lease.record.attempts.checked_add(1).ok_or_else(|| {
             SettlementRetryError::Conflict("settlement attempt count overflowed u32".to_string())
         })?;
@@ -1534,6 +1533,8 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
         let canonical_json =
             chio_core::canonical::canonical_json_bytes(record).map_err(backend_err)?;
         let canonical_json = String::from_utf8(canonical_json).map_err(backend_err)?;
+        let reason_projection = crate::dead_letters::dead_letter_reason_projection(record)
+            .map_err(|error| SettlementRetryError::Conflict(error.to_string()))?;
         let lease = lease.clone();
         let record = record.clone();
         let finalized_at = sqlite_i64(lease.record.finalized_at, "settlement finalized_at")?;
@@ -1600,8 +1601,8 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                                 record.receipt_id.as_str(),
                                 dead_letter_finalized_at,
                                 i64::from(record.attempts),
-                                record.reason.as_str(),
-                                record.pipeline_error.as_deref(),
+                                reason_projection.as_str(),
+                                Option::<&str>::None,
                                 canonical_json.as_str(),
                             ],
                         )

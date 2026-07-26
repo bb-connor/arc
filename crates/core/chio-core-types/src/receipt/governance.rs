@@ -22,6 +22,8 @@ pub struct GovernedApprovalReceiptMetadata {
     pub token_id: String,
     /// Hex-encoded approver public key.
     pub approver_key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_artifact_digest: Option<String>,
     /// Whether the token represented a positive approval.
     pub approved: bool,
 }

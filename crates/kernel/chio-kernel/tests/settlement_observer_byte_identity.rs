@@ -32,7 +32,10 @@ use chio_core::receipt::{
 use chio_kernel::settlement_observer::{
     self, SettlementObserverStatus, SETTLEMENT_OBSERVER_STATUS_SCHEMA,
 };
-use chio_settle::{SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome};
+use chio_settle::{
+    SettlementHook, SettlementHookError, SettlementIdempotencyKey, SettlementObservation,
+    SettlementOutcome,
+};
 
 /// Hook that records every observation it sees and always accepts.
 struct RecordingHook {
@@ -55,13 +58,10 @@ impl RecordingHook {
 }
 
 impl SettlementHook for RecordingHook {
-    fn supports_receipt_id_idempotency(&self) -> bool {
-        true
-    }
-
     fn observe(
         &self,
         observation: &SettlementObservation,
+        _idempotency_key: &SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         self.observations
             .lock()
@@ -141,10 +141,15 @@ fn ten_receipts_produce_ten_settlements_with_byte_identical_receipts() {
 
     let mut statuses = Vec::with_capacity(receipts.len());
     for receipt in &receipts {
+        let idempotency_key = SettlementIdempotencyKey {
+            receipt_id: receipt.id.clone(),
+            row_version: 1,
+        };
         statuses.push(settlement_observer::run_observer(
             Some(&hook_handle),
             receipt,
             std::slice::from_ref(&receipt.kernel_key),
+            &idempotency_key,
         ));
     }
 
@@ -212,10 +217,15 @@ fn no_settlement_baseline_matches_with_settlement_canonical_bytes() {
 
     // Run the observer for the with-hook variant only.
     for receipt in &receipts_with_hook {
+        let idempotency_key = SettlementIdempotencyKey {
+            receipt_id: receipt.id.clone(),
+            row_version: 1,
+        };
         let _status = settlement_observer::run_observer(
             Some(&hook),
             receipt,
             std::slice::from_ref(&receipt.kernel_key),
+            &idempotency_key,
         );
     }
 

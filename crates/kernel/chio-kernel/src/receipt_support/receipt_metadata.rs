@@ -342,6 +342,10 @@ fn governed_economic_authorization_metadata(
     Ok(Some(
         chio_core::receipt::economics::EconomicAuthorizationReceiptMetadata {
             version: chio_core::receipt::economics::EconomicAuthorizationReceiptMetadataVersion::V1,
+            economic_intent_digest: None,
+            payee_binding_digest: None,
+            pre_action_authority_digest: None,
+            credit_authority_digest: None,
             economic_mode,
             payer: chio_core::receipt::economics::EconomicPayerReceiptMetadata {
                 party_id: request.agent_id.clone(),
@@ -467,6 +471,11 @@ pub(crate) fn governed_request_metadata(
         return Ok(None);
     };
 
+    let approval_artifact_digest = request.approval_artifact_digest().map_err(|error| {
+        KernelError::ReceiptSigningFailed(format!(
+            "failed to hash governed approval for receipt metadata: {error}"
+        ))
+    })?;
     let approval =
         request
             .approval_token
@@ -474,6 +483,7 @@ pub(crate) fn governed_request_metadata(
             .map(|approval_token| GovernedApprovalReceiptMetadata {
                 token_id: approval_token.id.clone(),
                 approver_key: approval_token.approver.to_hex(),
+                approval_artifact_digest: approval_artifact_digest.clone(),
                 approved: approval_token.decision == GovernedApprovalDecision::Approved,
             });
     let commerce = intent

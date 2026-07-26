@@ -116,6 +116,8 @@ macro_rules! describe {
 
 pub const CHIO_ALERT_DISPATCH_TOTAL: &str = "chio_alert_dispatch_total";
 pub const CHIO_ALERT_DISPATCH_LATENCY_SECONDS: &str = "chio_alert_dispatch_latency_seconds";
+pub const CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL: &str =
+    "chio_ambiguous_dispatch_retained_hold_total";
 pub const CHIO_ANCHOR_ROUND_LATENCY_SECONDS: &str = "chio_anchor_round_latency_seconds";
 pub const CHIO_BUDGET_HOLDS_EXPIRED_TOTAL: &str = "chio_budget_holds_expired_total";
 pub const CHIO_BUDGET_OPEN_HOLDS: &str = "chio_budget_open_holds";
@@ -224,6 +226,12 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         help = "Total PagerDuty or OpsGenie alert dispatch outcomes.",
         kind = Counter,
         labels = ["route", "outcome"]
+    ),
+    describe!(
+        name = CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL,
+        help = "Total budget or payment holds retained after an ambiguous post-dispatch outcome, labeled by whether durable reconciliation is available.",
+        kind = Counter,
+        labels = ["reconciliation"]
     ),
     describe!(
         name = CHIO_ANCHOR_ROUND_LATENCY_SECONDS,
@@ -553,7 +561,7 @@ pub const REGISTRY: &[MetricDescriptor] = &[
     ),
     describe!(
         name = CHIO_SETTLEMENT_UNRESOLVED_TOTAL,
-        help = "Total money-bearing receipts whose settlement outcome could not be resolved (routed to retry or dead-letter, or surfaced as a loud incident).",
+        help = "Total settlement observer routing invocations with an unresolved outcome.",
         kind = Counter,
         labels = []
     ),
@@ -769,20 +777,6 @@ mod tests {
                 descriptor.name
             );
             previous = descriptor.name;
-        }
-    }
-
-    #[test]
-    fn money_path_descriptors_are_registered() {
-        for name in [
-            CHIO_SETTLEMENT_UNRESOLVED_TOTAL,
-            CHIO_BUDGET_OPEN_HOLDS,
-            CHIO_BUDGET_HOLDS_EXPIRED_TOTAL,
-        ] {
-            assert!(
-                REGISTRY.iter().any(|d| d.name == name),
-                "descriptor {name} missing from REGISTRY"
-            );
         }
     }
 

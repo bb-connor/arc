@@ -77,6 +77,7 @@ pub(crate) fn insert_runtime_loopback_treaty_context(
             destructive: step.admission_bundle.destructive,
             consistency_model: "totally_ordered".to_string(),
             co_sign: "bilateral_required".to_string(),
+            co_sign_quorum: None,
             evidence_required,
             participant_modes,
         }],

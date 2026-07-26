@@ -1503,6 +1503,7 @@ fn make_metered_billing_context(
             expires_at: Some(now + 300),
         },
         max_billed_units: Some(units + 4),
+        verified_outcome: None,
     }
 }
 

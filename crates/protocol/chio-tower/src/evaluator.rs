@@ -571,10 +571,13 @@ mod tests {
             std::sync::Arc::new(chio_store_sqlite::SqliteRevocationStore::open(
                 dir.path().join("revocations.db"),
             )?);
-        let evaluator = ChioEvaluator::builder(Keypair::generate(), "test-policy".to_string())
-            .receipt_store(receipt_store)
-            .revocation_store(revocation_store)
-            .build()?;
+        let evaluator = ChioEvaluator::builder(
+            Keypair::generate(),
+            chio_core_types::crypto::sha256_hex(b"test-policy"),
+        )
+        .receipt_store(receipt_store)
+        .revocation_store(revocation_store)
+        .build()?;
         assert!(!evaluator.is_fail_open());
 
         let caller = CallerIdentity::anonymous();

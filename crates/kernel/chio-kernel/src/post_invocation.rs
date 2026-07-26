@@ -2,6 +2,7 @@
 
 use chio_core::receipt::metadata::GuardEvidence;
 use chio_core::{capability::scope::ChioScope, AgentId, ServerId};
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::runtime::ToolCallRequest;
@@ -97,6 +98,75 @@ impl PostInvocationInspection {
     }
 }
 
+/// Canonical implementation and configuration identity for a durable hook.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PostInvocationHookIdentity {
+    component_id: String,
+    component_version: String,
+    implementation_digest: String,
+}
+
+impl PostInvocationHookIdentity {
+    pub fn from_canonical_config<T: Serialize>(
+        component_id: impl Into<String>,
+        component_version: impl Into<String>,
+        implementation_tag: &str,
+        configuration: &T,
+    ) -> Result<Self, String> {
+        #[derive(Serialize)]
+        struct IdentityPreimage<'a, T> {
+            schema: &'static str,
+            component_id: &'a str,
+            component_version: &'a str,
+            implementation_tag: &'a str,
+            configuration: &'a T,
+        }
+
+        let component_id = component_id.into();
+        let component_version = component_version.into();
+        for (field, value) in [
+            ("component_id", component_id.as_str()),
+            ("component_version", component_version.as_str()),
+            ("implementation_tag", implementation_tag),
+        ] {
+            if value.trim().is_empty() || value.len() > 128 {
+                return Err(format!(
+                    "post-invocation {field} must contain 1 to 128 characters"
+                ));
+            }
+        }
+        let canonical = crate::canonical_json_bytes(&IdentityPreimage {
+            schema: "chio.post-invocation-hook-identity.v1",
+            component_id: &component_id,
+            component_version: &component_version,
+            implementation_tag,
+            configuration,
+        })
+        .map_err(|error| format!("post-invocation identity is not canonical JSON: {error}"))?;
+        Ok(Self {
+            component_id,
+            component_version,
+            implementation_digest: crate::sha256_hex(&canonical),
+        })
+    }
+
+    #[must_use]
+    pub fn component_id(&self) -> &str {
+        &self.component_id
+    }
+
+    #[must_use]
+    pub fn component_version(&self) -> &str {
+        &self.component_version
+    }
+
+    #[must_use]
+    pub fn implementation_digest(&self) -> &str {
+        &self.implementation_digest
+    }
+}
+
 /// A hook that inspects tool responses after invocation.
 pub trait PostInvocationHook: Send + Sync {
     fn name(&self) -> &str;
@@ -111,6 +181,10 @@ pub trait PostInvocationHook: Send + Sync {
         let verdict = self.inspect(ctx, response);
         let evidence = self.take_evidence().into_iter().collect();
         PostInvocationInspection::new(verdict, evidence)
+    }
+
+    fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
+        Ok(None)
     }
 
     fn take_evidence(&self) -> Option<GuardEvidence> {

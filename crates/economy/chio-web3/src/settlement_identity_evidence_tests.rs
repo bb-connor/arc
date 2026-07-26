@@ -11,9 +11,6 @@ use super::tests::{
     verify_sample_public_settlement_proof,
 };
 
-type RegistryBindingMutation = fn(&mut Web3SettlementIdentityRegistryEvidenceBinding);
-type RegistryBindingMismatchCase = (&'static str, RegistryBindingMutation);
-
 #[test]
 fn dual_sign_settlement_receipt_requires_registry_evidence() {
     let mut receipt = sample_execution_receipt();
@@ -73,9 +70,11 @@ fn dual_sign_settlement_receipt_accepts_registry_evidence() {
     validate_web3_settlement_execution_receipt(&receipt).unwrap();
 }
 
+type RegistryBindingMutation = fn(&mut Web3SettlementIdentityRegistryEvidenceBinding);
+
 #[test]
 fn dual_sign_settlement_receipt_rejects_registry_binding_mismatches() {
-    let cases: [RegistryBindingMismatchCase; 3] = [
+    let cases: [(&str, RegistryBindingMutation); 3] = [
         (
             "contract",
             |binding: &mut Web3SettlementIdentityRegistryEvidenceBinding| {

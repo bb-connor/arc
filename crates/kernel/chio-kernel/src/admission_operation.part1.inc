@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::sha256_hex;
+pub use chio_core_types::StoreMutationFence;
 use serde::{Deserialize, Serialize};
 
 pub const ADMISSION_OPERATION_SCHEMA: &str = "chio.admission-operation.v1";

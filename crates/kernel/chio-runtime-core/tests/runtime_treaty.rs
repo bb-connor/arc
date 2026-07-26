@@ -4,7 +4,7 @@ use chio_runtime_core::{
     compute_ladder_intersection, evaluate_cross_boundary_admission,
     validate_cross_boundary_admission_report, validate_governance_ladder_manifest,
     validate_ladder_intersection, CrossBoundaryAdmissionInput, CrossBoundaryAdmissionReport,
-    CrossBoundaryEvidenceRef,
+    CrossBoundaryEvidenceRef, GovernanceLadderQuorum,
 };
 use std::io;
 use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
@@ -19,6 +19,7 @@ fn accepted_admission_report() -> CrossBoundaryAdmissionReport {
         mode: "receipt_backed".to_string(),
         consistency_model: "totally_ordered".to_string(),
         co_sign: "bilateral_required".to_string(),
+        co_sign_quorum: None,
         required_evidence: vec!["governance_receipt".to_string()],
         present_evidence: vec![
             "governance_receipt".to_string(),
@@ -269,6 +270,7 @@ fn treaty_cross_boundary_admission_rejects_accepted_failure_code(
         mode: "receipt_backed".to_string(),
         consistency_model: "totally_ordered".to_string(),
         co_sign: "bilateral_required".to_string(),
+        co_sign_quorum: None,
         required_evidence: vec!["governance_receipt".to_string()],
         present_evidence: vec!["governance_receipt".to_string()],
         verified_evidence: vec![CrossBoundaryEvidenceRef {
@@ -471,6 +473,11 @@ fn treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign(
         vec!["governance_receipt"],
     );
     buyer_action.co_sign = "quorum_required".to_string();
+    buyer_action.co_sign_quorum = Some(GovernanceLadderQuorum {
+        n: 2,
+        m: 3,
+        scope: "treaty".to_string(),
+    });
     let mut vendor_action = treaty_action_class(
         "receipt_backed",
         true,
@@ -478,6 +485,11 @@ fn treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign(
         vec!["governance_receipt"],
     );
     vendor_action.co_sign = "quorum_required".to_string();
+    vendor_action.co_sign_quorum = Some(GovernanceLadderQuorum {
+        n: 2,
+        m: 3,
+        scope: "treaty".to_string(),
+    });
     let buyer = treaty_manifest("kernel.buyer", buyer_action);
     let vendor = treaty_manifest("kernel.vendor-b", vendor_action);
     let mut treaty = treaty_scope();

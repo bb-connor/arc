@@ -650,6 +650,7 @@ fn request_receipt_metadata_projects_economic_authorization_from_financial_metad
                         expires_at: Some(200),
                     },
                     max_billed_units: Some(100),
+                    verified_outcome: None,
                 }),
                 runtime_attestation: None,
                 call_chain: None,

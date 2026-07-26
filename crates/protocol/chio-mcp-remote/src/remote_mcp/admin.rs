@@ -116,10 +116,12 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
         },
         "stores": {
             "receiptsConfigured": state.factory.config.receipt_db_path.is_some(),
-            "revocationsConfigured": state.factory.config.revocation_db_path.is_some(),
+            "revocationsConfigured": state.factory.config.control_url.is_some()
+                || state.factory.config.revocation_db_path.is_some(),
             "authorityDbConfigured": state.factory.config.authority_db_path.is_some(),
             "authoritySeedConfigured": state.factory.config.authority_seed_path.is_some(),
-            "budgetsConfigured": state.factory.config.budget_db_path.is_some(),
+            "budgetsConfigured": state.factory.config.control_url.is_some()
+                || state.factory.config.budget_db_path.is_some(),
             "sessionTombstonesConfigured": state.factory.config.session_db_path.is_some(),
         },
         "sessions": {

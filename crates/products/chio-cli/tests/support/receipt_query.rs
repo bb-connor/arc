@@ -5,6 +5,9 @@
     clippy::unwrap_used
 )]
 
+mod budget_fixture;
+pub(crate) use budget_fixture::seed_budget_exposure;
+
 pub(crate) use super::receipt_query_capital_authority::*;
 pub(crate) use super::receipt_query_helpers::*;
 
@@ -62,8 +65,8 @@ pub(crate) use chio_kernel::budget_store::{
     BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetQuotaKey,
 };
 pub(crate) use chio_kernel::{
-    build_checkpoint, AuthorizationContextReport, BudgetUsageRecord, CapabilitySnapshot,
-    CreditBacktestReport, CreditBondListReport, CreditBondReport,
+    build_checkpoint, AuthorizationContextReport, BudgetStore, BudgetUsageRecord,
+    CapabilitySnapshot, CreditBacktestReport, CreditBondListReport, CreditBondReport,
     CreditBondedExecutionSimulationReport, CreditFacilityListReport, CreditFacilityReport,
     CreditLossLifecycleListReport, FederatedEvidenceShareImport, LiabilityMarketWorkflowReport,
     LiabilityProviderListReport, LiabilityProviderResolutionReport, ReceiptStore,
@@ -1102,11 +1105,13 @@ pub(crate) fn make_governed_financial_receipt_signed_by(
             commerce: Some(GovernedCommerceReceiptMetadata {
                 seller: "seller-risk".to_string(),
                 shared_payment_token_id: "spt-risk-1".to_string(),
+                settlement_destination_ref: None,
             }),
             metered_billing: None,
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: "approval-risk-1".to_string(),
                 approver_key: issuer_key.to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: None,
@@ -1198,6 +1203,7 @@ pub(crate) fn make_governed_receipt(
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: "approval-ops-1".to_string(),
                 approver_key: "approver-key-1".to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: None,
@@ -1328,6 +1334,7 @@ pub(crate) fn make_governed_authorization_receipt_with_runtime_profile(
             commerce: Some(GovernedCommerceReceiptMetadata {
                 seller: "merchant.example".to_string(),
                 shared_payment_token_id: "spt_live_auth_1".to_string(),
+                settlement_destination_ref: None,
             }),
             metered_billing: include_metered_billing.then_some(MeteredBillingReceiptMetadata {
                 settlement_mode: MeteredSettlementMode::AllowThenSettle,
@@ -1349,6 +1356,7 @@ pub(crate) fn make_governed_authorization_receipt_with_runtime_profile(
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: "approval-auth-1".to_string(),
                 approver_key: issuer_key.to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: Some(RuntimeAssuranceReceiptMetadata {
@@ -1476,11 +1484,13 @@ pub(crate) fn make_credit_history_receipt(
             commerce: Some(GovernedCommerceReceiptMetadata {
                 seller: "merchant.example".to_string(),
                 shared_payment_token_id: format!("spt-{id}"),
+                settlement_destination_ref: None,
             }),
             metered_billing: None,
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: format!("approval-{id}"),
                 approver_key: issuer_key.to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: include_runtime_assurance.then_some(RuntimeAssuranceReceiptMetadata {
@@ -1573,6 +1583,7 @@ pub(crate) fn make_governed_authorization_receipt_without_runtime_assurance(
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: "approval-facility-1".to_string(),
                 approver_key: issuer_key.to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: None,
@@ -1657,6 +1668,7 @@ pub(crate) fn make_underwriting_simulation_receipt(
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: format!("approval-sim-{id}"),
                 approver_key: issuer_key.to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: Some(RuntimeAssuranceReceiptMetadata {
@@ -1750,6 +1762,7 @@ pub(crate) fn make_governed_x402_receipt(
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: "approval-x402-ops-1".to_string(),
                 approver_key: "approver-key-x402".to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: None,
@@ -1835,11 +1848,13 @@ pub(crate) fn make_governed_acp_receipt(
             commerce: Some(GovernedCommerceReceiptMetadata {
                 seller: "merchant.example".to_string(),
                 shared_payment_token_id: "spt_live_ops_1".to_string(),
+                settlement_destination_ref: None,
             }),
             metered_billing: None,
             approval: Some(GovernedApprovalReceiptMetadata {
                 token_id: "approval-acp-ops-1".to_string(),
                 approver_key: "approver-key-acp".to_string(),
+                approval_artifact_digest: None,
                 approved: true,
             }),
             runtime_assurance: None,

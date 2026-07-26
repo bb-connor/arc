@@ -770,9 +770,6 @@ impl ChioKernel {
         {
             return Err(KernelBuildError::SettlementRetryStoreNotDurable);
         }
-        if !hook.supports_receipt_id_idempotency() {
-            return Err(KernelBuildError::SettlementHookNotIdempotent);
-        }
         let receipt_store = self
             .receipt_store
             .as_deref()
@@ -1046,21 +1043,33 @@ impl ChioKernel {
         match self.verify_trusted_receipt(receipt) {
             Ok(true) => {}
             Ok(false) => {
-                return settlement_observer::SettlementObserverStatus::TrustFailed {
-                    error: "receipt signer is not trusted by the runtime authority resolver"
-                        .to_string(),
+                return settlement_observer::SettlementObserverStatus::HookFailed {
+                    class: chio_settle::SettlementFailureClass::Permanent,
+                    reason: chio_settle::SettlementFailureReason::from_detail(
+                        chio_settle::SettlementFailureCode::UntrustedReceiptSigner,
+                        "receipt signer is not trusted by the runtime authority resolver",
+                    ),
                 };
             }
             Err(_) => {
-                return settlement_observer::SettlementObserverStatus::TrustFailed {
-                    error: "receipt authority trust resolution failed".to_string(),
+                return settlement_observer::SettlementObserverStatus::HookFailed {
+                    class: chio_settle::SettlementFailureClass::Permanent,
+                    reason: chio_settle::SettlementFailureReason::from_detail(
+                        chio_settle::SettlementFailureCode::UntrustedReceiptSigner,
+                        "receipt authority trust resolution failed",
+                    ),
                 };
             }
         }
+        let idempotency_key = chio_settle::SettlementIdempotencyKey {
+            receipt_id: receipt.id.clone(),
+            row_version: 1,
+        };
         settlement_observer::run_observer(
             self.settlement_observer.as_ref(),
             receipt,
             std::slice::from_ref(&receipt.kernel_key),
+            &idempotency_key,
         )
     }
 
@@ -1092,7 +1101,7 @@ impl ChioKernel {
             &outcome,
         )
         {
-            RetryDecision::Skip { .. } => {
+            RetryDecision::Accepted | RetryDecision::Skip { .. } => {
                 // Resolved (accepted or skipped): the receipt owes nothing
                 // downstream, so any bounded envelope for it is cleared.
                 if let Some(store) = store {
@@ -1100,15 +1109,15 @@ impl ChioKernel {
                 }
                 Ok(())
             }
-            RetryDecision::Retry { attempt, backoff } => {
+            RetryDecision::Retry {
+                attempt,
+                backoff,
+                reason,
+            } => {
                 let Some(store) = store else {
                     return Err(SettlementRetryError::Backend(
                         "no settlement retry store installed".to_string(),
                     ));
-                };
-                let reason = match &outcome {
-                    chio_settle::SettlementOutcome::Retryable { reason, .. } => reason.clone(),
-                    _ => "settlement retry scheduled".to_string(),
                 };
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -1119,7 +1128,7 @@ impl ChioKernel {
                     finalized_at: receipt.timestamp,
                     attempts: attempt,
                     next_visible_at: now.saturating_add(backoff.as_secs().max(1)),
-                    last_reason: Some(reason),
+                    last_reason: Some(reason.code().as_str().to_string()),
                 })
             }
             RetryDecision::DeadLetter { reason } => {

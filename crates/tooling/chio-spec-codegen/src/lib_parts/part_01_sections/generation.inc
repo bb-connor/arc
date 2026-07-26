@@ -49,6 +49,8 @@ pub enum CodegenError {
     SynParse(syn::Error),
     /// A deterministic generated-binding hardening pattern was missing.
     GeneratedHardening(String),
+    /// `rustfmt` rejected or could not decode generated Rust source.
+    Rustfmt(PathBuf, String),
     /// The error registry YAML could not be loaded or validated.
     Registry(PathBuf, String),
     /// The schemas directory did not exist on disk.
@@ -82,6 +84,9 @@ impl fmt::Display for CodegenError {
             Self::GeneratedHardening(msg) => {
                 write!(f, "generated binding hardening failed: {msg}")
             }
+            Self::Rustfmt(path, msg) => {
+                write!(f, "rustfmt rejected generated source {}: {msg}", path.display())
+            }
             Self::Registry(path, msg) => {
                 write!(
                     f,
@@ -110,6 +115,40 @@ impl std::error::Error for CodegenError {}
 
 /// Result alias for the public API.
 pub type Result<T> = core::result::Result<T, CodegenError>;
+
+pub(crate) fn rustfmt_generated(path: &Path, source: &str) -> Result<String> {
+    use std::io::Write as _;
+
+    let mut child = std::process::Command::new("rustfmt")
+        .args(["--emit", "stdout", "--edition", "2021"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|error| CodegenError::Io(PathBuf::from("rustfmt"), error))?;
+    let Some(mut stdin) = child.stdin.take() else {
+        return Err(CodegenError::Rustfmt(
+            path.to_path_buf(),
+            "stdin unavailable".to_string(),
+        ));
+    };
+    stdin
+        .write_all(source.as_bytes())
+        .map_err(|error| CodegenError::Io(PathBuf::from("rustfmt stdin"), error))?;
+    drop(stdin);
+
+    let output = child
+        .wait_with_output()
+        .map_err(|error| CodegenError::Io(PathBuf::from("rustfmt"), error))?;
+    if !output.status.success() {
+        return Err(CodegenError::Rustfmt(
+            path.to_path_buf(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ));
+    }
+    String::from_utf8(output.stdout)
+        .map_err(|error| CodegenError::Rustfmt(path.to_path_buf(), error.to_string()))
+}
 
 /// Generate Rust types from every schema under `schemas_dir` and write them
 /// to `out_dir`.

@@ -686,6 +686,11 @@ impl HttpAuthority {
             tool_name: binding.requested_tool_name.clone(),
             arguments: binding.requested_arguments.clone(),
             model_metadata: input.model_metadata.cloned(),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: None,
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
             execution_nonce: input.execution_nonce.cloned(),
             timestamp: checked_unix_timestamp(chrono::Utc::now().timestamp())
                 .map_err(HttpAuthorityError::Kernel)?,

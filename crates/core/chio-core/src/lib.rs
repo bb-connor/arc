@@ -19,6 +19,7 @@ pub use chio_autonomy as autonomy;
 pub use chio_core_types::canonical;
 pub use chio_core_types::capability;
 pub use chio_core_types::crypto;
+pub use chio_core_types::economic_continuity;
 pub use chio_core_types::error;
 pub use chio_credit as credit;
 pub mod extension;

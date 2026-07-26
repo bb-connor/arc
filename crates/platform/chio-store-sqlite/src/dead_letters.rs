@@ -18,10 +18,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use chio_settle::{
-    DeadLetterRecord, DEAD_LETTER_MAX_ATTEMPTS, DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES,
-    DEAD_LETTER_REASON_MAX_BYTES, DEAD_LETTER_RECEIPT_ID_MAX_BYTES,
-};
+use chio_settle::DeadLetterRecord;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
@@ -122,6 +119,10 @@ END;
 "#;
 
 const SETTLE_DEAD_LETTER_CANONICAL_JSON_MAX_BYTES: usize = 16_384;
+const DEAD_LETTER_MAX_ATTEMPTS: u32 = 33;
+const DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES: usize = 2_048;
+const DEAD_LETTER_REASON_MAX_BYTES: usize = 2_048;
+const DEAD_LETTER_RECEIPT_ID_MAX_BYTES: usize = 512;
 
 fn normalize_schema_sql(sql: &str) -> String {
     sql.split_ascii_whitespace()
@@ -133,10 +134,21 @@ fn normalize_schema_sql(sql: &str) -> String {
         .to_string()
 }
 
-fn validate_dead_letter_record(record: &DeadLetterRecord) -> Result<(), DeadLetterStoreError> {
-    record.validate().map_err(|error| {
-        DeadLetterStoreError::Conflict(format!("invalid settlement dead-letter record: {error}"))
-    })
+pub(crate) fn validate_dead_letter_record(
+    record: &DeadLetterRecord,
+) -> Result<(), DeadLetterStoreError> {
+    validate_dead_letter_receipt_id(&record.receipt_id)?;
+    if !record.has_supported_schema() {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter record has an unsupported schema".to_string(),
+        ));
+    }
+    if record.attempts == 0 || record.attempts > DEAD_LETTER_MAX_ATTEMPTS {
+        return Err(DeadLetterStoreError::Conflict(
+            "settlement dead-letter attempts exceed the retry envelope".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_dead_letter_receipt_id(receipt_id: &str) -> Result<(), DeadLetterStoreError> {
@@ -171,6 +183,18 @@ fn encode_dead_letter_record(record: &DeadLetterRecord) -> Result<String, DeadLe
     String::from_utf8(bytes).map_err(|_| {
         DeadLetterStoreError::Conflict("dead-letter canonical JSON is not UTF-8".to_string())
     })
+}
+
+pub(crate) fn dead_letter_reason_projection(
+    record: &DeadLetterRecord,
+) -> Result<String, DeadLetterStoreError> {
+    let bytes = chio_core::canonical::canonical_json_bytes(&record.reason).map_err(|_| {
+        DeadLetterStoreError::Conflict("dead-letter reason encoding failed".to_string())
+    })?;
+    Ok(format!(
+        "settlement_failure:sha256:{}",
+        chio_core::sha256_hex(&bytes)
+    ))
 }
 
 fn validate_dead_letter_schema(
@@ -400,8 +424,8 @@ fn validate_dead_letter_schema(
         if record.receipt_id != receipt_id
             || record.finalized_at != finalized_at
             || record.attempts != attempts
-            || record.reason != reason
-            || record.pipeline_error != pipeline_error
+            || dead_letter_reason_projection(&record)? != reason
+            || pipeline_error.is_some()
             || encode_dead_letter_record(&record)? != canonical_json
         {
             return Err(DeadLetterStoreError::Conflict(
@@ -499,8 +523,8 @@ fn insert_dead_letter_on_connection(
                 record.receipt_id.as_str(),
                 finalized_at,
                 attempts,
-                record.reason.as_str(),
-                record.pipeline_error.as_deref(),
+                dead_letter_reason_projection(record)?,
+                Option::<&str>::None,
                 canonical_str,
             ],
         )
@@ -850,7 +874,7 @@ mod tests {
         ));
 
         let mut record = sample_record("rcpt-invalid", 1);
-        record.reason = "raw secret".to_string();
+        record.reason = "raw secret".into();
         assert!(matches!(
             store.insert(&record),
             Err(DeadLetterStoreError::Conflict(_))
