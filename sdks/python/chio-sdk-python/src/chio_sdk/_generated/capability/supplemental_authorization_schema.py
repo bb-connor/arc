@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 63696e53010dca489dd90f0f71166c42511e6e9734e364a6e3cd564e8d04693b
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,14 +11,20 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChioOpaqueSupplementalAuthorization(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    signed_extension: constr(min_length=4, max_length=87384) = Field(
-        ...,
-        description="Opaque authenticated extension bytes. Adapters must not interpret these bytes as quota authority.",
-    )
+    signed_extension: Annotated[
+        str,
+        Field(
+            description="Opaque authenticated extension bytes. Adapters must not interpret these bytes as quota authority.",
+            max_length=87384,
+            min_length=4,
+        ),
+    ]

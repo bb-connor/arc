@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 63696e53010dca489dd90f0f71166c42511e6e9734e364a6e3cd564e8d04693b
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,19 +11,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, conint, constr
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import active_response_governed_intent_schema
-
-
-class MaxAmount(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    units: conint(ge=0)
-    currency: constr(min_length=1)
 
 
 class Body(BaseModel):
@@ -33,7 +25,7 @@ class Body(BaseModel):
     kind: Literal["tool_invocation"]
 
 
-class Body3(BaseModel):
+class Body4(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -41,19 +33,27 @@ class Body3(BaseModel):
     value: active_response_governed_intent_schema.ChioGovernedActiveResponseIntentBody
 
 
+class MaxAmount(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    currency: Annotated[str, Field(min_length=1)]
+    units: Annotated[int, Field(ge=0)]
+
+
 class ChioGovernedTransactionIntent(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    id: constr(min_length=1)
-    server_id: constr(min_length=1)
-    tool_name: constr(min_length=1)
-    purpose: str
-    max_amount: MaxAmount | None = None
-    commerce: dict[str, Any] | None = None
-    metered_billing: dict[str, Any] | None = None
-    runtime_attestation: dict[str, Any] | None = None
-    call_chain: dict[str, Any] | None = None
     autonomy: dict[str, Any] | None = None
+    body: Body | Body4 | None = None
+    call_chain: dict[str, Any] | None = None
+    commerce: dict[str, Any] | None = None
     context: Any | None = None
-    body: Body | Body3 | None = None
+    id: Annotated[str, Field(min_length=1)]
+    max_amount: MaxAmount | None = None
+    metered_billing: dict[str, Any] | None = None
+    purpose: str
+    runtime_attestation: dict[str, Any] | None = None
+    server_id: Annotated[str, Field(min_length=1)]
+    tool_name: Annotated[str, Field(min_length=1)]

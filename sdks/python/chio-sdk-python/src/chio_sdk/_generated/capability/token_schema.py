@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,11 +14,12 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from . import (
     aggregate_family_preservation_evidence_schema,
     aggregate_invocation_budget_schema,
+    cumulative_approval_root_schema,
 )
 
 
@@ -56,15 +57,6 @@ class Caveat(BaseModel):
             pattern="^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
         ),
     ] = None
-
-
-class Constraint(BaseModel):
-    """
-    Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
-    """
-
-    type: Annotated[str, Field(min_length=1)]
-    value: Any | None = None
 
 
 class Attenuation(BaseModel):
@@ -116,6 +108,18 @@ class DelegationLink(BaseModel):
     timestamp: Annotated[int, Field(ge=0)]
 
 
+class GenericConstraint(BaseModel):
+    """
+    Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[str, Field(min_length=1)]
+    value: Any | None = None
+
+
 class GrantKind(Enum):
     tool = "tool"
     resource = "resource"
@@ -134,6 +138,21 @@ class GrantSubsetRelation(BaseModel):
     grantKind: GrantKind
     parentIndex: Annotated[int, Field(ge=0)]
     subset: Subset
+
+
+class Value2(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    threshold_units: Annotated[int, Field(ge=0)]
+
+
+class LegacyApprovalConstraint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["require_approval_above"]
+    value: Value2
 
 
 class MonetaryAmount(BaseModel):
@@ -181,6 +200,83 @@ class ResourceGrant(BaseModel):
     uri_pattern: Annotated[str, Field(min_length=1)]
 
 
+class AttenuationWitness(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    normalizedChildScope: Annotated[str, Field(min_length=2)]
+    normalizedParentScope: Annotated[str, Field(min_length=2)]
+    restrictedPredicates: list[str] | None = None
+    subsetRelations: list[GrantSubsetRelation] | None = None
+
+
+class Value(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    approval_budget_epoch: Annotated[int, Field(ge=0)]
+    approval_budget_id: Annotated[str, Field(min_length=1)]
+    cumulative_approval_root_binding: (
+        cumulative_approval_root_schema.ChioCumulativeApprovalRootBinding
+    )
+    threshold: MonetaryAmount
+
+
+class CumulativeApprovalDelegableConstraint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["require_cumulative_approval_above"]
+    value: Value
+
+
+class Value1(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    approval_budget_epoch: Annotated[int, Field(ge=0)]
+    approval_budget_id: Annotated[str, Field(min_length=1)]
+    cumulative_approval_root_binding: Any | None = None
+    threshold: MonetaryAmount
+
+
+class CumulativeApprovalDirectConstraint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["require_cumulative_approval_above"]
+    value: Value1
+
+
+class AttenuationProof(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    aggregateFamilyPreservation: (
+        aggregate_family_preservation_evidence_schema.ChioAggregateFamilyPreservationEvidence
+        | None
+    ) = None
+    childScopeHash: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    normalizedSubsetProof: AttenuationWitness
+    parentScopeHash: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+
+
+class Constraint(
+    RootModel[
+        GenericConstraint
+        | LegacyApprovalConstraint
+        | CumulativeApprovalDirectConstraint
+        | CumulativeApprovalDelegableConstraint
+    ]
+):
+    root: (
+        GenericConstraint
+        | LegacyApprovalConstraint
+        | CumulativeApprovalDirectConstraint
+        | CumulativeApprovalDelegableConstraint
+    )
+
+
 class ToolGrant(BaseModel):
     """
     Authorization to invoke a single tool. Mirrors `ToolGrant`.
@@ -199,16 +295,6 @@ class ToolGrant(BaseModel):
     tool_name: Annotated[str, Field(min_length=1)]
 
 
-class AttenuationWitness(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    normalizedChildScope: Annotated[str, Field(min_length=2)]
-    normalizedParentScope: Annotated[str, Field(min_length=2)]
-    restrictedPredicates: list[str] | None = None
-    subsetRelations: list[GrantSubsetRelation] | None = None
-
-
 class ChioScope(BaseModel):
     """
     What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
@@ -220,19 +306,6 @@ class ChioScope(BaseModel):
     grants: list[ToolGrant] | None = None
     prompt_grants: list[PromptGrant] | None = None
     resource_grants: list[ResourceGrant] | None = None
-
-
-class AttenuationProof(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    aggregateFamilyPreservation: (
-        aggregate_family_preservation_evidence_schema.ChioAggregateFamilyPreservationEvidence
-        | None
-    ) = None
-    childScopeHash: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
-    normalizedSubsetProof: AttenuationWitness
-    parentScopeHash: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
 
 
 class ChioCapabilitytoken(BaseModel):

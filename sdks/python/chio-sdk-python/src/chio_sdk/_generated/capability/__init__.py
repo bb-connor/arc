@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -13,28 +13,36 @@ from __future__ import annotations
 from .aggregate_budget_root_binding_body_schema import ChioAggregateBudgetRootBindingBody, Digest, Identifier, PublicKey
 from .aggregate_budget_root_binding_schema import Algorithm, ChioSignedAggregateBudgetRootBinding, Signature
 from .aggregate_budget_root_commitment_schema import ChioAggregateBudgetRootCommitment, Digest, Identifier, PublicKey
+from .aggregate_budget_root_schema import AggregateRootPublicKey, AggregateRootSignature, AggregateRootSigningAlgorithm, Body, ChioAggregateBudgetRootBinding
 from .aggregate_family_preservation_evidence_schema import ChioAggregateFamilyPreservationEvidence
 from .aggregate_invocation_budget_schema import ChioAggregateInvocationBudget, ChioAggregateInvocationBudget1, ChioAggregateInvocationBudget2, Scope
 from .capabilities_schema import ChioCapabilityNegotiationV1
+from .cumulative_approval_root_schema import Body, ChioCumulativeApprovalRootBinding, CumulativeRootMonetaryAmount, CumulativeRootPublicKey, CumulativeRootSignature, CumulativeRootSigningAlgorithm
 from .governed_approval_token_body_schema import ChioGovernedApprovalTokenBody, Decision, Digest, GovernanceIdentifier, PublicKey
 from .governed_approval_token_schema import Algorithm, ChioSignedGovernedApprovalToken, Decision, Digest, GovernanceIdentifier, PublicKey, Signature
 from .governed_transaction_intent_schema import ActiveResponsePlanBody, Autonomy, CallChain, ChioGovernedTransactionIntent, ChioGovernedTransactionIntent1, ChioGovernedTransactionIntent2, Commerce, Digest, GovernanceIdentifier, MeteredBilling, MonetaryAmount, OrderedEffect, PublicKey, Quote, SettlementMode, Tier, ToolInvocationBody
 from .grant_schema import ChioCapabilityGrant, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
 from .revocation_schema import ChioCapabilityRevocationEntry
+from .supplemental_authorization_schema import ChioOpaqueSupplementalAuthorization
 from .threshold_approval_proposal_body_schema import ChioThresholdApprovalProposalBody, Digest, GovernanceIdentifier, PublicKey
 from .threshold_approval_proposal_schema import Algorithm, ChioSignedThresholdApprovalProposal, PublicKey, Signature
-from .token_schema import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytoken, ChioScope, Constraint, DelegationLink, GrantKind, GrantSubsetRelation, Kind, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ScopeAttenuation, Subset, ToolGrant
+from .token_schema import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytoken, ChioScope, Constraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, DelegationLink, GenericConstraint, GrantKind, GrantSubsetRelation, Kind, LegacyApprovalConstraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ScopeAttenuation, Subset, ToolGrant, Value, Value1, Value2
 from .verified_approval_set_schema import ChioVerifiedThresholdApprovalSet, Digest, GovernanceIdentifier, PublicKey
 
 __all__ = [
     "ActiveResponsePlanBody",
+    "AggregateRootPublicKey",
+    "AggregateRootSignature",
+    "AggregateRootSigningAlgorithm",
     "Algorithm",
     "Attenuation",
     "AttenuationProof",
     "AttenuationWitness",
     "Autonomy",
+    "Body",
     "CallChain",
     "Caveat",
+    "ChioAggregateBudgetRootBinding",
     "ChioAggregateBudgetRootBindingBody",
     "ChioAggregateBudgetRootCommitment",
     "ChioAggregateFamilyPreservationEvidence",
@@ -45,10 +53,12 @@ __all__ = [
     "ChioCapabilityNegotiationV1",
     "ChioCapabilityRevocationEntry",
     "ChioCapabilitytoken",
+    "ChioCumulativeApprovalRootBinding",
     "ChioGovernedApprovalTokenBody",
     "ChioGovernedTransactionIntent",
     "ChioGovernedTransactionIntent1",
     "ChioGovernedTransactionIntent2",
+    "ChioOpaqueSupplementalAuthorization",
     "ChioScope",
     "ChioSignedAggregateBudgetRootBinding",
     "ChioSignedGovernedApprovalToken",
@@ -57,14 +67,22 @@ __all__ = [
     "ChioVerifiedThresholdApprovalSet",
     "Commerce",
     "Constraint",
+    "CumulativeApprovalDelegableConstraint",
+    "CumulativeApprovalDirectConstraint",
+    "CumulativeRootMonetaryAmount",
+    "CumulativeRootPublicKey",
+    "CumulativeRootSignature",
+    "CumulativeRootSigningAlgorithm",
     "Decision",
     "DelegationLink",
     "Digest",
+    "GenericConstraint",
     "GovernanceIdentifier",
     "GrantKind",
     "GrantSubsetRelation",
     "Identifier",
     "Kind",
+    "LegacyApprovalConstraint",
     "MeteredBilling",
     "MonetaryAmount",
     "Operation",
@@ -81,4 +99,7 @@ __all__ = [
     "Tier",
     "ToolGrant",
     "ToolInvocationBody",
+    "Value",
+    "Value1",
+    "Value2",
 ]

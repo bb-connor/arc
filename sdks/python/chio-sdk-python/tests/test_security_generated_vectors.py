@@ -105,6 +105,18 @@ from chio_sdk._generated.trust_control.admission_request_binding_schema import (
 from chio_sdk._generated.trust_control.budget_invocation_admission_evidence_schema import (
     ChioBudgetInvocationAdmissionEvidence,
 )
+from chio_sdk._generated.trust_control.partition_escrow_admission_evidence_schema import (
+    ChioPartitionEscrowAdmissionEvidence,
+)
+from chio_sdk._generated.trust_control.partition_escrow_allocation_set_schema import (
+    ChioSignedPartitionEscrowAllocationSet,
+)
+from chio_sdk._generated.trust_control.partition_escrow_quota_commitment_schema import (
+    ChioSignedPartitionEscrowQuotaCommitment,
+)
+from chio_sdk._generated.trust_control.partition_escrow_receipt_metadata_schema import (
+    ChioPartitionEscrowFinancialReceiptMetadata,
+)
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -132,7 +144,15 @@ PROTOCOL_MODEL_BY_ID = {
     "verified_approval_set": ChioVerifiedThresholdApprovalSet,
     "admission_request_binding": ChioAdmissionOperationRequestBindingProjection,
     "budget_admission_evidence": ChioBudgetInvocationAdmissionEvidence,
+    "budget_admission_evidence_partition_escrow": ChioBudgetInvocationAdmissionEvidence,
+    "partition_escrow_quota_commitment": ChioSignedPartitionEscrowQuotaCommitment,
     "admission_capture_metadata": ChioAuthoritativeAdmissionCaptureReceiptProjection,
+    "admission_capture_metadata_partition_escrow": (
+        ChioAuthoritativeAdmissionCaptureReceiptProjection
+    ),
+    "partition_escrow_receipt_metadata": ChioPartitionEscrowFinancialReceiptMetadata,
+    "partition_escrow_admission_evidence": ChioPartitionEscrowAdmissionEvidence,
+    "partition_escrow_allocation_set": ChioSignedPartitionEscrowAllocationSet,
 }
 
 JCS_MAX_SAFE_INTEGER = (1 << 53) - 1

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -22,7 +22,7 @@ _CHIO_FEATURE_NAME_RE = re.compile(r"^[a-z0-9_.-]{1,96}$")
 
 class ChioCapabilityNegotiationV1(BaseModel):
     """
-    Feature bitset exchanged during federation trust establishment. Malformed feature names and unsupported schema IDs fail closed.
+    Feature bitset exchanged during federation trust establishment, including aggregate budgets, cumulative approval, threshold approval, and governed active response. Malformed feature names and unsupported schema IDs fail closed.
     """
 
     model_config = ConfigDict(

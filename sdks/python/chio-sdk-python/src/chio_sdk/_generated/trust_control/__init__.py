@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,6 +14,7 @@ from .admission_capture_metadata_schema import Authority, ChioAuthoritativeAdmis
 from .admission_request_binding_schema import ChioAdmissionOperationRequestBindingProjection, ChioAdmissionOperationRequestBindingProjection1, ChioAdmissionOperationRequestBindingProjection2, Digest, Identifier, OptionalDigest, OptionalIdentifier
 from .attestation_schema import ChioTrustControlRuntimeAttestationEvidence, CredentialKind, Scheme, Tier, WorkloadIdentity
 from .budget_invocation_admission_evidence_schema import ChioBudgetInvocationAdmissionEvidence, Digest, Identifier, InvocationQuota, PartitionEscrowEvidence, Profile, PublicKey, QuotaKey, RevocationSet, SafeInteger, SupplementalBinding
+from .budget_snapshot_anchor_provenance_schema import BudgetSnapshotAnchorProvenance, Commitment, Digest, SignedCommitment
 from .heartbeat_schema import ChioTrustControlLeaseHeartbeat
 from .lease_schema import ChioTrustControlAuthorityLease
 from .partition_escrow_admission_evidence_schema import AggregateCapabilityTrust, AggregateFamilyTrust, BrokerCapabilityTrust, ChioPartitionEscrowAdmissionEvidence, Digest, DurableStore, GrantCapabilityTrust, Identifier, PositiveSafeInteger, PositiveUint32, PublicKey, QuotaEvidence, Resolver, SafeInteger, SourceTrust, Uint32
@@ -29,6 +30,7 @@ __all__ = [
     "Authority",
     "Body",
     "BrokerCapabilityTrust",
+    "BudgetSnapshotAnchorProvenance",
     "ChioAdmissionOperationRequestBindingProjection",
     "ChioAdmissionOperationRequestBindingProjection1",
     "ChioAdmissionOperationRequestBindingProjection2",
@@ -42,6 +44,7 @@ __all__ = [
     "ChioTrustControlLeaseHeartbeat",
     "ChioTrustControlLeaseTermination",
     "ChioTrustControlRuntimeAttestationEvidence",
+    "Commitment",
     "CredentialKind",
     "Digest",
     "DurableStore",
@@ -84,6 +87,7 @@ __all__ = [
     "RevocationSet",
     "SafeInteger",
     "Scheme",
+    "SignedCommitment",
     "SourceTrust",
     "Summary",
     "SupplementalBinding",

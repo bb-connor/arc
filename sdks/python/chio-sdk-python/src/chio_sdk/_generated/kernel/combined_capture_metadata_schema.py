@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 63696e53010dca489dd90f0f71166c42511e6e9734e364a6e3cd564e8d04693b
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,29 +11,31 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QuotaKey(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    profile: constr(min_length=1)
-    owner_id: constr(min_length=1)
-    grant_index: conint(ge=0, le=4294967295) | None = None
+    grant_index: Annotated[int | None, Field(ge=0, le=4294967295)] = None
+    owner_id: Annotated[str, Field(min_length=1)]
+    profile: Annotated[str, Field(min_length=1)]
 
 
 class ChioCombinedAdmissionCaptureMetadata(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.admission-capture-metadata.v1"] = Field(..., alias="schema")
-    operation_id: constr(pattern=r"^[0-9a-f]{64}$")
-    hold_id: constr(min_length=1)
-    quota_keys: list[QuotaKey] = Field(..., max_length=8, min_length=1)
-    revocation_set_digest: constr(pattern=r"^[0-9a-f]{64}$")
-    budget_commit_index: conint(ge=1)
-    revocation_commit_index: conint(ge=1)
-    leader_epoch: conint(ge=1)
+    budget_commit_index: Annotated[int, Field(ge=1)]
+    hold_id: Annotated[str, Field(min_length=1)]
+    leader_epoch: Annotated[int, Field(ge=1)]
+    operation_id: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    quota_keys: Annotated[list[QuotaKey], Field(max_length=8, min_length=1)]
+    revocation_commit_index: Annotated[int, Field(ge=1)]
+    revocation_set_digest: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    schema_: Annotated[
+        Literal["chio.admission-capture-metadata.v1"], Field(alias="schema")
+    ]

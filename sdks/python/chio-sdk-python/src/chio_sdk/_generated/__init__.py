@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
+# Schema sha256: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -29,20 +29,20 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9"
+SCHEMA_SHA256 = "12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09"
 
-from .agent import Algorithm as AgentAlgorithm, ArtifactItem, AttenuationProof as AgentAttenuationProof, Caveat as AgentCaveat, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, Constraint as AgentConstraint, DelegationChainItem as AgentDelegationChainItem, Grant as AgentGrant, MaxCostPerInvocation as AgentMaxCostPerInvocation, MaxTotalCost as AgentMaxTotalCost, Operation as AgentOperation, PromptGrant as AgentPromptGrant, ResourceGrant as AgentResourceGrant, Scope as AgentScope, ScopeAttenuation as AgentScopeAttenuation, SupplementalAuthorization
+from .agent import Algorithm as AgentAlgorithm, ArtifactItem, AttenuationProof as AgentAttenuationProof, Body as AgentBody, Body4, Caveat as AgentCaveat, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent as AgentChioGovernedTransactionIntent, Constraint as AgentConstraint, DelegationChainItem as AgentDelegationChainItem, Grant as AgentGrant, MaxAmount, MaxCostPerInvocation as AgentMaxCostPerInvocation, MaxTotalCost as AgentMaxTotalCost, Operation as AgentOperation, OrderedEffect as AgentOrderedEffect, PromptGrant as AgentPromptGrant, ResourceGrant as AgentResourceGrant, Scope as AgentScope, ScopeAttenuation as AgentScopeAttenuation, SupplementalAuthorization
 from .anchor import Body as AnchorBody, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3
-from .capability import ActiveResponsePlanBody, Algorithm as CapabilityAlgorithm, Attenuation, AttenuationProof as CapabilityAttenuationProof, AttenuationWitness, Autonomy, CallChain, Caveat as CapabilityCaveat, ChioAggregateBudgetRootBindingBody, ChioAggregateBudgetRootCommitment, ChioAggregateFamilyPreservationEvidence, ChioAggregateInvocationBudget, ChioAggregateInvocationBudget1, ChioAggregateInvocationBudget2, ChioCapabilityGrant, ChioCapabilityNegotiationV1, ChioCapabilityRevocationEntry, ChioCapabilitytoken, ChioGovernedApprovalTokenBody, ChioGovernedTransactionIntent, ChioGovernedTransactionIntent1, ChioGovernedTransactionIntent2, ChioScope, ChioSignedAggregateBudgetRootBinding, ChioSignedGovernedApprovalToken, ChioSignedThresholdApprovalProposal, ChioThresholdApprovalProposalBody, ChioVerifiedThresholdApprovalSet, Commerce, Constraint as CapabilityConstraint, Decision as CapabilityDecision, DelegationLink, Digest as CapabilityDigest, GovernanceIdentifier, GrantKind, GrantSubsetRelation, Identifier as CapabilityIdentifier, Kind as CapabilityKind, MeteredBilling, MonetaryAmount as CapabilityMonetaryAmount, Operation as CapabilityOperation, OrderedEffect, PromptGrant as CapabilityPromptGrant, PublicKey as CapabilityPublicKey, Quote, ResourceGrant as CapabilityResourceGrant, Scope as CapabilityScope, ScopeAttenuation as CapabilityScopeAttenuation, SettlementMode, Signature as CapabilitySignature, Subset, Tier as CapabilityTier, ToolGrant, ToolInvocationBody
+from .capability import ActiveResponsePlanBody, AggregateRootPublicKey, AggregateRootSignature, AggregateRootSigningAlgorithm, Algorithm as CapabilityAlgorithm, Attenuation, AttenuationProof as CapabilityAttenuationProof, AttenuationWitness, Autonomy, Body as CapabilityBody, CallChain, Caveat as CapabilityCaveat, ChioAggregateBudgetRootBinding, ChioAggregateBudgetRootBindingBody, ChioAggregateBudgetRootCommitment, ChioAggregateFamilyPreservationEvidence, ChioAggregateInvocationBudget, ChioAggregateInvocationBudget1, ChioAggregateInvocationBudget2, ChioCapabilityGrant, ChioCapabilityNegotiationV1, ChioCapabilityRevocationEntry, ChioCapabilitytoken, ChioCumulativeApprovalRootBinding, ChioGovernedApprovalTokenBody, ChioGovernedTransactionIntent as CapabilityChioGovernedTransactionIntent, ChioGovernedTransactionIntent1, ChioGovernedTransactionIntent2, ChioOpaqueSupplementalAuthorization, ChioScope, ChioSignedAggregateBudgetRootBinding, ChioSignedGovernedApprovalToken, ChioSignedThresholdApprovalProposal, ChioThresholdApprovalProposalBody, ChioVerifiedThresholdApprovalSet, Commerce, Constraint as CapabilityConstraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, CumulativeRootMonetaryAmount, CumulativeRootPublicKey, CumulativeRootSignature, CumulativeRootSigningAlgorithm, Decision as CapabilityDecision, DelegationLink, Digest as CapabilityDigest, GenericConstraint, GovernanceIdentifier, GrantKind, GrantSubsetRelation, Identifier as CapabilityIdentifier, Kind as CapabilityKind, LegacyApprovalConstraint, MeteredBilling, MonetaryAmount as CapabilityMonetaryAmount, Operation as CapabilityOperation, OrderedEffect as CapabilityOrderedEffect, PromptGrant as CapabilityPromptGrant, PublicKey as CapabilityPublicKey, Quote, ResourceGrant as CapabilityResourceGrant, Scope as CapabilityScope, ScopeAttenuation as CapabilityScopeAttenuation, SettlementMode, Signature as CapabilitySignature, Subset, Tier as CapabilityTier, ToolGrant, ToolInvocationBody, Value, Value1, Value2
 from .error import ChioToolcallerrorCapabilityDenied, ChioToolcallerrorCapabilityExpired, ChioToolcallerrorCapabilityRevoked, ChioToolcallerrorInternalError, ChioToolcallerrorPolicyDenied, ChioToolcallerrorToolServerError, Detail as ErrorDetail
 from .federation import CapabilityLeaseRef, ChioBilateralDsseSignatureSliceEnvelope, ChioBilateralDsseSignatureSliceStatement, CoSign, CrossOrgVisibility, Digest as FederationDigest, GovernanceReceiptRef, HashRecord, JointDisposition, KernelIdentity, PolicyEvaluationSummary, PolicyVerdict, Predicate, Signature as FederationSignature, SubjectItem, Verdict as FederationVerdict
 from .jsonrpc import ChioJsonRpc20Notification, ChioJsonRpc20Request, ChioJsonRpc20Response, ChioJsonRpc20Response1, ChioJsonRpc20Response2, Error as JsonrpcError, Id
-from .kernel import Algorithm as KernelAlgorithm, AttenuationProof as KernelAttenuationProof, Capability, Caveat as KernelCaveat, ChioKernelmessageCapabilityList, ChioKernelmessageCapabilityRevoked, ChioKernelmessageHeartbeat, ChioKernelmessageToolCallChunk, ChioKernelmessageToolCallResponse, Constraint as KernelConstraint, DelegationChainItem as KernelDelegationChainItem, Detail as KernelDetail, Error as KernelError, Error10, Error11, Error12, Error13, Error9, Grant as KernelGrant, MaxCostPerInvocation as KernelMaxCostPerInvocation, MaxTotalCost as KernelMaxTotalCost, Operation as KernelOperation, PromptGrant as KernelPromptGrant, ResourceGrant as KernelResourceGrant, Result as KernelResult, Result2, Result3, Result4, Result5, Scope as KernelScope, ScopeAttenuation as KernelScopeAttenuation
+from .kernel import Algorithm as KernelAlgorithm, AttenuationProof as KernelAttenuationProof, BoundTo, Capability, Caveat as KernelCaveat, ChioCombinedAdmissionCaptureMetadata, ChioKernelmessageCapabilityList, ChioKernelmessageCapabilityRevoked, ChioKernelmessageHeartbeat, ChioKernelmessageToolCallChunk, ChioKernelmessageToolCallResponse, ChioSignedExecutionNonce, Constraint as KernelConstraint, DelegationChainItem as KernelDelegationChainItem, Detail as KernelDetail, Error as KernelError, Error10, Error11, Error12, Error13, Error9, Grant as KernelGrant, MaxCostPerInvocation as KernelMaxCostPerInvocation, MaxTotalCost as KernelMaxTotalCost, Nonce as KernelNonce, Operation as KernelOperation, PromptGrant as KernelPromptGrant, QuotaKey as KernelQuotaKey, ResourceGrant as KernelResourceGrant, Result as KernelResult, Result2, Result3, Result4, Result5, Scope as KernelScope, ScopeAttenuation as KernelScopeAttenuation
 from .provenance import ChioProvenanceAttestationBundle, ChioProvenanceCallChainContext, ChioProvenanceStamp, ChioProvenanceVerdictLink, ChioProvenanceVerdictLink1, ChioProvenanceVerdictLink2, ChioProvenanceVerdictLink3, ChioProvenanceVerdictLink4, CredentialKind as ProvenanceCredentialKind, EvidenceClass as ProvenanceEvidenceClass, Scheme as ProvenanceScheme, Statement, Tier as ProvenanceTier, Verdict as ProvenanceVerdict, WorkloadIdentity as ProvenanceWorkloadIdentity
-from .receipt import ActorRef, Algorithm as ReceiptAlgorithm, AuditPathItem, BbsReceiptSignature, BoundaryClass, ChioReceiptLineageStatement, ChioReceiptMerkleInclusionProof, ChioReceiptRecord, Decision as ReceiptDecision, Decision2, Decision3, Decision4, Decision5, EvidenceClass as ReceiptEvidenceClass, GuardEvidence, ObservationOutcome, ReceiptKind, RedactionMode, RelationKind, SessionAnchorReference, ToolCallAction, ToolOrigin, TrustLevel
+from .receipt import ActorRef, Algorithm as ReceiptAlgorithm, AuditPathItem, BbsReceiptSignature, BoundaryClass, ChioDurableAdmissionReceiptMetadata, ChioReceiptLineageStatement, ChioReceiptMerkleInclusionProof, ChioReceiptRecord, CompensationStatus, Decision as ReceiptDecision, Decision2, Decision3, Decision4, Decision5, Digest as ReceiptDigest, DispatchCommit, EvidenceClass as ReceiptEvidenceClass, GuardEvidence, Identifier as ReceiptIdentifier, ObservationOutcome, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, ReceiptKind, RedactionMode, RelationKind, SessionAnchorReference, StoreFence, ToolCallAction, ToolOrigin, TrustLevel
 from .result import ChioToolcallresultCancelled, ChioToolcallresultErr, ChioToolcallresultIncomplete, ChioToolcallresultOk, ChioToolcallresultStreamComplete, Detail as ResultDetail, Error as ResultError, Error1, Error2, Error3, Error4, Error5
-from .security import AbsoluteCanonicalPath, Access, Action, Algorithm as SecurityAlgorithm, AllowedSyscall, Anchor, ApprovalRequirement, ApprovalRequirement1, ApprovalRequirement2, ArtifactEntry, AttemptIds, AuthorityExchange, AuthorityRpcDigest, AuthorityRpcIdentifier, AuthorizationItem, Authorizations, AuthorizeHoldRequest, Bindings, Body as SecurityBody, BodyItem, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, BrokerRevocationRequest, Byte, ByteArray, ByteArrayItem, CanonicalContributionItem, Capabilities, CapabilitiesOperation, CapabilitiesResult, CapabilityLivenessRequest, CaptureCommit, CaptureHoldRequest, Cause, ChallengeBody, CheckBrokerRevocationOperation, CheckpointAnchor, ChioBrokerAdminControlReceiptBodyV1, ChioBrokerAdminMutationReceiptBodyV1, ChioBrokerAttemptRegistrationV1, ChioBrokerAuditComparisonBodyV1, ChioBrokerAuditRunnerAuthorizationBodyV1, ChioBrokerAuthorityRpcRequestBodyV1, ChioBrokerAuthorityRpcResponseBodyV1, ChioBrokerCapabilityBodyV1, ChioBrokerExecuteFailureV1, ChioBrokerExecuteRequestV1, ChioBrokerExecuteResponseV1, ChioBrokerExecutionEvidenceV1, ChioBrokerExecutionFailureReceiptBodyV1, ChioBrokerExecutionReceiptBodyV1, ChioBrokerPrepareDispatchAcknowledgementV1, ChioBrokerPrivilegedAuditCommitRequestV1, ChioBrokerPrivilegedAuditEvidenceBundleV1, ChioBrokerPrivilegedAuditOpenRequestV1, ChioBrokerRegisterAttemptAcknowledgementV1, ChioBrokerRegisterAttemptAuthorizationBodyV1, ChioBrokerReleaseAttemptAcknowledgementV1, ChioBrokerRequestProofBodyV1, ChioCageEnforcementFailureV1, ChioCageEnforcementPreparedEvidenceV1, ChioCageEnforcementRecordV1, ChioCageEnforcementRecordV11, ChioCageEnforcementRecordV12, ChioCageEnforcementRecordV13, ChioCageExecTransitionObservationV1, ChioCageFullyEnforcedEvidenceV1, ChioCageInitPlanV2, ChioCageProcessExitEvidenceV1, ChioCageProcessExitEvidenceV11, ChioCageProcessExitEvidenceV12, ChioCageReceiptBodyV1, ChioCageReceiptBodyV11, ChioCageReceiptBodyV12, ChioCageReceiptBodyV13, ChioCageReceiptBodyV14, ChioCageReceiptMetadataV1, ChioCorrelatedFindingReceiptBodyV1, ChioCorrelatedFindingV1, ChioDeclassificationConsumptionReceiptBodyV1, ChioDeclassificationOutcomeReceiptBodyV1, ChioDetectorHealthReceiptBodyV1, ChioEffectTransitionReceiptBodyV1, ChioFlowDenialReceiptBodyV1, ChioKeyLogActivationCommitBodyV1, ChioKeyLogArtifactTimeAnchorBodyV1, ChioKeyLogAuditServiceReadinessBodyV1, ChioKeyLogCheckpointBodyV1, ChioKeyLogEnterpriseReceiptBodyV1, ChioKeyLogEnterpriseReceiptBodyV11, ChioKeyLogEnterpriseReceiptBodyV12, ChioKeyLogEventBodyV1, ChioKeyLogSynchronizationResponseV1, ChioKeyLogWitnessServiceReadinessBodyV1, ChioKeyLogWitnessSignatureV1, ChioKeyringArtifactSignatureEvidenceV1, ChioLiftOrRollbackCompletionReceiptBodyV1, ChioLiftOrRollbackCompletionReceiptBodyV11, ChioLiftOrRollbackCompletionReceiptBodyV12, ChioResponseCompletionReceiptBodyV1, ChioResponseEffectV1, ChioResponsePlanReceiptBodyV1, ChioResponsePlanV1, ChioResponseStateTransitionReceiptBodyV1, ChioSchedulerHealthReceiptBodyV1, ChioSecurityEventBodyV1, ChioSignedBrokerAdminControlReceiptV1, ChioSignedBrokerAdminMutationReceiptV1, ChioSignedBrokerAuditComparisonV1, ChioSignedBrokerAuditRunnerAuthorizationV1, ChioSignedBrokerAuthorityRpcRequestV1, ChioSignedBrokerAuthorityRpcResponseV1, ChioSignedBrokerCapabilityV1, ChioSignedBrokerExecutionFailureReceiptV1, ChioSignedBrokerExecutionReceiptV1, ChioSignedBrokerPrivilegedAuditChallengeV1, ChioSignedBrokerRegisterAttemptAuthorizationV1, ChioSignedBrokerRequestProofV1, ChioSignedKeyLogActivationCommitEnvelopeV1, ChioSignedKeyLogArtifactTimeAnchorV1, ChioSignedKeyLogAuditServiceReadinessProofV1, ChioSignedKeyLogCheckpointEnvelopeV1, ChioSignedKeyLogEnterpriseReceiptEnvelopeV1, ChioSignedKeyLogEventEnvelopeV1, ChioSignedKeyLogWitnessServiceReadinessProofV1, ChioSignedMcpCageLaunchPolicyV2, ChioSignedSecurityEventProvenanceEnvelopeV1, ChioSignedToolManifestV2, ChioToolManifestV2, ChioTripwireObservationReceiptBodyV1, Code, CompletionOutcome, CompletionOutcome1, CompletionOutcome2, CompletionOutcome3, ConsistencyProof, ControlOperation, ControlRequest, ControlResult, Count, CredentialRef, Destination, Digest as SecurityDigest, Digest32, Digest32Item, DigestItem, DigestOrNull, DirectoryIdentity, DispatchApproval, DispatchApproval1, DispatchApproval2, DispatchKnowledge, Disposition, Effect, EnterpriseMigration, Environment, EnvironmentVariable, EventKind, EventSigner, EventSigner1, EventSigner2, EventSigner3, EventSigner4, ExecutionDispatch, ExecutionIdentity, ExitCode, ExitCode1, ExitCode2, ExternalAnchor, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, FinalState, FlowIdentifier, ForbiddenResource, GovernedAdminAuthorizationItem, GroupBinding, GroupBinding1, GroupBinding2, Hash, Header, Header5, HeaderName, HeaderNames, HealthKind, HoldOperation, HoldOperation1, HoldOperation2, HoldOperation3, HoldOperation4, HoldResult, HoldState, HoldState1, HoldState2, Identifier as SecurityIdentifier, IdentifierOrNull, Identifiers, InformationLabel, InformationLabel1, InformationLabel2, KeyAuthorization, KeyLogIdentifier, KeyLogPin, Kind as SecurityKind, Kind5, Kind6, KnownLabel, LandlockPlan, LatencyHint, LiftOutcome, LiftOutcome1, LiftOutcome2, LiftOutcome3, LiftOutcome4, LiftOutcome5, Limits, LiveParent, LiveParentResult, Method, MigrationKey, MinimumGeneration, MinimumHead, Mode, MonetaryAmount as SecurityMonetaryAmount, NativeSyscallProfile, NetworkDestination, Nonce, NonzeroDigest, NonzeroDigest32, NonzeroDigest32Item, Operation as SecurityOperation, Operation10, Operation11, Operation12, Operation2, Operation7, Operation8, Operation9, OperatorAlgorithm, OperatorCapability, OperatorCeilings, Options, Outcome, Outcome1, Outcome2, Outcome3, Outcome4, Outcome5, Outcome6, PathIdentity, PayloadItem, Policy, PolicyBody, PositiveU64, PrepareExecutionOperation, PreparedResult, PricingModel, Profile as SecurityProfile, ProofBinding, PublicKey as SecurityPublicKey, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, QueryHoldRequest, Quota, ReadPath, ReceiptRuntime, RecoveryAuthorization, RegularFileIdentity, RejectedResult, Request, RequestConstraints, RequiredPermissions, ResourceLimits, Response, ResponseItem, Result as SecurityResult, ReverseHoldRequest, RevocationResult, RevocationSnapshot, Runtime, SchedulerFencingToken, Scheme as SecurityScheme, SeccompPlan, ServerTool, Severity, Signal, Signal2, Signature as SecuritySignature, SignedDeclassificationGrant, SocketIdentity, Stage, State, State2, StdioEntry, Subject, SupplementaryGid, SyscallArgumentConstraint, Target, Target1, Target2, Target3, Target4, Target5, Target6, Target7, Target8, TargetArgv, TargetArgvItem, TargetLabel, Time, ToState, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolPricing, TripwireKind, TrustClass, TrustedExecutionContext, Type, U32, U64, ValueItem, VerifyLiveParentOperation, Watermark, Watermark1, Watermark2, Watermark3, WitnessView, WritePath
-from .trust_control import AggregateCapabilityTrust, AggregateFamilyTrust, Allocation, Authority, Body as TrustControlBody, BrokerCapabilityTrust, ChioAdmissionOperationRequestBindingProjection, ChioAdmissionOperationRequestBindingProjection1, ChioAdmissionOperationRequestBindingProjection2, ChioAuthoritativeAdmissionCaptureReceiptProjection, ChioBudgetInvocationAdmissionEvidence, ChioPartitionEscrowAdmissionEvidence, ChioPartitionEscrowFinancialReceiptMetadata, ChioSignedPartitionEscrowAllocationSet, ChioSignedPartitionEscrowQuotaCommitment, ChioTrustControlAuthorityLease, ChioTrustControlLeaseHeartbeat, ChioTrustControlLeaseTermination, ChioTrustControlRuntimeAttestationEvidence, CredentialKind as TrustControlCredentialKind, Digest as TrustControlDigest, DurableStore, GrantCapabilityTrust, GuaranteeLevel, Identifier as TrustControlIdentifier, InvocationQuota, InvocationQuotaTransition, MonetaryState, OptionalDigest, OptionalIdentifier, PartitionEscrowDigest, PartitionEscrowEd25519PublicKey, PartitionEscrowEd25519Signature, PartitionEscrowEvidence, PartitionEscrowHybridPublicKey, PartitionEscrowHybridSignature, PartitionEscrowIdentifier, PartitionEscrowP256PublicKey, PartitionEscrowP256Signature, PartitionEscrowP384PublicKey, PartitionEscrowP384Signature, PartitionEscrowPositiveSafeInteger, PartitionEscrowPositiveUint32, PartitionEscrowPublicKey, PartitionEscrowQuota, PartitionEscrowSafeInteger, PartitionEscrowSignature, PartitionEscrowSignatureAlgorithm, PartitionEscrowUint32, PositiveSafeInteger, PositiveUint32, Profile as TrustControlProfile, PublicKey as TrustControlPublicKey, QuotaCommitmentBody, QuotaEvidence, QuotaKey, Reason, Resolver, RevocationSet, SafeInteger, Scheme as TrustControlScheme, SourceTrust, Summary, SupplementalBinding, Tier as TrustControlTier, Uint32, WorkloadIdentity as TrustControlWorkloadIdentity
+from .security import AbsoluteCanonicalPath, Access, Action, Algorithm as SecurityAlgorithm, AllowedSyscall, Anchor, ApprovalRequirement, ApprovalRequirement1, ApprovalRequirement2, ArtifactEntry, AttemptIds, AuthorityExchange, AuthorityRpcDigest, AuthorityRpcIdentifier, AuthorizationItem, Authorizations, AuthorizeHoldRequest, Bindings, Body as SecurityBody, BodyItem, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, BrokerRevocationRequest, Byte, ByteArray, ByteArrayItem, CanonicalContributionItem, Capabilities, CapabilitiesOperation, CapabilitiesResult, CapabilityLivenessRequest, CaptureCommit, CaptureHoldRequest, Cause, ChallengeBody, CheckBrokerRevocationOperation, CheckpointAnchor, ChioBrokerAdminControlReceiptBodyV1, ChioBrokerAdminMutationReceiptBodyV1, ChioBrokerAttemptRegistrationV1, ChioBrokerAuditComparisonBodyV1, ChioBrokerAuditRunnerAuthorizationBodyV1, ChioBrokerAuthorityRpcRequestBodyV1, ChioBrokerAuthorityRpcResponseBodyV1, ChioBrokerCapabilityBodyV1, ChioBrokerExecuteFailureV1, ChioBrokerExecuteRequestV1, ChioBrokerExecuteResponseV1, ChioBrokerExecutionEvidenceV1, ChioBrokerExecutionFailureReceiptBodyV1, ChioBrokerExecutionReceiptBodyV1, ChioBrokerPrepareDispatchAcknowledgementV1, ChioBrokerPrivilegedAuditCommitRequestV1, ChioBrokerPrivilegedAuditEvidenceBundleV1, ChioBrokerPrivilegedAuditOpenRequestV1, ChioBrokerRegisterAttemptAcknowledgementV1, ChioBrokerRegisterAttemptAuthorizationBodyV1, ChioBrokerReleaseAttemptAcknowledgementV1, ChioBrokerRequestProofBodyV1, ChioCageEnforcementFailureV1, ChioCageEnforcementPreparedEvidenceV1, ChioCageEnforcementRecordV1, ChioCageEnforcementRecordV11, ChioCageEnforcementRecordV12, ChioCageEnforcementRecordV13, ChioCageExecTransitionObservationV1, ChioCageFullyEnforcedEvidenceV1, ChioCageInitPlanV2, ChioCageProcessExitEvidenceV1, ChioCageProcessExitEvidenceV11, ChioCageProcessExitEvidenceV12, ChioCageReceiptBodyV1, ChioCageReceiptBodyV11, ChioCageReceiptBodyV12, ChioCageReceiptBodyV13, ChioCageReceiptBodyV14, ChioCageReceiptMetadataV1, ChioCorrelatedFindingReceiptBodyV1, ChioCorrelatedFindingV1, ChioDeclassificationConsumptionReceiptBodyV1, ChioDeclassificationOutcomeReceiptBodyV1, ChioDetectorHealthReceiptBodyV1, ChioEffectTransitionReceiptBodyV1, ChioFlowDenialReceiptBodyV1, ChioKeyLogActivationCommitBodyV1, ChioKeyLogArtifactTimeAnchorBodyV1, ChioKeyLogAuditServiceReadinessBodyV1, ChioKeyLogCheckpointBodyV1, ChioKeyLogEnterpriseReceiptBodyV1, ChioKeyLogEnterpriseReceiptBodyV11, ChioKeyLogEnterpriseReceiptBodyV12, ChioKeyLogEventBodyV1, ChioKeyLogSynchronizationResponseV1, ChioKeyLogWitnessServiceReadinessBodyV1, ChioKeyLogWitnessSignatureV1, ChioKeyringArtifactSignatureEvidenceV1, ChioLiftOrRollbackCompletionReceiptBodyV1, ChioLiftOrRollbackCompletionReceiptBodyV11, ChioLiftOrRollbackCompletionReceiptBodyV12, ChioResponseCompletionReceiptBodyV1, ChioResponseEffectV1, ChioResponsePlanReceiptBodyV1, ChioResponsePlanV1, ChioResponseStateTransitionReceiptBodyV1, ChioSchedulerHealthReceiptBodyV1, ChioSecurityEventBodyV1, ChioSignedBrokerAdminControlReceiptV1, ChioSignedBrokerAdminMutationReceiptV1, ChioSignedBrokerAuditComparisonV1, ChioSignedBrokerAuditRunnerAuthorizationV1, ChioSignedBrokerAuthorityRpcRequestV1, ChioSignedBrokerAuthorityRpcResponseV1, ChioSignedBrokerCapabilityV1, ChioSignedBrokerExecutionFailureReceiptV1, ChioSignedBrokerExecutionReceiptV1, ChioSignedBrokerPrivilegedAuditChallengeV1, ChioSignedBrokerRegisterAttemptAuthorizationV1, ChioSignedBrokerRequestProofV1, ChioSignedKeyLogActivationCommitEnvelopeV1, ChioSignedKeyLogArtifactTimeAnchorV1, ChioSignedKeyLogAuditServiceReadinessProofV1, ChioSignedKeyLogCheckpointEnvelopeV1, ChioSignedKeyLogEnterpriseReceiptEnvelopeV1, ChioSignedKeyLogEventEnvelopeV1, ChioSignedKeyLogWitnessServiceReadinessProofV1, ChioSignedMcpCageLaunchPolicyV2, ChioSignedSecurityEventProvenanceEnvelopeV1, ChioSignedToolManifestV2, ChioToolManifestV2, ChioTripwireObservationReceiptBodyV1, Code, CompletionOutcome, CompletionOutcome1, CompletionOutcome2, CompletionOutcome3, ConsistencyProof, ControlOperation, ControlRequest, ControlResult, Count, CredentialRef, Destination, Digest as SecurityDigest, Digest32, Digest32Item, DigestItem, DigestOrNull, DirectoryIdentity, DispatchApproval, DispatchApproval1, DispatchApproval2, DispatchKnowledge, Disposition, Effect, EnterpriseMigration, Environment, EnvironmentVariable, EventKind, EventSigner, EventSigner1, EventSigner2, EventSigner3, EventSigner4, ExecutionDispatch, ExecutionIdentity, ExitCode, ExitCode1, ExitCode2, ExternalAnchor, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, FinalState, FlowIdentifier, ForbiddenResource, GovernedAdminAuthorizationItem, GroupBinding, GroupBinding1, GroupBinding2, Hash, Header, Header5, HeaderName, HeaderNames, HealthKind, HoldOperation, HoldOperation1, HoldOperation2, HoldOperation3, HoldOperation4, HoldResult, HoldState, HoldState1, HoldState2, Identifier as SecurityIdentifier, IdentifierOrNull, Identifiers, InformationLabel, InformationLabel1, InformationLabel2, KeyAuthorization, KeyLogIdentifier, KeyLogPin, Kind as SecurityKind, Kind5, Kind6, KnownLabel, LandlockPlan, LatencyHint, LiftOutcome, LiftOutcome1, LiftOutcome2, LiftOutcome3, LiftOutcome4, LiftOutcome5, Limits, LiveParent, LiveParentResult, Method, MigrationKey, MinimumGeneration, MinimumHead, Mode, MonetaryAmount as SecurityMonetaryAmount, NativeSyscallProfile, NetworkDestination, Nonce as SecurityNonce, NonzeroDigest, NonzeroDigest32, NonzeroDigest32Item, Operation as SecurityOperation, Operation10, Operation11, Operation12, Operation2, Operation7, Operation8, Operation9, OperatorAlgorithm, OperatorCapability, OperatorCeilings, Options, Outcome, Outcome1, Outcome2, Outcome3, Outcome4, Outcome5, Outcome6, PathIdentity, PayloadItem, Policy, PolicyBody, PositiveU64, PrepareExecutionOperation, PreparedResult, PricingModel, Profile as SecurityProfile, ProofBinding, PublicKey as SecurityPublicKey, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, QueryHoldRequest, Quota, ReadPath, ReceiptRuntime, RecoveryAuthorization, RegularFileIdentity, RejectedResult, Request, RequestConstraints, RequiredPermissions, ResourceLimits, Response, ResponseItem, Result as SecurityResult, ReverseHoldRequest, RevocationResult, RevocationSnapshot, Runtime, SchedulerFencingToken, Scheme as SecurityScheme, SeccompPlan, ServerTool, Severity, Signal, Signal2, Signature as SecuritySignature, SignedDeclassificationGrant, SocketIdentity, Stage, State, State2, StdioEntry, Subject, SupplementaryGid, SyscallArgumentConstraint, Target, Target1, Target2, Target3, Target4, Target5, Target6, Target7, Target8, TargetArgv, TargetArgvItem, TargetLabel, Time, ToState, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolPricing, TripwireKind, TrustClass, TrustedExecutionContext, Type, U32, U64, ValueItem, VerifyLiveParentOperation, Watermark, Watermark1, Watermark2, Watermark3, WitnessView, WritePath
+from .trust_control import AggregateCapabilityTrust, AggregateFamilyTrust, Allocation, Authority, Body as TrustControlBody, BrokerCapabilityTrust, BudgetSnapshotAnchorProvenance, ChioAdmissionOperationRequestBindingProjection, ChioAdmissionOperationRequestBindingProjection1, ChioAdmissionOperationRequestBindingProjection2, ChioAuthoritativeAdmissionCaptureReceiptProjection, ChioBudgetInvocationAdmissionEvidence, ChioPartitionEscrowAdmissionEvidence, ChioPartitionEscrowFinancialReceiptMetadata, ChioSignedPartitionEscrowAllocationSet, ChioSignedPartitionEscrowQuotaCommitment, ChioTrustControlAuthorityLease, ChioTrustControlLeaseHeartbeat, ChioTrustControlLeaseTermination, ChioTrustControlRuntimeAttestationEvidence, Commitment, CredentialKind as TrustControlCredentialKind, Digest as TrustControlDigest, DurableStore, GrantCapabilityTrust, GuaranteeLevel, Identifier as TrustControlIdentifier, InvocationQuota, InvocationQuotaTransition, MonetaryState, OptionalDigest, OptionalIdentifier, PartitionEscrowDigest, PartitionEscrowEd25519PublicKey, PartitionEscrowEd25519Signature, PartitionEscrowEvidence, PartitionEscrowHybridPublicKey, PartitionEscrowHybridSignature, PartitionEscrowIdentifier, PartitionEscrowP256PublicKey, PartitionEscrowP256Signature, PartitionEscrowP384PublicKey, PartitionEscrowP384Signature, PartitionEscrowPositiveSafeInteger, PartitionEscrowPositiveUint32, PartitionEscrowPublicKey, PartitionEscrowQuota, PartitionEscrowSafeInteger, PartitionEscrowSignature, PartitionEscrowSignatureAlgorithm, PartitionEscrowUint32, PositiveSafeInteger, PositiveUint32, Profile as TrustControlProfile, PublicKey as TrustControlPublicKey, QuotaCommitmentBody, QuotaEvidence, QuotaKey as TrustControlQuotaKey, Reason, Resolver, RevocationSet, SafeInteger, Scheme as TrustControlScheme, SignedCommitment, SourceTrust, Summary, SupplementalBinding, Tier as TrustControlTier, Uint32, WorkloadIdentity as TrustControlWorkloadIdentity
 
 CapabilityToken = ChioCapabilitytoken
 
@@ -54,19 +54,25 @@ __all__ = [
     "ActorRef",
     "AgentAlgorithm",
     "AgentAttenuationProof",
+    "AgentBody",
     "AgentCaveat",
+    "AgentChioGovernedTransactionIntent",
     "AgentConstraint",
     "AgentDelegationChainItem",
     "AgentGrant",
     "AgentMaxCostPerInvocation",
     "AgentMaxTotalCost",
     "AgentOperation",
+    "AgentOrderedEffect",
     "AgentPromptGrant",
     "AgentResourceGrant",
     "AgentScope",
     "AgentScopeAttenuation",
     "AggregateCapabilityTrust",
     "AggregateFamilyTrust",
+    "AggregateRootPublicKey",
+    "AggregateRootSignature",
+    "AggregateRootSigningAlgorithm",
     "Allocation",
     "AllowedSyscall",
     "Anchor",
@@ -91,7 +97,9 @@ __all__ = [
     "Autonomy",
     "BbsReceiptSignature",
     "Bindings",
+    "Body4",
     "BodyItem",
+    "BoundTo",
     "BoundaryClass",
     "BrokerBinding",
     "BrokerBinding1",
@@ -99,6 +107,7 @@ __all__ = [
     "BrokerCapabilityTrust",
     "BrokerPeerIdentity",
     "BrokerRevocationRequest",
+    "BudgetSnapshotAnchorProvenance",
     "Byte",
     "ByteArray",
     "ByteArrayItem",
@@ -110,7 +119,9 @@ __all__ = [
     "Capability",
     "CapabilityAlgorithm",
     "CapabilityAttenuationProof",
+    "CapabilityBody",
     "CapabilityCaveat",
+    "CapabilityChioGovernedTransactionIntent",
     "CapabilityConstraint",
     "CapabilityDecision",
     "CapabilityDigest",
@@ -120,6 +131,7 @@ __all__ = [
     "CapabilityLivenessRequest",
     "CapabilityMonetaryAmount",
     "CapabilityOperation",
+    "CapabilityOrderedEffect",
     "CapabilityPromptGrant",
     "CapabilityPublicKey",
     "CapabilityResourceGrant",
@@ -141,6 +153,7 @@ __all__ = [
     "ChioAgentmessageHeartbeat",
     "ChioAgentmessageListCapabilities",
     "ChioAgentmessageToolCallRequest",
+    "ChioAggregateBudgetRootBinding",
     "ChioAggregateBudgetRootBindingBody",
     "ChioAggregateBudgetRootCommitment",
     "ChioAggregateFamilyPreservationEvidence",
@@ -196,15 +209,18 @@ __all__ = [
     "ChioCapabilityNegotiationV1",
     "ChioCapabilityRevocationEntry",
     "ChioCapabilitytoken",
+    "ChioCombinedAdmissionCaptureMetadata",
     "ChioCorrelatedFindingReceiptBodyV1",
     "ChioCorrelatedFindingV1",
+    "ChioCumulativeApprovalRootBinding",
     "ChioDeclassificationConsumptionReceiptBodyV1",
     "ChioDeclassificationOutcomeReceiptBodyV1",
     "ChioDetectorHealthReceiptBodyV1",
+    "ChioDurableAdmissionReceiptMetadata",
     "ChioEffectTransitionReceiptBodyV1",
     "ChioFlowDenialReceiptBodyV1",
+    "ChioGovernedActiveResponseIntentBody",
     "ChioGovernedApprovalTokenBody",
-    "ChioGovernedTransactionIntent",
     "ChioGovernedTransactionIntent1",
     "ChioGovernedTransactionIntent2",
     "ChioJsonRpc20Notification",
@@ -232,6 +248,7 @@ __all__ = [
     "ChioLiftOrRollbackCompletionReceiptBodyV1",
     "ChioLiftOrRollbackCompletionReceiptBodyV11",
     "ChioLiftOrRollbackCompletionReceiptBodyV12",
+    "ChioOpaqueSupplementalAuthorization",
     "ChioPartitionEscrowAdmissionEvidence",
     "ChioPartitionEscrowFinancialReceiptMetadata",
     "ChioProvenanceAttestationBundle",
@@ -266,6 +283,7 @@ __all__ = [
     "ChioSignedBrokerPrivilegedAuditChallengeV1",
     "ChioSignedBrokerRegisterAttemptAuthorizationV1",
     "ChioSignedBrokerRequestProofV1",
+    "ChioSignedExecutionNonce",
     "ChioSignedGovernedApprovalToken",
     "ChioSignedKeyLogActivationCommitEnvelopeV1",
     "ChioSignedKeyLogArtifactTimeAnchorV1",
@@ -302,6 +320,8 @@ __all__ = [
     "CoSign",
     "Code",
     "Commerce",
+    "Commitment",
+    "CompensationStatus",
     "CompletionOutcome",
     "CompletionOutcome1",
     "CompletionOutcome2",
@@ -313,6 +333,12 @@ __all__ = [
     "Count",
     "CredentialRef",
     "CrossOrgVisibility",
+    "CumulativeApprovalDelegableConstraint",
+    "CumulativeApprovalDirectConstraint",
+    "CumulativeRootMonetaryAmount",
+    "CumulativeRootPublicKey",
+    "CumulativeRootSignature",
+    "CumulativeRootSigningAlgorithm",
     "Decision2",
     "Decision3",
     "Decision4",
@@ -327,6 +353,7 @@ __all__ = [
     "DispatchApproval",
     "DispatchApproval1",
     "DispatchApproval2",
+    "DispatchCommit",
     "DispatchKnowledge",
     "Disposition",
     "DurableStore",
@@ -379,6 +406,7 @@ __all__ = [
     "FinalState",
     "FlowIdentifier",
     "ForbiddenResource",
+    "GenericConstraint",
     "GovernanceIdentifier",
     "GovernanceReceiptRef",
     "GovernedAdminAuthorizationItem",
@@ -428,8 +456,10 @@ __all__ = [
     "KernelIdentity",
     "KernelMaxCostPerInvocation",
     "KernelMaxTotalCost",
+    "KernelNonce",
     "KernelOperation",
     "KernelPromptGrant",
+    "KernelQuotaKey",
     "KernelResourceGrant",
     "KernelResult",
     "KernelScope",
@@ -442,6 +472,7 @@ __all__ = [
     "KnownLabel",
     "LandlockPlan",
     "LatencyHint",
+    "LegacyApprovalConstraint",
     "LiftOutcome",
     "LiftOutcome1",
     "LiftOutcome2",
@@ -451,6 +482,7 @@ __all__ = [
     "Limits",
     "LiveParent",
     "LiveParentResult",
+    "MaxAmount",
     "MeteredBilling",
     "Method",
     "MigrationKey",
@@ -460,7 +492,6 @@ __all__ = [
     "MonetaryState",
     "NativeSyscallProfile",
     "NetworkDestination",
-    "Nonce",
     "NonzeroDigest",
     "NonzeroDigest32",
     "NonzeroDigest32Item",
@@ -478,7 +509,6 @@ __all__ = [
     "OptionalDigest",
     "OptionalIdentifier",
     "Options",
-    "OrderedEffect",
     "Outcome",
     "Outcome1",
     "Outcome2",
@@ -511,6 +541,7 @@ __all__ = [
     "PolicyBody",
     "PolicyEvaluationSummary",
     "PolicyVerdict",
+    "PositiveIJsonInteger",
     "PositiveSafeInteger",
     "PositiveU64",
     "PositiveUint32",
@@ -518,6 +549,8 @@ __all__ = [
     "PrepareExecutionOperation",
     "PreparedResult",
     "PricingModel",
+    "ProjectedDispatchState",
+    "ProjectedState",
     "ProofBinding",
     "ProvenanceCredentialKind",
     "ProvenanceEvidenceClass",
@@ -525,6 +558,7 @@ __all__ = [
     "ProvenanceTier",
     "ProvenanceVerdict",
     "ProvenanceWorkloadIdentity",
+    "ProviderAttempt",
     "Purpose",
     "Purpose1",
     "Purpose2",
@@ -540,13 +574,14 @@ __all__ = [
     "Quota",
     "QuotaCommitmentBody",
     "QuotaEvidence",
-    "QuotaKey",
     "Quote",
     "ReadPath",
     "Reason",
     "ReceiptAlgorithm",
     "ReceiptDecision",
+    "ReceiptDigest",
     "ReceiptEvidenceClass",
+    "ReceiptIdentifier",
     "ReceiptKind",
     "ReceiptRuntime",
     "RecoveryAuthorization",
@@ -582,6 +617,7 @@ __all__ = [
     "SecurityIdentifier",
     "SecurityKind",
     "SecurityMonetaryAmount",
+    "SecurityNonce",
     "SecurityOperation",
     "SecurityProfile",
     "SecurityPublicKey",
@@ -594,6 +630,7 @@ __all__ = [
     "Severity",
     "Signal",
     "Signal2",
+    "SignedCommitment",
     "SignedDeclassificationGrant",
     "SocketIdentity",
     "SourceTrust",
@@ -602,6 +639,7 @@ __all__ = [
     "State2",
     "Statement",
     "StdioEntry",
+    "StoreFence",
     "Subject",
     "SubjectItem",
     "Subset",
@@ -640,6 +678,7 @@ __all__ = [
     "TrustControlIdentifier",
     "TrustControlProfile",
     "TrustControlPublicKey",
+    "TrustControlQuotaKey",
     "TrustControlScheme",
     "TrustControlTier",
     "TrustControlWorkloadIdentity",
@@ -649,6 +688,9 @@ __all__ = [
     "U32",
     "U64",
     "Uint32",
+    "Value",
+    "Value1",
+    "Value2",
     "ValueItem",
     "VerifyLiveParentOperation",
     "Watermark",

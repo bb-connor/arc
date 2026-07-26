@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
+// Schema SHA: 12f29b53e7b2b0f290d2f6e643bb969068e1777bf31ecf770aa23307b31bec09
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -11,6 +11,82 @@
 // asserts byte-equality of this entire file via `--check` mode.
 
 /* eslint-disable */
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/agent/active-response-governed-intent.schema.json
+export namespace Agent_ActiveResponseGovernedIntent {
+  export interface ChioGovernedActiveResponseIntentBody {
+    canonical_plan_body: {};
+    executor_subject: string;
+    expires_at: number;
+    operator_capability_expires_at: number;
+    operator_capability_hash: string;
+    operator_capability_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    ordered_effects: [
+      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
+    ];
+    plan_body_hash: string;
+    plan_id: string;
+    plan_schema: "chio.governed-response-plan.v1";
+    rollback_binding: {};
+    target_binding: {};
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/agent/governed-transaction-intent.schema.json
+export namespace Agent_GovernedTransactionIntent {
+  export interface ChioGovernedTransactionIntent {
+    autonomy?: {};
+    body?:
+      | {
+          kind: "tool_invocation";
+        }
+      | {
+          kind: "active_response_plan";
+          value: ChioGovernedActiveResponseIntentBody;
+        };
+    call_chain?: {};
+    commerce?: {};
+    context?: unknown;
+    id: string;
+    max_amount?: {
+      currency: string;
+      units: number;
+    };
+    metered_billing?: {};
+    purpose: string;
+    runtime_attestation?: {};
+    server_id: string;
+    tool_name: string;
+  }
+  export interface ChioGovernedActiveResponseIntentBody {
+    canonical_plan_body: {};
+    executor_subject: string;
+    expires_at: number;
+    operator_capability_expires_at: number;
+    operator_capability_hash: string;
+    operator_capability_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    ordered_effects: [
+      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
+    ];
+    plan_body_hash: string;
+    plan_id: string;
+    plan_schema: "chio.governed-response-plan.v1";
+    rollback_binding: {};
+    target_binding: {};
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/agent/heartbeat.schema.json
@@ -516,6 +592,29 @@ export namespace Capability_AggregateBudgetRootCommitment {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/aggregate-budget-root.schema.json
+export namespace Capability_AggregateBudgetRoot {
+  export type AggregateRootSigningAlgorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type AggregateRootPublicKey = string;
+  export type AggregateRootSignature = string;
+
+  export interface ChioAggregateBudgetRootBinding {
+    algorithm?: AggregateRootSigningAlgorithm;
+    body: {
+      max_invocations: number;
+      root_capability_hash: string;
+      root_capability_id: string;
+      root_expires_at: number;
+      root_issuer: AggregateRootPublicKey;
+      root_scope_hash: string;
+      root_subject: AggregateRootPublicKey;
+      schema: "chio.aggregate-budget-root.v1";
+    };
+    signature: AggregateRootSignature;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/aggregate-family-preservation-evidence.schema.json
 export namespace Capability_AggregateFamilyPreservationEvidence {
   export interface ChioAggregateFamilyPreservationEvidence {
@@ -563,7 +662,7 @@ export namespace Capability_AggregateInvocationBudget {
 // Source: spec/schemas/chio-wire/v1/capability/capabilities.schema.json
 export namespace Capability_Capabilities {
   /**
-   * Feature bitset exchanged during federation trust establishment. Malformed feature names and unsupported schema IDs fail closed.
+   * Feature bitset exchanged during federation trust establishment, including aggregate budgets, cumulative approval, threshold approval, and governed active response. Malformed feature names and unsupported schema IDs fail closed.
    */
   export interface ChioCapabilityNegotiationV1 {
     /**
@@ -573,6 +672,37 @@ export namespace Capability_Capabilities {
       [k: string]: boolean;
     };
     schema: "chio.capabilities.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/cumulative-approval-root.schema.json
+export namespace Capability_CumulativeApprovalRoot {
+  export type CumulativeRootSigningAlgorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type CumulativeRootPublicKey = string;
+  export type CumulativeRootSignature = string;
+
+  export interface ChioCumulativeApprovalRootBinding {
+    algorithm?: CumulativeRootSigningAlgorithm;
+    body: {
+      approval_budget_epoch: number;
+      approval_budget_id: string;
+      root_capability_hash: string;
+      root_capability_id: string;
+      root_expires_at: number;
+      root_grant_hash: string;
+      root_issuer: CumulativeRootPublicKey;
+      root_scope_hash: string;
+      root_subject: CumulativeRootPublicKey;
+      schema: "chio.cumulative-approval-root.v1";
+      signer_key_epoch: number;
+      threshold: CumulativeRootMonetaryAmount;
+    };
+    signature: CumulativeRootSignature;
+  }
+  export interface CumulativeRootMonetaryAmount {
+    currency: string;
+    units: number;
   }
 }
 
@@ -814,6 +944,17 @@ export namespace Capability_Revocation {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/supplemental-authorization.schema.json
+export namespace Capability_SupplementalAuthorization {
+  export interface ChioOpaqueSupplementalAuthorization {
+    /**
+     * Opaque authenticated extension bytes. Adapters must not interpret these bytes as quota authority.
+     */
+    signed_extension: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/threshold-approval-proposal-body.schema.json
 export namespace Capability_ThresholdApprovalProposalBody {
   export type Digest = string;
@@ -865,25 +1006,12 @@ export namespace Capability_ThresholdApprovalProposal {
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/token.schema.json
 export namespace Capability_Token {
-  export type ChioAggregateInvocationBudget = {
-    max_invocations: number;
-    root_binding?: ChioSignedAggregateBudgetRootBinding;
-    scope: "capability" | "delegation_family";
-  } & (
-    | {
-        scope?: "capability";
-      }
-    | {
-        root_binding: unknown;
-        scope?: "delegation_family";
-      }
-  );
-  export type Operation = "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate";
-
   /**
    * A Chio capability token with typed caveats, attenuation fields, attenuation proof, budget share, and hybrid signing support folded into the unreleased v1 wire shape.
    */
-  export interface ChioCapabilityToken {
+  export type ChioCapabilityToken = {
+    [k: string]: unknown;
+  } & {
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     attenuation_proof?: AttenuationProof;
@@ -905,7 +1033,27 @@ export namespace Capability_Token {
     }[];
     signature: string;
     subject: string;
-  }
+  };
+  export type ChioAggregateInvocationBudget = {
+    max_invocations: number;
+    root_binding?: ChioSignedAggregateBudgetRootBinding;
+    scope: "capability" | "delegation_family";
+  } & (
+    | {
+        scope?: "capability";
+      }
+    | {
+        root_binding: unknown;
+        scope?: "delegation_family";
+      }
+  );
+  export type Constraint =
+    | GenericConstraint
+    | LegacyApprovalConstraint
+    | CumulativeApprovalDirectConstraint
+    | CumulativeApprovalDelegableConstraint;
+  export type Operation = "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate";
+
   export interface ChioSignedAggregateBudgetRootBinding {
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     body: ChioAggregateBudgetRootBindingBody;
@@ -995,14 +1143,60 @@ export namespace Capability_Token {
   /**
    * Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
    */
-  export interface Constraint {
+  export interface GenericConstraint {
     type: string;
     value?: unknown;
+  }
+  export interface LegacyApprovalConstraint {
+    type: "require_approval_above";
+    value: {
+      threshold_units: number;
+    };
+  }
+  export interface CumulativeApprovalDirectConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      approval_budget_epoch: number;
+      approval_budget_id: string;
+      cumulative_approval_root_binding?: never;
+      threshold: MonetaryAmount;
+    };
   }
   /**
    * A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
    */
   export interface MonetaryAmount {
+    currency: string;
+    units: number;
+  }
+  export interface CumulativeApprovalDelegableConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      approval_budget_epoch: number;
+      approval_budget_id: string;
+      cumulative_approval_root_binding: ChioCumulativeApprovalRootBinding;
+      threshold: MonetaryAmount;
+    };
+  }
+  export interface ChioCumulativeApprovalRootBinding {
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    body: {
+      approval_budget_epoch: number;
+      approval_budget_id: string;
+      root_capability_hash: string;
+      root_capability_id: string;
+      root_expires_at: number;
+      root_grant_hash: string;
+      root_issuer: string;
+      root_scope_hash: string;
+      root_subject: string;
+      schema: "chio.cumulative-approval-root.v1";
+      signer_key_epoch: number;
+      threshold: CumulativeRootMonetaryAmount;
+    };
+    signature: string;
+  }
+  export interface CumulativeRootMonetaryAmount {
     currency: string;
     units: number;
   }
@@ -1432,6 +1626,245 @@ export namespace Kernel_CapabilityRevoked {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/combined-capture-metadata.schema.json
+export namespace Kernel_CombinedCaptureMetadata {
+  export interface ChioCombinedAdmissionCaptureMetadata {
+    budget_commit_index: number;
+    hold_id: string;
+    leader_epoch: number;
+    operation_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    quota_keys:
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ]
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ]
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ]
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ]
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ]
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ]
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ]
+      | [
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          },
+          {
+            grant_index?: number;
+            owner_id: string;
+            profile: string;
+          }
+        ];
+    revocation_commit_index: number;
+    revocation_set_digest: string;
+    schema: "chio.admission-capture-metadata.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/execution_nonce.schema.json
+export namespace Kernel_ExecutionNonce {
+  export interface ChioSignedExecutionNonce {
+    nonce: {
+      bound_to: {
+        capability_id: string;
+        parameter_hash: string;
+        request_id: string;
+        subject_id: string;
+        tool_name: string;
+        tool_server: string;
+      };
+      expires_at: number;
+      issued_at: number;
+      nonce_id: string;
+      reserved_hold_id?: string;
+      reserving_request_id?: string;
+      schema: "chio.execution_nonce.v1";
+    };
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/kernel/heartbeat.schema.json
 export namespace Kernel_Heartbeat {
   export interface ChioKernelMessageHeartbeat {
@@ -1583,6 +2016,7 @@ export namespace Kernel_ToolCallResponse {
       };
 
   export interface ChioKernelMessageToolCallResponse {
+    execution_nonce?: ChioSignedExecutionNonce;
     id: string;
     receipt: ChioReceiptRecord;
     result:
@@ -1634,6 +2068,25 @@ export namespace Kernel_ToolCallResponse {
           status: "err";
         };
     type: "tool_call_response";
+  }
+  export interface ChioSignedExecutionNonce {
+    nonce: {
+      bound_to: {
+        capability_id: string;
+        parameter_hash: string;
+        request_id: string;
+        subject_id: string;
+        tool_name: string;
+        tool_server: string;
+      };
+      expires_at: number;
+      issued_at: number;
+      nonce_id: string;
+      reserved_hold_id?: string;
+      reserving_request_id?: string;
+      schema: "chio.execution_nonce.v1";
+    };
+    signature: string;
   }
   /**
    * Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
@@ -1965,6 +2418,74 @@ export namespace Provenance_VerdictLink {
    */
   export interface Incomplete {
     verdict: "incomplete";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/admission-metadata.schema.json
+export namespace Receipt_AdmissionMetadata {
+  export type PositiveIJsonInteger = number;
+  export type Identifier = string;
+  export type Digest = string;
+
+  export interface ChioDurableAdmissionReceiptMetadata {
+    compensation_status: "not_compensated" | "compensated_before_dispatch" | "not_accepted_after_dispatch_commit";
+    coordinator_lease_epoch: PositiveIJsonInteger;
+    coordinator_lease_id: Identifier;
+    operation_id: Digest;
+    projected_dispatch_state:
+      | "not_committed"
+      | "capture_pending"
+      | "committed"
+      | "finalizing"
+      | "terminal"
+      | "not_applicable";
+    projected_operation_version: PositiveIJsonInteger;
+    projected_state:
+      | "prepared"
+      | "broker_attempt_registered"
+      | "approval_required"
+      | "budget_authorized"
+      | "approval_reserved"
+      | "ready_to_dispatch"
+      | "capture_pending"
+      | "dispatch_committed"
+      | "finalizing"
+      | "completed"
+      | "compensated_before_dispatch"
+      | "not_accepted_after_dispatch_commit"
+      | "outcome_unknown_after_dispatch"
+      | "mutation_ready"
+      | "mutation_submitted"
+      | "economic_mutation_applied"
+      | "economic_mutation_not_applied";
+    request_binding_hash: Digest;
+    request_id: Identifier;
+    request_namespace_digest: Digest;
+    retained_dispatch_commit: null | DispatchCommit;
+    schema: "chio.admission-receipt.v1";
+    store_fence: StoreFence;
+    tool_outcome_id: null | Digest;
+    tool_outcome_version: null | PositiveIJsonInteger;
+    trusted_time_unix_ms: PositiveIJsonInteger;
+  }
+  export interface DispatchCommit {
+    committed_version: PositiveIJsonInteger;
+    coordinator_lease_epoch: PositiveIJsonInteger;
+    coordinator_lease_id: Identifier;
+    provider_attempt: null | ProviderAttempt;
+    store_fence: StoreFence;
+  }
+  export interface ProviderAttempt {
+    attempt_id: Identifier;
+    operation_id: Digest;
+    transport_id: Identifier;
+    transport_key_epoch: PositiveIJsonInteger;
+  }
+  export interface StoreFence {
+    lease_id: Identifier;
+    owner_epoch: PositiveIJsonInteger;
+    store_uuid: Identifier;
   }
 }
 
@@ -9377,6 +9898,39 @@ export namespace TrustControl_BudgetInvocationAdmissionEvidence {
     requestConstraintDigest: Digest;
     verifiedAt: SafeInteger;
     verifierId: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/budget-snapshot-anchor-provenance.schema.json
+export namespace TrustControl_BudgetSnapshotAnchorProvenance {
+  export type Digest = string;
+
+  /**
+   * Leader-signed inclusion chain authenticating the exact immutable migration-anchor set carried by a trust-control cluster budget snapshot.
+   */
+  export interface BudgetSnapshotAnchorProvenance {
+    /**
+     * @minItems 1
+     */
+    chain: [SignedCommitment, ...SignedCommitment[]];
+    clusterAuthenticator: string;
+    schema: "chio.budget-snapshot-anchor-provenance.v1";
+  }
+  export interface SignedCommitment {
+    body: Commitment;
+    signature: string;
+  }
+  export interface Commitment {
+    anchorSetDigest: Digest;
+    chainDigest: Digest;
+    commitSequence: number;
+    committedAt: number;
+    electionTerm: number;
+    leaderUrl: string;
+    previousChainDigest: Digest;
+    schema: "chio.budget-snapshot-anchor-commitment.v1";
+    signerPublicKey: string;
   }
 }
 
