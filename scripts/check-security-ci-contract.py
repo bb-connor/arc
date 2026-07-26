@@ -857,7 +857,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise-hardening",
         "bind-source",
-    ): "7d05d2f074436ae7ee48f865f982f23ada8b2e1f444edada945fa047b1162c4f",
+    ): "8adb5dc08142daa85e42e8c23fc823660c826c65d11c092971ee06d2e44b90c5",
     (
         "enterprise evidence controller",
         "dispatch-isolated-capture",
@@ -4807,6 +4807,7 @@ def validate(root: Path) -> None:
         "EVENT_PR_HEAD_REPOSITORY": "${{ github.event.pull_request.head.repo.full_name }}",
         "EVENT_PR_HEAD_REPOSITORY_ID": "${{ github.event.pull_request.head.repo.id }}",
         "EVENT_PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+        "GH_TOKEN": "${{ github.token }}",
         "INPUT_SOURCE_REPOSITORY": "${{ inputs.source_repository }}",
         "INPUT_SOURCE_SHA": "${{ inputs.source_sha }}",
         "PR_NUMBER": "${{ github.event.pull_request.number }}",

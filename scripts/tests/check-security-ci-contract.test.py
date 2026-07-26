@@ -722,6 +722,16 @@ assert_rejected(
     "event inputs changed",
 )
 assert_rejected(
+    "enterprise bind-source omits GitHub CLI authentication",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Build canonical exact merge binding",
+        "          GH_TOKEN: ${{ github.token }}\n",
+        "",
+    ),
+    "event inputs changed",
+)
+assert_rejected(
     "enterprise bind-source accepts forged push SHA",
     "enterprise-hardening.yml",
     replace_in_named_step(
