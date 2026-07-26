@@ -36,6 +36,8 @@ root_modules = [
   "formal/lean4/Chio/Chio/Capability/Delegation.lean",
   "formal/lean4/Chio/Chio/Treaty/Intersection.lean",
   "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+  "formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean",
+  "formal/lean4/Chio/Chio/Treaty/BridgeEquivalence.lean",
   "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
 ]
 
@@ -156,6 +158,8 @@ allowed_open_modules = [
   "Chio.Core",
   "Chio.Proofs",
   "Chio.Spec",
+  "Chio.Treaty.IntersectionSyntactic",
+  "Chio.Treaty.PredicateLang",
   "Lake",
   "DSL",
 ]

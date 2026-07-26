@@ -428,6 +428,9 @@ fn kernel_hook_rejects_treaty_dsse_unanimous_deny() -> Result<(), Box<dyn std::e
     let metadata = decision
         .metadata
         .ok_or_else(|| io::Error::other("runtime metadata missing"))?;
+    if let Some(code) = metadata["chio_runtime"]["failure_code"].as_str() {
+        emit_threat_matrix_code(code);
+    }
     assert_eq!(
         metadata["chio_runtime"]["failure_code"],
         "chio_treaty_policy_denied"

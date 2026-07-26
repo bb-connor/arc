@@ -82,7 +82,7 @@ RUN test "$(rustc --version | cut -d' ' -f1-2)" = "rustc 1.93.0" \
  && test "$(cargo mutants --version | awk '{print $2}')" = "25.3.1" \
  && test "$(cargo clippy --version | cut -d' ' -f1)" = "clippy" \
  && test "$(cargo fmt --version | cut -d' ' -f1)" = "rustfmt" \
- && echo 'c2242633a6980bdcf55c4b0ace39cf58f616e8670778397e098e7f2363049ae5  Cargo.lock' | sha256sum -c - \
+ && echo '5851a69ff11a547e63fd13562de47abdea384ec4f5e84c0752179d3039a9436c  Cargo.lock' | sha256sum -c - \
  && echo '8bc51ecab82415fddd8489604f2424e137d71856e7f65cbdcfaa48850d794b46  rust-toolchain.toml' | sha256sum -c - \
  && cargo fetch --locked \
  && mkdir -p /opt/chio-security/cargo-cache \

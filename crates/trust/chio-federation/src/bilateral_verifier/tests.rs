@@ -20,6 +20,12 @@ use chio_core_types::receipt::{
     kinds::TrustLevel,
 };
 
+fn emit_threat_matrix_code(code: &str) {
+    if std::env::var_os("CHIO_THREAT_MATRIX_EMIT_CODE").is_some() {
+        println!("CHIO_THREAT_MATRIX_CODE={code}");
+    }
+}
+
 fn sample_receipt(kp_b: &Keypair) -> ChioReceipt {
     let body = ChioReceiptBody {
         id: "rcpt-bilateral-c2-sample".to_string(),
@@ -687,6 +693,7 @@ fn strict_chio_verifier_binds_treaty_request_hash_to_tool_args() {
     let err =
         verify_chio_bilateral_invocation(&envelope, &ChioBilateralVerifierConfig { base: &base })
             .unwrap_err();
+    emit_threat_matrix_code(err.code());
     assert_eq!(err.code(), "predicate.schema_invalid");
     assert!(err.to_string().contains("request_sha256"));
 }
@@ -701,6 +708,7 @@ fn strict_chio_verifier_binds_treaty_outcome_hash_to_resolved_receipt() {
             .unwrap()
             .outcome_sha256 = "7".repeat(64);
     });
+    emit_threat_matrix_code(err.code());
     assert_eq!(err.code(), "predicate.schema_invalid");
     assert!(err.to_string().contains("outcome_sha256"));
 }
@@ -715,6 +723,7 @@ fn strict_chio_verifier_binds_treaty_remote_receipt_hash_to_resolved_receipt() {
             .unwrap()
             .remote_receipt_sha256 = "9".repeat(64);
     });
+    emit_threat_matrix_code(err.code());
     assert_eq!(err.code(), "predicate.schema_invalid");
     assert!(err.to_string().contains("remote_receipt_sha256"));
 }
@@ -1168,6 +1177,7 @@ fn step_14_expired_lease_fails_closed() {
     );
 
     let err = verify_bilateral_cosign_invocation(&envelope, &config).unwrap_err();
+    emit_threat_matrix_code(err.code());
     assert_eq!(err.code(), "capability.lease_expired_or_unknown");
 }
 
@@ -1220,6 +1230,7 @@ fn step_13_verdict_disagreement_fails_closed() {
     );
 
     let err = verify_bilateral_cosign_invocation(&envelope, &config).unwrap_err();
+    emit_threat_matrix_code(err.code());
     assert_eq!(err.code(), "policy.verdict_disagreement");
 }
 
@@ -1246,6 +1257,7 @@ fn step_15_receipt_backed_class_requires_governance_receipt() {
         .insert("file_read".to_string(), ActionClassKind::ReceiptBacked);
 
     let err = verify_bilateral_cosign_invocation(&envelope, &cfg).unwrap_err();
+    emit_threat_matrix_code(err.code());
     assert_eq!(err.code(), "governance.receipt_required_missing");
 }
 

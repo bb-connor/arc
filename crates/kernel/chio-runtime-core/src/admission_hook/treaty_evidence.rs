@@ -382,7 +382,8 @@ fn verify_bilateral_invocation_evidence(
         || invocation.ladder_intersection_sha256 != review.ladder_intersection_sha256
         || invocation.continuation_sha256 != review.continuation_sha256
         || invocation.action_class_id != review.action_class_id
-        || invocation.consistency_model != review.consistency_model
+        || bilateral_dsse_consistency_model(&invocation.consistency_model)?
+            != bilateral_dsse_consistency_model(review.consistency_model)?
         || invocation.capability_id != review.request.capability_id
         || invocation.request_sha256 != review.request.tool_args_sha256
     {

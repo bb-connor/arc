@@ -2082,6 +2082,78 @@
       "artifactKind": "chio_comptroller_surface_report",
       "introducedBy": "chio-comptroller-surface/v1",
       "schemaFile": "spec/schemas/chio-comptroller/v1/surface-report.schema.json"
+    },
+    {
+      "schema": "chio.financial-agent-passport.source-manifest.v1",
+      "artifactKind": "financial_agent_passport_source_manifest",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-agent-passport-source-manifest.schema.json"
+    },
+    {
+      "schema": "chio.financial-agent-passport.v1",
+      "artifactKind": "financial_agent_passport",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-agent-passport.schema.json"
+    },
+    {
+      "schema": "chio.fincred.credit-scorecard.v1",
+      "artifactKind": "financial_credit_scorecard",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-credit-scorecard.schema.json"
+    },
+    {
+      "schema": "chio.fincred.exposure-history.v1",
+      "artifactKind": "financial_exposure_history",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-exposure-history.schema.json"
+    },
+    {
+      "schema": "chio.fincred.loss-history.v1",
+      "artifactKind": "financial_loss_history",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-loss-history.schema.json"
+    },
+    {
+      "schema": "chio.financial-agent-passport-presentation-challenge.v1",
+      "artifactKind": "financial_passport_presentation_challenge",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-passport-presentation-challenge.schema.json"
+    },
+    {
+      "schema": "chio.fincred.premium-history.v1",
+      "artifactKind": "financial_premium_history",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-premium-history.schema.json"
+    },
+    {
+      "schema": "chio.fincred.settlement-reliability.v1",
+      "artifactKind": "financial_settlement_reliability",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-settlement-reliability.schema.json"
+    },
+    {
+      "schema": "chio.fincred.source-checkpoint.v1",
+      "artifactKind": "financial_source_checkpoint",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-source-checkpoint.schema.json"
+    },
+    {
+      "schema": "chio.fincred.source-completeness-attestation.v1",
+      "artifactKind": "financial_source_completeness_attestation",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-source-completeness-attestation.schema.json"
+    },
+    {
+      "schema": "chio.fincred.source-member.v1",
+      "artifactKind": "financial_source_member",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-source-member.schema.json"
+    },
+    {
+      "schema": "chio.financial-agent-passport.presentation.v1",
+      "artifactKind": "presented_financial_agent_passport",
+      "introducedBy": "agent-economy-durability-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/presented-financial-agent-passport.schema.json"
     }
   ]
 }
