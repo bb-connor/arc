@@ -1782,6 +1782,16 @@ assert_rejected(
     "does not bind exact capture inputs",
 )
 assert_rejected(
+    "controller omits merge tree from dispatch context",
+    "enterprise-evidence-controller.yml",
+    replace_in_named_step(
+        "Dispatch exact default-branch capture definition",
+        "            merge_tree_sha,\n",
+        "",
+    ),
+    "does not bind exact capture inputs",
+)
+assert_rejected(
     "controller omits capture dispatch nonce input",
     "enterprise-evidence-controller.yml",
     replace_in_named_step(
@@ -1846,6 +1856,15 @@ assert_rejected(
     "manual fixed-input contract",
 )
 assert_rejected(
+    "capture dispatch context input removed",
+    "enterprise-linux-capture.yml",
+    replace_once(
+        "      dispatch_context:\n",
+        "      renamed_dispatch_context:\n",
+    ),
+    "manual fixed-input contract",
+)
+assert_rejected(
     "capture authenticated controller title loses nonce",
     "enterprise-linux-capture.yml",
     replace_once(
@@ -1858,9 +1877,29 @@ assert_rejected(
     "capture accepts a rerun before controller intent authentication",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Authenticate controller dispatch and capture definition",
+        "Authenticate capture dispatch and controller intent",
         'test "${CAPTURE_RUN_ATTEMPT}" = "1"',
         "true",
+    ),
+    "does not authenticate controller, run, intent, and definition bindings",
+)
+assert_rejected(
+    "capture accepts noncanonical dispatch context",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Authenticate capture dispatch and controller intent",
+        'test "${dispatch_context}" = "${INPUT_DISPATCH_CONTEXT}"',
+        "true",
+    ),
+    "does not authenticate controller, run, intent, and definition bindings",
+)
+assert_rejected(
+    "capture weakens dispatch context key schema",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Authenticate capture dispatch and controller intent",
+        '                  "base_ref",\n',
+        "",
     ),
     "does not authenticate controller, run, intent, and definition bindings",
 )
@@ -1868,7 +1907,7 @@ assert_rejected(
     "capture skips controller intent archive digest verification",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Authenticate controller dispatch and capture definition",
+        "Authenticate capture dispatch and controller intent",
         'test "$(sha256sum "${intent_partial}" | cut -d\' \' -f1)" = "${intent_artifact_digest#sha256:}"',
         "true",
     ),
@@ -1878,7 +1917,7 @@ assert_rejected(
     "capture permits multiple controller intent archive members",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Authenticate controller dispatch and capture definition",
+        "Authenticate capture dispatch and controller intent",
         "if len(infos) != 1:",
         "if False:",
     ),
@@ -1888,7 +1927,7 @@ assert_rejected(
     "capture accepts a mismatched controller dispatch nonce",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Authenticate controller dispatch and capture definition",
+        "Authenticate capture dispatch and controller intent",
         'test "$(jq -r \'.dispatch_nonce\' <<< "${intent}")" = "${INPUT_CONTROLLER_DISPATCH_NONCE}"',
         "true",
     ),
@@ -1898,7 +1937,7 @@ assert_rejected(
     "capture exceeds GitHub run expression limit",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Revalidate live merge authorization",
         "          set -euo pipefail\n",
         "          set -euo pipefail\n          # " + ("x" * 21_000) + "\n",
     ),
@@ -1979,7 +2018,7 @@ for label, old, new in (
         label,
         "enterprise-linux-capture.yml",
         replace_in_named_step(
-            "Authenticate controller dispatch and capture definition", old, new
+            "Authenticate capture dispatch and controller intent", old, new
         ),
         "does not authenticate controller, run, intent, and definition bindings",
     )
@@ -2000,7 +2039,7 @@ for label, old, new in (
         label,
         "enterprise-linux-capture.yml",
         replace_in_named_step(
-            "Revalidate controller source and merge authorization", old, new
+            "Revalidate live merge authorization", old, new
         ),
         "does not revalidate controller, run, merge, source, and freshness bindings",
     )
@@ -2008,7 +2047,7 @@ assert_rejected(
     "capture omits terminal label digest revalidation",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Revalidate live merge authorization",
         'test "${stable_labels_digest}" = "${INPUT_LABELS_DIGEST}"',
         "true",
     ),
@@ -2018,7 +2057,7 @@ assert_rejected(
     "capture omits terminal label-derived mode revalidation",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Revalidate live merge authorization",
         'test "${stable_mode}" = "${INPUT_MODE}"',
         "true",
     ),
@@ -2028,7 +2067,7 @@ assert_rejected(
     "capture exports stale first-read label mode",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Revalidate live merge authorization",
         'echo "mode=${stable_mode}"',
         'echo "mode=${live_mode}"',
     ),
@@ -2038,9 +2077,19 @@ assert_rejected(
     "capture trusted input binding removed",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
-        "          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}\n",
+        "Revalidate live merge authorization",
+        "          INPUT_SOURCE_SHA: ${{ steps.authenticate.outputs.source_sha }}\n",
         "",
+    ),
+    "trusted authorization bindings changed",
+)
+assert_rejected(
+    "capture authorization reads raw dispatch input",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Revalidate live merge authorization",
+        "          INPUT_SOURCE_SHA: ${{ steps.authenticate.outputs.source_sha }}\n",
+        "          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}\n",
     ),
     "trusted authorization bindings changed",
 )
@@ -2048,9 +2097,9 @@ assert_rejected(
     "capture interpolates raw dispatch input into trusted shell",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
-        '[[ "${INPUT_SOURCE_SHA}" =~ ${commit_pattern} ]]',
-        '[[ "${{ inputs.source_sha }}" =~ ${commit_pattern} ]]',
+        "Revalidate live merge authorization",
+        "          set -euo pipefail\n",
+        '          set -euo pipefail\n          echo "${{ inputs.source_sha }}"\n',
     ),
     "interpolates untrusted dispatch inputs",
 )
@@ -2058,11 +2107,11 @@ assert_rejected(
     "capture run actor treated as owner",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Authenticate capture dispatch and controller intent",
         'test "${CAPTURE_ACTOR}" = "github-actions[bot]"',
         'test "${CAPTURE_ACTOR}" = "${GITHUB_REPOSITORY_OWNER}"',
     ),
-    "does not revalidate controller, run, merge, source, and freshness bindings",
+    "does not authenticate controller, run, intent, and definition bindings",
 )
 assert_rejected(
     "capture enforcement checks out head not merge",
@@ -3011,11 +3060,11 @@ assert_rejected(
     "capture accepts trusted-definition variable drift",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Authenticate capture dispatch and controller intent",
         'test "${INPUT_SECURITY_DEFINITION_SHA}" = "${ENTERPRISE_SECURITY_DEFINITION_SHA}"',
         "true",
     ),
-    "isolated capture does not revalidate controller, run, merge, source, and freshness bindings",
+    "isolated capture does not authenticate controller, run, intent, and definition bindings",
 )
 assert_rejected(
     "finalizer accepts trusted-definition variable drift",

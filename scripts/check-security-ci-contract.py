@@ -53,7 +53,7 @@ EXPECTED_APK_LOCK_SHA256 = (
     "b4d4642b66191c1923fe7c293b408b570b71df9edb710ffa09bc518ca36a5ad8"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "5764368b209d95259cddfc171dca702298298a02bc77ef8fbd80ad24f8814a7c"
+    "0ecccafdcdfea7ea85ef5abc2391b81cfbde1bd5f7eabff4af9efea417c78b42"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "8bc51ecab82415fddd8489604f2424e137d71856e7f65cbdcfaa48850d794b46"
@@ -290,58 +290,13 @@ EXPECTED_CAPTURE_EVENTS = {
                 "required": "true",
                 "type": "string",
             },
-            "base_ref": {
-                "description": "Exact pull request base ref",
-                "required": "true",
-                "type": "string",
-            },
-            "base_repository": {
-                "description": "Exact pull request base repository",
-                "required": "true",
-                "type": "string",
-            },
-            "base_sha": {
-                "description": "Exact pull request base commit",
-                "required": "true",
-                "type": "string",
-            },
-            "controller_actor": {
-                "description": "Actor of the trusted controller run",
-                "required": "true",
-                "type": "string",
-            },
-            "controller_blob_sha": {
-                "description": "Blob identifier of the trusted controller definition",
-                "required": "true",
-                "type": "string",
-            },
             "controller_dispatch_nonce": {
                 "description": "Unique controller-issued capture dispatch nonce",
                 "required": "true",
                 "type": "string",
             },
-            "controller_issued_at_unix_ms": {
-                "description": "Trusted controller issuance time",
-                "required": "true",
-                "type": "string",
-            },
-            "controller_run_attempt": {
-                "description": "Exact trusted controller run attempt",
-                "required": "true",
-                "type": "string",
-            },
-            "controller_run_id": {
-                "description": "Exact trusted controller run",
-                "required": "true",
-                "type": "string",
-            },
-            "controller_workflow_id": {
-                "description": "Exact trusted controller workflow identifier",
-                "required": "true",
-                "type": "string",
-            },
-            "labels_digest": {
-                "description": "Digest of the live pull request label set",
+            "dispatch_context": {
+                "description": "Canonical JSON with the remaining authorized capture context",
                 "required": "true",
                 "type": "string",
             },
@@ -350,23 +305,8 @@ EXPECTED_CAPTURE_EVENTS = {
                 "required": "true",
                 "type": "string",
             },
-            "merge_tree_sha": {
-                "description": "Exact pull request test merge tree",
-                "required": "true",
-                "type": "string",
-            },
             "pr_number": {
                 "description": "Pull request bound to the capture",
-                "required": "true",
-                "type": "string",
-            },
-            "security_definition_sha": {
-                "description": "Authorized security workflow definition baseline commit",
-                "required": "true",
-                "type": "string",
-            },
-            "source_repository": {
-                "description": "Exact repository containing the candidate commit",
                 "required": "true",
                 "type": "string",
             },
@@ -374,12 +314,6 @@ EXPECTED_CAPTURE_EVENTS = {
                 "description": "Exact candidate head commit to exercise",
                 "required": "true",
                 "type": "string",
-            },
-            "mode": {
-                "description": "Enforcement or evidence refresh",
-                "required": "true",
-                "type": "choice",
-                "options": ["enforcement", "refresh"],
             },
         }
     }
@@ -557,11 +491,11 @@ EXPECTED_CONTROLLER_STEP_INVENTORY = (
 EXPECTED_CAPTURE_STEP_INVENTORIES = {
     "authorize-capture": (
         (
-            "Authenticate controller dispatch and capture definition",
+            "Authenticate capture dispatch and controller intent",
             "authenticate",
             None,
         ),
-        ("Revalidate controller source and merge authorization", "authorize", None),
+        ("Revalidate live merge authorization", "authorize", None),
     ),
     "refresh-linux-evidence": (
         (
@@ -927,11 +861,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence controller",
         "dispatch-isolated-capture",
-    ): "624faf15407b787ec705d492adcb4616d9986a907dcc8e643af29bcfbecd06e1",
+    ): "f00b93ee141443abd5ff2c041632d48b974e290b8096f7d7f9599f78b9cc136e",
     (
         "enterprise Linux capture",
         "authorize-capture",
-    ): "db37dae1df7436e0f2085df3f64d305a4c3780d1be803bef2ef182780a7640e6",
+    ): "385a55c096272604025962b9109d7131eeaf909fd4dfa280af55ad2c7fc0b92f",
     (
         "enterprise Linux capture",
         "refresh-linux-evidence",
@@ -5419,6 +5353,28 @@ def validate(root: Path) -> None:
             '--arg security_definition_sha "${SECURITY_DEFINITION_SHA}"',
             '--arg source_repository "${HEAD_REPOSITORY}"',
             '--arg source_sha "${HEAD_SHA}"',
+            "\n".join(
+                (
+                    'dispatch_context="$(jq -cS \'{',
+                    "  base_ref,",
+                    "  base_repository,",
+                    "  base_sha,",
+                    "  controller_actor,",
+                    "  controller_blob_sha,",
+                    "  controller_issued_at_unix_ms,",
+                    "  controller_run_attempt,",
+                    "  controller_run_id,",
+                    "  controller_workflow_id,",
+                    "  labels_digest,",
+                    "  merge_tree_sha,",
+                    "  mode,",
+                    "  security_definition_sha,",
+                    "  source_repository",
+                    '}\' <<< "${intent_inputs}")"',
+                )
+            ),
+            '--arg dispatch_context "${dispatch_context}"',
+            "dispatch_context: $dispatch_context",
             '--input - <<< "${payload}"',
             "enterprise-linux-capture.yml/runs?event=workflow_dispatch&branch=${default_branch}&per_page=100",
             "--paginate",
@@ -5430,12 +5386,12 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.run_attempt\' <<< "${dispatched_run}")" = "1"',
             'schema: "chio.enterprise-capture-dispatch-intent.v1"',
             'capture_run_attempt: "1"',
-            '--argjson inputs "$(jq -cS \'.inputs\' <<< "${payload}")"',
+            '--argjson inputs "${intent_inputs}"',
             'echo "capture_run_id=${capture_run_id}"',
         ),
         "enterprise evidence controller does not bind exact capture inputs",
     )
-    if dispatch_run.count("--arg ") != 32:
+    if dispatch_run.count("--arg ") != 38:
         raise ContractError(
             "enterprise evidence controller does not bind exact capture inputs"
         )
@@ -5514,7 +5470,7 @@ def validate(root: Path) -> None:
         "isolated capture authorization",
     )
     capture_authentication_step = named_step(
-        capture_authorization, "Authenticate controller dispatch and capture definition"
+        capture_authorization, "Authenticate capture dispatch and controller intent"
     )
     if capture_authentication_step.get("env") != {
         "CAPTURE_ACTOR": "${{ github.actor }}",
@@ -5522,30 +5478,40 @@ def validate(root: Path) -> None:
         "CAPTURE_RUN_ID": "${{ github.run_id }}",
         "CAPTURE_SHA": "${{ github.sha }}",
         "INPUT_AUTHORIZED_SOURCE_SHA": "${{ inputs.authorized_source_sha }}",
-        "INPUT_BASE_REF": "${{ inputs.base_ref }}",
-        "INPUT_BASE_REPOSITORY": "${{ inputs.base_repository }}",
-        "INPUT_BASE_SHA": "${{ inputs.base_sha }}",
-        "INPUT_CONTROLLER_ACTOR": "${{ inputs.controller_actor }}",
-        "INPUT_CONTROLLER_BLOB_SHA": "${{ inputs.controller_blob_sha }}",
         "INPUT_CONTROLLER_DISPATCH_NONCE": "${{ inputs.controller_dispatch_nonce }}",
-        "INPUT_CONTROLLER_ISSUED_AT_UNIX_MS": "${{ inputs.controller_issued_at_unix_ms }}",
-        "INPUT_CONTROLLER_RUN_ATTEMPT": "${{ inputs.controller_run_attempt }}",
-        "INPUT_CONTROLLER_RUN_ID": "${{ inputs.controller_run_id }}",
-        "INPUT_CONTROLLER_WORKFLOW_ID": "${{ inputs.controller_workflow_id }}",
-        "INPUT_LABELS_DIGEST": "${{ inputs.labels_digest }}",
+        "INPUT_DISPATCH_CONTEXT": "${{ inputs.dispatch_context }}",
         "INPUT_MERGE_COMMIT_SHA": "${{ inputs.merge_commit_sha }}",
-        "INPUT_MERGE_TREE_SHA": "${{ inputs.merge_tree_sha }}",
-        "INPUT_MODE": "${{ inputs.mode }}",
         "INPUT_PR_NUMBER": "${{ inputs.pr_number }}",
-        "INPUT_SECURITY_DEFINITION_SHA": "${{ inputs.security_definition_sha }}",
-        "INPUT_SOURCE_REPOSITORY": "${{ inputs.source_repository }}",
         "INPUT_SOURCE_SHA": "${{ inputs.source_sha }}",
     }:
         raise ContractError("isolated capture trusted input bindings changed")
     capture_authentication_run = require_run_markers(
         capture_authorization,
-        "Authenticate controller dispatch and capture definition",
+        "Authenticate capture dispatch and controller intent",
         (
+            'dispatch_context="$(',
+            "if type == \"object\"",
+            'and keys == [',
+            '"base_ref",',
+            '"base_repository",',
+            '"base_sha",',
+            '"controller_actor",',
+            '"controller_blob_sha",',
+            '"controller_issued_at_unix_ms",',
+            '"controller_run_attempt",',
+            '"controller_run_id",',
+            '"controller_workflow_id",',
+            '"labels_digest",',
+            '"merge_tree_sha",',
+            '"mode",',
+            '"security_definition_sha",',
+            '"source_repository"',
+            'and all(.[]; type == "string")',
+            'else error("invalid enterprise capture dispatch context")',
+            'test "${dispatch_context}" = "${INPUT_DISPATCH_CONTEXT}"',
+            'INPUT_BASE_REF="$(jq -r \'.base_ref\' <<< "${dispatch_context}")"',
+            'INPUT_CONTROLLER_RUN_ID="$(jq -r \'.controller_run_id\' <<< "${dispatch_context}")"',
+            'INPUT_SECURITY_DEFINITION_SHA="$(jq -r \'.security_definition_sha\' <<< "${dispatch_context}")"',
             'test "${INPUT_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
             'test "${INPUT_SECURITY_DEFINITION_SHA}" = "${ENTERPRISE_SECURITY_DEFINITION_SHA}"',
             'test "${CAPTURE_RUN_ATTEMPT}" = "1"',
@@ -5577,57 +5543,48 @@ def validate(root: Path) -> None:
             "contents/.github/workflows/enterprise-linux-capture.yml?ref=${INPUT_SECURITY_DEFINITION_SHA}",
             "contents/.github/workflows/enterprise-linux-capture.yml?ref=${CAPTURE_SHA}",
             'test "${running_capture_blob_sha}" = "${capture_blob_sha}"',
+            'echo "capture_created_epoch=${capture_created_epoch}"',
             'echo "capture_blob_sha=${capture_blob_sha}"',
-            'echo "capture_issued_at_unix_ms=$((capture_created_epoch * 1000))"',
             'echo "capture_workflow_id=${capture_workflow_id}"',
         ),
         "isolated capture does not authenticate controller, run, intent, and definition bindings",
     )
     capture_authorization_step = named_step(
-        capture_authorization, "Revalidate controller source and merge authorization"
+        capture_authorization, "Revalidate live merge authorization"
     )
     if capture_authorization_step.get("env") != {
-        "AUTHENTICATED_CAPTURE_BLOB_SHA": "${{ steps.authenticate.outputs.capture_blob_sha }}",
-        "AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS": "${{ steps.authenticate.outputs.capture_issued_at_unix_ms }}",
-        "AUTHENTICATED_CAPTURE_WORKFLOW_ID": "${{ steps.authenticate.outputs.capture_workflow_id }}",
-        "CAPTURE_ACTOR": "${{ github.actor }}",
-        "CAPTURE_RUN_ATTEMPT": "${{ github.run_attempt }}",
-        "CAPTURE_RUN_ID": "${{ github.run_id }}",
-        "INPUT_AUTHORIZED_SOURCE_SHA": "${{ inputs.authorized_source_sha }}",
-        "INPUT_BASE_REF": "${{ inputs.base_ref }}",
-        "INPUT_BASE_REPOSITORY": "${{ inputs.base_repository }}",
-        "INPUT_BASE_SHA": "${{ inputs.base_sha }}",
-        "INPUT_CONTROLLER_ACTOR": "${{ inputs.controller_actor }}",
-        "INPUT_CONTROLLER_BLOB_SHA": "${{ inputs.controller_blob_sha }}",
-        "INPUT_CONTROLLER_ISSUED_AT_UNIX_MS": "${{ inputs.controller_issued_at_unix_ms }}",
-        "INPUT_CONTROLLER_RUN_ATTEMPT": "${{ inputs.controller_run_attempt }}",
-        "INPUT_CONTROLLER_RUN_ID": "${{ inputs.controller_run_id }}",
-        "INPUT_CONTROLLER_WORKFLOW_ID": "${{ inputs.controller_workflow_id }}",
-        "INPUT_LABELS_DIGEST": "${{ inputs.labels_digest }}",
-        "INPUT_MERGE_COMMIT_SHA": "${{ inputs.merge_commit_sha }}",
-        "INPUT_MERGE_TREE_SHA": "${{ inputs.merge_tree_sha }}",
-        "INPUT_MODE": "${{ inputs.mode }}",
-        "INPUT_PR_NUMBER": "${{ inputs.pr_number }}",
-        "INPUT_SECURITY_DEFINITION_SHA": "${{ inputs.security_definition_sha }}",
-        "INPUT_SOURCE_REPOSITORY": "${{ inputs.source_repository }}",
-        "INPUT_SOURCE_SHA": "${{ inputs.source_sha }}",
+        "CAPTURE_ACTOR": "${{ steps.authenticate.outputs.capture_actor }}",
+        "CAPTURE_BLOB_SHA": "${{ steps.authenticate.outputs.capture_blob_sha }}",
+        "CAPTURE_CREATED_EPOCH": "${{ steps.authenticate.outputs.capture_created_epoch }}",
+        "CAPTURE_RUN_ATTEMPT": "${{ steps.authenticate.outputs.capture_run_attempt }}",
+        "CAPTURE_RUN_ID": "${{ steps.authenticate.outputs.capture_run_id }}",
+        "CAPTURE_WORKFLOW_ID": "${{ steps.authenticate.outputs.capture_workflow_id }}",
+        "INPUT_BASE_REF": "${{ steps.authenticate.outputs.base_ref }}",
+        "INPUT_BASE_REPOSITORY": "${{ steps.authenticate.outputs.base_repository }}",
+        "INPUT_BASE_SHA": "${{ steps.authenticate.outputs.base_sha }}",
+        "INPUT_CONTROLLER_ACTOR": "${{ steps.authenticate.outputs.controller_actor }}",
+        "INPUT_CONTROLLER_BLOB_SHA": "${{ steps.authenticate.outputs.controller_blob_sha }}",
+        "INPUT_CONTROLLER_ISSUED_AT_UNIX_MS": "${{ steps.authenticate.outputs.controller_issued_at_unix_ms }}",
+        "INPUT_CONTROLLER_RUN_ATTEMPT": "${{ steps.authenticate.outputs.controller_run_attempt }}",
+        "INPUT_CONTROLLER_RUN_ID": "${{ steps.authenticate.outputs.controller_run_id }}",
+        "INPUT_CONTROLLER_WORKFLOW_ID": "${{ steps.authenticate.outputs.controller_workflow_id }}",
+        "INPUT_LABELS_DIGEST": "${{ steps.authenticate.outputs.labels_digest }}",
+        "INPUT_MERGE_COMMIT_SHA": "${{ steps.authenticate.outputs.merge_commit_sha }}",
+        "INPUT_MERGE_TREE_SHA": "${{ steps.authenticate.outputs.merge_tree_sha }}",
+        "INPUT_MODE": "${{ steps.authenticate.outputs.mode }}",
+        "INPUT_PR_NUMBER": "${{ steps.authenticate.outputs.pr_number }}",
+        "INPUT_SECURITY_DEFINITION_SHA": "${{ steps.authenticate.outputs.security_definition_sha }}",
+        "INPUT_SOURCE_REPOSITORY": "${{ steps.authenticate.outputs.source_repository }}",
+        "INPUT_SOURCE_SHA": "${{ steps.authenticate.outputs.source_sha }}",
     }:
         raise ContractError("isolated capture trusted authorization bindings changed")
     capture_merge_authorization_run = require_run_markers(
         capture_authorization,
-        "Revalidate controller source and merge authorization",
+        "Revalidate live merge authorization",
         (
-            '[[ "${AUTHENTICATED_CAPTURE_BLOB_SHA}" =~ ${commit_pattern} ]]',
-            '[[ "${AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS}" =~ ^[1-9][0-9]{12}$ ]]',
-            '[[ "${AUTHENTICATED_CAPTURE_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]',
-            'test "${INPUT_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
-            'test "${INPUT_SECURITY_DEFINITION_SHA}" = "${ENTERPRISE_SECURITY_DEFINITION_SHA}"',
-            'test "${CAPTURE_RUN_ATTEMPT}" = "1"',
-            'test "${INPUT_CONTROLLER_RUN_ATTEMPT}" = "1"',
-            'test "${CAPTURE_ACTOR}" = "github-actions[bot]"',
-            'capture_blob_sha="${AUTHENTICATED_CAPTURE_BLOB_SHA}"',
-            'capture_created_epoch="$((AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS / 1000))"',
-            'capture_workflow_id="${AUTHENTICATED_CAPTURE_WORKFLOW_ID}"',
+            'capture_blob_sha="${CAPTURE_BLOB_SHA}"',
+            'capture_created_epoch="${CAPTURE_CREATED_EPOCH}"',
+            'capture_workflow_id="${CAPTURE_WORKFLOW_ID}"',
             'test "$(jq -r \'.head.sha\' <<< "${live_pr}")" = "${INPUT_SOURCE_SHA}"',
             "repos/${GITHUB_REPOSITORY}/git/ref/pull/${INPUT_PR_NUMBER}/merge",
             'test "$(jq -r \'.ref\' <<< "${merge_ref}")" = "refs/pull/${INPUT_PR_NUMBER}/merge"',
