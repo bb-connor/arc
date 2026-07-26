@@ -106,8 +106,17 @@
           "if": {
             "properties": { "profile": { "const": "chio.grant-invocation.v1" } }
           },
-          "then": { "required": ["grantIndex"] },
-          "else": { "not": { "required": ["grantIndex"] } }
+          "then": {
+            "properties": {
+              "grantIndex": { "$ref": "#/$defs/partitionEscrowUint32" }
+            },
+            "required": ["grantIndex"]
+          },
+          "else": {
+            "properties": {
+              "grantIndex": false
+            }
+          }
         },
         {
           "if": {

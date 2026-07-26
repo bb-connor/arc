@@ -50,7 +50,7 @@
       }
     },
     "aggregate_invocation_budget": {
-      "$ref": "aggregate-invocation-budget.schema.json"
+      "$ref": "https://chio.world/schemas/chio-wire/v1/capability/aggregate-invocation-budget.schema.json"
     },
     "algorithm": {
       "type": "string",

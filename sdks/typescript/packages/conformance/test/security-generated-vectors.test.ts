@@ -42,6 +42,10 @@ import type {
   TrustControl_AdmissionCaptureMetadata,
   TrustControl_AdmissionRequestBinding,
   TrustControl_BudgetInvocationAdmissionEvidence,
+  TrustControl_PartitionEscrowAdmissionEvidence,
+  TrustControl_PartitionEscrowAllocationSet,
+  TrustControl_PartitionEscrowQuotaCommitment,
+  TrustControl_PartitionEscrowReceiptMetadata,
 } from "../src/_generated/index.js";
 
 const root = fileURLToPath(new URL("../../../../../", import.meta.url));
@@ -306,13 +310,39 @@ function assertProtocolWireRoundTrip(
         sourceOverride,
       );
     case "budget_admission_evidence":
+    case "budget_admission_evidence_partition_escrow":
       return assertWireRoundTrip<TrustControl_BudgetInvocationAdmissionEvidence.ChioBudgetInvocationAdmissionEvidence>(
         validate,
         relativePath,
         sourceOverride,
       );
     case "admission_capture_metadata":
+    case "admission_capture_metadata_partition_escrow":
       return assertWireRoundTrip<TrustControl_AdmissionCaptureMetadata.ChioAuthoritativeAdmissionCaptureReceiptProjection>(
+        validate,
+        relativePath,
+        sourceOverride,
+      );
+    case "partition_escrow_quota_commitment":
+      return assertWireRoundTrip<TrustControl_PartitionEscrowQuotaCommitment.ChioSignedPartitionEscrowQuotaCommitment>(
+        validate,
+        relativePath,
+        sourceOverride,
+      );
+    case "partition_escrow_allocation_set":
+      return assertWireRoundTrip<TrustControl_PartitionEscrowAllocationSet.ChioSignedPartitionEscrowAllocationSet>(
+        validate,
+        relativePath,
+        sourceOverride,
+      );
+    case "partition_escrow_admission_evidence":
+      return assertWireRoundTrip<TrustControl_PartitionEscrowAdmissionEvidence.ChioPartitionEscrowAdmissionEvidence>(
+        validate,
+        relativePath,
+        sourceOverride,
+      );
+    case "partition_escrow_receipt_metadata":
+      return assertWireRoundTrip<TrustControl_PartitionEscrowReceiptMetadata.ChioPartitionEscrowFinancialReceiptMetadata>(
         validate,
         relativePath,
         sourceOverride,
@@ -671,5 +701,5 @@ describe("generated protocol security types", () => {
     expect(structuralRejections).toBe(16);
     expect(semanticRejections).toBe(28);
     expect(structuralRejections + semanticRejections).toBe(44);
-  });
+  }, 20_000);
 });
