@@ -70,20 +70,19 @@ fn test_shared_evidence_reporting_surfaces() {
         &local_issuer_kp,
     )
     .expect("sign local root capability");
-    let local_child = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: "cap-local-child".to_string(),
-            issuer: local_issuer_kp.public_key(),
-            subject: local_leaf_kp.public_key(),
-            scope,
-            issued_at: 1_600,
-            expires_at: 20_000,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        },
-        &local_issuer_kp,
-    )
-    .expect("sign local child capability");
+    let local_child = make_delegated_capability_token(
+        "cap-local-child",
+        &local_leaf_kp,
+        &local_root_kp,
+        &local_root,
+    );
+    let remote_root = make_capability_token("cap-remote-root", &remote_root_kp, &remote_issuer_kp);
+    let remote_delegate = make_delegated_capability_token(
+        "cap-remote-delegate",
+        &remote_delegate_kp,
+        &remote_root_kp,
+        &remote_root,
+    );
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -115,28 +114,8 @@ fn test_shared_evidence_reporting_surfaces() {
                     ),
                 }],
                 capability_lineage: vec![
-                    CapabilitySnapshot {
-                        capability_id: "cap-remote-root".to_string(),
-                        subject_key: remote_root_hex.clone(),
-                        issuer_key: remote_issuer_hex.clone(),
-                        issued_at: 1_000,
-                        expires_at: 20_000,
-                        grants_json: serde_json::to_string(&ChioScope::default())
-                            .expect("serialize remote root grants"),
-                        delegation_depth: 0,
-                        parent_capability_id: None,
-                    },
-                    CapabilitySnapshot {
-                        capability_id: "cap-remote-delegate".to_string(),
-                        subject_key: remote_delegate_hex.clone(),
-                        issuer_key: remote_issuer_hex.clone(),
-                        issued_at: 1_100,
-                        expires_at: 20_000,
-                        grants_json: serde_json::to_string(&ChioScope::default())
-                            .expect("serialize remote delegate grants"),
-                        delegation_depth: 1,
-                        parent_capability_id: Some("cap-remote-root".to_string()),
-                    },
+                    signed_snapshot(&remote_root),
+                    signed_snapshot(&remote_delegate),
                 ],
             })
             .expect("import federated evidence share");
@@ -202,28 +181,17 @@ fn test_shared_evidence_reporting_surfaces() {
         store
             .store_checkpoint(&checkpoint)
             .expect("store checkpoint");
+        store.close().expect("close shared-evidence receipt store");
     }
 
     {
         let budgets = SqliteBudgetStore::open(&budget_db_path).expect("open budget store");
-        import_budget_usage_with_quota(
-            &budgets,
-            BudgetUsageRecord {
-                capability_id: "cap-local-child".to_string(),
-                grant_index: 0,
-                invocation_count: 2,
-                updated_at: 1_800,
-                seq: 1,
-                total_cost_exposed: 450,
-                total_cost_realized_spend: 0,
-            },
-            5,
-        );
+        seed_budget_exposure(&budgets, "cap-local-child", 450);
     }
 
     let listen = reserve_listen_addr();
     let service_token = "shared-evidence-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -233,7 +201,8 @@ fn test_shared_evidence_reporting_surfaces() {
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start shared-evidence trust service");
 
     let operator_response = client
         .get(format!("{base_url}/v1/reports/operator"))
@@ -383,20 +352,7 @@ fn test_behavioral_feed_export_surfaces() {
         &issuer_kp,
     )
     .expect("sign root capability");
-    let child = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: "cap-risk-child".to_string(),
-            issuer: issuer_kp.public_key(),
-            subject: leaf_kp.public_key(),
-            scope,
-            issued_at: 1_100,
-            expires_at: 10_000,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        },
-        &issuer_kp,
-    )
-    .expect("sign child capability");
+    let child = make_delegated_capability_token("cap-risk-child", &leaf_kp, &root_kp, &root);
 
     let rc_risk_2 = make_financial_receipt_with_settlement_status(
         "rc-risk-2",
@@ -446,28 +402,17 @@ fn test_behavioral_feed_export_surfaces() {
         store
             .store_checkpoint(&checkpoint)
             .expect("store checkpoint");
+        store.close().expect("close behavioral-feed receipt store");
     }
 
     {
         let budgets = SqliteBudgetStore::open(&budget_db_path).expect("open budget store");
-        import_budget_usage_with_quota(
-            &budgets,
-            BudgetUsageRecord {
-                capability_id: "cap-risk-child".to_string(),
-                grant_index: 0,
-                invocation_count: 2,
-                updated_at: 5_100,
-                seq: 1,
-                total_cost_exposed: 950,
-                total_cost_realized_spend: 0,
-            },
-            5,
-        );
+        seed_budget_exposure(&budgets, "cap-risk-child", 950);
     }
 
     let listen = reserve_listen_addr();
     let service_token = "behavioral-feed-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -477,7 +422,8 @@ fn test_behavioral_feed_export_surfaces() {
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start behavioral-feed trust service");
 
     let response = client
         .get(format!("{base_url}/v1/reports/behavioral-feed"))
@@ -649,7 +595,7 @@ extensions:
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -659,7 +605,8 @@ extensions:
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start runtime-appraisal trust service");
 
     let response = client
         .post(format!(
@@ -737,12 +684,13 @@ extensions:
         RuntimeAssuranceTier::Attested
     );
 
+    let authority_seed_path = trust_service_authority_seed_path(&receipt_db_path);
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
             "--json",
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            authority_seed_path.to_str().expect("authority seed path"),
             "trust",
             "appraisal",
             "export",
@@ -832,7 +780,7 @@ extensions:
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-result-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -842,7 +790,8 @@ extensions:
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start appraisal-result trust service");
 
     let response = client
         .post(format!(
@@ -930,12 +879,13 @@ extensions:
         vec![RuntimeAttestationImportReasonCode::TierAttenuated]
     );
 
+    let authority_seed_path = trust_service_authority_seed_path(&receipt_db_path);
     let cli_export_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
             "--json",
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            authority_seed_path.to_str().expect("authority seed path"),
             "trust",
             "appraisal",
             "export-result",
@@ -1048,7 +998,7 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-mixed-provider-token";
-    let _service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -1058,7 +1008,8 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
     );
     let client = build_test_client();
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("start appraisal-qualification trust service");
 
     let providers = vec![
         ProviderCase {

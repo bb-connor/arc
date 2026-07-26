@@ -1363,7 +1363,6 @@ pub(crate) async fn handle_federated_issue(
                         };
                         let child_snapshot = match build_capability_snapshot(
                             &capability,
-                            anchor_snapshot.delegation_depth.saturating_add(1),
                             Some(anchor_snapshot.capability_id.clone()),
                         ) {
                             Ok(snapshot) => snapshot,

@@ -290,6 +290,7 @@ fn import_federated_reputation_share(
                 scope_hash: None,
                 aggregate_budget: None,
                 cumulative_approval: None,
+                aggregate_family_preservation: None,
             },
             subject_keypair,
         )

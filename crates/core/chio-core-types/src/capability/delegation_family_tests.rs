@@ -230,6 +230,8 @@ fn signed_link(
             attenuations: Vec::new(),
             timestamp,
             scope_hash,
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation,
         },
         signer,

@@ -6,8 +6,9 @@ use chio_core_types::receipt::decision::{Decision, ToolCallAction};
 use chio_core_types::receipt::kinds::TrustLevel;
 use chio_federation::bilateral_dsse::{
     sign_chio_bilateral_dsse_envelope, verify_chio_bilateral_dsse_envelope,
-    BilateralPredicateExtensions, CapabilityLeaseRef, GovernanceReceiptRef, HashRecord,
-    PolicyEvaluationSummary, PolicyVerdict, TreatyBindingRef,
+    BilateralDsseInvocationInput, BilateralDsseLocalSigningInput, BilateralPredicateExtensions,
+    CapabilityLeaseRef, GovernanceReceiptRef, HashRecord, PolicyEvaluationSummary, PolicyVerdict,
+    TreatyBindingRef,
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
@@ -132,16 +133,18 @@ pub fn bench(c: &mut Criterion) {
     let buyer_key = Keypair::from_seed(&[11_u8; 32]);
     let vendor_key = Keypair::from_seed(&[12_u8; 32]);
     let receipt = signed_receipt(&vendor_key);
-    let envelope = match sign_chio_bilateral_dsse_envelope(
-        &receipt,
-        &buyer_key,
-        &vendor_key,
-        "did:chio:buyer-kernel",
-        "did:chio:vendor-a",
-        "read_refund_case",
-        1_766_000_001_000,
-        extensions(&receipt),
-    ) {
+    let envelope = match sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "did:chio:buyer-kernel",
+            org_b_kernel_id: "did:chio:vendor-a",
+            tool_name: "read_refund_case",
+            timestamp_unix_ms: 1_766_000_001_000,
+            extensions: extensions(&receipt),
+        },
+        org_a_signer: &buyer_key,
+        org_b_signer: &vendor_key,
+    }) {
         Ok(envelope) => envelope,
         Err(error) => panic!("failed to sign bilateral benchmark envelope: {error}"),
     };

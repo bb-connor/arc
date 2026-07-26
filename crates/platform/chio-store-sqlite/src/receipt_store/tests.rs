@@ -10,6 +10,8 @@ mod dispatch_intent;
 mod dispatch_intent_property;
 #[path = "tests/errors.rs"]
 mod errors;
+#[path = "tests/federated_lineage.rs"]
+mod federated_lineage;
 #[path = "tests/head_property.rs"]
 mod head_property;
 #[path = "tests/insert.rs"]

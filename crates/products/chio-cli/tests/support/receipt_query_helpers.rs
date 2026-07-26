@@ -56,6 +56,7 @@ pub(crate) fn make_delegated_capability_token(
                 scope_hash: None,
                 aggregate_budget: None,
                 cumulative_approval: None,
+                aggregate_family_preservation: None,
             },
             delegator_keypair,
         )

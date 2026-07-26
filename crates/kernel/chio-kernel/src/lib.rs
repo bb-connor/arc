@@ -162,7 +162,8 @@ pub use budget_store::{
     BudgetUsageRecord, InMemoryBudgetStore,
 };
 pub use capability_lineage::{
-    CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
+    CapabilityLineageError, CapabilitySnapshot, CapabilitySnapshotProvenance,
+    StoredCapabilitySnapshot,
 };
 pub use checkpoint::{
     build_checkpoint, build_checkpoint_with_backend, build_checkpoint_with_previous,

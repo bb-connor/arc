@@ -768,22 +768,48 @@ impl ReceiptStore for SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
-        SqliteReceiptStore::get_lineage(self, capability_id).map_err(|error| match error {
+        let snapshot = SqliteReceiptStore::get_lineage(self, capability_id).map_err(|error| match error {
             chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
             chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
             chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-        })
+        })?;
+        Ok(snapshot.filter(|snapshot| {
+            snapshot.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                && snapshot.validate_for_transport().is_ok()
+        }))
     }
 
     fn get_capability_delegation_chain(
         &self,
         capability_id: &str,
     ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
-        SqliteReceiptStore::get_delegation_chain(self, capability_id).map_err(|error| match error {
+        let chain = SqliteReceiptStore::get_delegation_chain(self, capability_id).map_err(|error| match error {
             chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
             chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
             chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-        })
+        })?;
+        let complete = chain
+            .first()
+            .is_some_and(|root| root.parent_capability_id.is_none())
+            && chain
+                .last()
+                .is_some_and(|leaf| leaf.capability_id == capability_id)
+            && chain
+                .iter()
+                .all(|snapshot| {
+                    snapshot.provenance
+                        == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                        && snapshot.validate_for_transport().is_ok()
+                })
+            && chain.windows(2).all(|edge| {
+                edge[1].parent_capability_id.as_deref()
+                    == Some(edge[0].capability_id.as_str())
+            });
+        if complete {
+            Ok(chain)
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     fn record_session_anchor(

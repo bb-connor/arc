@@ -107,6 +107,8 @@ impl FamilyFixture {
                 attenuations: Vec::new(),
                 timestamp: 1_100,
                 scope_hash: Some(scope_hash(&self.root_token.scope).unwrap()),
+                aggregate_budget: None,
+                cumulative_approval: None,
                 aggregate_family_preservation: evidence,
             },
             &self.root_subject,
@@ -265,6 +267,8 @@ fn aggregate_invocation_attenuation_absent_proof_evidence_preserves_canonical_by
             normalized_child_scope: "child-scope".to_string(),
             subset_relations: vec![],
             restricted_predicates: vec![],
+            aggregate_budget: None,
+            cumulative_approval: None,
         },
         aggregate_family_preservation: None,
     };
@@ -286,6 +290,8 @@ fn aggregate_invocation_attenuation_absent_link_evidence_preserves_signing_bytes
         attenuations: Vec::new(),
         timestamp: 1_100,
         scope_hash: Some("scope-hash".to_string()),
+        aggregate_budget: None,
+        cumulative_approval: None,
         aggregate_family_preservation: None,
     };
     let expected = format!(
@@ -799,6 +805,8 @@ fn aggregate_invocation_attenuation_receipt_rejects_missing_parent_link_evidence
             attenuations: Vec::new(),
             timestamp: 1_100,
             scope_hash: Some(scope_hash(&fixture.root_token.scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         &fixture.root_subject,
@@ -817,12 +825,16 @@ fn aggregate_invocation_attenuation_receipt_rejects_missing_parent_link_evidence
                 attenuations: Vec::new(),
                 timestamp: 1_200,
                 scope_hash: Some(scope_hash(&fixture.root_token.scope).unwrap()),
+                aggregate_budget: None,
+                cumulative_approval: None,
                 aggregate_family_preservation: Some(fixture.evidence()),
             },
             &intermediate,
         )
         .unwrap(),
         parent_capability_id: "intermediate".to_string(),
+        aggregate_budget: None,
+        cumulative_approval: None,
     };
 
     let error = receipt
@@ -901,6 +913,8 @@ fn aggregate_invocation_attenuation_receipt_rejects_unrelated_signed_lineage() {
             attenuations: Vec::new(),
             timestamp: 1_100,
             scope_hash: Some(scope_hash(&fixture.root_token.scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: Some(fixture.evidence()),
         },
         &attacker,
@@ -913,6 +927,8 @@ fn aggregate_invocation_attenuation_receipt_rejects_unrelated_signed_lineage() {
         nonce: [15; 16],
         link,
         parent_capability_id: fixture.root_token.id.clone(),
+        aggregate_budget: None,
+        cumulative_approval: None,
     };
 
     let error = receipt

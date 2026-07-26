@@ -633,6 +633,7 @@ fn request_receipt_metadata_projects_economic_authorization_from_financial_metad
                 commerce: Some(chio_core::capability::governance::GovernedCommerceContext {
                     seller: "seller-1".to_string(),
                     shared_payment_token_id: "shared-token-1".to_string(),
+                    settlement_destination_ref: Some("acct:seller-1".to_string()),
                 }),
                 metered_billing: Some(chio_core::capability::governance::MeteredBillingContext {
                     settlement_mode:

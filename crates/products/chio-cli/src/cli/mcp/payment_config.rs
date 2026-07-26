@@ -270,6 +270,7 @@ mod tests {
                         expires_at: Some(now + 300),
                     },
                     max_billed_units: Some(2),
+                    verified_outcome: None,
                 }),
                 runtime_attestation: None,
                 call_chain: None,

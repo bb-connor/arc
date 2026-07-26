@@ -4,6 +4,7 @@ mod tests {
     use std::sync::Arc;
 
     use chio_core::capability::{
+        attenuation::{scope_hash, DelegationLink, DelegationLinkBody},
         scope::{ChioScope, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     };
@@ -60,6 +61,50 @@ mod tests {
             aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, issuer_kp).test_expect("sign failed")
+    }
+
+    fn make_delegated_token(
+        id: &str,
+        subject_kp: &Keypair,
+        delegator_kp: &Keypair,
+        parent: &CapabilityToken,
+        issued_at: u64,
+        expires_at: u64,
+    ) -> CapabilityToken {
+        let mut delegation_chain = parent.delegation_chain.clone();
+        delegation_chain.push(
+            DelegationLink::sign(
+                DelegationLinkBody {
+                    capability_id: parent.id.clone(),
+                    delegator: delegator_kp.public_key(),
+                    delegatee: subject_kp.public_key(),
+                    attenuations: Vec::new(),
+                    timestamp: issued_at,
+                    scope_hash: Some(
+                        scope_hash(&parent.scope).test_expect("hash delegated scope"),
+                    ),
+                    aggregate_budget: None,
+                    cumulative_approval: None,
+                    aggregate_family_preservation: None,
+                },
+                delegator_kp,
+            )
+            .test_expect("sign delegation link"),
+        );
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: delegator_kp.public_key(),
+                subject: subject_kp.public_key(),
+                scope: parent.scope.clone(),
+                issued_at,
+                expires_at,
+                delegation_chain,
+                aggregate_invocation_budget: None,
+            },
+            delegator_kp,
+        )
+        .test_expect("sign delegated capability")
     }
 
     fn tenant(value: &str) -> TenantId {
@@ -201,7 +246,14 @@ mod tests {
         let kp_root = Keypair::generate();
         let kp_child = Keypair::generate();
         let root = make_token("cap-root-bounded", &kp_root, &kp_root, 1000, 9000);
-        let child = make_token("cap-child-bounded", &kp_child, &kp_root, 1100, 8000);
+        let child = make_delegated_token(
+            "cap-child-bounded",
+            &kp_child,
+            &kp_root,
+            &root,
+            1100,
+            8000,
+        );
 
         store
             .record_capability_snapshot(&root, None)
@@ -387,10 +439,18 @@ mod tests {
 
         let subject_kp = Keypair::generate();
         let issuer_kp = Keypair::generate();
-        let child = make_token(
+        let parent = make_token(
+            "cap-corrupt-parent",
+            &issuer_kp,
+            &issuer_kp,
+            1_000,
+            2_000,
+        );
+        let child = make_delegated_token(
             "cap-child-from-corrupt",
             &subject_kp,
             &issuer_kp,
+            &parent,
             1_100,
             1_900,
         );
@@ -453,8 +513,10 @@ mod tests {
 
         // root -> parent -> child
         let root = make_token("cap-root", &kp_root, &kp_root, 1000, 9000);
-        let parent = make_token("cap-parent", &kp_mid, &kp_root, 1100, 8000);
-        let child = make_token("cap-child", &kp_leaf, &kp_mid, 1200, 7000);
+        let parent =
+            make_delegated_token("cap-parent", &kp_mid, &kp_root, &root, 1100, 8000);
+        let child =
+            make_delegated_token("cap-child", &kp_leaf, &kp_mid, &parent, 1200, 7000);
 
         store
             .record_capability_snapshot(&root, None)
@@ -508,15 +570,29 @@ mod tests {
         let store = SqliteReceiptStore::open(&path).test_expect("test operation");
 
         // Build a chain of 25 entries (exceeds the level < 20 guard).
-        let kp = Keypair::generate();
-        let mut prev_id: Option<String> = None;
-        for i in 0..25usize {
+        let root_kp = Keypair::generate();
+        let mut parent_subject_kp = Keypair::generate();
+        let mut parent =
+            make_token("cap-depth-000", &parent_subject_kp, &root_kp, 1000, 9000);
+        store
+            .record_capability_snapshot(&parent, None)
+            .test_expect("test operation");
+        for i in 1..25usize {
             let id = format!("cap-depth-{i:03}");
-            let token = make_token(&id, &kp, &kp, 1000 + i as u64, 9000);
+            let child_subject_kp = Keypair::generate();
+            let token = make_delegated_token(
+                &id,
+                &child_subject_kp,
+                &parent_subject_kp,
+                &parent,
+                1000 + i as u64,
+                9000,
+            );
             store
-                .record_capability_snapshot(&token, prev_id.as_deref())
+                .record_capability_snapshot(&token, Some(&parent.id))
                 .test_expect("test operation");
-            prev_id = Some(id);
+            parent = token;
+            parent_subject_kp = child_subject_kp;
         }
 
         // Walking the chain from the deepest node should be capped at 21 entries (depth guard).
@@ -937,8 +1013,16 @@ mod tests {
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let root = make_token("cap-root", &subject, &issuer, 1_000, 2_000);
-        let child = make_token("cap-child", &subject, &issuer, 1_100, 1_900);
-        let grandchild = make_token("cap-grandchild", &subject, &issuer, 1_200, 1_800);
+        let child =
+            make_delegated_token("cap-child", &subject, &subject, &root, 1_100, 1_900);
+        let grandchild = make_delegated_token(
+            "cap-grandchild",
+            &subject,
+            &subject,
+            &child,
+            1_200,
+            1_800,
+        );
 
         store
             .record_capability_snapshot_with_issuance_admission(

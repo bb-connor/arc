@@ -40,7 +40,9 @@ use crate::canonical::CanonicalBytes;
 use crate::capability::aggregate_budget::{
     AggregateFamilyPreservationEvidence, VerifiedAggregateFamilyRoot,
 };
+use crate::capability::aggregate_invocation::AggregateBudgetDelegationMarker;
 use crate::capability::attenuation::{validate_delegation_chain, Attenuation, DelegationLink};
+use crate::capability::cumulative_approval::CumulativeApprovalDelegationMarker;
 use crate::error::{Error, Result};
 
 /// Structured attenuation applied during a `delegate` mint.
@@ -135,6 +137,12 @@ pub struct DelegationReceipt {
     /// Capability identifier of the parent token whose chain was extended.
     /// Diagnostic only: the cryptographic binding lives in `link`.
     pub parent_capability_id: String,
+    /// Delegation-family budget preservation copied from the signed link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
+    /// Cumulative approval root-binding preservation copied from the signed link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
 }
 
 impl DelegationReceipt {
@@ -142,7 +150,32 @@ impl DelegationReceipt {
     /// host languages so downstream verifiers and lineage indexers can
     /// hash the receipt deterministically.
     pub fn canonical_bytes(&self) -> Result<CanonicalBytes> {
+        self.validate_aggregate_budget_projection()?;
+        self.validate_cumulative_approval_projection()?;
         CanonicalBytes::new(self)
+    }
+
+    pub fn validate_aggregate_budget_projection(&self) -> Result<()> {
+        if self.aggregate_budget != self.link.aggregate_budget {
+            return Err(Error::AttenuationViolation {
+                reason: "delegation receipt aggregate budget does not match its signed link".into(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_cumulative_approval_projection(&self) -> Result<()> {
+        if let Some(marker) = self.cumulative_approval.as_ref() {
+            marker.validate()?;
+        }
+        if self.cumulative_approval != self.link.cumulative_approval {
+            return Err(Error::AttenuationViolation {
+                reason:
+                    "delegation receipt cumulative approval marker does not match its signed link"
+                        .into(),
+            });
+        }
+        Ok(())
     }
 
     /// Borrow aggregate family evidence covered by the fresh link signature.

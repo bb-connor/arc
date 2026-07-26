@@ -387,6 +387,9 @@ impl SqliteReceiptStore {
                 grants_json: row.get::<_, String>(5)?,
                 delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                 parent_capability_id: row.get::<_, Option<String>>(7)?,
+                federated_parent_capability_id: None,
+                provenance: CapabilitySnapshotProvenance::LegacyProjection,
+                signed_capability: None,
             })
         }
 
@@ -455,6 +458,9 @@ impl SqliteReceiptStore {
                         grants_json: row.get::<_, String>(5)?,
                         delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                         parent_capability_id: row.get::<_, Option<String>>(7)?,
+                        federated_parent_capability_id: None,
+                        provenance: CapabilitySnapshotProvenance::LegacyProjection,
+                        signed_capability: None,
                     })
                 },
             )
@@ -1411,6 +1417,8 @@ fn make_chain_bound_delegation_link(
             attenuations: vec![],
             timestamp,
             scope_hash: Some(scope_hash(authorized_scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         delegator_kp,
@@ -1506,6 +1514,8 @@ fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken 
             attenuations: vec![],
             timestamp: current_unix_timestamp(),
             scope_hash: Some(parent_scope_hash),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         input.parent_kp,

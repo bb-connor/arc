@@ -151,6 +151,8 @@ mod tests {
                 attenuations: vec![],
                 timestamp: 1500,
                 scope_hash: None,
+                aggregate_budget: None,
+                cumulative_approval: None,
                 aggregate_family_preservation: None,
             };
             let link = DelegationLink::sign(body, &last_kp).unwrap();

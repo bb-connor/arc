@@ -636,6 +636,8 @@ fn attenuation_proof_validation_rejects_non_subset_scope() -> Result<()> {
             subset: true,
         }],
         restricted_predicates: vec![],
+        aggregate_budget: None,
+        cumulative_approval: None,
     };
 
     let parent_hash = scope_hash(&parent)?;
@@ -787,6 +789,8 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
             attenuations: vec![],
             timestamp: 100,
             scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         &issuer,
@@ -873,6 +877,8 @@ fn requires_chain_binding_tracks_only_new_attenuation() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         &issuer,
@@ -911,6 +917,8 @@ fn make_signed_link(
         attenuations: vec![],
         timestamp,
         scope_hash: None,
+        aggregate_budget: None,
+        cumulative_approval: None,
         aggregate_family_preservation: None,
     };
     DelegationLink::sign(body, delegator_kp).unwrap()
@@ -1036,6 +1044,7 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
         commerce: Some(GovernedCommerceContext {
             seller: "merchant.example".to_string(),
             shared_payment_token_id: "spt_123".to_string(),
+            settlement_destination_ref: Some("acct:merchant-primary".to_string()),
         }),
         metered_billing: Some(MeteredBillingContext {
             settlement_mode: MeteredSettlementMode::AllowThenSettle,
@@ -1052,6 +1061,7 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
                 expires_at: Some(1300),
             },
             max_billed_units: Some(20),
+            verified_outcome: None,
         }),
         runtime_attestation: Some(RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),

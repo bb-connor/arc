@@ -1327,6 +1327,8 @@ pub struct GovernedCommerceContext {
     pub seller: String,
     /// Shared payment token or equivalent external commerce approval reference.
     pub shared_payment_token_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_destination_ref: Option<String>,
 }
 
 /// Decision encoded by a governed approval token.

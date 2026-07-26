@@ -458,7 +458,7 @@ fn capability_token_backend_rejects_same_algorithm_wrong_key_signature() {
     match CapabilityToken::sign_with_backend(body, &backend).unwrap_err() {
         Error::InvalidSignature(reason) => assert_eq!(
             reason,
-            "capability token backend signature failed verification"
+            "signing backend returned a signature from a different identity"
         ),
         error => panic!("expected invalid signature, got {error:?}"),
     }
@@ -477,7 +477,7 @@ fn capability_token_backend_rejects_public_key_algorithm_mismatch() {
     match CapabilityToken::sign_with_backend(body, &backend).unwrap_err() {
         Error::InvalidSignature(reason) => assert_eq!(
             reason,
-            "capability token backend algorithm does not match public key"
+            "signing backend algorithm does not match public key"
         ),
         error => panic!("expected invalid signature, got {error:?}"),
     }
@@ -496,7 +496,7 @@ fn capability_token_backend_rejects_returned_signature_algorithm_mismatch() {
     match CapabilityToken::sign_with_backend(body, &backend).unwrap_err() {
         Error::InvalidSignature(reason) => assert_eq!(
             reason,
-            "capability token backend algorithm does not match returned signature"
+            "signing backend returned a signature from a different identity"
         ),
         error => panic!("expected invalid signature, got {error:?}"),
     }

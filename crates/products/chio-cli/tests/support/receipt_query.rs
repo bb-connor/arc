@@ -363,6 +363,8 @@ pub(crate) fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "test-authority-admin-token",
             "--policy",
             policy_path.to_str().expect("policy path"),
         ])
@@ -400,6 +402,8 @@ pub(crate) fn spawn_trust_service_without_receipt_db(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "test-authority-admin-token",
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())

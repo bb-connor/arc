@@ -2,7 +2,7 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::{
-    aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
+    aggregate_budget::{AggregateInvocationBudget, AggregateInvocationScope},
     attenuation::{DelegationLink, DelegationLinkBody},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
@@ -76,6 +76,7 @@ fn make_delegated_token(
                 scope_hash: None,
                 aggregate_budget: None,
                 cumulative_approval: None,
+                aggregate_family_preservation: None,
             },
             delegator_kp,
         )

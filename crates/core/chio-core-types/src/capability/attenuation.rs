@@ -12,7 +12,11 @@ use crate::signer_binding::ensure_keypair_matches_embedded_key;
 use super::aggregate_budget::{
     AggregateFamilyPreservationEvidence, AggregateInvocationScope, VerifiedAggregateFamilyRoot,
 };
+use super::aggregate_invocation::AggregateBudgetDelegationMarker;
 use super::caveat::GrantSubsetRelation;
+use super::cumulative_approval::{
+    cumulative_approval_delegation_marker, CumulativeApprovalDelegationMarker,
+};
 use super::scope::{ChioScope, Constraint, MonetaryAmount, Operation};
 use super::token::CapabilityToken;
 use super::validation::{validate_parent_relative_budget_share_bps, MAX_BUDGET_SHARE_BPS};
@@ -31,6 +35,10 @@ pub struct AttenuationWitness {
     pub subset_relations: Vec<GrantSubsetRelation>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub restricted_predicates: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
 }
 
 /// Wire proof carried by `CapabilityToken.attenuation_proof`.
@@ -77,6 +85,12 @@ pub struct DelegationLink {
     /// the next hop.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope_hash: Option<ScopeHash>,
+    /// Authenticated preservation marker for a delegation-family invocation budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
+    /// Authenticated preservation marker for cumulative approval root bindings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
     /// Signed projection of immutable aggregate family authority.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
@@ -98,6 +112,10 @@ pub struct DelegationLinkBody {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope_hash: Option<ScopeHash>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
 }
 
@@ -110,6 +128,12 @@ impl DelegationLink {
             "delegation link",
             "delegator",
         )?;
+        if let Some(marker) = body.aggregate_budget.as_ref() {
+            marker.validate()?;
+        }
+        if let Some(marker) = body.cumulative_approval.as_ref() {
+            marker.validate()?;
+        }
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
             capability_id: body.capability_id,
@@ -118,6 +142,8 @@ impl DelegationLink {
             attenuations: body.attenuations,
             timestamp: body.timestamp,
             scope_hash: body.scope_hash,
+            aggregate_budget: body.aggregate_budget,
+            cumulative_approval: body.cumulative_approval,
             aggregate_family_preservation: body.aggregate_family_preservation,
             signature,
         })
@@ -133,12 +159,20 @@ impl DelegationLink {
             attenuations: self.attenuations.clone(),
             timestamp: self.timestamp,
             scope_hash: self.scope_hash.clone(),
+            aggregate_budget: self.aggregate_budget.clone(),
+            cumulative_approval: self.cumulative_approval.clone(),
             aggregate_family_preservation: self.aggregate_family_preservation.clone(),
         }
     }
 
     /// Verify this link's signature against the delegator's key.
     pub fn verify_signature(&self) -> Result<bool> {
+        if let Some(marker) = self.aggregate_budget.as_ref() {
+            marker.validate()?;
+        }
+        if let Some(marker) = self.cumulative_approval.as_ref() {
+            marker.validate()?;
+        }
         let body = self.body();
         self.delegator.verify_canonical(&body, &self.signature)
     }
@@ -858,6 +892,8 @@ pub fn compute_attenuation_witness(
         normalized_child_scope: canonical_scope_string(child)?,
         subset_relations,
         restricted_predicates,
+        aggregate_budget: None,
+        cumulative_approval: cumulative_approval_delegation_marker(child)?,
     })
 }
 
@@ -897,6 +933,9 @@ pub fn validate_attenuation_proof(
             reason: "attenuation witness carries a non-subset relation".to_string(),
         });
     }
+    if let Some(marker) = witness.cumulative_approval.as_ref() {
+        marker.validate()?;
+    }
     let parent_scope: ChioScope =
         serde_json::from_str(&witness.normalized_parent_scope).map_err(|err| {
             Error::AttenuationViolation {
@@ -910,27 +949,23 @@ pub fn validate_attenuation_proof(
             }
         })?;
     validate_attenuation(&parent_scope, &child_scope)?;
+    if witness.cumulative_approval != cumulative_approval_delegation_marker(&child_scope)? {
+        return Err(Error::AttenuationViolation {
+            reason: "attenuation witness changed or omitted cumulative approval markers"
+                .to_string(),
+        });
+    }
     Ok(())
 }
 
-fn validate_delegable_child_scope(parent: &ChioScope, child: &ChioScope) -> Result<()> {
-    let has_delegable_parent_grant = parent
-        .grants
-        .iter()
-        .any(|grant| grant.operations.contains(&Operation::Delegate))
-        || parent
-            .resource_grants
-            .iter()
-            .any(|grant| grant.operations.contains(&Operation::Delegate))
-        || parent
-            .prompt_grants
-            .iter()
-            .any(|grant| grant.operations.contains(&Operation::Delegate));
-    if !has_delegable_parent_grant {
+pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioScope) -> Result<()> {
+    if !parent.authorizes_delegation() {
         return Err(Error::AttenuationViolation {
             reason: "parent capability scope does not authorize delegation".to_string(),
         });
     }
+
+    validate_attenuation(parent, child)?;
 
     for (index, child_grant) in child.grants.iter().enumerate() {
         let covered_by_delegable_parent = parent.grants.iter().any(|parent_grant| {
@@ -1183,8 +1218,7 @@ fn delegate_internal(
         });
     }
 
-    validate_attenuation(&parent.scope, child_scope)?;
-    validate_delegable_child_scope(&parent.scope, child_scope)?;
+    validate_delegable_attenuation(&parent.scope, child_scope)?;
 
     // Each attenuation step must be a TRUE narrowing of the parent: previously
     // the steps were copied onto the signed link verbatim, so a widening step
@@ -1254,6 +1288,33 @@ fn delegate_internal(
     // delegation link. A child token proving parent -> child attenuation binds
     // attenuation_proof.parent_scope_hash to this predecessor link.
     let parent_scope_hash = scope_hash(&parent.scope)?;
+    let aggregate_budget = parent
+        .aggregate_invocation_budget
+        .as_ref()
+        .and_then(|budget| budget.root_binding.as_ref())
+        .map(|binding| binding.delegation_marker())
+        .transpose()?;
+    let cumulative_approval = cumulative_approval_delegation_marker(child_scope)?;
+    if aggregate_budget.is_none()
+        && parent
+            .delegation_chain
+            .iter()
+            .any(|link| link.aggregate_budget.is_some())
+    {
+        return Err(Error::AttenuationViolation {
+            reason: "parent capability omitted its aggregate family budget".to_string(),
+        });
+    }
+    if cumulative_approval.is_none()
+        && parent
+            .delegation_chain
+            .iter()
+            .any(|link| link.cumulative_approval.is_some())
+    {
+        return Err(Error::AttenuationViolation {
+            reason: "parent capability omitted its cumulative approval binding".to_string(),
+        });
+    }
     let body = DelegationLinkBody {
         capability_id: parent.id.clone(),
         delegator: parent.subject.clone(),
@@ -1261,6 +1322,8 @@ fn delegate_internal(
         attenuations: attenuation.steps.clone(),
         timestamp: signed_at,
         scope_hash: Some(parent_scope_hash),
+        aggregate_budget: aggregate_budget.clone(),
+        cumulative_approval: cumulative_approval.clone(),
         aggregate_family_preservation,
     };
     let link = DelegationLink::sign(body, delegator_keypair)?;
@@ -1272,5 +1335,7 @@ fn delegate_internal(
         nonce,
         link,
         parent_capability_id: parent.id.clone(),
+        aggregate_budget,
+        cumulative_approval,
     })
 }

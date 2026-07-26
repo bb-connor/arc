@@ -158,6 +158,24 @@ pub struct AggregateBudgetRootBinding {
     pub signature: Signature,
 }
 
+/// Compact signed-link projection retained for compatibility with the
+/// original aggregate budget enforcement path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AggregateBudgetDelegationMarker {
+    pub root_binding_digest: String,
+    pub max_invocations: u32,
+}
+
+impl AggregateBudgetDelegationMarker {
+    pub(crate) fn validate(&self) -> Result<()> {
+        validate_sha256_hex(
+            &self.root_binding_digest,
+            "aggregate budget root binding digest",
+        )
+    }
+}
+
 /// Signed projection proving preservation of aggregate family authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -248,6 +266,13 @@ impl AggregateBudgetRootBinding {
     /// Hash the complete binding envelope for preservation evidence.
     pub fn preservation_digest(&self) -> Result<String> {
         domain_separated_hash(CHIO_AGGREGATE_BUDGET_ROOT_BINDING_DOMAIN, self)
+    }
+
+    pub(crate) fn delegation_marker(&self) -> Result<AggregateBudgetDelegationMarker> {
+        Ok(AggregateBudgetDelegationMarker {
+            root_binding_digest: self.preservation_digest()?,
+            max_invocations: self.body.max_invocations,
+        })
     }
 }
 

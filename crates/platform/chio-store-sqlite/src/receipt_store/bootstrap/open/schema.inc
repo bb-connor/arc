@@ -939,3 +939,44 @@ fn normalize_index_schema_sql(sql: &str) -> String {
         .trim_end_matches(';')
         .to_string()
 }
+
+fn ensure_capability_lineage_provenance_columns(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    for table in ["capability_lineage", "federated_share_capability_lineage"] {
+        for (column, definition) in [
+            ("signed_capability_json", "TEXT"),
+            ("federated_parent_capability_id", "TEXT"),
+            (
+                "provenance",
+                "TEXT NOT NULL DEFAULT 'legacy_projection' CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection'))",
+            ),
+        ] {
+            let mut statement =
+                connection.prepare(&format!("PRAGMA table_info({table})"))?;
+            let columns = statement
+                .query_map([], |row| row.get::<_, String>(1))?
+                .collect::<Result<Vec<_>, _>>()?;
+            if !columns.iter().any(|existing| existing == column) {
+                connection.execute(
+                    &format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"),
+                    [],
+                )?;
+            }
+        }
+        connection.execute(
+            &format!(
+                "UPDATE {table} SET provenance = 'signed_token' \
+                 WHERE provenance = 'legacy_projection' \
+                   AND signed_capability_json IS NOT NULL"
+            ),
+            [],
+        )?;
+    }
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_capability_lineage_federated_parent \
+         ON capability_lineage(federated_parent_capability_id)",
+        [],
+    )?;
+    Ok(())
+}

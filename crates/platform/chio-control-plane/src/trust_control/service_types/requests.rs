@@ -343,9 +343,12 @@ pub(crate) fn ensure_requested_capability_within_parent_snapshot(
 
 pub(crate) fn build_capability_snapshot(
     token: &CapabilityToken,
-    delegation_depth: u64,
-    parent_capability_id: Option<String>,
+    federated_parent_capability_id: Option<String>,
 ) -> Result<CapabilitySnapshot, CliError> {
+    let parent_capability_id = token
+        .delegation_chain
+        .last()
+        .map(|link| link.capability_id.clone());
     Ok(CapabilitySnapshot {
         capability_id: token.id.clone(),
         subject_key: token.subject.to_hex(),
@@ -353,8 +356,11 @@ pub(crate) fn build_capability_snapshot(
         issued_at: token.issued_at,
         expires_at: token.expires_at,
         grants_json: serde_json::to_string(&token.scope)?,
-        delegation_depth,
+        delegation_depth: token.delegation_chain.len() as u64,
         parent_capability_id,
+        federated_parent_capability_id,
+        provenance: CapabilitySnapshotProvenance::SignedToken,
+        signed_capability: Some(token.clone()),
     })
 }
 
@@ -386,10 +392,12 @@ pub(crate) fn build_federated_delegation_anchor_snapshot(
             .map(|snapshot| snapshot.expires_at.min(policy.body.expires_at))
             .unwrap_or(policy.body.expires_at),
         grants_json: serde_json::to_string(&policy.body.scope)?,
-        delegation_depth: parent_capability
-            .map(|snapshot| snapshot.delegation_depth.saturating_add(1))
-            .unwrap_or(0),
+        delegation_depth: 0,
         parent_capability_id: None,
+        federated_parent_capability_id: parent_capability
+            .map(|snapshot| snapshot.capability_id.clone()),
+        provenance: CapabilitySnapshotProvenance::SyntheticAnchor,
+        signed_capability: None,
     })
 }
 

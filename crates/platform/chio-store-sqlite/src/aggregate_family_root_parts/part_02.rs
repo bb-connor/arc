@@ -106,6 +106,8 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 1_100,
                 scope_hash: Some(scope_hash(&root.scope)?),
+                aggregate_budget: None,
+                cumulative_approval: None,
                 aggregate_family_preservation: None,
             },
             root_subject,

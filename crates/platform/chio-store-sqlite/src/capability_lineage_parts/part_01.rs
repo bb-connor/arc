@@ -1,7 +1,8 @@
 use chio_core::capability::token::CapabilityToken;
 use chio_core::sha256;
 pub use chio_kernel::capability_lineage::{
-    CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
+    CapabilityLineageError, CapabilitySnapshot, CapabilitySnapshotProvenance,
+    StoredCapabilitySnapshot,
 };
 use chio_security_types::ports::{
     response_affected_set_hash, ActionId, CausalLineageCommitMetadata, CausalLineageCommitRequest,
@@ -170,20 +171,214 @@ pub(crate) fn ensure_causal_lineage_schema(
     Ok(())
 }
 
-fn snapshot_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
-    Ok(CapabilitySnapshot {
-        capability_id: row.get::<_, String>(0)?,
-        subject_key: row.get::<_, String>(1)?,
-        issuer_key: row.get::<_, String>(2)?,
-        issued_at: non_negative_u64_from_column(row, 3, "issued_at")?,
-        expires_at: non_negative_u64_from_column(row, 4, "expires_at")?,
-        grants_json: row.get::<_, String>(5)?,
-        delegation_depth: non_negative_u64_from_column(row, 6, "delegation_depth")?,
-        parent_capability_id: row.get::<_, Option<String>>(7)?,
+pub(crate) fn snapshot_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
+    validate_snapshot_from_row(
+        CapabilitySnapshot {
+            capability_id: row.get::<_, String>(0)?,
+            subject_key: row.get::<_, String>(1)?,
+            issuer_key: row.get::<_, String>(2)?,
+            issued_at: non_negative_u64_from_column(row, 3, "issued_at")?,
+            expires_at: non_negative_u64_from_column(row, 4, "expires_at")?,
+            grants_json: row.get::<_, String>(5)?,
+            delegation_depth: non_negative_u64_from_column(row, 6, "delegation_depth")?,
+            parent_capability_id: row.get::<_, Option<String>>(7)?,
+            federated_parent_capability_id: row.get::<_, Option<String>>(8)?,
+            provenance: provenance_from_row(row, 9)?,
+            signed_capability: signed_capability_from_row(row, 10)?,
+        },
+        10,
+        true,
+    )
+}
+
+pub(crate) fn validate_snapshot_from_row(
+    snapshot: CapabilitySnapshot,
+    signed_capability_column: usize,
+    allow_legacy: bool,
+) -> rusqlite::Result<CapabilitySnapshot> {
+    let validation = if allow_legacy {
+        snapshot.validate_for_local_read()
+    } else {
+        snapshot.validate_for_transport()
+    };
+    validation.map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(
+            signed_capability_column,
+            Type::Text,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                error.to_string(),
+            )),
+        )
+    })?;
+    Ok(snapshot)
+}
+
+pub(crate) fn provenance_from_row(
+    row: &Row<'_>,
+    column: usize,
+) -> rusqlite::Result<CapabilitySnapshotProvenance> {
+    row.get::<_, String>(column)?.parse().map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(
+            column,
+            Type::Text,
+            Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
+        )
     })
 }
 
-fn non_negative_u64_from_column(
+pub(crate) fn signed_capability_from_row(
+    row: &Row<'_>,
+    column: usize,
+) -> rusqlite::Result<Option<CapabilityToken>> {
+    row.get::<_, Option<String>>(column)?
+        .map(|json| {
+            serde_json::from_str(&json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(column, Type::Text, Box::new(error))
+            })
+        })
+        .transpose()
+}
+
+pub(crate) fn validate_snapshot_for_transport(
+    snapshot: &CapabilitySnapshot,
+) -> Result<(), chio_kernel::ReceiptStoreError> {
+    snapshot.validate_for_transport()
+}
+
+pub(crate) fn ensure_snapshots_compatible(
+    existing: &CapabilitySnapshot,
+    incoming: &CapabilitySnapshot,
+) -> Result<(), chio_kernel::ReceiptStoreError> {
+    let existing_scope: serde_json::Value = serde_json::from_str(&existing.grants_json)?;
+    let incoming_scope: serde_json::Value = serde_json::from_str(&incoming.grants_json)?;
+    let scalar_fields_match = existing.capability_id == incoming.capability_id
+        && existing.subject_key == incoming.subject_key
+        && existing.issuer_key == incoming.issuer_key
+        && existing.issued_at == incoming.issued_at
+        && existing.expires_at == incoming.expires_at
+        && existing_scope == incoming_scope
+        && existing.delegation_depth == incoming.delegation_depth
+        && existing.parent_capability_id == incoming.parent_capability_id
+        && existing.federated_parent_capability_id == incoming.federated_parent_capability_id;
+    if !scalar_fields_match {
+        return Err(chio_kernel::ReceiptStoreError::Conflict(format!(
+            "capability lineage {} conflicts with the persisted projection",
+            incoming.capability_id
+        )));
+    }
+    if existing.provenance != incoming.provenance
+        && existing.provenance != CapabilitySnapshotProvenance::LegacyProjection
+    {
+        return Err(chio_kernel::ReceiptStoreError::Conflict(format!(
+            "capability lineage {} has conflicting provenance",
+            incoming.capability_id
+        )));
+    }
+    match (
+        existing.signed_capability.as_ref(),
+        incoming.signed_capability.as_ref(),
+    ) {
+        (Some(_), None) => Err(chio_kernel::ReceiptStoreError::Conflict(format!(
+            "capability lineage {} cannot discard its signed capability",
+            incoming.capability_id
+        ))),
+        (Some(existing), Some(incoming))
+            if serde_json::to_value(existing)? != serde_json::to_value(incoming)? =>
+        {
+            Err(chio_kernel::ReceiptStoreError::Conflict(format!(
+                "capability lineage {} has conflicting signed capabilities",
+                incoming.id
+            )))
+        }
+        _ => Ok(()),
+    }
+}
+
+pub(crate) fn persist_compatible_snapshot(
+    transaction: &Transaction<'_>,
+    incoming: &CapabilitySnapshot,
+) -> Result<(), chio_kernel::ReceiptStoreError> {
+    let existing = transaction
+        .query_row(
+            r#"
+            SELECT capability_id, subject_key, issuer_key, issued_at, expires_at,
+                   grants_json, delegation_depth, parent_capability_id,
+                   federated_parent_capability_id, provenance, signed_capability_json
+            FROM capability_lineage
+            WHERE capability_id = ?1
+            "#,
+            params![incoming.capability_id],
+            snapshot_from_row,
+        )
+        .optional()?;
+    let signed_capability_json = incoming
+        .signed_capability
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()?;
+
+    if let Some(existing) = existing.as_ref() {
+        ensure_snapshots_compatible(existing, incoming)?;
+        if existing.provenance == CapabilitySnapshotProvenance::LegacyProjection
+            && incoming.provenance != CapabilitySnapshotProvenance::LegacyProjection
+        {
+            let max_seq: i64 = transaction.query_row(
+                "SELECT COALESCE(MAX(rowid), 0) FROM capability_lineage",
+                [],
+                |row| row.get(0),
+            )?;
+            let next_seq = max_seq.checked_add(1).ok_or_else(|| {
+                chio_kernel::ReceiptStoreError::Conflict(
+                    "capability lineage replication sequence is exhausted".to_string(),
+                )
+            })?;
+            transaction.execute(
+                r#"
+                UPDATE capability_lineage
+                SET signed_capability_json = ?2, provenance = ?3, rowid = ?4
+                WHERE capability_id = ?1
+                "#,
+                params![
+                    incoming.capability_id,
+                    signed_capability_json,
+                    incoming.provenance.as_str(),
+                    next_seq,
+                ],
+            )?;
+        }
+        return Ok(());
+    }
+
+    transaction.execute(
+        r#"
+        INSERT INTO capability_lineage (
+            capability_id, subject_key, issuer_key, issued_at, expires_at,
+            grants_json, delegation_depth, parent_capability_id,
+            federated_parent_capability_id, provenance, signed_capability_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        "#,
+        params![
+            incoming.capability_id,
+            incoming.subject_key,
+            incoming.issuer_key,
+            sqlite_i64(incoming.issued_at, "capability lineage issued_at")?,
+            sqlite_i64(incoming.expires_at, "capability lineage expires_at")?,
+            incoming.grants_json,
+            sqlite_i64(
+                incoming.delegation_depth,
+                "capability lineage delegation_depth"
+            )?,
+            incoming.parent_capability_id,
+            incoming.federated_parent_capability_id,
+            incoming.provenance.as_str(),
+            signed_capability_json,
+        ],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn non_negative_u64_from_column(
     row: &Row<'_>,
     column: usize,
     field_name: &'static str,
@@ -815,6 +1010,7 @@ impl SqliteReceiptStore {
                     expires_at: capability.expires_at,
                     grants_json: &grants_json,
                     parent_capability_id: None,
+                    signed_capability: &capability,
                 },
             )?;
             transaction.execute(
@@ -875,10 +1071,13 @@ impl SqliteReceiptStore {
         let capability_id = token.id.clone();
         let issued_at = token.issued_at;
         let expires_at = token.expires_at;
+        let signed_capability = token.clone();
         let parent_capability_id = parent_capability_id.map(ToString::to_string);
         let job = move |connection: &mut SqliteStoreConnection| {
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let delegation_depth: u64 = if let Some(parent_id) = parent_capability_id.as_deref() {
-                let parent_depth: Option<u64> = connection
+                let parent_depth: Option<u64> = transaction
                     .query_row(
                         "SELECT delegation_depth FROM capability_lineage WHERE capability_id = ?1",
                         params![parent_id],
@@ -889,30 +1088,22 @@ impl SqliteReceiptStore {
             } else {
                 0
             };
-            connection.execute(
-                r#"
-                INSERT OR IGNORE INTO capability_lineage (
-                    capability_id,
-                    subject_key,
-                    issuer_key,
-                    issued_at,
-                    expires_at,
-                    grants_json,
-                    delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                "#,
-                params![
-                    capability_id,
-                    subject_key,
-                    issuer_key,
-                    issued_at as i64,
-                    expires_at as i64,
-                    grants_json,
-                    delegation_depth as i64,
-                    parent_capability_id,
-                ],
-            )?;
+            let incoming = CapabilitySnapshot {
+                capability_id,
+                subject_key,
+                issuer_key,
+                issued_at,
+                expires_at,
+                grants_json,
+                delegation_depth,
+                parent_capability_id,
+                federated_parent_capability_id: None,
+                provenance: CapabilitySnapshotProvenance::SignedToken,
+                signed_capability: Some(signed_capability),
+            };
+            validate_snapshot_for_transport(&incoming)?;
+            persist_compatible_snapshot(&transaction, &incoming)?;
+            transaction.commit()?;
             Ok(())
         };
         match budget {
@@ -946,6 +1137,7 @@ impl SqliteReceiptStore {
         let issuer_key = token.issuer.to_hex();
         let issued_at = token.issued_at;
         let expires_at = token.expires_at;
+        let signed_capability = token.clone();
         let parent_capability_id = parent_capability_id.map(ToString::to_string);
         self.writer_handle().run_write(move |connection| {
             let transaction =
@@ -962,6 +1154,7 @@ impl SqliteReceiptStore {
                     expires_at,
                     grants_json: &grants_json,
                     parent_capability_id: parent_capability_id.as_deref(),
+                    signed_capability: &signed_capability,
                 },
             )?;
             transaction.commit()?;
@@ -984,7 +1177,8 @@ impl SqliteReceiptStore {
             .query_row(
                 r#"
                 SELECT capability_id, subject_key, issuer_key, issued_at, expires_at,
-                       grants_json, delegation_depth, parent_capability_id
+                       grants_json, delegation_depth, parent_capability_id,
+                       federated_parent_capability_id, provenance, signed_capability_json
                 FROM capability_lineage
                 WHERE capability_id = ?1
                 "#,
@@ -1076,6 +1270,9 @@ impl SqliteReceiptStore {
             grants_json: serde_json::to_string(&token.scope)?,
             delegation_depth,
             parent_capability_id: parent_capability_id.map(ToString::to_string),
+            federated_parent_capability_id: None,
+            provenance: CapabilitySnapshotProvenance::SignedToken,
+            signed_capability: Some(token.clone()),
         };
         if existing != expected
             || bound_tenant != tenant_id.as_str()
@@ -1099,40 +1296,13 @@ impl SqliteReceiptStore {
         &mut self,
         snapshot: &CapabilitySnapshot,
     ) -> Result<(), CapabilityLineageError> {
+        validate_snapshot_for_transport(snapshot)?;
         let snapshot = snapshot.clone();
         self.writer_handle().run_write(move |connection| {
-            connection.execute(
-                r#"
-                INSERT INTO capability_lineage (
-                    capability_id,
-                    subject_key,
-                    issuer_key,
-                    issued_at,
-                    expires_at,
-                    grants_json,
-                    delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                ON CONFLICT(capability_id) DO UPDATE SET
-                    subject_key = excluded.subject_key,
-                    issuer_key = excluded.issuer_key,
-                    issued_at = excluded.issued_at,
-                    expires_at = excluded.expires_at,
-                    grants_json = excluded.grants_json,
-                    delegation_depth = excluded.delegation_depth,
-                    parent_capability_id = excluded.parent_capability_id
-                "#,
-                params![
-                    snapshot.capability_id,
-                    snapshot.subject_key,
-                    snapshot.issuer_key,
-                    snapshot.issued_at as i64,
-                    snapshot.expires_at as i64,
-                    snapshot.grants_json,
-                    snapshot.delegation_depth as i64,
-                    snapshot.parent_capability_id,
-                ],
-            )?;
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            persist_compatible_snapshot(&transaction, &snapshot)?;
+            transaction.commit()?;
             Ok(())
         })?;
         Ok(())
@@ -1157,7 +1327,10 @@ impl SqliteReceiptStore {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
+                    parent_capability_id,
+                    federated_parent_capability_id,
+                    provenance,
+                    signed_capability_json
                 FROM capability_lineage
                 WHERE capability_id = ?1
                 "#,
@@ -1193,6 +1366,9 @@ impl SqliteReceiptStore {
                 grants_json,
                 delegation_depth,
                 parent_capability_id,
+                federated_parent_capability_id,
+                provenance,
+                signed_capability_json,
                 level
             ) AS (
                 SELECT
@@ -1204,6 +1380,9 @@ impl SqliteReceiptStore {
                     grants_json,
                     delegation_depth,
                     parent_capability_id,
+                    federated_parent_capability_id,
+                    provenance,
+                    signed_capability_json,
                     0 AS level
                 FROM capability_lineage
                 WHERE capability_id = ?1
@@ -1219,6 +1398,9 @@ impl SqliteReceiptStore {
                     cl.grants_json,
                     cl.delegation_depth,
                     cl.parent_capability_id,
+                    cl.federated_parent_capability_id,
+                    cl.provenance,
+                    cl.signed_capability_json,
                     chain.level + 1
                 FROM capability_lineage cl
                 INNER JOIN chain ON cl.capability_id = chain.parent_capability_id
@@ -1232,7 +1414,10 @@ impl SqliteReceiptStore {
                 expires_at,
                 grants_json,
                 delegation_depth,
-                parent_capability_id
+                parent_capability_id,
+                federated_parent_capability_id,
+                provenance,
+                signed_capability_json
             FROM chain
             ORDER BY level DESC
             "#,
@@ -1279,7 +1464,10 @@ impl SqliteReceiptStore {
                 expires_at,
                 grants_json,
                 delegation_depth,
-                parent_capability_id
+                parent_capability_id,
+                federated_parent_capability_id,
+                provenance,
+                signed_capability_json
             FROM capability_lineage
             WHERE (?1 IS NULL OR subject_key = ?1)
               AND (?2 IS NULL OR issuer_key = ?2)
@@ -1306,6 +1494,16 @@ impl SqliteReceiptStore {
         after_seq: u64,
         limit: usize,
     ) -> Result<Vec<StoredCapabilitySnapshot>, CapabilityLineageError> {
+        let after_seq = i64::try_from(after_seq).map_err(|_| {
+            chio_kernel::ReceiptStoreError::Conflict(
+                "capability lineage replication cursor exceeds SQLite range".to_string(),
+            )
+        })?;
+        let limit = i64::try_from(limit).map_err(|_| {
+            chio_kernel::ReceiptStoreError::Conflict(
+                "capability lineage replication limit exceeds SQLite range".to_string(),
+            )
+        })?;
         let connection = self.connection()?;
         let mut stmt = connection.prepare(
             r#"
@@ -1318,7 +1516,10 @@ impl SqliteReceiptStore {
                 expires_at,
                 grants_json,
                 delegation_depth,
-                parent_capability_id
+                parent_capability_id,
+                federated_parent_capability_id,
+                provenance,
+                signed_capability_json
             FROM capability_lineage
             WHERE rowid > ?1
             ORDER BY rowid ASC
@@ -1326,8 +1527,8 @@ impl SqliteReceiptStore {
             "#,
         )?;
 
-        let rows = stmt.query_map(params![after_seq as i64, limit as i64], |row| {
-            Ok(StoredCapabilitySnapshot {
+        let rows = stmt.query_map(params![after_seq, limit], |row| {
+            let stored = StoredCapabilitySnapshot {
                 seq: non_negative_u64_from_column(row, 0, "rowid")?,
                 snapshot: CapabilitySnapshot {
                     capability_id: row.get::<_, String>(1)?,
@@ -1338,13 +1539,19 @@ impl SqliteReceiptStore {
                     grants_json: row.get::<_, String>(6)?,
                     delegation_depth: non_negative_u64_from_column(row, 7, "delegation_depth")?,
                     parent_capability_id: row.get::<_, Option<String>>(8)?,
+                    federated_parent_capability_id: row.get::<_, Option<String>>(9)?,
+                    provenance: provenance_from_row(row, 10)?,
+                    signed_capability: signed_capability_from_row(row, 11)?,
                 },
-            })
+            };
+            Ok(stored)
         })?;
 
         let mut snapshots = Vec::new();
         for row in rows {
-            snapshots.push(row?);
+            let stored = row?;
+            stored.snapshot.validate_for_transport()?;
+            snapshots.push(stored);
         }
 
         Ok(snapshots)

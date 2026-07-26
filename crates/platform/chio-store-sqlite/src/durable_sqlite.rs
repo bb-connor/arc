@@ -309,6 +309,10 @@ impl DurableSqliteFile {
     }
 
     #[cfg(unix)]
+    #[allow(
+        clippy::useless_conversion,
+        reason = "rustix dev_t is u64 on Linux but varies across supported Unix targets"
+    )]
     fn required_existing_sidecar_identity(
         &self,
         suffix: &str,

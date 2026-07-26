@@ -153,6 +153,7 @@ impl SqliteReceiptStore {
                 ensure_indexed_security_evidence_schema(&mut connection)?;
                 crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
                 crate::capability_lineage::ensure_causal_lineage_schema(&mut connection)?;
+                ensure_capability_lineage_provenance_columns(&connection)?;
                 super::support::ensure_receipt_retention_watermark_table(&connection)?;
                 super::support::ensure_receipt_retention_tombstones(&connection)?;
                 super::support::ensure_transparency_projection_guards(&connection)?;
@@ -1074,7 +1075,11 @@ impl SqliteReceiptStore {
                 expires_at           INTEGER NOT NULL,
                 grants_json          TEXT NOT NULL,
                 delegation_depth     INTEGER NOT NULL DEFAULT 0,
-                parent_capability_id TEXT REFERENCES capability_lineage(capability_id)
+                parent_capability_id TEXT REFERENCES capability_lineage(capability_id),
+                federated_parent_capability_id TEXT,
+                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                signed_capability_json TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_capability_lineage_subject
                 ON capability_lineage(subject_key);
@@ -1134,6 +1139,10 @@ impl SqliteReceiptStore {
                 grants_json TEXT NOT NULL,
                 delegation_depth INTEGER NOT NULL DEFAULT 0,
                 parent_capability_id TEXT,
+                federated_parent_capability_id TEXT,
+                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                signed_capability_json TEXT,
                 PRIMARY KEY (share_id, capability_id)
             );
             CREATE INDEX IF NOT EXISTS idx_federated_share_lineage_capability
@@ -1161,6 +1170,7 @@ impl SqliteReceiptStore {
         connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
         crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
         crate::capability_lineage::ensure_causal_lineage_schema(&mut connection)?;
+        ensure_capability_lineage_provenance_columns(&connection)?;
         ensure_tool_receipt_attribution_columns(&connection)?;
         super::support::ensure_receipt_lineage_statement_columns(&connection)?;
         super::support::drop_transparency_projection_guards(&connection)?;

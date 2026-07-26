@@ -657,7 +657,11 @@ fn co_archival_rejects_conflicting_capability_lineage() -> Result<(), Box<dyn st
                 capability_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL,
                 issuer_key TEXT NOT NULL, issued_at INTEGER NOT NULL,
                 expires_at INTEGER NOT NULL, grants_json TEXT NOT NULL,
-                delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT
+                delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT,
+                federated_parent_capability_id TEXT,
+                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                signed_capability_json TEXT
             );
             "#,
         )?;

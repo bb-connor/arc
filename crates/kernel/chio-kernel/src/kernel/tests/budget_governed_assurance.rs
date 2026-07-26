@@ -1500,6 +1500,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
         purpose: "purchase seller-bound result",
         seller: "merchant.example",
         shared_payment_token_id: "spt_live_governed",
+        settlement_destination_ref: Some("acct:merchant-primary"),
         units: 100,
         currency: "USD",
     });
@@ -1619,6 +1620,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
         purpose: "attempt purchase for wrong seller",
         seller: "wrong-merchant.example",
         shared_payment_token_id: "spt_live_wrong",
+        settlement_destination_ref: Some("acct:wrong-merchant"),
         units: 100,
         currency: "USD",
     });

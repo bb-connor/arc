@@ -492,6 +492,7 @@ pub(crate) fn governed_request_metadata(
         .map(|commerce| GovernedCommerceReceiptMetadata {
             seller: commerce.seller.clone(),
             shared_payment_token_id: commerce.shared_payment_token_id.clone(),
+            settlement_destination_ref: commerce.settlement_destination_ref.clone(),
         });
     let metered_billing =
         intent

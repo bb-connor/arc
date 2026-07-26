@@ -256,7 +256,11 @@ const ARCHIVE_SCHEMA_SQL: &str = r#"
             capability_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL,
             issuer_key TEXT NOT NULL, issued_at INTEGER NOT NULL,
             expires_at INTEGER NOT NULL, grants_json TEXT NOT NULL,
-            delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT
+            delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT,
+            federated_parent_capability_id TEXT,
+            provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+            signed_capability_json TEXT
         );
         CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries (
             entry_seq INTEGER PRIMARY KEY,
@@ -331,6 +335,7 @@ pub(super) fn create_archive_schema(
     connection: &rusqlite::Connection,
 ) -> Result<(), ReceiptStoreError> {
     connection.execute_batch(ARCHIVE_SCHEMA_SQL)?;
+    ensure_archive_capability_lineage_provenance_columns(connection, "archive")?;
     validate_archive_schema_contract(connection)
 }
 
@@ -342,7 +347,38 @@ pub(super) fn create_archive_schema_in_schema_for_test(
     let schema = validated_sqlite_schema_name(schema)?;
     let schema_sql = ARCHIVE_SCHEMA_SQL.replace("archive.", &format!("{schema}."));
     connection.execute_batch(&schema_sql)?;
+    ensure_archive_capability_lineage_provenance_columns(connection, schema)?;
     validate_archive_schema_contract_in_schema(connection, schema)
+}
+
+fn ensure_archive_capability_lineage_provenance_columns(
+    connection: &rusqlite::Connection,
+    schema: &str,
+) -> Result<(), ReceiptStoreError> {
+    let schema = validated_sqlite_schema_name(schema)?;
+    for (column, definition) in [
+        ("federated_parent_capability_id", "TEXT"),
+        (
+            "provenance",
+            "TEXT NOT NULL DEFAULT 'legacy_projection' CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection'))",
+        ),
+        ("signed_capability_json", "TEXT"),
+    ] {
+        let pragma = format!("PRAGMA {schema}.table_info(capability_lineage)");
+        let mut statement = connection.prepare(&pragma)?;
+        let columns = statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        if !columns.iter().any(|existing| existing == column) {
+            connection.execute(
+                &format!(
+                    "ALTER TABLE {schema}.capability_lineage ADD COLUMN {column} {definition}"
+                ),
+                [],
+            )?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Eq, PartialEq)]

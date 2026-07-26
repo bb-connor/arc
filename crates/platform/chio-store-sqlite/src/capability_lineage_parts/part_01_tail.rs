@@ -69,6 +69,7 @@ struct ContextualCapabilitySnapshot<'a> {
     expires_at: u64,
     grants_json: &'a str,
     parent_capability_id: Option<&'a str>,
+    signed_capability: &'a CapabilityToken,
 }
 
 fn record_contextual_capability_snapshot_tx(
@@ -85,6 +86,7 @@ fn record_contextual_capability_snapshot_tx(
         expires_at,
         grants_json,
         parent_capability_id,
+        signed_capability,
     } = snapshot;
     let (operation, delegation_depth) = match parent_capability_id {
         None => ("issue", 0),
@@ -141,12 +143,16 @@ fn record_contextual_capability_snapshot_tx(
         grants_json: grants_json.to_string(),
         delegation_depth,
         parent_capability_id: parent_capability_id.map(ToString::to_string),
+        federated_parent_capability_id: None,
+        provenance: CapabilitySnapshotProvenance::SignedToken,
+        signed_capability: Some(signed_capability.clone()),
     };
     let existing = transaction
         .query_row(
             r#"
             SELECT capability_id, subject_key, issuer_key, issued_at, expires_at,
-                   grants_json, delegation_depth, parent_capability_id
+                   grants_json, delegation_depth, parent_capability_id,
+                   federated_parent_capability_id, provenance, signed_capability_json
             FROM capability_lineage
             WHERE capability_id = ?1
             "#,
@@ -154,13 +160,8 @@ fn record_contextual_capability_snapshot_tx(
             snapshot_from_row,
         )
         .optional()?;
-    if existing
-        .as_ref()
-        .is_some_and(|snapshot| snapshot != &expected)
-    {
-        return Err(chio_kernel::ReceiptStoreError::Conflict(
-            "capability snapshot conflicts with its first recorded value".to_string(),
-        ));
+    if let Some(existing) = existing.as_ref() {
+        ensure_snapshots_compatible(existing, &expected)?;
     }
 
     let binding = transaction
@@ -203,26 +204,8 @@ fn record_contextual_capability_snapshot_tx(
         unix_time_ms_receipt()?,
     )?;
 
-    if existing.is_none() {
-        transaction.execute(
-            r#"
-            INSERT INTO capability_lineage (
-                capability_id, subject_key, issuer_key, issued_at, expires_at,
-                grants_json, delegation_depth, parent_capability_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#,
-            params![
-                capability_id,
-                subject_key,
-                issuer_key,
-                sqlite_i64(issued_at, "capability issued_at")?,
-                sqlite_i64(expires_at, "capability expires_at")?,
-                grants_json,
-                sqlite_i64(delegation_depth, "capability delegation depth")?,
-                parent_capability_id,
-            ],
-        )?;
-    }
+    validate_snapshot_for_transport(&expected)?;
+    persist_compatible_snapshot(transaction, &expected)?;
     let inserted = transaction.execute(
         r#"
         INSERT INTO capability_lineage_admissions (

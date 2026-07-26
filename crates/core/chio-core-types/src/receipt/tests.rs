@@ -138,6 +138,10 @@ fn bbs_signature_fixture() -> BbsReceiptSignature {
 fn make_economic_authorization_receipt_metadata() -> EconomicAuthorizationReceiptMetadata {
     EconomicAuthorizationReceiptMetadata {
         version: EconomicAuthorizationReceiptMetadataVersion::V1,
+        economic_intent_digest: Some("economic-intent-digest-001".to_string()),
+        payee_binding_digest: Some("payee-binding-digest-001".to_string()),
+        pre_action_authority_digest: Some("pre-action-authority-digest-001".to_string()),
+        credit_authority_digest: Some("credit-authority-digest-001".to_string()),
         economic_mode: EconomicAuthorizationMode::MeteredHoldCapture,
         payer: EconomicPayerReceiptMetadata {
             party_id: "payer-001".to_string(),
@@ -1105,6 +1109,7 @@ fn governed_transaction_receipt_metadata_serde_roundtrip() {
         commerce: Some(GovernedCommerceReceiptMetadata {
             seller: "merchant.example".to_string(),
             shared_payment_token_id: "spt_123".to_string(),
+            settlement_destination_ref: Some("acct:merchant-primary".to_string()),
         }),
         metered_billing: Some(MeteredBillingReceiptMetadata {
             settlement_mode: MeteredSettlementMode::AllowThenSettle,
@@ -1131,6 +1136,7 @@ fn governed_transaction_receipt_metadata_serde_roundtrip() {
         approval: Some(GovernedApprovalReceiptMetadata {
             token_id: "approval-1".to_string(),
             approver_key: "approver-key".to_string(),
+            approval_artifact_digest: Some("pre-action-authority-digest-001".to_string()),
             approved: true,
         }),
         runtime_assurance: Some(RuntimeAssuranceReceiptMetadata {
