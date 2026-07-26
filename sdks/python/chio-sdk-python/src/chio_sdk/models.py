@@ -115,6 +115,14 @@ def _constraint_key(constraint: Constraint) -> str:
     return constraint.model_dump_json(exclude_none=True)
 
 
+def _constraint_type(self: Constraint) -> str:
+    return self.root.type
+
+
+def _constraint_value(self: Constraint) -> object:
+    return self.root.value
+
+
 def _constraint_path_prefix(cls: type[Constraint], prefix: str) -> Constraint:
     return cls(type="path_prefix", value=prefix)
 
@@ -291,6 +299,8 @@ Constraint.domain_exact = classmethod(  # type: ignore[attr-defined]
 Constraint.max_length = classmethod(  # type: ignore[attr-defined]
     _constraint_max_length
 )
+Constraint.type = property(_constraint_type)  # type: ignore[attr-defined]
+Constraint.value = property(_constraint_value)  # type: ignore[attr-defined]
 Attenuation.remove_tool = classmethod(  # type: ignore[attr-defined]
     _attenuation_remove_tool
 )

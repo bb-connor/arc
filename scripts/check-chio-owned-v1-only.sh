@@ -9,7 +9,11 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
-pattern='ReceiptV[2-9]|CapabilityTokenV[2-9]|CHIO_[A-Z0-9_]+_V[2-9]|ACCEPTS_[A-Z0-9_]+_V[2-9]|CapabilitySchemaVersion|KernelReceiptVersion|NegotiationDowngrade|chio_receipts_v[2-9]|chio\.[A-Za-z0-9_.-]+\.v[2-9][0-9]*\b|[A-Za-z0-9_-]+\.v[2-9][0-9]*\.schema\.json|receipt/v[2-9][0-9]*\.schema\.json|receipt_v[2-9]\b|capability_v[2-9]\b|token_v[2-9]\b|delegation_v[2-9]\b|lineage_statement_v[2-9]\b|\b[Aa] v[2-9] CapabilityToken\b|\b[Vv][2-9] tokens?\b|\b[Vv][2-9] schema\b|\b[Vv][2-9]-aware\b|\b[Vv][2-9]-only\b|schema[- ]ceiling|maximum capability-token schema'
+# This gate freezes the core CapabilityToken and receipt wire at v1. It must
+# not treat every independently versioned Chio subsystem schema as a core wire
+# version. Security evidence, manifests, cages, federation, economy records,
+# and broker configuration all carry their own schema versions.
+pattern='ReceiptV[2-9]|CapabilityTokenV[2-9]|ACCEPTS_(RECEIPT|CAPABILITY|TOKEN)_[A-Z0-9_]*V[2-9]|CapabilitySchemaVersion|KernelReceiptVersion|NegotiationDowngrade|chio_receipts_v[2-9]|receipt/v[2-9][0-9]*\.schema\.json|receipt_v[2-9]\b|capability_v[2-9]\b|token_v[2-9]\b|delegation_v[2-9]\b|lineage_statement_v[2-9]\b|\b[Aa] v[2-9] CapabilityToken\b|\b[Vv][2-9] tokens?\b|schema[- ]ceiling|maximum capability-token schema'
 normative_claim_pattern='\b[Cc]urrently v[2-9](\.[0-9]+)?\b|\b[Cc]urrent( Chio-owned)? (protocol|schema|runtime|SDK|wire|API|storage|receipt)( surface| surfaces)?( is| are| remains)? v[2-9](\.[0-9]+)?\b|\b[Cc]urrent( Chio)? release( line| version| surface)?( is| are| remains|:)? v[2-9](\.[0-9]+)?\b|\b[Cc]urrent[- ]release( line| version| surface)?( is| are| remains|:)? v[2-9](\.[0-9]+)?\b|\b[Cc]urrent boundary: v[2-9](\.[0-9]+)?\b|\b[Cc]urrent v[2-9](\.[0-9]+)? (Chio-owned )?(protocol|schema|runtime|SDK|wire|API|storage|receipt|surface)\b|\bextension of v[2-9](\.[0-9]+)?\b|\bextends v[2-9](\.[0-9]+)?\b'
 
 normative_roots=(
@@ -156,9 +160,9 @@ while IFS= read -r line; do
 done <"$tmp"
 
 if ((${#failures[@]})); then
-  printf '%s\n' "Chio-owned pre-release version remnants found:" >&2
+  printf '%s\n' "Core capability or receipt v1 contract remnants found:" >&2
   printf '  %s\n' "${failures[@]}" >&2
   exit 1
 fi
 
-echo "No Chio-owned pre-release version remnants found."
+echo "Core capability and receipt surfaces remain v1-only."

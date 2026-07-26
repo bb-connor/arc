@@ -55,7 +55,7 @@
       "expected_reason": "broker_destination_rebinding_detected",
       "threat_id": "ssrf_via_http_substrate",
       "path": "cases/broker_destination_rebinding/broker-destination-rebinding-001.json",
-      "content_sha256": "84ed6c68c92dc6eaa3d3a94a81a24296d5ec66e0c7824ee592e72b2eaeee19c3"
+      "content_sha256": "726c6b89694f79ed72909b9de6a19389837b0964fa5f6066b74d050e49b5052b"
     },
     {
       "id": "broker-execution-overspend-001",

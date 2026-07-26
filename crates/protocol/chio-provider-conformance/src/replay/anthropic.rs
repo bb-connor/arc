@@ -7,7 +7,7 @@ pub fn replay_anthropic_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome,
     fixture.ensure_anthropic()?;
     let captured = fixture.captured_verdicts()?;
     let workspace_id = fixture.anthropic_workspace_id()?;
-    let adapter = anthropic_adapter(&fixture.path, workspace_id)?;
+    let adapter = anthropic_adapter(&fixture, workspace_id, &captured)?;
 
     let (mode, invocations, verdicts) = if fixture.has_anthropic_stream_tool_events() {
         let (invocations, verdicts) = replay_anthropic_stream(&fixture, &adapter, &captured)?;
@@ -97,8 +97,9 @@ fn replay_anthropic_stream(
 
 #[cfg(feature = "fixtures-anthropic")]
 fn anthropic_adapter(
-    path: &Path,
+    fixture: &ProviderCaptureFixture,
     workspace_id: String,
+    captured: &[CapturedVerdict],
 ) -> Result<chio_anthropic_tools_adapter::AnthropicAdapter, ReplayError> {
     use std::sync::Arc;
 
@@ -113,14 +114,14 @@ fn anthropic_adapter(
         signer.public_key().to_hex(),
         workspace_id,
     );
-    let signed = chio_manifest::sign_manifest(&anthropic_server_tool_manifest(), &signer).map_err(
-        |error| {
+    let signed =
+        chio_manifest::sign_manifest(&anthropic_server_tool_manifest(fixture, captured), &signer)
+            .map_err(|error| {
             invalid_fixture(
-                path,
+                &fixture.path,
                 format!("Anthropic conformance manifest signing failed: {error}"),
             )
-        },
-    )?;
+        })?;
     let mut registry = chio_manifest::VerifiedManifestRegistry::default();
     registry
         .register_public_only(
@@ -130,14 +131,14 @@ fn anthropic_adapter(
         )
         .map_err(|error| {
             invalid_fixture(
-                path,
+                &fixture.path,
                 format!("Anthropic conformance manifest admission failed: {error}"),
             )
         })?;
     AnthropicAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
         |error| {
             invalid_fixture(
-                path,
+                &fixture.path,
                 format!("Anthropic conformance manifest failed validation: {error}"),
             )
         },
@@ -145,32 +146,48 @@ fn anthropic_adapter(
 }
 
 #[cfg(feature = "fixtures-anthropic")]
-fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
+fn anthropic_server_tool_manifest(
+    fixture: &ProviderCaptureFixture,
+    captured: &[CapturedVerdict],
+) -> chio_manifest::ToolManifest {
     use chio_manifest::{
         LatencyHint, ServerTool, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA,
     };
 
+    let mut tool_names = captured
+        .iter()
+        .map(|entry| entry.invocation.tool_name.clone())
+        .collect::<BTreeSet<_>>();
+    for record in &fixture.records {
+        collect_anthropic_tool_names(&record.payload, &mut tool_names);
+    }
+    if tool_names.is_empty() {
+        tool_names.insert("conformance_no_tool_call".to_string());
+    }
     ToolManifest {
         schema: TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "anthropic-1".into(),
         name: "Anthropic Messages".to_string(),
         description: Some("Anthropic conformance replay manifest".to_string()),
         version: "0.1.0".to_string(),
-        tools: vec![ToolDefinition {
-            name: "regular_tool".to_string(),
-            description: "Regular client-hosted conformance tool".to_string(),
-            input_schema: serde_json::json!({"type": "object"}),
-            output_schema: Some(serde_json::json!({"type": "object"})),
-            pricing: None,
-            annotations: chio_manifest::ToolAnnotations {
-                read_only: true,
-                destructive: false,
-                idempotent: false,
-                requires_approval: false,
-            },
-            latency_hint: Some(LatencyHint::Fast),
-            flow: None,
-        }],
+        tools: tool_names
+            .into_iter()
+            .map(|name| ToolDefinition {
+                name,
+                description: "Anthropic conformance replay tool".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: Some(serde_json::json!({"type": "object"})),
+                pricing: None,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
+                latency_hint: Some(LatencyHint::Fast),
+                flow: None,
+            })
+            .collect(),
         server_tools: vec![
             ServerTool::ComputerUse,
             ServerTool::Bash,
@@ -180,6 +197,30 @@ fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
         public_key: chio_core::Keypair::from_seed(&[31u8; 32])
             .public_key()
             .to_hex(),
+    }
+}
+
+#[cfg(feature = "fixtures-anthropic")]
+fn collect_anthropic_tool_names(value: &Value, names: &mut BTreeSet<String>) {
+    match value {
+        Value::Object(object) => {
+            if object.get("type").and_then(Value::as_str) == Some("tool_use") {
+                if let Some(name) = object.get("name").and_then(Value::as_str) {
+                    if !name.trim().is_empty() {
+                        names.insert(name.to_string());
+                    }
+                }
+            }
+            for nested in object.values() {
+                collect_anthropic_tool_names(nested, names);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_anthropic_tool_names(item, names);
+            }
+        }
+        _ => {}
     }
 }
 

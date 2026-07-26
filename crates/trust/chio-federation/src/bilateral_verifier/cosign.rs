@@ -4,6 +4,7 @@ use super::support::{
     validate_policy_verdict, validate_verdict_string,
 };
 use super::treaty::{
+    canonical_consistency_model, consistency_model_requires_anchor, consistency_models_equal,
     resolve_governance_receipt_ref, validate_predicate_operational_refs_match_treaty,
     validate_treaty_binding_ref_for_review, validate_treaty_receipt_refs_match_resolved_receipt,
 };
@@ -328,32 +329,27 @@ pub fn verify_chio_bilateral_invocation(
         }
     }
 
-    if pred.consistency_model != crate::bilateral_dsse::DEFAULT_CONSISTENCY_MODEL {
+    let Some(consistency_model) = canonical_consistency_model(&pred.consistency_model) else {
+        return Err(VerifierError::PredicateSchemaInvalid(format!(
+            "consistency_model {:?} is not supported",
+            pred.consistency_model
+        )));
+    };
+    if consistency_model != crate::bilateral_dsse::DEFAULT_CONSISTENCY_MODEL {
         let Some(treaty) = pred.treaty_binding_ref.as_ref() else {
             return Err(VerifierError::PredicateSchemaInvalid(format!(
                 "consistency_model {:?} is not supported",
                 pred.consistency_model
             )));
         };
-        if treaty.consistency_model != pred.consistency_model {
+        if !consistency_models_equal(&treaty.consistency_model, &pred.consistency_model) {
             return Err(VerifierError::PredicateSchemaInvalid(
                 "strict treaty DSSE consistency_model does not match treaty_binding_ref"
                     .to_string(),
             ));
         }
-        if !matches!(
-            pred.consistency_model.as_str(),
-            "crdt_commutative" | "totally_ordered" | "single_kernel" | "quorum_required"
-        ) {
-            return Err(VerifierError::PredicateSchemaInvalid(format!(
-                "consistency_model {:?} is not supported",
-                pred.consistency_model
-            )));
-        }
-        if matches!(
-            pred.consistency_model.as_str(),
-            "totally_ordered" | "quorum_required"
-        ) && pred.consistency_anchor.as_deref().is_none_or(str::is_empty)
+        if consistency_model_requires_anchor(&pred.consistency_model)
+            && pred.consistency_anchor.as_deref().is_none_or(str::is_empty)
         {
             return Err(VerifierError::PredicateSchemaInvalid(
                 "strict treaty DSSE ordered consistency requires consistency_anchor".to_string(),

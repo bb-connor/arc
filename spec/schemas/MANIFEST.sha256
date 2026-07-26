@@ -1,4 +1,4 @@
-b8e6589b145d4a26ec54363cbf78680024c01f7f585ed3b8d08c5f9ab61ac792  spec/schemas/MANIFEST.sha256
+e681c729454dcb233cca06b5278c1f0aab2601eea516eb5b0d1763903f70528f  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -49,7 +49,7 @@ d2a53c221b35039ea66643a248c6f71019e13c0dfd523a51ca97a442b66b5f8f  spec/schemas/c
 187e0d1da854f627e45e8b99e34fd0935eae1401444ab6fc71d294cd3db5cbbc  spec/schemas/chio-federation/v1/authority-profile.schema.json
 bbdd0c9dfa964602d804b6707e993e9753381240faf3a2e8ac23b277da2e335a  spec/schemas/chio-federation/v1/bilateral-invocation.schema.json
 dcbb8ca503e1cc2ededa91633f5bee7af0b317eb56ed212bce5922e5e7271fce  spec/schemas/chio-federation/v1/capability-lease.schema.json
-04a6b2d1d00642245ca40268c8cf820ed55928592489d82e04541d1a0ebb532e  spec/schemas/chio-federation/v1/cross-boundary-admission-report.schema.json
+cc2b07b1056fccdffa927ad6e16ce317ee423eee4e28886233f7c3a3bca5775f  spec/schemas/chio-federation/v1/cross-boundary-admission-report.schema.json
 4712374356d22221b0dfe679d94ac14b3aeccf8df7b54292d0f7d418204e5466  spec/schemas/chio-federation/v1/cross-kernel-continuation.schema.json
 b017a6d8377b6e394d8b264c17d1d74d4a1a6f95350a2f7dc27d7b7954a7c957  spec/schemas/chio-federation/v1/governance-ladder-manifest.schema.json
 1cde6e5ee683de63b9425bb2d7960eccb8c55cfad82a66cff4b29943ad50be2d  spec/schemas/chio-federation/v1/governance-receipt.schema.json

@@ -269,6 +269,16 @@ if missing_buyer_checks:
     raise SystemExit(f"buyer review skipped closure checks: {sorted(missing_buyer_checks)}")
 
 has_treaty_dsse = False
+consistency_aliases = {
+    "crdt-commutative": "crdt-commutative",
+    "crdt_commutative": "crdt-commutative",
+    "totally-ordered": "totally-ordered",
+    "totally_ordered": "totally-ordered",
+    "single-kernel": "single-kernel",
+    "single_kernel": "single-kernel",
+    "quorum-required": "quorum-required",
+    "quorum_required": "quorum-required",
+}
 for envelope in proof_package.get("bilateralEnvelopes", []):
     payload = envelope.get("payload")
     if not payload:
@@ -279,8 +289,15 @@ for envelope in proof_package.get("bilateralEnvelopes", []):
     consistency_model = predicate.get("consistency_model") or predicate.get("consistencyModel")
     if treaty_binding_ref:
         has_treaty_dsse = True
-        if consistency_model != "totally-ordered":
+        binding_model = treaty_binding_ref.get("consistency_model") or treaty_binding_ref.get(
+            "consistencyModel"
+        )
+        canonical_model = consistency_aliases.get(consistency_model)
+        canonical_binding_model = consistency_aliases.get(binding_model)
+        if canonical_model != "totally-ordered":
             raise SystemExit("treaty DSSE did not carry ordered consistency")
+        if canonical_binding_model != canonical_model:
+            raise SystemExit("treaty DSSE consistency did not match its treaty binding")
 if not has_treaty_dsse:
     raise SystemExit("proof package did not carry a treaty-bound bilateral DSSE")
 

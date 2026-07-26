@@ -7,7 +7,7 @@ pub fn replay_gemini_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     fixture.ensure_gemini()?;
     let captured = fixture.captured_verdicts()?;
     let project_id = fixture.gemini_project_id()?;
-    let adapter = gemini_adapter(project_id);
+    let adapter = gemini_adapter(&fixture.path, project_id, &captured)?;
     let invocations = replay_gemini_batch(&fixture, &adapter)?;
     let (mode, verdicts) = replay_mode_and_captured_verdicts(&captured, invocations.is_empty());
 
@@ -33,7 +33,7 @@ pub fn replay_mistral_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, R
     fixture.ensure_mistral()?;
     let captured = fixture.captured_verdicts()?;
     let project_id = fixture.mistral_project_id()?;
-    let adapter = mistral_adapter(project_id);
+    let adapter = mistral_adapter(&fixture.path, project_id, &captured)?;
     let invocations = replay_mistral_batch(&fixture, &adapter)?;
     let (mode, verdicts) = replay_mode_and_captured_verdicts(&captured, invocations.is_empty());
 
@@ -59,7 +59,7 @@ pub fn replay_groq_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Repl
     fixture.ensure_groq()?;
     let captured = fixture.captured_verdicts()?;
     let project_id = fixture.groq_project_id()?;
-    let adapter = groq_adapter(project_id);
+    let adapter = groq_adapter(&fixture.path, project_id, &captured)?;
     let invocations = replay_groq_batch(&fixture, &adapter)?;
     let (mode, verdicts) = replay_mode_and_captured_verdicts(&captured, invocations.is_empty());
 
@@ -85,7 +85,7 @@ pub fn replay_ollama_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     fixture.ensure_ollama()?;
     let captured = fixture.captured_verdicts()?;
     let host = fixture.ollama_host()?;
-    let adapter = ollama_adapter(host);
+    let adapter = ollama_adapter(&fixture.path, host, &captured)?;
 
     let (mode, invocations, verdicts) = if fixture.has_ollama_stream_tool_events() {
         let (invocations, verdicts) = replay_ollama_stream(&fixture, &adapter, &captured)?;
@@ -638,72 +638,260 @@ fn replay_cohere_stream(
 }
 
 #[cfg(feature = "fixtures-gemini")]
-fn gemini_adapter(project_id: String) -> chio_gemini_tools_adapter::GeminiAdapter {
+fn gemini_adapter(
+    path: &Path,
+    project_id: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_gemini_tools_adapter::GeminiAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_gemini_tools_adapter::transport::MockTransport;
     use chio_gemini_tools_adapter::{GeminiAdapter, GeminiAdapterConfig};
 
-    GeminiAdapter::new(
-        GeminiAdapterConfig::new(
-            "gemini-1",
-            "Gemini GenerateContent",
-            "0.1.0",
-            "deadbeef",
-            project_id,
-        ),
-        Arc::new(MockTransport::new()),
+    let signer = chio_core::Keypair::from_seed(&[32u8; 32]);
+    let config = GeminiAdapterConfig::new(
+        "gemini-1",
+        "Gemini GenerateContent",
+        "0.1.0",
+        signer.public_key().to_hex(),
+        project_id,
+    );
+    let registry = conformance_replay_registry(
+        path,
+        &config.server_id,
+        &config.server_name,
+        &config.server_version,
+        &signer,
+        captured,
+    )?;
+    GeminiAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Gemini conformance manifest failed validation: {error}"),
+            )
+        },
     )
 }
 
 #[cfg(feature = "fixtures-mistral")]
-fn mistral_adapter(project_id: String) -> chio_mistral_tools_adapter::MistralAdapter {
+fn mistral_adapter(
+    path: &Path,
+    project_id: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_mistral_tools_adapter::MistralAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_mistral_tools_adapter::transport::MockTransport;
     use chio_mistral_tools_adapter::{MistralAdapter, MistralAdapterConfig};
 
-    MistralAdapter::new(
-        MistralAdapterConfig::new(
-            "mistral-1",
-            "Mistral Chat Completions",
-            "0.1.0",
-            "deadbeef",
-            project_id,
-        ),
-        Arc::new(MockTransport::new()),
+    let signer = chio_core::Keypair::from_seed(&[33u8; 32]);
+    let config = MistralAdapterConfig::new(
+        "mistral-1",
+        "Mistral Chat Completions",
+        "0.1.0",
+        signer.public_key().to_hex(),
+        project_id,
+    );
+    let registry = conformance_replay_registry(
+        path,
+        &config.server_id,
+        &config.server_name,
+        &config.server_version,
+        &signer,
+        captured,
+    )?;
+    MistralAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Mistral conformance manifest failed validation: {error}"),
+            )
+        },
     )
 }
 
 #[cfg(feature = "fixtures-groq")]
-fn groq_adapter(project_id: String) -> chio_groq_tools_adapter::GroqAdapter {
+fn groq_adapter(
+    path: &Path,
+    project_id: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_groq_tools_adapter::GroqAdapter, ReplayError> {
     use std::sync::Arc;
 
     use chio_groq_tools_adapter::{GroqAdapter, GroqAdapterConfig, MockTransport};
 
-    GroqAdapter::new(
-        GroqAdapterConfig::new(
-            "groq-1",
-            "Groq Chat Completions",
-            "0.1.0",
-            "deadbeef",
-            project_id,
-        ),
-        Arc::new(MockTransport::new()),
+    let signer = chio_core::Keypair::from_seed(&[34u8; 32]);
+    let config = GroqAdapterConfig::new(
+        "groq-1",
+        "Groq Chat Completions",
+        "0.1.0",
+        signer.public_key().to_hex(),
+        project_id,
+    );
+    let registry = conformance_replay_registry(
+        path,
+        &config.server_id,
+        &config.server_name,
+        &config.server_version,
+        &signer,
+        captured,
+    )?;
+    GroqAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry).map_err(
+        |error| {
+            invalid_fixture(
+                path,
+                format!("Groq conformance manifest failed validation: {error}"),
+            )
+        },
     )
 }
 
+#[cfg(any(
+    feature = "fixtures-gemini",
+    feature = "fixtures-mistral",
+    feature = "fixtures-groq"
+))]
+fn conformance_replay_registry(
+    path: &Path,
+    server_id: &str,
+    server_name: &str,
+    server_version: &str,
+    signer: &chio_core::Keypair,
+    captured: &[CapturedVerdict],
+) -> Result<chio_manifest::VerifiedManifestRegistry, ReplayError> {
+    use chio_manifest::{
+        RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
+
+    let mut tool_names = captured
+        .iter()
+        .map(|entry| entry.invocation.tool_name.clone())
+        .collect::<BTreeSet<_>>();
+    if tool_names.is_empty() {
+        tool_names.insert("conformance_no_tool_call".to_string());
+    }
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: server_id.to_string(),
+        name: server_name.to_string(),
+        description: Some("Provider conformance replay manifest".to_string()),
+        version: server_version.to_string(),
+        tools: tool_names
+            .into_iter()
+            .map(|name| ToolDefinition {
+                name,
+                description: "Provider conformance replay tool".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: ToolAnnotations::default(),
+                latency_hint: None,
+                flow: Some(ToolFlowDeclaration::public_egress()),
+            })
+            .collect(),
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, signer).map_err(|error| {
+        invalid_fixture(
+            path,
+            format!("Provider conformance manifest signing failed: {error}"),
+        )
+    })?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| {
+            invalid_fixture(
+                path,
+                format!("Provider conformance manifest admission failed: {error}"),
+            )
+        })?;
+    Ok(registry)
+}
+
 #[cfg(feature = "fixtures-ollama")]
-fn ollama_adapter(host: String) -> chio_ollama_tools_adapter::OllamaAdapter {
+fn ollama_adapter(
+    path: &Path,
+    host: String,
+    captured: &[CapturedVerdict],
+) -> Result<chio_ollama_tools_adapter::OllamaAdapter, ReplayError> {
     use std::sync::Arc;
 
+    use chio_manifest::{
+        RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
     use chio_ollama_tools_adapter::transport::MockTransport;
     use chio_ollama_tools_adapter::{OllamaAdapter, OllamaAdapterConfig};
 
-    OllamaAdapter::new(
-        OllamaAdapterConfig::new("ollama-1", "Ollama Chat", "0.1.0", "deadbeef", host),
+    let signer = chio_core::Keypair::from_seed(&[35u8; 32]);
+    let config = OllamaAdapterConfig::new(
+        "ollama-1",
+        "Ollama Chat",
+        "0.1.0",
+        signer.public_key().to_hex(),
+        host,
+    );
+    let mut tool_names = captured
+        .iter()
+        .map(|entry| entry.invocation.tool_name.clone())
+        .collect::<BTreeSet<_>>();
+    if tool_names.is_empty() {
+        tool_names.insert("conformance_no_tool_call".to_string());
+    }
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: Some("Ollama conformance replay manifest".to_string()),
+        version: config.server_version.clone(),
+        tools: tool_names
+            .into_iter()
+            .map(|name| ToolDefinition {
+                name,
+                description: "Ollama conformance replay tool".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: ToolAnnotations::default(),
+                latency_hint: None,
+                flow: Some(ToolFlowDeclaration::public_egress()),
+            })
+            .collect(),
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).map_err(|error| {
+        invalid_fixture(
+            path,
+            format!("Ollama conformance manifest signing failed: {error}"),
+        )
+    })?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| {
+            invalid_fixture(
+                path,
+                format!("Ollama conformance manifest admission failed: {error}"),
+            )
+        })?;
+    OllamaAdapter::new_with_registry(
+        config,
         Arc::new(MockTransport::new("mock://ollama")),
+        &registry,
     )
+    .map_err(|error| {
+        invalid_fixture(
+            path,
+            format!("Ollama conformance manifest failed validation: {error}"),
+        )
+    })
 }
 
 #[cfg(feature = "fixtures-cohere")]

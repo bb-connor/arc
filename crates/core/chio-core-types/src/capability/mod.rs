@@ -12,7 +12,7 @@ pub mod caveat;
 pub mod crypto_floor;
 pub mod cumulative_approval {
     use alloc::format;
-    use alloc::string::String;
+    use alloc::string::{String, ToString};
     use alloc::vec::Vec;
 
     use serde::{Deserialize, Serialize};

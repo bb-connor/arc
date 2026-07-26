@@ -9,6 +9,7 @@ on:
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
       - crates/platform/chio-store-sqlite/**
+      - third_party/**
       - Cargo.toml
       - Cargo.lock
       - examples/tee-sidecar/**
@@ -23,6 +24,7 @@ on:
       - crates/trust/chio-tee-frame/**
       - crates/core/chio-core-types/**
       - crates/platform/chio-store-sqlite/**
+      - third_party/**
       - Cargo.toml
       - Cargo.lock
       - examples/tee-sidecar/**

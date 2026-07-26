@@ -61,7 +61,10 @@ materialize.remove("non_unix_materializer_is_explicitly_unsupported")
 adapters = rust_tests("crates/security/chio-security-kernel/tests/adapters.rs")
 active_defense = rust_tests_with_exact_includes(
     "crates/tooling/chio-conformance/tests/active_defense.rs",
-    {"active_defense/deception_dispatch.rs"},
+    {
+        "active_defense/deception_dispatch.rs",
+        "active_defense/partial_rollback.rs",
+    },
 )
 
 expected = {

@@ -74,7 +74,16 @@
       "enum": ["observation", "guarded", "receipt_backed", "partition_contingency", "maintenance"]
     },
     "consistencyModel": {
-      "enum": ["crdt-commutative", "totally-ordered", "single-kernel", "quorum-required"]
+      "enum": [
+        "crdt-commutative",
+        "totally-ordered",
+        "single-kernel",
+        "quorum-required",
+        "crdt_commutative",
+        "totally_ordered",
+        "single_kernel",
+        "quorum_required"
+      ]
     },
     "coSign": {
       "enum": ["none", "bilateral_if_cross_org", "bilateral_required", "n_of_m"]

@@ -83,7 +83,13 @@ class SecurityWireLane(unittest.TestCase):
         entrypoint = ROOT / "crates/tooling/chio-conformance/tests/active_defense.rs"
         source = entrypoint.read_text(encoding="utf-8")
         includes = set(re.findall(r'(?m)^\s*include!\("([^"]+\.rs)"\);\s*$', source))
-        self.assertEqual(includes, {"active_defense/deception_dispatch.rs"})
+        self.assertEqual(
+            includes,
+            {
+                "active_defense/deception_dispatch.rs",
+                "active_defense/partial_rollback.rs",
+            },
+        )
 
         fragment_root = entrypoint.parent / "active_defense"
         fragments = {

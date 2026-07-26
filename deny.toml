@@ -334,6 +334,12 @@ name = "ed25519"
 name = "ed25519-dalek"
 
 [[bans.skip]]
+# FROST 3.0 pins serdect 0.2 while iroh's Ed25519 3 release-candidate stack
+# uses serdect 0.4. The exact two-version graph is pinned by
+# scripts/cargo-deny-duplicate-baseline.txt.
+name = "serdect"
+
+[[bans.skip]]
 name = "fiat-crypto"
 
 [[bans.skip]]

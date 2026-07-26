@@ -141,7 +141,7 @@ fn treaty_bound_extensions(
             },
         }),
         consistency_anchor: Some("anchor-live".to_string()),
-        consistency_model: Some("totally_ordered".to_string()),
+        consistency_model: Some("totally-ordered".to_string()),
         cross_org_visibility: Some("treaty_only".to_string()),
         treaty_binding_ref: Some(TreatyBindingRef {
             treaty_id: "treaty-buyer-vendor".to_string(),
@@ -151,7 +151,7 @@ fn treaty_bound_extensions(
             continuation_sha256: "4".repeat(64),
             lineage_bundle_sha256: "5".repeat(64),
             action_class_id: "workflow.destructive.vendor_call".to_string(),
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             request_sha256: receipt.action.parameter_hash.clone(),
             outcome_sha256: receipt.content_hash.clone(),
             local_receipt_sha256: "8".repeat(64),
@@ -770,9 +770,57 @@ fn strict_chio_verifier_accepts_treaty_ordered_consistency() {
     assert_eq!(verified.resolved_receipt.id, receipt.id);
     assert_eq!(
         verified.statement.predicate.consistency_model,
-        "totally_ordered"
+        "totally-ordered"
     );
     assert!(verified.statement.predicate.treaty_binding_ref.is_some());
+}
+
+#[test]
+fn strict_chio_verifier_accepts_legacy_signed_consistency_aliases() {
+    let kp_a = Keypair::generate();
+    let kp_b = Keypair::generate();
+    let receipt = sample_receipt(&kp_b);
+    let now_ms = 1_734_000_000_000;
+    let governance_json = r#"{"governance":"receipt"}"#.to_string();
+    let governance_digest = sha256_hex(governance_json.as_bytes());
+    let (_slice_envelope, receipt_store, lease_registry, mut governance_store, oracle, mut peers) =
+        fixture(&kp_a, &kp_b, &receipt, now_ms);
+    governance_store.insert(ResolvedGovernanceReceipt {
+        receipt_id: "gov-1".to_string(),
+        kernel_id: "did:chio:governance".to_string(),
+        canonical_json: governance_json,
+    });
+    insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
+    let mut extensions = treaty_bound_extensions(&receipt, now_ms, governance_digest);
+    extensions.consistency_model = Some("totally_ordered".to_string());
+    extensions
+        .treaty_binding_ref
+        .as_mut()
+        .unwrap()
+        .consistency_model = "totally_ordered".to_string();
+    let envelope = sign_chio_bilateral_dsse_envelope(local_signing_input(
+        &receipt, &kp_a, &kp_b, now_ms, extensions,
+    ))
+    .unwrap();
+    let mut base = config(
+        &peers,
+        &receipt_store,
+        &lease_registry,
+        &governance_store,
+        &oracle,
+        now_ms,
+    );
+    base.action_classes
+        .insert("file_read".to_string(), ActionClassKind::ReceiptBacked);
+
+    let verified =
+        verify_chio_bilateral_invocation(&envelope, &ChioBilateralVerifierConfig { base: &base })
+            .unwrap();
+
+    assert_eq!(
+        verified.statement.predicate.consistency_model,
+        "totally_ordered"
+    );
 }
 
 #[test]
@@ -848,6 +896,37 @@ fn strict_chio_treaty_review_binds_live_material() {
         signer_public_keys: &signer_public_keys,
     };
     verify_treaty_bound_chio_bilateral_invocation(&envelope, &accepted).unwrap();
+
+    let mut legacy_alias_binding = expected_treaty_binding.clone();
+    legacy_alias_binding.consistency_model = "totally_ordered".to_string();
+    let legacy_alias_review = TreatyBoundBilateralDsseReview {
+        expected_treaty_binding: &legacy_alias_binding,
+        expected_subject_name: &expected_subject_name,
+        expected_subject_sha256: &expected_subject_sha256,
+        expected_capability_lease_ref: &expected_capability_lease_ref,
+        expected_governance_receipt_ref: &expected_governance_receipt_ref,
+        expected_consistency_anchor: "anchor-live",
+        signer_public_keys: &signer_public_keys,
+    };
+    verify_treaty_bound_chio_bilateral_invocation(&envelope, &legacy_alias_review).unwrap();
+
+    let mut mismatched_binding = expected_treaty_binding.clone();
+    mismatched_binding.consistency_model = "single-kernel".to_string();
+    let mismatched_review = TreatyBoundBilateralDsseReview {
+        expected_treaty_binding: &mismatched_binding,
+        expected_subject_name: &expected_subject_name,
+        expected_subject_sha256: &expected_subject_sha256,
+        expected_capability_lease_ref: &expected_capability_lease_ref,
+        expected_governance_receipt_ref: &expected_governance_receipt_ref,
+        expected_consistency_anchor: "anchor-live",
+        signer_public_keys: &signer_public_keys,
+    };
+    assert_eq!(
+        verify_treaty_bound_chio_bilateral_invocation(&envelope, &mismatched_review)
+            .unwrap_err()
+            .code(),
+        "predicate.schema_invalid"
+    );
 
     let mut bad_statement = statement.clone();
     bad_statement
