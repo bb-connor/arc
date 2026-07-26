@@ -1078,6 +1078,18 @@ func protocolGeneratedTarget(identifier string) (any, error) {
 		return &TrustControlBudgetInvocationAdmissionEvidence{}, nil
 	case "admission_capture_metadata":
 		return &TrustControlAdmissionCaptureMetadata{}, nil
+	case "partition_escrow_quota_commitment":
+		return &TrustControlPartitionEscrowQuotaCommitment{}, nil
+	case "partition_escrow_allocation_set":
+		return &TrustControlPartitionEscrowAllocationSet{}, nil
+	case "partition_escrow_admission_evidence":
+		return &TrustControlPartitionEscrowAdmissionEvidence{}, nil
+	case "partition_escrow_receipt_metadata":
+		return &TrustControlPartitionEscrowReceiptMetadata{}, nil
+	case "budget_admission_evidence_partition_escrow":
+		return &TrustControlBudgetInvocationAdmissionEvidence{}, nil
+	case "admission_capture_metadata_partition_escrow":
+		return &TrustControlAdmissionCaptureMetadata{}, nil
 	default:
 		return nil, fmt.Errorf("protocol inventory has no generated type for %s", identifier)
 	}

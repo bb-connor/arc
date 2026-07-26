@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
+// Schema content SHA-256: 3432aff3f0e58b95d0507120eadc9543097949b5623e4959b06bc5da4e387ba2
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from each lex-sorted workspace-relative
@@ -23,6 +23,30 @@ import (
 	"fmt"
 
 	"github.com/oapi-codegen/runtime"
+)
+
+// Defines values for AgentActiveResponseGovernedIntentOrderedEffects.
+const (
+	AgentActiveResponseGovernedIntentOrderedEffectsFreezeIssuance       AgentActiveResponseGovernedIntentOrderedEffects = "freeze_issuance"
+	AgentActiveResponseGovernedIntentOrderedEffectsRestrictEgress       AgentActiveResponseGovernedIntentOrderedEffects = "restrict_egress"
+	AgentActiveResponseGovernedIntentOrderedEffectsSuspendCapabilitySet AgentActiveResponseGovernedIntentOrderedEffects = "suspend_capability_set"
+	AgentActiveResponseGovernedIntentOrderedEffectsSuspendSession       AgentActiveResponseGovernedIntentOrderedEffects = "suspend_session"
+	AgentActiveResponseGovernedIntentOrderedEffectsThrottleSession      AgentActiveResponseGovernedIntentOrderedEffects = "throttle_session"
+)
+
+// Defines values for AgentActiveResponseGovernedIntentPlanSchema.
+const (
+	AgentActiveResponseGovernedIntentPlanSchemaChioGovernedResponsePlanV1 AgentActiveResponseGovernedIntentPlanSchema = "chio.governed-response-plan.v1"
+)
+
+// Defines values for AgentGovernedTransactionIntentBody0Kind.
+const (
+	AgentGovernedTransactionIntentBody0KindToolInvocation AgentGovernedTransactionIntentBody0Kind = "tool_invocation"
+)
+
+// Defines values for AgentGovernedTransactionIntentBody1Kind.
+const (
+	AgentGovernedTransactionIntentBody1KindActiveResponsePlan AgentGovernedTransactionIntentBody1Kind = "active_response_plan"
 )
 
 // Defines values for AgentHeartbeatType.
@@ -117,6 +141,19 @@ const (
 	AnchorBatchWitnessState2KindStale AnchorBatchWitnessState2Kind = "stale"
 )
 
+// Defines values for CapabilityAggregateBudgetRootBodySchema.
+const (
+	CapabilityAggregateBudgetRootBodySchemaChioAggregateBudgetRootV1 CapabilityAggregateBudgetRootBodySchema = "chio.aggregate-budget-root.v1"
+)
+
+// Defines values for CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm.
+const (
+	CapabilityAggregateBudgetRootAggregateRootSigningAlgorithmEd25519 CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm = "ed25519"
+	CapabilityAggregateBudgetRootAggregateRootSigningAlgorithmHybrid  CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm = "hybrid"
+	CapabilityAggregateBudgetRootAggregateRootSigningAlgorithmP256    CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm = "p256"
+	CapabilityAggregateBudgetRootAggregateRootSigningAlgorithmP384    CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm = "p384"
+)
+
 // Defines values for CapabilityAggregateBudgetRootBindingAlgorithm.
 const (
 	CapabilityAggregateBudgetRootBindingAlgorithmEd25519 CapabilityAggregateBudgetRootBindingAlgorithm = "ed25519"
@@ -154,6 +191,19 @@ const (
 // Defines values for CapabilityCapabilitiesSchema.
 const (
 	CapabilityCapabilitiesSchemaChioCapabilitiesV1 CapabilityCapabilitiesSchema = "chio.capabilities.v1"
+)
+
+// Defines values for CapabilityCumulativeApprovalRootBodySchema.
+const (
+	CapabilityCumulativeApprovalRootBodySchemaChioCumulativeApprovalRootV1 CapabilityCumulativeApprovalRootBodySchema = "chio.cumulative-approval-root.v1"
+)
+
+// Defines values for CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm.
+const (
+	CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithmEd25519 CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm = "ed25519"
+	CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithmHybrid  CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm = "hybrid"
+	CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithmP256    CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm = "p256"
+	CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithmP384    CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm = "p384"
 )
 
 // Defines values for CapabilityGovernedApprovalTokenAlgorithm.
@@ -269,11 +319,26 @@ const (
 	CapabilityTokenCaveatKindRestrictTool       CapabilityTokenCaveatKind = "restrict_tool"
 )
 
+// Defines values for CapabilityTokenCumulativeApprovalDelegableConstraintType.
+const (
+	CapabilityTokenCumulativeApprovalDelegableConstraintTypeRequireCumulativeApprovalAbove CapabilityTokenCumulativeApprovalDelegableConstraintType = "require_cumulative_approval_above"
+)
+
+// Defines values for CapabilityTokenCumulativeApprovalDirectConstraintType.
+const (
+	CapabilityTokenCumulativeApprovalDirectConstraintTypeRequireCumulativeApprovalAbove CapabilityTokenCumulativeApprovalDirectConstraintType = "require_cumulative_approval_above"
+)
+
 // Defines values for CapabilityTokenGrantSubsetRelationGrantKind.
 const (
 	CapabilityTokenGrantSubsetRelationGrantKindPrompt   CapabilityTokenGrantSubsetRelationGrantKind = "prompt"
 	CapabilityTokenGrantSubsetRelationGrantKindResource CapabilityTokenGrantSubsetRelationGrantKind = "resource"
 	CapabilityTokenGrantSubsetRelationGrantKindTool     CapabilityTokenGrantSubsetRelationGrantKind = "tool"
+)
+
+// Defines values for CapabilityTokenLegacyApprovalConstraintType.
+const (
+	CapabilityTokenLegacyApprovalConstraintTypeRequireApprovalAbove CapabilityTokenLegacyApprovalConstraintType = "require_approval_above"
 )
 
 // Defines values for CapabilityTokenOperation.
@@ -450,6 +515,16 @@ const (
 	KernelCapabilityRevokedTypeCapabilityRevoked KernelCapabilityRevokedType = "capability_revoked"
 )
 
+// Defines values for KernelCombinedCaptureMetadataSchema.
+const (
+	KernelCombinedCaptureMetadataSchemaChioAdmissionCaptureMetadataV1 KernelCombinedCaptureMetadataSchema = "chio.admission-capture-metadata.v1"
+)
+
+// Defines values for KernelExecutionNonceNonceSchema.
+const (
+	KernelExecutionNonceNonceSchemaChioExecutionNonceV1 KernelExecutionNonceNonceSchema = "chio.execution_nonce.v1"
+)
+
 // Defines values for KernelHeartbeatType.
 const (
 	KernelHeartbeatTypeHeartbeat KernelHeartbeatType = "heartbeat"
@@ -580,6 +655,49 @@ const (
 // Defines values for ProvenanceVerdictLink3Verdict.
 const (
 	ProvenanceVerdictLink3VerdictIncomplete ProvenanceVerdictLink3Verdict = "incomplete"
+)
+
+// Defines values for ReceiptAdmissionMetadataCompensationStatus.
+const (
+	ReceiptAdmissionMetadataCompensationStatusCompensatedBeforeDispatch      ReceiptAdmissionMetadataCompensationStatus = "compensated_before_dispatch"
+	ReceiptAdmissionMetadataCompensationStatusNotAcceptedAfterDispatchCommit ReceiptAdmissionMetadataCompensationStatus = "not_accepted_after_dispatch_commit"
+	ReceiptAdmissionMetadataCompensationStatusNotCompensated                 ReceiptAdmissionMetadataCompensationStatus = "not_compensated"
+)
+
+// Defines values for ReceiptAdmissionMetadataProjectedDispatchState.
+const (
+	ReceiptAdmissionMetadataProjectedDispatchStateCapturePending ReceiptAdmissionMetadataProjectedDispatchState = "capture_pending"
+	ReceiptAdmissionMetadataProjectedDispatchStateCommitted      ReceiptAdmissionMetadataProjectedDispatchState = "committed"
+	ReceiptAdmissionMetadataProjectedDispatchStateFinalizing     ReceiptAdmissionMetadataProjectedDispatchState = "finalizing"
+	ReceiptAdmissionMetadataProjectedDispatchStateNotApplicable  ReceiptAdmissionMetadataProjectedDispatchState = "not_applicable"
+	ReceiptAdmissionMetadataProjectedDispatchStateNotCommitted   ReceiptAdmissionMetadataProjectedDispatchState = "not_committed"
+	ReceiptAdmissionMetadataProjectedDispatchStateTerminal       ReceiptAdmissionMetadataProjectedDispatchState = "terminal"
+)
+
+// Defines values for ReceiptAdmissionMetadataProjectedState.
+const (
+	ReceiptAdmissionMetadataProjectedStateApprovalRequired               ReceiptAdmissionMetadataProjectedState = "approval_required"
+	ReceiptAdmissionMetadataProjectedStateApprovalReserved               ReceiptAdmissionMetadataProjectedState = "approval_reserved"
+	ReceiptAdmissionMetadataProjectedStateBrokerAttemptRegistered        ReceiptAdmissionMetadataProjectedState = "broker_attempt_registered"
+	ReceiptAdmissionMetadataProjectedStateBudgetAuthorized               ReceiptAdmissionMetadataProjectedState = "budget_authorized"
+	ReceiptAdmissionMetadataProjectedStateCapturePending                 ReceiptAdmissionMetadataProjectedState = "capture_pending"
+	ReceiptAdmissionMetadataProjectedStateCompensatedBeforeDispatch      ReceiptAdmissionMetadataProjectedState = "compensated_before_dispatch"
+	ReceiptAdmissionMetadataProjectedStateCompleted                      ReceiptAdmissionMetadataProjectedState = "completed"
+	ReceiptAdmissionMetadataProjectedStateDispatchCommitted              ReceiptAdmissionMetadataProjectedState = "dispatch_committed"
+	ReceiptAdmissionMetadataProjectedStateEconomicMutationApplied        ReceiptAdmissionMetadataProjectedState = "economic_mutation_applied"
+	ReceiptAdmissionMetadataProjectedStateEconomicMutationNotApplied     ReceiptAdmissionMetadataProjectedState = "economic_mutation_not_applied"
+	ReceiptAdmissionMetadataProjectedStateFinalizing                     ReceiptAdmissionMetadataProjectedState = "finalizing"
+	ReceiptAdmissionMetadataProjectedStateMutationReady                  ReceiptAdmissionMetadataProjectedState = "mutation_ready"
+	ReceiptAdmissionMetadataProjectedStateMutationSubmitted              ReceiptAdmissionMetadataProjectedState = "mutation_submitted"
+	ReceiptAdmissionMetadataProjectedStateNotAcceptedAfterDispatchCommit ReceiptAdmissionMetadataProjectedState = "not_accepted_after_dispatch_commit"
+	ReceiptAdmissionMetadataProjectedStateOutcomeUnknownAfterDispatch    ReceiptAdmissionMetadataProjectedState = "outcome_unknown_after_dispatch"
+	ReceiptAdmissionMetadataProjectedStatePrepared                       ReceiptAdmissionMetadataProjectedState = "prepared"
+	ReceiptAdmissionMetadataProjectedStateReadyToDispatch                ReceiptAdmissionMetadataProjectedState = "ready_to_dispatch"
+)
+
+// Defines values for ReceiptAdmissionMetadataSchema.
+const (
+	ReceiptAdmissionMetadataSchemaChioAdmissionReceiptV1 ReceiptAdmissionMetadataSchema = "chio.admission-receipt.v1"
 )
 
 // Defines values for ReceiptLineageStatementEvidenceClass.
@@ -2303,6 +2421,16 @@ const (
 	TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfileChioGrantInvocationV1               TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfile = "chio.grant-invocation.v1"
 )
 
+// Defines values for TrustControlBudgetSnapshotAnchorProvenanceSchema.
+const (
+	TrustControlBudgetSnapshotAnchorProvenanceSchemaChioBudgetSnapshotAnchorProvenanceV1 TrustControlBudgetSnapshotAnchorProvenanceSchema = "chio.budget-snapshot-anchor-provenance.v1"
+)
+
+// Defines values for TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema.
+const (
+	TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchemaChioBudgetSnapshotAnchorCommitmentV1 TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema = "chio.budget-snapshot-anchor-commitment.v1"
+)
+
 // Defines values for TrustControlPartitionEscrowAdmissionEvidenceSchema.
 const (
 	TrustControlPartitionEscrowAdmissionEvidenceSchemaChioPartitionEscrowAdmissionEvidenceV1 TrustControlPartitionEscrowAdmissionEvidenceSchema = "chio.partition-escrow-admission-evidence.v1"
@@ -2361,6 +2489,69 @@ const (
 	TrustControlTerminateReasonQuorumLost       TrustControlTerminateReason = "quorum_lost"
 	TrustControlTerminateReasonTermAdvanced     TrustControlTerminateReason = "term_advanced"
 )
+
+// AgentActiveResponseGovernedIntent defines model for AgentActiveResponseGovernedIntent.
+type AgentActiveResponseGovernedIntent struct {
+	CanonicalPlanBody           map[string]interface{}                            `json:"canonical_plan_body"`
+	ExecutorSubject             string                                            `json:"executor_subject"`
+	ExpiresAt                   int64                                             `json:"expires_at"`
+	OperatorCapabilityExpiresAt int64                                             `json:"operator_capability_expires_at"`
+	OperatorCapabilityHash      string                                            `json:"operator_capability_hash"`
+	OperatorCapabilityId        string                                            `json:"operator_capability_id"`
+	OrderedEffects              []AgentActiveResponseGovernedIntentOrderedEffects `json:"ordered_effects"`
+	PlanBodyHash                string                                            `json:"plan_body_hash"`
+	PlanId                      string                                            `json:"plan_id"`
+	PlanSchema                  AgentActiveResponseGovernedIntentPlanSchema       `json:"plan_schema"`
+	RollbackBinding             map[string]interface{}                            `json:"rollback_binding"`
+	TargetBinding               map[string]interface{}                            `json:"target_binding"`
+}
+
+// AgentActiveResponseGovernedIntentOrderedEffects defines model for AgentActiveResponseGovernedIntent.OrderedEffects.
+type AgentActiveResponseGovernedIntentOrderedEffects string
+
+// AgentActiveResponseGovernedIntentPlanSchema defines model for AgentActiveResponseGovernedIntent.PlanSchema.
+type AgentActiveResponseGovernedIntentPlanSchema string
+
+// AgentGovernedTransactionIntent defines model for AgentGovernedTransactionIntent.
+type AgentGovernedTransactionIntent struct {
+	Autonomy  *map[string]interface{}              `json:"autonomy,omitempty"`
+	Body      *AgentGovernedTransactionIntent_Body `json:"body,omitempty"`
+	CallChain *map[string]interface{}              `json:"call_chain,omitempty"`
+	Commerce  *map[string]interface{}              `json:"commerce,omitempty"`
+	Context   *interface{}                         `json:"context,omitempty"`
+	Id        string                               `json:"id"`
+	MaxAmount *struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"max_amount,omitempty"`
+	MeteredBilling     *map[string]interface{} `json:"metered_billing,omitempty"`
+	Purpose            string                  `json:"purpose"`
+	RuntimeAttestation *map[string]interface{} `json:"runtime_attestation,omitempty"`
+	ServerId           string                  `json:"server_id"`
+	ToolName           string                  `json:"tool_name"`
+}
+
+// AgentGovernedTransactionIntentBody0 defines model for .
+type AgentGovernedTransactionIntentBody0 struct {
+	Kind AgentGovernedTransactionIntentBody0Kind `json:"kind"`
+}
+
+// AgentGovernedTransactionIntentBody0Kind defines model for AgentGovernedTransactionIntent.Body.0.Kind.
+type AgentGovernedTransactionIntentBody0Kind string
+
+// AgentGovernedTransactionIntentBody1 defines model for .
+type AgentGovernedTransactionIntentBody1 struct {
+	Kind  AgentGovernedTransactionIntentBody1Kind `json:"kind"`
+	Value AgentActiveResponseGovernedIntent       `json:"value"`
+}
+
+// AgentGovernedTransactionIntentBody1Kind defines model for AgentGovernedTransactionIntent.Body.1.Kind.
+type AgentGovernedTransactionIntentBody1Kind string
+
+// AgentGovernedTransactionIntent_Body defines model for AgentGovernedTransactionIntent.Body.
+type AgentGovernedTransactionIntent_Body struct {
+	union json.RawMessage
+}
 
 // AgentHeartbeat defines model for AgentHeartbeat.
 type AgentHeartbeat struct {
@@ -2574,6 +2765,34 @@ type AnchorBatchWitnessState2 struct {
 // AnchorBatchWitnessState2Kind defines model for AnchorBatchWitnessState.2.Kind.
 type AnchorBatchWitnessState2Kind string
 
+// CapabilityAggregateBudgetRoot defines model for CapabilityAggregateBudgetRoot.
+type CapabilityAggregateBudgetRoot struct {
+	Algorithm *CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm `json:"algorithm,omitempty"`
+	Body      struct {
+		MaxInvocations     int64                                               `json:"max_invocations"`
+		RootCapabilityHash string                                              `json:"root_capability_hash"`
+		RootCapabilityId   string                                              `json:"root_capability_id"`
+		RootExpiresAt      int64                                               `json:"root_expires_at"`
+		RootIssuer         CapabilityAggregateBudgetRootAggregateRootPublicKey `json:"root_issuer"`
+		RootScopeHash      string                                              `json:"root_scope_hash"`
+		RootSubject        CapabilityAggregateBudgetRootAggregateRootPublicKey `json:"root_subject"`
+		Schema             CapabilityAggregateBudgetRootBodySchema             `json:"schema"`
+	} `json:"body"`
+	Signature CapabilityAggregateBudgetRootAggregateRootSignature `json:"signature"`
+}
+
+// CapabilityAggregateBudgetRootBodySchema defines model for CapabilityAggregateBudgetRoot.Body.Schema.
+type CapabilityAggregateBudgetRootBodySchema string
+
+// CapabilityAggregateBudgetRootAggregateRootPublicKey defines model for CapabilityAggregateBudgetRootAggregateRootPublicKey.
+type CapabilityAggregateBudgetRootAggregateRootPublicKey = string
+
+// CapabilityAggregateBudgetRootAggregateRootSignature defines model for CapabilityAggregateBudgetRootAggregateRootSignature.
+type CapabilityAggregateBudgetRootAggregateRootSignature = string
+
+// CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm defines model for CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm.
+type CapabilityAggregateBudgetRootAggregateRootSigningAlgorithm string
+
 // CapabilityAggregateBudgetRootBinding defines model for CapabilityAggregateBudgetRootBinding.
 type CapabilityAggregateBudgetRootBinding struct {
 	Algorithm *CapabilityAggregateBudgetRootBindingAlgorithm `json:"algorithm,omitempty"`
@@ -2670,7 +2889,7 @@ type CapabilityAggregateInvocationBudget1 struct {
 // CapabilityAggregateInvocationBudget1Scope defines model for CapabilityAggregateInvocationBudget.1.Scope.
 type CapabilityAggregateInvocationBudget1Scope string
 
-// CapabilityCapabilities Feature bitset exchanged during federation trust establishment. Malformed feature names and unsupported schema IDs fail closed.
+// CapabilityCapabilities Feature bitset exchanged during federation trust establishment, including aggregate budgets, cumulative approval, threshold approval, and governed active response. Malformed feature names and unsupported schema IDs fail closed.
 type CapabilityCapabilities struct {
 	// Features String-keyed feature bitset. Peers proceed only with the intersection of true values advertised by both sides.
 	Features *map[string]bool             `json:"features,omitempty"`
@@ -2679,6 +2898,44 @@ type CapabilityCapabilities struct {
 
 // CapabilityCapabilitiesSchema defines model for CapabilityCapabilities.Schema.
 type CapabilityCapabilitiesSchema string
+
+// CapabilityCumulativeApprovalRoot defines model for CapabilityCumulativeApprovalRoot.
+type CapabilityCumulativeApprovalRoot struct {
+	Algorithm *CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm `json:"algorithm,omitempty"`
+	Body      struct {
+		ApprovalBudgetEpoch int64                                                        `json:"approval_budget_epoch"`
+		ApprovalBudgetId    string                                                       `json:"approval_budget_id"`
+		RootCapabilityHash  string                                                       `json:"root_capability_hash"`
+		RootCapabilityId    string                                                       `json:"root_capability_id"`
+		RootExpiresAt       int64                                                        `json:"root_expires_at"`
+		RootGrantHash       string                                                       `json:"root_grant_hash"`
+		RootIssuer          CapabilityCumulativeApprovalRootCumulativeRootPublicKey      `json:"root_issuer"`
+		RootScopeHash       string                                                       `json:"root_scope_hash"`
+		RootSubject         CapabilityCumulativeApprovalRootCumulativeRootPublicKey      `json:"root_subject"`
+		Schema              CapabilityCumulativeApprovalRootBodySchema                   `json:"schema"`
+		SignerKeyEpoch      int64                                                        `json:"signer_key_epoch"`
+		Threshold           CapabilityCumulativeApprovalRootCumulativeRootMonetaryAmount `json:"threshold"`
+	} `json:"body"`
+	Signature CapabilityCumulativeApprovalRootCumulativeRootSignature `json:"signature"`
+}
+
+// CapabilityCumulativeApprovalRootBodySchema defines model for CapabilityCumulativeApprovalRoot.Body.Schema.
+type CapabilityCumulativeApprovalRootBodySchema string
+
+// CapabilityCumulativeApprovalRootCumulativeRootMonetaryAmount defines model for CapabilityCumulativeApprovalRootCumulativeRootMonetaryAmount.
+type CapabilityCumulativeApprovalRootCumulativeRootMonetaryAmount struct {
+	Currency string `json:"currency"`
+	Units    int64  `json:"units"`
+}
+
+// CapabilityCumulativeApprovalRootCumulativeRootPublicKey defines model for CapabilityCumulativeApprovalRootCumulativeRootPublicKey.
+type CapabilityCumulativeApprovalRootCumulativeRootPublicKey = string
+
+// CapabilityCumulativeApprovalRootCumulativeRootSignature defines model for CapabilityCumulativeApprovalRootCumulativeRootSignature.
+type CapabilityCumulativeApprovalRootCumulativeRootSignature = string
+
+// CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm defines model for CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm.
+type CapabilityCumulativeApprovalRootCumulativeRootSigningAlgorithm string
 
 // CapabilityGovernedApprovalToken defines model for CapabilityGovernedApprovalToken.
 type CapabilityGovernedApprovalToken struct {
@@ -2926,6 +3183,12 @@ type CapabilityRevocation struct {
 	RevokedAt int64 `json:"revoked_at"`
 }
 
+// CapabilitySupplementalAuthorization defines model for CapabilitySupplementalAuthorization.
+type CapabilitySupplementalAuthorization struct {
+	// SignedExtension Opaque authenticated extension bytes. Adapters must not interpret these bytes as quota authority.
+	SignedExtension string `json:"signed_extension"`
+}
+
 // CapabilityThresholdApprovalProposal defines model for CapabilityThresholdApprovalProposal.
 type CapabilityThresholdApprovalProposal struct {
 	Algorithm       *CapabilityThresholdApprovalProposalAlgorithm `json:"algorithm,omitempty"`
@@ -3038,11 +3301,42 @@ type CapabilityTokenChioScope struct {
 	ResourceGrants *[]CapabilityTokenResourceGrant `json:"resource_grants,omitempty"`
 }
 
-// CapabilityTokenConstraint Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
+// CapabilityTokenConstraint defines model for CapabilityTokenConstraint.
 type CapabilityTokenConstraint struct {
-	Type  string       `json:"type"`
-	Value *interface{} `json:"value,omitempty"`
+	union json.RawMessage
 }
+
+// CapabilityTokenCumulativeApprovalDelegableConstraint defines model for CapabilityTokenCumulativeApprovalDelegableConstraint.
+type CapabilityTokenCumulativeApprovalDelegableConstraint struct {
+	Type  CapabilityTokenCumulativeApprovalDelegableConstraintType `json:"type"`
+	Value struct {
+		ApprovalBudgetEpoch           int64                            `json:"approval_budget_epoch"`
+		ApprovalBudgetId              string                           `json:"approval_budget_id"`
+		CumulativeApprovalRootBinding CapabilityCumulativeApprovalRoot `json:"cumulative_approval_root_binding"`
+
+		// Threshold A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
+		Threshold CapabilityTokenMonetaryAmount `json:"threshold"`
+	} `json:"value"`
+}
+
+// CapabilityTokenCumulativeApprovalDelegableConstraintType defines model for CapabilityTokenCumulativeApprovalDelegableConstraint.Type.
+type CapabilityTokenCumulativeApprovalDelegableConstraintType string
+
+// CapabilityTokenCumulativeApprovalDirectConstraint defines model for CapabilityTokenCumulativeApprovalDirectConstraint.
+type CapabilityTokenCumulativeApprovalDirectConstraint struct {
+	Type  CapabilityTokenCumulativeApprovalDirectConstraintType `json:"type"`
+	Value struct {
+		ApprovalBudgetEpoch           int64        `json:"approval_budget_epoch"`
+		ApprovalBudgetId              string       `json:"approval_budget_id"`
+		CumulativeApprovalRootBinding *interface{} `json:"cumulative_approval_root_binding,omitempty"`
+
+		// Threshold A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
+		Threshold CapabilityTokenMonetaryAmount `json:"threshold"`
+	} `json:"value"`
+}
+
+// CapabilityTokenCumulativeApprovalDirectConstraintType defines model for CapabilityTokenCumulativeApprovalDirectConstraint.Type.
+type CapabilityTokenCumulativeApprovalDirectConstraintType string
 
 // CapabilityTokenDelegationLink A single delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.
 type CapabilityTokenDelegationLink struct {
@@ -3064,6 +3358,12 @@ type CapabilityTokenDelegationLink_Attenuations_Item struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// CapabilityTokenGenericConstraint Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
+type CapabilityTokenGenericConstraint struct {
+	Type  string       `json:"type"`
+	Value *interface{} `json:"value,omitempty"`
+}
+
 // CapabilityTokenGrantSubsetRelation defines model for CapabilityTokenGrantSubsetRelation.
 type CapabilityTokenGrantSubsetRelation struct {
 	ChildIndex  int64                                       `json:"childIndex"`
@@ -3074,6 +3374,17 @@ type CapabilityTokenGrantSubsetRelation struct {
 
 // CapabilityTokenGrantSubsetRelationGrantKind defines model for CapabilityTokenGrantSubsetRelation.GrantKind.
 type CapabilityTokenGrantSubsetRelationGrantKind string
+
+// CapabilityTokenLegacyApprovalConstraint defines model for CapabilityTokenLegacyApprovalConstraint.
+type CapabilityTokenLegacyApprovalConstraint struct {
+	Type  CapabilityTokenLegacyApprovalConstraintType `json:"type"`
+	Value struct {
+		ThresholdUnits int64 `json:"threshold_units"`
+	} `json:"value"`
+}
+
+// CapabilityTokenLegacyApprovalConstraintType defines model for CapabilityTokenLegacyApprovalConstraint.Type.
+type CapabilityTokenLegacyApprovalConstraintType string
 
 // CapabilityTokenMonetaryAmount A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
 type CapabilityTokenMonetaryAmount struct {
@@ -3536,6 +3847,49 @@ type KernelCapabilityRevoked struct {
 // KernelCapabilityRevokedType defines model for KernelCapabilityRevoked.Type.
 type KernelCapabilityRevokedType string
 
+// KernelCombinedCaptureMetadata defines model for KernelCombinedCaptureMetadata.
+type KernelCombinedCaptureMetadata struct {
+	BudgetCommitIndex int64  `json:"budget_commit_index"`
+	HoldId            string `json:"hold_id"`
+	LeaderEpoch       int64  `json:"leader_epoch"`
+	OperationId       string `json:"operation_id"`
+	QuotaKeys         []struct {
+		GrantIndex *int64 `json:"grant_index,omitempty"`
+		OwnerId    string `json:"owner_id"`
+		Profile    string `json:"profile"`
+	} `json:"quota_keys"`
+	RevocationCommitIndex int64                               `json:"revocation_commit_index"`
+	RevocationSetDigest   string                              `json:"revocation_set_digest"`
+	Schema                KernelCombinedCaptureMetadataSchema `json:"schema"`
+}
+
+// KernelCombinedCaptureMetadataSchema defines model for KernelCombinedCaptureMetadata.Schema.
+type KernelCombinedCaptureMetadataSchema string
+
+// KernelExecutionNonce defines model for KernelExecutionNonce.
+type KernelExecutionNonce struct {
+	Nonce struct {
+		BoundTo struct {
+			CapabilityId  string `json:"capability_id"`
+			ParameterHash string `json:"parameter_hash"`
+			RequestId     string `json:"request_id"`
+			SubjectId     string `json:"subject_id"`
+			ToolName      string `json:"tool_name"`
+			ToolServer    string `json:"tool_server"`
+		} `json:"bound_to"`
+		ExpiresAt          int64                           `json:"expires_at"`
+		IssuedAt           int64                           `json:"issued_at"`
+		NonceId            string                          `json:"nonce_id"`
+		ReservedHoldId     *string                         `json:"reserved_hold_id,omitempty"`
+		ReservingRequestId *string                         `json:"reserving_request_id,omitempty"`
+		Schema             KernelExecutionNonceNonceSchema `json:"schema"`
+	} `json:"nonce"`
+	Signature string `json:"signature"`
+}
+
+// KernelExecutionNonceNonceSchema defines model for KernelExecutionNonce.Nonce.Schema.
+type KernelExecutionNonceNonceSchema string
+
 // KernelHeartbeat defines model for KernelHeartbeat.
 type KernelHeartbeat struct {
 	Type KernelHeartbeatType `json:"type"`
@@ -3557,7 +3911,8 @@ type KernelToolCallChunkType string
 
 // KernelToolCallResponse defines model for KernelToolCallResponse.
 type KernelToolCallResponse struct {
-	Id string `json:"id"`
+	ExecutionNonce *KernelExecutionNonce `json:"execution_nonce,omitempty"`
+	Id             string                `json:"id"`
 
 	// Receipt A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
 	Receipt ReceiptRecord                 `json:"receipt"`
@@ -3862,6 +4217,87 @@ type ProvenanceVerdictLink3 struct {
 
 // ProvenanceVerdictLink3Verdict defines model for ProvenanceVerdictLink.3.Verdict.
 type ProvenanceVerdictLink3Verdict string
+
+// ReceiptAdmissionMetadata defines model for ReceiptAdmissionMetadata.
+type ReceiptAdmissionMetadata struct {
+	CompensationStatus        ReceiptAdmissionMetadataCompensationStatus     `json:"compensation_status"`
+	CoordinatorLeaseEpoch     ReceiptAdmissionMetadataPositiveIJsonInteger   `json:"coordinator_lease_epoch"`
+	CoordinatorLeaseId        ReceiptAdmissionMetadataIdentifier             `json:"coordinator_lease_id"`
+	OperationId               ReceiptAdmissionMetadataDigest                 `json:"operation_id"`
+	ProjectedDispatchState    ReceiptAdmissionMetadataProjectedDispatchState `json:"projected_dispatch_state"`
+	ProjectedOperationVersion ReceiptAdmissionMetadataPositiveIJsonInteger   `json:"projected_operation_version"`
+	ProjectedState            ReceiptAdmissionMetadataProjectedState         `json:"projected_state"`
+	RequestBindingHash        ReceiptAdmissionMetadataDigest                 `json:"request_binding_hash"`
+	RequestId                 ReceiptAdmissionMetadataIdentifier             `json:"request_id"`
+	RequestNamespaceDigest    ReceiptAdmissionMetadataDigest                 `json:"request_namespace_digest"`
+	RetainedDispatchCommit    *struct {
+		CommittedVersion      ReceiptAdmissionMetadataPositiveIJsonInteger `json:"committed_version"`
+		CoordinatorLeaseEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"coordinator_lease_epoch"`
+		CoordinatorLeaseId    ReceiptAdmissionMetadataIdentifier           `json:"coordinator_lease_id"`
+		ProviderAttempt       *struct {
+			AttemptId         ReceiptAdmissionMetadataIdentifier           `json:"attempt_id"`
+			OperationId       ReceiptAdmissionMetadataDigest               `json:"operation_id"`
+			TransportId       ReceiptAdmissionMetadataIdentifier           `json:"transport_id"`
+			TransportKeyEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"transport_key_epoch"`
+		} `json:"provider_attempt"`
+		StoreFence ReceiptAdmissionMetadataStoreFence `json:"store_fence"`
+	} `json:"retained_dispatch_commit"`
+	Schema             ReceiptAdmissionMetadataSchema               `json:"schema"`
+	StoreFence         ReceiptAdmissionMetadataStoreFence           `json:"store_fence"`
+	ToolOutcomeId      *string                                      `json:"tool_outcome_id"`
+	ToolOutcomeVersion *int64                                       `json:"tool_outcome_version"`
+	TrustedTimeUnixMs  ReceiptAdmissionMetadataPositiveIJsonInteger `json:"trusted_time_unix_ms"`
+}
+
+// ReceiptAdmissionMetadataCompensationStatus defines model for ReceiptAdmissionMetadata.CompensationStatus.
+type ReceiptAdmissionMetadataCompensationStatus string
+
+// ReceiptAdmissionMetadataProjectedDispatchState defines model for ReceiptAdmissionMetadata.ProjectedDispatchState.
+type ReceiptAdmissionMetadataProjectedDispatchState string
+
+// ReceiptAdmissionMetadataProjectedState defines model for ReceiptAdmissionMetadata.ProjectedState.
+type ReceiptAdmissionMetadataProjectedState string
+
+// ReceiptAdmissionMetadataSchema defines model for ReceiptAdmissionMetadata.Schema.
+type ReceiptAdmissionMetadataSchema string
+
+// ReceiptAdmissionMetadataDigest defines model for ReceiptAdmissionMetadataDigest.
+type ReceiptAdmissionMetadataDigest = string
+
+// ReceiptAdmissionMetadataDispatchCommit defines model for ReceiptAdmissionMetadataDispatchCommit.
+type ReceiptAdmissionMetadataDispatchCommit struct {
+	CommittedVersion      ReceiptAdmissionMetadataPositiveIJsonInteger `json:"committed_version"`
+	CoordinatorLeaseEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"coordinator_lease_epoch"`
+	CoordinatorLeaseId    ReceiptAdmissionMetadataIdentifier           `json:"coordinator_lease_id"`
+	ProviderAttempt       *struct {
+		AttemptId         ReceiptAdmissionMetadataIdentifier           `json:"attempt_id"`
+		OperationId       ReceiptAdmissionMetadataDigest               `json:"operation_id"`
+		TransportId       ReceiptAdmissionMetadataIdentifier           `json:"transport_id"`
+		TransportKeyEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"transport_key_epoch"`
+	} `json:"provider_attempt"`
+	StoreFence ReceiptAdmissionMetadataStoreFence `json:"store_fence"`
+}
+
+// ReceiptAdmissionMetadataIdentifier defines model for ReceiptAdmissionMetadataIdentifier.
+type ReceiptAdmissionMetadataIdentifier = string
+
+// ReceiptAdmissionMetadataPositiveIJsonInteger defines model for ReceiptAdmissionMetadataPositiveIJsonInteger.
+type ReceiptAdmissionMetadataPositiveIJsonInteger = int64
+
+// ReceiptAdmissionMetadataProviderAttempt defines model for ReceiptAdmissionMetadataProviderAttempt.
+type ReceiptAdmissionMetadataProviderAttempt struct {
+	AttemptId         ReceiptAdmissionMetadataIdentifier           `json:"attempt_id"`
+	OperationId       ReceiptAdmissionMetadataDigest               `json:"operation_id"`
+	TransportId       ReceiptAdmissionMetadataIdentifier           `json:"transport_id"`
+	TransportKeyEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"transport_key_epoch"`
+}
+
+// ReceiptAdmissionMetadataStoreFence defines model for ReceiptAdmissionMetadataStoreFence.
+type ReceiptAdmissionMetadataStoreFence struct {
+	LeaseId    ReceiptAdmissionMetadataIdentifier           `json:"lease_id"`
+	OwnerEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"owner_epoch"`
+	StoreUuid  ReceiptAdmissionMetadataIdentifier           `json:"store_uuid"`
+}
 
 // ReceiptInclusionProof Merkle inclusion proof for a single receipt leaf in a receipt-log Merkle tree. Mirrors the serde shape of `MerkleProof` in `crates/core/chio-core-types/src/merkle.rs`. The proof allows an auditor, holding only the published Merkle root and the original leaf bytes, to verify that the leaf was included in a tree of the given size at the given position. The audit path is the ordered list of sibling hashes encountered when walking from the leaf up to the root; siblings whose subtree was carried upward without pairing (the right-edge of an unbalanced level) are omitted. Deterministic-replay consumes this schema as the contract for golden-bundle inclusion artifacts under `tests/replay/goldens/<family>/<name>/`.
 type ReceiptInclusionProof struct {
@@ -8241,6 +8677,41 @@ type TrustControlBudgetInvocationAdmissionEvidenceSupplementalBinding struct {
 	VerifierId               TrustControlBudgetInvocationAdmissionEvidenceIdentifier  `json:"verifierId"`
 }
 
+// TrustControlBudgetSnapshotAnchorProvenance Leader-signed inclusion chain authenticating the exact immutable migration-anchor set carried by a trust-control cluster budget snapshot.
+type TrustControlBudgetSnapshotAnchorProvenance struct {
+	Chain                []TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment `json:"chain"`
+	ClusterAuthenticator string                                                       `json:"clusterAuthenticator"`
+	Schema               TrustControlBudgetSnapshotAnchorProvenanceSchema             `json:"schema"`
+}
+
+// TrustControlBudgetSnapshotAnchorProvenanceSchema defines model for TrustControlBudgetSnapshotAnchorProvenance.Schema.
+type TrustControlBudgetSnapshotAnchorProvenanceSchema string
+
+// TrustControlBudgetSnapshotAnchorProvenanceCommitment defines model for TrustControlBudgetSnapshotAnchorProvenanceCommitment.
+type TrustControlBudgetSnapshotAnchorProvenanceCommitment struct {
+	AnchorSetDigest     TrustControlBudgetSnapshotAnchorProvenanceDigest           `json:"anchorSetDigest"`
+	ChainDigest         TrustControlBudgetSnapshotAnchorProvenanceDigest           `json:"chainDigest"`
+	CommitSequence      int64                                                      `json:"commitSequence"`
+	CommittedAt         int64                                                      `json:"committedAt"`
+	ElectionTerm        int64                                                      `json:"electionTerm"`
+	LeaderUrl           string                                                     `json:"leaderUrl"`
+	PreviousChainDigest TrustControlBudgetSnapshotAnchorProvenanceDigest           `json:"previousChainDigest"`
+	Schema              TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema `json:"schema"`
+	SignerPublicKey     string                                                     `json:"signerPublicKey"`
+}
+
+// TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema defines model for TrustControlBudgetSnapshotAnchorProvenanceCommitment.Schema.
+type TrustControlBudgetSnapshotAnchorProvenanceCommitmentSchema string
+
+// TrustControlBudgetSnapshotAnchorProvenanceDigest defines model for TrustControlBudgetSnapshotAnchorProvenanceDigest.
+type TrustControlBudgetSnapshotAnchorProvenanceDigest = string
+
+// TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment defines model for TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment.
+type TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment struct {
+	Body      TrustControlBudgetSnapshotAnchorProvenanceCommitment `json:"body"`
+	Signature string                                               `json:"signature"`
+}
+
 // TrustControlHeartbeat One trust-control heartbeat used to refresh a held authority lease before it expires. The heartbeat names the lease being refreshed (`leaseId` plus `leaseEpoch`), the leader URL claiming continued ownership, and the unix-millisecond observation timestamp at which the heartbeat was issued. The contract is anchored by `spec/PROTOCOL.md` section 9 (the `/v1/internal/cluster/status` cluster lease lifecycle). Wire field names are camelCase to match the lease projection.
 type TrustControlHeartbeat struct {
 	// LeaderUrl Normalized URL of the leader claiming continued ownership of the lease.
@@ -8914,6 +9385,68 @@ func (a KernelCapabilityList_Capabilities_ScopeAttenuations_Item) MarshalJSON() 
 	return json.Marshal(object)
 }
 
+// AsAgentGovernedTransactionIntentBody0 returns the union data inside the AgentGovernedTransactionIntent_Body as a AgentGovernedTransactionIntentBody0
+func (t AgentGovernedTransactionIntent_Body) AsAgentGovernedTransactionIntentBody0() (AgentGovernedTransactionIntentBody0, error) {
+	var body AgentGovernedTransactionIntentBody0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAgentGovernedTransactionIntentBody0 overwrites any union data inside the AgentGovernedTransactionIntent_Body as the provided AgentGovernedTransactionIntentBody0
+func (t *AgentGovernedTransactionIntent_Body) FromAgentGovernedTransactionIntentBody0(v AgentGovernedTransactionIntentBody0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAgentGovernedTransactionIntentBody0 performs a merge with any union data inside the AgentGovernedTransactionIntent_Body, using the provided AgentGovernedTransactionIntentBody0
+func (t *AgentGovernedTransactionIntent_Body) MergeAgentGovernedTransactionIntentBody0(v AgentGovernedTransactionIntentBody0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAgentGovernedTransactionIntentBody1 returns the union data inside the AgentGovernedTransactionIntent_Body as a AgentGovernedTransactionIntentBody1
+func (t AgentGovernedTransactionIntent_Body) AsAgentGovernedTransactionIntentBody1() (AgentGovernedTransactionIntentBody1, error) {
+	var body AgentGovernedTransactionIntentBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAgentGovernedTransactionIntentBody1 overwrites any union data inside the AgentGovernedTransactionIntent_Body as the provided AgentGovernedTransactionIntentBody1
+func (t *AgentGovernedTransactionIntent_Body) FromAgentGovernedTransactionIntentBody1(v AgentGovernedTransactionIntentBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAgentGovernedTransactionIntentBody1 performs a merge with any union data inside the AgentGovernedTransactionIntent_Body, using the provided AgentGovernedTransactionIntentBody1
+func (t *AgentGovernedTransactionIntent_Body) MergeAgentGovernedTransactionIntentBody1(v AgentGovernedTransactionIntentBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentGovernedTransactionIntent_Body) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentGovernedTransactionIntent_Body) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsAnchorBatchWitnessState0 returns the union data inside the AnchorBatchWitnessState as a AnchorBatchWitnessState0
 func (t AnchorBatchWitnessState) AsAnchorBatchWitnessState0() (AnchorBatchWitnessState0, error) {
 	var body AnchorBatchWitnessState0
@@ -9279,6 +9812,120 @@ func (t CapabilityGrant) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CapabilityGrant) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsCapabilityTokenGenericConstraint returns the union data inside the CapabilityTokenConstraint as a CapabilityTokenGenericConstraint
+func (t CapabilityTokenConstraint) AsCapabilityTokenGenericConstraint() (CapabilityTokenGenericConstraint, error) {
+	var body CapabilityTokenGenericConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCapabilityTokenGenericConstraint overwrites any union data inside the CapabilityTokenConstraint as the provided CapabilityTokenGenericConstraint
+func (t *CapabilityTokenConstraint) FromCapabilityTokenGenericConstraint(v CapabilityTokenGenericConstraint) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCapabilityTokenGenericConstraint performs a merge with any union data inside the CapabilityTokenConstraint, using the provided CapabilityTokenGenericConstraint
+func (t *CapabilityTokenConstraint) MergeCapabilityTokenGenericConstraint(v CapabilityTokenGenericConstraint) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCapabilityTokenLegacyApprovalConstraint returns the union data inside the CapabilityTokenConstraint as a CapabilityTokenLegacyApprovalConstraint
+func (t CapabilityTokenConstraint) AsCapabilityTokenLegacyApprovalConstraint() (CapabilityTokenLegacyApprovalConstraint, error) {
+	var body CapabilityTokenLegacyApprovalConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCapabilityTokenLegacyApprovalConstraint overwrites any union data inside the CapabilityTokenConstraint as the provided CapabilityTokenLegacyApprovalConstraint
+func (t *CapabilityTokenConstraint) FromCapabilityTokenLegacyApprovalConstraint(v CapabilityTokenLegacyApprovalConstraint) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCapabilityTokenLegacyApprovalConstraint performs a merge with any union data inside the CapabilityTokenConstraint, using the provided CapabilityTokenLegacyApprovalConstraint
+func (t *CapabilityTokenConstraint) MergeCapabilityTokenLegacyApprovalConstraint(v CapabilityTokenLegacyApprovalConstraint) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCapabilityTokenCumulativeApprovalDirectConstraint returns the union data inside the CapabilityTokenConstraint as a CapabilityTokenCumulativeApprovalDirectConstraint
+func (t CapabilityTokenConstraint) AsCapabilityTokenCumulativeApprovalDirectConstraint() (CapabilityTokenCumulativeApprovalDirectConstraint, error) {
+	var body CapabilityTokenCumulativeApprovalDirectConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCapabilityTokenCumulativeApprovalDirectConstraint overwrites any union data inside the CapabilityTokenConstraint as the provided CapabilityTokenCumulativeApprovalDirectConstraint
+func (t *CapabilityTokenConstraint) FromCapabilityTokenCumulativeApprovalDirectConstraint(v CapabilityTokenCumulativeApprovalDirectConstraint) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCapabilityTokenCumulativeApprovalDirectConstraint performs a merge with any union data inside the CapabilityTokenConstraint, using the provided CapabilityTokenCumulativeApprovalDirectConstraint
+func (t *CapabilityTokenConstraint) MergeCapabilityTokenCumulativeApprovalDirectConstraint(v CapabilityTokenCumulativeApprovalDirectConstraint) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCapabilityTokenCumulativeApprovalDelegableConstraint returns the union data inside the CapabilityTokenConstraint as a CapabilityTokenCumulativeApprovalDelegableConstraint
+func (t CapabilityTokenConstraint) AsCapabilityTokenCumulativeApprovalDelegableConstraint() (CapabilityTokenCumulativeApprovalDelegableConstraint, error) {
+	var body CapabilityTokenCumulativeApprovalDelegableConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCapabilityTokenCumulativeApprovalDelegableConstraint overwrites any union data inside the CapabilityTokenConstraint as the provided CapabilityTokenCumulativeApprovalDelegableConstraint
+func (t *CapabilityTokenConstraint) FromCapabilityTokenCumulativeApprovalDelegableConstraint(v CapabilityTokenCumulativeApprovalDelegableConstraint) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCapabilityTokenCumulativeApprovalDelegableConstraint performs a merge with any union data inside the CapabilityTokenConstraint, using the provided CapabilityTokenCumulativeApprovalDelegableConstraint
+func (t *CapabilityTokenConstraint) MergeCapabilityTokenCumulativeApprovalDelegableConstraint(v CapabilityTokenCumulativeApprovalDelegableConstraint) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CapabilityTokenConstraint) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CapabilityTokenConstraint) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
