@@ -1,8 +1,9 @@
 use super::*;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
 use chio_manifest::{load_existing_verified_manifest_registry, RuntimeToolTopology};
+use std::io::Read;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::mcp_cli::payment_config::PaymentAdapterConfig;
 
@@ -106,6 +107,128 @@ pub(crate) fn compose_cli_ordinary_runtime_kernel(
     )
 }
 
+const MAX_PARTITION_ESCROW_AUTHORITY_DESCRIPTOR_BYTES: usize = 16 * 1024 * 1024;
+
+pub(crate) fn load_partition_escrow_remote_authority(
+    descriptor_path: &Path,
+    trusted_signer: &chio_core::PublicKey,
+) -> Result<
+    Arc<
+        chio_control_plane::trust_control::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+    >,
+    CliError,
+> {
+    let mut descriptor_file = std::fs::File::open(descriptor_path).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to open partition-escrow authority descriptor `{}`: {error}",
+            descriptor_path.display()
+        ))
+    })?;
+    let mut descriptor = Vec::new();
+    Read::by_ref(&mut descriptor_file)
+        .take((MAX_PARTITION_ESCROW_AUTHORITY_DESCRIPTOR_BYTES + 1) as u64)
+        .read_to_end(&mut descriptor)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to read partition-escrow authority descriptor `{}`: {error}",
+                descriptor_path.display()
+            ))
+        })?;
+    if descriptor.len() > MAX_PARTITION_ESCROW_AUTHORITY_DESCRIPTOR_BYTES {
+        return Err(CliError::cli_other_error(
+            "partition-escrow authority descriptor exceeds its byte limit".to_string(),
+        ));
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "partition-escrow authority clock is before the Unix epoch: {error}"
+            ))
+        })?
+        .as_secs();
+    chio_control_plane::trust_control::service_runtime::budget::SealedPartitionEscrowRemoteAuthority::from_canonical_descriptor(
+        &descriptor,
+        trusted_signer,
+        now,
+    )
+    .map(Arc::new)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compose_cli_admission_runtime_kernel(
+    kernel: ChioKernel,
+    enable_aggregate_invocation_admission: bool,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
+) -> Result<ChioKernel, CliError> {
+    match (
+        partition_escrow_authority_descriptor,
+        partition_escrow_authority_signer,
+    ) {
+        (None, None) => compose_cli_ordinary_runtime_kernel(
+            kernel,
+            enable_aggregate_invocation_admission,
+            admission_operation_db_path,
+            approval_db_path,
+            budget_db_path,
+            control_url,
+            control_token,
+        ),
+        (Some(_), None) | (None, Some(_)) => Err(CliError::cli_other_error(
+            "partition-escrow authority descriptor and pinned signer must be configured together"
+                .to_string(),
+        )),
+        (Some(descriptor_path), Some(trusted_signer)) => {
+            if enable_aggregate_invocation_admission || approval_db_path.is_some() {
+                return Err(CliError::cli_other_error(
+                    "partition-escrow admission cannot be mixed with ordinary aggregate or threshold admission flags"
+                        .to_string(),
+                ));
+            }
+            if kernel.threshold_approval_requirement_resolver().is_some() {
+                return Err(CliError::cli_other_error(
+                    "partition-escrow admission does not support a threshold approval policy"
+                        .to_string(),
+                ));
+            }
+            if budget_db_path.is_some() {
+                return Err(CliError::cli_other_error(
+                    "partition-escrow admission uses its sealed remote budget authority and forbids --budget-db"
+                        .to_string(),
+                ));
+            }
+            let operation_path = admission_operation_db_path.ok_or_else(|| {
+                CliError::cli_other_error(
+                    "partition-escrow admission requires --admission-operation-db".to_string(),
+                )
+            })?;
+            let control_url = control_url.ok_or_else(|| {
+                CliError::cli_other_error(
+                    "partition-escrow admission requires --control-url".to_string(),
+                )
+            })?;
+            let control_token = chio_control_plane::require_control_token(control_token)?;
+            let authority =
+                load_partition_escrow_remote_authority(descriptor_path, trusted_signer)?;
+            chio_control_plane::compose_partition_escrow_remote_admission_runtime(
+                kernel,
+                chio_control_plane::PartitionEscrowRemoteAdmissionRuntimeConfig {
+                    control_url,
+                    control_token,
+                    admission_operation_db_path: operation_path,
+                    authority,
+                },
+            )
+        }
+    }
+}
+
 pub(crate) fn cmd_run(
     policy_path: &Path,
     command: &[String],
@@ -126,6 +249,8 @@ pub(crate) fn cmd_run(
     control_token: Option<&str>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
     control_authority_trusted_public_keys: &[chio_core::PublicKey],
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     let loaded_policy = policy::load_policy_for_runtime(
         policy_path,
@@ -217,7 +342,7 @@ pub(crate) fn cmd_run(
         issuance_policy,
         runtime_assurance_policy,
     )?;
-    let mut kernel = compose_cli_ordinary_runtime_kernel(
+    let mut kernel = compose_cli_admission_runtime_kernel(
         kernel,
         enable_aggregate_invocation_admission,
         admission_operation_db_path,
@@ -225,6 +350,8 @@ pub(crate) fn cmd_run(
         budget_db_path,
         control_url,
         control_token,
+        partition_escrow_authority_descriptor,
+        partition_escrow_authority_signer,
     )?;
 
     let agent_kp = Keypair::generate();
@@ -616,6 +743,8 @@ pub(crate) fn cmd_check(
     control_token: Option<&str>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
     control_authority_trusted_public_keys: &[chio_core::PublicKey],
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     let loaded_policy = policy::load_policy_for_runtime(
         policy_path,
@@ -700,7 +829,7 @@ pub(crate) fn cmd_check(
         issuance_policy,
         runtime_assurance_policy,
     )?;
-    let mut kernel = compose_cli_ordinary_runtime_kernel(
+    let mut kernel = compose_cli_admission_runtime_kernel(
         kernel,
         enable_aggregate_invocation_admission,
         admission_operation_db_path,
@@ -708,6 +837,8 @@ pub(crate) fn cmd_check(
         budget_db_path,
         control_url,
         control_token,
+        partition_escrow_authority_descriptor,
+        partition_escrow_authority_signer,
     )?;
 
     kernel.register_tool_server(Box::new(CheckToolServer {
@@ -977,6 +1108,8 @@ pub(crate) fn cmd_mcp_serve(
     control_token: Option<&str>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
     control_authority_trusted_public_keys: &[chio_core::PublicKey],
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     // Resolve `--preset` to a materialized YAML on disk so the rest
     // of the plumbing can use `load_policy` unchanged. Keeping the
@@ -1061,6 +1194,15 @@ pub(crate) fn cmd_mcp_serve(
     if broker_config_path.is_some() && keyring_runtime.is_none() {
         return Err(CliError::cli_other_error(
             "production broker composition requires an enterprise keyring-backed authority signer"
+                .to_string(),
+        ));
+    }
+    if broker_config_path.is_some()
+        && (partition_escrow_authority_descriptor.is_some()
+            || partition_escrow_authority_signer.is_some())
+    {
+        return Err(CliError::cli_other_error(
+            "partition-escrow admission cannot be mixed with production broker composition"
                 .to_string(),
         ));
     }
@@ -1426,7 +1568,7 @@ pub(crate) fn cmd_mcp_serve(
         let mut kernel = if broker_runtime.is_some() {
             kernel
         } else {
-            compose_cli_ordinary_runtime_kernel(
+            compose_cli_admission_runtime_kernel(
                 kernel,
                 effective_aggregate_invocation_admission,
                 effective_admission_operation_db_path.as_deref(),
@@ -1434,10 +1576,12 @@ pub(crate) fn cmd_mcp_serve(
                 effective_budget_db_path.as_deref(),
                 control_url,
                 control_token,
+                partition_escrow_authority_descriptor,
+                partition_escrow_authority_signer,
             )?
         };
         #[cfg(not(unix))]
-        let mut kernel = compose_cli_ordinary_runtime_kernel(
+        let mut kernel = compose_cli_admission_runtime_kernel(
             kernel,
             effective_aggregate_invocation_admission,
             effective_admission_operation_db_path.as_deref(),
@@ -1445,6 +1589,8 @@ pub(crate) fn cmd_mcp_serve(
             effective_budget_db_path.as_deref(),
             control_url,
             control_token,
+            partition_escrow_authority_descriptor,
+            partition_escrow_authority_signer,
         )?;
 
         let (wrapped_cmd, wrapped_args) = command

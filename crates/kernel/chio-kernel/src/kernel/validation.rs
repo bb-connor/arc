@@ -11,12 +11,13 @@ use self::responses::{
     PostInvocationHandling,
 };
 use super::kernel_struct::OperationOwnedDelegatedBudgetLease;
+use super::ordinary_admission::BudgetTerminalDecisionExpectation;
 use super::*;
 use crate::budget_store::{
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetEventAuthority,
-    BudgetHoldMutationDecision, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
-    BudgetReverseHoldRequest,
+    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
+    BudgetInvocationReservationState, BudgetMonetaryHoldState, BudgetReconcileHoldDecision,
+    BudgetReconcileHoldRequest, BudgetReleaseHoldDecision, BudgetReleaseHoldRequest,
+    BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
 struct IssuedCapabilityPostconditions<'a> {

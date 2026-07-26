@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib.util
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -102,6 +104,8 @@ def static_contract_tests() -> None:
         "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028",
         "cargo install \\",
         "--path /tmp/cargo-mutants-25.3.1",
+        "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
+        "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
         'test "$(rustc --version | cut -d\' \' -f1-2)" = "rustc 1.93.0"',
         'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
         'test "$(cargo fmt --version | cut -d\' \' -f1)" = "rustfmt"',
@@ -123,6 +127,8 @@ def static_contract_tests() -> None:
         raise AssertionError(
             "authorized evidence checker is not the container authority"
         )
+    if "Path(\"/usr/local/cargo/bin/cargo-mutants\")" not in entrypoint:
+        raise AssertionError("cargo-mutants is not a fixed trusted executable")
     profile = json.loads(SECCOMP_PATH.read_text(encoding="utf-8"))
     if profile != BOUNDARY.expected_seccomp_profile():
         raise AssertionError(
@@ -197,6 +203,8 @@ def static_contract_tests() -> None:
             "--cap-drop",
             "ALL",
             "--cap-add",
+            "CHOWN",
+            "--cap-add",
             "SETGID",
             "--cap-add",
             "SETUID",
@@ -224,7 +232,7 @@ def static_contract_tests() -> None:
             "--tmpfs",
             "/tmp:rw,nosuid,nodev,size=536870912,mode=1777",
             "--tmpfs",
-            "/private:rw,nosuid,nodev,size=2147483648,uid=65532,gid=65532,mode=0755",
+            "/private:rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755",
             "--tmpfs",
             "/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755",
             "--tmpfs",
@@ -406,6 +414,8 @@ def copy_and_output_tests() -> None:
         boundary_files = {
             name: "d" * 64 for name in BOUNDARY.TRUSTED_BOUNDARY_FILE_KEYS
         }
+        if len(boundary_files) != 15 or "cargo-mutants" not in boundary_files:
+            raise AssertionError("trusted boundary file inventory changed")
 
         def write_inventory(files: dict[str, str]) -> None:
             inventory = {
@@ -421,7 +431,7 @@ def copy_and_output_tests() -> None:
                 },
                 "outcome_count": 35,
                 "patch_sha256": patch_sha,
-                "paths": [f"path-{index}" for index in range(65)],
+                "paths": [f"path-{index}" for index in range(64)],
                 "schema": "chio.security-evidence-refresh.v1",
                 "source_sha": head,
             }
@@ -434,8 +444,43 @@ def copy_and_output_tests() -> None:
         BOUNDARY.collect_outputs(
             refresh_stage, "refresh-all-evidence", head, image, seccomp_digest
         )
+        inventory_path = refresh_stage / "all-evidence-inventory.json"
+        invalid_boundary = json.loads(inventory_path.read_text(encoding="utf-8"))
+        invalid_boundary["execution_boundary"]["schema"] = "untrusted.v1"
+        inventory_path.write_text(
+            json.dumps(invalid_boundary, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        assert_rejected(
+            "invalid execution boundary schema",
+            lambda: BOUNDARY.collect_outputs(
+                refresh_stage,
+                "refresh-all-evidence",
+                head,
+                image,
+                seccomp_digest,
+            ),
+        )
+        write_inventory(boundary_files)
+        extra_boundary = json.loads(inventory_path.read_text(encoding="utf-8"))
+        extra_boundary["execution_boundary"]["candidate_path"] = "/workspace/tool"
+        inventory_path.write_text(
+            json.dumps(extra_boundary, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        assert_rejected(
+            "extra execution boundary authority",
+            lambda: BOUNDARY.collect_outputs(
+                refresh_stage,
+                "refresh-all-evidence",
+                head,
+                image,
+                seccomp_digest,
+            ),
+        )
+        write_inventory(boundary_files)
         missing_files = dict(boundary_files)
-        missing_files.pop("command-client.py")
+        missing_files.pop("cargo-mutants")
         write_inventory(missing_files)
         assert_rejected(
             "missing trusted boundary hash",
@@ -461,7 +506,7 @@ def copy_and_output_tests() -> None:
             ),
         )
         substituted_files = dict(boundary_files)
-        substituted_files["entrypoint.py"] = "not-a-sha256"
+        substituted_files["cargo-mutants"] = "not-a-sha256"
         write_inventory(substituted_files)
         assert_rejected(
             "substituted trusted boundary hash",
@@ -512,30 +557,754 @@ def refresh_inventory_tests() -> None:
     campaigns = [campaign for campaign, _outcome, _case in inventory]
     outcomes = [outcome for _campaign, outcome, _case in inventory]
     cases = [case for _campaign, _outcome, case in inventory]
-    expected_outcomes = sorted(
-        path.relative_to(ROOT).as_posix()
-        for path in (ROOT / "audits/evidence/mutants/security").glob(
-            "*/mutants.out/outcomes.json"
+    expected_outcomes: list[str] = []
+    for case_path in (
+        ROOT / "crates/core/chio-adversarial-suite/cases"
+    ).glob("*/*.json"):
+        case_body = json.loads(case_path.read_text(encoding="utf-8"))
+        artifact = case_body.get("artifact")
+        if not isinstance(artifact, dict):
+            continue
+        artifact_campaigns = artifact.get("campaigns")
+        if not isinstance(artifact_campaigns, list):
+            continue
+        expected_outcomes.extend(
+            campaign["outcomes"]["path"] for campaign in artifact_campaigns
         )
-    )
+    expected_outcomes.sort()
     if (
         len(inventory) != 35
         or len(set(campaigns)) != 35
         or len(set(outcomes)) != 35
         or len(set(cases)) != 28
-        or len(ENTRYPOINT.ALL_REFRESH_PATHS) != 65
+        or len(ENTRYPOINT.ALL_REFRESH_PATHS) != 64
         or sorted(outcomes) != expected_outcomes
         or tuple(campaigns) != ENTRYPOINT.ALL_CAMPAIGNS
     ):
         raise AssertionError("complete evidence refresh inventory is not exact")
     expected_paths = {
-        "audits/evidence/threats/pii_phi_exposure.json",
         "crates/core/chio-adversarial-suite/manifest.json",
         *outcomes,
         *cases,
     }
     if set(ENTRYPOINT.ALL_REFRESH_PATHS) != expected_paths:
         raise AssertionError("complete evidence refresh allowlist is not exact")
+
+
+def pending_promotion_tests() -> None:
+    def assert_entrypoint_rejected(label: str, callback) -> None:
+        try:
+            callback()
+        except ENTRYPOINT.EntrypointError:
+            return
+        raise AssertionError(f"entrypoint accepted invalid pending promotion: {label}")
+
+    with mock.patch.object(
+        ENTRYPOINT,
+        "run_trusted_bounded",
+        return_value=b"broker_plaintext_custody\nsandbox_path_swap\n",
+    ):
+        if ENTRYPOINT.pending_campaigns(30) != frozenset(
+            {"broker_plaintext_custody", "sandbox_path_swap"}
+        ):
+            raise AssertionError("pending campaign inventory was not preserved")
+    for label, payload in (
+        ("unsorted", b"sandbox_path_swap\nbroker_plaintext_custody\n"),
+        ("duplicate", b"sandbox_path_swap\nsandbox_path_swap\n"),
+        ("unknown", b"candidate_selected_campaign\n"),
+        ("unterminated", b"sandbox_path_swap"),
+        ("non-ASCII", b"sandbox_path_swap\xff\n"),
+    ):
+        with mock.patch.object(
+            ENTRYPOINT, "run_trusted_bounded", return_value=payload
+        ):
+            assert_entrypoint_rejected(
+                label, lambda: ENTRYPOINT.pending_campaigns(30)
+            )
+
+    pending_campaign = "broker_plaintext_custody"
+    refreshed_campaign = "sandbox_path_swap"
+    pending_outcome = ENTRYPOINT.OUTCOME_PATH_BY_CAMPAIGN[pending_campaign]
+    campaigns = ENTRYPOINT.LINUX_CAMPAIGNS
+    paths = ENTRYPOINT.REFRESH_PATHS
+    tracked_names = "".join(
+        f"{path}\0" for path in paths if path != pending_outcome
+    ).encode("utf-8")
+    tracked_patch = b"tracked evidence patch\n"
+    new_patch = b"new Linux outcome patch\n"
+    untracked = f"{pending_outcome}\0".encode("utf-8")
+    publications: dict[str, bytes] = {}
+
+    def trusted_refresh_command(
+        command: list[str], _timeout_seconds: int, *, cwd=ENTRYPOINT.WORKSPACE
+    ) -> bytes:
+        del cwd
+        if "--require-complete" in command:
+            return b"complete\n"
+        if "--name-only" in command:
+            return tracked_names
+        raise AssertionError(f"unexpected trusted refresh command: {command!r}")
+
+    sequence = mock.Mock()
+    exact_inventory = mock.Mock()
+    with (
+        mock.patch.object(
+            ENTRYPOINT,
+            "pending_campaigns",
+            return_value=frozenset({pending_campaign}),
+        ),
+        mock.patch.object(ENTRYPOINT, "run_sequence", sequence),
+        mock.patch.object(
+            ENTRYPOINT,
+            "run_trusted_bounded",
+            side_effect=trusted_refresh_command,
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "repository_inventory",
+            return_value=(tracked_patch, untracked, b""),
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "new_evidence_file_patch",
+            return_value=new_patch,
+        ) as new_file_patch,
+        mock.patch.object(
+            ENTRYPOINT,
+            "candidate_environment",
+            return_value={"SOURCE_SHA": "a" * 40},
+        ),
+        mock.patch.object(
+            ENTRYPOINT, "require_exact_repository_inventory", exact_inventory
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "publish_regular",
+            side_effect=lambda name, payload: publications.setdefault(name, payload),
+        ),
+    ):
+        ENTRYPOINT.refresh_evidence(
+            30,
+            campaigns,
+            paths,
+            full_inventory=False,
+        )
+    commands = sequence.call_args.args[0]
+    commands_by_campaign = dict(zip(campaigns, commands, strict=True))
+    if (
+        "--promote-pending-outcome" not in commands_by_campaign[pending_campaign]
+        or pending_campaign not in commands_by_campaign[pending_campaign]
+        or "--refresh-outcome" not in commands_by_campaign[refreshed_campaign]
+        or refreshed_campaign not in commands_by_campaign[refreshed_campaign]
+    ):
+        raise AssertionError("pending and promoted campaigns used the wrong operations")
+    if new_file_patch.call_args.args != (
+        pending_outcome,
+        30,
+        ENTRYPOINT.LINUX_OUTCOME_PATHS,
+    ):
+        raise AssertionError("new Linux outcome did not use the exact patch path")
+    exact_inventory.assert_called_once_with((tracked_patch, untracked, b""), 30)
+    combined_patch = tracked_patch + new_patch
+    combined_digest = hashlib.sha256(combined_patch).hexdigest()
+    if (
+        publications.get("linux-evidence.patch") != combined_patch
+        or publications.get("linux-evidence.patch.sha256")
+        != f"{combined_digest}  linux-evidence.patch\n".encode("ascii")
+        or publications.get("source-sha.txt") != b"a" * 40 + b"\n"
+    ):
+        raise AssertionError("initial promotion publication was not source-bound")
+
+    full_pending = frozenset({"broker_plaintext_custody", "grant_replay"})
+    full_pending_paths = tuple(
+        sorted(ENTRYPOINT.OUTCOME_PATH_BY_CAMPAIGN[name] for name in full_pending)
+    )
+    full_tracked_names = "".join(
+        f"{path}\0"
+        for path in ENTRYPOINT.ALL_REFRESH_PATHS
+        if path not in full_pending_paths
+    ).encode("utf-8")
+    full_untracked = "".join(f"{path}\0" for path in full_pending_paths).encode(
+        "utf-8"
+    )
+    full_tracked_patch = b"full tracked evidence patch\n"
+    full_publications: dict[str, bytes] = {}
+
+    def trusted_full_refresh_command(
+        command: list[str], _timeout_seconds: int, *, cwd=ENTRYPOINT.WORKSPACE
+    ) -> bytes:
+        del cwd
+        if "--require-complete" in command:
+            return b"complete\n"
+        if "--name-only" in command:
+            return full_tracked_names
+        raise AssertionError(f"unexpected full refresh command: {command!r}")
+
+    def full_new_file_patch(
+        path: str, timeout_seconds: int, allowed_paths: tuple[str, ...]
+    ) -> bytes:
+        if timeout_seconds != 30 or allowed_paths != ENTRYPOINT.ALL_OUTCOME_PATHS:
+            raise AssertionError("full refresh did not use the complete outcome allowlist")
+        return f"new full outcome: {path}\n".encode("utf-8")
+
+    full_sequence = mock.Mock()
+    full_exact_inventory = mock.Mock()
+    with (
+        mock.patch.object(
+            ENTRYPOINT, "pending_campaigns", return_value=full_pending
+        ),
+        mock.patch.object(ENTRYPOINT, "run_sequence", full_sequence),
+        mock.patch.object(
+            ENTRYPOINT,
+            "run_trusted_bounded",
+            side_effect=trusted_full_refresh_command,
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "repository_inventory",
+            return_value=(full_tracked_patch, full_untracked, b""),
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "new_evidence_file_patch",
+            side_effect=full_new_file_patch,
+        ) as full_file_patch,
+        mock.patch.object(
+            ENTRYPOINT,
+            "candidate_environment",
+            return_value={"SOURCE_SHA": "b" * 40},
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "execution_boundary_record",
+            return_value=b'{"schema":"test-execution-boundary"}\n',
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "require_exact_repository_inventory",
+            full_exact_inventory,
+        ),
+        mock.patch.object(
+            ENTRYPOINT,
+            "publish_regular",
+            side_effect=lambda name, payload: full_publications.setdefault(
+                name, payload
+            ),
+        ),
+    ):
+        ENTRYPOINT.refresh_evidence(
+            30,
+            ENTRYPOINT.ALL_CAMPAIGNS,
+            ENTRYPOINT.ALL_REFRESH_PATHS,
+            full_inventory=True,
+        )
+    full_commands = full_sequence.call_args.args[0]
+    for campaign, command in zip(
+        ENTRYPOINT.ALL_CAMPAIGNS, full_commands, strict=True
+    ):
+        operation = (
+            "--promote-pending-outcome"
+            if campaign in full_pending
+            else "--refresh-outcome"
+        )
+        if operation not in command or campaign not in command:
+            raise AssertionError("full refresh did not bootstrap the exact pending set")
+    expected_full_patch_calls = [
+        mock.call(path, 30, ENTRYPOINT.ALL_OUTCOME_PATHS)
+        for path in full_pending_paths
+    ]
+    if full_file_patch.call_args_list != expected_full_patch_calls:
+        raise AssertionError("full refresh new-file patch allowlist was not exact")
+    full_exact_inventory.assert_called_once_with(
+        (full_tracked_patch, full_untracked, b""), 30
+    )
+    full_inventory = json.loads(
+        full_publications["all-evidence-inventory.json"].decode("utf-8")
+    )
+    if (
+        full_inventory["campaigns"] != list(ENTRYPOINT.ALL_CAMPAIGNS)
+        or full_inventory["paths"] != list(ENTRYPOINT.ALL_REFRESH_PATHS)
+        or full_inventory["source_sha"] != "b" * 40
+    ):
+        raise AssertionError("full refresh publication inventory was not exact")
+
+    with (
+        mock.patch.object(
+            ENTRYPOINT,
+            "pending_campaigns",
+            side_effect=AssertionError("invalid mode reached pending discovery"),
+        ),
+    ):
+        assert_entrypoint_rejected(
+            "arbitrary subset campaign",
+            lambda: ENTRYPOINT.refresh_evidence(
+                30,
+                ("grant_replay",),
+                (ENTRYPOINT.OUTCOME_PATH_BY_CAMPAIGN["grant_replay"],),
+                full_inventory=False,
+            ),
+        )
+        assert_entrypoint_rejected(
+            "forged full inventory",
+            lambda: ENTRYPOINT.refresh_evidence(
+                30,
+                ("grant_replay",),
+                ENTRYPOINT.ALL_REFRESH_PATHS,
+                full_inventory=True,
+            ),
+        )
+
+    relative = ENTRYPOINT.LINUX_OUTCOME_PATHS[0]
+    with tempfile.TemporaryDirectory(prefix="chio-new-linux-outcome-") as raw:
+        workspace = Path(raw)
+        outcome = workspace / relative
+        outcome.parent.mkdir(parents=True)
+        outcome.write_text("{}\n", encoding="utf-8")
+        outcome.chmod(0o644)
+        expected_patch = (
+            f"diff --git a/{relative} b/{relative}\n"
+            "new file mode 100644\n"
+            "index 0000000..1234567\n"
+            "--- /dev/null\n"
+            f"+++ b/{relative}\n"
+            "@@ -0,0 +1 @@\n"
+            "+{}\n"
+        ).encode("utf-8")
+        trusted_diff = mock.Mock(return_value=expected_patch)
+        with (
+            mock.patch.object(ENTRYPOINT, "WORKSPACE", workspace),
+            mock.patch.object(ENTRYPOINT, "VERIFIER_UID", os.getuid()),
+            mock.patch.object(ENTRYPOINT, "VERIFIER_GID", os.getgid()),
+            mock.patch.object(ENTRYPOINT, "run_trusted_bounded", trusted_diff),
+        ):
+            if (
+                ENTRYPOINT.new_evidence_file_patch(
+                    relative, 30, ENTRYPOINT.LINUX_OUTCOME_PATHS
+                )
+                != expected_patch
+            ):
+                raise AssertionError("new Linux outcome patch bytes changed")
+            assert_entrypoint_rejected(
+                "path outside fixed inventory",
+                lambda: ENTRYPOINT.new_evidence_file_patch(
+                    "candidate/path", 30, ENTRYPOINT.LINUX_OUTCOME_PATHS
+                ),
+            )
+            assert_entrypoint_rejected(
+                "caller-selected allowlist",
+                lambda: ENTRYPOINT.new_evidence_file_patch(
+                    relative, 30, (relative,)
+                ),
+            )
+            renamed_outcome = outcome.with_name("outcome-real.json")
+            outcome.rename(renamed_outcome)
+            outcome.symlink_to(renamed_outcome)
+            assert_entrypoint_rejected(
+                "symlinked new outcome",
+                lambda: ENTRYPOINT.new_evidence_file_patch(
+                    relative, 30, ENTRYPOINT.LINUX_OUTCOME_PATHS
+                ),
+            )
+            outcome.unlink()
+            renamed_outcome.rename(outcome)
+            hardlink = outcome.with_name("outcome-hardlink.json")
+            os.link(outcome, hardlink)
+            assert_entrypoint_rejected(
+                "hard-linked new outcome",
+                lambda: ENTRYPOINT.new_evidence_file_patch(
+                    relative, 30, ENTRYPOINT.LINUX_OUTCOME_PATHS
+                ),
+            )
+            hardlink.unlink()
+            with mock.patch.object(ENTRYPOINT, "VERIFIER_UID", os.getuid() + 1):
+                assert_entrypoint_rejected(
+                    "wrong new outcome owner",
+                    lambda: ENTRYPOINT.new_evidence_file_patch(
+                        relative, 30, ENTRYPOINT.LINUX_OUTCOME_PATHS
+                    ),
+                )
+            with mock.patch.object(ENTRYPOINT, "VERIFIER_GID", os.getgid() + 1):
+                assert_entrypoint_rejected(
+                    "wrong new outcome group",
+                    lambda: ENTRYPOINT.new_evidence_file_patch(
+                        relative, 30, ENTRYPOINT.LINUX_OUTCOME_PATHS
+                    ),
+                )
+            full_relative = ENTRYPOINT.OUTCOME_PATH_BY_CAMPAIGN["grant_replay"]
+            full_outcome = workspace / full_relative
+            full_outcome.parent.mkdir(parents=True)
+            full_outcome.write_text("{}\n", encoding="utf-8")
+            full_outcome.chmod(0o644)
+            expected_full_patch = (
+                f"diff --git a/{full_relative} b/{full_relative}\n"
+                "new file mode 100644\n"
+                "index 0000000..7654321\n"
+                "--- /dev/null\n"
+                f"+++ b/{full_relative}\n"
+                "@@ -0,0 +1 @@\n"
+                "+{}\n"
+            ).encode("utf-8")
+            trusted_diff.return_value = expected_full_patch
+            if (
+                ENTRYPOINT.new_evidence_file_patch(
+                    full_relative, 30, ENTRYPOINT.ALL_OUTCOME_PATHS
+                )
+                != expected_full_patch
+            ):
+                raise AssertionError("full refresh outcome patch bytes changed")
+            outcome.chmod(0o600)
+            assert_entrypoint_rejected(
+                "noncanonical file mode",
+                lambda: ENTRYPOINT.new_evidence_file_patch(
+                    relative, 30, ENTRYPOINT.LINUX_OUTCOME_PATHS
+                ),
+            )
+        diff_commands = [call.args[0] for call in trusted_diff.call_args_list]
+        if len(diff_commands) != 2:
+            raise AssertionError("new evidence patch command count changed")
+        for diff_command, expected_relative in zip(
+            diff_commands, (relative, full_relative), strict=True
+        ):
+            if (
+                diff_command[:2] != ["/bin/bash", "-c"]
+                or "--no-renames --no-index -- /dev/null \"$1\""
+                not in diff_command[2]
+                or diff_command[-1] != expected_relative
+            ):
+                raise AssertionError("new evidence outcome patch command is not fixed")
+
+
+def trusted_refresh_state_tests() -> None:
+    def assert_state_rejected(label: str, callback) -> None:
+        try:
+            callback()
+        except ENTRYPOINT.EntrypointError:
+            return
+        raise AssertionError(f"entrypoint accepted invalid refresh state: {label}")
+
+    with tempfile.TemporaryDirectory(prefix="chio-refresh-state-") as raw:
+        private = Path(raw).resolve() / "private"
+        private.mkdir(mode=0o755)
+        workspace = private / "candidate"
+        workspace.mkdir(mode=0o770)
+        workspace_metadata = workspace.lstat()
+        identity = {
+            "canonical_path": os.fspath(workspace.resolve(strict=True)),
+            "device": workspace_metadata.st_dev,
+            "inode": workspace_metadata.st_ino,
+        }
+        digest = hashlib.sha256(
+            (json.dumps(identity, indent=2, ensure_ascii=False) + "\n").encode(
+                "utf-8"
+            )
+        ).hexdigest()
+        state = private / f"{ENTRYPOINT.TRUSTED_STATE_DIRECTORY_PREFIX}{digest}"
+        state.mkdir(mode=0o700)
+        state.chmod(0o700)
+        with (
+            mock.patch.object(ENTRYPOINT, "WORKSPACE", workspace),
+            mock.patch.object(ENTRYPOINT, "VERIFIER_UID", os.getuid()),
+            mock.patch.object(ENTRYPOINT, "VERIFIER_GID", os.getgid()),
+        ):
+            if ENTRYPOINT.trusted_refresh_state_path() != state:
+                raise AssertionError("trusted refresh state path binding changed")
+            ENTRYPOINT.validate_trusted_refresh_state(state)
+            assert_state_rejected(
+                "adjacent path",
+                lambda: ENTRYPOINT.validate_trusted_refresh_state(
+                    state.with_name("candidate-selected-state")
+                ),
+            )
+            with mock.patch.object(ENTRYPOINT, "VERIFIER_UID", os.getuid() + 1):
+                assert_state_rejected(
+                    "wrong owner",
+                    lambda: ENTRYPOINT.validate_trusted_refresh_state(state),
+                )
+            with mock.patch.object(ENTRYPOINT, "VERIFIER_GID", os.getgid() + 1):
+                assert_state_rejected(
+                    "wrong group",
+                    lambda: ENTRYPOINT.validate_trusted_refresh_state(state),
+                )
+            state.chmod(0o750)
+            assert_state_rejected(
+                "wrong mode", lambda: ENTRYPOINT.validate_trusted_refresh_state(state)
+            )
+            state.chmod(0o700)
+            child = state / "unexpected-child"
+            child.mkdir()
+            assert_state_rejected(
+                "unexpected link count",
+                lambda: ENTRYPOINT.validate_trusted_refresh_state(state),
+            )
+            child.rmdir()
+            real_state = state.with_name(f"{state.name}.real")
+            state.rename(real_state)
+            state.symlink_to(real_state, target_is_directory=True)
+            assert_state_rejected(
+                "symlink replacement",
+                lambda: ENTRYPOINT.validate_trusted_refresh_state(state),
+            )
+            state.unlink()
+            real_state.rename(state)
+            private.chmod(0o555)
+            with (
+                mock.patch.object(ENTRYPOINT, "CANDIDATE_UID", os.getuid()),
+                mock.patch.object(ENTRYPOINT, "CANDIDATE_GID", os.getgid()),
+            ):
+                ENTRYPOINT.require_candidate_cannot_replace_trusted_state(state)
+
+        checker_program = r'''
+import importlib.util
+import sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("state_checker", Path(sys.argv[1]))
+assert spec is not None and spec.loader is not None
+checker = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = checker
+spec.loader.exec_module(checker)
+with checker.refresh_lock(Path(sys.argv[2])):
+    pass
+'''
+        for _invocation in range(2):
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    checker_program,
+                    os.fspath(ROOT / "scripts/check-security-adversarial-evidence.py"),
+                    os.fspath(workspace),
+                ],
+                cwd=ROOT,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=30,
+            )
+            if completed.returncode != 0:
+                raise AssertionError(
+                    "precreated refresh state did not survive checker invocations: "
+                    + completed.stdout
+                )
+        if not state.is_dir() or state.lstat().st_nlink != 2:
+            raise AssertionError("checker invocation did not preserve trusted state")
+        private.chmod(0o755)
+
+
+def immutable_workspace_tests() -> None:
+    def assert_workspace_rejected(label: str, callback) -> None:
+        try:
+            callback()
+        except ENTRYPOINT.EntrypointError:
+            return
+        raise AssertionError(f"entrypoint accepted mutable workspace: {label}")
+
+    def populate(workspace: Path) -> tuple[Path, Path, Path]:
+        workspace.mkdir(mode=0o700)
+        data = workspace / "data"
+        data.mkdir()
+        regular = data / "input.txt"
+        regular.write_text("immutable input\n", encoding="utf-8")
+        executable = workspace / "tool.sh"
+        executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(0o755)
+        links = workspace / "links"
+        links.mkdir()
+        symlink = links / "fixture"
+        symlink.symlink_to("../data/input.txt")
+        return regular, executable, symlink
+
+    def identity_boundary(workspace: Path) -> contextlib.ExitStack:
+        stack = contextlib.ExitStack()
+        stack.enter_context(mock.patch.object(ENTRYPOINT, "WORKSPACE", workspace))
+        stack.enter_context(
+            mock.patch.object(ENTRYPOINT, "CANDIDATE_UID", os.getuid())
+        )
+        stack.enter_context(
+            mock.patch.object(ENTRYPOINT, "CANDIDATE_GID", os.getgid())
+        )
+        stack.enter_context(
+            mock.patch.object(ENTRYPOINT, "VERIFIER_UID", os.getuid())
+        )
+        stack.enter_context(
+            mock.patch.object(ENTRYPOINT, "VERIFIER_GID", os.getgid())
+        )
+        stack.enter_context(
+            mock.patch.object(
+                ENTRYPOINT,
+                "effective_identity",
+                side_effect=lambda _uid, _gid: contextlib.nullcontext(),
+            )
+        )
+        return stack
+
+    with tempfile.TemporaryDirectory(prefix="chio-immutable-workspace-") as raw:
+        temporary = Path(raw).resolve()
+        workspace = temporary / "candidate"
+        regular, executable, symlink = populate(workspace)
+        with identity_boundary(workspace):
+            snapshot = ENTRYPOINT.freeze_candidate_workspace()
+            ENTRYPOINT.validate_frozen_candidate_workspace(snapshot)
+            if (
+                stat.S_IMODE(workspace.lstat().st_mode) != 0o755
+                or stat.S_IMODE(regular.lstat().st_mode) != 0o644
+                or stat.S_IMODE(executable.lstat().st_mode) != 0o755
+                or os.readlink(symlink) != "../data/input.txt"
+            ):
+                raise AssertionError("workspace freeze modes or symlink changed")
+
+            regular.chmod(0o600)
+            assert_workspace_rejected(
+                "post-freeze writable mode",
+                lambda: ENTRYPOINT.validate_frozen_candidate_workspace(snapshot),
+            )
+            regular.chmod(0o644)
+            with mock.patch.object(ENTRYPOINT, "VERIFIER_UID", os.getuid() + 1):
+                assert_workspace_rejected(
+                    "post-freeze wrong owner",
+                    lambda: ENTRYPOINT.validate_frozen_candidate_workspace(snapshot),
+                )
+            with mock.patch.object(ENTRYPOINT, "VERIFIER_GID", os.getgid() + 1):
+                assert_workspace_rejected(
+                    "post-freeze wrong group",
+                    lambda: ENTRYPOINT.validate_frozen_candidate_workspace(snapshot),
+                )
+            tampered_device = tuple(
+                (
+                    relative,
+                    kind,
+                    device + (1 if relative == "data/input.txt" else 0),
+                    inode,
+                    mode,
+                    target,
+                )
+                for relative, kind, device, inode, mode, target in snapshot
+            )
+            assert_workspace_rejected(
+                "post-freeze device replacement",
+                lambda: ENTRYPOINT.validate_frozen_candidate_workspace(
+                    tampered_device
+                ),
+            )
+            data = workspace / "data"
+            data.chmod(0o777)
+            assert_workspace_rejected(
+                "post-freeze writable directory",
+                lambda: ENTRYPOINT.validate_frozen_candidate_workspace(snapshot),
+            )
+            data.chmod(0o755)
+            unexpected = workspace / "candidate-added"
+            unexpected.write_text("unexpected\n", encoding="utf-8")
+            assert_workspace_rejected(
+                "post-freeze added path",
+                lambda: ENTRYPOINT.validate_frozen_candidate_workspace(snapshot),
+            )
+            unexpected.unlink()
+            original = regular.read_bytes()
+            regular.unlink()
+            regular.write_bytes(original)
+            regular.chmod(0o644)
+            assert_workspace_rejected(
+                "post-freeze inode replacement",
+                lambda: ENTRYPOINT.validate_frozen_candidate_workspace(snapshot),
+            )
+
+        escaping_workspace = temporary / "escaping"
+        escaping_workspace.mkdir()
+        (escaping_workspace / "outside-link").symlink_to(temporary / "outside")
+        with identity_boundary(escaping_workspace):
+            assert_workspace_rejected(
+                "escaping symbolic link", ENTRYPOINT.candidate_workspace_inventory
+            )
+
+        reentry_workspace = temporary / "reentry"
+        reentry_workspace.mkdir()
+        reentry_data = reentry_workspace / "data"
+        reentry_data.mkdir()
+        (reentry_data / "input").write_text("inside\n", encoding="utf-8")
+        external = temporary / "external"
+        external.mkdir()
+        (external / "back-inside").symlink_to(reentry_data / "input")
+        (reentry_workspace / "escape-and-reenter").symlink_to(
+            "../external/back-inside"
+        )
+        with identity_boundary(reentry_workspace):
+            assert_workspace_rejected(
+                "lexical symbolic-link escape and reentry",
+                ENTRYPOINT.candidate_workspace_inventory,
+            )
+
+        hardlink_workspace = temporary / "hardlink"
+        hardlink_workspace.mkdir()
+        source = hardlink_workspace / "source"
+        source.write_text("one inode\n", encoding="utf-8")
+        os.link(source, hardlink_workspace / "alias")
+        with identity_boundary(hardlink_workspace):
+            assert_workspace_rejected(
+                "hard-linked regular file", ENTRYPOINT.candidate_workspace_inventory
+            )
+
+        wrong_identity_workspace = temporary / "wrong-identity"
+        wrong_identity_workspace.mkdir()
+        with (
+            mock.patch.object(ENTRYPOINT, "WORKSPACE", wrong_identity_workspace),
+            mock.patch.object(ENTRYPOINT, "CANDIDATE_UID", os.getuid() + 1),
+            mock.patch.object(ENTRYPOINT, "CANDIDATE_GID", os.getgid()),
+            mock.patch.object(ENTRYPOINT, "VERIFIER_GID", os.getgid()),
+        ):
+            assert_workspace_rejected(
+                "wrong initial owner", ENTRYPOINT.candidate_workspace_inventory
+            )
+
+        special_workspace = temporary / "special"
+        special_workspace.mkdir()
+        os.mkfifo(special_workspace / "candidate-fifo")
+        with identity_boundary(special_workspace):
+            assert_workspace_rejected(
+                "special file", ENTRYPOINT.candidate_workspace_inventory
+            )
+
+        retarget_workspace = temporary / "retarget"
+        _regular, _executable, retargeted = populate(retarget_workspace)
+        other = retarget_workspace / "data/other.txt"
+        other.write_text("other\n", encoding="utf-8")
+        with identity_boundary(retarget_workspace):
+            retarget_snapshot = ENTRYPOINT.freeze_candidate_workspace()
+            retargeted.unlink()
+            retargeted.symlink_to("../data/other.txt")
+            assert_workspace_rejected(
+                "post-freeze symbolic-link retarget",
+                lambda: ENTRYPOINT.validate_frozen_candidate_workspace(
+                    retarget_snapshot
+                ),
+            )
+
+    trusted_ancestors = mock.Mock()
+    trusted_executable = mock.Mock()
+    with (
+        mock.patch.object(
+            ENTRYPOINT, "validate_trusted_directory", trusted_ancestors
+        ),
+        mock.patch.object(
+            ENTRYPOINT, "validate_trusted_regular_file", trusted_executable
+        ),
+    ):
+        ENTRYPOINT.validate_trusted_cargo_mutants()
+    expected_ancestors = [
+        mock.call(
+            Path(path),
+            expected_mode=0o755,
+            description=f"trusted cargo-mutants ancestor {path}",
+        )
+        for path in ("/", "/usr", "/usr/local", "/usr/local/cargo", "/usr/local/cargo/bin")
+    ]
+    if trusted_ancestors.call_args_list != expected_ancestors:
+        raise AssertionError("cargo-mutants ancestor authentication changed")
+    trusted_executable.assert_called_once_with(
+        ENTRYPOINT.TRUSTED_CARGO_MUTANTS,
+        expected_mode=0o555,
+        description="trusted cargo-mutants executable",
+    )
 
 
 def entrypoint_repository_inventory_tests() -> None:
@@ -671,7 +1440,7 @@ class FakeDocker:
             "HostConfig": {
                 "AutoRemove": False,
                 "Binds": None,
-                "CapAdd": ["CAP_SETGID", "CAP_SETUID"],
+                "CapAdd": ["CAP_CHOWN", "CAP_SETGID", "CAP_SETUID"],
                 "CapDrop": ["ALL"],
                 "CgroupnsMode": "private",
                 "DeviceRequests": None,
@@ -1095,7 +1864,75 @@ from pathlib import Path
 authority = Path({os.fspath(sentinel)!r})
 authority.write_text("container-only", encoding="utf-8")
 workspace_stat = Path(__file__).stat()
-Path(__file__).write_text("mutated private copy", encoding="utf-8")
+contract_write_denials = []
+for label, protected in (
+    ("source", Path(__file__)),
+    ("manifest", Path("crates/core/chio-adversarial-suite/manifest.json")),
+    (
+        "later-case",
+        Path("crates/core/chio-adversarial-suite/cases/label_downgrade/label-downgrade-001.json"),
+    ),
+    (
+        "later-outcome",
+        Path("audits/evidence/mutants/security/grant_replay/mutants.out/outcomes.json"),
+    ),
+    ("threat", Path("audits/evidence/threats/README.md")),
+):
+    try:
+        with protected.open("ab"):
+            pass
+    except PermissionError:
+        contract_write_denials.append(label)
+    else:
+        raise SystemExit(f"candidate can rewrite frozen contract: {{label}}")
+contract_create_denials = []
+for label, protected in (
+    ("workspace", Path(".")),
+    ("cases", Path("crates/core/chio-adversarial-suite/cases")),
+    ("mutants", Path("audits/evidence/mutants/security")),
+    ("threats", Path("audits/evidence/threats")),
+):
+    try:
+        (protected / ".candidate-cross-campaign-probe").write_text(
+            "forged", encoding="utf-8"
+        )
+    except PermissionError:
+        contract_create_denials.append(label)
+    else:
+        raise SystemExit(f"candidate can add frozen contract: {{label}}")
+contract_rename_denials = []
+for label, protected in (
+    ("workspace", Path("/private/candidate")),
+    ("manifest", Path("crates/core/chio-adversarial-suite/manifest.json")),
+    ("cases", Path("crates/core/chio-adversarial-suite/cases")),
+    ("mutants", Path("audits/evidence/mutants/security")),
+    (
+        "later-case",
+        Path("crates/core/chio-adversarial-suite/cases/label_downgrade/label-downgrade-001.json"),
+    ),
+):
+    replacement = protected.with_name(f"{{protected.name}}.candidate-renamed")
+    try:
+        protected.rename(replacement)
+    except PermissionError:
+        contract_rename_denials.append(label)
+    else:
+        raise SystemExit(f"candidate can rename frozen contract: {{label}}")
+later_case = Path(
+    "crates/core/chio-adversarial-suite/cases/label_downgrade/label-downgrade-001.json"
+)
+try:
+    later_case.unlink()
+except PermissionError:
+    contract_unlink_denied = True
+else:
+    raise SystemExit("candidate can unlink a later campaign contract")
+try:
+    Path("crates/core/chio-adversarial-suite/cases").rmdir()
+except PermissionError:
+    contract_rmdir_denied = True
+else:
+    raise SystemExit("candidate can remove the campaign contract tree")
 parent = os.getppid()
 try:
     os.kill(parent, 0)
@@ -1167,6 +2004,11 @@ subprocess.Popen(
 print(json.dumps({{
     "baseline_denials": sorted(baseline_denials),
     "broker_token_argv": broker_token_argv,
+    "contract_create_denials": sorted(contract_create_denials),
+    "contract_rename_denials": sorted(contract_rename_denials),
+    "contract_rmdir_denied": contract_rmdir_denied,
+    "contract_unlink_denied": contract_unlink_denied,
+    "contract_write_denials": sorted(contract_write_denials),
     "environment": sorted(os.environ),
     "inode": workspace_stat.st_ino,
     "device": workspace_stat.st_dev,
@@ -1187,6 +2029,10 @@ print(json.dumps({{
                 "scripts/check-keyring-transparency.sh": malicious_checker,
                 "scripts/check-secret-broker-boundary.sh": malicious_checker,
                 "scripts/check-cage-enforcement.sh": malicious_checker,
+                "crates/core/chio-adversarial-suite/manifest.json": "{}\n",
+                "crates/core/chio-adversarial-suite/cases/label_downgrade/label-downgrade-001.json": "{}\n",
+                "audits/evidence/mutants/security/grant_replay/mutants.out/outcomes.json": "{}\n",
+                "audits/evidence/threats/README.md": "immutable threat contract\n",
             },
             executable=(
                 "scripts/check-security-adversarial-evidence.py",
@@ -1254,6 +2100,14 @@ print(json.dumps({{
             record["uid"] != 65532
             or record["baseline_denials"] != ["HEAD", "index"]
             or record["broker_token_argv"] != []
+            or record["contract_create_denials"]
+            != ["cases", "mutants", "threats", "workspace"]
+            or record["contract_rename_denials"]
+            != ["cases", "later-case", "manifest", "mutants", "workspace"]
+            or record["contract_rmdir_denied"] is not True
+            or record["contract_unlink_denied"] is not True
+            or record["contract_write_denials"]
+            != ["later-case", "later-outcome", "manifest", "source", "threat"]
             or record["parent_signal_denied"] is not True
             or len(record["poisoned_paths"]) != 5
         ):
@@ -1305,6 +2159,10 @@ print(json.dumps({{
                 "build.rs": f'use std::fs; fn main() {{ fs::create_dir_all({json.dumps(str(build_sentinel.parent))}).unwrap(); fs::write({json.dumps(str(build_sentinel))}, b"hostile").unwrap(); }}\n',
                 "src/lib.rs": "pub fn value() -> u8 { 7 }\n#[test]\nfn works() { assert_eq!(value(), 7); }\n",
                 ".cargo/config.toml": '[build]\nrustc-wrapper = "/private/candidate/wrapper.sh"\n',
+                "crates/core/chio-adversarial-suite/manifest.json": "{}\n",
+                "crates/core/chio-adversarial-suite/cases/label_downgrade/label-downgrade-001.json": "{}\n",
+                "audits/evidence/mutants/security/grant_replay/mutants.out/outcomes.json": "{}\n",
+                "audits/evidence/threats/README.md": "immutable threat contract\n",
                 "wrapper.sh": f'''#!/bin/sh
 mkdir -p {wrapper_sentinel.parent!s}
 printf hostile > {wrapper_sentinel!s}
@@ -1371,6 +2229,9 @@ def main() -> int:
     static_contract_tests()
     copy_and_output_tests()
     refresh_inventory_tests()
+    pending_promotion_tests()
+    trusted_refresh_state_tests()
+    immutable_workspace_tests()
     entrypoint_repository_inventory_tests()
     fake_docker_main_tests()
     if args.docker:

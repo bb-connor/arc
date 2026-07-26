@@ -48,6 +48,13 @@ impl TrustControlClient {
         self.post_internal_json(INTERNAL_INVOCATION_CAPTURE_QUERY_PATH, request, None)
     }
 
+    pub(crate) fn committed_composite_authorization_replica_query(
+        &self,
+        request: &CommittedCompositeAuthorizationReplicaQueryRequest,
+    ) -> Result<CommittedCompositeAuthorizationReplicaQueryResponse, CliError> {
+        self.post_internal_json(INTERNAL_COMPOSITE_AUTHORIZE_QUERY_PATH, request, None)
+    }
+
     pub(crate) fn cluster_status(&self) -> Result<ClusterStatusResponse, CliError> {
         self.get_internal_json(INTERNAL_CLUSTER_STATUS_PATH, None)
     }

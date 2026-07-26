@@ -259,7 +259,7 @@ impl ChioKernel {
                         charge,
                         Some(("reversed", reverse)),
                         None,
-                    ),
+                    )?,
                 ),
             );
         }
@@ -315,7 +315,7 @@ impl ChioKernel {
                 charge,
                 Some(("reversed", reverse)),
                 None,
-            )),
+            )?),
             _ => None,
         };
         let preflight_metadata = Some(serde_json::json!({
@@ -399,7 +399,7 @@ impl ChioKernel {
         // the hold is open, neither reversed nor reconciled. This is what keeps
         // the receipt non-authoritative and keeps the budget reserved.
         let metadata =
-            self.caller_reservation_response_metadata(budget_mutation, runtime_admission_metadata);
+            self.caller_reservation_response_metadata(budget_mutation, runtime_admission_metadata)?;
 
         if let PreExecutionBudgetMutation::Admission(admission) = budget_mutation {
             return self.build_operation_owned_caller_reservation_response(
@@ -427,9 +427,6 @@ impl ChioKernel {
                 charge,
                 payment_reference: reserved_payment_reference,
             }),
-            PreExecutionBudgetMutation::InvocationReservation(reservation) => {
-                Some(ReservedHoldStamp::InvocationReservation { reservation })
-            }
             PreExecutionBudgetMutation::Invocation { .. } => {
                 return Err(KernelError::Internal(
                     "caller reservation reached response without an atomic invocation hold"
@@ -459,16 +456,12 @@ impl ChioKernel {
         &self,
         budget_mutation: &PreExecutionBudgetMutation,
         runtime_admission_metadata: Option<serde_json::Value>,
-    ) -> Option<serde_json::Value> {
-        let budget_metadata = budget_mutation
-            .charge_result()
-            .map(|charge| self.budget_execution_receipt_metadata(charge, None, None))
-            .or_else(|| match budget_mutation {
-                PreExecutionBudgetMutation::InvocationReservation(reservation) => {
-                    Some(self.budget_invocation_reservation_receipt_metadata(reservation))
-                }
-                _ => None,
-            });
+    ) -> Result<Option<serde_json::Value>, KernelError> {
+        let budget_metadata = if let Some(charge) = budget_mutation.charge_result() {
+            Some(self.budget_execution_receipt_metadata(charge, None, None)?)
+        } else {
+            None
+        };
         let authorization_metadata = Some(serde_json::json!({
             "execution_nonce": {
                 "stage": "authorization",
@@ -476,10 +469,10 @@ impl ChioKernel {
                 "hold_disposition": "reserved"
             }
         }));
-        merge_metadata_objects(
+        Ok(merge_metadata_objects(
             merge_metadata_objects(runtime_admission_metadata, budget_metadata),
             authorization_metadata,
-        )
+        ))
     }
 
     pub(crate) fn prepare_operation_owned_caller_reservation_handoff(

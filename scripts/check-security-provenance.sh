@@ -15,6 +15,19 @@ if ! grep -Fq "\`$SOURCE_COMMIT\`" "$PROVENANCE"; then
   exit 1
 fi
 
+required_temporal_rows=(
+  '| `crates/libs/hunt-correlate/src/rules.rs` | `crates/security/chio-quarantine/src/rules.rs` | concept | Ordered stages over Chio event kinds with explicit predecessor validation, bounded windows, grouping, policy-version binding, and bounded state estimates |'
+  '| `crates/libs/hunt-correlate/src/engine.rs` | `crates/security/chio-quarantine/src/correlation.rs` | concept | Verified Chio event ingress, tenant-rule-group partitioning, deterministic event-time watermarks, transactional durable partials, stable finding identifiers, and detector-health suppression |'
+)
+for required_row in "${required_temporal_rows[@]}"; do
+  row_count="$(grep -Fxc -- "${required_row}" "$PROVENANCE" || true)"
+  if [[ "${row_count}" -ne 1 ]]; then
+    printf 'required temporal provenance row is missing or ambiguous: %s\n' \
+      "${required_row}" >&2
+    exit 1
+  fi
+done
+
 marked_output=""
 if marked_output="$(
   rg -l --hidden --fixed-strings 'Adapted from Clawdstrike' \

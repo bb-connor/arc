@@ -656,6 +656,7 @@ fn monetary_kernel_with_retry_store() -> (
     Keypair,
 ) {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-retry");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     kernel
         .try_set_receipt_store_handle(std::sync::Arc::new(RecordingReceiptStore::default()))
@@ -746,6 +747,7 @@ fn observer_install_without_a_retry_store_is_rejected() {
 #[test]
 fn second_settlement_observer_install_preserves_original_hook_and_worker() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-observer-replacement");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let receipt_store = std::sync::Arc::new(RecordingReceiptStore::default());
     kernel
@@ -813,6 +815,7 @@ fn second_settlement_observer_install_preserves_original_hook_and_worker() {
 #[test]
 fn terminal_receipt_recording_does_not_enter_or_wait_for_hook_on_caller_thread() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-terminal-recording");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let receipt_store = std::sync::Arc::new(RecordingReceiptStore::default());
     kernel
@@ -995,6 +998,7 @@ fn retryable_outcome_persists_a_bounded_attempt_row() {
 #[test]
 fn hook_failure_persists_a_bounded_attempt_row() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "settlement-hook-failure");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     kernel
         .try_set_receipt_store_handle(std::sync::Arc::new(RecordingReceiptStore::default()))

@@ -17,9 +17,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability::capability_digest;
 use crate::generic_https::response_digest;
-use crate::protocol::{BrokerExecuteFailure, BrokerExecuteRequest, BrokerExecuteResponse};
+use crate::proof::{body_digest, caller_header_digest, caller_option_digest};
+use crate::protocol::{
+    is_well_formed_broker_execute_diagnostic_code, BrokerExecuteFailure, BrokerExecuteRequest,
+    BrokerExecuteResponse,
+};
 use crate::receipt::{
-    failure_receipt_digest, receipt_digest, verify_execution_receipt, verify_failure_receipt,
+    credential_reference_hash, failure_receipt_digest, validate_durable_completed_response,
+    verify_failure_receipt,
 };
 use crate::registration::{
     sign_register_attempt_authorization, AuthenticatedAttemptRequest,
@@ -77,6 +82,16 @@ pub struct BrokerIpcClient {
 pub enum BrokerIpcExecutionOutcome {
     Success(Box<BrokerExecuteResponse>),
     Failure(Box<BrokerExecuteFailure>),
+}
+
+/// A validated execute outcome with the exact deframed IPC payloads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrokerIpcExecutionTranscript {
+    /// Canonical request payload, excluding the four-byte length prefix.
+    pub canonical_request_frame: Vec<u8>,
+    /// Canonical response payload, excluding the four-byte length prefix.
+    pub canonical_response_frame: Vec<u8>,
+    pub outcome: BrokerIpcExecutionOutcome,
 }
 
 impl BrokerIpcClient {
@@ -204,30 +219,45 @@ impl BrokerIpcClient {
         &self,
         request: &BrokerExecuteRequest,
     ) -> Result<BrokerIpcExecutionOutcome> {
-        request.validate_bounds()?;
-        let payload = canonical_json_bytes(request).map_err(|error| {
-            BrokerError::Invariant(format!("broker execute payload encoding failed: {error}"))
-        })?;
-        let authorization = canonical_json_bytes(&request.proof).map_err(|error| {
-            BrokerError::Invariant(format!("broker execute proof encoding failed: {error}"))
-        })?;
+        let (authorization, payload) = encode_execute_call(request)?;
         let response = self.call_envelope(IpcOperation::Execute, authorization, payload)?;
-        if response.accepted {
-            let execution: BrokerExecuteResponse =
-                decode_canonical_response(&response.response, "broker execute response")?;
-            validate_execute_response(request, &execution, &self.config.trusted_receipt_signer)?;
-            Ok(BrokerIpcExecutionOutcome::Success(Box::new(execution)))
-        } else {
-            let failure: BrokerExecuteFailure =
-                decode_canonical_response(&response.response, "broker execute failure")?;
-            validate_execute_failure(
-                request,
-                &failure,
-                response.error_code.as_deref(),
-                &self.config.trusted_receipt_signer,
-            )?;
-            Ok(BrokerIpcExecutionOutcome::Failure(Box::new(failure)))
-        }
+        decode_execute_outcome(request, &response, &self.config.trusted_receipt_signer)
+    }
+
+    /// Execute one request over a caller-authenticated, deadline-bounded stream.
+    ///
+    /// This consumes the stream and never connects, retries, or falls back to a
+    /// different transport. The exact canonical frame payloads are returned so
+    /// callers can audit the process-boundary surfaces without reimplementing
+    /// the wire protocol.
+    #[cfg(unix)]
+    pub fn execute_evidenced_on_authenticated_stream(
+        mut stream: UnixStream,
+        tenant_scope: &str,
+        request: &BrokerExecuteRequest,
+        trusted_receipt_signer: &PublicKey,
+    ) -> Result<BrokerIpcExecutionTranscript> {
+        validate_identifier(tenant_scope, "broker IPC tenant scope", 512)?;
+        let (authorization, payload) = encode_execute_call(request)?;
+        let ipc_request = AuthenticatedIpcRequest {
+            operation: IpcOperation::Execute,
+            tenant_scope: tenant_scope.to_string(),
+            authorization: authorization.into(),
+            payload: payload.into(),
+        };
+        let encoded = canonical_ipc_request_bytes(&ipc_request)?;
+        let canonical_request_frame = encoded.to_vec();
+        let (response, canonical_response_frame) = exchange_ipc_envelope(
+            &mut stream,
+            IpcOperation::Execute,
+            canonical_request_frame.as_slice(),
+        )?;
+        let outcome = decode_execute_outcome(request, &response, trusted_receipt_signer)?;
+        Ok(BrokerIpcExecutionTranscript {
+            canonical_request_frame,
+            canonical_response_frame,
+            outcome,
+        })
     }
 
     #[cfg(unix)]
@@ -265,22 +295,7 @@ impl BrokerIpcClient {
         };
         let encoded = canonical_ipc_request_bytes(&request)?;
         let mut stream = self.connect_authenticated()?;
-        write_bounded_frame(&mut stream, &encoded).map_err(|error| {
-            BrokerError::AuthorityUnavailable(format!("broker IPC write failed: {error}"))
-        })?;
-        let response_bytes = read_bounded_frame(&mut stream).map_err(|error| {
-            BrokerError::AuthorityUnavailable(format!("broker IPC read failed: {error}"))
-        })?;
-        let response: IpcResponse =
-            decode_canonical_response(&response_bytes, "broker IPC response")?;
-        if response.operation != operation
-            || (response.accepted && response.error_code.is_some())
-            || (!response.accepted && response.error_code.is_none())
-        {
-            return Err(BrokerError::AuthorityUnavailable(
-                "broker IPC response envelope is malformed or misbound".to_string(),
-            ));
-        }
+        let (response, _) = exchange_ipc_envelope(&mut stream, operation, encoded.as_slice())?;
         Ok(response)
     }
 
@@ -425,25 +440,104 @@ fn validate_stable_broker_socket_metadata(
     Ok(())
 }
 
+fn encode_execute_call(request: &BrokerExecuteRequest) -> Result<(Vec<u8>, Vec<u8>)> {
+    request.validate_bounds()?;
+    let payload = canonical_json_bytes(request).map_err(|error| {
+        BrokerError::Invariant(format!("broker execute payload encoding failed: {error}"))
+    })?;
+    let authorization = canonical_json_bytes(&request.proof).map_err(|error| {
+        BrokerError::Invariant(format!("broker execute proof encoding failed: {error}"))
+    })?;
+    Ok((authorization, payload))
+}
+
+#[cfg(unix)]
+fn exchange_ipc_envelope(
+    stream: &mut UnixStream,
+    operation: IpcOperation,
+    request_frame: &[u8],
+) -> Result<(IpcResponse, Vec<u8>)> {
+    write_bounded_frame(stream, request_frame).map_err(|error| {
+        BrokerError::AuthorityUnavailable(format!("broker IPC write failed: {error}"))
+    })?;
+    let response_frame = read_bounded_frame(stream).map_err(|error| {
+        BrokerError::AuthorityUnavailable(format!("broker IPC read failed: {error}"))
+    })?;
+    let response = decode_ipc_response_envelope(&response_frame, operation)?;
+    Ok((response, response_frame))
+}
+
+#[cfg(unix)]
+fn decode_ipc_response_envelope(bytes: &[u8], operation: IpcOperation) -> Result<IpcResponse> {
+    let response: IpcResponse = decode_canonical_response(bytes, "broker IPC response")?;
+    let valid = response.operation == operation
+        && if response.accepted {
+            !response.response.is_empty() && response.error_code.is_none()
+        } else if operation == IpcOperation::Execute {
+            !response.response.is_empty()
+                && response
+                    .error_code
+                    .as_deref()
+                    .is_some_and(is_well_formed_broker_execute_diagnostic_code)
+        } else {
+            response.response.is_empty()
+                && response
+                    .error_code
+                    .as_deref()
+                    .is_some_and(is_well_formed_ipc_error_code)
+        };
+    if !valid {
+        return Err(BrokerError::AuthorityUnavailable(
+            "broker IPC response envelope is malformed or misbound".to_string(),
+        ));
+    }
+    Ok(response)
+}
+
+#[cfg(unix)]
+fn is_well_formed_ipc_error_code(code: &str) -> bool {
+    let bytes = code.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 64
+        && bytes.first().is_some_and(|byte| byte.is_ascii_lowercase())
+        && bytes
+            .last()
+            .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
+        && !bytes.windows(2).any(|pair| pair == b"__")
+}
+
+fn decode_execute_outcome(
+    request: &BrokerExecuteRequest,
+    response: &IpcResponse,
+    trusted_receipt_signer: &PublicKey,
+) -> Result<BrokerIpcExecutionOutcome> {
+    if response.accepted {
+        let execution: BrokerExecuteResponse =
+            decode_canonical_response(&response.response, "broker execute response")?;
+        validate_execute_response(request, &execution, trusted_receipt_signer)?;
+        Ok(BrokerIpcExecutionOutcome::Success(Box::new(execution)))
+    } else {
+        let failure: BrokerExecuteFailure =
+            decode_canonical_response(&response.response, "broker execute failure")?;
+        validate_execute_failure(
+            request,
+            &failure,
+            response.error_code.as_deref(),
+            trusted_receipt_signer,
+        )?;
+        Ok(BrokerIpcExecutionOutcome::Failure(Box::new(failure)))
+    }
+}
+
 fn validate_execute_response(
     request: &BrokerExecuteRequest,
     response: &BrokerExecuteResponse,
     trusted_receipt_signer: &PublicKey,
 ) -> Result<()> {
-    response.evidence.validate()?;
-    verify_execution_receipt(&response.receipt, trusted_receipt_signer)?;
-    let expected_reference = format!(
-        "broker-receipt-sha256-{}",
-        receipt_digest(&response.receipt)?
-    );
-    if response.receipt_reference != expected_reference
-        || response.receipt.body.evidence != response.evidence
-    {
-        return Err(BrokerError::AuthorizationDenied(
-            "broker execution receipt envelope or reference is misbound".to_string(),
-        ));
-    }
-    validate_identifier(&response.receipt_reference, "broker receipt reference", 512)?;
+    validate_durable_completed_response(response, trusted_receipt_signer)?;
     let request_digest = broker_request_digest(request)?;
     let ids = derive_attempt_ids(
         &request.capability.body.capability_id,
@@ -451,6 +545,10 @@ fn validate_execute_response(
         &request.proof.body.nonce,
         &request_digest,
     )?;
+    let receipt = &response.receipt.body;
+    let request_body_bytes = u64::try_from(request.request.body.len()).map_err(|_| {
+        BrokerError::ResponseRejected("broker request body length overflowed".to_string())
+    })?;
     if response.status != response.evidence.upstream_status
         || response.evidence.attempt_id != ids.attempt_id
         || response.evidence.invocation_id != request.invocation_id
@@ -458,6 +556,22 @@ fn validate_execute_response(
         || response.evidence.request_digest != request_digest
         || response.evidence.capability_digest != capability_digest(&request.capability)?
         || response.evidence.response_body_sha256 != response_digest(&response.body)
+        || receipt.authorize_event_id != ids.authorize_event_id
+        || receipt.capture_event_id != ids.capture_event_id
+        || receipt.parent_capability_id != request.capability.body.parent_capability_id
+        || receipt.broker_capability_id != request.capability.body.capability_id
+        || receipt.subject != request.capability.body.subject
+        || receipt.credential_reference_hash
+            != credential_reference_hash(&request.capability.body.credential)?
+        || receipt.credential_version != request.capability.body.credential.version
+        || receipt.normalized_destination != request.request.destination
+        || receipt.request_body_sha256 != body_digest(&request.request.body)
+        || receipt.caller_headers_sha256 != caller_header_digest(&request.request.headers)?
+        || receipt.caller_options_sha256 != caller_option_digest(&request.request.options)?
+        || receipt.broker_quota_key_id != request.capability.body.broker_quota_key_id
+        || receipt.provider_adapter_id != request.capability.body.provider_adapter_id
+        || receipt.provider_adapter_version != request.capability.body.provider_adapter_version
+        || receipt.request_body_bytes != request_body_bytes
     {
         return Err(BrokerError::ResponseRejected(
             "broker execute response evidence is malformed or misbound".to_string(),
@@ -472,6 +586,11 @@ fn validate_execute_failure(
     envelope_error_code: Option<&str>,
     trusted_receipt_signer: &PublicKey,
 ) -> Result<()> {
+    if !is_well_formed_broker_execute_diagnostic_code(&failure.diagnostic_code) {
+        return Err(BrokerError::AuthorizationDenied(
+            "broker failure diagnostic code is outside the signed execution domain".to_string(),
+        ));
+    }
     verify_failure_receipt(&failure.receipt, trusted_receipt_signer)?;
     let expected_reference = format!(
         "broker-failure-receipt-sha256-{}",
@@ -551,6 +670,311 @@ fn now_unix_seconds() -> Result<u64> {
 
 #[cfg(test)]
 mod vector_semantics_tests;
+
+#[cfg(all(test, unix))]
+mod preconnected_execution_tests {
+    use std::path::PathBuf;
+    use std::thread;
+    use std::time::Duration;
+
+    use chio_test_support::prelude::*;
+    use serde::de::DeserializeOwned;
+
+    use super::*;
+
+    const RECEIPT_SIGNER_HEX: &str =
+        "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565";
+    const TENANT_SCOPE: &str = "tenant-production";
+
+    #[test]
+    fn preconnected_execute_returns_validated_outcome_and_exact_canonical_frames() {
+        let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
+        let execute_response: BrokerExecuteResponse =
+            read_vector("broker-execute-response-v1.json");
+        let response_frame = canonical_json_bytes(&IpcResponse {
+            operation: IpcOperation::Execute,
+            accepted: true,
+            response: canonical_json_bytes(&execute_response).test_expect("execute response"),
+            error_code: None,
+        })
+        .test_expect("IPC response");
+        let (client, mut server) = deadline_bounded_pair();
+        let expected_response_frame = response_frame.clone();
+        let server = thread::spawn(move || {
+            let request_frame = read_bounded_frame(&mut server).test_expect("request frame");
+            write_bounded_frame(&mut server, &response_frame).test_expect("response frame");
+            request_frame
+        });
+
+        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+        let transcript = BrokerIpcClient::execute_evidenced_on_authenticated_stream(
+            client,
+            TENANT_SCOPE,
+            &request,
+            &signer,
+        )
+        .test_expect("preconnected execute");
+        let observed_request_frame = server.join().test_expect("IPC server");
+
+        assert_eq!(transcript.canonical_request_frame, observed_request_frame);
+        assert_eq!(transcript.canonical_response_frame, expected_response_frame);
+        assert_eq!(
+            canonical_json_bytes(
+                &decode_canonical_response::<IpcResponse>(
+                    &transcript.canonical_response_frame,
+                    "transcript response",
+                )
+                .test_expect("canonical transcript response")
+            )
+            .test_expect("canonical response bytes"),
+            transcript.canonical_response_frame
+        );
+        match transcript.outcome {
+            BrokerIpcExecutionOutcome::Success(actual) => {
+                assert_eq!(*actual, execute_response);
+                assert_eq!(
+                    canonical_json_bytes(&actual.receipt).test_expect("canonical receipt"),
+                    canonical_json_bytes(&execute_response.receipt)
+                        .test_expect("expected canonical receipt")
+                );
+            }
+            BrokerIpcExecutionOutcome::Failure(failure) => {
+                panic!("unexpected execution failure: {}", failure.diagnostic_code)
+            }
+        }
+    }
+
+    #[test]
+    fn preconnected_execute_maps_a_dead_peer_to_authority_unavailable() {
+        let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
+        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+        let (client, server) = deadline_bounded_pair();
+        drop(server);
+
+        let error = BrokerIpcClient::execute_evidenced_on_authenticated_stream(
+            client,
+            TENANT_SCOPE,
+            &request,
+            &signer,
+        )
+        .test_expect_err("dead broker must fail closed");
+
+        assert!(matches!(error, BrokerError::AuthorityUnavailable(_)));
+    }
+
+    #[test]
+    fn preconnected_execute_preserves_a_valid_signed_failure() {
+        let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
+        let execute_failure: BrokerExecuteFailure = read_vector("broker-execute-failure-v1.json");
+        let response_frame = canonical_json_bytes(&IpcResponse {
+            operation: IpcOperation::Execute,
+            accepted: false,
+            response: canonical_json_bytes(&execute_failure).test_expect("execute failure"),
+            error_code: Some(execute_failure.diagnostic_code.clone()),
+        })
+        .test_expect("IPC failure response");
+        let (client, mut server) = deadline_bounded_pair();
+        let server = thread::spawn(move || {
+            read_bounded_frame(&mut server).test_expect("request frame");
+            write_bounded_frame(&mut server, &response_frame).test_expect("failure response frame");
+        });
+
+        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+        let transcript = BrokerIpcClient::execute_evidenced_on_authenticated_stream(
+            client,
+            TENANT_SCOPE,
+            &request,
+            &signer,
+        )
+        .test_expect("preconnected evidenced failure");
+        server.join().test_expect("IPC server");
+
+        match transcript.outcome {
+            BrokerIpcExecutionOutcome::Failure(actual) => assert_eq!(*actual, execute_failure),
+            BrokerIpcExecutionOutcome::Success(response) => {
+                panic!("unexpected execution success: {}", response.status)
+            }
+        }
+    }
+
+    #[test]
+    fn preconnected_execute_rejects_rebound_or_tampered_signed_failures() {
+        let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
+        let failure: BrokerExecuteFailure = read_vector("broker-execute-failure-v1.json");
+        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+
+        let mut rebound_failure = failure.clone();
+        rebound_failure.diagnostic_code = "chio.broker.conflict".to_string();
+        let mut receipt_tampered = failure.clone();
+        receipt_tampered.diagnostic_code = "chio.broker.conflict".to_string();
+        receipt_tampered.receipt.body.diagnostic_code = "chio.broker.conflict".to_string();
+        let mut wrong_domain = failure.clone();
+        wrong_domain.diagnostic_code = "chio.kernel.authorization_denied".to_string();
+
+        let envelopes = [
+            IpcResponse {
+                operation: IpcOperation::Execute,
+                accepted: false,
+                response: canonical_json_bytes(&failure).test_expect("execute failure"),
+                error_code: Some("chio.broker.conflict".to_string()),
+            },
+            IpcResponse {
+                operation: IpcOperation::Execute,
+                accepted: false,
+                response: canonical_json_bytes(&rebound_failure)
+                    .test_expect("rebound execute failure"),
+                error_code: Some("chio.broker.conflict".to_string()),
+            },
+            IpcResponse {
+                operation: IpcOperation::Execute,
+                accepted: false,
+                response: canonical_json_bytes(&receipt_tampered)
+                    .test_expect("tampered execute failure"),
+                error_code: Some("chio.broker.conflict".to_string()),
+            },
+            IpcResponse {
+                operation: IpcOperation::Execute,
+                accepted: false,
+                response: canonical_json_bytes(&wrong_domain)
+                    .test_expect("wrong-domain execute failure"),
+                error_code: Some("chio.kernel.authorization_denied".to_string()),
+            },
+            IpcResponse {
+                operation: IpcOperation::Execute,
+                accepted: false,
+                response: serde_json::to_vec_pretty(&failure)
+                    .test_expect("noncanonical execute failure"),
+                error_code: Some(failure.diagnostic_code.clone()),
+            },
+        ];
+
+        for envelope in envelopes {
+            let response_frame =
+                canonical_json_bytes(&envelope).test_expect("denial response envelope");
+            let (client, mut server) = deadline_bounded_pair();
+            let server = thread::spawn(move || {
+                read_bounded_frame(&mut server).test_expect("request frame");
+                write_bounded_frame(&mut server, &response_frame)
+                    .test_expect("denial response frame");
+            });
+            let error = BrokerIpcClient::execute_evidenced_on_authenticated_stream(
+                client,
+                TENANT_SCOPE,
+                &request,
+                &signer,
+            )
+            .test_expect_err("tampered denial must fail closed");
+            server.join().test_expect("IPC server");
+            assert!(matches!(
+                error,
+                BrokerError::AuthorizationDenied(_) | BrokerError::AuthorityUnavailable(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn preconnected_execute_rejects_a_signed_response_misbound_to_the_request() {
+        let mut request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
+        request.invocation_id = "invocation-production-misbound".to_string();
+        let execute_response: BrokerExecuteResponse =
+            read_vector("broker-execute-response-v1.json");
+        let response_frame = canonical_json_bytes(&IpcResponse {
+            operation: IpcOperation::Execute,
+            accepted: true,
+            response: canonical_json_bytes(&execute_response).test_expect("execute response"),
+            error_code: None,
+        })
+        .test_expect("IPC response");
+        let (client, mut server) = deadline_bounded_pair();
+        let server = thread::spawn(move || {
+            read_bounded_frame(&mut server).test_expect("request frame");
+            write_bounded_frame(&mut server, &response_frame).test_expect("response frame");
+        });
+
+        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+        let error = BrokerIpcClient::execute_evidenced_on_authenticated_stream(
+            client,
+            TENANT_SCOPE,
+            &request,
+            &signer,
+        )
+        .test_expect_err("misbound response must fail closed");
+        server.join().test_expect("IPC server");
+
+        assert!(matches!(error, BrokerError::ResponseRejected(_)));
+    }
+
+    #[test]
+    fn preconnected_execute_rejects_noncanonical_or_invalid_outer_envelopes() {
+        let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
+        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+        let canonical_invalid_code = canonical_json_bytes(&IpcResponse {
+            operation: IpcOperation::Execute,
+            accepted: false,
+            response: b"{}".to_vec(),
+            error_code: Some("invalid error code".to_string()),
+        })
+        .test_expect("invalid-code envelope");
+        let canonical_envelope = IpcResponse {
+            operation: IpcOperation::Execute,
+            accepted: true,
+            response: b"{}".to_vec(),
+            error_code: None,
+        };
+        let noncanonical = serde_json::to_vec_pretty(&canonical_envelope)
+            .test_expect("noncanonical response envelope");
+
+        for (frame, expected_authority_unavailable) in
+            [(canonical_invalid_code, true), (noncanonical, false)]
+        {
+            let (client, mut server) = deadline_bounded_pair();
+            let server = thread::spawn(move || {
+                read_bounded_frame(&mut server).test_expect("request frame");
+                write_bounded_frame(&mut server, &frame).test_expect("response frame");
+            });
+            let error = BrokerIpcClient::execute_evidenced_on_authenticated_stream(
+                client,
+                TENANT_SCOPE,
+                &request,
+                &signer,
+            )
+            .test_expect_err("invalid envelope must fail closed");
+            server.join().test_expect("IPC server");
+            if expected_authority_unavailable {
+                assert!(matches!(error, BrokerError::AuthorityUnavailable(_)));
+            } else {
+                assert!(matches!(error, BrokerError::AuthorizationDenied(_)));
+            }
+        }
+    }
+
+    fn deadline_bounded_pair() -> (UnixStream, UnixStream) {
+        let (client, server) = UnixStream::pair().test_expect("Unix stream pair");
+        let timeout = Some(Duration::from_secs(1));
+        client
+            .set_read_timeout(timeout)
+            .test_expect("client read timeout");
+        client
+            .set_write_timeout(timeout)
+            .test_expect("client write timeout");
+        server
+            .set_read_timeout(timeout)
+            .test_expect("server read timeout");
+        server
+            .set_write_timeout(timeout)
+            .test_expect("server write timeout");
+        (client, server)
+    }
+
+    fn read_vector<T: DeserializeOwned>(file: &str) -> T {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/bindings/vectors/security/broker/positive")
+            .join(file);
+        let bytes =
+            std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        serde_json::from_slice(&bytes).test_expect("broker vector")
+    }
+}
 
 #[cfg(all(test, target_os = "linux"))]
 mod service_identity_tests {

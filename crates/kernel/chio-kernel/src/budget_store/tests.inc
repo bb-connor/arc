@@ -1,4 +1,5 @@
     use super::*;
+    use chio_test_support::prelude::*;
 
     #[test]
     fn hard_invocation_guarantee_requires_a_matching_authoritative_topology() {
@@ -61,7 +62,15 @@
                 verifier_id: "test-verifier".to_string(),
                 request_binding_hash: "22".repeat(32),
                 negotiated_features_digest: "33".repeat(32),
+                issuer: chio_core::crypto::Keypair::from_seed(&[72; 32]).public_key(),
+                not_before: 90,
+                expires_at: 300,
+                request_constraint_digest: "34".repeat(32),
+                broker_capability_id: "test-broker-capability".to_string(),
+                claim_binding_digest: "35".repeat(32),
+                verified_at: 100,
             }),
+            partition_escrow_evidence: None,
         };
         BudgetAuthorizeHoldRequest {
             capability_id: "cap-composite".to_string(),
@@ -75,6 +84,7 @@
             authority: None,
             admission_operation: Some(composite_operation_binding(hold_id)),
             invocation_admission: Some(invocation_admission),
+            authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
             payment_journal: None,
         }
     }
@@ -100,6 +110,83 @@
                 2,
             ),
         ]
+    }
+
+    #[test]
+    fn snapshot_authorization_can_only_replay_an_exact_committed_decision() {
+        let store = InMemoryBudgetStore::new();
+        let request = composite_request(
+            "hold-existing-only-replay",
+            "event-existing-only-replay",
+            three_quotas(2),
+        );
+        let snapshot = request
+            .cleanup_snapshot(
+                "event-existing-only-reverse".to_string(),
+                "event-existing-only-capture".to_string(),
+            )
+            .test_expect("cleanup snapshot");
+        let original = store
+            .authorize_budget_hold(request)
+            .test_expect("fresh authorization");
+        let replay = snapshot
+            .authorization_request()
+            .test_expect("snapshot replay request");
+        assert!(replay.requires_existing_authorization_replay());
+        assert!(matches!(
+            store.authorize_budget_hold(replay.clone()),
+            Err(BudgetStoreError::Invariant(_))
+        ));
+        assert_eq!(
+            store
+                .replay_budget_authorization(replay)
+                .test_expect("exact committed replay"),
+            original
+        );
+
+        let empty_store = InMemoryBudgetStore::new();
+        let absent = snapshot
+            .authorization_request()
+            .test_expect("absent replay request");
+        assert!(matches!(
+            empty_store.replay_budget_authorization(absent),
+            Err(BudgetStoreError::MissingCommittedReplay(_))
+        ));
+        assert!(empty_store
+            .get_usage("cap-composite", 0)
+            .test_expect("empty usage lookup")
+            .is_none());
+    }
+
+    #[test]
+    fn snapshot_replay_rejects_tampered_source_provenance() {
+        let store = InMemoryBudgetStore::new();
+        let request = composite_request(
+            "hold-tampered-replay",
+            "event-tampered-replay",
+            three_quotas(2),
+        );
+        let snapshot = request
+            .cleanup_snapshot(
+                "event-tampered-reverse".to_string(),
+                "event-tampered-capture".to_string(),
+            )
+            .test_expect("cleanup snapshot");
+        store
+            .authorize_budget_hold(request)
+            .test_expect("fresh authorization");
+        let mut encoded = serde_json::to_value(&snapshot).test_expect("snapshot JSON");
+        encoded["supplementalBinding"]["claimBindingDigest"] =
+            serde_json::Value::String("ff".repeat(32));
+        let tampered: BudgetAuthorizationCleanupSnapshot =
+            serde_json::from_value(encoded).test_expect("structurally valid tampered snapshot");
+        let replay = tampered
+            .authorization_request()
+            .test_expect("tampered replay request");
+        assert!(matches!(
+            store.replay_budget_authorization(replay),
+            Err(BudgetStoreError::Conflict(_))
+        ));
     }
 
     #[test]
@@ -261,6 +348,90 @@
             .iter()
             .all(|count| count.invocation_count_after().unwrap() == 1));
         assert_eq!(second.committed_cost_units_after, 100);
+        let denial_seq = second
+            .metadata
+            .budget_commit_index
+            .test_expect("a durable denial must expose its event sequence");
+        let denial_event = store
+            .list_mutation_events(10, Some("cap-composite"), Some(0))
+            .test_expect("list composite denial event")
+            .into_iter()
+            .find(|event| event.event_id == "event-composite-2")
+            .test_expect("composite denial event");
+        assert_eq!(denial_event.allowed, Some(false));
+        assert_eq!(denial_event.event_seq, denial_seq);
+        assert_eq!(denial_event.usage_seq, None);
+    }
+
+    #[test]
+    fn monetary_denial_does_not_reserve_quota_and_replays_its_frozen_snapshot() {
+        let store = InMemoryBudgetStore::new();
+        let first = store
+            .authorize_budget_hold(composite_request(
+                "hold-monetary-baseline",
+                "event-monetary-baseline",
+                three_quotas(3),
+            ))
+            .test_expect("baseline monetary authorization");
+        assert!(first.is_authorized());
+
+        let mut denied_request = composite_request(
+            "hold-monetary-denied",
+            "event-monetary-denied",
+            three_quotas(3),
+        );
+        denied_request.requested_exposure_units = 101;
+        denied_request.max_cost_per_invocation = Some(100);
+        let denied = store
+            .authorize_budget_hold(denied_request.clone())
+            .test_expect("monetary denial");
+        let denied_snapshot = match &denied {
+            BudgetAuthorizeHoldDecision::Denied(denied_snapshot) => Some(denied_snapshot),
+            BudgetAuthorizeHoldDecision::Authorized(_) => None,
+        }
+        .test_expect("monetary overspend denial");
+        assert!(denied_snapshot
+            .invocation_counts_after
+            .iter()
+            .all(|usage| usage.invocation_count_after().test_expect("quota count") == 1));
+        let denial_seq = denied_snapshot
+            .metadata
+            .budget_commit_index
+            .test_expect("a durable denial must expose its event sequence");
+
+        let later = store
+            .authorize_budget_hold(composite_request(
+                "hold-monetary-later",
+                "event-monetary-later",
+                three_quotas(3),
+            ))
+            .test_expect("later monetary authorization");
+        assert!(later.is_authorized());
+        assert_eq!(
+            store
+                .authorize_budget_hold(denied_request.clone())
+                .test_expect("replayed monetary denial"),
+            denied,
+            "exact replay must return the original denial snapshot"
+        );
+        denied_request.requested_exposure_units = 99;
+        assert!(matches!(
+            store.authorize_budget_hold(denied_request),
+            Err(BudgetStoreError::Conflict(_))
+        ));
+
+        let denial_event = store
+            .list_mutation_events(10, Some("cap-composite"), Some(0))
+            .test_expect("list monetary denial event")
+            .into_iter()
+            .find(|event| event.event_id == "event-monetary-denied")
+            .test_expect("monetary denial event");
+        assert_eq!(denial_event.event_seq, denial_seq);
+        assert_eq!(denial_event.usage_seq, None);
+        assert!(store
+            .get_budget_hold("hold-monetary-denied")
+            .test_expect("monetary denial hold lookup")
+            .is_none());
     }
 
     #[test]
@@ -538,9 +709,7 @@
             root_budget_holder: "root-capability".to_string(),
         };
         store
-            .mark_admission_operation_hold_reserved(
-                hold_id, &binding, 2_345, None, None, &envelope,
-            )
+            .mark_admission_operation_hold_reserved(hold_id, &binding, 2_345, None, None, &envelope)
             .unwrap();
         store
             .capture_invocation_reservations(BudgetCaptureInvocationRequest {
@@ -594,22 +763,10 @@
             root_budget_holder: "root-atomic-invocation".to_string(),
         };
         store
-            .mark_invocation_hold_reserved(
-                hold_id,
-                "cap-atomic-invocation",
-                0,
-                3_456,
-                &envelope,
-            )
+            .mark_invocation_hold_reserved(hold_id, "cap-atomic-invocation", 0, 3_456, &envelope)
             .unwrap();
         store
-            .mark_invocation_hold_reserved(
-                hold_id,
-                "cap-atomic-invocation",
-                0,
-                3_456,
-                &envelope,
-            )
+            .mark_invocation_hold_reserved(hold_id, "cap-atomic-invocation", 0, 3_456, &envelope)
             .unwrap();
 
         let snapshot = store.get_budget_hold(hold_id).unwrap().unwrap();
@@ -625,13 +782,7 @@
             Some("root-atomic-invocation")
         );
         assert!(matches!(
-            store.mark_invocation_hold_reserved(
-                hold_id,
-                "cap-atomic-invocation",
-                0,
-                3_457,
-                &envelope,
-            ),
+            store.mark_invocation_hold_reserved(hold_id, "cap-atomic-invocation", 0, 3_457, &envelope,),
             Err(BudgetStoreError::Conflict(_))
         ));
     }
@@ -763,13 +914,13 @@
         changed_event.requested_exposure_units = 99;
         assert!(matches!(
             store.authorize_budget_hold(changed_event),
-            Err(BudgetStoreError::Invariant(_))
+            Err(BudgetStoreError::Conflict(_))
         ));
         let mut changed_hold = request;
         changed_hold.event_id = Some("event-mismatch-second".to_string());
         assert!(matches!(
             store.authorize_budget_hold(changed_hold),
-            Err(BudgetStoreError::Invariant(_))
+            Err(BudgetStoreError::Conflict(_))
         ));
     }
 

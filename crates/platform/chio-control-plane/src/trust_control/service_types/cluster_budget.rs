@@ -218,7 +218,7 @@ pub(crate) struct BudgetInvocationQuotaUsageRecordView {
     pub(crate) seq: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BudgetMutationEventView {
     pub(crate) event_id: String,
@@ -246,6 +246,11 @@ pub(crate) struct BudgetMutationEventView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) max_total_cost_units: Option<u64>,
     pub(crate) invocation_count_after: u32,
+    pub(crate) invocation_counts_after: Vec<BudgetInvocationQuotaUsageView>,
+    pub(crate) invocation_state: BudgetInvocationReservationStateView,
+    pub(crate) monetary_state: BudgetMonetaryHoldStateView,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) revocation_set: Option<CanonicalRevocationSetView>,
     pub(crate) total_cost_exposed_after: u64,
     pub(crate) total_cost_realized_spend_after: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -380,6 +385,8 @@ pub(crate) struct BudgetAuthorityMetadataView {
     pub(crate) guarantee_level: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) budget_commit_index: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) partition_escrow_evidence: Option<BudgetPartitionEscrowEvidenceView>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -108,25 +108,22 @@ fn unstamped_caller_reservation_recovery_is_exact_atomic_and_restart_durable() {
     let ordinary_hold = "budget-hold:ordinary-request:cap-ordinary:0";
     let stamped_hold = "budget-hold:stamped-request:cap-stamped:0";
     let composite_hold = "budget-hold:composite-request:leaf:0";
-    let caller_event = |hold_id: &str| {
-        format!("{hold_id}{CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX}")
-    };
-    let legacy_request = |capability_id: &str,
-                          hold_id: &str,
-                          event_id: String,
-                          authority: &BudgetEventAuthority| {
-        BudgetAuthorizeHoldRequest::legacy(
-            capability_id.to_string(),
-            0,
-            Some(1),
-            100,
-            Some(100),
-            Some(100),
-            Some(hold_id.to_string()),
-            Some(event_id),
-            Some(authority.clone()),
-        )
-    };
+    let caller_event =
+        |hold_id: &str| format!("{hold_id}{CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX}");
+    let legacy_request =
+        |capability_id: &str, hold_id: &str, event_id: String, authority: &BudgetEventAuthority| {
+            BudgetAuthorizeHoldRequest::legacy(
+                capability_id.to_string(),
+                0,
+                Some(1),
+                100,
+                Some(100),
+                Some(100),
+                Some(hold_id.to_string()),
+                Some(event_id),
+                Some(authority.clone()),
+            )
+        };
     let budget_authority = authority("budget-primary", "lease-recovery", 17);
 
     {
@@ -152,8 +149,8 @@ fn unstamped_caller_reservation_recovery_is_exact_atomic_and_restart_durable() {
             ),
         ] {
             assert!(matches!(
-                store.authorize_budget_hold(request).expect("authorize hold"),
-                BudgetAuthorizeHoldDecision::Authorized(_)
+                store.authorize_budget_hold(request),
+                Ok(BudgetAuthorizeHoldDecision::Authorized(_))
             ));
         }
         store
@@ -166,11 +163,8 @@ fn unstamped_caller_reservation_recovery_is_exact_atomic_and_restart_durable() {
             )
             .expect("stamp caller reservation");
 
-        let mut composite = composite_authorize_input(
-            composite_hold,
-            &caller_event(composite_hold),
-            2,
-        );
+        let mut composite =
+            composite_authorize_input(composite_hold, &caller_event(composite_hold), 2);
         composite.authority = Some(budget_authority.clone());
         assert!(matches!(
             store
@@ -434,8 +428,8 @@ fn unstamped_invocation_only_caller_reservation_recovers_its_atomic_zero_exposur
 #[test]
 fn atomic_invocation_only_caller_reservation_stamps_existing_hold_without_money_fields() {
     use chio_kernel::budget_store::{
-        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetStore,
-        ReservedHoldEnvelope, CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
+        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetStore, ReservedHoldEnvelope,
+        CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX,
     };
 
     let path = unique_db_path("atomic-invocation-only-reservation-stamp");
@@ -1160,4 +1154,580 @@ fn expire_open_hold_returns_the_invocation_slot() {
     ));
 
     let _ = std::fs::remove_file(&path);
+}
+
+type QuotaAuthorityRow = (String, String, i64, u32, u32, u32, i64, u64);
+
+fn quota_authority_rows(
+    store: &SqliteBudgetStore,
+) -> Result<Vec<QuotaAuthorityRow>, Box<dyn std::error::Error>> {
+    let connection = store.connection()?;
+    let mut statement = connection.prepare(
+        r#"
+            SELECT profile, owner_id, grant_index_key, max_invocations,
+                   reserved_invocations, captured_invocations, updated_at, seq
+            FROM budget_invocation_quota_usage
+            ORDER BY profile, owner_id, grant_index_key
+            "#,
+    )?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                test_row_u64(row, 7)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn grant_quota_authority_row(
+    store: &SqliteBudgetStore,
+    owner_id: &str,
+) -> Result<QuotaAuthorityRow, Box<dyn std::error::Error>> {
+    quota_authority_rows(store)?
+        .into_iter()
+        .find(|row| {
+            row.0 == BudgetQuotaProfile::GrantInvocation.as_str() && row.1 == owner_id && row.2 == 0
+        })
+        .ok_or_else(|| format!("grant quota row for `{owner_id}` is missing").into())
+}
+
+#[test]
+fn mixed_monetary_denial_preserves_primary_and_pins_missing_quota_rows_at_zero(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("quota-authority-mixed-monetary-denial");
+    {
+        let store = SqliteBudgetStore::open(&path)?;
+        assert!(store.try_increment_with_event_id(
+            "leaf",
+            0,
+            Some(2),
+            Some("event-quota-authority-primary-capture"),
+        )?);
+
+        let quota_count = store.connection()?.query_row(
+            "SELECT COUNT(*) FROM budget_invocation_quota_usage",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        assert_eq!(
+            quota_count, 1,
+            "only the primary quota may exist before admission"
+        );
+
+        let primary_before = grant_quota_authority_row(&store, "leaf")?;
+        assert_eq!((primary_before.4, primary_before.5), (0, 1));
+
+        let mut request = composite_authorize_input(
+            "hold-quota-authority-mixed-denial",
+            "event-quota-authority-mixed-denial",
+            2,
+        );
+        request.requested_exposure_units = 101;
+        request.max_cost_per_invocation = Some(100);
+        let decision = store.authorize_composite_hold(request.clone())?;
+        let BudgetAuthorizeHoldDecision::Denied(denied) = &decision else {
+            return Err("monetary overspend did not deny the composite authorization".into());
+        };
+        let denial_seq = denied
+            .metadata
+            .budget_commit_index
+            .ok_or("durable denial did not expose its event sequence")?;
+        assert_eq!(denied.invocation_count_after, 1);
+        assert!(denied
+            .invocation_counts_after
+            .iter()
+            .any(
+                |usage| usage.quota.key().profile() == BudgetQuotaProfile::GrantInvocation
+                    && usage.captured_invocations_after == 1
+                    && usage.reserved_invocations_after == 0
+            ));
+
+        let primary_after = grant_quota_authority_row(&store, "leaf")?;
+        assert_eq!(
+            primary_after, primary_before,
+            "denial must not rewrite the existing primary authority row"
+        );
+
+        let pinned = quota_authority_rows(&store)?
+            .into_iter()
+            .filter(|row| {
+                !(row.0 == BudgetQuotaProfile::GrantInvocation.as_str()
+                    && row.1 == "leaf"
+                    && row.2 == 0)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            pinned.len(),
+            2,
+            "aggregate and broker authority must be pinned"
+        );
+        assert!(pinned.iter().all(|row| row.4 == 0 && row.5 == 0));
+        assert!(pinned.iter().any(|row| {
+            row.0 == BudgetQuotaProfile::AggregateCapabilityInvocation.as_str()
+                && row.1 == "leaf"
+                && row.2 == -1
+        }));
+        let broker_owner_id = "22".repeat(32);
+        assert!(pinned.iter().any(|row| {
+            row.0 == BudgetQuotaProfile::SupplementalBrokerExecution.as_str()
+                && row.1 == broker_owner_id.as_str()
+                && row.2 == -1
+        }));
+
+        let persisted: (i64, u64, Option<u64>) = store.connection()?.query_row(
+            r#"
+                SELECT authorization.allowed, event.event_seq, event.usage_seq
+                FROM budget_composite_authorizations AS authorization
+                JOIN budget_mutation_events AS event
+                  ON event.event_id = authorization.event_id
+                WHERE authorization.event_id = 'event-quota-authority-mixed-denial'
+                "#,
+            [],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    test_row_u64(row, 1)?,
+                    test_row_optional_u64(row, 2)?,
+                ))
+            },
+        )?;
+        assert_eq!(persisted, (0, denial_seq, None));
+        assert_eq!(
+            store.get_budget_hold("hold-quota-authority-mixed-denial")?,
+            None,
+            "denial must not synthesize a hold"
+        );
+        drop(store);
+
+        let reopened = SqliteBudgetStore::open(&path)?;
+        assert_eq!(
+            reopened.authorize_composite_hold(request.clone())?,
+            decision
+        );
+        let mut changed = request.clone();
+        changed.requested_exposure_units = 99;
+        assert!(matches!(
+            reopened.authorize_composite_hold(changed),
+            Err(BudgetStoreError::Conflict(_))
+        ));
+    }
+    let _ = std::fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn composite_replay_after_capture_and_later_reserve_keeps_live_quota_state(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("quota-authority-composite-replay-live-state");
+    let first_request = composite_authorize_input(
+        "hold-quota-authority-replay-first",
+        "event-quota-authority-replay-first",
+        4,
+    );
+
+    let store = SqliteBudgetStore::open(&path)?;
+    let original = store.authorize_composite_hold(first_request.clone())?;
+    let BudgetAuthorizeHoldDecision::Authorized(original_snapshot) = &original else {
+        return Err("first composite hold was not authorized".into());
+    };
+    let original_seq = original_snapshot
+        .metadata
+        .budget_commit_index
+        .ok_or("authorization did not expose its event sequence")?;
+    assert!(original_snapshot
+        .invocation_counts_after
+        .iter()
+        .all(
+            |usage| usage.reserved_invocations_after == 1 && usage.captured_invocations_after == 0
+        ));
+
+    let captured = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+        capability_id: "leaf".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-quota-authority-replay-first".to_string()),
+        event_id: Some("event-quota-authority-replay-first:capture".to_string()),
+        authority: None,
+        admission_operation: Some(composite_admission_binding(
+            "hold-quota-authority-replay-first",
+        )),
+    })?;
+    assert_eq!(
+        captured.invocation_state,
+        BudgetInvocationReservationState::Captured
+    );
+    assert!(store
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-quota-authority-replay-later",
+            "event-quota-authority-replay-later",
+            4,
+        ))?
+        .is_authorized());
+
+    let live_before_replay = quota_authority_rows(&store)?;
+    assert_eq!(live_before_replay.len(), 3);
+    assert!(live_before_replay
+        .iter()
+        .all(|row| row.4 == 1 && row.5 == 1 && row.7 > original_seq));
+    let event_count_before = store.connection()?.query_row(
+        "SELECT COUNT(*) FROM budget_mutation_events",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    drop(store);
+
+    let reopened = SqliteBudgetStore::open(&path)?;
+    assert_eq!(
+        reopened.authorize_composite_hold(first_request)?,
+        original,
+        "authorization replay must return its original frozen decision"
+    );
+    assert_eq!(
+        quota_authority_rows(&reopened)?,
+        live_before_replay,
+        "authorization replay must not rewind later live quota counters or sequence"
+    );
+    let event_count_after = reopened.connection()?.query_row(
+        "SELECT COUNT(*) FROM budget_mutation_events",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    assert_eq!(event_count_after, event_count_before);
+
+    let _ = std::fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn reserve_and_compatibility_capture_race_consume_one_shared_grant_unit(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("quota-authority-reserve-capture-race");
+    let seed = SqliteBudgetStore::open(&path)?;
+    drop(seed);
+
+    let increment_store = SqliteBudgetStore::open(&path)?;
+    let composite_store = SqliteBudgetStore::open(&path)?;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+
+    let increment_barrier = std::sync::Arc::clone(&barrier);
+    let increment = std::thread::spawn(move || {
+        increment_barrier.wait();
+        increment_store.try_increment_with_event_id(
+            "leaf",
+            0,
+            Some(1),
+            Some("event-quota-authority-race-capture"),
+        )
+    });
+
+    let mut composite_request = composite_authorize_input(
+        "hold-quota-authority-race-reserve",
+        "event-quota-authority-race-reserve",
+        1,
+    );
+    composite_request.invocation_quotas = vec![persisted_quota(
+        BudgetQuotaProfile::GrantInvocation,
+        "leaf",
+        Some(0),
+        1,
+    )];
+    composite_request.requested_exposure_units = 0;
+    composite_request.max_cost_per_invocation = None;
+    composite_request.max_total_cost_units = None;
+    let composite_barrier = std::sync::Arc::clone(&barrier);
+    let composite = std::thread::spawn(move || {
+        composite_barrier.wait();
+        composite_store.authorize_composite_hold(composite_request)
+    });
+
+    let increment_result = increment.join().map_err(|_| "increment racer panicked")?;
+    let composite_result = composite.join().map_err(|_| "composite racer panicked")?;
+    let increment_allowed = match &increment_result {
+        Ok(allowed) => *allowed,
+        Err(error) if error.to_string().contains("composite invocation admission") => false,
+        Err(error) => return Err(format!("unexpected compatibility racer error: {error}").into()),
+    };
+    let composite_authorized = match &composite_result {
+        Ok(decision) => decision.is_authorized(),
+        Err(error) => return Err(format!("unexpected composite racer error: {error}").into()),
+    };
+    assert_eq!(
+        usize::from(increment_allowed) + usize::from(composite_authorized),
+        1,
+        "exactly one mutation mode may consume the shared last unit"
+    );
+    if increment_allowed {
+        assert!(matches!(
+            &composite_result,
+            Ok(BudgetAuthorizeHoldDecision::Denied(_))
+        ));
+    } else {
+        assert!(composite_authorized);
+        assert!(
+            matches!(&increment_result, Ok(false))
+                || matches!(&increment_result, Err(error) if error.to_string().contains("composite invocation admission")),
+            "the compatibility loser must be a durable denial or managed-grant conflict"
+        );
+    }
+
+    let store = SqliteBudgetStore::open(&path)?;
+    let (row_count, maximum, reserved, captured, quota_seq): (i64, u32, u32, u32, u64) =
+        store.connection()?.query_row(
+            r#"
+                SELECT
+                    (SELECT COUNT(*) FROM budget_invocation_quota_usage),
+                    max_invocations,
+                    reserved_invocations,
+                    captured_invocations,
+                    seq
+                FROM budget_invocation_quota_usage
+                WHERE profile = 'chio.grant-invocation.v1'
+                  AND owner_id = 'leaf'
+                  AND grant_index_key = 0
+                "#,
+            [],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    test_row_u64(row, 4)?,
+                ))
+            },
+        )?;
+    assert_eq!(row_count, 1);
+    assert_eq!(maximum, 1);
+    assert_eq!(reserved + captured, 1);
+    assert_eq!(usize::from(reserved == 1) + usize::from(captured == 1), 1);
+    assert_eq!(
+        store
+            .get_usage("leaf", 0)?
+            .ok_or("legacy race usage is missing")?
+            .invocation_count,
+        1
+    );
+
+    let events = {
+        let connection = store.connection()?;
+        let mut statement = connection.prepare(
+            r#"
+                SELECT event_id, allowed, event_seq, usage_seq
+                FROM budget_mutation_events
+                WHERE event_id IN (
+                    'event-quota-authority-race-capture',
+                    'event-quota-authority-race-reserve'
+                )
+                ORDER BY event_seq
+                "#,
+        )?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<i64>>(1)?,
+                    test_row_u64(row, 2)?,
+                    test_row_optional_u64(row, 3)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    assert!((1..=2).contains(&events.len()));
+    let allowed_events = events
+        .iter()
+        .filter(|event| event.1 == Some(1))
+        .collect::<Vec<_>>();
+    assert_eq!(allowed_events.len(), 1);
+    assert_eq!(allowed_events[0].3, Some(allowed_events[0].2));
+    assert_eq!(quota_seq, allowed_events[0].2);
+    assert!(events
+        .iter()
+        .filter(|event| event.1 == Some(0))
+        .all(|event| event.3.is_none()));
+    let hold_count = store
+        .connection()?
+        .query_row(
+            "SELECT COUNT(*) FROM budget_authorization_holds WHERE hold_id = 'hold-quota-authority-race-reserve'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+    assert_eq!(hold_count, i64::from(composite_authorized));
+
+    let _ = std::fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn compatibility_increment_replay_after_reverse_and_live_mutations_is_read_only(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("quota-authority-compatibility-replay-live-state");
+    let store = SqliteBudgetStore::open(&path)?;
+    assert!(store.try_increment_with_event_id(
+        "cap-quota-authority-replay",
+        0,
+        Some(2),
+        Some("event-quota-authority-replay-original"),
+    )?);
+    let original_event_seq = store
+        .list_mutation_events(10, Some("cap-quota-authority-replay"), Some(0))?
+        .into_iter()
+        .find(|event| event.event_id == "event-quota-authority-replay-original")
+        .ok_or("original compatibility event is missing")?
+        .event_seq;
+    store.reverse_charge_cost_with_ids(
+        "cap-quota-authority-replay",
+        0,
+        0,
+        None,
+        Some("event-quota-authority-replay-reverse"),
+    )?;
+    assert!(store.try_increment_with_event_id(
+        "cap-quota-authority-replay",
+        0,
+        Some(2),
+        Some("event-quota-authority-replay-live-one"),
+    )?);
+    assert!(store.try_increment_with_event_id(
+        "cap-quota-authority-replay",
+        0,
+        Some(2),
+        Some("event-quota-authority-replay-live-two"),
+    )?);
+
+    let row_before = grant_quota_authority_row(&store, "cap-quota-authority-replay")?;
+    assert_eq!((row_before.3, row_before.4, row_before.5), (2, 0, 2));
+    assert!(row_before.7 > original_event_seq);
+    let event_count_before = store
+        .connection()?
+        .query_row(
+            "SELECT COUNT(*) FROM budget_mutation_events WHERE capability_id = 'cap-quota-authority-replay' AND grant_index = 0",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+    drop(store);
+
+    let reopened = SqliteBudgetStore::open(&path)?;
+    assert!(reopened.try_increment_with_event_id(
+        "cap-quota-authority-replay",
+        0,
+        Some(2),
+        Some("event-quota-authority-replay-original"),
+    )?);
+    let row_after = grant_quota_authority_row(&reopened, "cap-quota-authority-replay")?;
+    assert_eq!(row_after, row_before);
+    let event_count_after = reopened
+        .connection()?
+        .query_row(
+            "SELECT COUNT(*) FROM budget_mutation_events WHERE capability_id = 'cap-quota-authority-replay' AND grant_index = 0",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+    assert_eq!(event_count_after, event_count_before);
+    assert!(matches!(
+        reopened.try_increment_with_event_id(
+            "cap-quota-authority-replay",
+            0,
+            Some(3),
+            Some("event-quota-authority-replay-original"),
+        ),
+        Err(BudgetStoreError::Conflict(_))
+    ));
+    let unchanged = grant_quota_authority_row(&reopened, "cap-quota-authority-replay")?;
+    assert_eq!(unchanged, row_before);
+
+    let _ = std::fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn budget_schema_v0_removes_self_asserted_partition_escrow_authority() {
+    let path = unique_db_path("partition-escrow-schema-v0-upgrade");
+    drop(SqliteBudgetStore::open(&path).expect("create current budget database"));
+
+    let legacy = Connection::open(&path).expect("open prior budget database");
+    legacy
+        .execute(
+            "UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'budget'",
+            [],
+        )
+        .expect("mark prior budget schema");
+    legacy
+        .execute_batch(
+            r#"
+            DROP TRIGGER budget_partition_escrow_evidence_insert_guard;
+            CREATE TABLE partition_escrow_budget_store_config (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                store_identity_digest TEXT NOT NULL UNIQUE,
+                counter_namespace_digest TEXT NOT NULL UNIQUE,
+                fencing_token INTEGER NOT NULL CHECK (fencing_token > 0)
+            );
+            CREATE TRIGGER partition_escrow_budget_store_config_update_forbidden
+            BEFORE UPDATE ON partition_escrow_budget_store_config
+            BEGIN
+                SELECT RAISE(ABORT, 'immutable partition escrow budget store configuration');
+            END;
+            CREATE TRIGGER partition_escrow_budget_store_config_delete_forbidden
+            BEFORE DELETE ON partition_escrow_budget_store_config
+            BEGIN
+                SELECT RAISE(ABORT, 'immutable partition escrow budget store configuration');
+            END;
+            CREATE TRIGGER budget_partition_escrow_evidence_insert_guard
+            BEFORE INSERT ON budget_composite_partition_escrow_evidence
+            WHEN NOT EXISTS (
+                SELECT 1 FROM partition_escrow_budget_store_config WHERE singleton = 1
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'partition escrow evidence lacks configured authorization binding');
+            END;
+            "#,
+        )
+        .expect("install prior self-asserted partition escrow schema");
+    drop(legacy);
+
+    drop(SqliteBudgetStore::open(&path).expect("upgrade prior budget schema"));
+    let upgraded = Connection::open(&path).expect("inspect upgraded budget database");
+    let version = upgraded
+        .query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'budget'",
+            [],
+            |row| row.get::<_, i32>(0),
+        )
+        .expect("budget schema version");
+    assert_eq!(version, 1);
+    let obsolete_table_exists = upgraded
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'partition_escrow_budget_store_config')",
+            [],
+            |row| row.get::<_, bool>(0),
+        )
+        .expect("obsolete config table query");
+    assert!(!obsolete_table_exists);
+    let trigger_sql = upgraded
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'budget_partition_escrow_evidence_insert_guard'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .expect("partition escrow evidence trigger");
+    assert!(!trigger_sql.contains("partition_escrow_budget_store_config"));
+    assert!(trigger_sql.contains("budget_composite_authorizations"));
+    assert!(trigger_sql.contains("budget_composite_authorization_artifacts"));
+    assert!(crate::check_schema_version(
+        &upgraded,
+        super::store::BUDGET_STORE_SCHEMA_KEY,
+        0,
+        super::store::BUDGET_STORE_LEGACY_ANCHOR_TABLES,
+    )
+    .is_err());
+
+    drop(upgraded);
+    let _ = std::fs::remove_file(path);
 }

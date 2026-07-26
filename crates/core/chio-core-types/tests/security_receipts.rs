@@ -500,14 +500,13 @@ fn every_active_defense_body_field_tamper_fails_closed() {
                 mutate_at_path(embedded, &path),
                 "{kind:?} field path could not be mutated: {path:?}"
             );
-            match serde_json::from_value::<ChioReceipt>(tampered) {
-                Ok(receipt) => assert!(
+            if let Ok(receipt) = serde_json::from_value::<ChioReceipt>(tampered) {
+                assert!(
                     !receipt.verify_signature().unwrap_or_else(|error| {
                         panic!("verify tampered {kind:?} receipt at {path:?}: {error}")
                     }),
                     "{kind:?} field tamper retained a valid signature at {path:?}"
-                ),
-                Err(_) => {}
+                );
             }
         }
     }

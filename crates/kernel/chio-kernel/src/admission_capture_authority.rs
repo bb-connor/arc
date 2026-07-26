@@ -2,7 +2,7 @@ use crate::budget_store::{
     AuthorizedBudgetHold, BudgetCaptureInvocationRequest, BudgetCommitMetadata,
     BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
     BudgetInvocationQuotaUsage, BudgetInvocationReservationState, BudgetQuotaProfile,
-    BudgetStoreError, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
+    BudgetStoreError, PartitionEscrowCommitEvidence, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
 use crate::supplemental_quota::{
     CanonicalRevocationSet, SupplementalQuotaError, MAX_REVOCATION_IDS_PER_ADMISSION,
@@ -291,6 +291,53 @@ pub struct AdmissionCaptureAuthorityProjection {
     lease_epoch: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PartitionEscrowCommitReceiptProjection {
+    canonical_json: String,
+    digest: String,
+}
+
+pub(crate) fn project_partition_escrow_commit_evidence(
+    authorized: &BudgetCommitMetadata,
+    captured: &BudgetCommitMetadata,
+) -> Result<Option<PartitionEscrowCommitReceiptProjection>, AdmissionCaptureError> {
+    if authorized.partition_escrow_evidence != captured.partition_escrow_evidence {
+        return Err(AdmissionCaptureError::InvalidRequest(
+            "capture projection partition escrow evidence changed after authorization".to_string(),
+        ));
+    }
+    match captured.guarantee_level {
+        BudgetGuaranteeLevel::PartitionEscrowed => {
+            let evidence = captured.partition_escrow_evidence.as_ref().ok_or_else(|| {
+                AdmissionCaptureError::InvalidRequest(
+                    "partition-escrowed capture projection omitted signed allocation evidence"
+                        .to_string(),
+                )
+            })?;
+            project_partition_escrow_commit_evidence_value(evidence).map(Some)
+        }
+        _ if captured.partition_escrow_evidence.is_none() => Ok(None),
+        _ => Err(AdmissionCaptureError::InvalidRequest(
+            "non-partition capture projection included partition escrow evidence".to_string(),
+        )),
+    }
+}
+
+fn project_partition_escrow_commit_evidence_value(
+    evidence: &PartitionEscrowCommitEvidence,
+) -> Result<PartitionEscrowCommitReceiptProjection, AdmissionCaptureError> {
+    evidence.evidence().map_err(|error| {
+        AdmissionCaptureError::InvalidRequest(format!(
+            "capture projection partition escrow evidence is invalid: {error}"
+        ))
+    })?;
+    Ok(PartitionEscrowCommitReceiptProjection {
+        canonical_json: evidence.canonical_json().to_string(),
+        digest: evidence.evidence_digest().to_string(),
+    })
+}
+
 impl AdmissionCaptureAuthorityProjection {
     pub(crate) fn from_budget_authority(
         authority: &BudgetEventAuthority,
@@ -328,6 +375,8 @@ pub struct CombinedAdmissionCaptureReceiptProjection {
     #[serde(skip_serializing_if = "Option::is_none")]
     leader_epoch: Option<u64>,
     guarantee_level: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    partition_escrow_evidence: Option<PartitionEscrowCommitReceiptProjection>,
     authority: AdmissionCaptureAuthorityProjection,
     invocation_state: String,
     monetary_state: String,
@@ -422,7 +471,9 @@ impl CombinedAdmissionCaptureReceiptProjection {
         }
         if !matches!(
             captured.metadata.guarantee_level,
-            BudgetGuaranteeLevel::SingleNodeAtomic | BudgetGuaranteeLevel::HaLinearizable
+            BudgetGuaranteeLevel::SingleNodeAtomic
+                | BudgetGuaranteeLevel::HaLinearizable
+                | BudgetGuaranteeLevel::PartitionEscrowed
         ) {
             return Err(AdmissionCaptureError::InvalidRequest(
                 "capture projection requires a hard budget guarantee".to_string(),
@@ -433,6 +484,8 @@ impl CombinedAdmissionCaptureReceiptProjection {
                 "capture projection requires fenced authority evidence".to_string(),
             )
         })?;
+        let partition_escrow_evidence =
+            project_partition_escrow_commit_evidence(&authorized.metadata, &captured.metadata)?;
         let invocation_quotas = project_invocation_quota_transitions(
             &authorized.invocation_counts_after,
             &captured.invocation_counts_after,
@@ -465,6 +518,7 @@ impl CombinedAdmissionCaptureReceiptProjection {
             authority_commit_index: metadata.authority_commit_index(),
             leader_epoch: metadata.leader_epoch(),
             guarantee_level: captured.metadata.guarantee_level.as_str().to_string(),
+            partition_escrow_evidence,
             authority: AdmissionCaptureAuthorityProjection::from_budget_authority(authority)?,
             invocation_state: captured.invocation_state.as_str().to_string(),
             monetary_state: captured.monetary_state.as_str().to_string(),
@@ -767,6 +821,7 @@ mod tests {
             metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: Some(7),
             event_id: Some("event-capture-1".to_string()),
+            partition_escrow_evidence: None,
         }
     }
 
@@ -879,6 +934,7 @@ mod tests {
                 metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
                 budget_commit_index: Some(41),
                 event_id: Some("budget-authorize-vector-1".to_string()),
+                partition_escrow_evidence: None,
             },
         }
     }
@@ -901,6 +957,7 @@ mod tests {
                 metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
                 budget_commit_index: Some(42),
                 event_id: Some("budget-capture-vector-1".to_string()),
+                partition_escrow_evidence: None,
             },
         }
     }

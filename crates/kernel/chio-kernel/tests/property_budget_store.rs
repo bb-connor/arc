@@ -127,6 +127,7 @@ fn error_kind(error: &BudgetStoreError) -> &'static str {
     match error {
         BudgetStoreError::Overflow(_) => "overflow",
         BudgetStoreError::Conflict(_) => "conflict",
+        BudgetStoreError::MissingCommittedReplay(_) => "missing_committed_replay",
         BudgetStoreError::Invariant(_) => "invariant",
         BudgetStoreError::Sqlite(_) => "sqlite",
         BudgetStoreError::Io(_) => "io",
@@ -219,6 +220,7 @@ fn financial_receipt_carries_hold_lineage_and_guarantee_level() {
             realized_spend_units: 75,
             committed_cost_units_after: 75,
         }),
+        partition_escrow: None,
     };
     let receipt = ChioReceipt::sign(
         ChioReceiptBody {

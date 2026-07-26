@@ -419,9 +419,9 @@ impl SqliteBudgetStore {
                     BudgetInvocationReservationState::Captured
                 }
             }
+            BudgetMutationKind::ReverseExposure => BudgetInvocationReservationState::Reversed,
             BudgetMutationKind::AuthorizeExposure
             | BudgetMutationKind::CaptureExposure
-            | BudgetMutationKind::ReverseExposure
             | BudgetMutationKind::ReleaseExposure
             | BudgetMutationKind::ReconcileSpend
             | BudgetMutationKind::ExpireHold => BudgetInvocationReservationState::Absent,
@@ -440,6 +440,9 @@ impl SqliteBudgetStore {
                 BudgetMonetaryHoldState::Exposed
             }
             BudgetMutationKind::CaptureExposure => BudgetMonetaryHoldState::Captured,
+            BudgetMutationKind::ReverseExposure if record.exposure_units == 0 => {
+                BudgetMonetaryHoldState::None
+            }
             BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
             BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
             BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,

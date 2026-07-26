@@ -210,6 +210,7 @@ fn connector_tool_not_registered_retains_reservations_and_marks_receipt(
 fn connector_tool_not_registered_retains_invocation_top_level(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "connector-not-registered-top-level");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
         "srv-chio-runtime",
@@ -249,6 +250,7 @@ fn connector_tool_not_registered_retains_invocation_top_level(
 fn connector_tool_not_registered_retains_invocation_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "connector-not-registered-nested");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
         "srv-chio-runtime",
@@ -304,6 +306,7 @@ fn connector_tool_not_registered_retains_invocation_nested_flow(
 fn connector_url_elicitation_retains_invocation_top_level() -> Result<(), Box<dyn std::error::Error>>
 {
     let mut kernel = make_kernel(make_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "connector-url-elicitation-top-level");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
         "srv-chio-runtime",
@@ -354,6 +357,7 @@ fn connector_url_elicitation_retains_invocation_top_level() -> Result<(), Box<dy
 fn connector_url_elicitation_retains_invocation_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "connector-url-elicitation-nested");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
         "srv-chio-runtime",
@@ -425,6 +429,7 @@ fn assert_monetary_url_elicitation_release_projection(
         "req-monetary-url-release-top"
     };
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, request_id);
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
         "cost-srv",
@@ -690,6 +695,7 @@ fn url_elicitation_retained_evaluation_holder_blocks_sibling_nested_flow(
 fn url_elicitation_retains_runtime_reservations_and_invocation_top_level(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "url-runtime-reservations-top-level");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
         "srv-chio-runtime",
@@ -758,6 +764,7 @@ fn url_elicitation_retains_runtime_reservations_and_invocation_top_level(
 fn url_elicitation_retains_runtime_reservations_and_invocation_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "url-runtime-reservations-nested");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
         "srv-chio-runtime",
@@ -1017,7 +1024,29 @@ fn retained_marker_requires_a_real_reservation() -> Result<(), Box<dyn std::erro
 /// deterministic so a test can assert it lands in the recorded fault's `hold_ids`.
 struct FailingReleasePaymentAdapter;
 
+impl FailingReleasePaymentAdapter {
+    fn operation_adapter(&self) -> &'static crate::payment::SimPaymentAdapter {
+        static ADAPTER: std::sync::OnceLock<crate::payment::SimPaymentAdapter> =
+            std::sync::OnceLock::new();
+        ADAPTER.get_or_init(crate::payment::SimPaymentAdapter::new)
+    }
+
+    fn operation_authorization_id(reference: &str, amount_units: u64, currency: &str) -> String {
+        let seed = format!("{reference}|{amount_units}|{currency}");
+        let digest = chio_core::sha256_hex(seed.as_bytes());
+        format!("sim-{}", &digest[..32])
+    }
+}
+
 impl PaymentAdapter for FailingReleasePaymentAdapter {
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        true
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        true
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -1060,6 +1089,75 @@ impl PaymentAdapter for FailingReleasePaymentAdapter {
     ) -> Result<PaymentResult, PaymentError> {
         Err(PaymentError::RailError("refund should not run".to_string()))
     }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        self.operation_adapter().authorize_for_operation(
+            operation_id,
+            request_binding_hash,
+            request,
+        )
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        self.operation_adapter()
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)
+    }
+
+    fn capture_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.operation_adapter().capture_for_operation(request)
+    }
+
+    fn release_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        let _ = self.operation_adapter().settlement_state_for_operation(
+            operation_id,
+            request_binding_hash,
+            reference,
+            Some(authorization_id),
+        )?;
+        Err(PaymentError::RailError(
+            "injected payment release failure sk_live_abcdefghijklmnopqrstuvwx".to_string(),
+        ))
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.operation_adapter().refund_for_operation(request)
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        self.operation_adapter().settlement_state_for_operation(
+            operation_id,
+            request_binding_hash,
+            reference,
+            authorization_id,
+        )
+    }
 }
 
 #[test]
@@ -1070,13 +1168,19 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
     // (the payment authorization id), not just the capability id, so an operator can
     // locate the hold to recover from the signed fault alone.
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(
+        &mut kernel,
+        "url-monetary-release-failure-top-level",
+    );
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
         "cost-srv",
         vec!["compute"],
         std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
+        .expect("install payment adapter");
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -1109,13 +1213,17 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
     assert_url_elicitation_budget_cleanup_fault_recorded(
         &kernel,
         "payment_release",
-        "auth_failing_release",
+        &FailingReleasePaymentAdapter::operation_authorization_id(
+            "req-url-elicitation-monetary-release-failure-async",
+            100,
+            "USD",
+        ),
     )?;
     Ok(())
 }
 
 #[test]
-fn url_elicitation_cleanup_failure_rejects_forged_budget_authority(
+fn url_elicitation_public_metadata_rejects_forged_budget_authority_before_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_monetary_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
@@ -1124,10 +1232,6 @@ fn url_elicitation_cleanup_failure_rejects_forged_budget_authority(
         vec!["compute"],
         std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel
-        .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
-        .expect("payment adapter");
-
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
@@ -1145,25 +1249,22 @@ fn url_elicitation_cleanup_failure_rejects_forged_budget_authority(
         serde_json::json!({}),
     );
 
-    let result = kernel.evaluate_tool_call_blocking_with_metadata(
-        &request,
-        Some(forged_budget_authority_metadata()),
-    );
+    let error = kernel
+        .evaluate_tool_call_blocking_with_metadata(
+            &request,
+            Some(forged_budget_authority_metadata()),
+        )
+        .expect_err("caller budget authority metadata must fail before dispatch");
     assert!(matches!(
-        result,
-        Err(KernelError::UrlElicitationsRequired { .. })
+        error,
+        KernelError::InvalidReceiptMetadata(reason) if reason.contains("budget_authority")
     ));
-    assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1);
-    let receipt = receipt_log.get(0).unwrap();
-    assert!(receipt.is_incomplete());
-    let metadata = receipt.metadata.as_ref().unwrap();
-    assert_forged_budget_authority_removed(receipt);
     assert_eq!(
-        metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["step"],
-        "payment_release"
+        stream_attempts.load(Ordering::SeqCst),
+        0,
+        "reserved metadata must be rejected before the tool server runs"
     );
+    assert_eq!(kernel.receipt_log().len(), 0);
     Ok(())
 }
 
@@ -1173,13 +1274,16 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
     // Nested-flow mirror of the async monetary-release-failure test: the
     // nested arm must ALSO name the stuck payment authorization id in the fault.
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, "url-monetary-release-failure-nested");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
         "cost-srv",
         vec!["compute"],
         std::sync::Arc::clone(&stream_attempts),
     )));
-    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
+        .expect("install payment adapter");
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -1227,7 +1331,11 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
     assert_url_elicitation_budget_cleanup_fault_recorded(
         &kernel,
         "payment_release",
-        "auth_failing_release",
+        &FailingReleasePaymentAdapter::operation_authorization_id(
+            "req-url-elicitation-monetary-release-failure-nested",
+            100,
+            "USD",
+        ),
     )?;
     Ok(())
 }

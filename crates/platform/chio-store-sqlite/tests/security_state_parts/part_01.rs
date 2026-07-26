@@ -20,18 +20,18 @@ use chio_security_types::ports::{
     containment_session_target, predict_containment_overlay_apply,
     predict_containment_overlay_remove, AdvisorySecurityEvent, CanonicalBody,
     ContainmentOverlayCommand, ContainmentOverlayStore, CorrelationCasRequest,
-    CorrelationEventAdmissionRequest, CorrelationEventIndexRequest, CorrelationPartial,
-    CorrelationIngressStore, CorrelationPartitionKey, CreateOutcome, Digest32, EffectId,
-    EffectOperation, EffectRequest,
-    EffectResult, EgressFenceCommit, EgressFenceRequest, ErrorCode, EventId, EventPartitionScan,
-    FlowJoinRequest, FlowStateKey, FlowStateStore, IsolationEpochEvidenceVerifierPort,
-    IsolationEpochId, IsolationEpochTransition, LineageId, OpaqueReceiptRef, OverlayApplyRequest,
-    OverlayContribution, OverlayContributions, OverlayRemoveRequest, OverlaySnapshot, PortError,
-    PortErrorKind, PortResult, ProducerId, ProducerTrustClass, RecordId, ResponseEffectKey,
-    ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseSchedulerStore,
-    ResponseStore, RuleId, SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerRetryRequest,
-    SchedulerWorkKey, SecurityEventStore, SessionId, TenantId, TenantScopedId,
-    UnverifiedSecurityEvent, VerifiedIsolationEvidence, VerifiedSecurityEvent,
+    CorrelationEventAdmissionRequest, CorrelationEventIndexRequest, CorrelationIngressStore,
+    CorrelationPartial, CorrelationPartitionKey, CreateOutcome, Digest32, EffectId,
+    EffectOperation, EffectRequest, EffectResult, EgressFenceCommit, EgressFenceRequest, ErrorCode,
+    EventId, EventPartitionScan, FlowJoinRequest, FlowStateKey, FlowStateStore,
+    IsolationEpochEvidenceVerifierPort, IsolationEpochId, IsolationEpochTransition, LineageId,
+    OpaqueReceiptRef, OverlayApplyRequest, OverlayContribution, OverlayContributions,
+    OverlayRemoveRequest, OverlaySnapshot, PortError, PortErrorKind, PortResult, ProducerId,
+    ProducerTrustClass, RecordId, ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey,
+    ResponsePlanRecord, ResponseSchedulerStore, ResponseStore, RuleId, SchedulerClaimRequest,
+    SchedulerHealthAckRequest, SchedulerRetryRequest, SchedulerWorkKey, SecurityEventStore,
+    SessionId, TenantId, TenantScopedId, UnverifiedSecurityEvent, VerifiedIsolationEvidence,
+    VerifiedSecurityEvent,
 };
 use chio_security_types::ports::{
     ActionId, LineageFenceRelease, LineageFenceRequest, LineageFenceStore,
@@ -43,8 +43,7 @@ use chio_security_types::{
 };
 use chio_store_sqlite::{
     security_state::SecurityStateClock, SqliteEncryptedBlobStore, SqliteReceiptStore,
-    SqliteSecurityStateStore,
-    TenantId as BlobTenantId, TenantKey,
+    SqliteSecurityStateStore, TenantId as BlobTenantId, TenantKey,
 };
 use tempfile::tempdir;
 
@@ -160,15 +159,12 @@ fn authenticated_correlation_event_at(
     .unwrap_or_else(|error| panic!("security event body: {error}"));
     let canonical_body =
         canonical_json_bytes(&body).unwrap_or_else(|error| panic!("canonical event body: {error}"));
-    let signed = SignedSecurityEvent::sign_with_backend(
-        body,
-        &Ed25519Backend::new(Keypair::generate()),
-    )
-    .unwrap_or_else(|error| panic!("sign correlation event: {error}"));
+    let signed =
+        SignedSecurityEvent::sign_with_backend(body, &Ed25519Backend::new(Keypair::generate()))
+            .unwrap_or_else(|error| panic!("sign correlation event: {error}"));
     let source_evidence = canonical_json_bytes(&signed)
         .unwrap_or_else(|error| panic!("canonical source evidence: {error}"));
-    let mut evidence_preimage =
-        b"chio.verified-security-event-evidence.v1\0".to_vec();
+    let mut evidence_preimage = b"chio.verified-security-event-evidence.v1\0".to_vec();
     evidence_preimage.extend_from_slice(&source_evidence);
     let canonical_body = CanonicalBody::new(canonical_body)
         .unwrap_or_else(|error| panic!("canonical event body: {error}"));
@@ -399,10 +395,9 @@ fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
 
 #[test]
 fn migration_is_idempotent_and_preserves_existing_tables() {
-    let directory = chio_test_support::private_fs::private_tempdir(
-        "receipt-security-state-migration",
-    )
-    .unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_fs::private_tempdir("receipt-security-state-migration")
+            .unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let receipt_store = SqliteReceiptStore::open(&path)
         .unwrap_or_else(|error| panic!("open receipt store: {error}"));
@@ -537,6 +532,20 @@ fn response_effect_generation_migration_preserves_existing_intent() {
     assert_eq!(loaded.scheduler_lease_owner_id.as_str(), "legacy-worker");
     assert_eq!(loaded.scheduler_fencing_token, 7);
     assert_eq!(loaded.state, record("apply_requested"));
+    let lease_body_hash_length = rusqlite::Connection::open(&path)
+        .and_then(|connection| {
+            connection.query_row(
+                r#"
+                SELECT length(lease_body_hash)
+                FROM security_scheduler_leases
+                WHERE tenant_id = 'tenant-a' AND action_id = 'legacy-action'
+                "#,
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+        })
+        .unwrap_or_else(|error| panic!("load migrated lease body hash: {error}"));
+    assert_eq!(lease_body_hash_length, 32);
 }
 
 #[test]
@@ -1598,8 +1607,10 @@ fn scheduler_takeover_fences_stale_overlay_mutations() {
     let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let now = current_unix_ms();
-    let store =
-        SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
+    let clock = Arc::new(FixedSecurityStateClock::new(now));
+    let store_clock: Arc<dyn SecurityStateClock> = clock.clone();
+    let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, store_clock)
+        .unwrap_or_else(|error| panic!("open store: {error}"));
     let plan = ResponsePlanRecord {
         tenant_id: tenant("tenant-a"),
         action_id: chio_security_types::ports::ActionId::new("action-a")
@@ -1681,28 +1692,18 @@ fn scheduler_takeover_fences_stale_overlay_mutations() {
             .unwrap_or_else(|error| panic!("persist effect: {error}")),
         CreateOutcome::Created
     );
-    drop(store);
-    rusqlite::Connection::open(&path)
-        .and_then(|connection| {
-            connection.execute(
-                "UPDATE security_scheduler_leases SET lease_expires_at = ?1",
-                rusqlite::params![i64::try_from(now.saturating_sub(1)).unwrap_or(i64::MAX)],
-            )?;
-            Ok(())
-        })
-        .unwrap_or_else(|error| panic!("expire lease: {error}"));
-    let store = SqliteSecurityStateStore::open(path)
-        .unwrap_or_else(|error| panic!("reopen store: {error}"));
+    let takeover_now = first[0].lease_expires_at_unix_ms.saturating_add(1);
+    clock.set(takeover_now);
     let expired_claim_error = require_error(store.claim_due(&first_request));
-    assert_eq!(expired_claim_error.kind(), PortErrorKind::IntegrityFailure);
+    assert_eq!(expired_claim_error.kind(), PortErrorKind::Conflict);
     let second = store
         .claim_due(&SchedulerClaimRequest {
             tenant_id: tenant("tenant-a"),
             claim_id: record("scheduler-takeover"),
             lease_owner_id: chio_security_types::ports::LeaseOwnerId::new("worker-b")
                 .unwrap_or_else(|error| panic!("owner id: {error}")),
-            now_unix_ms: current_unix_ms(),
-            lease_expires_at_unix_ms: current_unix_ms() + 60_000,
+            now_unix_ms: takeover_now,
+            lease_expires_at_unix_ms: takeover_now.saturating_add(60_000),
             max_claims: 1,
         })
         .unwrap_or_else(|error| panic!("takeover claim: {error}"));
@@ -1710,10 +1711,7 @@ fn scheduler_takeover_fences_stale_overlay_mutations() {
     assert_eq!(second.len(), 1);
     assert!(second[0].fencing_token > first[0].fencing_token);
     let displaced_claim_error = require_error(store.claim_due(&first_request));
-    assert_eq!(
-        displaced_claim_error.kind(),
-        PortErrorKind::IntegrityFailure
-    );
+    assert_eq!(displaced_claim_error.kind(), PortErrorKind::Conflict);
     let stale_effect_error = require_error(store.persist_effect(&effect));
     assert_eq!(stale_effect_error.kind(), PortErrorKind::Conflict);
 
@@ -1754,8 +1752,8 @@ fn injected_clock_controls_scheduler_lease_and_overlay_mutations() {
         store_clock,
     )
     .unwrap_or_else(|error| panic!("open trusted-clock store: {error}"));
-    let action_id = ActionId::new("trusted-clock-action")
-        .unwrap_or_else(|error| panic!("action id: {error}"));
+    let action_id =
+        ActionId::new("trusted-clock-action").unwrap_or_else(|error| panic!("action id: {error}"));
     store
         .create(&ResponsePlanRecord {
             tenant_id: tenant("tenant-a"),

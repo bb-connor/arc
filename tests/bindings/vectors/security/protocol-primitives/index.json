@@ -17,10 +17,18 @@
     { "id": "governed_token_bob", "file": "positive/governed-approval-token-bob-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/governed-approval-token.schema.json" },
     { "id": "tool_call_request_singular_approval", "file": "positive/tool-call-request-singular-approval-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json" },
     { "id": "tool_call_request_list_approval", "file": "positive/tool-call-request-list-approval-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json" },
+    { "id": "governed_active_response_intent", "file": "positive/governed-active-response-intent-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/governed-transaction-intent.schema.json" },
+    { "id": "tool_call_request_full_security", "file": "positive/tool-call-request-full-security-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/agent/tool_call_request.schema.json" },
     { "id": "verified_approval_set", "file": "positive/verified-approval-set-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/capability/verified-approval-set.schema.json" },
     { "id": "admission_request_binding", "file": "positive/admission-request-binding-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-request-binding.schema.json" },
     { "id": "budget_admission_evidence", "file": "positive/budget-invocation-admission-evidence-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/budget-invocation-admission-evidence.schema.json" },
-    { "id": "admission_capture_metadata", "file": "positive/admission-capture-metadata-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json" }
+    { "id": "admission_capture_metadata", "file": "positive/admission-capture-metadata-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json" },
+    { "id": "partition_escrow_quota_commitment", "file": "positive/partition-escrow-quota-commitment-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-quota-commitment.schema.json" },
+    { "id": "partition_escrow_allocation_set", "file": "positive/partition-escrow-allocation-set-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-allocation-set.schema.json" },
+    { "id": "partition_escrow_admission_evidence", "file": "positive/partition-escrow-admission-evidence-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-admission-evidence.schema.json" },
+    { "id": "partition_escrow_receipt_metadata", "file": "positive/partition-escrow-receipt-metadata-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-receipt-metadata.schema.json" },
+    { "id": "budget_admission_evidence_partition_escrow", "file": "positive/budget-invocation-admission-evidence-partition-escrow-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/budget-invocation-admission-evidence.schema.json" },
+    { "id": "admission_capture_metadata_partition_escrow", "file": "positive/admission-capture-metadata-partition-escrow-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json" }
   ],
   "negative": [
     {

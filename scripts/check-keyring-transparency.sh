@@ -150,7 +150,6 @@ EOF
 
 run_tests "signing epoch serialization" no "$(cat <<'EOF'
 activation_waits_until_inflight_signature_is_durably_anchored
-authority_backend_rejects_router_without_validated_independent_services
 concurrent_duplicate_signing_returns_one_durable_artifact
 enterprise_anchor_insert_failure_rolls_back_the_artifact_signature
 enterprise_router_rejects_legacy_artifact_without_trusted_time

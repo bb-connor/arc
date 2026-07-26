@@ -248,6 +248,18 @@ pub trait BudgetStore: Send + Sync {
         ))
     }
 
+    /// Return the exact durable mutation event for an explicit id.
+    /// Hard-guarantee stores using the default authorization method must override this.
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<BudgetMutationRecord>, BudgetStoreError> {
+        let _ = event_id;
+        Err(BudgetStoreError::Invariant(
+            "exact budget mutation event lookup is unavailable for this backend".to_string(),
+        ))
+    }
+
     fn budget_guarantee_level(&self) -> BudgetGuaranteeLevel {
         BudgetGuaranteeLevel::SingleNodeAtomic
     }
@@ -258,6 +270,15 @@ pub trait BudgetStore: Send + Sync {
 
     fn budget_metering_profile(&self) -> BudgetMeteringProfile {
         BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual
+    }
+
+    /// Exact durable counter identity used by partition-escrow configuration.
+    /// A store must return `Some` only when it enforces the named namespace
+    /// under the supplied fencing token across restart and failover.
+    fn partition_escrow_store_binding(
+        &self,
+    ) -> Result<Option<PartitionEscrowStoreBinding>, BudgetStoreError> {
+        Ok(None)
     }
 
     /// Open holds created at or before `older_than_unix_ms`, oldest first.
@@ -382,11 +403,40 @@ pub trait BudgetStore: Send + Sync {
         &self,
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if request.requires_existing_authorization_replay() {
+            return Err(BudgetStoreError::Invariant(
+                "snapshot-derived authorization requires the committed replay operation"
+                    .to_string(),
+            ));
+        }
         if !request.invocation_quotas().is_empty() || request.revocation_set().is_some() {
             return Err(BudgetStoreError::Invariant(
                 "composite budget holds are unavailable for this backend".to_string(),
             ));
         }
+        let requires_durable_decision = !matches!(
+            self.budget_guarantee_level(),
+            BudgetGuaranteeLevel::AdvisoryPosthoc
+        );
+        let durable_event_preexisted = if requires_durable_decision {
+            let event_id = request.event_id.as_deref().ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "durable budget authorization requires an event_id".to_string(),
+                )
+            })?;
+            let existing = self.get_mutation_event_by_id(event_id)?;
+            if let Some(record) = existing.as_ref() {
+                let frozen_allowed = record.allowed.ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "durable budget authorization event omitted its outcome".to_string(),
+                    )
+                })?;
+                validate_default_authorization_event(&request, frozen_allowed, record)?;
+            }
+            Some(existing.is_some())
+        } else {
+            None
+        };
         let monetary_state = if request.requested_exposure_units > 0
             || request.max_cost_per_invocation.is_some()
             || request.max_total_cost_units.is_some()
@@ -406,6 +456,56 @@ pub trait BudgetStore: Send + Sync {
             request.event_id.as_deref(),
             request.authority.as_ref(),
         )?;
+        let durable_decision_event = if requires_durable_decision {
+            let event_id = request.event_id.as_deref().ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "durable budget authorization requires an event_id".to_string(),
+                )
+            })?;
+            let exact_event = self
+                .get_mutation_event_by_id(event_id)
+                .and_then(|record| {
+                    record.ok_or_else(|| {
+                        BudgetStoreError::Invariant(format!(
+                            "durable budget authorization event `{event_id}` is unavailable"
+                        ))
+                    })
+                })
+                .and_then(|record| {
+                    let committed_cost_units_after =
+                        validate_default_authorization_event(&request, allowed, &record)?;
+                    Ok((record, committed_cost_units_after))
+                });
+            match exact_event {
+                Ok(record) => Some(record),
+                Err(error) => {
+                    if allowed && durable_event_preexisted == Some(false) {
+                        let rollback_event_id =
+                            format!("{event_id}:missing-decision-event-rollback");
+                        if let Err(rollback_error) = self
+                            .reverse_charge_cost_with_ids_and_authority(
+                                &request.capability_id,
+                                request.grant_index,
+                                request.requested_exposure_units,
+                                request.hold_id.as_deref(),
+                                Some(&rollback_event_id),
+                                request.authority.as_ref(),
+                            )
+                        {
+                            tracing::warn!(
+                                capability_id = %request.capability_id,
+                                grant_index = request.grant_index,
+                                reason = %redacted!(&rollback_error.to_string()),
+                                "budget hold rollback failed after durable decision lookup failure"
+                            );
+                        }
+                    }
+                    return Err(error);
+                }
+            }
+        } else {
+            None
+        };
         // The recoverable money record exists only for a granted hold: a
         // budget-denied request never touches the rail, so journaling it
         // would leave an incomplete HoldPlaced row for reconciliation to
@@ -445,21 +545,42 @@ pub trait BudgetStore: Send + Sync {
                 }
             }
         }
-        let usage = self.get_usage(&request.capability_id, request.grant_index)?;
-        let committed_cost_units_after = usage
-            .as_ref()
-            .map(BudgetUsageRecord::committed_cost_units)
-            .transpose()?
-            .unwrap_or(0);
-        let invocation_count_after = usage.as_ref().map_or(0, |usage| usage.invocation_count);
-        let metadata = budget_commit_metadata(
-            self,
-            request.authority,
-            allowed
-                .then(|| usage.as_ref().map(|usage| usage.seq))
-                .flatten(),
-            request.event_id,
-        );
+        let (committed_cost_units_after, invocation_count_after, metadata) =
+            match durable_decision_event {
+                Some((record, committed_cost_units_after)) => (
+                    committed_cost_units_after,
+                    record.invocation_count_after,
+                    budget_commit_metadata(
+                        self,
+                        record.authority,
+                        Some(record.event_seq),
+                        Some(record.event_id),
+                    ),
+                ),
+                None => {
+                    let usage = self.get_usage(&request.capability_id, request.grant_index)?;
+                    let committed_cost_units_after = usage
+                        .as_ref()
+                        .map(BudgetUsageRecord::committed_cost_units)
+                        .transpose()?
+                        .unwrap_or(0);
+                    let invocation_count_after =
+                        usage.as_ref().map_or(0, |usage| usage.invocation_count);
+                    let metadata = budget_commit_metadata(
+                        self,
+                        request.authority,
+                        allowed
+                            .then(|| usage.as_ref().map(|usage| usage.seq))
+                            .flatten(),
+                        request.event_id,
+                    );
+                    (
+                        committed_cost_units_after,
+                        invocation_count_after,
+                        metadata,
+                    )
+                }
+            };
 
         if allowed {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
@@ -488,6 +609,30 @@ pub trait BudgetStore: Send + Sync {
                 metadata,
             }))
         }
+    }
+
+    /// Return the exact frozen decision for a previously committed composite
+    /// authorization without creating or retrying the mutation.
+    ///
+    /// Cleanup snapshots can outlive the capability, revocation, supplemental,
+    /// or escrow evidence that originally authorized a hold. A recovery path
+    /// must therefore use this read-only operation instead of treating the
+    /// snapshot as fresh admission authority. Implementations that can prove
+    /// absence return [`BudgetStoreError::MissingCommittedReplay`]. The default
+    /// is unsupported rather than assuming absence.
+    fn replay_budget_authorization(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if !request.requires_existing_authorization_replay() {
+            return Err(BudgetStoreError::Invariant(
+                "committed replay requires a snapshot-derived authorization request".to_string(),
+            ));
+        }
+        Err(BudgetStoreError::Invariant(
+            "exact committed budget authorization replay is unavailable for this backend"
+                .to_string(),
+        ))
     }
 
     fn reverse_budget_hold(
@@ -855,6 +1000,44 @@ pub trait BudgetStore: Send + Sync {
         Ok(0)
     }
 }
+
+fn validate_default_authorization_event(
+    request: &BudgetAuthorizeHoldRequest,
+    allowed: bool,
+    record: &BudgetMutationRecord,
+) -> Result<u64, BudgetStoreError> {
+    let grant_index = u32::try_from(request.grant_index)
+        .map_err(|_| BudgetStoreError::Invariant("budget grant index exceeds u32".to_string()))?;
+    if request.event_id.as_deref() != Some(record.event_id.as_str())
+        || record.hold_id != request.hold_id
+        || record.capability_id != request.capability_id
+        || record.grant_index != grant_index
+        || record.exposure_units != request.requested_exposure_units
+        || record.max_invocations != request.max_invocations
+        || record.max_cost_per_invocation != request.max_cost_per_invocation
+        || record.max_total_cost_units != request.max_total_cost_units
+        || record.authority != request.authority
+        || record.admission_operation != request.admission_operation
+    {
+        return Err(BudgetStoreError::Conflict(
+            "budget authorization event was reused for a different request".to_string(),
+        ));
+    }
+    if record.event_seq == 0
+        || record.kind != BudgetMutationKind::AuthorizeExposure
+        || record.allowed != Some(allowed)
+        || record.usage_seq != allowed.then_some(record.event_seq)
+    {
+        return Err(BudgetStoreError::Invariant(
+            "durable budget authorization event has an invalid decision shape".to_string(),
+        ));
+    }
+    checked_committed_cost_units(
+        record.total_cost_exposed_after,
+        record.total_cost_realized_spend_after,
+    )
+}
+
 fn checked_committed_cost_units(
     total_cost_exposed: u64,
     total_cost_realized_spend: u64,

@@ -219,6 +219,12 @@ fn prepare_command(
             "leadership barriers cannot be submitted as external commands".to_string(),
         )),
         AdmissionCommandKind::IncrementInvocation => {
+            if config.partition_escrow_authority.is_some() {
+                return Err(AdmissionConsensusError::Protocol(
+                    "sealed partition escrow authority rejects legacy unbound invocation increments"
+                        .to_string(),
+                ));
+            }
             let request: TryIncrementBudgetRequest =
                 serde_json::from_value(command).map_err(|error| {
                     AdmissionConsensusError::Protocol(format!(
@@ -253,15 +259,22 @@ fn prepare_command(
                         "composite authorize command is invalid: {error}"
                     ))
                 })?;
+            if request.existing_only {
+                return Err(AdmissionConsensusError::Protocol(
+                    "existingOnly cannot be prepared as a composite authorization command"
+                        .to_string(),
+                ));
+            }
             let authority = BudgetMutationAuthorityView {
                 authority_id: election.candidate_id.clone(),
                 lease_id: format!("{}#admission-term-{}", election.candidate_id, election.term),
                 lease_epoch: election.term,
             };
-            super::super::budget_handlers::sqlite_composite_authorize_input(
+            super::super::budget_handlers::sqlite_fresh_composite_authorize_input(
                 &request,
                 budget_authority_from_view(&authority)
                     .map_err(AdmissionConsensusError::Protocol)?,
+                config.partition_escrow_authority.as_deref(),
             )
             .map_err(|error| AdmissionConsensusError::Protocol(error.to_string()))?;
             validate_composite_quota_maxima(config, &request)
@@ -494,6 +507,524 @@ fn admission_members(
     Ok((self_url, peers, membership))
 }
 
+fn admission_members_read_only(
+    state: &TrustServiceState,
+) -> Result<(String, Vec<String>, AdmissionMembership), AdmissionConsensusError> {
+    let (self_url, peers, members) = admission_member_urls(state)?;
+    let store = configured_admission_consensus_store_read_only(&state.config)?;
+    let meta = store.meta()?;
+    let digest = meta.baseline_state_digest.ok_or_else(|| {
+        AdmissionConsensusError::Protocol(
+            "committed admission replay requires an already-bound genesis baseline".to_string(),
+        )
+    })?;
+    let projection = store.genesis_projection()?.ok_or_else(|| {
+        AdmissionConsensusError::Protocol(
+            "committed admission replay baseline has no persisted genesis projection".to_string(),
+        )
+    })?;
+    if admission_genesis_projection_digest(&projection)? != digest {
+        return Err(AdmissionConsensusError::Protocol(
+            "committed admission replay genesis projection does not match its baseline digest"
+                .to_string(),
+        ));
+    }
+    let membership = AdmissionMembership::new_with_genesis(members, projection)?;
+    if meta.membership_digest.as_deref() != Some(membership.digest()) {
+        return Err(AdmissionConsensusError::Protocol(
+            "committed admission replay membership differs from persisted state".to_string(),
+        ));
+    }
+    Ok((self_url, peers, membership))
+}
+
+pub(crate) fn validate_partition_escrow_admission_membership(
+    config: &TrustServiceConfig,
+    authority: &super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+) -> Result<(), CliError> {
+    let store = configured_admission_consensus_store_read_only(config)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    store
+        .validate_integrity()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let meta = store
+        .meta()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let baseline_digest = meta.baseline_state_digest.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "partition escrow requires an already-bound admission consensus baseline"
+                .to_string(),
+        )
+    })?;
+    let genesis_projection = store
+        .genesis_projection()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "partition escrow admission consensus baseline projection is missing".to_string(),
+            )
+        })?;
+    let observed_baseline = admission_genesis_projection_digest(&genesis_projection)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if observed_baseline != baseline_digest {
+        return Err(CliError::cli_other_error(
+            "partition escrow admission consensus baseline projection digest is invalid"
+                .to_string(),
+        ));
+    }
+    let membership = AdmissionMembership::new_with_genesis(
+        authority.service_endpoints().to_vec(),
+        genesis_projection,
+    )
+    .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if meta.membership_digest.as_deref() != Some(membership.digest())
+        || authority.admission_membership_digest() != membership.digest()
+    {
+        return Err(CliError::cli_other_error(
+            "partition escrow descriptor, configured members, and persisted admission membership must have one exact digest"
+                .to_string(),
+        ));
+    }
+    store
+        .validate_membership_proofs(&membership)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    validate_partition_escrow_authority_pin(&store, authority)?;
+    validate_persisted_partition_escrow_authority(&store, authority)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PartitionEscrowAuthorityPin {
+    descriptor_digest: String,
+    membership_digest: String,
+}
+
+fn validate_partition_escrow_authority_pin(
+    store: &AdmissionConsensusStore,
+    authority: &super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+) -> Result<(), CliError> {
+    let connection = store
+        .connection()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let evidence_count = persisted_partition_escrow_evidence_count_from_connection(&connection)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let pin = load_partition_escrow_authority_pin(&connection)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let pin = pin.ok_or_else(|| {
+        if evidence_count == 0 {
+            CliError::cli_other_error(
+                "partition escrow authority is not provisioned in the HA admission database"
+                    .to_string(),
+            )
+        } else {
+            CliError::cli_other_error(
+                "partition escrow evidence exists without an immutable authority pin"
+                    .to_string(),
+            )
+        }
+    })?;
+    let meta = load_meta(&connection)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if pin.descriptor_digest != authority.descriptor_digest()
+        || pin.membership_digest != authority.admission_membership_digest()
+        || meta.membership_digest.as_deref() != Some(pin.membership_digest.as_str())
+    {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority descriptor differs from the immutable HA admission pin"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn bind_initial_partition_escrow_admission_membership(
+    budget_db_path: &Path,
+    revocation_db_path: &Path,
+    service_endpoints: &[String],
+) -> Result<String, CliError> {
+    if !super::super::cluster_replay::cluster_replay_path_aliases(
+        budget_db_path,
+        revocation_db_path,
+    )? {
+        return Err(CliError::cli_other_error(
+            "partition escrow provisioning requires one shared budget and revocation database"
+                .to_string(),
+        ));
+    }
+    SqliteAdmissionCaptureAuthority::open_with_paths(budget_db_path, revocation_db_path)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let store = AdmissionConsensusStore::open(budget_db_path)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    store
+        .validate_integrity()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let meta = store
+        .meta()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if meta.current_term != 0
+        || meta.voted_for.is_some()
+        || meta.last_log_index != 0
+        || meta.last_log_term != 0
+        || meta.commit_index != 0
+        || meta.last_applied != 0
+    {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority provisioning must precede every admission consensus term and command"
+                .to_string(),
+        ));
+    }
+    let projection = match (
+        meta.baseline_state_digest.as_deref(),
+        meta.membership_digest.as_deref(),
+    ) {
+        (Some(expected), Some(_)) => {
+            let projection = store
+                .genesis_projection()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?
+                .ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "partition escrow provisioning baseline projection is missing"
+                            .to_string(),
+                    )
+                })?;
+            let observed = admission_genesis_projection_digest(&projection)
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            if observed != expected {
+                return Err(CliError::cli_other_error(
+                    "partition escrow provisioning baseline projection digest is invalid"
+                        .to_string(),
+                ));
+            }
+            projection
+        }
+        (None, None) => capture_admission_genesis_projection(budget_db_path)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+        _ => {
+            return Err(CliError::cli_other_error(
+                "partition escrow provisioning found a partial admission membership binding"
+                    .to_string(),
+            ));
+        }
+    };
+    let membership =
+        AdmissionMembership::new_with_genesis(service_endpoints.to_vec(), projection)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if load_partition_escrow_authority_pin(
+        &store
+            .connection()
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+    )
+    .map_err(|error| CliError::cli_other_error(error.to_string()))?
+    .is_some()
+    {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority provisioning is immutable and has already completed"
+                .to_string(),
+        ));
+    }
+    if persisted_partition_escrow_evidence_count(&store)? != 0 {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority cannot be provisioned after allocation evidence exists"
+                .to_string(),
+        ));
+    }
+    store
+        .bind_membership(&membership)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    store
+        .validate_membership_proofs(&membership)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    Ok(membership.digest().to_string())
+}
+
+pub(crate) fn persist_initial_partition_escrow_authority_pin(
+    budget_db_path: &Path,
+    revocation_db_path: &Path,
+    descriptor_digest: &str,
+    membership_digest: &str,
+) -> Result<(), CliError> {
+    if !is_lower_sha256(descriptor_digest) || !is_lower_sha256(membership_digest) {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority pin digests are invalid".to_string(),
+        ));
+    }
+    if !super::super::cluster_replay::cluster_replay_path_aliases(
+        budget_db_path,
+        revocation_db_path,
+    )? {
+        return Err(CliError::cli_other_error(
+            "partition escrow provisioning requires one shared budget and revocation database"
+                .to_string(),
+        ));
+    }
+    let store = AdmissionConsensusStore::open_existing(budget_db_path)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let mut connection = store
+        .connection()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    validate_integrity(&transaction)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let meta = load_meta(&transaction)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if meta.membership_digest.as_deref() != Some(membership_digest) {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority pin differs from the bound admission membership"
+                .to_string(),
+        ));
+    }
+    if load_partition_escrow_authority_pin(&transaction)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?
+        .is_some()
+    {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority pin is immutable and already exists".to_string(),
+        ));
+    }
+    if persisted_partition_escrow_evidence_count_from_connection(&transaction)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?
+        != 0
+    {
+        return Err(CliError::cli_other_error(
+            "partition escrow authority pin cannot be created after allocation evidence exists"
+                .to_string(),
+        ));
+    }
+    transaction
+        .execute(
+            r#"
+            INSERT INTO admission_consensus_partition_escrow_authority (
+                singleton, descriptor_digest, membership_digest
+            ) VALUES (1, ?1, ?2)
+            "#,
+            params![descriptor_digest, membership_digest],
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    transaction
+        .commit()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}
+
+fn validate_partition_escrow_authority_for_mutation(
+    config: &TrustServiceConfig,
+    transaction: &Transaction<'_>,
+) -> Result<(), String> {
+    let pin = load_partition_escrow_authority_pin(transaction).map_err(|error| error.to_string())?;
+    let evidence_count = persisted_partition_escrow_evidence_count_from_connection(transaction)
+        .map_err(|error| error.to_string())?;
+    match (config.partition_escrow_authority.as_deref(), pin) {
+        (Some(authority), Some(pin)) => {
+            authority
+                .verify_persisted_configuration()
+                .map_err(|error| error.to_string())?;
+            let meta = load_meta(transaction).map_err(|error| error.to_string())?;
+            if pin.descriptor_digest != authority.descriptor_digest()
+                || pin.membership_digest != authority.admission_membership_digest()
+                || meta.membership_digest.as_deref() != Some(pin.membership_digest.as_str())
+            {
+                return Err(
+                    "partition escrow mutation differs from its immutable authority or membership pin"
+                        .to_string(),
+                );
+            }
+            Ok(())
+        }
+        (Some(_), None) if evidence_count == 0 => {
+            Err("partition escrow mutation requires a provisioned authority pin".to_string())
+        }
+        (Some(_), None) => Err(
+            "partition escrow evidence exists without an immutable authority pin".to_string(),
+        ),
+        (None, Some(_)) => Err(
+            "ordinary admission cannot mutate a partition-escrow-pinned database".to_string(),
+        ),
+        (None, None) if evidence_count != 0 => Err(
+            "partition escrow evidence exists without an immutable authority pin".to_string(),
+        ),
+        (None, None) => Ok(()),
+    }
+}
+
+fn load_partition_escrow_authority_pin(
+    connection: &Connection,
+) -> Result<Option<PartitionEscrowAuthorityPin>, AdmissionConsensusError> {
+    let pin = connection
+        .query_row(
+            r#"
+            SELECT descriptor_digest, membership_digest
+            FROM admission_consensus_partition_escrow_authority
+            WHERE singleton = 1
+            "#,
+            [],
+            |row| {
+                Ok(PartitionEscrowAuthorityPin {
+                    descriptor_digest: row.get(0)?,
+                    membership_digest: row.get(1)?,
+                })
+            },
+        )
+        .optional()?;
+    if pin.as_ref().is_some_and(|pin| {
+        !is_lower_sha256(&pin.descriptor_digest) || !is_lower_sha256(&pin.membership_digest)
+    }) {
+        return Err(AdmissionConsensusError::Protocol(
+            "partition escrow authority pin contains an invalid digest".to_string(),
+        ));
+    }
+    Ok(pin)
+}
+
+pub(crate) fn provisionable_partition_escrow_admission_membership_digest(
+    budget_db_path: &Path,
+    revocation_db_path: &Path,
+    service_endpoints: &[String],
+) -> Result<String, CliError> {
+    let store = admission_consensus_store_read_only_from_paths(
+        budget_db_path,
+        revocation_db_path,
+        "partition escrow descriptor provisioning",
+    )
+    .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    store
+        .validate_integrity()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let meta = store
+        .meta()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let baseline_digest = meta.baseline_state_digest.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "partition escrow descriptor provisioning requires an already-bound admission consensus baseline"
+                .to_string(),
+        )
+    })?;
+    let genesis_projection = store
+        .genesis_projection()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "partition escrow descriptor provisioning baseline projection is missing"
+                    .to_string(),
+            )
+        })?;
+    let observed_baseline = admission_genesis_projection_digest(&genesis_projection)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if observed_baseline != baseline_digest {
+        return Err(CliError::cli_other_error(
+            "partition escrow descriptor provisioning baseline projection digest is invalid"
+                .to_string(),
+        ));
+    }
+    let membership =
+        AdmissionMembership::new_with_genesis(service_endpoints.to_vec(), genesis_projection)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if meta.membership_digest.as_deref() != Some(membership.digest()) {
+        return Err(CliError::cli_other_error(
+            "partition escrow descriptor endpoints differ from the persisted admission membership"
+                .to_string(),
+        ));
+    }
+    store
+        .validate_membership_proofs(&membership)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    if persisted_partition_escrow_evidence_count(&store)? != 0 {
+        return Err(CliError::cli_other_error(
+            "partition escrow descriptor provisioning is initial-generation only; online rollover and replacement after allocation evidence exists are unsupported"
+                .to_string(),
+        ));
+    }
+    Ok(membership.digest().to_string())
+}
+
+fn persisted_partition_escrow_evidence_count(
+    store: &AdmissionConsensusStore,
+) -> Result<u64, CliError> {
+    let connection = store
+        .connection()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    persisted_partition_escrow_evidence_count_from_connection(&connection)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}
+
+fn persisted_partition_escrow_evidence_count_from_connection(
+    connection: &Connection,
+) -> Result<u64, AdmissionConsensusError> {
+    let count = connection
+        .query_row(
+            "SELECT COUNT(*) FROM budget_composite_partition_escrow_evidence",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        ?;
+    u64::try_from(count).map_err(|_| {
+        AdmissionConsensusError::Protocol(
+            "partition escrow persisted evidence count is invalid".to_string(),
+        )
+    })
+}
+
+fn validate_persisted_partition_escrow_authority(
+    store: &AdmissionConsensusStore,
+    authority: &super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+) -> Result<(), CliError> {
+    let connection = store
+        .connection()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT evidence_digest, canonical_evidence
+            FROM budget_composite_partition_escrow_evidence
+            ORDER BY hold_id ASC
+            "#,
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let mut rows = statement
+        .query([])
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let mut evidence_count = 0usize;
+    while let Some(row) = rows
+        .next()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?
+    {
+        evidence_count = evidence_count.checked_add(1).ok_or_else(|| {
+            CliError::cli_other_error(
+                "partition escrow persisted evidence inventory overflowed".to_string(),
+            )
+        })?;
+        if evidence_count > MAX_ADMISSION_GENESIS_ROWS {
+            return Err(CliError::cli_other_error(
+                "partition escrow persisted evidence inventory exceeds its startup limit"
+                    .to_string(),
+            ));
+        }
+        let evidence_digest = row
+            .get::<_, String>(0)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let canonical_evidence = row
+            .get::<_, Vec<u8>>(1)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let canonical_evidence = String::from_utf8(canonical_evidence).map_err(|_| {
+            CliError::cli_other_error(
+                "partition escrow persisted evidence is not UTF-8 canonical JSON".to_string(),
+            )
+        })?;
+        let evidence = chio_kernel::budget_store::PartitionEscrowCommitEvidence::from_canonical_json(
+            canonical_evidence,
+            evidence_digest,
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        authority
+            .validate_persisted_commit_evidence(&evidence)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "partition escrow authority replacement is unsupported while persisted allocation evidence exists: {error}"
+                ))
+            })?;
+    }
+    Ok(())
+}
+
 fn admission_member_urls(
     state: &TrustServiceState,
 ) -> Result<(String, Vec<String>, Vec<String>), AdmissionConsensusError> {
@@ -552,6 +1083,49 @@ fn configured_admission_consensus_store(
     AdmissionConsensusStore::open_existing(canonical_budget)
 }
 
+fn configured_admission_consensus_store_read_only(
+    config: &TrustServiceConfig,
+) -> Result<AdmissionConsensusStore, AdmissionConsensusError> {
+    let budget_path = config.budget_db_path.as_deref().ok_or_else(|| {
+        AdmissionConsensusError::Protocol(
+            "committed admission replay requires a budget database".to_string(),
+        )
+    })?;
+    let revocation_path = config.revocation_db_path.as_deref().ok_or_else(|| {
+        AdmissionConsensusError::Protocol(
+            "committed admission replay requires a revocation database".to_string(),
+        )
+    })?;
+    admission_consensus_store_read_only_from_paths(
+        budget_path,
+        revocation_path,
+        "committed admission replay",
+    )
+}
+
+fn admission_consensus_store_read_only_from_paths(
+    budget_path: &Path,
+    revocation_path: &Path,
+    context: &str,
+) -> Result<AdmissionConsensusStore, AdmissionConsensusError> {
+    let canonical_budget = std::fs::canonicalize(budget_path).map_err(|error| {
+        AdmissionConsensusError::Protocol(format!(
+            "{context} budget database cannot be resolved: {error}"
+        ))
+    })?;
+    let canonical_revocation = std::fs::canonicalize(revocation_path).map_err(|error| {
+        AdmissionConsensusError::Protocol(format!(
+            "{context} revocation database cannot be resolved: {error}"
+        ))
+    })?;
+    if canonical_budget != canonical_revocation {
+        return Err(AdmissionConsensusError::Protocol(format!(
+            "{context} requires one shared budget and revocation database"
+        )));
+    }
+    AdmissionConsensusStore::open_existing_read_only(canonical_budget)
+}
+
 fn capture_admission_genesis_projection(
     path: &Path,
 ) -> Result<AdmissionGenesisProjection, AdmissionConsensusError> {
@@ -571,6 +1145,7 @@ fn capture_admission_genesis_projection_from_connection<F>(
 where
     F: FnMut(&str) -> Result<(), AdmissionConsensusError>,
 {
+    validate_partition_escrow_projection_integrity(connection)?;
     let existing_tables = {
         let mut statement = connection
             .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name ASC")?;
@@ -682,848 +1257,4 @@ where
     Ok(projection)
 }
 
-fn validate_admission_genesis_table_schema(
-    connection: &Connection,
-    spec: &AdmissionGenesisTableSpec,
-) -> Result<(), AdmissionConsensusError> {
-    let mut statement = connection.prepare(&format!("PRAGMA table_info(\"{}\")", spec.name))?;
-    let actual = statement
-        .query_map([], |row| {
-            Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    if actual.len() != spec.columns.len() {
-        return Err(AdmissionConsensusError::Protocol(format!(
-            "admission genesis table `{}` has extra or missing columns",
-            spec.name
-        )));
-    }
-    for (expected_name, expected_type) in spec.columns {
-        let Some((_, declared_type)) = actual.iter().find(|(name, _)| name == expected_name) else {
-            return Err(AdmissionConsensusError::Protocol(format!(
-                "admission genesis table `{}` is missing column `{expected_name}`",
-                spec.name
-            )));
-        };
-        if sqlite_logical_value_type(declared_type).as_ref() != Some(expected_type) {
-            return Err(AdmissionConsensusError::Protocol(format!(
-                "admission genesis column `{}.{expected_name}` has an incompatible logical type",
-                spec.name
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn sqlite_logical_value_type(declared_type: &str) -> Option<AdmissionGenesisValueType> {
-    let declared = declared_type.trim().to_ascii_uppercase();
-    if declared.contains("INT") {
-        Some(AdmissionGenesisValueType::Integer)
-    } else if declared.contains("CHAR") || declared.contains("CLOB") || declared.contains("TEXT") {
-        Some(AdmissionGenesisValueType::Text)
-    } else if declared.contains("REAL") || declared.contains("FLOA") || declared.contains("DOUB") {
-        Some(AdmissionGenesisValueType::Real)
-    } else if declared.is_empty() || declared.contains("BLOB") {
-        Some(AdmissionGenesisValueType::Blob)
-    } else {
-        None
-    }
-}
-
-fn admission_genesis_value_matches_type(
-    value: &AdmissionGenesisValue,
-    expected: AdmissionGenesisValueType,
-) -> bool {
-    matches!(value, AdmissionGenesisValue::Null)
-        || matches!(
-            (value, expected),
-            (
-                AdmissionGenesisValue::Integer(_),
-                AdmissionGenesisValueType::Integer
-            ) | (
-                AdmissionGenesisValue::RealBits(_),
-                AdmissionGenesisValueType::Real
-            ) | (
-                AdmissionGenesisValue::Text(_),
-                AdmissionGenesisValueType::Text
-            ) | (
-                AdmissionGenesisValue::BlobHex(_),
-                AdmissionGenesisValueType::Blob
-            )
-        )
-}
-
-fn validate_admission_genesis_projection(
-    projection: &AdmissionGenesisProjection,
-) -> Result<(), AdmissionConsensusError> {
-    if projection.tables.len() != ADMISSION_GENESIS_TABLES.len() {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission genesis projection has extra or missing tables".to_string(),
-        ));
-    }
-    let mut row_count = 0usize;
-    let mut cell_count = 0usize;
-    for (table, spec) in projection.tables.iter().zip(ADMISSION_GENESIS_TABLES) {
-        if table.name != spec.name || table.columns.len() != spec.columns.len() {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission genesis projection table schema is noncanonical".to_string(),
-            ));
-        }
-        for (column, (expected_name, expected_type)) in table.columns.iter().zip(spec.columns) {
-            if column.name != *expected_name || column.value_type != *expected_type {
-                return Err(AdmissionConsensusError::Protocol(format!(
-                    "admission genesis projection column `{}.{}` is noncanonical",
-                    table.name, column.name
-                )));
-            }
-        }
-        row_count = row_count.checked_add(table.rows.len()).ok_or_else(|| {
-            AdmissionConsensusError::Protocol("admission genesis row count overflow".to_string())
-        })?;
-        for row in &table.rows {
-            if row.len() != table.columns.len() {
-                return Err(AdmissionConsensusError::Protocol(format!(
-                    "admission genesis table `{}` contains a partial row",
-                    table.name
-                )));
-            }
-            cell_count = cell_count.checked_add(row.len()).ok_or_else(|| {
-                AdmissionConsensusError::Protocol(
-                    "admission genesis cell count overflow".to_string(),
-                )
-            })?;
-            for (value, column) in row.iter().zip(&table.columns) {
-                if !admission_genesis_value_matches_type(value, column.value_type)
-                    || admission_genesis_value_bytes(value) > MAX_ADMISSION_GENESIS_CELL_BYTES
-                    || !admission_genesis_value_is_canonical(value)
-                {
-                    return Err(AdmissionConsensusError::Protocol(format!(
-                        "admission genesis table `{}` contains an invalid typed value",
-                        table.name
-                    )));
-                }
-            }
-        }
-        let row_keys = table
-            .rows
-            .iter()
-            .map(canonical_json_bytes)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| {
-                AdmissionConsensusError::Protocol(format!(
-                    "admission genesis row canonicalization failed: {error}"
-                ))
-            })?;
-        if row_keys.windows(2).any(|pair| pair[0] >= pair[1]) {
-            return Err(AdmissionConsensusError::Protocol(format!(
-                "admission genesis table `{}` rows are unsorted or duplicated",
-                table.name
-            )));
-        }
-    }
-    if row_count > MAX_ADMISSION_GENESIS_ROWS || cell_count > MAX_ADMISSION_GENESIS_CELLS {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission genesis projection exceeds row or cell bounds".to_string(),
-        ));
-    }
-    let canonical = canonical_json_bytes(projection).map_err(|error| {
-        AdmissionConsensusError::Protocol(format!(
-            "admission genesis projection canonicalization failed: {error}"
-        ))
-    })?;
-    if canonical.len() > MAX_ADMISSION_GENESIS_BYTES {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission genesis projection exceeds the encoded size bound".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn admission_genesis_value_bytes(value: &AdmissionGenesisValue) -> usize {
-    match value {
-        AdmissionGenesisValue::Null | AdmissionGenesisValue::Integer(_) => 0,
-        AdmissionGenesisValue::RealBits(value)
-        | AdmissionGenesisValue::Text(value)
-        | AdmissionGenesisValue::BlobHex(value) => value.len(),
-    }
-}
-
-fn admission_genesis_value_is_canonical(value: &AdmissionGenesisValue) -> bool {
-    match value {
-        AdmissionGenesisValue::RealBits(value) => value.len() == 16 && is_lower_hex(value),
-        AdmissionGenesisValue::BlobHex(value) => value.len() % 2 == 0 && is_lower_hex(value),
-        AdmissionGenesisValue::Null
-        | AdmissionGenesisValue::Integer(_)
-        | AdmissionGenesisValue::Text(_) => true,
-    }
-}
-
-fn admission_genesis_projection_digest(
-    projection: &AdmissionGenesisProjection,
-) -> Result<String, AdmissionConsensusError> {
-    validate_admission_genesis_projection(projection)?;
-    let canonical = canonical_json_bytes(projection).map_err(|error| {
-        AdmissionConsensusError::Protocol(format!(
-            "admission genesis projection canonicalization failed: {error}"
-        ))
-    })?;
-    let mut preimage =
-        Vec::with_capacity(ADMISSION_PROJECTION_BASELINE_DOMAIN.len() + canonical.len());
-    preimage.extend_from_slice(ADMISSION_PROJECTION_BASELINE_DOMAIN);
-    preimage.extend_from_slice(&canonical);
-    Ok(sha256_hex(&preimage))
-}
-
-fn capture_admission_security_projection_digest_from_connection(
-    connection: &Connection,
-) -> Result<String, AdmissionConsensusError> {
-    let projection = capture_admission_genesis_projection_from_connection(connection, |_| Ok(()))?;
-    admission_security_projection_digest(&projection)
-}
-
-fn admission_security_projection_digest(
-    projection: &AdmissionGenesisProjection,
-) -> Result<String, AdmissionConsensusError> {
-    validate_admission_genesis_projection(projection)?;
-    let mut tables = Vec::with_capacity(projection.tables.len());
-    for table in &projection.tables {
-        let included = table
-            .columns
-            .iter()
-            .enumerate()
-            .filter(|(_, column)| !admission_security_projection_ignores(&table.name, &column.name))
-            .collect::<Vec<_>>();
-        let columns = included
-            .iter()
-            .map(|(_, column)| (*column).clone())
-            .collect::<Vec<_>>();
-        let mut rows = table
-            .rows
-            .iter()
-            .map(|row| {
-                included
-                    .iter()
-                    .map(|(index, _)| row[*index].clone())
-                    .collect::<Vec<_>>()
-            })
-            .map(|row| {
-                canonical_json_bytes(&row)
-                    .map(|key| (key, row))
-                    .map_err(|error| {
-                        AdmissionConsensusError::Protocol(format!(
-                            "admission security projection row canonicalization failed: {error}"
-                        ))
-                    })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        rows.sort_by(|left, right| left.0.cmp(&right.0));
-        tables.push(AdmissionSecurityTable {
-            name: table.name.clone(),
-            columns,
-            rows: rows.into_iter().map(|(_, row)| row).collect(),
-        });
-    }
-    let projection = AdmissionSecurityProjection { tables };
-    let canonical = canonical_json_bytes(&projection).map_err(|error| {
-        AdmissionConsensusError::Protocol(format!(
-            "admission security projection canonicalization failed: {error}"
-        ))
-    })?;
-    let mut preimage =
-        Vec::with_capacity(ADMISSION_SECURITY_PROJECTION_DOMAIN.len() + canonical.len());
-    preimage.extend_from_slice(ADMISSION_SECURITY_PROJECTION_DOMAIN);
-    preimage.extend_from_slice(&canonical);
-    Ok(sha256_hex(&preimage))
-}
-
-fn admission_security_projection_ignores(table: &str, column: &str) -> bool {
-    ADMISSION_SECURITY_PROJECTION_EXCLUSIONS.contains(&(table, column))
-}
-
-fn is_lower_hex(value: &str) -> bool {
-    value
-        .bytes()
-        .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
-}
-
-fn lower_hex(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
-    for byte in bytes {
-        output.push(char::from(HEX[usize::from(byte >> 4)]));
-        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    output
-}
-
-fn admission_genesis_projection_is_empty(projection: &AdmissionGenesisProjection) -> bool {
-    projection.tables.iter().all(|table| {
-        if table.name == "admission_authority_meta" {
-            table.rows
-                == vec![vec![
-                    AdmissionGenesisValue::Integer(1),
-                    AdmissionGenesisValue::Text("combined-admission-capture-v1".to_string()),
-                    AdmissionGenesisValue::Integer(0),
-                    AdmissionGenesisValue::Integer(0),
-                ]]
-        } else {
-            table.rows.is_empty()
-        }
-    })
-}
-
-fn install_admission_genesis_projection(
-    transaction: &Transaction<'_>,
-    projection: &AdmissionGenesisProjection,
-) -> Result<(), AdmissionConsensusError> {
-    validate_admission_genesis_projection(projection)?;
-    transaction.execute_batch(
-        r#"
-        PRAGMA defer_foreign_keys = ON;
-        DROP TRIGGER IF EXISTS admission_revocation_insert_requires_authority;
-        "#,
-    )?;
-    for table in projection.tables.iter().rev() {
-        transaction.execute(&format!("DELETE FROM \"{}\"", table.name), [])?;
-    }
-    for table in &projection.tables {
-        if table.rows.is_empty() {
-            continue;
-        }
-        let columns = table
-            .columns
-            .iter()
-            .map(|column| format!("\"{}\"", column.name))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let bind_markers = (1..=table.columns.len())
-            .map(|index| format!("?{index}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let sql = format!(
-            "INSERT INTO \"{}\" ({columns}) VALUES ({bind_markers})",
-            table.name
-        );
-        for row in &table.rows {
-            let values = row
-                .iter()
-                .map(admission_genesis_sql_value)
-                .collect::<Result<Vec<_>, _>>()?;
-            transaction.execute(&sql, rusqlite::params_from_iter(values))?;
-        }
-    }
-    transaction.execute_batch(
-        r#"
-        CREATE TRIGGER IF NOT EXISTS admission_revocation_insert_requires_authority
-        BEFORE INSERT ON revoked_capabilities
-        BEGIN
-            SELECT RAISE(ABORT, 'revocation write requires combined admission authority');
-        END;
-        "#,
-    )?;
-    normalize_admission_transport_cache(transaction)?;
-    let foreign_key_violation = transaction
-        .query_row("PRAGMA foreign_key_check", [], |row| {
-            row.get::<_, String>(0)
-        })
-        .optional()?;
-    if foreign_key_violation.is_some() {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission genesis projection violates relational integrity".to_string(),
-        ));
-    }
-    let installed = capture_admission_genesis_projection_from_connection(transaction, |_| Ok(()))?;
-    if installed != *projection {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission genesis projection was only partially installed".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn admission_genesis_sql_value(
-    value: &AdmissionGenesisValue,
-) -> Result<rusqlite::types::Value, AdmissionConsensusError> {
-    Ok(match value {
-        AdmissionGenesisValue::Null => rusqlite::types::Value::Null,
-        AdmissionGenesisValue::Integer(value) => rusqlite::types::Value::Integer(*value),
-        AdmissionGenesisValue::RealBits(value) => {
-            let bits = u64::from_str_radix(value, 16).map_err(|_| {
-                AdmissionConsensusError::Protocol(
-                    "admission genesis real value has invalid bits".to_string(),
-                )
-            })?;
-            rusqlite::types::Value::Real(f64::from_bits(bits))
-        }
-        AdmissionGenesisValue::Text(value) => rusqlite::types::Value::Text(value.clone()),
-        AdmissionGenesisValue::BlobHex(value) => {
-            rusqlite::types::Value::Blob(decode_lower_hex(value)?)
-        }
-    })
-}
-
-fn decode_lower_hex(value: &str) -> Result<Vec<u8>, AdmissionConsensusError> {
-    if !value.len().is_multiple_of(2) || !is_lower_hex(value) {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission genesis blob is not canonical lowercase hex".to_string(),
-        ));
-    }
-    value
-        .as_bytes()
-        .chunks_exact(2)
-        .map(|pair| {
-            let text = std::str::from_utf8(pair).map_err(|_| {
-                AdmissionConsensusError::Protocol(
-                    "admission genesis blob contains invalid hex".to_string(),
-                )
-            })?;
-            u8::from_str_radix(text, 16).map_err(|_| {
-                AdmissionConsensusError::Protocol(
-                    "admission genesis blob contains invalid hex".to_string(),
-                )
-            })
-        })
-        .collect()
-}
-
-fn normalize_admission_transport_cache(
-    transaction: &Transaction<'_>,
-) -> Result<(), AdmissionConsensusError> {
-    transaction.execute("DELETE FROM budget_import_floors", [])?;
-    transaction.execute("DELETE FROM budget_origin_ack_heads", [])?;
-    transaction.execute("DELETE FROM budget_abandoned_event_seqs", [])?;
-    transaction.execute("DELETE FROM budget_abandoned_event_ranges", [])?;
-    transaction.execute(
-        "UPDATE budget_ack_head_watermark SET head_seq = 0 WHERE singleton = 1",
-        [],
-    )?;
-    transaction.execute(
-        r#"
-        UPDATE budget_replication_meta
-        SET next_seq = MAX(
-            COALESCE((SELECT MAX(seq) FROM capability_grant_budgets), 0),
-            COALESCE((SELECT MAX(event_seq) FROM budget_mutation_events), 0)
-        )
-        WHERE singleton = 1
-        "#,
-        [],
-    )?;
-    Ok(())
-}
-
-fn apply_admission_log_entry(
-    _config: &TrustServiceConfig,
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-    proof: &AdmissionCommitProof,
-) -> Result<String, String> {
-    if proof.index != entry.index || proof.leader_epoch < entry.leader_epoch {
-        return Err("admission commit proof does not match the applied entry".to_string());
-    }
-    match entry.command_kind {
-        AdmissionCommandKind::LeadershipBarrier => canonical_result(&json!({"committed": true})),
-        AdmissionCommandKind::IncrementInvocation => {
-            apply_increment_invocation(transaction, entry, proof)
-        }
-        AdmissionCommandKind::CompositeAuthorize => {
-            apply_composite_authorize(transaction, entry, proof)
-        }
-        AdmissionCommandKind::CaptureInvocations => {
-            apply_invocation_capture(transaction, entry, proof)
-        }
-        AdmissionCommandKind::ReverseExposure => apply_reverse_exposure(transaction, entry, proof),
-        AdmissionCommandKind::ReleaseExposure => apply_reduce_exposure(
-            transaction,
-            entry,
-            proof,
-            AdmissionCommandKind::ReleaseExposure,
-        ),
-        AdmissionCommandKind::ReconcileSpend => apply_reduce_exposure(
-            transaction,
-            entry,
-            proof,
-            AdmissionCommandKind::ReconcileSpend,
-        ),
-        AdmissionCommandKind::CaptureExposure => apply_reduce_exposure(
-            transaction,
-            entry,
-            proof,
-            AdmissionCommandKind::CaptureExposure,
-        ),
-        AdmissionCommandKind::Revoke => apply_revocation(transaction, entry),
-        AdmissionCommandKind::CombinedCapture => apply_combined_capture(transaction, entry, proof),
-    }
-}
-
-fn apply_increment_invocation(
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-    proof: &AdmissionCommitProof,
-) -> Result<String, String> {
-    let command: ConsensusIncrementInvocationCommand =
-        serde_json::from_str(&entry.canonical_command).map_err(|error| error.to_string())?;
-    let authority = budget_authority_from_view(&command.authority)?;
-    let outcome = match SqliteBudgetStore::increment_invocation_in_transaction(
-        transaction,
-        &command.request.capability_id,
-        command.request.grant_index,
-        command.request.max_invocations,
-        &entry.operation_id,
-        &authority,
-    ) {
-        Ok(outcome) => outcome,
-        Err(error) => return frozen_budget_rejection(error),
-    };
-    let (metadata, commit) = consensus_budget_evidence(proof, &authority, outcome.event_seq);
-    canonical_result(&TryIncrementBudgetResponse {
-        capability_id: command.request.capability_id,
-        grant_index: command.request.grant_index,
-        allowed: outcome.allowed,
-        invocation_count: Some(outcome.invocation_count),
-        budget_authority: Some(metadata),
-        budget_commit: Some(commit),
-    })
-}
-
-fn apply_composite_authorize(
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-    proof: &AdmissionCommitProof,
-) -> Result<String, String> {
-    let command: ConsensusCompositeAuthorizeCommand =
-        serde_json::from_str(&entry.canonical_command).map_err(|error| error.to_string())?;
-    let authority = budget_authority_from_view(&command.authority)?;
-    let prepared = super::super::budget_handlers::sqlite_composite_authorize_input(
-        &command.request,
-        authority.clone(),
-    )
-    .map_err(|error| error.to_string())?;
-    let decision = match prepared.authorize_in_transaction(transaction) {
-        Ok(decision) => decision,
-        Err(error) => return frozen_budget_rejection(error),
-    };
-    let budget_seq = load_consensus_budget_event(transaction, &command.request.event_id)?.event_seq;
-    let (metadata, commit) = consensus_budget_evidence(proof, &authority, budget_seq);
-    let response = super::super::budget_handlers::composite_authorize_response_view(
-        &command.request,
-        decision,
-        metadata,
-        commit,
-    )
-    .map_err(|error| error.to_string())?;
-    canonical_result(&response)
-}
-
-fn apply_invocation_capture(
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-    proof: &AdmissionCommitProof,
-) -> Result<String, String> {
-    let request: CaptureInvocationReservationsRequest =
-        serde_json::from_str(&entry.canonical_command).map_err(|error| error.to_string())?;
-    let authority = request
-        .budget_authority
-        .as_ref()
-        .ok_or_else(|| "invocation capture omitted its persisted authority".to_string())
-        .and_then(budget_authority_from_view)?;
-    let decision = match SqliteBudgetStore::capture_invocation_reservations_in_transaction(
-        transaction,
-        &BudgetCaptureInvocationRequest {
-            admission_operation: Some(
-                BudgetAdmissionOperationBinding::new(
-                    request.operation_id.clone(),
-                    request.request_binding_hash.clone(),
-                )
-                .map_err(|error| error.to_string())?,
-            ),
-            capability_id: request.capability_id.clone(),
-            grant_index: request.grant_index,
-            hold_id: Some(request.hold_id.clone()),
-            event_id: Some(request.event_id.clone()),
-            authority: Some(authority.clone()),
-        },
-    ) {
-        Ok(decision) => decision,
-        Err(error) => return frozen_budget_rejection(error),
-    };
-    if decision.invocation_state != BudgetInvocationReservationState::Captured {
-        return Err("invocation capture did not reach captured state".to_string());
-    }
-    let budget_seq = load_consensus_budget_event(transaction, &request.event_id)?.event_seq;
-    let (metadata, commit) = consensus_budget_evidence(proof, &authority, budget_seq);
-    let response = super::super::budget_handlers::invocation_capture_response_view(
-        &request, decision, metadata, commit,
-    )
-    .map_err(|error| error.to_string())?;
-    canonical_result(&response)
-}
-
-fn apply_reverse_exposure(
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-    proof: &AdmissionCommitProof,
-) -> Result<String, String> {
-    let request: ReverseChargeCostRequest =
-        serde_json::from_str(&entry.canonical_command).map_err(|error| error.to_string())?;
-    let hold_id = request
-        .hold_id
-        .as_deref()
-        .ok_or_else(|| "reverse exposure command omitted hold_id".to_string())?;
-    let event_id = request
-        .event_id
-        .as_deref()
-        .ok_or_else(|| "reverse exposure command omitted event_id".to_string())?;
-    let authority = request
-        .budget_authority
-        .as_ref()
-        .ok_or_else(|| "reverse exposure command omitted persisted authority".to_string())
-        .and_then(budget_authority_from_view)?;
-    let decision = match SqliteBudgetStore::reverse_composite_budget_hold_in_transaction(
-        transaction,
-        BudgetReverseHoldRequest {
-            admission_operation: super::super::budget_handlers::budget_admission_operation_binding(
-                request.operation_id.as_deref(),
-                request.request_binding_hash.as_deref(),
-            )
-            .map_err(|error| error.to_string())?,
-            capability_id: request.capability_id.clone(),
-            grant_index: request.grant_index,
-            reversed_exposure_units: request.cost_units,
-            hold_id: Some(hold_id.to_string()),
-            event_id: Some(event_id.to_string()),
-            authority: Some(authority.clone()),
-        },
-    ) {
-        Ok(decision) => decision,
-        Err(error) => return frozen_budget_rejection(error),
-    };
-    if decision.invocation_state != BudgetInvocationReservationState::Reversed {
-        return Err("budget reverse did not reach reversed invocation state".to_string());
-    }
-    let event = load_consensus_budget_event(transaction, event_id)?;
-    validate_consensus_budget_event(
-        &event,
-        BudgetMutationKind::ReverseInvocations,
-        &request.capability_id,
-        request.grant_index,
-        hold_id,
-        request.cost_units,
-        0,
-        &authority,
-    )?;
-    let (metadata, commit) = consensus_budget_evidence(proof, &authority, event.event_seq);
-    canonical_result(&ReverseChargeCostResponse {
-        capability_id: request.capability_id,
-        grant_index: request.grant_index,
-        invocation_count: Some(event.invocation_count_after),
-        total_cost_exposed: Some(event.total_cost_exposed_after),
-        total_cost_realized_spend: Some(event.total_cost_realized_spend_after),
-        budget_authority: Some(metadata),
-        budget_commit: Some(commit),
-    })
-}
-
-fn apply_reduce_exposure(
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-    proof: &AdmissionCommitProof,
-    command_kind: AdmissionCommandKind,
-) -> Result<String, String> {
-    let request: ReduceChargeCostRequest =
-        serde_json::from_str(&entry.canonical_command).map_err(|error| error.to_string())?;
-    let hold_id = request
-        .hold_id
-        .as_deref()
-        .ok_or_else(|| "monetary transition command omitted hold_id".to_string())?;
-    let event_id = request
-        .event_id
-        .as_deref()
-        .ok_or_else(|| "monetary transition command omitted event_id".to_string())?;
-    let authority = request
-        .budget_authority
-        .as_ref()
-        .ok_or_else(|| "monetary transition command omitted persisted authority".to_string())
-        .and_then(budget_authority_from_view)?;
-    let (mutation_kind, exposure_units, realized_spend_units) = match command_kind {
-        AdmissionCommandKind::ReleaseExposure => {
-            if let Err(error) = SqliteBudgetStore::release_composite_budget_hold_in_transaction(
-                transaction,
-                BudgetReleaseHoldRequest {
-                    admission_operation:
-                        super::super::budget_handlers::budget_admission_operation_binding(
-                            request.operation_id.as_deref(),
-                            request.request_binding_hash.as_deref(),
-                        )
-                        .map_err(|error| error.to_string())?,
-                    capability_id: request.capability_id.clone(),
-                    grant_index: request.grant_index,
-                    released_exposure_units: request.cost_units,
-                    hold_id: Some(hold_id.to_string()),
-                    event_id: Some(event_id.to_string()),
-                    authority: Some(authority.clone()),
-                },
-            ) {
-                return frozen_budget_rejection(error);
-            }
-            (BudgetMutationKind::ReleaseExposure, request.cost_units, 0)
-        }
-        AdmissionCommandKind::ReconcileSpend => {
-            let exposure_units = request
-                .exposure_units
-                .ok_or_else(|| "reconcile command omitted exposure units".to_string())?;
-            let realized_spend_units = request
-                .realized_spend_units
-                .ok_or_else(|| "reconcile command omitted realized spend".to_string())?;
-            if let Err(error) = SqliteBudgetStore::settle_composite_budget_hold_in_transaction(
-                transaction,
-                BudgetReconcileHoldRequest {
-                    admission_operation:
-                        super::super::budget_handlers::budget_admission_operation_binding(
-                            request.operation_id.as_deref(),
-                            request.request_binding_hash.as_deref(),
-                        )
-                        .map_err(|error| error.to_string())?,
-                    capability_id: request.capability_id.clone(),
-                    grant_index: request.grant_index,
-                    exposed_cost_units: exposure_units,
-                    realized_spend_units,
-                    hold_id: Some(hold_id.to_string()),
-                    event_id: Some(event_id.to_string()),
-                    authority: Some(authority.clone()),
-                },
-                false,
-            ) {
-                return frozen_budget_rejection(error);
-            }
-            (
-                BudgetMutationKind::ReconcileSpend,
-                exposure_units,
-                realized_spend_units,
-            )
-        }
-        AdmissionCommandKind::CaptureExposure => {
-            let exposure_units = request
-                .exposure_units
-                .ok_or_else(|| "capture command omitted exposure units".to_string())?;
-            let realized_spend_units = request
-                .realized_spend_units
-                .ok_or_else(|| "capture command omitted realized spend".to_string())?;
-            if exposure_units.checked_sub(realized_spend_units) != Some(request.cost_units) {
-                return Err(
-                    "capture command reduction does not match exposure minus spend".to_string(),
-                );
-            }
-            let decision = match SqliteBudgetStore::settle_composite_budget_hold_in_transaction(
-                transaction,
-                BudgetReconcileHoldRequest {
-                    admission_operation:
-                        super::super::budget_handlers::budget_admission_operation_binding(
-                            request.operation_id.as_deref(),
-                            request.request_binding_hash.as_deref(),
-                        )
-                        .map_err(|error| error.to_string())?,
-                    capability_id: request.capability_id.clone(),
-                    grant_index: request.grant_index,
-                    exposed_cost_units: exposure_units,
-                    realized_spend_units,
-                    hold_id: Some(hold_id.to_string()),
-                    event_id: Some(event_id.to_string()),
-                    authority: Some(authority.clone()),
-                },
-                true,
-            ) {
-                Ok(decision) => decision,
-                Err(error) => return frozen_budget_rejection(error),
-            };
-            if decision.monetary_state != BudgetMonetaryHoldState::Captured {
-                return Err("monetary capture did not reach captured state".to_string());
-            }
-            (
-                BudgetMutationKind::CaptureExposure,
-                exposure_units,
-                realized_spend_units,
-            )
-        }
-        _ => return Err("unsupported monetary transition command".to_string()),
-    };
-    let event = load_consensus_budget_event(transaction, event_id)?;
-    validate_consensus_budget_event(
-        &event,
-        mutation_kind,
-        &request.capability_id,
-        request.grant_index,
-        hold_id,
-        exposure_units,
-        realized_spend_units,
-        &authority,
-    )?;
-    let (metadata, commit) = consensus_budget_evidence(proof, &authority, event.event_seq);
-    canonical_result(&ReduceChargeCostResponse {
-        capability_id: request.capability_id,
-        grant_index: request.grant_index,
-        invocation_count: Some(event.invocation_count_after),
-        total_cost_exposed: Some(event.total_cost_exposed_after),
-        total_cost_realized_spend: Some(event.total_cost_realized_spend_after),
-        released_exposure_units: Some(request.cost_units),
-        budget_authority: Some(metadata),
-        budget_commit: Some(commit),
-    })
-}
-
-fn load_consensus_budget_event(
-    transaction: &Transaction<'_>,
-    event_id: &str,
-) -> Result<BudgetMutationRecord, String> {
-    SqliteBudgetStore::mutation_event_for_event_id_in_transaction(transaction, event_id)
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| format!("budget event `{event_id}` is not persisted"))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn validate_consensus_budget_event(
-    event: &BudgetMutationRecord,
-    kind: BudgetMutationKind,
-    capability_id: &str,
-    grant_index: usize,
-    hold_id: &str,
-    exposure_units: u64,
-    realized_spend_units: u64,
-    authority: &BudgetEventAuthority,
-) -> Result<(), String> {
-    if event.kind != kind
-        || event.capability_id != capability_id
-        || usize::try_from(event.grant_index).ok() != Some(grant_index)
-        || event.hold_id.as_deref() != Some(hold_id)
-        || event.exposure_units != exposure_units
-        || event.realized_spend_units != realized_spend_units
-        || event.authority.as_ref() != Some(authority)
-        || event.usage_seq != Some(event.event_seq)
-    {
-        return Err(format!(
-            "budget event `{}` does not match its consensus command",
-            event.event_id
-        ));
-    }
-    Ok(())
-}
-
-fn apply_revocation(
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-) -> Result<String, String> {
-    let command: ConsensusRevocationCommand =
-        serde_json::from_str(&entry.canonical_command).map_err(|error| error.to_string())?;
-    let outcome = SqliteAdmissionCaptureAuthority::upsert_revocation_in_transaction(
-        transaction,
-        &RevocationRecord {
-            capability_id: command.capability_id.clone(),
-            revoked_at: command.revoked_at,
-        },
-    )
-    .map_err(|error| error.to_string())?;
-    canonical_result(&RevokeCapabilityResponse {
-        capability_id: command.capability_id,
-        revoked: true,
-        newly_revoked: !outcome.was_present(),
-    })
-}
+include!("part_03_tail.inc");

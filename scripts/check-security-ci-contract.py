@@ -53,7 +53,7 @@ EXPECTED_APK_LOCK_SHA256 = (
     "b4d4642b66191c1923fe7c293b408b570b71df9edb710ffa09bc518ca36a5ad8"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "44426ff0f763ae5e8a8f72bf3feb344a7870bf6e8402c2e4b0438a75fbf87032"
+    "5764368b209d95259cddfc171dca702298298a02bc77ef8fbd80ad24f8814a7c"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "8bc51ecab82415fddd8489604f2424e137d71856e7f65cbdcfaa48850d794b46"
@@ -70,6 +70,44 @@ EXPECTED_CARGO_MUTANTS_ARCHIVE_SHA256 = (
 EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
+EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
+    "bdd31e29868ad10bcc18af97eb431958851824634d977eeaffaa95a995109d33"
+)
+EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
+    "f1a37575a5b8dafe1d416413e46be76883cb97373ca14d3a708cdaa3b791456c"
+)
+EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
+    "51cfd01140812db5df3310271c0cc12e123d41ddea2e13e9f82b23cfaec18cde"
+)
+EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
+    "f35c9e95544a7d22a037a287a0d63696b1b85b1691312aab908b4b4c46944b18"
+)
+EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
+    "80caeb391bc7d7cbf92e5c30cea9847c8af026ee1179289c7b030ad083229648"
+)
+EXPECTED_TEMPORAL_GATE_SHA256 = (
+    "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554"
+)
+EXPECTED_TEMPORAL_SELF_TEST_SHA256 = (
+    "af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06"
+)
+EXPECTED_TEMPORAL_STEP_SHELL = "/bin/bash --noprofile --norc -p -e {0}"
+EXPECTED_TEMPORAL_GATE_RUN = rf"""
+set -euo pipefail
+readonly temporal_runner="scripts/check-temporal-security.sh"
+readonly temporal_self_test="scripts/tests/check-temporal-security.test.sh"
+test -f "${{temporal_runner}}"
+test ! -L "${{temporal_runner}}"
+test -x "${{temporal_runner}}"
+test -f "${{temporal_self_test}}"
+test ! -L "${{temporal_self_test}}"
+test -x "${{temporal_self_test}}"
+printf '%s  %s\n' '{EXPECTED_TEMPORAL_GATE_SHA256}' "${{temporal_runner}}" | /usr/bin/sha256sum --check --strict
+printf '%s  %s\n' '{EXPECTED_TEMPORAL_SELF_TEST_SHA256}' "${{temporal_self_test}}" | /usr/bin/sha256sum --check --strict
+/bin/bash -p "${{temporal_self_test}}"
+printf '%s  %s\n' '{EXPECTED_TEMPORAL_GATE_SHA256}' "${{temporal_runner}}" | /usr/bin/sha256sum --check --strict
+/bin/bash -p "${{temporal_runner}}"
+""".strip()
 EXPECTED_DIRECT_APK_PACKAGES = (
     "bash=5.2.37-r0",
     "build-base=0.5-r3",
@@ -89,6 +127,7 @@ EXPECTED_DIRECT_APK_PACKAGES = (
 )
 EXPECTED_TRUSTED_BOUNDARY_FILES = frozenset(
     {
+        "cargo-mutants",
         "check-cage-all-target-inventory.py",
         "check-cage-enforcement.sh",
         "check-cage-linux-enforcement.sh",
@@ -170,6 +209,12 @@ FORBIDDEN_INHERITED_ENV = {
     "RUSTC_WRAPPER",
     "SHELLOPTS",
 }
+FORBIDDEN_SHELL_STARTUP_REFERENCES = (
+    "BASH_ENV",
+    "BASHOPTS",
+    "ENV",
+    "SHELLOPTS",
+)
 REQUIRED_CANDIDATE_ENTERPRISE_JOBS = {
     "portable-contracts",
     "active-defense-security",
@@ -511,6 +556,11 @@ EXPECTED_CONTROLLER_STEP_INVENTORY = (
 )
 EXPECTED_CAPTURE_STEP_INVENTORIES = {
     "authorize-capture": (
+        (
+            "Authenticate controller dispatch and capture definition",
+            "authenticate",
+            None,
+        ),
         ("Revalidate controller source and merge authorization", "authorize", None),
     ),
     "refresh-linux-evidence": (
@@ -805,7 +855,8 @@ EXPECTED_COMMITTED_EVIDENCE_STEP_INVENTORY = (
         "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
     ),
     ("Verify exact isolated checkout identities", None, None),
-    ("Verify committed Linux evidence descendant", None, None),
+    ("Verify committed Linux evidence descendant", "strict", None),
+    ("Require committed Linux evidence verification", None, None),
 )
 EXPECTED_BIND_SOURCE_STEP_INVENTORY = (
     (
@@ -876,11 +927,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence controller",
         "dispatch-isolated-capture",
-    ): "22e5b956093ed25b89d6809eb325cb6a82a7de88bfab0eb3acf12d4648f348c3",
+    ): "624faf15407b787ec705d492adcb4616d9986a907dcc8e643af29bcfbecd06e1",
     (
         "enterprise Linux capture",
         "authorize-capture",
-    ): "00c5dc81fe982d3515e6a80e4723009cb46f5d5085c32bad9db3a1804a92fd2a",
+    ): "db37dae1df7436e0f2085df3f64d305a4c3780d1be803bef2ef182780a7640e6",
     (
         "enterprise Linux capture",
         "refresh-linux-evidence",
@@ -896,7 +947,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "validate-capture",
-    ): "579f73c2b6eea625547ff4ad2fde3cbfd99847f51daff6933f6c79ea2de8bc1f",
+    ): "df011f9c62a55e6c06293536fe5686cd83424f978ac6f25a3b736e1fc7901807",
     (
         "enterprise evidence finalizer",
         "sign-validated-capture",
@@ -920,11 +971,12 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise-hardening",
         "committed-linux-evidence",
-    ): "9a7f021026ec5253b299113627546ab3beb8d2919473ab8aa5ac6aa79b7b3873",
+    ): "98436d207ab41edfb0ce4e3c915cc8f30277ec57d601c48ab5dc32eb44320766",
 }
 EXPECTED_AGGREGATE_RUN = "\n".join(
     (
         "set -euo pipefail",
+        '[[ "${COMMITTED_LINUX_EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]',
         *(
             f"test '${{{{ needs.{identifier}.result }}}}' = success"
             for identifier in REQUIRED_AGGREGATE_NEEDS
@@ -1013,6 +1065,7 @@ EXPECTED_ACTIVE_DEFENSE_STEPS = (
     ),
     ("Information-flow behavior and formal model", "./scripts/check-flow-security.sh"),
     ("Deception boundary behavior", "./scripts/check-deception-security.sh"),
+    ("Temporal security gate", EXPECTED_TEMPORAL_GATE_RUN),
     ("Response recovery behavior", "./scripts/check-response-recovery.sh"),
     (
         "Active defense acceptance behavior",
@@ -1021,6 +1074,10 @@ EXPECTED_ACTIVE_DEFENSE_STEPS = (
     (
         "Protocol primitive concurrency",
         "./scripts/check-protocol-primitives-concurrency.sh",
+    ),
+    (
+        "Protocol primitive focused gate",
+        "./scripts/check-protocol-primitives-focused.sh --all",
     ),
     ("Protocol peer negotiation", "./scripts/check-protocol-peer-negotiation.sh"),
 )
@@ -1035,6 +1092,9 @@ EXPECTED_ADVERSARIAL_EVIDENCE_STEPS = (
         "./scripts/check-security-adversarial-evidence.sh --release",
     ),
 )
+EXPECTED_ACTIVE_DEFENSE_EXTRAS = {
+    "Temporal security gate": {"shell": EXPECTED_TEMPORAL_STEP_SHELL}
+}
 EXPECTED_LINUX_RELEASE_STEPS = (
     (
         "Verify designated runner contract",
@@ -1191,6 +1251,7 @@ fi
 """.strip()
 EXPECTED_CI_EVIDENCE_STEPS = (
     ("Formal traceability gate", "bash scripts/check-mapping.sh"),
+    ("Temporal security gate", EXPECTED_TEMPORAL_GATE_RUN),
     ("Workspace format", "cargo fmt --all -- --check"),
     ("Workspace clippy", "cargo clippy --workspace --all-targets -- -D warnings"),
     ("Workspace build", "cargo build --workspace"),
@@ -1198,6 +1259,10 @@ EXPECTED_CI_EVIDENCE_STEPS = (
     (
         "Protocol-primitives production Loom gate",
         "./scripts/check-protocol-primitives-concurrency.sh",
+    ),
+    (
+        "Protocol-primitives focused gate",
+        "./scripts/check-protocol-primitives-focused.sh --all",
     ),
     ("Protocol peer-negotiation gate", "./scripts/check-protocol-peer-negotiation.sh"),
     ("Wasm guards library tests", "cargo test -p chio-wasm-guards --lib"),
@@ -1216,15 +1281,21 @@ EXPECTED_CI_EVIDENCE_EXTRAS = {
     name: {"env": EXPECTED_COMMON_CI_STEP_ENV}
     for name in (
         "Workspace format",
+        "Temporal security gate",
         "Workspace clippy",
         "Workspace build",
         "Workspace tests",
         "Protocol-primitives production Loom gate",
+        "Protocol-primitives focused gate",
         "Protocol peer-negotiation gate",
         "Wasm guards library tests",
         "Wasm guards Python SDK round-trip tests",
         "Exact workspace test gate",
     )
+}
+EXPECTED_CI_EVIDENCE_EXTRAS["Temporal security gate"] = {
+    "env": EXPECTED_COMMON_CI_STEP_ENV,
+    "shell": EXPECTED_TEMPORAL_STEP_SHELL,
 }
 EXPECTED_KANI_STEP_EXTRAS = {
     "Verify all PR Kani harnesses": {
@@ -1345,8 +1416,50 @@ fi
 grep -Eq "state invariant [0-9]+ violated" "${negative_log}"
 grep -Fq "The outcome is: Error" "${negative_log}"
 """.strip()
+EXPECTED_THREAT_CARGO_MUTANTS_RUN = r"""
+set -euo pipefail
+cargo install cargo-mutants --locked --version 25.3.1
+cargo_mutants="$(command -v cargo-mutants)"
+test -n "${cargo_mutants}"
+test "$(realpath "${cargo_mutants}")" = "${cargo_mutants}"
+test -f "${cargo_mutants}"
+test ! -L "${cargo_mutants}"
+test -x "${cargo_mutants}"
+test "$(stat -c '%h' "${cargo_mutants}")" = "1"
+test "$("${cargo_mutants}" mutants --version)" = "cargo-mutants 25.3.1"
+""".strip()
+EXPECTED_THREAT_STEP_INVENTORY = (
+    (
+        "Checkout",
+        None,
+        "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+    ),
+    (
+        "Set up Python (json parser)",
+        None,
+        "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+    ),
+    (
+        "Install Rust toolchain",
+        None,
+        "dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8",
+    ),
+    (
+        "Cache cargo registry and target",
+        None,
+        "Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+    ),
+    ("Run threat-model coverage gate (file-existence)", None, None),
+    ("Install and authenticate cargo-mutants", None, None),
+    ("Run threat-model mutants gate (per-row evidence)", None, None),
+    ("Self-test the coverage gate (state matrix)", None, None),
+    ("Self-test the mutants gate (evidence matrix)", None, None),
+    ("Cargo test - threat_model_schema_test", None, None),
+    ("Cargo test - threat-model integration test", None, None),
+)
 EXPECTED_THREAT_GATE_COMMANDS = {
     "Run threat-model coverage gate (file-existence)": "bash scripts/check-threat-coverage.sh",
+    "Install and authenticate cargo-mutants": EXPECTED_THREAT_CARGO_MUTANTS_RUN,
     "Run threat-model mutants gate (per-row evidence)": "bash scripts/check-threat-coverage-mutants.sh",
     "Self-test the coverage gate (state matrix)": "bash scripts/tests/check-threat-coverage.test.sh",
     "Self-test the mutants gate (evidence matrix)": "bash scripts/tests/check-threat-coverage-mutants.test.sh",
@@ -1837,6 +1950,27 @@ def require_exact_file_digest(path: Path, expected: str, description: str) -> st
     return observed
 
 
+def validate_temporal_security_contract_files(root: Path) -> None:
+    for relative, expected, description in (
+        (
+            Path("scripts/check-temporal-security.sh"),
+            EXPECTED_TEMPORAL_GATE_SHA256,
+            "temporal security gate",
+        ),
+        (
+            Path("scripts/tests/check-temporal-security.test.sh"),
+            EXPECTED_TEMPORAL_SELF_TEST_SHA256,
+            "temporal security self-test",
+        ),
+    ):
+        path = root / relative
+        if path.is_symlink() or not path.is_file():
+            raise ContractError(f"{description} is not a regular file")
+        if path.stat().st_mode & 0o111 == 0:
+            raise ContractError(f"{description} is not executable")
+        require_exact_file_digest(path, expected, description)
+
+
 def validate_security_dockerfile(root: Path, document: str) -> None:
     apk_lock = root / "deploy/docker/security-evidence-apk.lock"
     apk_digest = require_exact_file_digest(
@@ -1935,6 +2069,10 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/tmp/cargo-mutants-25.3.1/Cargo.lock' | sha256sum -c -",
         "cargo install --locked --path /tmp/cargo-mutants-25.3.1 "
         "--root /usr/local/cargo",
+        "chown 0:0 /usr/local/cargo /usr/local/cargo/bin "
+        "/usr/local/cargo/bin/cargo-mutants",
+        "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
+        "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
         "rm -rf /tmp/cargo-mutants-25.3.1 /tmp/cargo-mutants-25.3.1.crate",
     )
     if shell_clauses(instructions[4][1]) != expected_mutants:
@@ -2039,6 +2177,219 @@ def ast_parent_map(root: ast.AST) -> dict[ast.AST, ast.AST]:
     }
 
 
+def directly_owned_by_function(
+    node: ast.AST,
+    function: ast.FunctionDef,
+    parents: dict[ast.AST, ast.AST],
+) -> bool:
+    current = node
+    while current is not function:
+        parent = parents.get(current)
+        if parent is None:
+            return False
+        if isinstance(
+            parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+        ):
+            return parent is function
+        current = parent
+    return True
+
+
+def direct_statement_matches(statement: ast.stmt, expected: str) -> bool:
+    expected_body = ast.parse(expected).body
+    return len(expected_body) == 1 and ast.dump(
+        statement, include_attributes=False
+    ) == ast.dump(expected_body[0], include_attributes=False)
+
+
+def direct_statement_position(function: ast.FunctionDef, expected: str) -> int:
+    matches = [
+        index
+        for index, statement in enumerate(function.body)
+        if direct_statement_matches(statement, expected)
+    ]
+    if len(matches) != 1:
+        return -1
+    return matches[0]
+
+
+STATIC_NORMAL = "normal"
+STATIC_RETURN = "return"
+STATIC_RAISE = "raise"
+STATIC_BREAK = "break"
+STATIC_CONTINUE = "continue"
+
+
+def literal_truth(node: ast.expr) -> bool | None:
+    try:
+        return bool(ast.literal_eval(node))
+    except (ValueError, TypeError):
+        return None
+
+
+def statically_nonempty_iterable(node: ast.expr) -> bool | None:
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)) and not any(
+        isinstance(element, ast.Starred) for element in node.elts
+    ):
+        return bool(node.elts)
+    if isinstance(node, ast.Dict) and all(key is not None for key in node.keys):
+        return bool(node.keys)
+    return None
+
+
+def irrefutable_match_pattern(pattern: ast.pattern) -> bool:
+    if isinstance(pattern, ast.MatchAs):
+        return pattern.pattern is None or irrefutable_match_pattern(pattern.pattern)
+    if isinstance(pattern, ast.MatchOr):
+        return any(irrefutable_match_pattern(child) for child in pattern.patterns)
+    return False
+
+
+def block_static_exits(statements: list[ast.stmt]) -> frozenset[str]:
+    exits: set[str] = {STATIC_NORMAL}
+    for statement in statements:
+        if STATIC_NORMAL not in exits:
+            break
+        exits.remove(STATIC_NORMAL)
+        exits.update(statement_static_exits(statement))
+    return frozenset(exits)
+
+
+def statement_static_exits(statement: ast.stmt) -> frozenset[str]:
+    if isinstance(statement, ast.Return):
+        exits = {STATIC_RETURN}
+        if statement.value is not None:
+            exits.add(STATIC_RAISE)
+        return frozenset(exits)
+    if isinstance(statement, ast.Raise):
+        return frozenset({STATIC_RAISE})
+    if isinstance(statement, ast.Break):
+        return frozenset({STATIC_BREAK})
+    if isinstance(statement, ast.Continue):
+        return frozenset({STATIC_CONTINUE})
+    if isinstance(statement, ast.If):
+        condition = literal_truth(statement.test)
+        if condition is True:
+            return block_static_exits(statement.body)
+        if condition is False:
+            return block_static_exits(statement.orelse)
+        return frozenset(
+            {
+                STATIC_RAISE,
+                *block_static_exits(statement.body),
+                *block_static_exits(statement.orelse),
+            }
+        )
+    if isinstance(statement, ast.While):
+        condition = literal_truth(statement.test)
+        if condition is False:
+            return block_static_exits(statement.orelse)
+        body_exits = block_static_exits(statement.body)
+        if condition is True:
+            exits = {
+                exit_kind
+                for exit_kind in body_exits
+                if exit_kind in {STATIC_RETURN, STATIC_RAISE}
+            }
+            if STATIC_BREAK in body_exits:
+                exits.add(STATIC_NORMAL)
+            return frozenset(exits)
+        return frozenset(
+            {
+                STATIC_NORMAL,
+                STATIC_RAISE,
+                *(
+                    exit_kind
+                    for exit_kind in body_exits
+                    if exit_kind in {STATIC_RETURN, STATIC_RAISE}
+                ),
+            }
+        )
+    if isinstance(statement, (ast.For, ast.AsyncFor)):
+        body_exits = block_static_exits(statement.body)
+        known_nonempty = statically_nonempty_iterable(statement.iter)
+        exits = {
+            STATIC_RAISE,
+            *(
+                exit_kind
+                for exit_kind in body_exits
+                if exit_kind in {STATIC_RETURN, STATIC_RAISE}
+            ),
+        }
+        if STATIC_BREAK in body_exits:
+            exits.add(STATIC_NORMAL)
+        if known_nonempty is not True or {
+            STATIC_NORMAL,
+            STATIC_CONTINUE,
+        } & body_exits:
+            exits.update(block_static_exits(statement.orelse))
+        return frozenset(exits)
+    if isinstance(statement, ast.Match):
+        exits: set[str] = {STATIC_RAISE}
+        unmatched = True
+        for case in statement.cases:
+            if not unmatched:
+                break
+            exits.update(block_static_exits(case.body))
+            if case.guard is None and irrefutable_match_pattern(case.pattern):
+                unmatched = False
+        if unmatched:
+            exits.add(STATIC_NORMAL)
+        return frozenset(exits)
+    if isinstance(statement, (ast.With, ast.AsyncWith)):
+        body_exits = block_static_exits(statement.body)
+        exits = {
+            STATIC_RAISE,
+            *(
+                exit_kind
+                for exit_kind in body_exits
+                if exit_kind in {STATIC_RETURN, STATIC_BREAK, STATIC_CONTINUE}
+            ),
+        }
+        if STATIC_NORMAL in body_exits or STATIC_RAISE in body_exits:
+            exits.add(STATIC_NORMAL)
+        return frozenset(exits)
+    if isinstance(statement, (ast.Try, ast.TryStar)):
+        body_exits = block_static_exits(statement.body)
+        before_finally = {
+            exit_kind for exit_kind in body_exits if exit_kind != STATIC_NORMAL
+        }
+        if STATIC_NORMAL in body_exits:
+            before_finally.update(block_static_exits(statement.orelse))
+        if STATIC_RAISE in body_exits:
+            for handler in statement.handlers:
+                before_finally.update(block_static_exits(handler.body))
+        if not statement.finalbody:
+            return frozenset(before_finally)
+        final_exits = block_static_exits(statement.finalbody)
+        exits = {
+            exit_kind for exit_kind in final_exits if exit_kind != STATIC_NORMAL
+        }
+        if STATIC_NORMAL in final_exits:
+            exits.update(before_finally)
+        return frozenset(exits)
+    if isinstance(statement, ast.Pass):
+        return frozenset({STATIC_NORMAL})
+    return frozenset({STATIC_NORMAL, STATIC_RAISE})
+
+
+def block_statically_terminates(statements: list[ast.stmt]) -> bool:
+    return STATIC_NORMAL not in block_static_exits(statements)
+
+
+def preceding_statement_block(
+    parent: ast.AST, current: ast.AST
+) -> list[ast.stmt] | None:
+    for _field, value in ast.iter_fields(parent):
+        if (
+            isinstance(value, list)
+            and current in value
+            and all(isinstance(item, ast.stmt) for item in value)
+        ):
+            return value[: value.index(current)]
+    return None
+
+
 def statically_dead(
     node: ast.AST, function: ast.FunctionDef, parents: dict[ast.AST, ast.AST]
 ) -> bool:
@@ -2067,6 +2418,28 @@ def statically_dead(
                     return True
             except (ValueError, TypeError):
                 pass
+        if isinstance(parent, ast.BoolOp):
+            value_index = parent.values.index(current)
+            preceding_values = parent.values[:value_index]
+            if isinstance(parent.op, ast.And) and any(
+                literal_truth(value) is False for value in preceding_values
+            ):
+                return True
+            if isinstance(parent.op, ast.Or) and any(
+                literal_truth(value) is True for value in preceding_values
+            ):
+                return True
+        if isinstance(parent, ast.IfExp):
+            condition = literal_truth(parent.test)
+            if condition is False and current is parent.body:
+                return True
+            if condition is True and current is parent.orelse:
+                return True
+        if isinstance(parent, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+            return True
+        preceding = preceding_statement_block(parent, current)
+        if preceding is not None and block_statically_terminates(preceding):
+            return True
         current = parent
     return False
 
@@ -2094,7 +2467,26 @@ def has_control_guard(
         parent = parents.get(current)
         if parent is None:
             return True
-        if isinstance(parent, (ast.If, ast.For, ast.While, ast.Match)):
+        if isinstance(
+            parent,
+            (
+                ast.If,
+                ast.For,
+                ast.AsyncFor,
+                ast.While,
+                ast.Match,
+                ast.Try,
+                ast.TryStar,
+                ast.With,
+                ast.AsyncWith,
+                ast.BoolOp,
+                ast.IfExp,
+                ast.ListComp,
+                ast.SetComp,
+                ast.DictComp,
+                ast.GeneratorExp,
+            ),
+        ):
             return True
         current = parent
     return False
@@ -2356,16 +2748,23 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         "broker_server",
         "candidate_environment",
         "candidate_process_options",
+        "candidate_workspace_inventory",
         "configure_child_subreaper",
+        "drop_setup_chown_capability",
         "execution_boundary_record",
         "hostile_probe",
         "initialize_baseline",
         "linux_enforcement",
         "main",
+        "new_evidence_file_patch",
+        "pending_campaigns",
         "prepare_candidate_state",
         "prepare_private_runtime",
+        "prepare_refresh_workspace",
         "quiesce_identity_processes",
         "refresh_evidence",
+        "require_candidate_cannot_replace_trusted_state",
+        "require_candidate_cannot_mutate_workspace",
         "remove_candidate_state",
         "repository_inventory",
         "require_exact_repository_inventory",
@@ -2373,6 +2772,12 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         "run_candidate_capture",
         "run_trusted_bounded",
         "trusted_checker_arguments",
+        "trusted_refresh_state_path",
+        "freeze_candidate_workspace",
+        "validate_frozen_candidate_workspace",
+        "validate_trusted_cargo_mutants",
+        "validate_trusted_directory",
+        "validate_trusted_refresh_state",
         "verifier_environment",
         "verifier_process_options",
         "workspace_copy_process_options",
@@ -2380,11 +2785,41 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
     if not required_functions.issubset(functions):
         raise ContractError("trusted security entrypoint function graph changed")
     parents = ast_parent_map(tree)
+    generator_functions = {
+        name
+        for name, function in functions.items()
+        if any(
+            isinstance(node, (ast.Yield, ast.YieldFrom))
+            and directly_owned_by_function(node, function, parents)
+            for node in ast.walk(function)
+        )
+    }
+    if generator_functions != {"effective_identity"}:
+        raise ContractError("trusted security entrypoint generator inventory changed")
     if (
         literal_top_level_assignment(tree, "CANDIDATE_UID") != 65532
         or literal_top_level_assignment(tree, "CANDIDATE_GID") != 65532
         or literal_top_level_assignment(tree, "VERIFIER_UID") != 65533
         or literal_top_level_assignment(tree, "VERIFIER_GID") != 65533
+        or literal_top_level_assignment(tree, "TRUSTED_STATE_DIRECTORY_PREFIX")
+        != ".chio-security-adversarial-evidence.state.v2."
+        or literal_top_level_assignment(tree, "REFRESH_CONTRACT_SPINES")
+        != (
+            "audits",
+            "audits/evidence",
+            "audits/evidence/mutants",
+            "crates",
+            "crates/core",
+            "crates/core/chio-adversarial-suite",
+        )
+        or literal_top_level_assignment(tree, "REFRESH_CONTRACT_TREES")
+        != (
+            "audits/evidence/mutants/security",
+            "audits/evidence/threats",
+            "crates/core/chio-adversarial-suite/cases",
+        )
+        or literal_top_level_assignment(tree, "REFRESH_CONTRACT_FILES")
+        != ("crates/core/chio-adversarial-suite/manifest.json",)
         or literal_top_level_assignment(tree, "COMMAND_EXECUTABLES")
         != {"cargo": "/usr/local/cargo/bin/cargo", "cc": "/usr/bin/cc", "ldd": "/usr/bin/ldd"}
         or set(literal_top_level_assignment(tree, "TRUSTED_GATES"))
@@ -2401,6 +2836,7 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         raise ContractError("trusted security entrypoint identity inventory changed")
     expected_paths = {
         "TRUSTED_CHECKER": "Path('/opt/chio-security/check-security-adversarial-evidence.py')",
+        "TRUSTED_CARGO_MUTANTS": "Path('/usr/local/cargo/bin/cargo-mutants')",
         "TRUSTED_ENTRYPOINT": "Path('/opt/chio-security/entrypoint.py')",
         "TRUSTED_COMMAND_CLIENT": "Path('/opt/chio-security/command-client.py')",
         "TRUSTED_SECCOMP_PROFILE": "Path('/opt/chio-security/security-evidence-seccomp.json')",
@@ -2490,7 +2926,6 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         | {
             "CHIO_SECURITY_BROKER_SOCKET",
             "CHIO_SECURITY_BROKER_TOKEN",
-            "CHIO_SECURITY_CANDIDATE_ARTIFACTS",
             "CHIO_SECURITY_VERIFIER_ARTIFACTS",
         }
     )
@@ -2555,8 +2990,6 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         or verifier_values.get("CHIO_SECURITY_BROKER_SOCKET")
         != "os.fspath(socket_path)"
         or verifier_values.get("CHIO_SECURITY_BROKER_TOKEN") != "token"
-        or verifier_values.get("CHIO_SECURITY_CANDIDATE_ARTIFACTS")
-        != "'/target/artifacts'"
         or verifier_values.get("CHIO_SECURITY_VERIFIER_ARTIFACTS")
         != "os.fspath(verifier_root / 'artifacts')"
         or verifier_values.get("HOME") != "os.fspath(verifier_root / 'home')"
@@ -2603,15 +3036,81 @@ return environment
 
     private_runtime_source = ast.unparse(functions["prepare_private_runtime"])
     for required in (
+        "(Path('/private'), 0, 0)",
+        "prepare_refresh_workspace()",
+        "workspace_snapshot = freeze_candidate_workspace()",
+        "require_candidate_cannot_mutate_workspace(workspace_snapshot)",
+        "drop_setup_chown_capability()",
         "validate_trusted_regular_file(TRUSTED_ENTRYPOINT, expected_mode=365",
         "validate_trusted_regular_file(TRUSTED_COMMAND_CLIENT, expected_mode=365",
         "validate_trusted_regular_file(BROKER_BIN / executable, expected_mode=365",
         "validate_trusted_regular_file(TRUSTED_CHECKER, expected_mode=292",
         "validate_trusted_regular_file(gate, expected_mode=365",
         "validate_trusted_regular_file(TRUSTED_SECCOMP_PROFILE, expected_mode=292",
+        "validate_trusted_cargo_mutants()",
     ):
         if required not in private_runtime_source:
             raise ContractError("trusted security entrypoint file modes changed")
+    private_runtime = functions["prepare_private_runtime"]
+    if any(
+        isinstance(node, ast.Return)
+        and directly_owned_by_function(node, private_runtime, parents)
+        for node in ast.walk(private_runtime)
+    ):
+        raise ContractError("trusted immutable-workspace capability handoff changed")
+    private_runtime_direct_sequence = tuple(
+        direct_statement_position(private_runtime, statement)
+        for statement in (
+            "prepare_refresh_workspace()",
+            "workspace_snapshot = freeze_candidate_workspace()",
+            "require_candidate_cannot_mutate_workspace(workspace_snapshot)",
+            "validate_trusted_cargo_mutants()",
+            "drop_setup_chown_capability()",
+        )
+    )
+    state_setup_calls = live_calls(private_runtime, "prepare_refresh_workspace", parents)
+    workspace_freeze_calls = live_calls(
+        private_runtime, "freeze_candidate_workspace", parents
+    )
+    workspace_hostile_calls = live_calls(
+        private_runtime, "require_candidate_cannot_mutate_workspace", parents
+    )
+    cargo_mutants_validation_calls = live_calls(
+        private_runtime, "validate_trusted_cargo_mutants", parents
+    )
+    capability_drop_calls = live_calls(
+        private_runtime, "drop_setup_chown_capability", parents
+    )
+    private_runtime_subprocesses = live_calls(private_runtime, "subprocess.run", parents)
+    if (
+        len(state_setup_calls) != 1
+        or len(workspace_freeze_calls) != 1
+        or len(workspace_hostile_calls) != 1
+        or len(cargo_mutants_validation_calls) != 1
+        or len(capability_drop_calls) != 1
+        or len(private_runtime_subprocesses) != 1
+        or -1 in private_runtime_direct_sequence
+        or private_runtime_direct_sequence
+        != tuple(sorted(private_runtime_direct_sequence))
+        or has_control_guard(state_setup_calls[0], private_runtime, parents)
+        or has_control_guard(workspace_freeze_calls[0], private_runtime, parents)
+        or has_control_guard(workspace_hostile_calls[0], private_runtime, parents)
+        or has_control_guard(
+            cargo_mutants_validation_calls[0], private_runtime, parents
+        )
+        or has_control_guard(capability_drop_calls[0], private_runtime, parents)
+        or not (
+            state_setup_calls[0].lineno
+            < private_runtime_subprocesses[0].lineno
+            < workspace_freeze_calls[0].lineno
+            < workspace_hostile_calls[0].lineno
+            < cargo_mutants_validation_calls[0].lineno
+            < capability_drop_calls[0].lineno
+        )
+        or ast.unparse(private_runtime_subprocesses[0].args[0])
+        != "['/bin/cp', '-a', '--no-preserve=ownership', f'{SOURCE}/.', os.fspath(WORKSPACE)]"
+    ):
+        raise ContractError("trusted immutable-workspace capability handoff changed")
     supervisor_source = ast.unparse(functions["validate_supervisor_boundary"])
     for required in (
         "os.setgroups([])",
@@ -2620,10 +3119,202 @@ return environment
         "host_gid = numeric_environment('CHIO_HOST_GID')",
         "NoNewPrivs:\\t1\\n",
         "Seccomp:\\t2\\n",
-        "CapEff:\\t00000000000000c0",
+        "require_supervisor_capabilities('00000000000000c1', 'setup-only CHOWN plus SETUID/SETGID')",
+        "require_supervisor_capabilities('00000000000000c0', 'internal broker SETUID/SETGID only')",
     ):
         if required not in supervisor_source:
             raise ContractError("trusted root supervisor boundary changed")
+    capability_drop_source = ast.unparse(functions["drop_setup_chown_capability"])
+    if "libc.syscall" in capability_drop_source or "os.uname" in capability_drop_source:
+        raise ContractError("setup-only CHOWN capability retirement is architecture-bound")
+    for required in (
+        "sys.platform != 'linux'",
+        "cap_chown_mask = 1",
+        "capget = libc.capget",
+        "capset = libc.capset",
+        "capget.argtypes = [ctypes.POINTER(CapabilityHeader), ctypes.POINTER(CapabilityData)]",
+        "capset.argtypes = [ctypes.POINTER(CapabilityHeader), ctypes.POINTER(CapabilityData)]",
+        "capget(ctypes.byref(header), data)",
+        "capset(ctypes.byref(header), data)",
+        "data[0].effective &= ~cap_chown_mask",
+        "data[0].permitted &= ~cap_chown_mask",
+        "require_supervisor_capabilities('00000000000000c0', 'SETUID/SETGID only after private-state setup')",
+    ):
+        if required not in capability_drop_source:
+            raise ContractError("setup-only CHOWN capability retirement changed")
+    state_path_source = ast.unparse(functions["trusted_refresh_state_path"])
+    for required in (
+        "canonical_workspace != selected",
+        "parent_metadata.st_dev != workspace_metadata.st_dev",
+        "json.dumps(identity, indent=2, ensure_ascii=False)",
+        "hashlib.sha256(payload).hexdigest()",
+        "TRUSTED_STATE_DIRECTORY_PREFIX",
+    ):
+        if required not in state_path_source:
+            raise ContractError("trusted refresh-state path binding changed")
+    state_validation_source = ast.unparse(functions["validate_trusted_refresh_state"])
+    for required in (
+        "path != expected",
+        "metadata.st_uid != VERIFIER_UID",
+        "metadata.st_gid != VERIFIER_GID",
+        "stat.S_IMODE(metadata.st_mode) != 448",
+        "metadata.st_nlink != 2",
+        "metadata.st_dev != workspace_metadata.st_dev",
+    ):
+        if required not in state_validation_source:
+            raise ContractError("trusted refresh-state identity validation changed")
+    state_setup_source = ast.unparse(functions["prepare_refresh_workspace"])
+    for required in (
+        "WORKSPACE != Path('/private/candidate')",
+        "os.chown(WORKSPACE, CANDIDATE_UID, VERIFIER_GID)",
+        "os.chown(state, VERIFIER_UID, VERIFIER_GID)",
+        "validate_trusted_refresh_state(state)",
+        "require_candidate_cannot_replace_trusted_state(state)",
+    ):
+        if required not in state_setup_source:
+            raise ContractError("trusted refresh-state bootstrap changed")
+    state_hostile_source = ast.unparse(
+        functions["require_candidate_cannot_replace_trusted_state"]
+    )
+    for required in (
+        "effective_identity(CANDIDATE_UID, CANDIDATE_GID)",
+        "os.rename(path, renamed)",
+        "path.rmdir()",
+    ):
+        if required not in state_hostile_source:
+            raise ContractError("candidate refresh-state replacement probe changed")
+    candidate_workspace_source = ast.unparse(
+        functions["candidate_workspace_inventory"]
+    )
+    for required in (
+        "canonical_workspace != WORKSPACE",
+        "workspace_metadata.st_uid != CANDIDATE_UID",
+        "workspace_metadata.st_gid != VERIFIER_GID",
+        "metadata.st_dev != workspace_device",
+        "metadata.st_nlink != 1",
+        "parsed_target.is_absolute()",
+        "lexical_target = posixpath.normpath(posixpath.join(posixpath.dirname(relative), link_target))",
+        "lexical_target == '..'",
+        "lexical_target.startswith('../')",
+        "resolved_target.relative_to(WORKSPACE)",
+        "target_metadata.st_dev != workspace_device",
+        "candidate workspace contains a special file",
+        "inspect(WORKSPACE)",
+    ):
+        if required not in candidate_workspace_source:
+            raise ContractError("candidate workspace pre-freeze inventory changed")
+    freeze_source = ast.unparse(functions["freeze_candidate_workspace"])
+    for required in (
+        "snapshot = candidate_workspace_inventory()",
+        "effective_identity(0, VERIFIER_GID)",
+        "os.chown(path, VERIFIER_UID, VERIFIER_GID, follow_symlinks=False)",
+        "kind == 'directory' or original_mode & 73",
+        "os.chmod(path, mode, follow_symlinks=False)",
+        "validate_frozen_candidate_workspace(snapshot)",
+    ):
+        if required not in freeze_source:
+            raise ContractError("candidate workspace ownership freeze changed")
+    frozen_validation_source = ast.unparse(
+        functions["validate_frozen_candidate_workspace"]
+    )
+    for required in (
+        "metadata.st_dev != device",
+        "metadata.st_ino != inode",
+        "metadata.st_uid != VERIFIER_UID",
+        "metadata.st_gid != VERIFIER_GID",
+        "stat.S_IMODE(metadata.st_mode) != expected_mode",
+        "metadata.st_nlink != 1",
+        "observed_target != link_target",
+        "observed_relatives != expected_relatives",
+    ):
+        if required not in frozen_validation_source:
+            raise ContractError("frozen candidate workspace validation changed")
+    workspace_hostile_source = ast.unparse(
+        functions["require_candidate_cannot_mutate_workspace"]
+    )
+    for required in (
+        "denied_errors = {errno.EACCES, errno.EPERM, errno.EROFS}",
+        "effective_identity(CANDIDATE_UID, CANDIDATE_GID)",
+        "os.O_WRONLY | os.O_APPEND",
+        "os.O_WRONLY | os.O_CREAT | os.O_EXCL",
+        "REFRESH_CONTRACT_SPINES",
+        "REFRESH_CONTRACT_TREES",
+        "REFRESH_CONTRACT_FILES",
+        "hardlink_root = WORKSPACE.parent / '.chio-candidate-workspace-link-probe'",
+        "os.rename(path, replacement)",
+        "os.unlink(path)",
+        "os.rmdir(path)",
+        "os.link(regular_paths[0], hardlink_probe, follow_symlinks=False)",
+        "os.chmod(regular_paths[0], 438)",
+        "validate_frozen_candidate_workspace(snapshot)",
+    ):
+        if required not in workspace_hostile_source:
+            raise ContractError("candidate immutable-workspace hostile probe changed")
+    destructive_probe_contracts = (
+        ("REFRESH_CONTRACT_FILES", "os.unlink"),
+        ("REFRESH_CONTRACT_TREES", "os.rmdir"),
+    )
+    for inventory_name, operation_name in destructive_probe_contracts:
+        loops = [
+            node
+            for node in ast.walk(functions["require_candidate_cannot_mutate_workspace"])
+            if isinstance(node, ast.For)
+            and ast.unparse(node.iter) == inventory_name
+        ]
+        if len(loops) != 1:
+            raise ContractError("candidate immutable-workspace hostile probe changed")
+        operations = [
+            node
+            for node in ast.walk(loops[0])
+            if isinstance(node, ast.Call) and ast_call_name(node) == operation_name
+        ]
+        denied_calls = [
+            node
+            for node in ast.walk(loops[0])
+            if isinstance(node, ast.Call) and ast_call_name(node) == "require_denied"
+        ]
+        path_assignments = [
+            node
+            for node in loops[0].body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "path"
+                for target in node.targets
+            )
+            and ast.unparse(node.value) == "WORKSPACE / relative"
+        ]
+        if (
+            len(operations) != 1
+            or len(operations[0].args) != 1
+            or ast.unparse(operations[0].args[0]) != "path"
+            or len(denied_calls) != 1
+            or len(path_assignments) != 1
+        ):
+            raise ContractError("candidate immutable-workspace hostile probe changed")
+    trusted_directory_source = ast.unparse(functions["validate_trusted_directory"])
+    for required in (
+        "not stat.S_ISDIR(observed.st_mode)",
+        "stat.S_ISLNK(observed.st_mode)",
+        "observed.st_uid != 0",
+        "observed.st_gid != 0",
+        "stat.S_IMODE(observed.st_mode) != expected_mode",
+    ):
+        if required not in trusted_directory_source:
+            raise ContractError("trusted directory authentication changed")
+    cargo_mutants_validation_source = ast.unparse(
+        functions["validate_trusted_cargo_mutants"]
+    )
+    for required in (
+        "Path('/')",
+        "Path('/usr')",
+        "Path('/usr/local')",
+        "Path('/usr/local/cargo')",
+        "Path('/usr/local/cargo/bin')",
+        "expected_mode=493",
+        "validate_trusted_regular_file(TRUSTED_CARGO_MUTANTS, expected_mode=365",
+    ):
+        if required not in cargo_mutants_validation_source:
+            raise ContractError("trusted cargo-mutants authentication changed")
     subreaper = functions["configure_child_subreaper"]
     subreaper_calls = live_calls(subreaper, "prctl", parents)
     if (
@@ -2649,7 +3340,52 @@ return environment
         raise ContractError("trusted Python checker isolation changed")
 
     main = functions["main"]
+    main_source = ast.unparse(main)
+    for required in (
+        "internal_invocation = any((value is not None for value in internal_arguments))",
+        "validate_supervisor_boundary(setup=not internal_invocation)",
+        "if internal_invocation:",
+    ):
+        if required not in main_source:
+            raise ContractError("trusted supervisor invocation mode changed")
     main_sequence = []
+    main_direct_sequence = tuple(
+        direct_statement_position(main, statement)
+        for statement in (
+            "validate_supervisor_boundary(setup=not internal_invocation)",
+            "prepare_private_runtime()",
+            "initialize_baseline()",
+        )
+    )
+    if -1 in main_direct_sequence or main_direct_sequence != tuple(
+        sorted(main_direct_sequence)
+    ):
+        raise ContractError("trusted security entrypoint main control flow changed")
+    main_returns = [
+        node
+        for node in ast.walk(main)
+        if isinstance(node, ast.Return)
+        and directly_owned_by_function(node, main, parents)
+    ]
+    internal_returns = [
+        node
+        for node in main_returns
+        if node.value is not None
+        and expression_matches(
+            node.value,
+            "broker_server(args.broker_server, broker_token, args.gate_root, args.timeout_seconds)",
+        )
+        and isinstance(parents.get(node), ast.If)
+        and ast.unparse(parents[node].test) == "internal_invocation"
+    ]
+    if (
+        len(main_returns) != 2
+        or len(internal_returns) != 1
+        or not isinstance(main.body[-1], ast.Return)
+        or main.body[-1].value is None
+        or not expression_matches(main.body[-1].value, "0")
+    ):
+        raise ContractError("trusted security entrypoint main control flow changed")
     for call_name in (
         "validate_supervisor_boundary",
         "prepare_private_runtime",
@@ -2879,7 +3615,6 @@ except BaseException as primary_error:
         "initialize_baseline",
         "prepare_candidate_state",
         "prepare_private_runtime",
-        "prepare_private_runtime",
         "reset_candidate_command_state",
     ] or sorted(name for name, _call in popen_sites) != [
         "run_candidate_capture",
@@ -2973,7 +3708,55 @@ except BaseException as primary_error:
             or inventory_calls[0].lineno >= min(call.lineno for call in publications)
         ):
             raise ContractError("candidate repository publication graph changed")
+    refresh_source = ast.unparse(functions["refresh_evidence"])
+    for required in (
+        "if full_inventory:",
+        "expected_campaigns = ALL_CAMPAIGNS",
+        "expected_paths = ALL_REFRESH_PATHS",
+        "promotable_campaigns = ALL_CAMPAIGNS",
+        "new_outcome_paths = ALL_OUTCOME_PATHS",
+        "expected_campaigns = LINUX_CAMPAIGNS",
+        "expected_paths = REFRESH_PATHS",
+        "promotable_campaigns = LINUX_CAMPAIGNS",
+        "new_outcome_paths = LINUX_OUTCOME_PATHS",
+        "if campaigns != expected_campaigns or paths != expected_paths:",
+        "pending = pending_campaigns(timeout_seconds)",
+        "if campaign not in promotable_campaigns:",
+        "trusted_checker_arguments('--promote-pending-outcome', campaign)",
+        "trusted_checker_arguments('--refresh-outcome', campaign)",
+        "tracked_patch, untracked_payload, ignored = repository_inventory(timeout_seconds)",
+        "expected_untracked = tuple(sorted((OUTCOME_PATH_BY_CAMPAIGN[campaign] for campaign in campaigns if campaign in pending)))",
+        "new_evidence_file_patch(path, timeout_seconds, new_outcome_paths)",
+        "(tracked_patch, untracked_payload, ignored)",
+    ):
+        if required not in refresh_source:
+            raise ContractError("trusted pending evidence promotion graph changed")
+    pending_source = ast.unparse(functions["pending_campaigns"])
+    for required in (
+        "trusted_checker_arguments('--list-pending')",
+        "observed != tuple(sorted(observed))",
+        "len(observed) != len(set(observed))",
+        "campaign not in ALL_CAMPAIGNS",
+    ):
+        if required not in pending_source:
+            raise ContractError("trusted pending campaign inventory changed")
+    new_file_source = ast.unparse(functions["new_evidence_file_patch"])
+    for required in (
+        "allowed_paths not in (LINUX_OUTCOME_PATHS, ALL_OUTCOME_PATHS)",
+        "relative_path not in allowed_paths",
+        "stat.S_IMODE(metadata.st_mode) != 420",
+        "metadata.st_uid != VERIFIER_UID",
+        "metadata.st_gid != VERIFIER_GID",
+        "metadata.st_nlink != 1",
+        "--no-renames --no-index -- /dev/null \"$1\"",
+        "test \"${diff_status}\" -eq 1",
+        "patch.startswith(expected_prefix)",
+        "expected_destination not in patch",
+    ):
+        if required not in new_file_source:
+            raise ContractError("trusted new evidence outcome patch contract changed")
     linux = functions["linux_enforcement"]
+    linux_source = ast.unparse(linux)
     clippy_calls = [
         call
         for call in live_calls(linux, "run_candidate_bounded", parents)
@@ -2984,6 +3767,8 @@ except BaseException as primary_error:
         len(clippy_calls) != 1
         or len(linux_inventory) != 1
         or clippy_calls[0].lineno >= linux_inventory[0].lineno
+        or "trusted_checker_arguments('--campaign', campaign)" not in linux_source
+        or "/target/artifacts/final-" in linux_source
     ):
         raise ContractError("candidate repository publication graph changed")
 
@@ -2994,6 +3779,7 @@ except BaseException as primary_error:
         trusted_files_expression,
         """
 {
+    "cargo-mutants": TRUSTED_CARGO_MUTANTS,
     "check-security-adversarial-evidence.py": TRUSTED_CHECKER,
     "command-client.py": TRUSTED_COMMAND_CLIENT,
     "entrypoint.py": TRUSTED_ENTRYPOINT,
@@ -3131,6 +3917,272 @@ except BaseException as primary_error:
         and expression_matches(client_main.body[-1].value, "returncode")
     ):
         raise ContractError("candidate command client control flow changed")
+    function_graph_payload = {
+        name: ast.dump(function, include_attributes=False)
+        for name, function in sorted(functions.items())
+    }
+    function_graph_digest = hashlib.sha256(
+        json.dumps(
+            function_graph_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    if function_graph_digest != EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256:
+        raise ContractError("trusted security entrypoint function graph commitment changed")
+    if (
+        hashlib.sha256(source.encode("utf-8")).hexdigest()
+        != EXPECTED_SECURITY_ENTRYPOINT_SHA256
+    ):
+        raise ContractError("trusted security entrypoint source commitment changed")
+    if (
+        hashlib.sha256(command_client.encode("utf-8")).hexdigest()
+        != EXPECTED_SECURITY_COMMAND_CLIENT_SHA256
+    ):
+        raise ContractError("candidate command client source commitment changed")
+
+
+def validate_security_adversarial_checker_boundary(source: str) -> None:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        raise ContractError("trusted adversarial checker is invalid Python") from error
+    functions = ast_function_map(tree)
+    required_functions = {
+        "cargo_mutants_executable",
+        "cargo_mutants_output",
+        "cargo_mutants_source_inventory",
+        "cargo_mutants_subprocess_options",
+        "enterprise_cargo_mutants_executable",
+        "enterprise_security_runner",
+        "main",
+        "mutation_output_workspace",
+        "require_cargo_mutants_version",
+        "run_campaign",
+        "validate_mutation_output_root",
+        "verifier_artifact_root",
+    }
+    if not required_functions.issubset(functions):
+        raise ContractError("trusted adversarial checker function graph changed")
+
+    expected_assignments = {
+        "TRUSTED_CARGO_MUTANTS": "Path('/usr/local/cargo/bin/cargo-mutants')",
+        "TRUSTED_CARGO_MUTANTS_ANCESTORS": (
+            "(Path('/'), Path('/usr'), Path('/usr/local'), "
+            "Path('/usr/local/cargo'), Path('/usr/local/cargo/bin'))"
+        ),
+        "ENTERPRISE_STATE_ROOT": "Path('/baseline/candidate-state')",
+    }
+    for name, expected in expected_assignments.items():
+        matches = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == name
+                for target in node.targets
+            )
+        ]
+        if len(matches) != 1 or ast.unparse(matches[0]) != expected:
+            raise ContractError("trusted adversarial checker authority paths changed")
+    inventory_classes = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and node.name == "CargoMutantsSourceInventory"
+    ]
+    verified_identity_fields = (
+        [
+            node
+            for node in inventory_classes[0].body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "verified_identity"
+            and ast.unparse(node.annotation) == "tuple[int, int] | None"
+            and node.value is not None
+            and ast.unparse(node.value) == "None"
+        ]
+        if len(inventory_classes) == 1
+        else []
+    )
+    if len(verified_identity_fields) != 1:
+        raise ContractError("cargo-mutants verified identity cache changed")
+    if (
+        literal_top_level_assignment(tree, "PINNED_CARGO_MUTANTS_VERSION")
+        != "cargo-mutants 25.3.1"
+        or literal_top_level_assignment(tree, "ENTERPRISE_VERIFIER_UID") != 65533
+        or literal_top_level_assignment(tree, "ENTERPRISE_VERIFIER_GID") != 65533
+        or literal_top_level_assignment(tree, "ENTERPRISE_BASELINE_MODE") != 0o555
+    ):
+        raise ContractError("trusted adversarial checker authority identity changed")
+
+    cached_source = ast.unparse(functions["cargo_mutants_executable"])
+    for required in (
+        "if cache.executable is not None:",
+        "if enterprise:",
+        "authenticated = enterprise_cargo_mutants_executable(root)",
+        "cache.executable != authenticated",
+        "cache.executable = authenticated",
+    ):
+        if required not in cached_source:
+            raise ContractError("enterprise cargo-mutants cache authentication changed")
+
+    descriptor_function = functions["cargo_mutants_subprocess_options"]
+    if [ast.unparse(value) for value in descriptor_function.decorator_list] != [
+        "contextmanager"
+    ]:
+        raise ContractError("cargo-mutants descriptor execution context changed")
+    descriptor_source = ast.unparse(descriptor_function)
+    for required in (
+        "command[1] != 'mutants'",
+        "executable != TRUSTED_CARGO_MUTANTS",
+        "authenticated = enterprise_cargo_mutants_executable(root)",
+        "os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)",
+        "descriptor = os.open(authenticated, flags)",
+        "opened = os.fstat(descriptor)",
+        "opened_identity = metadata_identity(opened)",
+        "if expected_identity is not None and opened_identity != expected_identity:",
+        "cargo-mutants differs from the version-verified inode",
+        "require_unchanged_cargo_mutants_identity(opened, named, authenticated)",
+        "yield ({'executable': f'/proc/self/fd/{descriptor}', 'pass_fds': (descriptor,)}, opened_identity)",
+        "repeated = authenticated.lstat()",
+        "os.close(descriptor)",
+    ):
+        if required not in descriptor_source:
+            raise ContractError("cargo-mutants descriptor execution changed")
+    if descriptor_source.count("enterprise_cargo_mutants_executable(root)") != 3:
+        raise ContractError("cargo-mutants descriptor reauthentication changed")
+
+    output_source = ast.unparse(functions["cargo_mutants_output"])
+    if (
+        "with cargo_mutants_subprocess_options(root, command, environment, expected_identity) as (execution_options, observed_identity):"
+        not in output_source
+        or "subprocess.run(command" not in output_source
+        or "**execution_options" not in output_source
+        or "return (completed.stdout, observed_identity)" not in output_source
+    ):
+        raise ContractError("cargo-mutants descriptor execution routing changed")
+
+    version_source = ast.unparse(functions["require_cargo_mutants_version"])
+    for required in (
+        "observed_version_output, observed_identity = cargo_mutants_output(",
+        "observed_version = observed_version_output.strip()",
+        "enterprise_security_runner(environment) and observed_identity is None",
+        "return observed_identity",
+    ):
+        if required not in version_source:
+            raise ContractError("cargo-mutants version identity binding changed")
+
+    inventory_source = ast.unparse(functions["cargo_mutants_source_inventory"])
+    for required in (
+        "[os.fspath(executable), 'mutants', '--no-config', '-p', package, '--list-files', '--json']",
+        "json.loads(output, object_pairs_hook=reject_duplicate_keys)",
+        "exact_keys(entry, {'path', 'package'}, set(), label)",
+        "entry['package'] != package",
+        "safe_rust_path(path, label)",
+        "package_prefix not in parsed.parents",
+        "if path in sources:",
+        "cache.verified_identity = require_cargo_mutants_version(",
+        "output, _observed_identity = cargo_mutants_output(",
+        "cache.verified_identity)",
+    ):
+        if required not in inventory_source:
+            raise ContractError("cargo-mutants JSON source inventory changed")
+    if ".splitlines()" in inventory_source:
+        raise ContractError("cargo-mutants source inventory became line-delimited")
+
+    campaign_source = ast.unparse(functions["run_campaign"])
+    if (
+        campaign_source.count("with cargo_mutants_subprocess_options(") != 2
+        or campaign_source.count("os.fspath(cargo_mutants), 'mutants'") != 2
+        or campaign_source.count("execution_options=execution_options") != 2
+        or campaign_source.count("verified_cargo_mutants_identity") != 3
+        or campaign_source.count(
+            "environment, verified_cargo_mutants_identity) as (execution_options,"
+        )
+        != 2
+        or "output_authority = validate_mutation_output_root(output_root, environment)"
+        not in campaign_source
+    ):
+        raise ContractError("cargo-mutants campaign execution routing changed")
+
+    artifact_function = functions["verifier_artifact_root"]
+    artifact_source = ast.unparse(artifact_function)
+    expected_authority = """
+(
+    (Path("/baseline"), 0, 0, ENTERPRISE_BASELINE_MODE),
+    (ENTERPRISE_STATE_ROOT, 0, 0, 0o711),
+    (gate_root, 0, 0, 0o711),
+    (verifier_root, 0, ENTERPRISE_VERIFIER_GID, 0o770),
+    (artifact_root, ENTERPRISE_VERIFIER_UID, ENTERPRISE_VERIFIER_GID, 0o700),
+)
+"""
+    if not expression_matches(assignment_node(artifact_function, "authority"), expected_authority):
+        raise ContractError("verifier artifact authority chain changed")
+    for required in (
+        "legacy = environment.get('CHIO_SECURITY_CANDIDATE_ARTIFACTS')",
+        "raise EvidenceError('candidate artifact authority is forbidden')",
+        "relative.parts[1:] != ('verifier', 'artifacts')",
+        "snapshots = {path: path.lstat() for path, _uid, _gid, _mode in authority}",
+        "repeated = {path: path.lstat() for path, _uid, _gid, _mode in authority}",
+        "metadata_identity(snapshots[path]) != metadata_identity(repeated[path])",
+        "require_directory_authority(repeated[path], path, uid=uid, gid=gid, mode=mode)",
+    ):
+        if required not in artifact_source:
+            raise ContractError("verifier artifact authority authentication changed")
+
+    output_root_source = ast.unparse(functions["validate_mutation_output_root"])
+    workspace_source = ast.unparse(functions["mutation_output_workspace"])
+    if (
+        "verifier_root = verifier_artifact_root(environment)" not in output_root_source
+        or "output_root.relative_to(verifier_root)" not in output_root_source
+        or "allow_missing_parents=True" not in output_root_source
+        or "verifier_root = verifier_artifact_root(environment)" not in workspace_source
+        or "output = verifier_root / f'{prefix}-{secrets.token_hex(16)}'"
+        not in workspace_source
+    ):
+        raise ContractError("verifier mutation output routing changed")
+
+    main_source = ast.unparse(functions["main"])
+    promotion_guard = (
+        "if args.promote_outcome and enterprise_security_runner(environment):"
+    )
+    root_binding = "root = (args.root or Path(__file__).resolve().parents[1]).resolve()"
+    load_binding = "cases, index = load_cases("
+    if (
+        promotion_guard not in main_source
+        or "legacy --promote-outcome is forbidden in the enterprise boundary"
+        not in main_source
+        or not (
+            main_source.index(promotion_guard)
+            < main_source.index(root_binding)
+            < main_source.index(load_binding)
+        )
+    ):
+        raise ContractError("enterprise legacy outcome promotion boundary changed")
+    function_graph_payload = {
+        name: ast.dump(function, include_attributes=False)
+        for name, function in sorted(functions.items())
+    }
+    function_graph_digest = hashlib.sha256(
+        json.dumps(
+            function_graph_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    if (
+        function_graph_digest
+        != EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256
+    ):
+        raise ContractError("trusted adversarial checker function graph commitment changed")
+    if (
+        hashlib.sha256(source.encode("utf-8")).hexdigest()
+        != EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256
+    ):
+        raise ContractError("trusted adversarial checker source commitment changed")
 
 
 def validate_security_execution_boundary_files(root: Path) -> None:
@@ -3269,6 +4321,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"--network",\n        "none"',
         '"--read-only"',
         '"--cap-drop",\n        "ALL"',
+        '"--cap-add",\n        "CHOWN"',
         '"--cap-add",\n        "SETGID"',
         '"--cap-add",\n        "SETUID"',
         '"no-new-privileges"',
@@ -3282,6 +4335,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"CARGO_PROFILE_TEST_DEBUG": "0"',
         'f"seccomp={seccomp_profile}"',
         'f"type=bind,src={source},dst=/source,readonly"',
+        '"/private": "rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755"',
         '"/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755"',
         '"core=0:0"',
         '"fsize=1073741824:1073741824"',
@@ -3318,6 +4372,18 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         raise ContractError(
             "trusted security container runner is invalid Python"
         ) from error
+    try:
+        runner_boundary_files = literal_top_level_assignment(
+            runner_tree, "TRUSTED_BOUNDARY_FILE_KEYS"
+        )
+    except ContractError as error:
+        raise ContractError(
+            "trusted security container runner boundary inventory changed"
+        ) from error
+    if runner_boundary_files != EXPECTED_TRUSTED_BOUNDARY_FILES:
+        raise ContractError(
+            "trusted security container runner boundary inventory changed"
+        )
     runner_lines = runner.splitlines(keepends=True)
     runner_functions = {
         node.name: "".join(runner_lines[node.lineno - 1 : node.end_lineno])
@@ -3326,7 +4392,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
     }
     create_body = runner_functions.get("container_create_arguments", "")
     create_flag_counts = {
-        "--cap-add": 2,
+        "--cap-add": 3,
         "--cap-drop": 1,
         "--cidfile": 1,
         "--cpus": 1,
@@ -3351,6 +4417,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"linux/amd64"',
         '"none"',
         '"ALL"',
+        '"CHOWN"',
         '"SETGID"',
         '"SETUID"',
         '"no-new-privileges"',
@@ -3362,7 +4429,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"fsize=1073741824:1073741824"',
         '"nofile=1024:1024"',
         '"/tmp:rw,nosuid,nodev,size=536870912,mode=1777"',
-        '"/private:rw,nosuid,nodev,size=2147483648,uid=65532,gid=65532,mode=0755"',
+        '"/private:rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755"',
         '"/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755"',
         '"/target:rw,nosuid,nodev,size=8589934592,uid=65532,gid=65532,mode=0700"',
         '"/cargo-home:rw,nosuid,nodev,noexec,size=2147483648,uid=65532,gid=65532,mode=0700"',
@@ -3377,7 +4444,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
     create_validator = runner_functions.get("validate_container_create_arguments", "")
     created_validator = runner_functions.get("validate_created_container", "")
     validator_markers = (
-        '"--cap-add": 2',
+        '"--cap-add": 3',
         '"--env": 19',
         '"--label": 3',
         '"--mount": 2',
@@ -3389,6 +4456,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"--memory-swap": ["12g"]',
         '"--network": ["none"]',
         '"--pids-limit": ["512"]',
+        '"--cap-add": ["CHOWN", "SETGID", "SETUID"]',
         "flag not in value_flags",
         "len(environment) != len(environment_entries)",
     )
@@ -3402,6 +4470,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         '"MemorySwap": 12884901888',
         '"NanoCpus": 4000000000',
         '"Runtime": "runc"',
+        '"CapAdd": ["CAP_CHOWN", "CAP_SETGID", "CAP_SETUID"]',
         '"ShmSize": 67108864',
         '"Tmpfs": EXPECTED_TMPFS',
         "normalized_ulimits != EXPECTED_ULIMITS",
@@ -3438,6 +4507,10 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         root / "scripts/security-execution-container-entrypoint.py"
     ).read_text(encoding="utf-8")
     validate_security_entrypoint(root, entrypoint)
+    adversarial_checker = (
+        root / "scripts/check-security-adversarial-evidence.py"
+    ).read_text(encoding="utf-8")
+    validate_security_adversarial_checker_boundary(adversarial_checker)
 
     gate_contracts = {
         "scripts/check-keyring-transparency.sh": (
@@ -3479,6 +4552,12 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "while :; do printf CANDIDATE_POISON_RAN",
         "while True:",
         "complete evidence refresh inventory is not exact",
+        "immutable_workspace_tests",
+        "candidate can rewrite frozen contract",
+        "candidate can add frozen contract",
+        "candidate can rename frozen contract",
+        "candidate can unlink a later campaign contract",
+        "candidate can remove the campaign contract tree",
     ):
         if marker not in boundary_test:
             raise ContractError("security execution hostile test contract changed")
@@ -3602,6 +4681,7 @@ def validate(root: Path) -> None:
     validate_global_workflow_boundaries(root)
     validate_environment_provisioning_document(root)
     validate_security_execution_boundary_files(root)
+    validate_temporal_security_contract_files(root)
     ci = load_workflow(root / ".github/workflows/ci.yml")
     enterprise = load_workflow(root / ".github/workflows/enterprise-hardening.yml")
     evidence_controller = load_workflow(
@@ -3643,6 +4723,22 @@ def validate(root: Path) -> None:
             raise ContractError(
                 f"{workflow_name} inherits dangerous execution environment: "
                 + ", ".join(sorted(inherited_env))
+            )
+        startup_references = {
+            name
+            for name in FORBIDDEN_SHELL_STARTUP_REFERENCES
+            if any(
+                re.search(
+                    rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])",
+                    value,
+                )
+                for value in all_strings(workflow)
+            )
+        }
+        if startup_references:
+            raise ContractError(
+                f"{workflow_name} writes dangerous shell startup state: "
+                + ", ".join(sorted(startup_references))
             )
 
     ci_events = ci.get("on")
@@ -3949,6 +5045,12 @@ def validate(root: Path) -> None:
     ]
     if len(uv_matches) != 1 or uv_matches[0].get("with") != EXPECTED_UV_INPUTS:
         raise ContractError("enterprise portable contracts do not install pinned uv")
+    require_run_markers(
+        portable,
+        "Gate contract self-tests",
+        ("bash scripts/tests/check-temporal-security.test.sh",),
+        "enterprise portable contracts omit the temporal gate self-test",
+    )
     portable_evidence_steps = (
         ("Schema registry and generated bindings", EXPECTED_SCHEMA_BINDINGS_RUN),
         ("Native security conformance", EXPECTED_NATIVE_SECURITY_RUN),
@@ -3971,6 +5073,7 @@ def validate(root: Path) -> None:
         job(enterprise, "active-defense-security"),
         EXPECTED_ACTIVE_DEFENSE_STEPS,
         "active-defense security evidence",
+        EXPECTED_ACTIVE_DEFENSE_EXTRAS,
     )
     hostile_probe = named_step(
         job(enterprise, "adversarial-evidence"),
@@ -4101,7 +5204,8 @@ def validate(root: Path) -> None:
         committed_evidence, "Verify committed Linux evidence descendant"
     )
     if (
-        committed_verify.get("if") != verify_condition
+        committed_verify.get("id") != "strict"
+        or committed_verify.get("if") != verify_condition
         or committed_verify.get("env")
         != {
             "AUTHORIZED_SOURCE_SHA": "${{ vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA }}",
@@ -4114,7 +5218,7 @@ def validate(root: Path) -> None:
         or contains_text(committed_verify, "inputs.source_sha")
     ):
         raise ContractError("committed Linux evidence verification bindings changed")
-    require_run_markers(
+    committed_verify_run = require_run_markers(
         committed_evidence,
         "Verify committed Linux evidence descendant",
         (
@@ -4128,9 +5232,36 @@ def validate(root: Path) -> None:
             '--source-commit "${AUTHORIZED_SOURCE_SHA}"',
             '--evidence-commit "${EVIDENCE_SHA}"',
             '--expected-binding-digest "0x$(jq -r \'.binding_digest\' <<< "${policy}")"',
+            'echo "verified=true" >> "${GITHUB_OUTPUT}"',
         ),
         "committed Linux evidence does not use pinned checker bytes for detached E",
     )
+    verifier_command = (
+        "/usr/bin/python3 authorized-checker/scripts/"
+        "check-committed-linux-evidence.py"
+    )
+    verified_marker = 'echo "verified=true" >> "${GITHUB_OUTPUT}"'
+    if committed_verify_run.index(verified_marker) <= committed_verify_run.index(
+        verifier_command
+    ):
+        raise ContractError(
+            "committed Linux evidence completion precedes detached verification"
+        )
+    completion_step = named_step(
+        committed_evidence, "Require committed Linux evidence verification"
+    )
+    if (
+        set(completion_step) != {"name", "if", "env", "run"}
+        or completion_step.get("if") != "${{ always() }}"
+        or completion_step.get("env")
+        != {"VERIFIED": "${{ steps.strict.outputs.verified }}"}
+        or not isinstance(completion_step.get("run"), str)
+        or completion_step["run"].strip()
+        != 'set -euo pipefail\ntest "${VERIFIED}" = "true"'
+    ):
+        raise ContractError(
+            "committed Linux evidence can complete without detached verification"
+        )
     validate_job_digest(
         committed_evidence,
         EXPECTED_TRUST_JOB_DIGESTS[
@@ -4355,6 +5486,13 @@ def validate(root: Path) -> None:
         "dispatch-trusted-finalizer",
     }:
         raise ContractError("enterprise Linux capture job inventory changed")
+    for capture_job in capture_jobs.values():
+        for step in capture_job.get("steps", []):
+            run = step.get("run")
+            if isinstance(run, str) and len(run) > 21_000:
+                raise ContractError(
+                    "enterprise Linux capture exceeds the GitHub run expression limit"
+                )
     capture_authorization = job(linux_capture, "authorize-capture")
     if (
         capture_authorization.get("runs-on") != "ubuntu-24.04"
@@ -4375,10 +5513,10 @@ def validate(root: Path) -> None:
         EXPECTED_CAPTURE_STEP_INVENTORIES["authorize-capture"],
         "isolated capture authorization",
     )
-    capture_authorization_step = named_step(
-        capture_authorization, "Revalidate controller source and merge authorization"
+    capture_authentication_step = named_step(
+        capture_authorization, "Authenticate controller dispatch and capture definition"
     )
-    if capture_authorization_step.get("env") != {
+    if capture_authentication_step.get("env") != {
         "CAPTURE_ACTOR": "${{ github.actor }}",
         "CAPTURE_RUN_ATTEMPT": "${{ github.run_attempt }}",
         "CAPTURE_RUN_ID": "${{ github.run_id }}",
@@ -4404,9 +5542,9 @@ def validate(root: Path) -> None:
         "INPUT_SOURCE_SHA": "${{ inputs.source_sha }}",
     }:
         raise ContractError("isolated capture trusted input bindings changed")
-    capture_authorization_run = require_run_markers(
+    capture_authentication_run = require_run_markers(
         capture_authorization,
-        "Revalidate controller source and merge authorization",
+        "Authenticate controller dispatch and capture definition",
         (
             'test "${INPUT_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
             'test "${INPUT_SECURITY_DEFINITION_SHA}" = "${ENTERPRISE_SECURITY_DEFINITION_SHA}"',
@@ -4439,6 +5577,57 @@ def validate(root: Path) -> None:
             "contents/.github/workflows/enterprise-linux-capture.yml?ref=${INPUT_SECURITY_DEFINITION_SHA}",
             "contents/.github/workflows/enterprise-linux-capture.yml?ref=${CAPTURE_SHA}",
             'test "${running_capture_blob_sha}" = "${capture_blob_sha}"',
+            'echo "capture_blob_sha=${capture_blob_sha}"',
+            'echo "capture_issued_at_unix_ms=$((capture_created_epoch * 1000))"',
+            'echo "capture_workflow_id=${capture_workflow_id}"',
+        ),
+        "isolated capture does not authenticate controller, run, intent, and definition bindings",
+    )
+    capture_authorization_step = named_step(
+        capture_authorization, "Revalidate controller source and merge authorization"
+    )
+    if capture_authorization_step.get("env") != {
+        "AUTHENTICATED_CAPTURE_BLOB_SHA": "${{ steps.authenticate.outputs.capture_blob_sha }}",
+        "AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS": "${{ steps.authenticate.outputs.capture_issued_at_unix_ms }}",
+        "AUTHENTICATED_CAPTURE_WORKFLOW_ID": "${{ steps.authenticate.outputs.capture_workflow_id }}",
+        "CAPTURE_ACTOR": "${{ github.actor }}",
+        "CAPTURE_RUN_ATTEMPT": "${{ github.run_attempt }}",
+        "CAPTURE_RUN_ID": "${{ github.run_id }}",
+        "INPUT_AUTHORIZED_SOURCE_SHA": "${{ inputs.authorized_source_sha }}",
+        "INPUT_BASE_REF": "${{ inputs.base_ref }}",
+        "INPUT_BASE_REPOSITORY": "${{ inputs.base_repository }}",
+        "INPUT_BASE_SHA": "${{ inputs.base_sha }}",
+        "INPUT_CONTROLLER_ACTOR": "${{ inputs.controller_actor }}",
+        "INPUT_CONTROLLER_BLOB_SHA": "${{ inputs.controller_blob_sha }}",
+        "INPUT_CONTROLLER_ISSUED_AT_UNIX_MS": "${{ inputs.controller_issued_at_unix_ms }}",
+        "INPUT_CONTROLLER_RUN_ATTEMPT": "${{ inputs.controller_run_attempt }}",
+        "INPUT_CONTROLLER_RUN_ID": "${{ inputs.controller_run_id }}",
+        "INPUT_CONTROLLER_WORKFLOW_ID": "${{ inputs.controller_workflow_id }}",
+        "INPUT_LABELS_DIGEST": "${{ inputs.labels_digest }}",
+        "INPUT_MERGE_COMMIT_SHA": "${{ inputs.merge_commit_sha }}",
+        "INPUT_MERGE_TREE_SHA": "${{ inputs.merge_tree_sha }}",
+        "INPUT_MODE": "${{ inputs.mode }}",
+        "INPUT_PR_NUMBER": "${{ inputs.pr_number }}",
+        "INPUT_SECURITY_DEFINITION_SHA": "${{ inputs.security_definition_sha }}",
+        "INPUT_SOURCE_REPOSITORY": "${{ inputs.source_repository }}",
+        "INPUT_SOURCE_SHA": "${{ inputs.source_sha }}",
+    }:
+        raise ContractError("isolated capture trusted authorization bindings changed")
+    capture_merge_authorization_run = require_run_markers(
+        capture_authorization,
+        "Revalidate controller source and merge authorization",
+        (
+            '[[ "${AUTHENTICATED_CAPTURE_BLOB_SHA}" =~ ${commit_pattern} ]]',
+            '[[ "${AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS}" =~ ^[1-9][0-9]{12}$ ]]',
+            '[[ "${AUTHENTICATED_CAPTURE_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]',
+            'test "${INPUT_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
+            'test "${INPUT_SECURITY_DEFINITION_SHA}" = "${ENTERPRISE_SECURITY_DEFINITION_SHA}"',
+            'test "${CAPTURE_RUN_ATTEMPT}" = "1"',
+            'test "${INPUT_CONTROLLER_RUN_ATTEMPT}" = "1"',
+            'test "${CAPTURE_ACTOR}" = "github-actions[bot]"',
+            'capture_blob_sha="${AUTHENTICATED_CAPTURE_BLOB_SHA}"',
+            'capture_created_epoch="$((AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS / 1000))"',
+            'capture_workflow_id="${AUTHENTICATED_CAPTURE_WORKFLOW_ID}"',
             'test "$(jq -r \'.head.sha\' <<< "${live_pr}")" = "${INPUT_SOURCE_SHA}"',
             "repos/${GITHUB_REPOSITORY}/git/ref/pull/${INPUT_PR_NUMBER}/merge",
             'test "$(jq -r \'.ref\' <<< "${merge_ref}")" = "refs/pull/${INPUT_PR_NUMBER}/merge"',
@@ -4457,10 +5646,20 @@ def validate(root: Path) -> None:
             'test "$((now_epoch - controller_epoch))" -le 1800',
             'test "$(jq -r \'.head.sha\' <<< "${stable_pr}")" = "${INPUT_SOURCE_SHA}"',
             'test "$(jq -r \'.base.sha\' <<< "${stable_pr}")" = "${INPUT_BASE_SHA}"',
+            'stable_labels_json="$(jq -cS \'[.labels[].name] | sort\' <<< "${stable_pr}")"',
+            'stable_labels_digest="$(printf \'%s\' "${stable_labels_json}" | sha256sum | cut -d\' \' -f1)"',
+            'test "${stable_labels_digest}" = "${INPUT_LABELS_DIGEST}"',
+            "if jq -e '.labels | any(.name == \"refresh-linux-evidence\")' <<< \"${stable_pr}\" > /dev/null; then",
+            'test "${stable_mode}" = "${INPUT_MODE}"',
             'test "$(jq -r \'.object.sha\' <<< "${stable_merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"',
             'test "$(jq -r \'.tree.sha\' <<< "${stable_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"',
+            'echo "labels_digest=${stable_labels_digest}"',
+            'echo "mode=${stable_mode}"',
         ),
         "isolated capture does not revalidate controller, run, merge, source, and freshness bindings",
+    )
+    capture_authorization_run = (
+        capture_authentication_run + "\n" + capture_merge_authorization_run
     )
     if "${{ inputs." in capture_authorization_run:
         raise ContractError(
@@ -4949,6 +6148,7 @@ def validate(root: Path) -> None:
             'boundary["seccomp_profile_sha256"]',
             'boundary["trusted_file_sha256"]',
             'set(boundary["trusted_file_sha256"]) != expected_trusted_files',
+            '"cargo-mutants"',
             '"command-client.py"',
             '"verifier-bin/cargo"',
             '"verifier-bin/cc"',
@@ -6402,8 +7602,27 @@ def validate(root: Path) -> None:
         raise ContractError(
             "threat-model coverage contains a conditional or soft-fail gate"
         )
+    validate_step_inventory(
+        threat_job,
+        EXPECTED_THREAT_STEP_INVENTORY,
+        "threat-model coverage",
+    )
+    cargo_mutants_install = named_step(
+        threat_job, "Install and authenticate cargo-mutants"
+    )
+    if (
+        set(cargo_mutants_install) != {"name", "shell", "run"}
+        or cargo_mutants_install.get("shell") != "bash"
+        or not isinstance(cargo_mutants_install.get("run"), str)
+        or cargo_mutants_install["run"].strip()
+        != EXPECTED_THREAT_CARGO_MUTANTS_RUN
+    ):
+        raise ContractError(
+            "threat-model coverage cargo-mutants installation changed"
+        )
     for step_name, command in EXPECTED_THREAT_GATE_COMMANDS.items():
-        if named_step(threat_job, step_name).get("run") != command:
+        observed_run = named_step(threat_job, step_name).get("run")
+        if not isinstance(observed_run, str) or observed_run.strip() != command:
             raise ContractError(
                 f"threat-model coverage omits exact gate command: {step_name}"
             )
@@ -6492,7 +7711,11 @@ def validate(root: Path) -> None:
     aggregate_step = named_step(aggregate, "Require every security dependency")
     aggregate_run = aggregate_step.get("run")
     if (
-        set(aggregate_step) != {"name", "run"}
+        set(aggregate_step) != {"name", "env", "run"}
+        or aggregate_step.get("env")
+        != {
+            "COMMITTED_LINUX_EVIDENCE_SHA": "${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}"
+        }
         or not isinstance(aggregate_run, str)
         or aggregate_run.strip() != EXPECTED_AGGREGATE_RUN
     ):
@@ -6507,6 +7730,12 @@ def validate(root: Path) -> None:
     if ci_validators.get("run") != EXPECTED_CI_PYTHON_VALIDATORS_RUN:
         raise ContractError("required CI does not install pinned PyYAML")
     check_lines = run_lines(check_job)
+    require_run_markers(
+        check_job,
+        "Workspace structural gates",
+        ("bash ./scripts/tests/check-temporal-security.test.sh",),
+        "required CI omits the temporal gate self-test",
+    )
     mapping = named_step(check_job, "Formal traceability gate")
     if mapping.get("run") != "bash scripts/check-mapping.sh":
         raise ContractError("required CI omits the exact formal traceability gate")

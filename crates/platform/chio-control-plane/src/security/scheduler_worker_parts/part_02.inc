@@ -6,23 +6,31 @@ mod tests {
         DeclassificationReceiptDrainReport, DeclassificationReceiptOutboxPort,
         DeclassificationReconciliationReport, ProductionDeclassificationReceiptOutbox,
         ProductionResponseSchedulerConfig, ProductionResponseWorker,
-        ProductionResponseWorkerHandle, ProductionResponseWorkerLoopConfig,
-        ResponseWorkerHealth, ResponseWorkerJoinJob, ResponseWorkerLifecycle, ResponseWorkerPort,
+        ProductionResponseWorkerHandle, ProductionResponseWorkerLoopConfig, ResponseWorkerHealth,
+        ResponseWorkerJoinJob, ResponseWorkerLifecycle, ResponseWorkerPort,
         ResponseWorkerReaperRegistry, ResponseWorkerTick, ResponseWorkerTickError,
-        SqliteResponseWorkerPort, MAX_RESPONSE_WORKER_JOIN_OWNERS,
-        MAX_WORKER_PROGRESS_DEADLINE, MIN_WORKER_PROGRESS_DEADLINE,
+        SqliteResponseWorkerPort, MAX_RESPONSE_WORKER_JOIN_OWNERS, MAX_WORKER_PROGRESS_DEADLINE,
+        MIN_WORKER_PROGRESS_DEADLINE,
     };
-    use chio_quarantine::{SchedulerPolicy, SchedulerWorkOutcome};
+    use chio_quarantine::{
+        build_response_plan, ResponseStateMachine, ResponseTransitionRequest, SchedulerPolicy,
+        SchedulerWorkOutcome,
+    };
     use chio_security_kernel::SecurityClock;
     use chio_security_types::ports::{
         ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, EffectExecutionStatus,
         EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode, GrantId,
         LeaseOwnerId, OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest, RecordId,
-        ResponsePlanRecord, ResponseSchedulerStore, ResponseStore, SchedulerHealthPageRequest,
-        SchedulerHealthPort, SecurityAlert, SecurityAlertPort, SecurityReceiptSink, TenantId,
+        ResponsePlanRecord, ResponseSchedulerStore, ResponseStore, ScheduledWork,
+        SchedulerHealthPageRequest, SchedulerHealthPort, SchedulerRetryRequest, SecurityAlert,
+        SecurityAlertPort, SecurityReceiptSink, SessionId, TenantId,
         MAX_DECLASSIFICATION_EVIDENCE_BATCH,
     };
-    use chio_store_sqlite::security_state::SqliteSecurityStateStore;
+    use chio_security_types::{
+        OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
+        ResponseEffectSpec, ResponsePlanInput, ResponseState, ResponseTarget,
+    };
+    use chio_store_sqlite::security_state::{SecurityStateClock, SqliteSecurityStateStore};
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
@@ -593,12 +601,22 @@ mod tests {
     struct SqliteTestClock(AtomicU64);
 
     impl SqliteTestClock {
+        fn now(&self) -> u64 {
+            self.0.load(Ordering::Acquire)
+        }
+
         fn set(&self, now_unix_ms: u64) {
             self.0.store(now_unix_ms, Ordering::Release);
         }
     }
 
     impl SecurityClock for SqliteTestClock {
+        fn now_unix_ms(&self) -> PortResult<u64> {
+            Ok(self.0.load(Ordering::Acquire))
+        }
+    }
+
+    impl SecurityStateClock for SqliteTestClock {
         fn now_unix_ms(&self) -> PortResult<u64> {
             Ok(self.0.load(Ordering::Acquire))
         }
@@ -704,39 +722,71 @@ mod tests {
     }
 
     fn install_due_sqlite_plan(
-        store: &SqliteSecurityStateStore,
+        store: &Arc<SqliteSecurityStateStore>,
         action_id: &str,
         due_at_unix_ms: u64,
     ) -> ResponsePlanRecord {
-        let body = CanonicalBody::new(br#"{"state":"planned"}"#.to_vec())
-            .unwrap_or_else(|error| panic!("plan body: {error}"));
-        let record = ResponsePlanRecord {
-            tenant_id: tenant(),
+        let created_at_unix_ms = due_at_unix_ms.saturating_sub(1_000);
+        let canonical_contribution = CanonicalBody::new(b"{\"posture_rank\":3}".to_vec())
+            .unwrap_or_else(|error| panic!("contribution body: {error}"));
+        let contribution_hash = chio_security_types::ports::Digest32::new(
+            *chio_core::sha256(canonical_contribution.as_bytes()).as_bytes(),
+        );
+        let plan = build_response_plan(ResponsePlanInput {
             action_id: ActionId::new(action_id)
                 .unwrap_or_else(|error| panic!("action id: {error}")),
-            generation: 0,
-            state: RecordId::new("planned").unwrap_or_else(|error| panic!("state id: {error}")),
-            body_hash: chio_security_types::ports::Digest32::new(
-                *chio_core::sha256(body.as_bytes()).as_bytes(),
-            ),
-            canonical_body: body,
-            due_at_unix_ms: Some(due_at_unix_ms),
-        };
-        store
-            .create(&record)
-            .unwrap_or_else(|error| panic!("create plan: {error}"));
-        record
+            trigger_finding_id: RecordId::new("finding-scheduler-worker")
+                .unwrap_or_else(|error| panic!("finding id: {error}")),
+            trigger_finding_hash: chio_security_types::ports::Digest32::new([11; 32]),
+            trigger_finding_receipt_id: OpaqueReceiptRef::new("finding-scheduler-worker-receipt")
+                .unwrap_or_else(|error| panic!("finding receipt: {error}")),
+            tenant_id: tenant(),
+            policy_version: RecordId::new("policy-scheduler-worker")
+                .unwrap_or_else(|error| panic!("policy version: {error}")),
+            policy_hash: chio_security_types::ports::Digest32::new([12; 32]),
+            affected_ids: vec![RecordId::new("affected-scheduler-worker")
+                .unwrap_or_else(|error| panic!("affected id: {error}"))],
+            effects: vec![ResponseEffectSpec {
+                kind: ResponseEffectKind::ThrottleSession,
+                target: ResponseTarget::Session {
+                    session_id: SessionId::new("session-scheduler-worker")
+                        .unwrap_or_else(|error| panic!("session id: {error}")),
+                },
+                canonical_contribution,
+                contribution_hash,
+                observed_base_version_hash: chio_security_types::ports::Digest32::new([13; 32]),
+            }],
+            ttl_ms: due_at_unix_ms.saturating_sub(created_at_unix_ms),
+            created_at_unix_ms,
+            operator_capability: OperatorCapabilityBinding {
+                capability_id: RecordId::new("capability-scheduler-worker")
+                    .unwrap_or_else(|error| panic!("capability id: {error}")),
+                capability_digest: chio_security_types::ports::Digest32::new([14; 32]),
+                expires_at_unix_ms: due_at_unix_ms.saturating_add(10_000),
+                executor_subject: RecordId::new("executor-scheduler-worker")
+                    .unwrap_or_else(|error| panic!("executor subject: {error}")),
+            },
+            approval_requirement: ResponseApprovalRequirement::Automatic,
+            submitter: RecordId::new("submitter-scheduler-worker")
+                .unwrap_or_else(|error| panic!("submitter: {error}")),
+            reason_hash: chio_security_types::ports::Digest32::new([15; 32]),
+        })
+        .unwrap_or_else(|error| panic!("response plan: {error}"));
+        ResponseStateMachine::new(Arc::clone(store))
+            .create(plan)
+            .unwrap_or_else(|error| panic!("create plan: {error}"))
     }
 
     fn sqlite_worker_port(
         store: Arc<SqliteSecurityStateStore>,
         clock: Arc<SqliteTestClock>,
         owner: &str,
+        claim_incarnation: &str,
         lease_duration_ms: u64,
     ) -> Arc<SqliteResponseWorkerPort> {
         let ports = Arc::new(SqliteTestPorts);
         Arc::new(
-            SqliteResponseWorkerPort::new(
+            SqliteResponseWorkerPort::new_with_claim_incarnation_for_test(
                 store,
                 Arc::clone(&ports) as Arc<dyn EffectPort>,
                 Arc::clone(&ports) as Arc<dyn SecurityReceiptSink>,
@@ -756,9 +806,133 @@ mod tests {
                     },
                     renewal_margin_ms: 5,
                 },
+                RecordId::new(claim_incarnation)
+                    .unwrap_or_else(|error| panic!("claim incarnation id: {error}")),
             )
             .unwrap_or_else(|error| panic!("worker port: {error}")),
         )
+    }
+
+    fn record_retry_and_reclaim(
+        store: &SqliteSecurityStateStore,
+        clock: &SqliteTestClock,
+        port: &SqliteResponseWorkerPort,
+        work: &ScheduledWork,
+        tick_sequence: u64,
+        transition_id: RecordId,
+    ) -> ScheduledWork {
+        let retry_now_unix_ms = clock.now();
+        let not_before_unix_ms = retry_now_unix_ms.saturating_add(1);
+        store
+            .record_retry(&SchedulerRetryRequest {
+                work: work.clone(),
+                expected_attempts: 0,
+                error_code: ErrorCode::new("response.terminal_recovery_test")
+                    .unwrap_or_else(|error| panic!("terminal retry error code: {error}")),
+                first_failure_at_unix_ms: retry_now_unix_ms,
+                now_unix_ms: retry_now_unix_ms,
+                not_before_unix_ms,
+                health_event_id: None,
+                transition_id,
+            })
+            .unwrap_or_else(|error| panic!("terminal retry persistence: {error}"));
+        clock.set(not_before_unix_ms);
+        let reclaimed = port
+            .claim(tick_sequence)
+            .unwrap_or_else(|error| panic!("terminal retry reclaim: {error}"));
+        assert_eq!(reclaimed.len(), 1);
+        assert_eq!(reclaimed[0].action_id, work.action_id);
+        assert!(reclaimed[0].fencing_token > work.fencing_token);
+        reclaimed[0].clone()
+    }
+
+    #[test]
+    fn sqlite_worker_operation_gate_recovers_after_panic_for_cleanup() {
+        let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let now_unix_ms = current_unix_ms();
+        let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));
+        let store = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                directory.path().join("operation-gate-poison.sqlite"),
+                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("security store: {error}")),
+        );
+        let port = sqlite_worker_port(
+            store,
+            clock,
+            "worker-operation-gate-poison",
+            "incarnation-operation-gate-poison",
+            100,
+        );
+        let panicking_port = Arc::clone(&port);
+        let panicked = std::thread::spawn(move || {
+            let _operation_guard = panicking_port
+                .operation_lock
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            panic!("forced worker operation panic");
+        })
+        .join();
+        assert!(panicked.is_err());
+        let report = port
+            .tick(0, false)
+            .unwrap_or_else(|error| panic!("post-panic worker tick: {error}"));
+        assert_eq!(report.claimed, 0);
+        port.shutdown()
+            .unwrap_or_else(|error| panic!("post-panic worker shutdown: {error}"));
+    }
+
+    #[test]
+    fn sqlite_worker_shutdown_forgets_a_naturally_expired_safe_lease() {
+        let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let path = directory.path().join("expired-safe-shutdown.sqlite");
+        let now_unix_ms = current_unix_ms();
+        let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));
+        let store = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                &path,
+                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("security store: {error}")),
+        );
+        install_due_sqlite_plan(
+            &store,
+            "action-expired-safe-shutdown",
+            now_unix_ms.saturating_sub(1),
+        );
+        let port = sqlite_worker_port(
+            Arc::clone(&store),
+            Arc::clone(&clock),
+            "worker-expired-safe-shutdown",
+            "incarnation-expired-safe-shutdown",
+            100,
+        );
+        let work = port
+            .claim(0)
+            .unwrap_or_else(|error| panic!("safe lease claim: {error}"))
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| panic!("safe lease claim missing"));
+        clock.set(work.lease_expires_at_unix_ms.saturating_add(1));
+
+        port.shutdown()
+            .unwrap_or_else(|error| panic!("expired safe lease shutdown: {error}"));
+        assert!(port
+            .owned_leases
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_empty());
+        let connection = rusqlite::Connection::open(path)
+            .unwrap_or_else(|error| panic!("expired safe lease readback: {error}"));
+        let durable_leases = connection
+            .query_row(
+                "SELECT COUNT(*) FROM security_scheduler_leases WHERE tenant_id = ?1 AND action_id = ?2",
+                rusqlite::params![work.tenant_id.as_str(), work.action_id.as_str()],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or_else(|error| panic!("expired safe lease count: {error}"));
+        assert_eq!(durable_leases, 1);
     }
 
     #[test]
@@ -856,1136 +1030,361 @@ mod tests {
     #[test]
     fn sqlite_worker_restart_replays_lost_claim_ack_and_shutdown_releases_lease() {
         let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-        let store = Arc::new(
-            SqliteSecurityStateStore::open(directory.path().join("response-worker.sqlite"))
-                .unwrap_or_else(|error| panic!("security store: {error}")),
-        );
+        let path = directory.path().join("response-worker.sqlite");
         let now_unix_ms = current_unix_ms();
+        let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));
+        let first_store = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                &path,
+                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("security store: {error}")),
+        );
         install_due_sqlite_plan(
-            &store,
+            &first_store,
             "action-sqlite-restart",
             now_unix_ms.saturating_sub(1),
         );
-        let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));
         let first_port = sqlite_worker_port(
-            Arc::clone(&store),
+            Arc::clone(&first_store),
             Arc::clone(&clock),
             "worker-sqlite-restart",
-            5_000,
+            "incarnation-sqlite-restart-first",
+            100,
         );
         let claimed = first_port
             .claim(0)
             .unwrap_or_else(|error| panic!("first claim: {error}"));
         assert_eq!(claimed.len(), 1);
         drop(first_port);
+        drop(first_store);
 
-        let restarted_port =
-            sqlite_worker_port(Arc::clone(&store), clock, "worker-sqlite-restart", 5_000);
-        let replayed = restarted_port
+        let reopened_store = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                &path,
+                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("reopen security store: {error}")),
+        );
+        let same_owner_port = sqlite_worker_port(
+            Arc::clone(&reopened_store),
+            Arc::clone(&clock),
+            "worker-sqlite-restart",
+            "incarnation-sqlite-restart-live",
+            100,
+        );
+        assert!(same_owner_port
             .claim(0)
-            .unwrap_or_else(|error| panic!("replayed claim: {error}"));
-        assert_eq!(replayed, claimed);
+            .unwrap_or_else(|error| panic!("live same-owner claim: {error}"))
+            .is_empty());
+        reopened_store
+            .validate_lease(&claimed[0])
+            .unwrap_or_else(|error| panic!("live restart changed prior lease: {error}"));
+        drop(same_owner_port);
+
+        let takeover_now_unix_ms = claimed[0].lease_expires_at_unix_ms.saturating_add(1);
+        clock.set(takeover_now_unix_ms);
+        let restarted_port = sqlite_worker_port(
+            Arc::clone(&reopened_store),
+            Arc::clone(&clock),
+            "worker-sqlite-restart",
+            "incarnation-sqlite-restart-takeover",
+            100,
+        );
+        let takeover = restarted_port
+            .claim(0)
+            .unwrap_or_else(|error| panic!("takeover claim: {error}"));
+        assert_eq!(takeover.len(), 1);
+        assert_eq!(takeover[0].action_id, claimed[0].action_id);
+        assert_eq!(takeover[0].lease_owner_id, claimed[0].lease_owner_id);
+        assert!(takeover[0].fencing_token > claimed[0].fencing_token);
+        let plan_key = chio_security_types::ports::ResponsePlanKey {
+            tenant_id: claimed[0].tenant_id.clone(),
+            action_id: claimed[0].action_id.clone(),
+        };
+        let before_stale_attempt = reopened_store
+            .load_plan(&plan_key)
+            .unwrap_or_else(|error| panic!("plan before stale attempt: {error}"));
+        assert!(matches!(
+            restarted_port
+                .scheduler
+                .process(&claimed[0], takeover_now_unix_ms),
+            Ok(SchedulerWorkOutcome::LeaseLost { action_id })
+                if action_id == claimed[0].action_id
+        ));
+        assert_eq!(
+            reopened_store
+                .load_plan(&plan_key)
+                .unwrap_or_else(|error| panic!("plan after stale attempt: {error}")),
+            before_stale_attempt
+        );
         let restarted = ProductionResponseWorker::new_for_test(restarted_port)
             .unwrap_or_else(|error| panic!("restarted worker: {error}"));
         restarted
             .complete_shutdown_after_loop()
             .unwrap_or_else(|error| panic!("worker shutdown: {error}"));
-        assert!(store.validate_lease(&claimed[0]).is_err());
-    }
+        let connection = rusqlite::Connection::open(&path)
+            .unwrap_or_else(|error| panic!("restart lease readback: {error}"));
+        let remaining_leases = connection
+            .query_row(
+                "SELECT COUNT(*) FROM security_scheduler_leases WHERE tenant_id = ?1 AND action_id = ?2",
+                rusqlite::params![claimed[0].tenant_id.as_str(), claimed[0].action_id.as_str()],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or_else(|error| panic!("restart lease count: {error}"));
+        assert_eq!(remaining_leases, 0);
 
-    #[test]
-    fn sqlite_worker_stale_fence_loses_after_expiry_takeover() {
-        let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-        let store = Arc::new(
-            SqliteSecurityStateStore::open(directory.path().join("response-fence.sqlite"))
-                .unwrap_or_else(|error| panic!("security store: {error}")),
+        let terminal_path = directory.path().join("response-worker-terminal.sqlite");
+        let terminal_now_unix_ms = current_unix_ms();
+        let terminal_clock = Arc::new(SqliteTestClock(AtomicU64::new(terminal_now_unix_ms)));
+        let terminal_store = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                &terminal_path,
+                Arc::clone(&terminal_clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("terminal security store: {error}")),
         );
-        let now_unix_ms = current_unix_ms();
-        install_due_sqlite_plan(&store, "action-sqlite-fence", now_unix_ms.saturating_sub(1));
-        let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));
-        let stale_port = sqlite_worker_port(
-            Arc::clone(&store),
-            Arc::clone(&clock),
-            "worker-sqlite-stale",
-            150,
+        let terminal_plan = install_due_sqlite_plan(
+            &terminal_store,
+            "action-sqlite-restart-terminal",
+            terminal_now_unix_ms.saturating_sub(1),
         );
-        let _stale_worker = ProductionResponseWorker::new_for_test(Arc::clone(&stale_port))
-            .unwrap_or_else(|error| panic!("stale worker: {error}"));
-        clock.set(current_unix_ms());
-        let stale_work = stale_port
+        let terminal_port = sqlite_worker_port(
+            Arc::clone(&terminal_store),
+            Arc::clone(&terminal_clock),
+            "worker-sqlite-restart-terminal",
+            "incarnation-sqlite-terminal-first",
+            100,
+        );
+        let initial_terminal_work = terminal_port
             .claim(0)
-            .unwrap_or_else(|error| panic!("stale claim: {error}"))
+            .unwrap_or_else(|error| panic!("terminal first claim: {error}"))
             .into_iter()
             .next()
-            .unwrap_or_else(|| panic!("stale work missing"));
-
-        std::thread::sleep(Duration::from_millis(200));
-        let takeover_now = current_unix_ms();
-        clock.set(takeover_now);
-        let takeover_port = sqlite_worker_port(
-            Arc::clone(&store),
-            Arc::clone(&clock),
-            "worker-sqlite-takeover",
-            5_000,
+            .unwrap_or_else(|| panic!("terminal first claim missing"));
+        let terminal_work = record_retry_and_reclaim(
+            &terminal_store,
+            &terminal_clock,
+            &terminal_port,
+            &initial_terminal_work,
+            1,
+            RecordId::new("terminal-recovery-retry")
+                .unwrap_or_else(|error| panic!("terminal retry transition: {error}")),
         );
-        let takeover_work = takeover_port
-            .claim(0)
-            .unwrap_or_else(|error| panic!("takeover claim: {error}"))
-            .into_iter()
-            .next()
-            .unwrap_or_else(|| panic!("takeover work missing"));
-        assert!(takeover_work.fencing_token > stale_work.fencing_token);
-        assert!(matches!(
-            stale_port.scheduler.process(&stale_work, takeover_now),
-            Ok(SchedulerWorkOutcome::LeaseLost { .. })
-        ));
-        let takeover = ProductionResponseWorker::new_for_test(takeover_port)
-            .unwrap_or_else(|error| panic!("takeover worker: {error}"));
-        takeover
-            .complete_shutdown_after_loop()
-            .unwrap_or_else(|error| panic!("takeover shutdown: {error}"));
-    }
-
-    #[test]
-    fn production_worker_restart_recovers_after_ack_loss_without_duplicate_completion() {
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![
-            Err(ResponseWorkerTickError::AckLost),
-            Ok(tick("action-recovered")),
-        ]));
-        let first = ProductionResponseWorker::new_for_test(Arc::clone(&port))
-            .unwrap_or_else(|error| panic!("first worker: {error}"));
-        assert!(matches!(
-            first.tick_once(),
-            Err(ResponseWorkerTickError::AckLost)
-        ));
-
-        let restarted = ProductionResponseWorker::new_for_test(Arc::clone(&port))
-            .unwrap_or_else(|error| panic!("restarted worker: {error}"));
-        let recovered = restarted
-            .tick_once()
-            .unwrap_or_else(|error| panic!("recovery tick: {error}"));
-        assert_eq!(recovered.completed_action_ids.len(), 1);
-        assert_eq!(
-            recovered.completed_action_ids[0].as_str(),
-            "action-recovered"
-        );
-    }
-
-    #[test]
-    fn production_worker_surfaces_stale_fence_as_lease_loss_not_completion() {
-        let stale = ResponseWorkerTick {
-            tenant_id: tenant(),
-            declassification_receipts_appended: 0,
-            declassification_receipts_acknowledged: 0,
-            declassification_receipts_pending: 0,
-            declassification_receipts_compacted: 0,
-            claimed: 1,
-            completed_action_ids: Vec::new(),
-            retry_action_ids: Vec::new(),
-            lease_lost_action_ids: vec![
-                ActionId::new("action-stale").unwrap_or_else(|error| panic!("action id: {error}"))
-            ],
-        };
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Ok(stale)]));
-        let worker = ProductionResponseWorker::new_for_test(port)
-            .unwrap_or_else(|error| panic!("worker: {error}"));
-        let report = worker
-            .tick_once()
-            .unwrap_or_else(|error| panic!("stale tick: {error}"));
-        assert!(report.completed_action_ids.is_empty());
-        assert_eq!(report.lease_lost_action_ids.len(), 1);
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Degraded);
-    }
-
-    #[test]
-    fn worker_progress_deadline_has_an_absolute_validated_boundary() {
-        let rapid = ProductionResponseWorkerLoopConfig {
-            tick_interval: Duration::from_millis(1),
-        };
-        assert_eq!(rapid.progress_deadline(), MIN_WORKER_PROGRESS_DEADLINE);
-
-        let boundary = ProductionResponseWorkerLoopConfig {
-            tick_interval: Duration::from_secs(30),
-        };
-        let validated = boundary
-            .validate()
-            .unwrap_or_else(|error| panic!("valid progress boundary rejected: {error}"));
-        assert_eq!(validated, boundary);
-        assert_eq!(boundary.progress_deadline(), MAX_WORKER_PROGRESS_DEADLINE);
-
-        let above_boundary = ProductionResponseWorkerLoopConfig {
-            tick_interval: Duration::from_secs(30) + Duration::from_nanos(1),
-        };
-        assert!(matches!(
-            above_boundary.validate(),
-            Err(ResponseWorkerTickError::InvalidConfig)
-        ));
-    }
-
-    #[test]
-    fn pending_declassification_receipts_keep_worker_health_degraded() {
-        let mut pending = tick("action-with-pending-evidence");
-        pending.declassification_receipts_pending = 3;
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Ok(pending)]));
-        let worker = ProductionResponseWorker::new_for_test(port)
-            .unwrap_or_else(|error| panic!("worker: {error}"));
-
-        worker
-            .tick_once()
-            .unwrap_or_else(|error| panic!("pending evidence tick: {error}"));
-
-        let health = worker.health();
-        assert_eq!(health.lifecycle, ResponseWorkerLifecycle::Degraded);
-        assert_eq!(
-            health.last_error.as_deref(),
-            Some("3 declassification receipts remain pending")
-        );
-    }
-
-    #[test]
-    fn post_loop_cleanup_releases_owned_work_and_is_idempotent() {
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(Vec::new()));
-        let worker = ProductionResponseWorker::new_for_test(Arc::clone(&port))
-            .unwrap_or_else(|error| panic!("worker: {error}"));
-        worker
-            .complete_shutdown_after_loop()
-            .unwrap_or_else(|error| panic!("first shutdown: {error}"));
-        worker
-            .complete_shutdown_after_loop()
-            .unwrap_or_else(|error| panic!("second shutdown: {error}"));
-        assert_eq!(port.shutdown_calls(), 1);
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Stopped);
-    }
-
-    #[test]
-    fn reaper_spawn_failure_retains_join_ownership_for_later_recovery() {
-        let registry = Arc::new(ResponseWorkerReaperRegistry::new());
-        registry.fail_next_spawn.store(true, Ordering::Release);
-        let permit = registry
-            .acquire_without_service_for_test()
-            .unwrap_or_else(|error| panic!("join permit: {error}"));
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(Vec::new()));
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let worker_for_thread = Arc::clone(&worker);
-        let join = std::thread::spawn(move || worker_for_thread.complete_shutdown_after_loop());
-
-        registry.enqueue(ResponseWorkerJoinJob {
-            join,
-            worker: Arc::clone(&worker),
-            _permit: permit,
-        });
-
-        {
-            let state = registry.lock_state();
-            assert_eq!(state.jobs.len(), 1);
-            assert_eq!(state.join_owners, 1);
-            assert!(state.reaper.is_none());
-        }
-        let ResponseWorkerJoinJob {
-            join,
-            worker,
-            _permit,
-        } = registry
-            .take_retained_job_for_test()
-            .unwrap_or_else(|| panic!("retained join ownership was lost"));
-        join_response_worker_thread(join, &worker)
-            .unwrap_or_else(|error| panic!("retained join: {error}"));
-        drop(_permit);
-        assert_eq!(registry.lock_state().join_owners, 0);
-        assert!(worker.thread_joined.load(Ordering::Acquire));
-        assert_eq!(port.shutdown_calls(), 1);
-    }
-
-    #[test]
-    fn join_registry_reservations_bound_retained_worker_growth() {
-        let registry = Arc::new(ResponseWorkerReaperRegistry::new());
-        let mut permits = Vec::new();
-        for _ in 0..MAX_RESPONSE_WORKER_JOIN_OWNERS {
-            permits.push(
-                registry
-                    .acquire_without_service_for_test()
-                    .unwrap_or_else(|error| panic!("join permit: {error}")),
-            );
-        }
-        assert!(matches!(
-            registry.acquire_without_service_for_test(),
-            Err(ResponseWorkerTickError::WorkerReaperCapacity)
-        ));
-        drop(permits);
-        assert_eq!(registry.lock_state().join_owners, 0);
-    }
-
-    #[tokio::test]
-    async fn production_worker_allows_only_one_background_loop() {
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Ok(tick(
-            "initial-publication-readiness",
-        ))]));
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let config = ProductionResponseWorkerLoopConfig {
-            tick_interval: Duration::from_secs(30),
-        };
-        let mut handle = worker
-            .start_parked(config)
-            .await
-            .unwrap_or_else(|error| panic!("first start: {error}"));
-
-        assert!(matches!(
-            worker.start_parked(config).await,
-            Err(ResponseWorkerTickError::WorkerAlreadyRunning)
-        ));
-
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("release publication: {error}"));
-        handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("publication readiness: {error}"));
-
-        handle
-            .shutdown()
-            .await
-            .unwrap_or_else(|error| panic!("shutdown: {error}"));
-        assert_eq!(port.shutdown_calls(), 1);
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn worker_owned_thread_survives_caller_starvation_and_joins_before_restart() {
-        let ticks = (0..64)
-            .map(|_| Ok(tick("worker-owned-thread-progress")))
-            .collect();
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(ticks));
-
-        for generation in 0..2 {
-            let worker = Arc::new(
-                ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                    .unwrap_or_else(|error| panic!("worker {generation}: {error}")),
-            );
-            let mut handle = worker
-                .start_parked(ProductionResponseWorkerLoopConfig {
-                    tick_interval: Duration::from_millis(10),
-                })
-                .await
-                .unwrap_or_else(|error| panic!("start worker {generation}: {error}"));
-            handle
-                .arm()
-                .await
-                .unwrap_or_else(|error| panic!("arm worker {generation}: {error}"));
-            handle
-                .release_publication()
-                .unwrap_or_else(|error| panic!("publish worker {generation}: {error}"));
-            handle
-                .wait_for_publication_readiness()
-                .await
-                .unwrap_or_else(|error| {
-                    panic!("publication readiness for worker {generation}: {error}")
-                });
-            let completed_before_starvation = worker.health().ticks_completed;
-
-            std::thread::sleep(Duration::from_millis(100));
-
-            let completed_after_starvation = worker.health().ticks_completed;
-            assert!(completed_after_starvation > completed_before_starvation);
-            worker
-                .ensure_ready()
-                .unwrap_or_else(|error| panic!("worker {generation} stalled: {error}"));
-            handle
-                .shutdown()
-                .await
-                .unwrap_or_else(|error| panic!("shutdown worker {generation}: {error}"));
-            assert!(!worker.task_live.load(Ordering::Acquire));
-            assert!(worker.shutdown_is_complete());
-            assert!(handle.join.is_none());
-        }
-
-        assert_eq!(port.shutdown_calls(), 2);
-    }
-
-    #[test]
-    fn progress_deadline_begins_when_the_worker_reaches_publication_readiness() {
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(Vec::new()));
-        let worker = ProductionResponseWorker::new_for_test(port)
-            .unwrap_or_else(|error| panic!("worker: {error}"));
-        worker.configure_progress(Duration::from_millis(1));
-        worker.task_live.store(true, Ordering::Release);
-        worker
-            .mark_publication_released()
-            .unwrap_or_else(|error| panic!("release publication: {error}"));
-
-        std::thread::sleep(Duration::from_millis(20));
-        worker
-            .ensure_ready()
-            .unwrap_or_else(|error| panic!("unobserved publication stalled: {error}"));
-
-        worker
-            .mark_publication_ready()
-            .unwrap_or_else(|error| panic!("mark publication ready: {error}"));
-        std::thread::sleep(Duration::from_millis(20));
-        assert!(matches!(
-            worker.ensure_ready(),
-            Err(ResponseWorkerTickError::WorkerProgressStalled { .. })
-        ));
-    }
-
-    #[tokio::test]
-    async fn crashed_worker_thread_revokes_liveness_before_the_progress_deadline() {
-        let crash = ResponseWorkerTickError::WorkerCrash(
-            ErrorCode::new("response.worker-thread-crash")
-                .unwrap_or_else(|error| panic!("worker crash code: {error}")),
-        );
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![
-            Ok(tick("initial-publication-readiness")),
-            Err(crash),
-        ]));
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("release publication: {error}"));
-        handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("publication readiness: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while worker.health().lifecycle != ResponseWorkerLifecycle::Failed {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("worker thread did not report its crash"));
-
-        assert!(!handle.is_running());
-        assert!(matches!(
-            worker.ensure_ready(),
-            Err(ResponseWorkerTickError::WorkerStopped)
-        ));
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Failed);
-
-        assert!(handle.shutdown().await.is_err());
-        assert_eq!(port.shutdown_calls(), 1);
-    }
-
-    #[tokio::test]
-    async fn parked_worker_commit_failure_stops_with_zero_ticks() {
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Ok(tick(
-            "action-must-not-run",
-        ))]));
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let services: Arc<dyn ActiveDefenseServices> = Arc::new(WorkerBackedServices {
-            worker: Arc::clone(&worker),
-        });
-        let registry = ActiveDefenseServiceRegistry::default();
-        registry
-            .reserve_exact(Arc::clone(&services))
-            .unwrap_or_else(|error| panic!("reserve: {error}"));
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("parked start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        tokio::task::yield_now().await;
-        assert_eq!(port.tick_calls(), 0);
-        assert!(registry.snapshot().is_none());
-
-        port.set_ready(false);
-        let release_called = AtomicBool::new(false);
-        assert!(registry
-            .commit_reserved_exact_with_release(&services, || {
-                release_called.store(true, Ordering::Release);
-                handle.release_publication()
-            })
-            .is_err());
-        assert!(!release_called.load(Ordering::Acquire));
-        assert!(registry.snapshot().is_none());
-        handle
-            .shutdown()
-            .await
-            .unwrap_or_else(|error| panic!("parked shutdown: {error}"));
-        assert_eq!(port.tick_calls(), 0);
-        assert_eq!(port.shutdown_calls(), 1);
-        registry
-            .cancel_reserved_exact(&services)
-            .unwrap_or_else(|error| panic!("cancel reserve: {error}"));
-    }
-
-    #[tokio::test]
-    async fn publication_remains_unready_until_the_first_tick_completes() {
-        let port = Arc::new(BlockingWorkerPort::blocking_initial_tick());
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let services: Arc<dyn ActiveDefenseServices> = Arc::new(WorkerBackedServices {
-            worker: Arc::clone(&worker),
-        });
-        let registry = ActiveDefenseServiceRegistry::default();
-        registry
-            .reserve_exact(Arc::clone(&services))
-            .unwrap_or_else(|error| panic!("reserve: {error}"));
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_secs(30),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("parked start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        assert!(registry.snapshot().is_none());
-        assert!(!port.tick_started.load(Ordering::Acquire));
-
-        registry
-            .commit_reserved_exact_with_release(&services, || handle.release_publication())
-            .unwrap_or_else(|error| panic!("publish: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while !port.tick_started.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("initial publication tick did not start"));
-
-        assert!(registry.snapshot().is_some());
-        assert!(!handle.is_running());
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Running);
-        assert!(matches!(
-            services.ensure_ready(),
-            Err(ResponseWorkerTickError::WorkerPublicationPending)
-        ));
-        port.release();
-        handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("publication readiness: {error}"));
-        assert!(handle.is_running());
-        let health = worker.health();
-        assert_eq!(health.lifecycle, ResponseWorkerLifecycle::Ready);
-        assert!(health.ticks_completed >= 1);
-        services
-            .ensure_ready()
-            .unwrap_or_else(|error| panic!("published services are not ready: {error}"));
-        handle
-            .shutdown()
-            .await
-            .unwrap_or_else(|error| panic!("shutdown: {error}"));
-        registry
-            .unpublish_exact(&services)
-            .unwrap_or_else(|error| panic!("unpublish: {error}"));
-    }
-
-    #[tokio::test]
-    async fn cancelled_publication_wait_transfers_join_ownership_without_blocking_drop() {
-        let port = Arc::new(BlockingWorkerPort::blocking_initial_tick());
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_secs(30),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("parked start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("publication: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while !port.tick_started.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("initial publication tick did not start"));
-
-        let startup = async move {
-            handle.wait_for_publication_readiness().await?;
-            Ok::<ProductionResponseWorkerHandle, ResponseWorkerTickError>(handle)
-        };
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), startup)
-                .await
-                .is_err()
-        );
-        assert!(worker.shutdown_requested.load(Ordering::Acquire));
-        assert!(!worker.thread_joined.load(Ordering::Acquire));
-
-        port.release();
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            worker.wait_for_shutdown_completion(),
-        )
-        .await
-        .unwrap_or_else(|_| panic!("cancelled startup worker did not stop"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while !worker.thread_joined.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("cancelled startup worker thread was not joined"));
-        assert!(!port.shutdown_during_tick.load(Ordering::Acquire));
-        assert_eq!(port.shutdown_calls.load(Ordering::Acquire), 1);
-    }
-
-    #[tokio::test]
-    async fn initial_tick_retries_non_crash_failures_on_the_configured_cadence() {
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![
-            Err(ResponseWorkerTickError::Port(PortError::unavailable())),
-            Err(ResponseWorkerTickError::Port(PortError::unavailable())),
-            Ok(tick("initial-retry-success")),
-        ]));
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("publication: {error}"));
-        handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("publication readiness: {error}"));
-
-        let health = worker.health();
-        assert_eq!(health.lifecycle, ResponseWorkerLifecycle::Ready);
-        assert_eq!(health.ticks_attempted, 3);
-        assert_eq!(health.ticks_completed, 1);
-        handle
-            .shutdown()
-            .await
-            .unwrap_or_else(|error| panic!("shutdown: {error}"));
-    }
-
-    #[tokio::test]
-    async fn initial_tick_deadline_exhaustion_fails_publication_and_joins_the_thread() {
-        let failures = (0..8)
-            .map(|_| Err(ResponseWorkerTickError::Port(PortError::unavailable())))
-            .collect();
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(failures));
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("publication: {error}"));
-
-        assert!(matches!(
-            handle.wait_for_publication_readiness().await,
-            Err(ResponseWorkerTickError::WorkerInitialTick(_))
-        ));
-        assert!(handle.shutdown().await.is_err());
-        assert!(!worker.task_live.load(Ordering::Acquire));
-        assert!(handle.join.is_none());
-    }
-
-    #[tokio::test]
-    async fn immediate_post_release_crash_keeps_the_degraded_services_published() {
-        let failure = ResponseWorkerTickError::WorkerCrash(
-            ErrorCode::new("response.post_release_crash")
-                .unwrap_or_else(|error| panic!("error code: {error}")),
-        );
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Err(failure)]));
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(port)
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let services: Arc<dyn ActiveDefenseServices> = Arc::new(WorkerBackedServices {
-            worker: Arc::clone(&worker),
-        });
-        let registry = ActiveDefenseServiceRegistry::default();
-        registry
-            .reserve_exact(Arc::clone(&services))
-            .unwrap_or_else(|error| panic!("reserve: {error}"));
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("parked start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-
-        registry
-            .commit_reserved_exact_with_release(&services, || handle.release_publication())
-            .unwrap_or_else(|error| panic!("publish: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while worker.health().lifecycle != ResponseWorkerLifecycle::Failed {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("post-release worker crash was not observed"));
-
-        assert!(registry.snapshot().is_some());
-        assert!(services.ensure_ready().is_err());
-        assert!(handle.shutdown().await.is_err());
-        registry
-            .unpublish_exact(&services)
-            .unwrap_or_else(|error| panic!("unpublish failed services: {error}"));
-    }
-
-    #[tokio::test]
-    async fn wedged_tick_fails_readiness_and_awaited_shutdown_never_drains_concurrently() {
-        let port = Arc::new(BlockingWorkerPort::new());
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("parked start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("publication: {error}"));
-        handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("publication readiness: {error}"));
-        worker.configure_progress(Duration::from_millis(30));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while !port.tick_started.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("tick did not start"));
-        tokio::time::sleep(Duration::from_millis(40)).await;
-
-        assert!(matches!(
-            worker.ensure_ready(),
-            Err(ResponseWorkerTickError::WorkerProgressStalled { .. })
-        ));
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Degraded);
-        assert!(worker.health().tick_in_flight);
-
-        port.release();
-        handle
-            .shutdown()
-            .await
-            .unwrap_or_else(|error| panic!("shutdown: {error}"));
-        assert!(!port.shutdown_during_tick.load(Ordering::Acquire));
-        assert_eq!(port.shutdown_calls.load(Ordering::Acquire), 1);
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Stopped);
-    }
-
-    #[tokio::test]
-    async fn cancelled_shutdown_retains_join_until_the_blocked_tick_exits() {
-        let port = Arc::new(BlockingWorkerPort::new());
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("parked start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("publication: {error}"));
-        handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("publication readiness: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while !port.tick_started.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("tick did not start"));
-
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), handle.shutdown())
-                .await
-                .is_err()
-        );
-        assert!(worker.shutdown_requested.load(Ordering::Acquire));
-        assert!(handle.join.is_some());
-        assert!(port.tick_in_flight.load(Ordering::Acquire));
-        assert_eq!(port.shutdown_calls.load(Ordering::Acquire), 0);
-        assert!(!worker.shutdown_is_complete());
-
-        let mut resumed_shutdown = Box::pin(handle.shutdown());
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), &mut resumed_shutdown)
-                .await
-                .is_err()
-        );
-        assert!(port.tick_in_flight.load(Ordering::Acquire));
-        assert!(!port.shutdown_during_tick.load(Ordering::Acquire));
-        assert_eq!(port.shutdown_calls.load(Ordering::Acquire), 0);
-        assert!(!worker.shutdown_is_complete());
-        assert!(tokio::time::timeout(
-            Duration::from_millis(20),
-            worker.wait_for_shutdown_completion(),
-        )
-        .await
-        .is_err());
-
-        port.release();
-        resumed_shutdown
-            .as_mut()
-            .await
-            .unwrap_or_else(|error| panic!("resumed shutdown: {error}"));
-        drop(resumed_shutdown);
-
-        assert!(!port.shutdown_during_tick.load(Ordering::Acquire));
-        assert_eq!(port.shutdown_calls.load(Ordering::Acquire), 1);
-        assert!(worker.shutdown_is_complete());
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            worker.wait_for_shutdown_completion(),
-        )
-        .await
-        .unwrap_or_else(|_| panic!("worker did not publish clean shutdown completion"));
-        assert!(handle.clean_shutdown);
-        assert!(handle.join.is_none());
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Stopped);
-    }
-
-    #[tokio::test]
-    async fn dropping_handle_signals_stop_without_concurrent_drain_or_zombie_tick() {
-        let port = Arc::new(BlockingWorkerPort::new());
-        let worker = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("worker: {error}")),
-        );
-        let mut handle = worker
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("parked start: {error}"));
-        handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm: {error}"));
-        handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("publication: {error}"));
-        handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("publication readiness: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while !port.tick_started.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("tick did not start"));
-
-        drop(handle);
-        assert_eq!(port.shutdown_calls.load(Ordering::Acquire), 0);
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Degraded);
-        port.release();
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            worker.wait_for_shutdown_completion(),
-        )
-        .await
-        .unwrap_or_else(|_| panic!("worker did not stop"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while !worker.thread_joined.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("dropped worker thread was not joined"));
-        assert!(!port.shutdown_during_tick.load(Ordering::Acquire));
-        assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Stopped);
-    }
-
-    #[test]
-    fn worker_crash_marks_health_failed_and_restart_can_take_over() {
-        let failure = ResponseWorkerTickError::WorkerCrash(
-            ErrorCode::new("response.worker_crash")
-                .unwrap_or_else(|error| panic!("error code: {error}")),
-        );
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![
-            Err(failure),
-            Ok(tick("action-after-crash")),
-        ]));
-        let crashed = ProductionResponseWorker::new_for_test(Arc::clone(&port))
-            .unwrap_or_else(|error| panic!("worker: {error}"));
-        assert!(crashed.tick_once().is_err());
-        assert_eq!(crashed.health().lifecycle, ResponseWorkerLifecycle::Failed);
-
-        let restarted = ProductionResponseWorker::new_for_test(port)
-            .unwrap_or_else(|error| panic!("restart: {error}"));
-        assert_eq!(
-            restarted
-                .tick_once()
-                .unwrap_or_else(|error| panic!("takeover: {error}"))
-                .completed_action_ids
-                .len(),
-            1
-        );
-    }
-
-    #[tokio::test]
-    async fn terminated_primary_reuses_its_durable_port_without_concurrent_ticks() {
-        let failure = ResponseWorkerTickError::WorkerCrash(
-            ErrorCode::new("response.primary_crash")
-                .unwrap_or_else(|error| panic!("error code: {error}")),
-        );
-        let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![
-            Err(failure),
-            Ok(tick("teardown-recovery")),
-        ]));
-        let primary = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("primary worker: {error}")),
-        );
-        let mut primary_handle = primary
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("start primary: {error}"));
-        primary_handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm primary: {error}"));
-        primary_handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("release primary: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while primary.health().lifecycle != ResponseWorkerLifecycle::Failed {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("primary did not fail"));
-        assert!(primary_handle.shutdown().await.is_err());
-        assert!(primary.shutdown_is_complete());
-
-        let recovery = Arc::new(
-            ProductionResponseWorker::new_for_test(Arc::clone(&port))
-                .unwrap_or_else(|error| panic!("recovery worker: {error}")),
-        );
-        let mut recovery_handle = recovery
-            .start_parked(ProductionResponseWorkerLoopConfig {
-                tick_interval: Duration::from_millis(10),
-            })
-            .await
-            .unwrap_or_else(|error| panic!("start recovery: {error}"));
-        recovery_handle
-            .arm()
-            .await
-            .unwrap_or_else(|error| panic!("arm recovery: {error}"));
-        recovery_handle
-            .release_publication()
-            .unwrap_or_else(|error| panic!("release recovery: {error}"));
-        recovery_handle
-            .wait_for_publication_readiness()
-            .await
-            .unwrap_or_else(|error| panic!("recovery publication readiness: {error}"));
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while port.tick_calls() < 2 {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| panic!("recovery worker did not tick"));
-        recovery_handle
-            .shutdown()
-            .await
-            .unwrap_or_else(|error| panic!("shutdown recovery: {error}"));
-
-        assert_eq!(port.maximum_concurrent_ticks(), 1);
-    }
-
-    struct TestServices {
-        ready: Mutex<bool>,
-    }
-
-    impl ActiveDefenseServices for TestServices {
-        fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
-            match self.ready.lock() {
-                Ok(ready) if *ready => Ok(()),
-                Ok(_) | Err(_) => Err(ResponseWorkerTickError::Port(PortError::unavailable())),
-            }
-        }
-
-        fn worker_health(&self) -> ResponseWorkerHealth {
-            ResponseWorkerHealth::created()
-        }
-    }
-
-    struct SequencedServices {
-        readiness: Mutex<VecDeque<bool>>,
-    }
-
-    impl ActiveDefenseServices for SequencedServices {
-        fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
-            match self.readiness.lock() {
-                Ok(mut readiness) => match readiness.pop_front() {
-                    Some(true) => Ok(()),
-                    Some(false) | None => {
-                        Err(ResponseWorkerTickError::Port(PortError::unavailable()))
-                    }
+        ResponseStateMachine::new(Arc::clone(&terminal_store))
+            .transition_scheduled(
+                &terminal_plan,
+                &terminal_work,
+                &ResponseTransitionRequest {
+                    expected_generation: terminal_plan.generation,
+                    target_state: ResponseState::Cancelled,
+                    occurred_at_unix_ms: terminal_clock.now(),
+                    applying_lease_expires_at_unix_ms: None,
+                    error_code: None,
                 },
-                Err(_) => Err(ResponseWorkerTickError::Port(PortError::unavailable())),
-            }
+            )
+            .unwrap_or_else(|error| panic!("terminal transition: {error}"));
+        drop(terminal_port);
+        drop(terminal_store);
+
+        let terminal_reopened = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                &terminal_path,
+                Arc::clone(&terminal_clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("terminal store reopen: {error}")),
+        );
+        let terminal_restarted = sqlite_worker_port(
+            Arc::clone(&terminal_reopened),
+            Arc::clone(&terminal_clock),
+            "worker-sqlite-restart-terminal",
+            "incarnation-sqlite-terminal-restart",
+            100,
+        );
+        assert!(terminal_restarted
+            .claim(0)
+            .unwrap_or_else(|error| panic!("live terminal restart claim: {error}"))
+            .is_empty());
+        let connection = rusqlite::Connection::open(&terminal_path)
+            .unwrap_or_else(|error| panic!("live terminal readback: {error}"));
+        let live_terminal_counts = connection
+            .query_row(
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM security_scheduler_leases
+                     WHERE tenant_id = ?1 AND action_id = ?2),
+                    (SELECT COUNT(*) FROM security_scheduler_retries
+                     WHERE tenant_id = ?1 AND action_id = ?2)
+                "#,
+                rusqlite::params![
+                    terminal_work.tenant_id.as_str(),
+                    terminal_work.action_id.as_str()
+                ],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .unwrap_or_else(|error| panic!("live terminal counts: {error}"));
+        assert_eq!(live_terminal_counts, (1, 1));
+        drop(connection);
+
+        terminal_clock.set(terminal_work.lease_expires_at_unix_ms.saturating_add(1));
+        assert!(terminal_restarted
+            .claim(1)
+            .unwrap_or_else(|error| panic!("expired terminal cleanup: {error}"))
+            .is_empty());
+        let connection = rusqlite::Connection::open(terminal_path)
+            .unwrap_or_else(|error| panic!("terminal cleanup readback: {error}"));
+        let terminal_cleanup_counts = connection
+            .query_row(
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM security_scheduler_leases
+                     WHERE tenant_id = ?1 AND action_id = ?2),
+                    (SELECT COUNT(*) FROM security_scheduler_retries
+                     WHERE tenant_id = ?1 AND action_id = ?2)
+                "#,
+                rusqlite::params![
+                    terminal_work.tenant_id.as_str(),
+                    terminal_work.action_id.as_str()
+                ],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .unwrap_or_else(|error| panic!("terminal cleanup counts: {error}"));
+        assert_eq!(terminal_cleanup_counts, (0, 0));
+
+        let batch_path = directory
+            .path()
+            .join("response-worker-terminal-batch.sqlite");
+        let batch_now_unix_ms = current_unix_ms();
+        let batch_clock = Arc::new(SqliteTestClock(AtomicU64::new(batch_now_unix_ms)));
+        let batch_store = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                &batch_path,
+                Arc::clone(&batch_clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("terminal batch store: {error}")),
+        );
+        let batch_plans = (0..9)
+            .map(|index| {
+                install_due_sqlite_plan(
+                    &batch_store,
+                    &format!("action-sqlite-terminal-batch-{index}"),
+                    batch_now_unix_ms.saturating_sub(1),
+                )
+            })
+            .collect::<Vec<_>>();
+        let batch_port = sqlite_worker_port(
+            Arc::clone(&batch_store),
+            Arc::clone(&batch_clock),
+            "worker-sqlite-terminal-batch",
+            "incarnation-sqlite-terminal-batch-first",
+            100,
+        );
+        let mut initial_batch_work = batch_port
+            .claim(0)
+            .unwrap_or_else(|error| panic!("terminal batch first claim: {error}"));
+        initial_batch_work.extend(
+            batch_port
+                .claim(1)
+                .unwrap_or_else(|error| panic!("terminal batch second claim: {error}")),
+        );
+        assert_eq!(initial_batch_work.len(), 9);
+        let mut batch_work = Vec::with_capacity(initial_batch_work.len());
+        for (index, initial_work) in initial_batch_work.iter().enumerate() {
+            let plan = batch_plans
+                .iter()
+                .find(|plan| plan.action_id == initial_work.action_id)
+                .unwrap_or_else(|| panic!("terminal batch plan missing"));
+            let tick_sequence = u64::try_from(index)
+                .unwrap_or_else(|error| panic!("terminal batch tick conversion: {error}"))
+                .saturating_add(10);
+            let work = record_retry_and_reclaim(
+                &batch_store,
+                &batch_clock,
+                &batch_port,
+                initial_work,
+                tick_sequence,
+                RecordId::new(format!(
+                    "terminal-batch-retry-{}",
+                    initial_work.action_id.as_str()
+                ))
+                .unwrap_or_else(|error| panic!("terminal batch retry transition: {error}")),
+            );
+            ResponseStateMachine::new(Arc::clone(&batch_store))
+                .transition_scheduled(
+                    plan,
+                    &work,
+                    &ResponseTransitionRequest {
+                        expected_generation: plan.generation,
+                        target_state: ResponseState::Cancelled,
+                        occurred_at_unix_ms: batch_clock.now(),
+                        applying_lease_expires_at_unix_ms: None,
+                        error_code: None,
+                    },
+                )
+                .unwrap_or_else(|error| panic!("terminal batch transition: {error}"));
+            batch_work.push(work);
         }
+        let batch_expiry = batch_work
+            .iter()
+            .map(|work| work.lease_expires_at_unix_ms)
+            .max()
+            .unwrap_or_else(|| panic!("terminal batch expiry missing"));
+        drop(batch_port);
+        drop(batch_store);
 
-        fn worker_health(&self) -> ResponseWorkerHealth {
-            ResponseWorkerHealth::created()
-        }
-    }
-
-    struct BootstrapOnlyServices;
-
-    impl ActiveDefenseServices for BootstrapOnlyServices {
-        fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
-            Err(ResponseWorkerTickError::Port(PortError::unavailable()))
-        }
-
-        fn ensure_bootstrap_ready(&self) -> Result<(), ResponseWorkerTickError> {
-            Ok(())
-        }
-
-        fn worker_health(&self) -> ResponseWorkerHealth {
-            ResponseWorkerHealth::created()
-        }
-    }
-
-    #[test]
-    fn service_publication_can_precede_operational_kernel_binding() {
-        let registry = ActiveDefenseServiceRegistry::default();
-        let services: Arc<dyn ActiveDefenseServices> = Arc::new(BootstrapOnlyServices);
-        registry
-            .publish(Arc::clone(&services))
-            .unwrap_or_else(|error| panic!("publish bootstrap-ready services: {error}"));
-        let installed = registry
-            .snapshot()
-            .unwrap_or_else(|| panic!("bootstrap-ready services are missing"));
-        assert!(Arc::ptr_eq(&installed, &services));
-        assert!(installed.ensure_ready().is_err());
-    }
-
-    #[test]
-    fn service_publication_is_atomic_when_replacement_readiness_fails() {
-        let registry = ActiveDefenseServiceRegistry::default();
-        let first = Arc::new(TestServices {
-            ready: Mutex::new(true),
-        });
-        let first_services: Arc<dyn ActiveDefenseServices> = first.clone();
-        registry
-            .publish(Arc::clone(&first_services))
-            .unwrap_or_else(|error| panic!("publish first: {error}"));
-        let replacement = Arc::new(TestServices {
-            ready: Mutex::new(false),
-        });
-        assert!(registry.publish(replacement).is_err());
-        let installed = registry
-            .snapshot()
-            .unwrap_or_else(|| panic!("installed services missing"));
-        assert!(Arc::ptr_eq(&installed, &first_services));
-    }
-
-    #[test]
-    fn service_publication_rechecks_readiness_at_commit_time() {
-        let registry = ActiveDefenseServiceRegistry::default();
-        let services = Arc::new(SequencedServices {
-            readiness: Mutex::new(VecDeque::from([true, true, false])),
-        });
-        assert!(registry.publish(services).is_err());
-        assert!(registry.snapshot().is_none());
-    }
-
-    #[test]
-    fn service_publication_rejects_duplicate_ownership_without_replacement() {
-        let registry = ActiveDefenseServiceRegistry::default();
-        let first: Arc<dyn ActiveDefenseServices> = Arc::new(TestServices {
-            ready: Mutex::new(true),
-        });
-        registry
-            .publish(Arc::clone(&first))
-            .unwrap_or_else(|error| panic!("publish first: {error}"));
-        let duplicate: Arc<dyn ActiveDefenseServices> = Arc::new(TestServices {
-            ready: Mutex::new(true),
-        });
-
+        batch_clock.set(batch_expiry.saturating_add(1));
+        let batch_reopened = Arc::new(
+            SqliteSecurityStateStore::open_with_trusted_clock(
+                &batch_path,
+                Arc::clone(&batch_clock) as Arc<dyn SecurityStateClock>,
+            )
+            .unwrap_or_else(|error| panic!("terminal batch reopen: {error}")),
+        );
+        let batch_restarted = sqlite_worker_port(
+            batch_reopened,
+            batch_clock,
+            "worker-sqlite-terminal-batch",
+            "incarnation-sqlite-terminal-batch-restart",
+            100,
+        );
         assert!(matches!(
-            registry.publish(duplicate),
-            Err(ResponseWorkerTickError::ServicesAlreadyPublished)
+            batch_restarted.claim(0),
+            Err(ResponseWorkerTickError::TerminalSchedulerCleanupPending)
         ));
-        let installed = registry
-            .snapshot()
-            .unwrap_or_else(|| panic!("installed services missing"));
-        assert!(Arc::ptr_eq(&installed, &first));
+        let connection = rusqlite::Connection::open(&batch_path)
+            .unwrap_or_else(|error| panic!("terminal batch continuation readback: {error}"));
+        let continuation_counts = connection
+            .query_row(
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM security_scheduler_leases),
+                    (SELECT COUNT(*) FROM security_scheduler_retries)
+                "#,
+                [],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .unwrap_or_else(|error| panic!("terminal batch continuation counts: {error}"));
+        assert_eq!(continuation_counts, (1, 1));
+        drop(connection);
+        assert!(batch_restarted
+            .claim(1)
+            .unwrap_or_else(|error| panic!("terminal batch final cleanup: {error}"))
+            .is_empty());
+        let connection = rusqlite::Connection::open(batch_path)
+            .unwrap_or_else(|error| panic!("terminal batch cleanup readback: {error}"));
+        let batch_cleanup_counts = connection
+            .query_row(
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM security_scheduler_leases),
+                    (SELECT COUNT(*) FROM security_scheduler_retries)
+                "#,
+                [],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .unwrap_or_else(|error| panic!("terminal batch cleanup counts: {error}"));
+        assert_eq!(batch_cleanup_counts, (0, 0));
     }
+
+    include!("part_02_tests_tail.inc");
 }

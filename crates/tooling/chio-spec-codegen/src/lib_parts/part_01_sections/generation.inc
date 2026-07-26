@@ -238,6 +238,7 @@ fn render_chio_wire_v1_from_files(
     let pretty = prettyplease::unparse(&file);
     let pretty = harden_active_defense_receipts_rust(pretty)?;
     let pretty = harden_detector_health_rust(pretty)?;
+    let pretty = harden_admission_capture_guarantee_rust(pretty)?;
     let mut body = String::with_capacity(GENERATED_HEADER.len() + pretty.len() + 1);
     body.push_str(GENERATED_HEADER);
     body.push('\n');
@@ -880,18 +881,413 @@ fn harden_detector_health_rust(mut body: String) -> Result<String> {
     Ok(body)
 }
 
+fn harden_admission_capture_guarantee_rust(mut body: String) -> Result<String> {
+    const MODULE_START: &str = "pub mod trust_control__admission_capture_metadata {";
+    let Some(start) = body.find(MODULE_START) else {
+        return Ok(body);
+    };
+    let search_start = start + MODULE_START.len();
+    let end = body[search_start..]
+        .find("\npub mod ")
+        .map_or(body.len(), |relative_end| search_start + relative_end);
+    let mut module = body[start..end].to_string();
+
+    const ROOT_NEEDLE: &str = r#"    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        #[serde(
+            rename = "aggregateRootBindingDigest",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub aggregate_root_binding_digest: ::std::option::Option<Digest>,
+        #[serde(
+            rename = "aggregateRootCapabilityId",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub aggregate_root_capability_id: ::std::option::Option<Identifier>,
+        pub authority: Authority,
+        #[serde(rename = "authorityCommitIndex")]
+        pub authority_commit_index: u64,
+        #[serde(rename = "authorizationArtifactDigests")]
+        pub authorization_artifact_digests: Vec<Digest>,
+        #[serde(rename = "budgetCommitIndex")]
+        pub budget_commit_index: ::std::num::NonZeroU64,
+        #[serde(rename = "checkedRevocationSetDigest")]
+        pub checked_revocation_set_digest: Digest,
+        #[serde(rename = "eventId")]
+        pub event_id: Identifier,
+        #[serde(rename = "guaranteeLevel")]
+        pub guarantee_level: ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel,
+        #[serde(rename = "holdId")]
+        pub hold_id: Identifier,
+        #[serde(rename = "invocationQuotas")]
+        pub invocation_quotas: ::std::vec::Vec<InvocationQuotaTransition>,
+        #[serde(rename = "invocationState")]
+        pub invocation_state: ::serde_json::Value,
+        #[serde(
+            rename = "leaderEpoch",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub leader_epoch: ::std::option::Option<::std::num::NonZeroU64>,
+        #[serde(rename = "monetaryState")]
+        pub monetary_state: ChioAuthoritativeAdmissionCaptureReceiptProjectionMonetaryState,
+        #[serde(rename = "operationId")]
+        pub operation_id: Identifier,
+        #[serde(
+            rename = "partitionEscrowEvidence",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub partition_escrow_evidence: ::std::option::Option<
+            ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence,
+        >,
+        #[serde(rename = "revocationCommitIndex")]
+        pub revocation_commit_index: u64,
+    }
+"#;
+    const ROOT_REPLACEMENT: &str = r#"    #[derive(Clone, Debug)]
+    pub struct ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        pub aggregate_root_binding_digest: ::std::option::Option<Digest>,
+        pub aggregate_root_capability_id: ::std::option::Option<Identifier>,
+        pub authority: Authority,
+        pub authority_commit_index: u64,
+        pub authorization_artifact_digests: Vec<Digest>,
+        pub budget_commit_index: ::std::num::NonZeroU64,
+        pub checked_revocation_set_digest: Digest,
+        pub event_id: Identifier,
+        pub guarantee_level: ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel,
+        pub hold_id: Identifier,
+        pub invocation_quotas: ::std::vec::Vec<InvocationQuotaTransition>,
+        pub invocation_state: ::serde_json::Value,
+        pub leader_epoch: ::std::option::Option<::std::num::NonZeroU64>,
+        pub monetary_state: ChioAuthoritativeAdmissionCaptureReceiptProjectionMonetaryState,
+        pub operation_id: Identifier,
+        pub partition_escrow_evidence: ::std::option::Option<
+            ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence,
+        >,
+        pub revocation_commit_index: u64,
+    }
+"#;
+    replace_generated_hardening_once(
+        &mut module,
+        ROOT_NEEDLE,
+        ROOT_REPLACEMENT,
+        "admission capture root",
+    )?;
+
+    const GUARANTEE_ENUM_NEEDLE: &str = r#"    pub enum ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel {
+        #[serde(rename = "single_node_atomic")]
+        SingleNodeAtomic,
+        #[serde(rename = "partition_escrowed")]
+        PartitionEscrowed,
+        #[serde(rename = "ha_linearizable")]
+        HaLinearizable,
+    }
+"#;
+    ensure_generated_hardening_once(
+        &module,
+        GUARANTEE_ENUM_NEEDLE,
+        "admission capture guarantee enum",
+    )?;
+
+    const ROOT_FROM_NEEDLE: &str = r#"    impl ::std::convert::From<&ChioAuthoritativeAdmissionCaptureReceiptProjection>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjection {
+"#;
+    const ROOT_FROM_REPLACEMENT: &str = r#"    struct AdmissionCaptureOptionalField<T> {
+        value: ::std::option::Option<T>,
+        was_present: bool,
+    }
+    impl<T> ::std::default::Default for AdmissionCaptureOptionalField<T> {
+        fn default() -> Self {
+            Self {
+                value: None,
+                was_present: false,
+            }
+        }
+    }
+    impl<'de, T> ::serde::Deserialize<'de> for AdmissionCaptureOptionalField<T>
+    where
+        T: ::serde::Deserialize<'de>,
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            let value = <::std::option::Option<T> as ::serde::Deserialize>::deserialize(
+                deserializer,
+            )?;
+            Ok(Self {
+                value,
+                was_present: true,
+            })
+        }
+    }
+    #[derive(::serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct ChioAuthoritativeAdmissionCaptureReceiptProjectionWire {
+        #[serde(rename = "aggregateRootBindingDigest", default)]
+        aggregate_root_binding_digest: ::std::option::Option<Digest>,
+        #[serde(rename = "aggregateRootCapabilityId", default)]
+        aggregate_root_capability_id: ::std::option::Option<Identifier>,
+        authority: Authority,
+        #[serde(rename = "authorityCommitIndex")]
+        authority_commit_index: u64,
+        #[serde(rename = "authorizationArtifactDigests")]
+        authorization_artifact_digests: Vec<Digest>,
+        #[serde(rename = "budgetCommitIndex")]
+        budget_commit_index: ::std::num::NonZeroU64,
+        #[serde(rename = "checkedRevocationSetDigest")]
+        checked_revocation_set_digest: Digest,
+        #[serde(rename = "eventId")]
+        event_id: Identifier,
+        #[serde(rename = "guaranteeLevel")]
+        guarantee_level: ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel,
+        #[serde(rename = "holdId")]
+        hold_id: Identifier,
+        #[serde(rename = "invocationQuotas")]
+        invocation_quotas: ::std::vec::Vec<InvocationQuotaTransition>,
+        #[serde(rename = "invocationState")]
+        invocation_state: ::serde_json::Value,
+        #[serde(rename = "leaderEpoch", default)]
+        leader_epoch: AdmissionCaptureOptionalField<::std::num::NonZeroU64>,
+        #[serde(rename = "monetaryState")]
+        monetary_state: ChioAuthoritativeAdmissionCaptureReceiptProjectionMonetaryState,
+        #[serde(rename = "operationId")]
+        operation_id: Identifier,
+        #[serde(rename = "partitionEscrowEvidence", default)]
+        partition_escrow_evidence: AdmissionCaptureOptionalField<
+            ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence,
+        >,
+        #[serde(rename = "revocationCommitIndex")]
+        revocation_commit_index: u64,
+    }
+    impl ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        fn validate_guarantee_evidence(
+            &self,
+            leader_epoch_present: bool,
+            partition_escrow_evidence_present: bool,
+        ) -> ::std::result::Result<(), &'static str> {
+            use ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel::{
+                HaLinearizable, PartitionEscrowed, SingleNodeAtomic,
+            };
+            match self.guarantee_level {
+                SingleNodeAtomic => {
+                    if leader_epoch_present {
+                        return Err("single_node_atomic admission capture forbids leaderEpoch");
+                    }
+                    if partition_escrow_evidence_present {
+                        return Err(
+                            "single_node_atomic admission capture forbids partitionEscrowEvidence",
+                        );
+                    }
+                }
+                PartitionEscrowed => {
+                    if leader_epoch_present {
+                        return Err("partition_escrowed admission capture forbids leaderEpoch");
+                    }
+                    if self.partition_escrow_evidence.is_none() {
+                        return Err(
+                            "partition_escrowed admission capture requires partitionEscrowEvidence",
+                        );
+                    }
+                }
+                HaLinearizable => {
+                    if self.leader_epoch.is_none() {
+                        return Err("ha_linearizable admission capture requires leaderEpoch");
+                    }
+                    if partition_escrow_evidence_present {
+                        return Err(
+                            "ha_linearizable admission capture forbids partitionEscrowEvidence",
+                        );
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            let wire = <ChioAuthoritativeAdmissionCaptureReceiptProjectionWire as ::serde::Deserialize>::deserialize(
+                deserializer,
+            )?;
+            let leader_epoch_present = wire.leader_epoch.was_present;
+            let partition_escrow_evidence_present = wire.partition_escrow_evidence.was_present;
+            let value = Self {
+                aggregate_root_binding_digest: wire.aggregate_root_binding_digest,
+                aggregate_root_capability_id: wire.aggregate_root_capability_id,
+                authority: wire.authority,
+                authority_commit_index: wire.authority_commit_index,
+                authorization_artifact_digests: wire.authorization_artifact_digests,
+                budget_commit_index: wire.budget_commit_index,
+                checked_revocation_set_digest: wire.checked_revocation_set_digest,
+                event_id: wire.event_id,
+                guarantee_level: wire.guarantee_level,
+                hold_id: wire.hold_id,
+                invocation_quotas: wire.invocation_quotas,
+                invocation_state: wire.invocation_state,
+                leader_epoch: wire.leader_epoch.value,
+                monetary_state: wire.monetary_state,
+                operation_id: wire.operation_id,
+                partition_escrow_evidence: wire.partition_escrow_evidence.value,
+                revocation_commit_index: wire.revocation_commit_index,
+            };
+            value
+                .validate_guarantee_evidence(
+                    leader_epoch_present,
+                    partition_escrow_evidence_present,
+                )
+                .map_err(<D::Error as ::serde::de::Error>::custom)?;
+            Ok(value)
+        }
+    }
+    impl ::serde::Serialize for ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
+        where
+            S: ::serde::Serializer,
+        {
+            self.validate_guarantee_evidence(
+                self.leader_epoch.is_some(),
+                self.partition_escrow_evidence.is_some(),
+            )
+                .map_err(<S::Error as ::serde::ser::Error>::custom)?;
+            let mut state = serializer.serialize_struct(
+                "ChioAuthoritativeAdmissionCaptureReceiptProjection",
+                17,
+            )?;
+            if let Some(value) = &self.aggregate_root_binding_digest {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "aggregateRootBindingDigest",
+                    value,
+                )?;
+            }
+            if let Some(value) = &self.aggregate_root_capability_id {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "aggregateRootCapabilityId",
+                    value,
+                )?;
+            }
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "authority",
+                &self.authority,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "authorityCommitIndex",
+                &self.authority_commit_index,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "authorizationArtifactDigests",
+                &self.authorization_artifact_digests,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "budgetCommitIndex",
+                &self.budget_commit_index,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "checkedRevocationSetDigest",
+                &self.checked_revocation_set_digest,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "eventId",
+                &self.event_id,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "guaranteeLevel",
+                &self.guarantee_level,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "holdId",
+                &self.hold_id,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "invocationQuotas",
+                &self.invocation_quotas,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "invocationState",
+                &self.invocation_state,
+            )?;
+            if let Some(value) = &self.leader_epoch {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "leaderEpoch",
+                    value,
+                )?;
+            }
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "monetaryState",
+                &self.monetary_state,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "operationId",
+                &self.operation_id,
+            )?;
+            if let Some(value) = &self.partition_escrow_evidence {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "partitionEscrowEvidence",
+                    value,
+                )?;
+            }
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "revocationCommitIndex",
+                &self.revocation_commit_index,
+            )?;
+            ::serde::ser::SerializeStruct::end(state)
+        }
+    }
+    impl ::std::convert::From<&ChioAuthoritativeAdmissionCaptureReceiptProjection>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjection {
+"#;
+    replace_generated_hardening_once(
+        &mut module,
+        ROOT_FROM_NEEDLE,
+        ROOT_FROM_REPLACEMENT,
+        "admission capture validation",
+    )?;
+
+    body.replace_range(start..end, &module);
+    Ok(body)
+}
+
 fn replace_generated_hardening_once(
     body: &mut String,
     needle: &str,
     replacement: &str,
     context: &str,
 ) -> Result<()> {
+    ensure_generated_hardening_once(body, needle, context)?;
+    *body = body.replacen(needle, replacement, 1);
+    Ok(())
+}
+
+fn ensure_generated_hardening_once(body: &str, needle: &str, context: &str) -> Result<()> {
     if body.matches(needle).count() != 1 {
         return Err(CodegenError::GeneratedHardening(format!(
             "generated Rust {context} pattern is missing or ambiguous"
         )));
     }
-    *body = body.replacen(needle, replacement, 1);
     Ok(())
 }
 

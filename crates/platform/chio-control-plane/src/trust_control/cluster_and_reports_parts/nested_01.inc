@@ -29,6 +29,7 @@
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: None,
+            partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -893,6 +894,10 @@
             max_cost_per_invocation: None,
             max_total_cost_units: None,
             invocation_count_after: 1,
+            invocation_counts_after: Vec::new(),
+            invocation_state: BudgetInvocationReservationStateView::Absent,
+            monetary_state: BudgetMonetaryHoldStateView::Exposed,
+            revocation_set: None,
             total_cost_exposed_after: 1,
             total_cost_realized_spend_after: 0,
             authority: Some(BudgetMutationAuthorityView {

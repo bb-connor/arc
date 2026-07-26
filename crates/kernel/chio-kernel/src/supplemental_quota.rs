@@ -15,6 +15,8 @@ pub const MAX_REVOCATION_IDS_PER_ADMISSION: usize = 128;
 const MAX_REVOCATION_ID_BYTES: usize = 512;
 const REVOCATION_SET_DOMAIN: &[u8] = b"chio.revocation-set.v1\0";
 const BROKER_QUOTA_KEY_DOMAIN: &[u8] = b"chio.broker-capability-execution.v1\0";
+const VERIFIED_SUPPLEMENTAL_CLAIM_BINDING_DOMAIN: &[u8] =
+    b"chio.verified-supplemental-quota-claim-binding.v1\0";
 
 #[derive(Debug, thiserror::Error)]
 pub enum SupplementalQuotaError {
@@ -115,6 +117,7 @@ pub struct VerifiedSupplementalQuotaClaimBody {
     pub destination: SupplementalQuotaDestination,
     pub arguments_digest: String,
     pub request_binding_hash: String,
+    pub not_before: u64,
     pub expires_at: u64,
     pub broker_capability_id: String,
     pub issuer: PublicKey,
@@ -290,6 +293,13 @@ pub struct VerifiedSupplementalQuota {
     verifier_id: String,
     request_binding_hash: String,
     negotiated_features_digest: String,
+    issuer: PublicKey,
+    not_before: u64,
+    expires_at: u64,
+    request_constraint_digest: String,
+    broker_capability_id: String,
+    claim_binding_digest: String,
+    verified_at: u64,
 }
 
 impl VerifiedSupplementalQuota {
@@ -315,6 +325,34 @@ impl VerifiedSupplementalQuota {
 
     pub fn negotiated_features_digest(&self) -> &str {
         &self.negotiated_features_digest
+    }
+
+    pub fn issuer(&self) -> &PublicKey {
+        &self.issuer
+    }
+
+    pub fn not_before(&self) -> u64 {
+        self.not_before
+    }
+
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+
+    pub fn request_constraint_digest(&self) -> &str {
+        &self.request_constraint_digest
+    }
+
+    pub fn broker_capability_id(&self) -> &str {
+        &self.broker_capability_id
+    }
+
+    pub fn claim_binding_digest(&self) -> &str {
+        &self.claim_binding_digest
+    }
+
+    pub fn verified_at(&self) -> u64 {
+        self.verified_at
     }
 }
 
@@ -372,6 +410,16 @@ pub(crate) fn verify_supplemental_quota(
             "request binding hash".to_string(),
         ));
     }
+    if body.expires_at <= body.not_before {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "source validity window".to_string(),
+        ));
+    }
+    if context.now < body.not_before {
+        return Err(SupplementalQuotaError::ContextMismatch(
+            "source activation".to_string(),
+        ));
+    }
     if context.now >= body.expires_at {
         return Err(SupplementalQuotaError::Expired);
     }
@@ -392,6 +440,7 @@ pub(crate) fn verify_supplemental_quota(
     validate_identifier(verifier.verifier_id(), "verifier id")?;
 
     let owner_id = derive_broker_quota_owner(&body)?;
+    let claim_binding_digest = supplemental_claim_binding_digest(&body, verifier.verifier_id())?;
     Ok(VerifiedSupplementalQuota {
         quota: BudgetInvocationQuota::from_verified_parts(
             BudgetQuotaKey::from_verified_parts(
@@ -406,7 +455,69 @@ pub(crate) fn verify_supplemental_quota(
         verifier_id: verifier.verifier_id().to_string(),
         request_binding_hash: body.request_binding_hash.clone(),
         negotiated_features_digest,
+        issuer: body.issuer.clone(),
+        not_before: body.not_before,
+        expires_at: body.expires_at,
+        request_constraint_digest: body.request_constraint_digest.clone(),
+        broker_capability_id: body.broker_capability_id.clone(),
+        claim_binding_digest,
+        verified_at: context.now,
     })
+}
+
+fn supplemental_claim_binding_digest(
+    body: &VerifiedSupplementalQuotaClaimBody,
+    verifier_id: &str,
+) -> Result<String, SupplementalQuotaError> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ClaimBinding<'a> {
+        verifier_id: &'a str,
+        capability_id: &'a str,
+        capability_digest: &'a str,
+        subject: &'a PublicKey,
+        request_id: &'a str,
+        destination: &'a SupplementalQuotaDestination,
+        arguments_digest: &'a str,
+        request_binding_hash: &'a str,
+        not_before: u64,
+        expires_at: u64,
+        broker_capability_id: &'a str,
+        issuer: &'a PublicKey,
+        request_constraint_digest: &'a str,
+        max_invocations: u32,
+        supplemental_revocation_ids: &'a [String],
+        artifact_digest: &'a str,
+        negotiated_features_digest: &'a str,
+        profile: &'a str,
+    }
+
+    let canonical = canonical_json_bytes(&ClaimBinding {
+        verifier_id,
+        capability_id: &body.capability_id,
+        capability_digest: &body.capability_digest,
+        subject: &body.subject,
+        request_id: &body.request_id,
+        destination: &body.destination,
+        arguments_digest: &body.arguments_digest,
+        request_binding_hash: &body.request_binding_hash,
+        not_before: body.not_before,
+        expires_at: body.expires_at,
+        broker_capability_id: &body.broker_capability_id,
+        issuer: &body.issuer,
+        request_constraint_digest: &body.request_constraint_digest,
+        max_invocations: body.max_invocations,
+        supplemental_revocation_ids: &body.supplemental_revocation_ids,
+        artifact_digest: &body.artifact_digest,
+        negotiated_features_digest: &body.negotiated_features_digest,
+        profile: body.profile.as_str(),
+    })
+    .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
+    let mut input =
+        Vec::with_capacity(VERIFIED_SUPPLEMENTAL_CLAIM_BINDING_DOMAIN.len() + canonical.len());
+    input.extend_from_slice(VERIFIED_SUPPLEMENTAL_CLAIM_BINDING_DOMAIN);
+    input.extend_from_slice(&canonical);
+    Ok(sha256_hex(&input))
 }
 
 fn validate_context(
@@ -630,6 +741,7 @@ fn validate_digest(value: &str, label: &str) -> Result<(), SupplementalQuotaErro
 mod tests {
     use super::*;
     use chio_core::crypto::Keypair;
+    use chio_test_support::prelude::*;
 
     #[derive(Clone)]
     struct FixedVerifier {
@@ -657,8 +769,10 @@ mod tests {
     ) {
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
-        let artifact = OpaqueSignedSupplementalQuota::new(b"signed-extension".to_vec()).unwrap();
-        let destination = SupplementalQuotaDestination::new("broker", "execute").unwrap();
+        let artifact = OpaqueSignedSupplementalQuota::new(b"signed-extension".to_vec())
+            .test_expect("opaque supplemental artifact");
+        let destination = SupplementalQuotaDestination::new("broker", "execute")
+            .test_expect("supplemental destination");
         let mut negotiated_features = CapabilityNegotiation::t1_default();
         negotiated_features
             .features
@@ -683,6 +797,7 @@ mod tests {
             destination,
             arguments_digest: context.arguments_digest.clone(),
             request_binding_hash: context.request_binding_hash.clone(),
+            not_before: 90,
             expires_at: 101,
             broker_capability_id: "broker-capability-1".to_string(),
             issuer: issuer.public_key(),
@@ -690,7 +805,8 @@ mod tests {
             max_invocations: 7,
             supplemental_revocation_ids: vec!["broker-capability-1".to_string()],
             artifact_digest: artifact.digest(),
-            negotiated_features_digest: negotiation_digest(&negotiated_features).unwrap(),
+            negotiated_features_digest: negotiation_digest(&negotiated_features)
+                .test_expect("negotiated features digest"),
             profile: BudgetQuotaProfile::SupplementalBrokerExecution,
         };
         (artifact, context, body)
@@ -699,9 +815,13 @@ mod tests {
     #[test]
     fn trusted_verifier_result_derives_broker_quota_from_bound_claim() {
         let (artifact, context, body) = fixture();
+        let expected_issuer = body.issuer.clone();
+        let expected_binding =
+            supplemental_claim_binding_digest(&body, "test-verifier").test_expect("claim binding");
         let verifier = FixedVerifier { claim: body };
 
-        let verified = verify_supplemental_quota(&verifier, &artifact, &context).unwrap();
+        let verified = verify_supplemental_quota(&verifier, &artifact, &context)
+            .test_expect("verified supplemental quota");
 
         assert_eq!(verified.quota.max_invocations(), 7);
         assert_eq!(
@@ -712,6 +832,41 @@ mod tests {
         assert_eq!(
             verified.supplemental_revocation_ids,
             ["broker-capability-1"]
+        );
+        assert_eq!(verified.issuer(), &expected_issuer);
+        assert_eq!(verified.not_before(), 90);
+        assert_eq!(verified.expires_at(), 101);
+        assert_eq!(verified.request_constraint_digest(), "33".repeat(32));
+        assert_eq!(verified.broker_capability_id(), "broker-capability-1");
+        assert_eq!(verified.claim_binding_digest(), expected_binding);
+        assert_eq!(verified.verified_at(), context.now);
+    }
+
+    #[test]
+    fn claim_binding_changes_with_exact_verified_source_projection() {
+        let (_, _, body) = fixture();
+        let expected = supplemental_claim_binding_digest(&body, "test-verifier")
+            .test_expect("expected claim binding");
+
+        let mut changed_issuer = body.clone();
+        changed_issuer.issuer = Keypair::generate().public_key();
+        assert_ne!(
+            supplemental_claim_binding_digest(&changed_issuer, "test-verifier")
+                .test_expect("changed issuer binding"),
+            expected
+        );
+
+        let mut changed_constraint = body.clone();
+        changed_constraint.request_constraint_digest = "55".repeat(32);
+        assert_ne!(
+            supplemental_claim_binding_digest(&changed_constraint, "test-verifier")
+                .test_expect("changed constraint binding"),
+            expected
+        );
+        assert_ne!(
+            supplemental_claim_binding_digest(&body, "other-verifier")
+                .test_expect("changed verifier binding"),
+            expected
         );
     }
 
@@ -731,6 +886,14 @@ mod tests {
         assert!(matches!(
             verify_supplemental_quota(&verifier, &artifact, &context),
             Err(SupplementalQuotaError::Expired)
+        ));
+
+        let (artifact, context, mut body) = fixture();
+        body.not_before = context.now.saturating_add(1);
+        let verifier = FixedVerifier { claim: body };
+        assert!(matches!(
+            verify_supplemental_quota(&verifier, &artifact, &context),
+            Err(SupplementalQuotaError::ContextMismatch(_))
         ));
     }
 
@@ -755,16 +918,16 @@ mod tests {
             &["root".to_string(), "parent".to_string()],
             &["supplemental".to_string()],
         )
-        .unwrap();
+        .test_expect("first canonical revocation set");
         let second = CanonicalRevocationSet::new(
             "leaf",
             &["parent".to_string(), "root".to_string()],
             &["supplemental".to_string()],
         )
-        .unwrap();
+        .test_expect("second canonical revocation set");
         assert_eq!(first, second);
         assert_eq!(first.ids(), ["leaf", "parent", "root", "supplemental"]);
-        first.validate().unwrap();
+        first.validate().test_expect("valid revocation set");
 
         assert!(CanonicalRevocationSet::new("leaf", &["leaf".to_string()], &[],).is_err());
     }
@@ -776,12 +939,12 @@ mod tests {
             &["ancestor".to_string()],
             &["supplemental".to_string()],
         )
-        .unwrap();
+        .test_expect("original revocation set");
         let restored = CanonicalRevocationSet::from_persisted_parts(
             original.ids().to_vec(),
             original.digest().to_string(),
         )
-        .unwrap();
+        .test_expect("restored revocation set");
         assert_eq!(restored, original);
 
         assert!(CanonicalRevocationSet::from_persisted_parts(
@@ -833,11 +996,14 @@ mod tests {
         ];
 
         for (ids, expected) in cases {
-            assert_eq!(revocation_set_digest(&ids).unwrap(), expected);
+            assert_eq!(
+                revocation_set_digest(&ids).test_expect("revocation set digest"),
+                expected
+            );
         }
 
-        let utf8_ordered =
-            CanonicalRevocationSet::new("\u{10000}", &["\u{e000}".to_string()], &[]).unwrap();
+        let utf8_ordered = CanonicalRevocationSet::new("\u{10000}", &["\u{e000}".to_string()], &[])
+            .test_expect("UTF-8 ordered revocation set");
         assert_eq!(utf8_ordered.ids(), ["\u{e000}", "\u{10000}"]);
         assert_eq!(
             utf8_ordered.digest(),

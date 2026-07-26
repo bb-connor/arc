@@ -349,9 +349,14 @@ impl BrokerDaemonConfig {
             runner_id: self.audit_runner_id.clone(),
         }
         .validate()?;
-        if self.ipc_socket_path == self.authority_socket_path
-            || self.ipc_socket_path == self.privileged_audit.socket_path
-            || self.authority_socket_path == self.privileged_audit.socket_path
+        let socket_paths = [
+            self.ipc_socket_path.as_path(),
+            self.authority_socket_path.as_path(),
+            self.privileged_audit.socket_path.as_path(),
+        ];
+        if socket_paths[0] == socket_paths[1]
+            || socket_paths[0] == socket_paths[2]
+            || socket_paths[1] == socket_paths[2]
         {
             return Err(BrokerError::InvalidRequest(
                 "broker, authority, and privileged audit sockets must be distinct".to_string(),
@@ -365,29 +370,19 @@ impl BrokerDaemonConfig {
             ));
         }
         let database_paths = [
-            &self.databases.secret_database_path,
-            &self.databases.attempt_database_path,
-            &self.databases.admin_replay_database_path,
-            &self.databases.receipt_database_path,
+            self.databases.secret_database_path.as_path(),
+            self.databases.attempt_database_path.as_path(),
+            self.databases.admin_replay_database_path.as_path(),
+            self.databases.receipt_database_path.as_path(),
+            self.enterprise_migration.state_database_path.as_path(),
         ];
         for path in database_paths {
             validate_database_path(path)?;
-            if path == &self.privileged_audit.socket_path
-                || path == &self.enterprise_migration.state_database_path
-            {
+            if socket_paths.contains(&path) {
                 return Err(BrokerError::InvalidRequest(
-                    "daemon database, migration ledger, and privileged audit paths must be distinct"
-                        .to_string(),
+                    "daemon database and socket paths must be distinct".to_string(),
                 ));
             }
-        }
-        if self.enterprise_migration.state_database_path == self.ipc_socket_path
-            || self.enterprise_migration.state_database_path == self.authority_socket_path
-            || self.enterprise_migration.state_database_path == self.privileged_audit.socket_path
-        {
-            return Err(BrokerError::InvalidRequest(
-                "daemon enterprise migration ledger and socket paths must be distinct".to_string(),
-            ));
         }
         for (index, path) in database_paths.iter().enumerate() {
             if database_paths[index + 1..].contains(path) {
@@ -431,12 +426,62 @@ struct BrokerDaemonAuditContext {
 #[cfg(not(unix))]
 pub struct BrokerDaemonRuntime;
 
+#[cfg(unix)]
+fn run_daemon_serving_worker<F>(
+    label: &'static str,
+    failure_sender: std::sync::mpsc::SyncSender<BrokerError>,
+    worker: F,
+) where
+    F: FnOnce() -> Result<()>,
+{
+    // Unwinding profiles publish one typed terminal failure so the peer worker
+    // is stopped and joined. Abort profiles terminate the entire broker
+    // process at the panic site, which is already terminal and cannot deadlock
+    // this in-process supervisor.
+    #[cfg(panic = "unwind")]
+    let failure = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(worker)) {
+        Ok(Ok(())) => BrokerError::Invariant(format!(
+            "{label} serving worker terminated without a terminal error"
+        )),
+        Ok(Err(error)) => error,
+        Err(_) => BrokerError::Invariant(format!("{label} serving worker panicked")),
+    };
+    #[cfg(panic = "abort")]
+    let failure = match worker() {
+        Ok(()) => BrokerError::Invariant(format!(
+            "{label} serving worker terminated without a terminal error"
+        )),
+        Err(error) => error,
+    };
+    let _send_result = failure_sender.send(failure);
+}
+
 impl BrokerDaemonRuntime {
     #[cfg(unix)]
     pub fn build(
         config: BrokerDaemonConfig,
         master_key_file: File,
         signing_key_file: File,
+    ) -> Result<Self> {
+        Self::build_with_https_override(config, master_key_file, signing_key_file, None)
+    }
+
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn build_for_process_boundary_test(
+        config: BrokerDaemonConfig,
+        master_key_file: File,
+        signing_key_file: File,
+        https: Arc<GenericHttpsExecutor>,
+    ) -> Result<Self> {
+        Self::build_with_https_override(config, master_key_file, signing_key_file, Some(https))
+    }
+
+    #[cfg(unix)]
+    fn build_with_https_override(
+        config: BrokerDaemonConfig,
+        master_key_file: File,
+        signing_key_file: File,
+        https_override: Option<Arc<GenericHttpsExecutor>>,
     ) -> Result<Self> {
         config.validate()?;
         validate_key_file_identity(&master_key_file, config.trusted_service_uid, "master key")?;
@@ -599,7 +644,10 @@ impl BrokerDaemonRuntime {
             config.provider_adapter_version,
             config.provider_placement.into_placement(),
         )?);
-        let https = Arc::new(GenericHttpsExecutor::production()?);
+        let https = match https_override {
+            Some(https) => https,
+            None => Arc::new(GenericHttpsExecutor::production()?),
+        };
         let budget: Arc<dyn BrokerExecutionBudget> = authority.clone();
         let liveness: Arc<dyn CapabilityLiveness> = authority.clone();
         let revocations: Arc<dyn BrokerRevocations> = authority.clone();
@@ -736,31 +784,31 @@ impl BrokerDaemonRuntime {
             let normal_stop = &stop;
             let normal_endpoint = &self.endpoint;
             scope.spawn(move || {
-                while !normal_stop.load(Ordering::Acquire) {
-                    match normal_endpoint.try_serve_one() {
-                        Ok(Some(_)) => {}
-                        Ok(None) => std::thread::sleep(Duration::from_millis(2)),
-                        Err(error) => {
-                            let _send_result = normal_sender.send(error);
-                            return;
+                run_daemon_serving_worker("normal IPC", normal_sender, || {
+                    while !normal_stop.load(Ordering::Acquire) {
+                        match normal_endpoint.try_serve_one() {
+                            Ok(Some(_)) => {}
+                            Ok(None) => std::thread::sleep(Duration::from_millis(2)),
+                            Err(error) => return Err(error),
                         }
                     }
-                }
+                    Ok(())
+                });
             });
             let audit_sender = failure_sender.clone();
             let audit_stop = &stop;
             let audit_endpoint = &self.privileged_audit_endpoint;
             scope.spawn(move || {
-                while !audit_stop.load(Ordering::Acquire) {
-                    match audit_endpoint.try_serve_one() {
-                        Ok(Some(_)) => {}
-                        Ok(None) => std::thread::sleep(Duration::from_millis(2)),
-                        Err(error) => {
-                            let _send_result = audit_sender.send(error);
-                            return;
+                run_daemon_serving_worker("privileged audit", audit_sender, || {
+                    while !audit_stop.load(Ordering::Acquire) {
+                        match audit_endpoint.try_serve_one() {
+                            Ok(Some(_)) => {}
+                            Ok(None) => std::thread::sleep(Duration::from_millis(2)),
+                            Err(error) => return Err(error),
                         }
                     }
-                }
+                    Ok(())
+                });
             });
             drop(failure_sender);
             let failure = failure_receiver.recv().unwrap_or_else(|_| {
@@ -900,6 +948,28 @@ pub fn secure_inherited_key_file(file: File, label: &str) -> Result<File> {
             "inherited key descriptors require Unix descriptor custody".to_string(),
         ))
     }
+}
+
+#[cfg(target_os = "linux")]
+pub fn harden_broker_process_custody() -> Result<()> {
+    use rustix::process::{dumpable_behavior, set_dumpable_behavior, DumpableBehavior};
+
+    set_dumpable_behavior(DumpableBehavior::NotDumpable).map_err(|error| {
+        BrokerError::Custody(format!(
+            "broker process dump protection could not be enabled: {error}"
+        ))
+    })?;
+    if dumpable_behavior().map_err(|error| {
+        BrokerError::Custody(format!(
+            "broker process dump protection could not be verified: {error}"
+        ))
+    })? != DumpableBehavior::NotDumpable
+    {
+        return Err(BrokerError::Custody(
+            "broker process dump protection was not retained".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_socket_path(path: &Path, label: &str) -> Result<()> {
@@ -1180,6 +1250,28 @@ fn current_effective_uid() -> Result<u32> {
 mod tests {
     use super::*;
     use chio_test_support::prelude::*;
+
+    #[cfg(panic = "unwind")]
+    #[test]
+    fn serving_worker_panics_publish_failure_while_peer_sender_is_live() {
+        for label in ["normal IPC", "privileged audit"] {
+            let (sender, receiver) = std::sync::mpsc::sync_channel(2);
+            let peer_sender = sender.clone();
+            run_daemon_serving_worker(label, sender, || {
+                panic!("deterministic serving worker panic")
+            });
+
+            let failure = receiver
+                .try_recv()
+                .test_expect("panicking serving worker must publish a failure");
+            assert!(matches!(
+                failure,
+                BrokerError::Invariant(message)
+                    if message == format!("{label} serving worker panicked")
+            ));
+            drop(peer_sender);
+        }
+    }
 
     #[test]
     fn key_custody_requires_distinct_underlying_files() {

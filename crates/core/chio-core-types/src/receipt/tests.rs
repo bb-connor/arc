@@ -18,7 +18,8 @@ use super::{
         EconomicPricingBasisReceiptMetadata, EconomicRailReceiptMetadata,
         EconomicSettlementReceiptMetadata, FinancialBudgetAuthorityReceiptMetadata,
         FinancialBudgetAuthorizeReceiptMetadata, FinancialBudgetHoldAuthorityMetadata,
-        FinancialBudgetTerminalReceiptMetadata, FinancialReceiptMetadata, SettlementStatus,
+        FinancialBudgetTerminalReceiptMetadata, FinancialPartitionEscrowReceiptMetadata,
+        FinancialPartitionEscrowReceiptSummary, FinancialReceiptMetadata, SettlementStatus,
     },
     governance::{
         GovernedApprovalReceiptMetadata, GovernedAutonomyReceiptMetadata,
@@ -909,7 +910,7 @@ fn financial_receipt_metadata_attempted_cost_optional() {
 #[test]
 fn financial_budget_authority_metadata_serde_roundtrip() {
     let metadata = FinancialBudgetAuthorityReceiptMetadata {
-        guarantee_level: "ha_quorum_commit".to_string(),
+        guarantee_level: "partition_escrowed".to_string(),
         authority_profile: "authoritative_hold_event".to_string(),
         metering_profile: "max_cost_preauthorize_then_reconcile_actual".to_string(),
         hold_id: "budget-hold:req-1:cap-1:0".to_string(),
@@ -932,6 +933,22 @@ fn financial_budget_authority_metadata_serde_roundtrip() {
             exposure_units: 120,
             realized_spend_units: 75,
             committed_cost_units_after: 75,
+        }),
+        partition_escrow: Some(FinancialPartitionEscrowReceiptMetadata {
+            canonical_json: "{\"schema\":\"chio.partition-escrow-admission-evidence.v1\"}"
+                .to_string(),
+            evidence_digest: "11".repeat(32),
+            summary: FinancialPartitionEscrowReceiptSummary {
+                resolver_id: "resolver-a".to_string(),
+                resolver_implementation_id: "resolver-implementation-a".to_string(),
+                resolver_implementation_version: 1,
+                resolver_configuration_digest: "22".repeat(32),
+                store_identity_digest: "33".repeat(32),
+                counter_namespace_digest: "44".repeat(32),
+                fencing_token: 7,
+                partition_id: "partition-a".to_string(),
+                authority_id: "33".repeat(32),
+            },
         }),
     };
 
@@ -1026,6 +1043,7 @@ fn chio_receipt_extracts_typed_financial_and_budget_authority_metadata() {
             realized_spend_units: 75,
             committed_cost_units_after: 75,
         }),
+        partition_escrow: None,
     };
     let receipt = ChioReceipt::sign(
         ChioReceiptBody {

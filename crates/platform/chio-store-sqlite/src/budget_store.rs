@@ -12,7 +12,8 @@ use chio_kernel::budget_store::{
     BudgetInvocationReservationState, BudgetMeteringProfile, BudgetMonetaryHoldState,
     BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile,
     BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
-    DeniedBudgetHold, ReservedHoldEnvelope, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
+    DeniedBudgetHold, PartitionEscrowCommitEvidence, ReservedHoldEnvelope,
+    MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{
@@ -23,6 +24,7 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 mod composite;
 mod model;
+mod read_only;
 mod reaper;
 mod replication;
 mod rows;
@@ -97,6 +99,7 @@ pub struct SqliteCompositeAuthorizeInput {
     pub invocation_quotas: Vec<BudgetInvocationQuota>,
     pub revocation_set: CanonicalRevocationSet,
     pub authorization_artifact_digests: Vec<String>,
+    pub partition_escrow_evidence: Option<PartitionEscrowCommitEvidence>,
 }
 
 /// Authenticated aggregate-family identity bound to a composite authorization.

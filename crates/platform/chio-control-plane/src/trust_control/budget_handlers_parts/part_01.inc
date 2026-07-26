@@ -431,13 +431,20 @@ pub(crate) async fn handle_authorize_composite_budget_hold(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if let Err(error) = sqlite_composite_authorize_input(
+    if payload.existing_only {
+        return plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "existingOnly is reserved for the committed authorization query endpoint",
+        );
+    }
+    if let Err(error) = sqlite_fresh_composite_authorize_input(
         &payload,
         BudgetEventAuthority {
             authority_id: "pure-validation".to_string(),
             lease_id: "pure-validation".to_string(),
             lease_epoch: 1,
         },
+        state.config.partition_escrow_authority.as_deref(),
     ) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
@@ -458,6 +465,50 @@ pub(crate) async fn handle_authorize_composite_budget_hold(
             StatusCode::INTERNAL_SERVER_ERROR,
             &format!("persisted composite authorize result is invalid: {error}"),
         ),
+    }
+}
+
+pub(crate) async fn handle_query_committed_composite_budget_authorization(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(payload): Json<CompositeBudgetAuthorizeRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    if !payload.existing_only {
+        return plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "committed authorization queries require existingOnly",
+        );
+    }
+    if let Err(error) = sqlite_composite_authorize_input(
+        &payload,
+        BudgetEventAuthority {
+            authority_id: "pure-validation".to_string(),
+            lease_id: "pure-validation".to_string(),
+            lease_epoch: 1,
+        },
+        state.config.partition_escrow_authority.as_deref(),
+    ) {
+        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+    }
+    if state.cluster.is_none() || state.config.budget_db_path.is_none() {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "committed authorization queries require configured HA consensus storage",
+        );
+    }
+    match super::cluster::query_committed_composite_authorization(&state, payload).await {
+        Ok(response_json) => {
+            let mut response = response_json.into_response();
+            response.headers_mut().insert(
+                CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            );
+            response
+        }
+        Err(response) => response,
     }
 }
 
@@ -641,18 +692,36 @@ impl PreparedSqliteCompositeAuthorization {
     pub(crate) fn authorize_in_transaction(
         self,
         transaction: &rusqlite::Transaction<'_>,
+        existing_only: bool,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
-        match self {
-            Self::NonFamily(authorization) => {
+        match (self, existing_only) {
+            (Self::NonFamily(authorization), false) => {
                 SqliteBudgetStore::authorize_composite_hold_in_transaction(
                     transaction,
                     authorization,
                 )
             }
-            Self::AggregateFamily {
+            (
+                Self::AggregateFamily {
+                    authorization,
+                    evidence,
+                },
+                false,
+            ) => SqliteBudgetStore::authorize_aggregate_family_composite_hold_in_transaction(
+                transaction,
                 authorization,
                 evidence,
-            } => SqliteBudgetStore::authorize_aggregate_family_composite_hold_in_transaction(
+            ),
+            (Self::NonFamily(authorization), true) => {
+                SqliteBudgetStore::replay_composite_hold_in_transaction(transaction, authorization)
+            }
+            (
+                Self::AggregateFamily {
+                    authorization,
+                    evidence,
+                },
+                true,
+            ) => SqliteBudgetStore::replay_aggregate_family_composite_hold_in_transaction(
                 transaction,
                 authorization,
                 evidence,
@@ -661,9 +730,53 @@ impl PreparedSqliteCompositeAuthorization {
     }
 }
 
+#[derive(Clone, Copy)]
+enum PartitionEscrowAuthorizationValidation {
+    FreshProposal,
+    PersistedCommit,
+}
+
+/// Deterministic committed-command parser. This validates the sealed authority
+/// and exact persisted proof, but never reads the wall clock or a live source.
 pub(crate) fn sqlite_composite_authorize_input(
     payload: &CompositeBudgetAuthorizeRequest,
     authority: BudgetEventAuthority,
+    partition_escrow_authority: Option<
+        &super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+    >,
+) -> Result<PreparedSqliteCompositeAuthorization, BudgetStoreError> {
+    sqlite_composite_authorize_input_with_validation(
+        payload,
+        authority,
+        partition_escrow_authority,
+        PartitionEscrowAuthorizationValidation::PersistedCommit,
+    )
+}
+
+/// Fresh proposal parser. This is the only parser allowed to require that the
+/// sealed proof and its underlying source are valid at the current wall clock.
+pub(crate) fn sqlite_fresh_composite_authorize_input(
+    payload: &CompositeBudgetAuthorizeRequest,
+    authority: BudgetEventAuthority,
+    partition_escrow_authority: Option<
+        &super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+    >,
+) -> Result<PreparedSqliteCompositeAuthorization, BudgetStoreError> {
+    sqlite_composite_authorize_input_with_validation(
+        payload,
+        authority,
+        partition_escrow_authority,
+        PartitionEscrowAuthorizationValidation::FreshProposal,
+    )
+}
+
+fn sqlite_composite_authorize_input_with_validation(
+    payload: &CompositeBudgetAuthorizeRequest,
+    authority: BudgetEventAuthority,
+    partition_escrow_authority: Option<
+        &super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+    >,
+    partition_escrow_validation: PartitionEscrowAuthorizationValidation,
 ) -> Result<PreparedSqliteCompositeAuthorization, BudgetStoreError> {
     BudgetAdmissionOperationBinding::new(
         payload.operation_id.clone(),
@@ -717,7 +830,7 @@ pub(crate) fn sqlite_composite_authorize_input(
             ));
         }
     };
-    let authorization_artifact_digests = payload
+    let supplemental_artifact_digest = payload
         .admission_evidence
         .supplemental_binding
         .as_ref()
@@ -736,11 +849,107 @@ pub(crate) fn sqlite_composite_authorize_input(
                     "supplemental verifier id is empty or contains NUL".to_string(),
                 ));
             }
+            if binding.not_before >= binding.expires_at
+                || binding.verified_at < binding.not_before
+                || binding.verified_at >= binding.expires_at
+                || binding.broker_capability_id.is_empty()
+                || binding.broker_capability_id.bytes().any(|byte| byte == 0)
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "supplemental admission provenance is invalid".to_string(),
+                ));
+            }
+            validate_admission_digest(
+                &binding.request_constraint_digest,
+                "supplemental request constraint digest",
+            )?;
+            validate_admission_digest(
+                &binding.claim_binding_digest,
+                "supplemental claim binding digest",
+            )?;
             Ok(binding.artifact_digest.clone())
         })
-        .transpose()?
+        .transpose()?;
+    let partition_escrow_evidence = payload
+        .admission_evidence
+        .partition_escrow_evidence
+        .as_ref()
+        .map(|binding| {
+            validate_admission_digest(&binding.digest, "partition escrow evidence digest")?;
+            let evidence = chio_kernel::partition_escrow::PartitionEscrowAdmissionEvidence::from_canonical_json_bytes(
+                binding.canonical_json.as_bytes(),
+            )
+            .map_err(|error| {
+                BudgetStoreError::Invariant(format!(
+                    "partition escrow admission evidence is invalid: {error}"
+                ))
+            })?;
+            let digest = evidence.digest().map_err(|error| {
+                BudgetStoreError::Invariant(format!(
+                    "partition escrow admission evidence digest failed: {error}"
+                ))
+            })?;
+            if digest != binding.digest
+                || evidence.quotas().len() != invocation_quotas.len()
+                || evidence
+                    .quotas()
+                    .iter()
+                    .zip(&invocation_quotas)
+                    .any(|(escrow, local)| {
+                        escrow.global_quota().profile() != local.key().profile().as_str()
+                            || escrow.global_quota().owner_id() != local.key().owner_id()
+                            || escrow.global_quota().grant_index() != local.key().grant_index()
+                            || escrow.local_allocated_invocations() != local.max_invocations()
+                    })
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "partition escrow evidence changed its digest or local quota projection"
+                        .to_string(),
+                ));
+            }
+            chio_kernel::budget_store::PartitionEscrowCommitEvidence::from_canonical_json(
+                binding.canonical_json.clone(),
+                binding.digest.clone(),
+            )
+        })
+        .transpose()?;
+    match (
+        partition_escrow_authority,
+        partition_escrow_evidence.as_ref(),
+    ) {
+        (None, None) => {}
+        (None, Some(_)) => {
+            return Err(BudgetStoreError::Conflict(
+                "ordinary HA authority rejects partition escrow evidence".to_string(),
+            ));
+        }
+        (Some(_), None) => {
+            return Err(BudgetStoreError::Invariant(
+                "sealed partition escrow authority requires exact signed allocation evidence"
+                    .to_string(),
+            ));
+        }
+        (Some(authority), Some(evidence)) => {
+            match partition_escrow_validation {
+                PartitionEscrowAuthorizationValidation::FreshProposal => {
+                    authority.validate_fresh_authorization_evidence_now(evidence)?;
+                }
+                PartitionEscrowAuthorizationValidation::PersistedCommit => {
+                    authority.validate_persisted_commit_evidence(evidence)?;
+                }
+            }
+        }
+    }
+    let mut authorization_artifact_digests = supplemental_artifact_digest
         .into_iter()
-        .collect();
+        .chain(
+            partition_escrow_evidence
+                .iter()
+                .map(|evidence| evidence.evidence_digest().to_string()),
+        )
+        .collect::<Vec<_>>();
+    authorization_artifact_digests.sort();
+    authorization_artifact_digests.dedup();
     let authorization = SqliteCompositeAuthorizeInput {
         operation_id: payload.operation_id.clone(),
         request_binding_hash: payload.request_binding_hash.clone(),
@@ -757,6 +966,7 @@ pub(crate) fn sqlite_composite_authorize_input(
             &payload.admission_evidence.revocation_set,
         )?,
         authorization_artifact_digests,
+        partition_escrow_evidence,
     };
     Ok(match aggregate_family_evidence {
         Some(evidence) => PreparedSqliteCompositeAuthorization::AggregateFamily {

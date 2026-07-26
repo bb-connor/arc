@@ -94,7 +94,7 @@ use chio_kernel::budget_store::{
     BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetInvocationReservationState,
     BudgetMeteringProfile, BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord,
     BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
-    BudgetReverseHoldRequest, DeniedBudgetHold,
+    BudgetReverseHoldRequest, DeniedBudgetHold, PartitionEscrowCommitEvidence,
 };
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;

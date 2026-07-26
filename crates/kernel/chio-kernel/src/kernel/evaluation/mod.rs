@@ -39,3 +39,24 @@ pub(crate) enum PreflightHoldDisposition {
     /// crash reaper reclaims it, never over-subscribed.
     ReserveForCaller,
 }
+
+#[cfg(test)]
+impl ChioKernel {
+    /// Exercise receipt sanitizers below the public metadata ingress boundary.
+    /// Production callers must use entrypoints that reject reserved metadata.
+    pub(crate) async fn evaluate_tool_call_with_unchecked_receipt_metadata_for_test(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            extra_metadata,
+            None,
+            None,
+            PreflightHoldDisposition::ReverseForRetry,
+        )
+        .await
+    }
+}

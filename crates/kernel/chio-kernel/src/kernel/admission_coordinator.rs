@@ -83,6 +83,15 @@ struct ThresholdBudgetAuthorization {
     authorization_artifact_digests: Vec<String>,
 }
 
+struct ThresholdBudgetAuthorizationContext<'a> {
+    capability: &'a CapabilityToken,
+    grant_index: usize,
+    grant: &'a ToolGrant,
+    operation: &'a AdmissionOperation,
+    protocol: &'a ThresholdProtocolPreparation,
+    preexisting_operation: bool,
+}
+
 pub(super) struct ThresholdDispatchPermit {
     operation: AdmissionOperation,
     preexisting_operation: bool,
@@ -320,8 +329,6 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
-        let authorization =
-            self.prepare_threshold_budget_authorization(&context, prepared.operation(), &protocol)?;
         let ThresholdToolAdmissionContext {
             request,
             cap,
@@ -341,6 +348,28 @@ impl ChioKernel {
         {
             AdmissionOperationCreateOutcome::Created(operation) => (operation, false),
             AdmissionOperationCreateOutcome::Existing(operation) => (operation, true),
+        };
+        let authorization = if preexisting_operation {
+            self.frozen_threshold_budget_authorization(
+                operation_store.as_ref(),
+                &operation,
+                cap,
+                grant_index,
+                &protocol,
+            )?
+        } else {
+            self.prepare_threshold_budget_authorization(
+                &ThresholdToolAdmissionContext {
+                    request,
+                    cap,
+                    grant_index,
+                    grant,
+                    now,
+                    payment_mode,
+                },
+                &operation,
+                &protocol,
+            )?
         };
         self.journal_budget_cleanup(
             &operation,
@@ -449,14 +478,15 @@ impl ChioKernel {
             }
         }
 
-        let budget_mutation = match self.authorize_threshold_budget(
-            cap,
+        let budget_context = ThresholdBudgetAuthorizationContext {
+            capability: cap,
             grant_index,
             grant,
-            &operation,
-            &protocol,
-            authorization,
-        ) {
+            operation: &operation,
+            protocol: &protocol,
+            preexisting_operation,
+        };
+        let budget_mutation = match self.authorize_threshold_budget(budget_context, authorization) {
             Ok(mutation) => mutation,
             Err(error @ KernelError::BudgetExhausted(_))
                 if matches!(
@@ -522,7 +552,7 @@ impl ChioKernel {
             let response_metadata = self.caller_reservation_response_metadata(
                 &budget_mutation,
                 handoff.runtime_response_metadata.cloned(),
-            );
+            )?;
             if let Err(error) = self.prepare_operation_owned_caller_reservation_handoff(
                 request,
                 now,
@@ -1115,6 +1145,57 @@ impl ChioKernel {
             .map_err(KernelError::from)
     }
 
+    fn frozen_threshold_budget_authorization(
+        &self,
+        operation_store: &dyn crate::admission_operation::AdmissionOperationStore,
+        operation: &AdmissionOperation,
+        cap: &CapabilityToken,
+        grant_index: usize,
+        protocol: &ThresholdProtocolPreparation,
+    ) -> Result<ThresholdBudgetAuthorization, KernelError> {
+        let snapshot = self.load_recovery_budget_snapshot(operation_store, operation)?;
+        if snapshot.hold_id() != protocol.hold_id.as_str()
+            || snapshot.reverse_event_id() != protocol.reverse_event_id.as_str()
+            || snapshot.capture_event_id() != protocol.capture_event_id.as_str()
+            || snapshot.request_binding_hash() != operation.request_binding_hash()
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "existing threshold admission changed its frozen budget participant binding"
+                    .to_string(),
+            ));
+        }
+        let request = snapshot.authorization_request()?;
+        if request.capability_id != cap.id
+            || request.grant_index != grant_index
+            || request.hold_id.as_deref() != Some(protocol.hold_id.as_str())
+            || request.event_id.as_deref() != Some(protocol.authorize_event_id.as_str())
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "existing threshold admission changed its frozen budget authorization".to_string(),
+            ));
+        }
+        let evidence = request.invocation_admission_evidence().ok_or_else(|| {
+            KernelError::Internal(
+                "existing threshold authorization omitted frozen admission evidence".to_string(),
+            )
+        })?;
+        Ok(ThresholdBudgetAuthorization {
+            aggregate_root_capability_id: evidence
+                .aggregate_root_capability_id()
+                .map(str::to_string),
+            aggregate_binding_digest: evidence.aggregate_binding_digest().map(str::to_string),
+            supplemental_verifier_id: evidence.supplemental_verifier_id().map(str::to_string),
+            supplemental_request_binding_hash: evidence
+                .supplemental_request_binding_hash()
+                .map(str::to_string),
+            supplemental_negotiated_features_digest: evidence
+                .supplemental_negotiated_features_digest()
+                .map(str::to_string),
+            authorization_artifact_digests: snapshot.authorization_artifact_digests(),
+            request,
+        })
+    }
+
     fn prepare_threshold_budget_authorization(
         &self,
         context: &ThresholdToolAdmissionContext<'_>,
@@ -1186,6 +1267,23 @@ impl ChioKernel {
             supplemental.as_ref(),
             &verified_ancestor_ids,
         )?;
+        let invocation_admission = match self.partition_escrow_registry.as_ref() {
+            Some(registry) => registry
+                .install_verified_admission(
+                    cap,
+                    grant_index,
+                    aggregate.as_ref(),
+                    supplemental.as_ref(),
+                    invocation_admission,
+                    now,
+                )
+                .map_err(|error| {
+                    KernelError::GuardDenied(format!(
+                        "partition escrow admission verification failed: {error}"
+                    ))
+                })?,
+            None => invocation_admission,
+        };
         let cost_units = grant
             .max_cost_per_invocation
             .as_ref()
@@ -1204,7 +1302,7 @@ impl ChioKernel {
             max_total,
             Some(protocol.hold_id.clone()),
             Some(protocol.authorize_event_id.clone()),
-            Some(self.local_budget_event_authority()),
+            Some(self.budget_event_authority()),
         );
         authorization.admission_operation = Some(BudgetAdmissionOperationBinding::new(
             operation.operation_id().to_string(),
@@ -1276,6 +1374,10 @@ impl ChioKernel {
         let supplemental_negotiated_features_digest = admission_evidence
             .supplemental_negotiated_features_digest()
             .map(str::to_string);
+        let authorization_artifact_digests =
+            super::ordinary_admission::admission_authorization_artifact_digests(
+                admission_evidence,
+            )?;
         Ok(ThresholdBudgetAuthorization {
             request: authorization,
             aggregate_root_capability_id,
@@ -1283,29 +1385,68 @@ impl ChioKernel {
             supplemental_verifier_id,
             supplemental_request_binding_hash,
             supplemental_negotiated_features_digest,
-            authorization_artifact_digests: protocol.supplemental_digest.iter().cloned().collect(),
+            authorization_artifact_digests,
         })
     }
 
     fn authorize_threshold_budget(
         &self,
-        cap: &CapabilityToken,
-        grant_index: usize,
-        grant: &ToolGrant,
-        operation: &AdmissionOperation,
-        protocol: &ThresholdProtocolPreparation,
+        context: ThresholdBudgetAuthorizationContext<'_>,
         authorization: ThresholdBudgetAuthorization,
     ) -> Result<PreExecutionBudgetMutation, KernelError> {
+        let ThresholdBudgetAuthorizationContext {
+            capability: cap,
+            grant_index,
+            grant,
+            operation,
+            protocol,
+            preexisting_operation,
+        } = context;
         let expected_authority = authorization.request.authority.clone();
+        let trusted_partition_escrow_evidence =
+            super::ordinary_admission::authorization_partition_escrow_commit_evidence(
+                &authorization.request,
+                if preexisting_operation {
+                    "threshold authorization replay"
+                } else {
+                    "threshold authorization"
+                },
+            )?;
         let decision = self.with_budget_store(|store| {
-            match store.authorize_budget_hold(authorization.request.clone()) {
-                Ok(decision) => Ok(decision),
-                Err(_) => Ok(store.authorize_budget_hold(authorization.request.clone())?),
-            }
+            let decision = if preexisting_operation {
+                store
+                    .replay_budget_authorization(authorization.request.clone())
+                    .map_err(KernelError::from)?
+            } else {
+                match store.authorize_budget_hold(authorization.request.clone()) {
+                    Ok(decision) => decision,
+                    Err(_) => store.authorize_budget_hold(authorization.request.clone())?,
+                }
+            };
+            let validation = self.validate_budget_authorization_decision_for_store(
+                store,
+                &authorization.request,
+                &decision,
+                &authorization.authorization_artifact_digests,
+                if preexisting_operation {
+                    "threshold authorization replay"
+                } else {
+                    "threshold authorization"
+                },
+            );
+            Ok((decision, validation))
         })?;
-        let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
+        let (decision, authorization_validation) = decision;
+        let BudgetAuthorizeHoldDecision::Authorized(mut authorized) = decision else {
+            if authorization_validation.is_err() {
+                return Err(KernelError::GuardDenied(
+                    "budget authorization denial lacks exact hard-budget authority evidence"
+                        .to_string(),
+                ));
+            }
             return Err(KernelError::BudgetExhausted(cap.id.clone()));
         };
+        authorized.metadata.partition_escrow_evidence = trusted_partition_escrow_evidence;
         let admission_operation = BudgetAdmissionOperationBinding::new(
             operation.operation_id().to_string(),
             operation.request_binding_hash().to_string(),
@@ -1318,7 +1459,7 @@ impl ChioKernel {
             admission_operation.clone(),
         );
         let mutation = OrdinaryAdmissionMutation {
-            preexisting_operation: false,
+            preexisting_operation,
             operation_id: operation.operation_id().to_string(),
             admission_operation,
             grant_index,
@@ -1337,13 +1478,7 @@ impl ChioKernel {
             supplemental: protocol.supplemental_plan.is_some(),
             charge,
         };
-        if let Err(error) = self.validate_hard_budget_commit_metadata(
-            &mutation.authorized.metadata,
-            &protocol.authorize_event_id,
-            expected_authority.as_ref(),
-            None,
-            "threshold authorization",
-        ) {
+        if let Err(error) = authorization_validation {
             let cleanup_authority = (self
                 .with_budget_store(|store| Ok(store.budget_guarantee_level()))?
                 == crate::budget_store::BudgetGuaranteeLevel::SingleNodeAtomic)
@@ -1551,6 +1686,7 @@ impl ChioKernel {
         let exposure = budget_mutation
             .charge_result()
             .map_or(0, |charge| charge.cost_charged);
+        let budget_authority = self.budget_event_authority();
         self.with_budget_store(|store| {
             let request = BudgetReverseHoldRequest {
                 capability_id: capability.id.clone(),
@@ -1558,7 +1694,7 @@ impl ChioKernel {
                 reversed_exposure_units: exposure,
                 hold_id: Some(hold_id.to_string()),
                 event_id: Some(format!("{hold_id}:reverse")),
-                authority: Some(self.local_budget_event_authority()),
+                authority: Some(budget_authority),
                 admission_operation: Some(BudgetAdmissionOperationBinding::new(
                     operation.operation_id().to_string(),
                     operation.request_binding_hash().to_string(),

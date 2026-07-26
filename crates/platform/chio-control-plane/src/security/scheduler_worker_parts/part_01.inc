@@ -6,11 +6,12 @@ use chio_quarantine::{
 use chio_security_kernel::SecurityClock;
 use chio_security_types::ports::{
     ActionId, DeclassificationEvidenceCommitStore, EffectPort, ErrorCode, GrantId, LeaseOwnerId,
-    PortError, RecordId, ResponseDispatchStore, ResponseSchedulerStore, ScheduledWork,
-    SchedulerHealthPort, SecurityAlertPort, SecurityReceiptSink, TenantId,
+    PortError, PortErrorKind, RecordId, ResponseDispatchStore, ResponseSchedulerStore,
+    ScheduledWork, SchedulerHealthPort, SecurityAlertPort, SecurityReceiptSink, TenantId,
     MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
+use rand_core::{OsRng, RngCore};
 use serde::Serialize;
 use std::collections::{BTreeMap, VecDeque};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -67,6 +68,8 @@ pub enum ResponseWorkerTickError {
     AckLost,
     #[error("response worker configuration is invalid")]
     InvalidConfig,
+    #[error("expired terminal scheduler cleanup remains pending")]
+    TerminalSchedulerCleanupPending,
     #[error("declassification receipt outbox failed: {0}")]
     DeclassificationOutbox(PortError),
     #[error("declassification receipt outbox has {0} pending receipts")]
@@ -782,8 +785,8 @@ impl Drop for ResponseWorkerJoinPermit {
     }
 }
 
-fn acquire_response_worker_join_permit(
-) -> Result<ResponseWorkerJoinPermit, ResponseWorkerTickError> {
+fn acquire_response_worker_join_permit() -> Result<ResponseWorkerJoinPermit, ResponseWorkerTickError>
+{
     let registry = Arc::clone(
         RESPONSE_WORKER_REAPER_REGISTRY
             .get_or_init(|| Arc::new(ResponseWorkerReaperRegistry::new())),
@@ -807,13 +810,8 @@ fn join_response_worker_thread(
 }
 
 impl ResponseWorkerStartupGuard {
-    fn take_join(
-        &mut self,
-    ) -> Result<ResponseWorkerJoinOwnership, ResponseWorkerTickError> {
-        let join = self
-            .join
-            .take()
-            .ok_or_else(worker_task_crash_error)?;
+    fn take_join(&mut self) -> Result<ResponseWorkerJoinOwnership, ResponseWorkerTickError> {
+        let join = self.join.take().ok_or_else(worker_task_crash_error)?;
         self.active = false;
         Ok(join)
     }
@@ -942,10 +940,8 @@ impl ProductionResponseWorkerHandle {
             {
                 tokio::task::yield_now().await;
             }
-            let ResponseWorkerJoinOwnership { join, permit } = self
-                .join
-                .take()
-                .ok_or_else(worker_task_crash_error)?;
+            let ResponseWorkerJoinOwnership { join, permit } =
+                self.join.take().ok_or_else(worker_task_crash_error)?;
             let result = join_response_worker_thread(join, &self.worker);
             drop(permit);
             result
@@ -1132,6 +1128,14 @@ impl ProductionResponseWorker {
                         completed_sequence: health.last_tick_completed_sequence,
                     });
                 }
+                Err(ResponseWorkerTickError::TerminalSchedulerCleanupPending)
+                    if elapsed < deadline =>
+                {
+                    if shutdown_receiver.has_changed().is_err() || *shutdown_receiver.borrow() {
+                        return Err(ResponseWorkerTickError::WorkerStopped);
+                    }
+                    tokio::task::yield_now().await;
+                }
                 Err(error @ ResponseWorkerTickError::WorkerCrash(_)) => return Err(error),
                 Err(error) => {
                     let remaining = deadline.saturating_sub(elapsed);
@@ -1197,93 +1201,93 @@ impl ProductionResponseWorker {
                     return Err(ResponseWorkerTickError::WorkerTaskReadyHandshake);
                 }
                 let result = runtime.block_on(async move {
-            let arm_received = tokio::select! {
-                result = &mut arm_receiver => result.is_ok(),
-                _ = shutdown_receiver.changed() => {
-                    worker.request_stop();
-                    return worker.complete_shutdown_after_loop();
-                }
-            };
-            if !arm_received {
-                worker.request_stop();
-                worker.complete_shutdown_after_loop()?;
-                return Err(ResponseWorkerTickError::WorkerArmHandshake);
-            }
-            worker.mark_armed();
-            if armed_sender.send(()).is_err() {
-                worker.request_stop();
-                worker.complete_shutdown_after_loop()?;
-                return Err(ResponseWorkerTickError::WorkerArmHandshake);
-            }
-            let publication_released = tokio::select! {
-                result = &mut publication_receiver => result.is_ok(),
-                _ = shutdown_receiver.changed() => {
-                    worker.request_stop();
-                    return worker.complete_shutdown_after_loop();
-                }
-            };
-            if !publication_released {
-                worker.request_stop();
-                worker.complete_shutdown_after_loop()?;
-                return Err(ResponseWorkerTickError::WorkerPublicationGate);
-            }
-            let initial_tick = worker
-                .tick_until_initial_ready(config, &mut shutdown_receiver)
-                .await;
-            if let Err(error) = initial_tick {
-                let _ = publication_readiness_sender.send(Err(error.to_string()));
-                worker.request_stop();
-                worker.complete_shutdown_after_loop()?;
-                worker.mark_failed(&error);
-                return Err(error);
-            }
-            if let Err(error) = worker.mark_publication_ready() {
-                let _ = publication_readiness_sender.send(Err(error.to_string()));
-                worker.request_stop();
-                worker.complete_shutdown_after_loop()?;
-                worker.mark_failed(&error);
-                return Err(error);
-            }
-            if publication_readiness_sender.send(Ok(())).is_err() {
-                let error = ResponseWorkerTickError::WorkerPublicationGate;
-                worker.request_stop();
-                worker.complete_shutdown_after_loop()?;
-                worker.mark_failed(&error);
-                return Err(error);
-            }
-            let mut interval = tokio::time::interval_at(
-                tokio::time::Instant::now() + config.tick_interval,
-                config.tick_interval,
-            );
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            loop {
-                tokio::select! {
-                    changed = shutdown_receiver.changed() => {
-                        if changed.is_err() || *shutdown_receiver.borrow() {
-                            break;
+                    let arm_received = tokio::select! {
+                        result = &mut arm_receiver => result.is_ok(),
+                        _ = shutdown_receiver.changed() => {
+                            worker.request_stop();
+                            return worker.complete_shutdown_after_loop();
+                        }
+                    };
+                    if !arm_received {
+                        worker.request_stop();
+                        worker.complete_shutdown_after_loop()?;
+                        return Err(ResponseWorkerTickError::WorkerArmHandshake);
+                    }
+                    worker.mark_armed();
+                    if armed_sender.send(()).is_err() {
+                        worker.request_stop();
+                        worker.complete_shutdown_after_loop()?;
+                        return Err(ResponseWorkerTickError::WorkerArmHandshake);
+                    }
+                    let publication_released = tokio::select! {
+                        result = &mut publication_receiver => result.is_ok(),
+                        _ = shutdown_receiver.changed() => {
+                            worker.request_stop();
+                            return worker.complete_shutdown_after_loop();
+                        }
+                    };
+                    if !publication_released {
+                        worker.request_stop();
+                        worker.complete_shutdown_after_loop()?;
+                        return Err(ResponseWorkerTickError::WorkerPublicationGate);
+                    }
+                    let initial_tick = worker
+                        .tick_until_initial_ready(config, &mut shutdown_receiver)
+                        .await;
+                    if let Err(error) = initial_tick {
+                        let _ = publication_readiness_sender.send(Err(error.to_string()));
+                        worker.request_stop();
+                        worker.complete_shutdown_after_loop()?;
+                        worker.mark_failed(&error);
+                        return Err(error);
+                    }
+                    if let Err(error) = worker.mark_publication_ready() {
+                        let _ = publication_readiness_sender.send(Err(error.to_string()));
+                        worker.request_stop();
+                        worker.complete_shutdown_after_loop()?;
+                        worker.mark_failed(&error);
+                        return Err(error);
+                    }
+                    if publication_readiness_sender.send(Ok(())).is_err() {
+                        let error = ResponseWorkerTickError::WorkerPublicationGate;
+                        worker.request_stop();
+                        worker.complete_shutdown_after_loop()?;
+                        worker.mark_failed(&error);
+                        return Err(error);
+                    }
+                    let mut interval = tokio::time::interval_at(
+                        tokio::time::Instant::now() + config.tick_interval,
+                        config.tick_interval,
+                    );
+                    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    loop {
+                        tokio::select! {
+                            changed = shutdown_receiver.changed() => {
+                                if changed.is_err() || *shutdown_receiver.borrow() {
+                                    break;
+                                }
+                            }
+                            _ = interval.tick() => {
+                                match worker.tick_once_catching_crash() {
+                                    Ok(_) => {}
+                                    Err(ResponseWorkerTickError::WorkerStopped)
+                                        if *shutdown_receiver.borrow() =>
+                                    {
+                                        break;
+                                    }
+                                    Err(ResponseWorkerTickError::WorkerCrash(code)) => {
+                                        let error = ResponseWorkerTickError::WorkerCrash(code);
+                                        worker.request_stop();
+                                        worker.complete_shutdown_after_loop()?;
+                                        worker.mark_failed(&error);
+                                        return Err(error);
+                                    }
+                                    Err(_) => {}
+                                }
+                            }
                         }
                     }
-                    _ = interval.tick() => {
-                        match worker.tick_once_catching_crash() {
-                            Ok(_) => {}
-                            Err(ResponseWorkerTickError::WorkerStopped)
-                                if *shutdown_receiver.borrow() =>
-                            {
-                                break;
-                            }
-                            Err(ResponseWorkerTickError::WorkerCrash(code)) => {
-                                let error = ResponseWorkerTickError::WorkerCrash(code);
-                                worker.request_stop();
-                                worker.complete_shutdown_after_loop()?;
-                                worker.mark_failed(&error);
-                                return Err(error);
-                            }
-                            Err(_) => {}
-                        }
-                    }
-                }
-            }
-            worker.complete_shutdown_after_loop()
+                    worker.complete_shutdown_after_loop()
                 });
                 drop(runtime);
                 drop(task_liveness);

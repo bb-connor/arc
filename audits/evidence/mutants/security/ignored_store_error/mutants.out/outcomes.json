@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.267642416,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.59581875,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters",
+            "every_flow_domain_error_is_fail_closed_pre_and_post",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-security-kernel",
+          "file": "crates/security/chio-security-kernel/src/pre_invocation.rs",
+          "function": {
+            "function_name": "<impl FlowPreInvocationPort for EngineFlowPreInvocationPort>::evaluate",
+            "return_type": "-> Result<(), FlowDenial>",
+            "span": {
+              "start": {
+                "line": 46,
+                "column": 5
+              },
+              "end": {
+                "line": 50,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 47,
+              "column": 9
+            },
+            "end": {
+              "line": 49,
+              "column": 42
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-security-kernel__src__pre_invocation.rs_line_47_col_9.log",
+      "diff_path": "diff/crates__security__chio-security-kernel__src__pre_invocation.rs_line_47_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 2.50516025,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.6413985,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-security-kernel@0.1.0",
+            "--test=adapters",
+            "every_flow_domain_error_is_fail_closed_pre_and_post",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

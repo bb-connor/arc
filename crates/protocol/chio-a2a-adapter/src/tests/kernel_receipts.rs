@@ -71,7 +71,7 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
                     tool_name: "research".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: vec![],
-                    max_invocations: Some(5),
+                    max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
                     dpop_required: None,
@@ -112,7 +112,12 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
         .await
         .expect("evaluate A2A tool call");
 
-    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "unexpected kernel denial: {:?}",
+        response.reason
+    );
     assert_eq!(response.receipt.body().decision, Some(Decision::Allow));
     assert_eq!(response.receipt.body().tool_name, "research");
     assert_eq!(response.receipt.body().tool_server, expected_server_id);
@@ -487,7 +492,7 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
                     tool_name: "research".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: vec![],
-                    max_invocations: Some(5),
+                    max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
                     dpop_required: None,

@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.102444042,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.70831475,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--lib",
+            "budget_store::tests::broker_composite_hold_denies_quota_and_monetary_overspend",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-store-sqlite",
+          "file": "crates/platform/chio-store-sqlite/src/budget_store/composite.rs",
+          "function": {
+            "function_name": "SqliteBudgetStore::invocation_quota_attempt_is_allowed",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 122,
+                "column": 5
+              },
+              "end": {
+                "line": 127,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 126,
+              "column": 26
+            },
+            "end": {
+              "line": 126,
+              "column": 28
+            }
+          },
+          "replacement": "||",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__platform__chio-store-sqlite__src__budget_store__composite.rs_line_126_col_26.log",
+      "diff_path": "diff/crates__platform__chio-store-sqlite__src__budget_store__composite.rs_line_126_col_26.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 18.14251,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.447201166,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--lib",
+            "budget_store::tests::broker_composite_hold_denies_quota_and_monetary_overspend",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

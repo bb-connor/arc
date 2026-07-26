@@ -1,4 +1,4 @@
-12998a70680827b11a4fbc3e6f16d88d41040430c03703bd123a9c279dc6548c  spec/schemas/MANIFEST.sha256
+9feed7816236ac283ccadfee256473c6fca597ee05f39d481638dd4daf1f0e75  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -390,12 +390,16 @@ a89cebb22ad42d0353c5c0a2b35af56a2198a003b172e864741c5b9a878eaccc  spec/schemas/c
 1e0106d04c5d7efe295e2341a463e2b013c14ad84848a76686245466da676319  spec/schemas/chio-wire/v1/security/tool-flow-declaration.schema.json
 55144f444838d05190977e3e11110a456a42c8a5be91eb95ad8241d4b8efc380  spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json
 66012c9282207dbefb4efa61648684b9f66b8cb53589cdd8996ac93a01663301  spec/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json
-48e09b64b71af676edcbd35b3948bc9e9ac680d93514906308a3176bfee76188  spec/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json
+95382b2702afb3e448f44a8ff95ff1306094ba2331b2bcdad8b6c811543dd67e  spec/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json
 b1ad0368f18a3a0f2dd5591701d8259b6838976ec40d11ea626f3125404b79c0  spec/schemas/chio-wire/v1/trust-control/admission-request-binding.schema.json
 79e13f78d1cff7910455dbf7998154d363acc9449bc4b0b30b6da7556b264313  spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
-dc64aa87adfde9a7426716809a2076c4e95881f2ccb68d1b2814bc4601c1a811  spec/schemas/chio-wire/v1/trust-control/budget-invocation-admission-evidence.schema.json
+5b7aaa431a17e0533d8176d092ff3caef19c90f8896f6e84843c18eb215889c2  spec/schemas/chio-wire/v1/trust-control/budget-invocation-admission-evidence.schema.json
 33a84d19445de5074f554f66ff838acb72bc002772b5dcf82ad53abccb4dc656  spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json
 47661110b2674673ca5f1401271af6a0de8a2f465440ac964553ce6be1f9e0ae  spec/schemas/chio-wire/v1/trust-control/lease.schema.json
+a03c5d3060f4a3795b45a50a4296813f6b5e119a24fc74639c16e77e5ab8c1c4  spec/schemas/chio-wire/v1/trust-control/partition-escrow-admission-evidence.schema.json
+cd180258e65895ded1b174a0fe6debee53e48d51d30bef74c658b234d08bce8d  spec/schemas/chio-wire/v1/trust-control/partition-escrow-allocation-set.schema.json
+1e387b198dc326b53e8546a8f3aaca334d45eab24f208187a08bdda23cda0d9a  spec/schemas/chio-wire/v1/trust-control/partition-escrow-quota-commitment.schema.json
+699b778edce30d8ad6954778089d4c12fb2020ee9b0050cf09cca0a2ccd82c0f  spec/schemas/chio-wire/v1/trust-control/partition-escrow-receipt-metadata.schema.json
 63540f55a91b96cf071cece6b3465e8c3bba82512a91a5f83b05affc757033f4  spec/schemas/chio-wire/v1/trust-control/terminate.schema.json
 4646a51a6d23c27f0ba3951923e029ab9568bfa87f1b373ad2b1334be0ca7f62  spec/schemas/chio-workflow/v1/preflight-plan.schema.json
 3374b9d40520b66cae420da1f9c8bb07fed6bfbd62ae918615e2f88b6e1b7700  spec/schemas/chio-workflow/v1/preflight-report.schema.json

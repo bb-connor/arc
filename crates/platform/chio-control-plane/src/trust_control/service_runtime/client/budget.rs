@@ -95,6 +95,13 @@ impl TrustControlClient {
         self.post_json(BUDGET_AUTHORIZE_HOLD_PATH, request)
     }
 
+    pub(crate) fn query_committed_composite_budget_authorization(
+        &self,
+        request: &CompositeBudgetAuthorizeRequest,
+    ) -> Result<CompositeBudgetAuthorizeResponse, CliError> {
+        self.post_json(BUDGET_AUTHORIZE_HOLD_QUERY_PATH, request)
+    }
+
     pub(crate) fn capture_invocation_reservations(
         &self,
         request: &CaptureInvocationReservationsRequest,
@@ -107,6 +114,14 @@ impl TrustControlClient {
         request: &CaptureInvocationPointQueryRequest,
     ) -> Result<CaptureInvocationPointQueryResponse, CliError> {
         self.post_json(BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH, request)
+    }
+
+    pub(crate) fn query_budget_mutation_event_at(
+        &self,
+        endpoint: &str,
+        request: &BudgetMutationEventQueryRequest,
+    ) -> Result<BudgetMutationEventReplicaResponse, CliError> {
+        self.post_json_to_endpoint(endpoint, BUDGET_MUTATION_EVENT_QUERY_PATH, request)
     }
 
     pub(crate) fn capture_admission(

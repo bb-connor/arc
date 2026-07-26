@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-quota-commitment.schema.json",
+  "title": "Chio signed partition-escrow quota commitment",
+  "description": "A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["body", "signerKey", "algorithm", "signature"],
+  "properties": {
+    "body": { "$ref": "#/$defs/quotaCommitmentBody" },
+    "signerKey": { "$ref": "#/$defs/partitionEscrowPublicKey" },
+    "algorithm": { "$ref": "#/$defs/partitionEscrowSignatureAlgorithm" },
+    "signature": { "$ref": "#/$defs/partitionEscrowSignature" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "algorithm": { "const": "ed25519" } } },
+      "then": {
+        "properties": {
+          "signerKey": { "$ref": "#/$defs/partitionEscrowEd25519PublicKey" },
+          "signature": { "$ref": "#/$defs/partitionEscrowEd25519Signature" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "algorithm": { "const": "p256" } } },
+      "then": {
+        "properties": {
+          "signerKey": { "$ref": "#/$defs/partitionEscrowP256PublicKey" },
+          "signature": { "$ref": "#/$defs/partitionEscrowP256Signature" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "algorithm": { "const": "p384" } } },
+      "then": {
+        "properties": {
+          "signerKey": { "$ref": "#/$defs/partitionEscrowP384PublicKey" },
+          "signature": { "$ref": "#/$defs/partitionEscrowP384Signature" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "algorithm": { "const": "hybrid" } } },
+      "then": {
+        "properties": {
+          "signerKey": { "$ref": "#/$defs/partitionEscrowHybridPublicKey" },
+          "signature": { "$ref": "#/$defs/partitionEscrowHybridSignature" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "quotaCommitmentBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "authorityDomain",
+        "allocationRootId",
+        "allocationEpoch",
+        "quota",
+        "quotaKeyDigest",
+        "underlyingSourceArtifactDigest",
+        "sourceTrustBindingDigest",
+        "allocationPlanDigest",
+        "sourceNotBefore",
+        "sourceExpiresAt"
+      ],
+      "properties": {
+        "schema": { "const": "chio.partition-escrow-quota-commitment.v1" },
+        "authorityDomain": { "$ref": "#/$defs/partitionEscrowIdentifier" },
+        "allocationRootId": { "$ref": "#/$defs/partitionEscrowIdentifier" },
+        "allocationEpoch": { "$ref": "#/$defs/partitionEscrowPositiveSafeInteger" },
+        "quota": { "$ref": "#/$defs/partitionEscrowQuota" },
+        "quotaKeyDigest": { "$ref": "#/$defs/partitionEscrowDigest" },
+        "underlyingSourceArtifactDigest": { "$ref": "#/$defs/partitionEscrowDigest" },
+        "sourceTrustBindingDigest": { "$ref": "#/$defs/partitionEscrowDigest" },
+        "allocationPlanDigest": { "$ref": "#/$defs/partitionEscrowDigest" },
+        "sourceNotBefore": { "$ref": "#/$defs/partitionEscrowSafeInteger" },
+        "sourceExpiresAt": {
+          "allOf": [{ "$ref": "#/$defs/partitionEscrowPositiveSafeInteger" }],
+          "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore."
+        }
+      }
+    },
+    "partitionEscrowQuota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "ownerId", "maxInvocations"],
+      "properties": {
+        "profile": {
+          "enum": [
+            "chio.grant-invocation.v1",
+            "chio.aggregate-capability-invocation.v1",
+            "chio.aggregate-family-invocation.v1",
+            "chio.broker-capability-execution.v1"
+          ]
+        },
+        "ownerId": { "$ref": "#/$defs/partitionEscrowIdentifier" },
+        "grantIndex": { "$ref": "#/$defs/partitionEscrowUint32" },
+        "maxInvocations": { "$ref": "#/$defs/partitionEscrowUint32" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "profile": { "const": "chio.grant-invocation.v1" } }
+          },
+          "then": { "required": ["grantIndex"] },
+          "else": { "not": { "required": ["grantIndex"] } }
+        },
+        {
+          "if": {
+            "properties": {
+              "profile": {
+                "enum": [
+                  "chio.aggregate-family-invocation.v1",
+                  "chio.broker-capability-execution.v1"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "ownerId": { "$ref": "#/$defs/partitionEscrowDigest" }
+            }
+          }
+        }
+      ]
+    },
+    "partitionEscrowIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000]+$",
+      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation."
+    },
+    "partitionEscrowDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "partitionEscrowUint32": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "partitionEscrowPositiveUint32": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "partitionEscrowSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "partitionEscrowPositiveSafeInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "partitionEscrowPublicKey": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "partitionEscrowEd25519PublicKey": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "partitionEscrowP256PublicKey": {
+      "type": "string",
+      "pattern": "^p256:[0-9a-f]{130}$"
+    },
+    "partitionEscrowP384PublicKey": {
+      "type": "string",
+      "pattern": "^p384:[0-9a-f]{194}$"
+    },
+    "partitionEscrowHybridPublicKey": {
+      "type": "string",
+      "pattern": "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$"
+    },
+    "partitionEscrowSignatureAlgorithm": {
+      "enum": ["ed25519", "p256", "p384", "hybrid"]
+    },
+    "partitionEscrowSignature": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "partitionEscrowEd25519Signature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "partitionEscrowP256Signature": {
+      "type": "string",
+      "pattern": "^p256:[0-9a-f]+$"
+    },
+    "partitionEscrowP384Signature": {
+      "type": "string",
+      "pattern": "^p384:[0-9a-f]+$"
+    },
+    "partitionEscrowHybridSignature": {
+      "type": "string",
+      "pattern": "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$"
+    }
+  }
+}

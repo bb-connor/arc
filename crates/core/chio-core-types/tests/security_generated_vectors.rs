@@ -17,19 +17,35 @@ use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use std::path::PathBuf;
 
+fn fixture_payload(bytes: &[u8]) -> &[u8] {
+    bytes.strip_suffix(b"\n").unwrap_or(bytes)
+}
+
 fn assert_generated_round_trip<T>(bytes: &[u8])
 where
     T: DeserializeOwned + Serialize,
 {
+    let payload = fixture_payload(bytes);
+    let source_text = std::str::from_utf8(payload).test_expect("security vector is UTF-8");
+    let source_canonical = chio_core_types::canonical_json_bytes_from_str(source_text)
+        .test_expect("source canonicalizes under strict RFC 8785 rules");
+    assert_eq!(
+        source_canonical.as_slice(),
+        payload,
+        "checked-in security vector is not exact RFC 8785 bytes"
+    );
+
     let source: serde_json::Value =
-        serde_json::from_slice(bytes).test_expect("positive security vector parses");
+        serde_json::from_slice(payload).test_expect("positive security vector parses");
     let decoded: T =
-        serde_json::from_slice(bytes).test_expect("generated Rust type decodes vector");
-    let source_canonical =
-        chio_core_types::canonical_json_bytes(&source).test_expect("source canonicalizes");
+        serde_json::from_slice(payload).test_expect("generated Rust type decodes vector");
     let encoded_canonical =
         chio_core_types::canonical_json_bytes(&decoded).test_expect("generated type canonicalizes");
-    assert_eq!(encoded_canonical, source_canonical);
+    assert_eq!(
+        encoded_canonical.as_slice(),
+        payload,
+        "generated Rust type changed the exact RFC 8785 fixture bytes"
+    );
 
     let mut unknown = source;
     unknown
@@ -350,6 +366,12 @@ fn generated_active_defense_types_decode_reencode_and_reject() {
         "/../../../tests/bindings/vectors/security/active-defense/positive/response-completion-receipt-body-failed-v1.json"
     )));
     assert_generated_round_trip::<
+        generated::security__response_completion_receipt_body_v1::ChioResponseCompletionReceiptBodyV1,
+    >(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../tests/bindings/vectors/security/active-defense/positive/response-completion-receipt-body-failed-before-effect-v1.json"
+    )));
+    assert_generated_round_trip::<
         generated::security__lift_rollback_completion_receipt_body_v1::ChioLiftOrRollbackCompletionReceiptBodyV1,
     >(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -407,7 +429,8 @@ fn generated_receipt_accepts(stem: &str, value: serde_json::Value) -> bool {
         >(value)
         .is_ok(),
         "response-completion-receipt-body-v1.json"
-        | "response-completion-receipt-body-failed-v1.json" => serde_json::from_value::<
+        | "response-completion-receipt-body-failed-v1.json"
+        | "response-completion-receipt-body-failed-before-effect-v1.json" => serde_json::from_value::<
             generated::security__response_completion_receipt_body_v1::ChioResponseCompletionReceiptBodyV1,
         >(value)
         .is_ok(),
@@ -432,15 +455,16 @@ fn legacy_response_transition_canonical_digest_is_unchanged() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../../tests/bindings/vectors/security/active-defense/positive/response-state-transition-receipt-body-v1.json"
     ));
-    let source: serde_json::Value =
-        serde_json::from_slice(bytes).test_expect("legacy transition vector parses");
+    let payload = fixture_payload(bytes);
+    let source_text = std::str::from_utf8(payload).test_expect("legacy transition vector is UTF-8");
+    let source_canonical = chio_core_types::canonical_json_bytes_from_str(source_text)
+        .test_expect("legacy transition source canonicalizes under strict RFC 8785 rules");
+    assert_eq!(source_canonical.as_slice(), payload);
     let decoded: generated::security__response_state_transition_receipt_body_v1::ChioResponseStateTransitionReceiptBodyV1 =
-        serde_json::from_slice(bytes).test_expect("legacy transition vector decodes");
-    let source_canonical =
-        chio_core_types::canonical_json_bytes(&source).test_expect("source canonicalizes");
+        serde_json::from_slice(payload).test_expect("legacy transition vector decodes");
     let decoded_canonical =
         chio_core_types::canonical_json_bytes(&decoded).test_expect("decoded body canonicalizes");
-    assert_eq!(decoded_canonical, source_canonical);
+    assert_eq!(decoded_canonical.as_slice(), payload);
     assert_eq!(
         hex::encode(Sha256::digest(source_canonical)),
         LEGACY_CANONICAL_SHA256
@@ -593,7 +617,7 @@ fn generated_protocol_types_preserve_approval_and_aggregate_budget_fields() {
     let positives = index["positive"]
         .as_array()
         .test_expect("protocol positive inventory is an array");
-    assert_eq!(positives.len(), 18);
+    assert_eq!(positives.len(), 26);
     let mut identifiers = std::collections::BTreeSet::new();
     let mut files = std::collections::BTreeSet::new();
     for entry in positives {
@@ -650,6 +674,24 @@ fn assert_protocol_generated_round_trip(identifier: &str, bytes: &[u8]) {
                 generated::agent__tool_call_request::ChioAgentMessageToolCallRequest,
             >(bytes)
         }
+        "governed_active_response_intent" => {
+            assert_generated_round_trip::<
+                generated::capability__governed_transaction_intent::ChioGovernedTransactionIntent,
+            >(bytes);
+            let intent: generated::capability__governed_transaction_intent::ChioGovernedTransactionIntent =
+                serde_json::from_slice(fixture_payload(bytes))
+                    .test_expect("governed active-response intent decodes");
+            assert!(matches!(
+                intent,
+                generated::capability__governed_transaction_intent::ChioGovernedTransactionIntent::ActiveResponsePlan { .. }
+            ));
+        }
+        "tool_call_request_full_security" => {
+            assert_generated_round_trip::<
+                generated::agent__tool_call_request::ChioAgentMessageToolCallRequest,
+            >(bytes);
+            assert_full_security_request_fields(bytes);
+        }
         "verified_approval_set" => assert_generated_round_trip::<
             generated::capability__verified_approval_set::ChioVerifiedThresholdApprovalSet,
         >(bytes),
@@ -659,11 +701,51 @@ fn assert_protocol_generated_round_trip(identifier: &str, bytes: &[u8]) {
         "budget_admission_evidence" => assert_generated_round_trip::<
             generated::trust_control__budget_invocation_admission_evidence::ChioBudgetInvocationAdmissionEvidence,
         >(bytes),
+        "budget_admission_evidence_partition_escrow" => assert_generated_round_trip::<
+            generated::trust_control__budget_invocation_admission_evidence::ChioBudgetInvocationAdmissionEvidence,
+        >(bytes),
         "admission_capture_metadata" => assert_generated_round_trip::<
             generated::trust_control__admission_capture_metadata::ChioAuthoritativeAdmissionCaptureReceiptProjection,
         >(bytes),
+        "admission_capture_metadata_partition_escrow" => assert_generated_round_trip::<
+            generated::trust_control__admission_capture_metadata::ChioAuthoritativeAdmissionCaptureReceiptProjection,
+        >(bytes),
+        "partition_escrow_quota_commitment" => assert_generated_round_trip::<
+            generated::trust_control__partition_escrow_quota_commitment::ChioSignedPartitionEscrowQuotaCommitment,
+        >(bytes),
+        "partition_escrow_allocation_set" => assert_generated_round_trip::<
+            generated::trust_control__partition_escrow_allocation_set::ChioSignedPartitionEscrowAllocationSet,
+        >(bytes),
+        "partition_escrow_admission_evidence" => assert_generated_round_trip::<
+            generated::trust_control__partition_escrow_admission_evidence::ChioPartitionEscrowAdmissionEvidence,
+        >(bytes),
+        "partition_escrow_receipt_metadata" => assert_generated_round_trip::<
+            generated::trust_control__partition_escrow_receipt_metadata::ChioPartitionEscrowFinancialReceiptMetadata,
+        >(bytes),
         other => panic!("protocol positive inventory has no exact generated type for {other}"),
     }
+}
+
+fn assert_full_security_request_fields(bytes: &[u8]) {
+    use generated::agent__tool_call_request::{
+        ChioAgentMessageToolCallRequest, ChioGovernedTransactionIntent,
+    };
+
+    let request: ChioAgentMessageToolCallRequest = serde_json::from_slice(fixture_payload(bytes))
+        .test_expect("full-security tool-call request decodes");
+    assert!(request
+        .capability_token
+        .aggregate_invocation_budget
+        .is_some());
+    assert!(request.supplemental_authorization.is_some());
+    assert!(matches!(
+        request.governed_intent.as_ref(),
+        Some(ChioGovernedTransactionIntent::ToolInvocation { .. })
+    ));
+    assert!(request.approval_token.is_none());
+    assert_eq!(request.approval_tokens.len(), 2);
+    assert!(request.threshold_approval_proposal.is_some());
+    assert!(request.declassification_grant.is_some());
 }
 
 fn protocol_generated_accepts(identifier: &str, value: serde_json::Value) -> bool {
@@ -714,6 +796,14 @@ fn protocol_generated_accepts(identifier: &str, value: serde_json::Value) -> boo
             >(value)
             .is_ok()
         }
+        "governed_active_response_intent" => serde_json::from_value::<
+            generated::capability__governed_transaction_intent::ChioGovernedTransactionIntent,
+        >(value)
+        .is_ok(),
+        "tool_call_request_full_security" => serde_json::from_value::<
+            generated::agent__tool_call_request::ChioAgentMessageToolCallRequest,
+        >(value)
+        .is_ok(),
         "verified_approval_set" => serde_json::from_value::<
             generated::capability__verified_approval_set::ChioVerifiedThresholdApprovalSet,
         >(value)
@@ -726,8 +816,32 @@ fn protocol_generated_accepts(identifier: &str, value: serde_json::Value) -> boo
             generated::trust_control__budget_invocation_admission_evidence::ChioBudgetInvocationAdmissionEvidence,
         >(value)
         .is_ok(),
+        "budget_admission_evidence_partition_escrow" => serde_json::from_value::<
+            generated::trust_control__budget_invocation_admission_evidence::ChioBudgetInvocationAdmissionEvidence,
+        >(value)
+        .is_ok(),
         "admission_capture_metadata" => serde_json::from_value::<
             generated::trust_control__admission_capture_metadata::ChioAuthoritativeAdmissionCaptureReceiptProjection,
+        >(value)
+        .is_ok(),
+        "admission_capture_metadata_partition_escrow" => serde_json::from_value::<
+            generated::trust_control__admission_capture_metadata::ChioAuthoritativeAdmissionCaptureReceiptProjection,
+        >(value)
+        .is_ok(),
+        "partition_escrow_quota_commitment" => serde_json::from_value::<
+            generated::trust_control__partition_escrow_quota_commitment::ChioSignedPartitionEscrowQuotaCommitment,
+        >(value)
+        .is_ok(),
+        "partition_escrow_allocation_set" => serde_json::from_value::<
+            generated::trust_control__partition_escrow_allocation_set::ChioSignedPartitionEscrowAllocationSet,
+        >(value)
+        .is_ok(),
+        "partition_escrow_admission_evidence" => serde_json::from_value::<
+            generated::trust_control__partition_escrow_admission_evidence::ChioPartitionEscrowAdmissionEvidence,
+        >(value)
+        .is_ok(),
+        "partition_escrow_receipt_metadata" => serde_json::from_value::<
+            generated::trust_control__partition_escrow_receipt_metadata::ChioPartitionEscrowFinancialReceiptMetadata,
         >(value)
         .is_ok(),
         other => panic!("protocol mutation base has no exact generated type for {other}"),
@@ -803,7 +917,7 @@ fn protocol_schema_and_generated_types_cover_exact_negative_corpus() {
     let cases = corpus["cases"]
         .as_array()
         .test_expect("protocol mutation cases are an array");
-    assert_eq!(cases.len(), 20);
+    assert_eq!(cases.len(), 43);
     let mut identifiers = std::collections::BTreeSet::new();
     let mut structural_rejections = 1usize;
     let mut semantic_rejections = 0usize;
@@ -868,9 +982,9 @@ fn protocol_schema_and_generated_types_cover_exact_negative_corpus() {
             structural_rejections += 1;
         }
     }
-    assert_eq!(structural_rejections, 8);
-    assert_eq!(semantic_rejections, 13);
-    assert_eq!(structural_rejections + semantic_rejections, 21);
+    assert_eq!(structural_rejections, 16);
+    assert_eq!(semantic_rejections, 28);
+    assert_eq!(structural_rejections + semantic_rejections, 44);
 }
 
 fn protocol_schema_path(root: &std::path::Path, schema_id: &str) -> PathBuf {

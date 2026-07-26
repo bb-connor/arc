@@ -1726,6 +1726,10 @@ mod tests {
 
     include!(concat!(
         env!("CARGO_MANIFEST_DIR"),
+        "/src/security/event_consumer_parts/part_02_temporal_ingress.inc"
+    ));
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
         "/src/security/event_consumer_parts/part_02_recovery.inc"
     ));
     include!(concat!(

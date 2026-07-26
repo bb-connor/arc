@@ -334,6 +334,7 @@ impl ChioKernel {
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
+            partition_escrow_registry: None,
             budget_store_lock: Mutex::new(()),
             admission_operation_store: None,
             approval_store: None,
@@ -904,6 +905,14 @@ impl ChioKernel {
     /// Activate threshold admission only after all durable authorities are installed.
     pub fn enable_threshold_governed_approvals(&mut self) -> Result<(), KernelError> {
         self.require_no_atomic_security_runtime_publication()?;
+        if self.partition_escrow_registry.is_some()
+            && self.admission_capture_authority.is_none()
+        {
+            return Err(KernelError::Internal(
+                "partition escrow threshold admission requires an exact admission capture authority"
+                    .to_string(),
+            ));
+        }
         if !self.threshold_approval_policy_configured
             || self.threshold_approval_requirement_resolver.is_none()
         {

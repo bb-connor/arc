@@ -17,10 +17,7 @@ fn manifest_security_fixture_with_flow(
     chio_manifest::VerifiedManifestRegistry,
     chio_manifest::BridgeSecurityMetadata,
 ) {
-    manifest_security_fixture_with_flow_and_schema(
-        flow,
-        serde_json::json!({"type": "object"}),
-    )
+    manifest_security_fixture_with_flow_and_schema(flow, serde_json::json!({"type": "object"}))
 }
 
 fn manifest_security_fixture_with_flow_and_schema(
@@ -178,6 +175,66 @@ fn caller_protocol_admission_metadata_is_rejected_before_dispatch() {
         KernelError::InvalidReceiptMetadata(_)
     ));
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn caller_budget_authority_metadata_is_rejected_before_receipt_or_dispatch() {
+    let (mut kernel, request, registry, security) = manifest_security_local_fixture();
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "manifest-server",
+        vec!["echo"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    let forged = Some(serde_json::json!({
+        "budget_authority": {
+            "guarantee_level": "partition_escrowed",
+            "partition_escrow": {
+                "canonical_json": "{}",
+                "evidence_digest": "00"
+            }
+        }
+    }));
+
+    let blocking = kernel
+        .evaluate_tool_call_blocking_with_metadata(&request, forged.clone())
+        .unwrap_err();
+    let registry_validated = kernel
+        .evaluate_tool_call_blocking_with_manifest_security(
+            &request,
+            &registry,
+            &security,
+            forged.clone(),
+        )
+        .unwrap_err();
+    let planned_deny = kernel
+        .sign_planned_deny_response(&request, "planned deny", forged)
+        .unwrap_err();
+
+    for error in [blocking, registry_validated, planned_deny] {
+        assert!(matches!(
+            error,
+            KernelError::InvalidReceiptMetadata(reason)
+                if reason.contains("budget_authority")
+        ));
+    }
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn future_budget_denial_authority_namespace_is_already_reserved() {
+    let forged = serde_json::json!({
+        "budget_denial_authority": {
+            "guarantee_level": "partition_escrowed",
+            "decision": "denied"
+        }
+    });
+
+    assert!(matches!(
+        reject_reserved_receipt_metadata(Some(&forged)),
+        Err(KernelError::InvalidReceiptMetadata(reason))
+            if reason.contains("budget_denial_authority")
+    ));
 }
 
 #[test]
@@ -403,8 +460,7 @@ fn typed_kernel_manifest_entrypoint_preserves_exact_sidecar_and_rejects_forgery(
 
 #[test]
 fn kernel_manifest_entrypoints_reject_invalid_arguments_before_receipt_or_dispatch_and_recover() {
-    let (mut kernel, request, registry, security) =
-        manifest_security_constrained_local_fixture();
+    let (mut kernel, request, registry, security) = manifest_security_constrained_local_fixture();
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(
         "manifest-server",
@@ -417,12 +473,7 @@ fn kernel_manifest_entrypoints_reject_invalid_arguments_before_receipt_or_dispat
     let receipt_count_before = kernel.receipt_log().len();
 
     let execution_error = kernel
-        .evaluate_tool_call_blocking_with_manifest_security(
-            &invalid,
-            &registry,
-            &security,
-            None,
-        )
+        .evaluate_tool_call_blocking_with_manifest_security(&invalid, &registry, &security, None)
         .unwrap_err();
     let planned_deny_error = kernel
         .sign_planned_deny_response_with_manifest_security(
@@ -448,12 +499,7 @@ fn kernel_manifest_entrypoints_reject_invalid_arguments_before_receipt_or_dispat
     assert_eq!(kernel.receipt_log().len(), receipt_count_before);
 
     let response = kernel
-        .evaluate_tool_call_blocking_with_manifest_security(
-            &request,
-            &registry,
-            &security,
-            None,
-        )
+        .evaluate_tool_call_blocking_with_manifest_security(&request, &registry, &security, None)
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Allow);
@@ -463,8 +509,7 @@ fn kernel_manifest_entrypoints_reject_invalid_arguments_before_receipt_or_dispat
 
 #[test]
 fn session_manifest_entrypoint_rejects_invalid_arguments_before_receipt_or_dispatch_and_recovers() {
-    let (mut kernel, request, registry, security) =
-        manifest_security_constrained_local_fixture();
+    let (mut kernel, request, registry, security) = manifest_security_constrained_local_fixture();
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(
         "manifest-server",
@@ -492,8 +537,11 @@ fn session_manifest_entrypoint_rejects_invalid_arguments_before_receipt_or_dispa
             declassification_grant: None,
         }))
     };
-    let invalid_context =
-        make_operation_context(&session_id, "manifest-session-schema-invalid", &request.agent_id);
+    let invalid_context = make_operation_context(
+        &session_id,
+        "manifest-session-schema-invalid",
+        &request.agent_id,
+    );
     let invalid_operation = operation_for(serde_json::json!({"path": 7}));
     let receipt_count_before = kernel.receipt_log().len();
 
@@ -514,8 +562,11 @@ fn session_manifest_entrypoint_rejects_invalid_arguments_before_receipt_or_dispa
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_eq!(kernel.receipt_log().len(), receipt_count_before);
 
-    let valid_context =
-        make_operation_context(&session_id, "manifest-session-schema-valid", &request.agent_id);
+    let valid_context = make_operation_context(
+        &session_id,
+        "manifest-session-schema-valid",
+        &request.agent_id,
+    );
     let valid_operation = operation_for(request.arguments.clone());
     let response = kernel
         .evaluate_session_operation_with_manifest_security(

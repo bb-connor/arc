@@ -159,6 +159,10 @@ pub(crate) fn run() {
     let settlement_driver = cli.settlement_driver.clone();
     let aggregate_invocation_admission = cli.aggregate_invocation_admission;
     let admission_operation_db = cli.admission_operation_db.clone();
+    let partition_escrow_authority_descriptor =
+        cli.partition_escrow_authority_descriptor.clone();
+    let partition_escrow_authority_signer_public_key =
+        cli.partition_escrow_authority_signer_public_key.clone();
     let approval_db = cli.approval_db.clone();
     let approver_directory = cli.approver_directory.clone();
     let threshold_proposal_authority_public_key =
@@ -190,12 +194,47 @@ pub(crate) fn run() {
             command: McpCommands::ServeHttp { .. }
         }
     );
+    let partition_escrow_requested = partition_escrow_authority_descriptor.is_some()
+        || partition_escrow_authority_signer_public_key.is_some();
+    let partition_escrow_supported = matches!(
+        &command,
+        Commands::Run { .. }
+            | Commands::Check { .. }
+            | Commands::Mcp {
+                command: McpCommands::Serve { .. }
+            }
+            | Commands::Trust {
+                command: TrustCommands::Serve { .. }
+            }
+    );
     let ordinary_admission_requested = aggregate_invocation_admission
         || admission_operation_db.is_some()
         || approval_db.is_some()
         || approver_directory.is_some()
         || threshold_proposal_authority_public_key.is_some();
-    let result = if resume_hmac_keyring.is_some() && !resume_hmac_supported {
+    let result = if partition_escrow_authority_descriptor.is_some()
+        != partition_escrow_authority_signer_public_key.is_some()
+    {
+        Err(CliError::cli_other_error(
+            "partition-escrow authority descriptor and pinned signer must be configured together"
+                .to_string(),
+        ))
+    } else if partition_escrow_requested && !partition_escrow_supported {
+        Err(CliError::cli_other_error(
+            "partition-escrow authority configuration is supported only by run, check, MCP serve, and trust serve"
+                .to_string(),
+        ))
+    } else if partition_escrow_requested
+        && (aggregate_invocation_admission
+            || approval_db.is_some()
+            || approver_directory.is_some()
+            || threshold_proposal_authority_public_key.is_some())
+    {
+        Err(CliError::cli_other_error(
+            "partition-escrow admission cannot be mixed with ordinary aggregate or threshold admission flags"
+                .to_string(),
+        ))
+    } else if resume_hmac_keyring.is_some() && !resume_hmac_supported {
         Err(CliError::cli_other_error(
             "--resume-hmac-keyring is supported only by MCP serve-http".to_string(),
         ))
@@ -234,6 +273,8 @@ pub(crate) fn run() {
                 control_token.as_deref(),
                 control_authority_public_key.as_ref(),
                 &control_authority_trusted_public_keys,
+                partition_escrow_authority_descriptor.as_deref(),
+                partition_escrow_authority_signer_public_key.as_ref(),
             ),
             Commands::Check {
                 policy,
@@ -266,6 +307,8 @@ pub(crate) fn run() {
                 control_token.as_deref(),
                 control_authority_public_key.as_ref(),
                 &control_authority_trusted_public_keys,
+                partition_escrow_authority_descriptor.as_deref(),
+                partition_escrow_authority_signer_public_key.as_ref(),
             ),
             Commands::Init { path } => scaffold::cmd_init(&path),
             Commands::Api { command } => dispatch_api(
@@ -297,6 +340,8 @@ pub(crate) fn run() {
                 control_token,
                 control_authority_public_key,
                 control_authority_trusted_public_keys,
+                partition_escrow_authority_descriptor,
+                partition_escrow_authority_signer_public_key,
             ),
             Commands::Trust { command } => dispatch_trust(
                 command,
@@ -309,6 +354,8 @@ pub(crate) fn run() {
                 session_db,
                 control_url,
                 control_token,
+                partition_escrow_authority_descriptor,
+                partition_escrow_authority_signer_public_key,
             ),
             Commands::Receipt { command } => {
                 dispatch_receipt(command, json_output, receipt_db, control_url, control_token)

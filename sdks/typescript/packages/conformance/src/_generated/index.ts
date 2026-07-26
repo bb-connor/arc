@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
+// Schema SHA: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -9061,7 +9061,7 @@ export namespace Security_TripwireObservationReceiptBodyV1 {
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/trust-control/admission-capture-metadata.schema.json
 export namespace TrustControl_AdmissionCaptureMetadata {
-  export type ChioAuthoritativeAdmissionCaptureReceiptProjection = {
+  type AdmissionCaptureMetadataBase = {
     [k: string]: unknown;
   } & {
     aggregateRootBindingDigest?: Digest;
@@ -9084,7 +9084,6 @@ export namespace TrustControl_AdmissionCaptureMetadata {
     budgetCommitIndex: number;
     checkedRevocationSetDigest: Digest;
     eventId: Identifier;
-    guaranteeLevel: "single_node_atomic" | "ha_linearizable";
     holdId: Identifier;
     /**
      * @minItems 1
@@ -9130,11 +9129,29 @@ export namespace TrustControl_AdmissionCaptureMetadata {
           InvocationQuotaTransition
         ];
     invocationState: "captured";
-    leaderEpoch?: number;
     monetaryState: "none" | "exposed" | "released" | "reconciled" | "captured" | "reversed";
     operationId: Identifier;
     revocationCommitIndex: number;
   };
+  export type ChioAuthoritativeAdmissionCaptureReceiptProjection =
+    AdmissionCaptureMetadataBase &
+    (
+      | {
+          guaranteeLevel: "single_node_atomic";
+          leaderEpoch?: never;
+          partitionEscrowEvidence?: never;
+        }
+      | {
+          guaranteeLevel: "partition_escrowed";
+          leaderEpoch?: never;
+          partitionEscrowEvidence: PartitionEscrowEvidence;
+        }
+      | {
+          guaranteeLevel: "ha_linearizable";
+          leaderEpoch: number;
+          partitionEscrowEvidence?: never;
+        }
+    );
   export type Digest = string;
   export type Identifier = string;
   export type QuotaKey = {
@@ -9163,6 +9180,10 @@ export namespace TrustControl_AdmissionCaptureMetadata {
     maxInvocations: number;
     reservedInvocationsAfter: number;
     reservedInvocationsBefore: number;
+  }
+  export interface PartitionEscrowEvidence {
+    canonicalJson: string;
+    digest: string;
   }
 }
 
@@ -9306,6 +9327,7 @@ export namespace TrustControl_BudgetInvocationAdmissionEvidence {
           InvocationQuota,
           InvocationQuota
         ];
+    partitionEscrowEvidence?: PartitionEscrowEvidence;
     revocationSet: RevocationSet;
     supplementalBinding?: SupplementalBinding;
   };
@@ -9324,10 +9346,16 @@ export namespace TrustControl_BudgetInvocationAdmissionEvidence {
       | "chio.aggregate-family-invocation.v1"
       | "chio.broker-capability-execution.v1";
   };
+  export type SafeInteger = number;
+  export type PublicKey = string;
 
   export interface InvocationQuota {
     key: QuotaKey;
     maxInvocations: number;
+  }
+  export interface PartitionEscrowEvidence {
+    canonicalJson: string;
+    digest: Digest;
   }
   export interface RevocationSet {
     digest: Digest;
@@ -9339,8 +9367,15 @@ export namespace TrustControl_BudgetInvocationAdmissionEvidence {
   }
   export interface SupplementalBinding {
     artifactDigest: Digest;
+    brokerCapabilityId: Identifier;
+    claimBindingDigest: Digest;
+    expiresAt: SafeInteger;
+    issuer: PublicKey;
     negotiatedFeaturesDigest: Digest;
+    notBefore: SafeInteger;
     requestBindingHash: Digest;
+    requestConstraintDigest: Digest;
+    verifiedAt: SafeInteger;
     verifierId: Identifier;
   }
 }
@@ -9418,6 +9453,428 @@ export namespace TrustControl_Lease {
      * Optional unix-second timestamp at which the current term began on this leader. Omitted when unknown (no quorum or no leader).
      */
     termStartedAt?: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/partition-escrow-admission-evidence.schema.json
+export namespace TrustControl_PartitionEscrowAdmissionEvidence {
+  /**
+   * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+   */
+  export type Identifier = string;
+  export type Digest = string;
+  export type PositiveSafeInteger = number;
+  /**
+   * An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.
+   */
+  export type ChioSignedPartitionEscrowAllocationSet = {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    allocatorKey: string;
+    body: Body;
+    signature: string;
+  };
+  export type PartitionEscrowQuota = {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    grantIndex?: number;
+    maxInvocations: number;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    ownerId: string;
+    profile:
+      | "chio.grant-invocation.v1"
+      | "chio.aggregate-capability-invocation.v1"
+      | "chio.aggregate-family-invocation.v1"
+      | "chio.broker-capability-execution.v1";
+  } & {
+    grantIndex?: number;
+    maxInvocations: number;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    ownerId: string;
+    profile:
+      | "chio.grant-invocation.v1"
+      | "chio.aggregate-capability-invocation.v1"
+      | "chio.aggregate-family-invocation.v1"
+      | "chio.broker-capability-execution.v1";
+  } & {
+    grantIndex?: number;
+    maxInvocations: number;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    ownerId: string;
+    profile:
+      | "chio.grant-invocation.v1"
+      | "chio.aggregate-capability-invocation.v1"
+      | "chio.aggregate-family-invocation.v1"
+      | "chio.broker-capability-execution.v1";
+  };
+  export type Uint32 = number;
+  /**
+   * A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.
+   */
+  export type ChioSignedPartitionEscrowQuotaCommitment = {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    body: QuotaCommitmentBody;
+    signature: string;
+    signerKey: string;
+  };
+  export type SafeInteger = number;
+  export type PublicKey = string;
+  /**
+   * The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation.
+   */
+  export type SourceTrust =
+    | GrantCapabilityTrust
+    | AggregateCapabilityTrust
+    | AggregateFamilyTrust
+    | BrokerCapabilityTrust;
+  export type PositiveUint32 = number;
+
+  /**
+   * Canonical historical proof that a durable partition authority verified and admitted one or more source-backed invocation quotas.
+   */
+  export interface ChioPartitionEscrowAdmissionEvidence {
+    authorityDomain: Identifier;
+    authorityId: Identifier;
+    durableStore: DurableStore;
+    partitionId: Identifier;
+    /**
+     * Quota keys and certificate bindings must be unique under runtime validation.
+     *
+     * @minItems 1
+     * @maxItems 8
+     */
+    quotas:
+      | [QuotaEvidence]
+      | [QuotaEvidence, QuotaEvidence]
+      | [QuotaEvidence, QuotaEvidence, QuotaEvidence]
+      | [QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence]
+      | [QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence]
+      | [QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence]
+      | [QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence, QuotaEvidence]
+      | [
+          QuotaEvidence,
+          QuotaEvidence,
+          QuotaEvidence,
+          QuotaEvidence,
+          QuotaEvidence,
+          QuotaEvidence,
+          QuotaEvidence,
+          QuotaEvidence
+        ];
+    resolver: Resolver;
+    schema: "chio.partition-escrow-admission-evidence.v1";
+    verifiedAt: SafeInteger;
+  }
+  export interface DurableStore {
+    counterNamespaceDigest: Digest;
+    fencingToken: PositiveSafeInteger;
+    storeIdentityDigest: Digest;
+  }
+  export interface QuotaEvidence {
+    allocationEpoch: PositiveSafeInteger;
+    allocationPlanDigest: Digest;
+    allocationRootId: Identifier;
+    allocationSet: ChioSignedPartitionEscrowAllocationSet;
+    allocationSetDigest: Digest;
+    globalQuota: PartitionEscrowQuota;
+    localAllocatedInvocations: Uint32;
+    quotaCertificateBindingDigest: Digest;
+    quotaCommitment: ChioSignedPartitionEscrowQuotaCommitment;
+    quotaCommitmentDigest: Digest;
+    quotaDescriptorDigest: Digest;
+    quotaKeyDigest: Digest;
+    /**
+     * Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+     */
+    sourceExpiresAt: PositiveSafeInteger;
+    sourceNotBefore: SafeInteger;
+    sourceSigner: PublicKey;
+    sourceTrust: SourceTrust;
+    sourceTrustBindingDigest: Digest;
+    totalAllocatedInvocations: Uint32;
+    underlyingSourceArtifactDigest: Digest;
+  }
+  export interface Body {
+    allocationEpoch: number;
+    allocationPlanDigest: string;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    allocationRootId: string;
+    /**
+     * The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.
+     *
+     * @minItems 1
+     * @maxItems 64
+     */
+    allocations: [Allocation, ...Allocation[]];
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    authorityDomain: string;
+    /**
+     * Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.
+     */
+    expiresAt: number;
+    notBefore: number;
+    quota: PartitionEscrowQuota;
+    quotaCommitmentDigest: string;
+    quotaCommitmentExpiresAt: number;
+    schema: "chio.partition-escrow-allocation-set.v1";
+  }
+  export interface Allocation {
+    allocatedInvocations: number;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    authorityId: string;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    partitionId: string;
+  }
+  export interface QuotaCommitmentBody {
+    allocationEpoch: number;
+    allocationPlanDigest: string;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    allocationRootId: string;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    authorityDomain: string;
+    quota: PartitionEscrowQuota;
+    quotaKeyDigest: string;
+    schema: "chio.partition-escrow-quota-commitment.v1";
+    /**
+     * Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+     */
+    sourceExpiresAt: number;
+    sourceNotBefore: number;
+    sourceTrustBindingDigest: string;
+    underlyingSourceArtifactDigest: string;
+  }
+  export interface GrantCapabilityTrust {
+    capability_id: Identifier;
+    grant_index: Uint32;
+    kind: "grantCapability";
+    revocation_set_digest: Digest;
+  }
+  export interface AggregateCapabilityTrust {
+    capability_id: Identifier;
+    kind: "aggregateCapability";
+    revocation_set_digest: Digest;
+  }
+  export interface AggregateFamilyTrust {
+    family_owner: Digest;
+    kind: "aggregateFamily";
+    revocation_set_digest: Digest;
+    root_binding_digest: Digest;
+    root_capability_id: Identifier;
+  }
+  export interface BrokerCapabilityTrust {
+    broker_capability_id: Identifier;
+    claim_binding_digest: Digest;
+    kind: "brokerCapability";
+    negotiated_features_digest: Digest;
+    quota_owner_id: Digest;
+    request_binding_hash: Digest;
+    request_constraint_digest: Digest;
+    revocation_set_digest: Digest;
+    verifier_id: Identifier;
+  }
+  export interface Resolver {
+    configurationDigest: Digest;
+    implementationId: Identifier;
+    implementationVersion: PositiveUint32;
+    resolverId: Identifier;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/partition-escrow-allocation-set.schema.json
+export namespace TrustControl_PartitionEscrowAllocationSet {
+  /**
+   * An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.
+   */
+  export type ChioSignedPartitionEscrowAllocationSet = {
+    [k: string]: unknown;
+  } & {
+    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
+    allocatorKey: string;
+    body: Body;
+    signature: string;
+  };
+  export type PartitionEscrowQuota = {
+    [k: string]: unknown;
+  } & {
+    grantIndex?: number;
+    maxInvocations: number;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    ownerId: string;
+    profile:
+      | "chio.grant-invocation.v1"
+      | "chio.aggregate-capability-invocation.v1"
+      | "chio.aggregate-family-invocation.v1"
+      | "chio.broker-capability-execution.v1";
+  };
+
+  export interface Body {
+    allocationEpoch: number;
+    allocationPlanDigest: string;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    allocationRootId: string;
+    /**
+     * The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.
+     *
+     * @minItems 1
+     * @maxItems 64
+     */
+    allocations: [Allocation, ...Allocation[]];
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    authorityDomain: string;
+    /**
+     * Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.
+     */
+    expiresAt: number;
+    notBefore: number;
+    quota: PartitionEscrowQuota;
+    quotaCommitmentDigest: string;
+    quotaCommitmentExpiresAt: number;
+    schema: "chio.partition-escrow-allocation-set.v1";
+  }
+  export interface Allocation {
+    allocatedInvocations: number;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    authorityId: string;
+    /**
+     * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+     */
+    partitionId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/partition-escrow-quota-commitment.schema.json
+export namespace TrustControl_PartitionEscrowQuotaCommitment {
+  /**
+   * A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.
+   */
+  export type ChioSignedPartitionEscrowQuotaCommitment = {
+    [k: string]: unknown;
+  } & {
+    algorithm: PartitionEscrowSignatureAlgorithm;
+    body: QuotaCommitmentBody;
+    signature: PartitionEscrowSignature;
+    signerKey: PartitionEscrowPublicKey;
+  };
+  export type PartitionEscrowSignatureAlgorithm = "ed25519" | "p256" | "p384" | "hybrid";
+  export type PartitionEscrowPositiveSafeInteger = number;
+  export type PartitionEscrowDigest = string;
+  /**
+   * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+   */
+  export type PartitionEscrowIdentifier = string;
+  export type PartitionEscrowQuota = {
+    [k: string]: unknown;
+  } & {
+    grantIndex?: PartitionEscrowUint32;
+    maxInvocations: PartitionEscrowUint32;
+    ownerId: PartitionEscrowIdentifier;
+    profile:
+      | "chio.grant-invocation.v1"
+      | "chio.aggregate-capability-invocation.v1"
+      | "chio.aggregate-family-invocation.v1"
+      | "chio.broker-capability-execution.v1";
+  };
+  export type PartitionEscrowUint32 = number;
+  export type PartitionEscrowSafeInteger = number;
+  export type PartitionEscrowSignature = string;
+  export type PartitionEscrowPublicKey = string;
+
+  export interface QuotaCommitmentBody {
+    allocationEpoch: PartitionEscrowPositiveSafeInteger;
+    allocationPlanDigest: PartitionEscrowDigest;
+    allocationRootId: PartitionEscrowIdentifier;
+    authorityDomain: PartitionEscrowIdentifier;
+    quota: PartitionEscrowQuota;
+    quotaKeyDigest: PartitionEscrowDigest;
+    schema: "chio.partition-escrow-quota-commitment.v1";
+    /**
+     * Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+     */
+    sourceExpiresAt: PartitionEscrowPositiveSafeInteger;
+    sourceNotBefore: PartitionEscrowSafeInteger;
+    sourceTrustBindingDigest: PartitionEscrowDigest;
+    underlyingSourceArtifactDigest: PartitionEscrowDigest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/partition-escrow-receipt-metadata.schema.json
+export namespace TrustControl_PartitionEscrowReceiptMetadata {
+  export type Digest = string;
+  /**
+   * A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+   */
+  export type Identifier = string;
+  export type PositiveSafeInteger = number;
+  export type PositiveUint32 = number;
+
+  /**
+   * Receipt-side partition authority proof carrying the exact canonical admission-evidence JSON, its domain-separated digest, and an indexable authority summary.
+   */
+  export interface ChioPartitionEscrowFinancialReceiptMetadata {
+    /**
+     * The exact RFC 8785 canonical JSON serialization of a partition-escrow admission evidence object. Runtime validation applies the one MiB bound to UTF-8 bytes.
+     */
+    canonical_json: string;
+    evidence_digest: Digest;
+    summary: Summary;
+  }
+  export interface Summary {
+    authority_id: Identifier;
+    counter_namespace_digest: Digest;
+    fencing_token: PositiveSafeInteger;
+    partition_id: Identifier;
+    resolver_configuration_digest: Digest;
+    resolver_id: Identifier;
+    resolver_implementation_id: Identifier;
+    resolver_implementation_version: PositiveUint32;
+    store_identity_digest: Digest;
   }
 }
 

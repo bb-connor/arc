@@ -331,6 +331,8 @@ pub struct TrustServiceConfig {
     pub authority_db_path: Option<PathBuf>,
     pub authority_keyring_config_path: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
+    pub partition_escrow_authority:
+        Option<Arc<super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority>>,
     pub enterprise_providers_file: Option<PathBuf>,
     pub federation_policies_file: Option<PathBuf>,
     pub scim_lifecycle_file: Option<PathBuf>,
@@ -616,12 +618,62 @@ impl TrustServiceConfig {
             ));
         }
         self.validate_cluster_membership()?;
+        self.validate_partition_escrow_authority()?;
         if self.certification_public_metadata_ttl_seconds == 0 {
             return Err(CliError::cli_other_error(
                 "certification public metadata TTL must be non-zero".to_string(),
             ));
         }
         Ok(())
+    }
+
+    fn validate_partition_escrow_authority(&self) -> Result<(), CliError> {
+        let Some(authority) = self.partition_escrow_authority.as_deref() else {
+            return Ok(());
+        };
+        if self.peer_urls.is_empty()
+            || self.budget_db_path.is_none()
+            || self.revocation_db_path.is_none()
+            || self.cluster_members.is_empty()
+        {
+            return Err(CliError::cli_other_error(
+                "partition escrow service authority requires HA admission consensus and a shared budget/revocation database"
+                    .to_string(),
+            ));
+        }
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "partition escrow authority clock is before the Unix epoch: {error}"
+                ))
+            })?
+            .as_secs();
+        authority
+            .verify_current(now)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let mut normalized_members = self
+            .cluster_members
+            .iter()
+            .map(|member| {
+                Ok(ClusterMemberIdentity {
+                    node_url: normalize_cluster_config_url(
+                        &member.node_url,
+                        self.allow_local_peer_urls,
+                    )?,
+                    public_key: member.public_key.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, CliError>>()?;
+        normalized_members
+            .sort_by(|left, right| left.node_url.as_bytes().cmp(right.node_url.as_bytes()));
+        authority.validate_cluster_members(&normalized_members)?;
+        let endpoints = normalized_members
+            .iter()
+            .map(|member| member.node_url.clone())
+            .collect::<Vec<_>>();
+        authority.validate_service_endpoints(&endpoints)?;
+        super::super::cluster::validate_partition_escrow_admission_membership(self, authority)
     }
 
     fn validate_dashboard_report_bridge(&self) -> Result<(), CliError> {
@@ -987,6 +1039,7 @@ mod service_config_tests {
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: None,
+            partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,

@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
+// Schema content SHA-256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from each lex-sorted workspace-relative
@@ -2255,8 +2255,9 @@ const (
 
 // Defines values for TrustControlAdmissionCaptureMetadataGuaranteeLevel.
 const (
-	TrustControlAdmissionCaptureMetadataGuaranteeLevelHaLinearizable   TrustControlAdmissionCaptureMetadataGuaranteeLevel = "ha_linearizable"
-	TrustControlAdmissionCaptureMetadataGuaranteeLevelSingleNodeAtomic TrustControlAdmissionCaptureMetadataGuaranteeLevel = "single_node_atomic"
+	TrustControlAdmissionCaptureMetadataGuaranteeLevelHaLinearizable    TrustControlAdmissionCaptureMetadataGuaranteeLevel = "ha_linearizable"
+	TrustControlAdmissionCaptureMetadataGuaranteeLevelPartitionEscrowed TrustControlAdmissionCaptureMetadataGuaranteeLevel = "partition_escrowed"
+	TrustControlAdmissionCaptureMetadataGuaranteeLevelSingleNodeAtomic  TrustControlAdmissionCaptureMetadataGuaranteeLevel = "single_node_atomic"
 )
 
 // Defines values for TrustControlAdmissionCaptureMetadataInvocationState.
@@ -2300,6 +2301,57 @@ const (
 	TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfileChioAggregateFamilyInvocationV1     TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfile = "chio.aggregate-family-invocation.v1"
 	TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfileChioBrokerCapabilityExecutionV1     TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfile = "chio.broker-capability-execution.v1"
 	TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfileChioGrantInvocationV1               TrustControlBudgetInvocationAdmissionEvidenceQuotaKeyProfile = "chio.grant-invocation.v1"
+)
+
+// Defines values for TrustControlPartitionEscrowAdmissionEvidenceSchema.
+const (
+	TrustControlPartitionEscrowAdmissionEvidenceSchemaChioPartitionEscrowAdmissionEvidenceV1 TrustControlPartitionEscrowAdmissionEvidenceSchema = "chio.partition-escrow-admission-evidence.v1"
+)
+
+// Defines values for TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrustKind.
+const (
+	TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrustKindAggregateCapability TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrustKind = "aggregateCapability"
+)
+
+// Defines values for TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrustKind.
+const (
+	TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrustKindAggregateFamily TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrustKind = "aggregateFamily"
+)
+
+// Defines values for TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrustKind.
+const (
+	TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrustKindBrokerCapability TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrustKind = "brokerCapability"
+)
+
+// Defines values for TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrustKind.
+const (
+	TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrustKindGrantCapability TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrustKind = "grantCapability"
+)
+
+// Defines values for TrustControlPartitionEscrowAllocationSetBodySchema.
+const (
+	TrustControlPartitionEscrowAllocationSetBodySchemaChioPartitionEscrowAllocationSetV1 TrustControlPartitionEscrowAllocationSetBodySchema = "chio.partition-escrow-allocation-set.v1"
+)
+
+// Defines values for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile.
+const (
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfileChioAggregateCapabilityInvocationV1 TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile = "chio.aggregate-capability-invocation.v1"
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfileChioAggregateFamilyInvocationV1     TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile = "chio.aggregate-family-invocation.v1"
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfileChioBrokerCapabilityExecutionV1     TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile = "chio.broker-capability-execution.v1"
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfileChioGrantInvocationV1               TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile = "chio.grant-invocation.v1"
+)
+
+// Defines values for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm.
+const (
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithmEd25519 TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm = "ed25519"
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithmHybrid  TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm = "hybrid"
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithmP256    TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm = "p256"
+	TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithmP384    TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm = "p384"
+)
+
+// Defines values for TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBodySchema.
+const (
+	TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBodySchemaChioPartitionEscrowQuotaCommitmentV1 TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBodySchema = "chio.partition-escrow-quota-commitment.v1"
 )
 
 // Defines values for TrustControlTerminateReason.
@@ -7892,22 +7944,111 @@ type SecurityTripwireObservationReceiptBodyV1TripwireKind string
 
 // TrustControlAdmissionCaptureMetadata defines model for TrustControlAdmissionCaptureMetadata.
 type TrustControlAdmissionCaptureMetadata struct {
-	AggregateRootBindingDigest   *TrustControlAdmissionCaptureMetadataDigest                     `json:"aggregateRootBindingDigest,omitempty"`
-	AggregateRootCapabilityId    *TrustControlAdmissionCaptureMetadataIdentifier                 `json:"aggregateRootCapabilityId,omitempty"`
-	Authority                    TrustControlAdmissionCaptureMetadataAuthority                   `json:"authority"`
-	AuthorityCommitIndex         int64                                                           `json:"authorityCommitIndex"`
-	AuthorizationArtifactDigests []TrustControlAdmissionCaptureMetadataDigest                    `json:"authorizationArtifactDigests"`
-	BudgetCommitIndex            int64                                                           `json:"budgetCommitIndex"`
-	CheckedRevocationSetDigest   TrustControlAdmissionCaptureMetadataDigest                      `json:"checkedRevocationSetDigest"`
-	EventId                      TrustControlAdmissionCaptureMetadataIdentifier                  `json:"eventId"`
-	GuaranteeLevel               TrustControlAdmissionCaptureMetadataGuaranteeLevel              `json:"guaranteeLevel"`
-	HoldId                       TrustControlAdmissionCaptureMetadataIdentifier                  `json:"holdId"`
-	InvocationQuotas             []TrustControlAdmissionCaptureMetadataInvocationQuotaTransition `json:"invocationQuotas"`
-	InvocationState              TrustControlAdmissionCaptureMetadataInvocationState             `json:"invocationState"`
-	LeaderEpoch                  *int64                                                          `json:"leaderEpoch,omitempty"`
-	MonetaryState                TrustControlAdmissionCaptureMetadataMonetaryState               `json:"monetaryState"`
-	OperationId                  TrustControlAdmissionCaptureMetadataIdentifier                  `json:"operationId"`
-	RevocationCommitIndex        int64                                                           `json:"revocationCommitIndex"`
+	AggregateRootBindingDigest   *TrustControlAdmissionCaptureMetadataDigest                           `json:"aggregateRootBindingDigest,omitempty"`
+	AggregateRootCapabilityId    *TrustControlAdmissionCaptureMetadataIdentifier                       `json:"aggregateRootCapabilityId,omitempty"`
+	Authority                    TrustControlAdmissionCaptureMetadataAuthority                         `json:"authority"`
+	AuthorityCommitIndex         int64                                                                 `json:"authorityCommitIndex"`
+	AuthorizationArtifactDigests []TrustControlAdmissionCaptureMetadataDigest                          `json:"authorizationArtifactDigests"`
+	BudgetCommitIndex            int64                                                                 `json:"budgetCommitIndex"`
+	CheckedRevocationSetDigest   TrustControlAdmissionCaptureMetadataDigest                            `json:"checkedRevocationSetDigest"`
+	EventId                      TrustControlAdmissionCaptureMetadataIdentifier                        `json:"eventId"`
+	GuaranteeLevel               TrustControlAdmissionCaptureMetadataGuaranteeLevel                    `json:"guaranteeLevel"`
+	HoldId                       TrustControlAdmissionCaptureMetadataIdentifier                        `json:"holdId"`
+	InvocationQuotas             []TrustControlAdmissionCaptureMetadataInvocationQuotaTransition       `json:"invocationQuotas"`
+	InvocationState              TrustControlAdmissionCaptureMetadataInvocationState                   `json:"invocationState"`
+	LeaderEpoch                  *int64                                                                `json:"leaderEpoch,omitempty"`
+	MonetaryState                TrustControlAdmissionCaptureMetadataMonetaryState                     `json:"monetaryState"`
+	OperationId                  TrustControlAdmissionCaptureMetadataIdentifier                        `json:"operationId"`
+	PartitionEscrowEvidence      *TrustControlBudgetInvocationAdmissionEvidencePartitionEscrowEvidence `json:"partitionEscrowEvidence,omitempty"`
+	RevocationCommitIndex        int64                                                                 `json:"revocationCommitIndex"`
+}
+
+func validateTrustControlAdmissionCaptureMetadata(
+	value *TrustControlAdmissionCaptureMetadata,
+	leaderEpochPresent bool,
+	partitionEscrowEvidencePresent bool,
+) error {
+	if value == nil {
+		return fmt.Errorf("admission capture metadata is nil")
+	}
+	switch value.GuaranteeLevel {
+	case TrustControlAdmissionCaptureMetadataGuaranteeLevelSingleNodeAtomic:
+		if leaderEpochPresent || partitionEscrowEvidencePresent {
+			return fmt.Errorf(
+				"single_node_atomic admission capture forbids leaderEpoch and partitionEscrowEvidence",
+			)
+		}
+	case TrustControlAdmissionCaptureMetadataGuaranteeLevelPartitionEscrowed:
+		if leaderEpochPresent {
+			return fmt.Errorf("partition_escrowed admission capture forbids leaderEpoch")
+		}
+		if !partitionEscrowEvidencePresent || value.PartitionEscrowEvidence == nil {
+			return fmt.Errorf(
+				"partition_escrowed admission capture requires partitionEscrowEvidence",
+			)
+		}
+	case TrustControlAdmissionCaptureMetadataGuaranteeLevelHaLinearizable:
+		if !leaderEpochPresent || value.LeaderEpoch == nil {
+			return fmt.Errorf("ha_linearizable admission capture requires leaderEpoch")
+		}
+		if partitionEscrowEvidencePresent {
+			return fmt.Errorf(
+				"ha_linearizable admission capture forbids partitionEscrowEvidence",
+			)
+		}
+	default:
+		return fmt.Errorf(
+			"unsupported admission capture guaranteeLevel %q",
+			value.GuaranteeLevel,
+		)
+	}
+	return nil
+}
+
+func (t TrustControlAdmissionCaptureMetadata) MarshalJSON() ([]byte, error) {
+	if err := validateTrustControlAdmissionCaptureMetadata(
+		&t,
+		t.LeaderEpoch != nil,
+		t.PartitionEscrowEvidence != nil,
+	); err != nil {
+		return nil, err
+	}
+	type admissionCaptureMetadataAlias TrustControlAdmissionCaptureMetadata
+	return json.Marshal(admissionCaptureMetadataAlias(t))
+}
+
+func (t *TrustControlAdmissionCaptureMetadata) UnmarshalJSON(b []byte) error {
+	if t == nil {
+		return fmt.Errorf(
+			"cannot decode TrustControlAdmissionCaptureMetadata into a nil receiver",
+		)
+	}
+	if !json.Valid(b) {
+		return fmt.Errorf("invalid TrustControlAdmissionCaptureMetadata JSON")
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(b, &fields); err != nil || fields == nil {
+		return fmt.Errorf("TrustControlAdmissionCaptureMetadata must be a JSON object")
+	}
+	_, leaderEpochPresent := fields["leaderEpoch"]
+	_, partitionEscrowEvidencePresent := fields["partitionEscrowEvidence"]
+	type admissionCaptureMetadataAlias TrustControlAdmissionCaptureMetadata
+	var decoded admissionCaptureMetadataAlias
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&decoded); err != nil {
+		return fmt.Errorf("invalid TrustControlAdmissionCaptureMetadata: %w", err)
+	}
+	candidate := TrustControlAdmissionCaptureMetadata(decoded)
+	if err := validateTrustControlAdmissionCaptureMetadata(
+		&candidate,
+		leaderEpochPresent,
+		partitionEscrowEvidencePresent,
+	); err != nil {
+		return err
+	}
+	*t = candidate
+	return nil
 }
 
 // TrustControlAdmissionCaptureMetadataGuaranteeLevel defines model for TrustControlAdmissionCaptureMetadata.GuaranteeLevel.
@@ -8037,11 +8178,12 @@ type TrustControlAttestationWorkloadIdentityScheme string
 
 // TrustControlBudgetInvocationAdmissionEvidence defines model for TrustControlBudgetInvocationAdmissionEvidence.
 type TrustControlBudgetInvocationAdmissionEvidence struct {
-	AggregateBindingDigest    *TrustControlBudgetInvocationAdmissionEvidenceDigest              `json:"aggregateBindingDigest,omitempty"`
-	AggregateRootCapabilityId *TrustControlBudgetInvocationAdmissionEvidenceIdentifier          `json:"aggregateRootCapabilityId,omitempty"`
-	InvocationQuotas          []TrustControlBudgetInvocationAdmissionEvidenceInvocationQuota    `json:"invocationQuotas"`
-	RevocationSet             TrustControlBudgetInvocationAdmissionEvidenceRevocationSet        `json:"revocationSet"`
-	SupplementalBinding       *TrustControlBudgetInvocationAdmissionEvidenceSupplementalBinding `json:"supplementalBinding,omitempty"`
+	AggregateBindingDigest    *TrustControlBudgetInvocationAdmissionEvidenceDigest                  `json:"aggregateBindingDigest,omitempty"`
+	AggregateRootCapabilityId *TrustControlBudgetInvocationAdmissionEvidenceIdentifier              `json:"aggregateRootCapabilityId,omitempty"`
+	InvocationQuotas          []TrustControlBudgetInvocationAdmissionEvidenceInvocationQuota        `json:"invocationQuotas"`
+	PartitionEscrowEvidence   *TrustControlBudgetInvocationAdmissionEvidencePartitionEscrowEvidence `json:"partitionEscrowEvidence,omitempty"`
+	RevocationSet             TrustControlBudgetInvocationAdmissionEvidenceRevocationSet            `json:"revocationSet"`
+	SupplementalBinding       *TrustControlBudgetInvocationAdmissionEvidenceSupplementalBinding     `json:"supplementalBinding,omitempty"`
 }
 
 // TrustControlBudgetInvocationAdmissionEvidenceDigest defines model for TrustControlBudgetInvocationAdmissionEvidenceDigest.
@@ -8055,6 +8197,15 @@ type TrustControlBudgetInvocationAdmissionEvidenceInvocationQuota struct {
 	Key            TrustControlBudgetInvocationAdmissionEvidenceQuotaKey `json:"key"`
 	MaxInvocations int64                                                 `json:"maxInvocations"`
 }
+
+// TrustControlBudgetInvocationAdmissionEvidencePartitionEscrowEvidence defines model for TrustControlBudgetInvocationAdmissionEvidencePartitionEscrowEvidence.
+type TrustControlBudgetInvocationAdmissionEvidencePartitionEscrowEvidence struct {
+	CanonicalJson string                                              `json:"canonicalJson"`
+	Digest        TrustControlBudgetInvocationAdmissionEvidenceDigest `json:"digest"`
+}
+
+// TrustControlBudgetInvocationAdmissionEvidencePublicKey defines model for TrustControlBudgetInvocationAdmissionEvidencePublicKey.
+type TrustControlBudgetInvocationAdmissionEvidencePublicKey = string
 
 // TrustControlBudgetInvocationAdmissionEvidenceQuotaKey defines model for TrustControlBudgetInvocationAdmissionEvidenceQuotaKey.
 type TrustControlBudgetInvocationAdmissionEvidenceQuotaKey struct {
@@ -8072,12 +8223,22 @@ type TrustControlBudgetInvocationAdmissionEvidenceRevocationSet struct {
 	Ids    []TrustControlBudgetInvocationAdmissionEvidenceIdentifier `json:"ids"`
 }
 
+// TrustControlBudgetInvocationAdmissionEvidenceSafeInteger defines model for TrustControlBudgetInvocationAdmissionEvidenceSafeInteger.
+type TrustControlBudgetInvocationAdmissionEvidenceSafeInteger = int64
+
 // TrustControlBudgetInvocationAdmissionEvidenceSupplementalBinding defines model for TrustControlBudgetInvocationAdmissionEvidenceSupplementalBinding.
 type TrustControlBudgetInvocationAdmissionEvidenceSupplementalBinding struct {
-	ArtifactDigest           TrustControlBudgetInvocationAdmissionEvidenceDigest     `json:"artifactDigest"`
-	NegotiatedFeaturesDigest TrustControlBudgetInvocationAdmissionEvidenceDigest     `json:"negotiatedFeaturesDigest"`
-	RequestBindingHash       TrustControlBudgetInvocationAdmissionEvidenceDigest     `json:"requestBindingHash"`
-	VerifierId               TrustControlBudgetInvocationAdmissionEvidenceIdentifier `json:"verifierId"`
+	ArtifactDigest           TrustControlBudgetInvocationAdmissionEvidenceDigest      `json:"artifactDigest"`
+	BrokerCapabilityId       TrustControlBudgetInvocationAdmissionEvidenceIdentifier  `json:"brokerCapabilityId"`
+	ClaimBindingDigest       TrustControlBudgetInvocationAdmissionEvidenceDigest      `json:"claimBindingDigest"`
+	ExpiresAt                TrustControlBudgetInvocationAdmissionEvidenceSafeInteger `json:"expiresAt"`
+	Issuer                   TrustControlBudgetInvocationAdmissionEvidencePublicKey   `json:"issuer"`
+	NegotiatedFeaturesDigest TrustControlBudgetInvocationAdmissionEvidenceDigest      `json:"negotiatedFeaturesDigest"`
+	NotBefore                TrustControlBudgetInvocationAdmissionEvidenceSafeInteger `json:"notBefore"`
+	RequestBindingHash       TrustControlBudgetInvocationAdmissionEvidenceDigest      `json:"requestBindingHash"`
+	RequestConstraintDigest  TrustControlBudgetInvocationAdmissionEvidenceDigest      `json:"requestConstraintDigest"`
+	VerifiedAt               TrustControlBudgetInvocationAdmissionEvidenceSafeInteger `json:"verifiedAt"`
+	VerifierId               TrustControlBudgetInvocationAdmissionEvidenceIdentifier  `json:"verifierId"`
 }
 
 // TrustControlHeartbeat One trust-control heartbeat used to refresh a held authority lease before it expires. The heartbeat names the lease being refreshed (`leaseId` plus `leaseEpoch`), the leader URL claiming continued ownership, and the unix-millisecond observation timestamp at which the heartbeat was issued. The contract is anchored by `spec/PROTOCOL.md` section 9 (the `/v1/internal/cluster/status` cluster lease lifecycle). Wire field names are camelCase to match the lease projection.
@@ -8126,6 +8287,343 @@ type TrustControlLease struct {
 
 	// TermStartedAt Optional unix-second timestamp at which the current term began on this leader. Omitted when unknown (no quorum or no leader).
 	TermStartedAt *int64 `json:"termStartedAt,omitempty"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidence Canonical historical proof that a durable partition authority verified and admitted one or more source-backed invocation quotas.
+type TrustControlPartitionEscrowAdmissionEvidence struct {
+	// AuthorityDomain A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AuthorityDomain TrustControlPartitionEscrowAdmissionEvidenceIdentifier `json:"authorityDomain"`
+
+	// AuthorityId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AuthorityId  TrustControlPartitionEscrowAdmissionEvidenceIdentifier   `json:"authorityId"`
+	DurableStore TrustControlPartitionEscrowAdmissionEvidenceDurableStore `json:"durableStore"`
+
+	// PartitionId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	PartitionId TrustControlPartitionEscrowAdmissionEvidenceIdentifier `json:"partitionId"`
+
+	// Quotas Quota keys and certificate bindings must be unique under runtime validation.
+	Quotas     []TrustControlPartitionEscrowAdmissionEvidenceQuotaEvidence `json:"quotas"`
+	Resolver   TrustControlPartitionEscrowAdmissionEvidenceResolver        `json:"resolver"`
+	Schema     TrustControlPartitionEscrowAdmissionEvidenceSchema          `json:"schema"`
+	VerifiedAt TrustControlPartitionEscrowAdmissionEvidenceSafeInteger     `json:"verifiedAt"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceSchema defines model for TrustControlPartitionEscrowAdmissionEvidence.Schema.
+type TrustControlPartitionEscrowAdmissionEvidenceSchema string
+
+// TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust defines model for TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust.
+type TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust struct {
+	// CapabilityId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	CapabilityId        TrustControlPartitionEscrowAdmissionEvidenceIdentifier                   `json:"capability_id"`
+	Kind                TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrustKind `json:"kind"`
+	RevocationSetDigest TrustControlPartitionEscrowAdmissionEvidenceDigest                       `json:"revocation_set_digest"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrustKind defines model for TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust.Kind.
+type TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrustKind string
+
+// TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust defines model for TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust.
+type TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust struct {
+	FamilyOwner         TrustControlPartitionEscrowAdmissionEvidenceDigest                   `json:"family_owner"`
+	Kind                TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrustKind `json:"kind"`
+	RevocationSetDigest TrustControlPartitionEscrowAdmissionEvidenceDigest                   `json:"revocation_set_digest"`
+	RootBindingDigest   TrustControlPartitionEscrowAdmissionEvidenceDigest                   `json:"root_binding_digest"`
+
+	// RootCapabilityId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	RootCapabilityId TrustControlPartitionEscrowAdmissionEvidenceIdentifier `json:"root_capability_id"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrustKind defines model for TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust.Kind.
+type TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrustKind string
+
+// TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust defines model for TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust.
+type TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust struct {
+	// BrokerCapabilityId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	BrokerCapabilityId       TrustControlPartitionEscrowAdmissionEvidenceIdentifier                `json:"broker_capability_id"`
+	ClaimBindingDigest       TrustControlPartitionEscrowAdmissionEvidenceDigest                    `json:"claim_binding_digest"`
+	Kind                     TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrustKind `json:"kind"`
+	NegotiatedFeaturesDigest TrustControlPartitionEscrowAdmissionEvidenceDigest                    `json:"negotiated_features_digest"`
+	QuotaOwnerId             TrustControlPartitionEscrowAdmissionEvidenceDigest                    `json:"quota_owner_id"`
+	RequestBindingHash       TrustControlPartitionEscrowAdmissionEvidenceDigest                    `json:"request_binding_hash"`
+	RequestConstraintDigest  TrustControlPartitionEscrowAdmissionEvidenceDigest                    `json:"request_constraint_digest"`
+	RevocationSetDigest      TrustControlPartitionEscrowAdmissionEvidenceDigest                    `json:"revocation_set_digest"`
+
+	// VerifierId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	VerifierId TrustControlPartitionEscrowAdmissionEvidenceIdentifier `json:"verifier_id"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrustKind defines model for TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust.Kind.
+type TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrustKind string
+
+// TrustControlPartitionEscrowAdmissionEvidenceDigest defines model for TrustControlPartitionEscrowAdmissionEvidenceDigest.
+type TrustControlPartitionEscrowAdmissionEvidenceDigest = string
+
+// TrustControlPartitionEscrowAdmissionEvidenceDurableStore defines model for TrustControlPartitionEscrowAdmissionEvidenceDurableStore.
+type TrustControlPartitionEscrowAdmissionEvidenceDurableStore struct {
+	CounterNamespaceDigest TrustControlPartitionEscrowAdmissionEvidenceDigest              `json:"counterNamespaceDigest"`
+	FencingToken           TrustControlPartitionEscrowAdmissionEvidencePositiveSafeInteger `json:"fencingToken"`
+	StoreIdentityDigest    TrustControlPartitionEscrowAdmissionEvidenceDigest              `json:"storeIdentityDigest"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust defines model for TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust.
+type TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust struct {
+	// CapabilityId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	CapabilityId        TrustControlPartitionEscrowAdmissionEvidenceIdentifier               `json:"capability_id"`
+	GrantIndex          TrustControlPartitionEscrowAdmissionEvidenceUint32                   `json:"grant_index"`
+	Kind                TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrustKind `json:"kind"`
+	RevocationSetDigest TrustControlPartitionEscrowAdmissionEvidenceDigest                   `json:"revocation_set_digest"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrustKind defines model for TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust.Kind.
+type TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrustKind string
+
+// TrustControlPartitionEscrowAdmissionEvidenceIdentifier A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+type TrustControlPartitionEscrowAdmissionEvidenceIdentifier = string
+
+// TrustControlPartitionEscrowAdmissionEvidencePositiveSafeInteger defines model for TrustControlPartitionEscrowAdmissionEvidencePositiveSafeInteger.
+type TrustControlPartitionEscrowAdmissionEvidencePositiveSafeInteger = int64
+
+// TrustControlPartitionEscrowAdmissionEvidencePositiveUint32 defines model for TrustControlPartitionEscrowAdmissionEvidencePositiveUint32.
+type TrustControlPartitionEscrowAdmissionEvidencePositiveUint32 = int64
+
+// TrustControlPartitionEscrowAdmissionEvidencePublicKey defines model for TrustControlPartitionEscrowAdmissionEvidencePublicKey.
+type TrustControlPartitionEscrowAdmissionEvidencePublicKey = string
+
+// TrustControlPartitionEscrowAdmissionEvidenceQuotaEvidence defines model for TrustControlPartitionEscrowAdmissionEvidenceQuotaEvidence.
+type TrustControlPartitionEscrowAdmissionEvidenceQuotaEvidence struct {
+	AllocationEpoch      TrustControlPartitionEscrowAdmissionEvidencePositiveSafeInteger `json:"allocationEpoch"`
+	AllocationPlanDigest TrustControlPartitionEscrowAdmissionEvidenceDigest              `json:"allocationPlanDigest"`
+
+	// AllocationRootId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AllocationRootId TrustControlPartitionEscrowAdmissionEvidenceIdentifier `json:"allocationRootId"`
+
+	// AllocationSet An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.
+	AllocationSet                 TrustControlPartitionEscrowAllocationSet                       `json:"allocationSet"`
+	AllocationSetDigest           TrustControlPartitionEscrowAdmissionEvidenceDigest             `json:"allocationSetDigest"`
+	GlobalQuota                   TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuota `json:"globalQuota"`
+	LocalAllocatedInvocations     TrustControlPartitionEscrowAdmissionEvidenceUint32             `json:"localAllocatedInvocations"`
+	QuotaCertificateBindingDigest TrustControlPartitionEscrowAdmissionEvidenceDigest             `json:"quotaCertificateBindingDigest"`
+
+	// QuotaCommitment A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.
+	QuotaCommitment       TrustControlPartitionEscrowQuotaCommitment         `json:"quotaCommitment"`
+	QuotaCommitmentDigest TrustControlPartitionEscrowAdmissionEvidenceDigest `json:"quotaCommitmentDigest"`
+	QuotaDescriptorDigest TrustControlPartitionEscrowAdmissionEvidenceDigest `json:"quotaDescriptorDigest"`
+	QuotaKeyDigest        TrustControlPartitionEscrowAdmissionEvidenceDigest `json:"quotaKeyDigest"`
+
+	// SourceExpiresAt Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+	SourceExpiresAt TrustControlPartitionEscrowAdmissionEvidencePositiveSafeInteger `json:"sourceExpiresAt"`
+	SourceNotBefore TrustControlPartitionEscrowAdmissionEvidenceSafeInteger         `json:"sourceNotBefore"`
+	SourceSigner    TrustControlPartitionEscrowAdmissionEvidencePublicKey           `json:"sourceSigner"`
+
+	// SourceTrust The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation.
+	SourceTrust                    TrustControlPartitionEscrowAdmissionEvidenceSourceTrust `json:"sourceTrust"`
+	SourceTrustBindingDigest       TrustControlPartitionEscrowAdmissionEvidenceDigest      `json:"sourceTrustBindingDigest"`
+	TotalAllocatedInvocations      TrustControlPartitionEscrowAdmissionEvidenceUint32      `json:"totalAllocatedInvocations"`
+	UnderlyingSourceArtifactDigest TrustControlPartitionEscrowAdmissionEvidenceDigest      `json:"underlyingSourceArtifactDigest"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceResolver defines model for TrustControlPartitionEscrowAdmissionEvidenceResolver.
+type TrustControlPartitionEscrowAdmissionEvidenceResolver struct {
+	ConfigurationDigest TrustControlPartitionEscrowAdmissionEvidenceDigest `json:"configurationDigest"`
+
+	// ImplementationId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	ImplementationId      TrustControlPartitionEscrowAdmissionEvidenceIdentifier     `json:"implementationId"`
+	ImplementationVersion TrustControlPartitionEscrowAdmissionEvidencePositiveUint32 `json:"implementationVersion"`
+
+	// ResolverId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	ResolverId TrustControlPartitionEscrowAdmissionEvidenceIdentifier `json:"resolverId"`
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceSafeInteger defines model for TrustControlPartitionEscrowAdmissionEvidenceSafeInteger.
+type TrustControlPartitionEscrowAdmissionEvidenceSafeInteger = int64
+
+// TrustControlPartitionEscrowAdmissionEvidenceSourceTrust The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation.
+type TrustControlPartitionEscrowAdmissionEvidenceSourceTrust struct {
+	union json.RawMessage
+}
+
+// TrustControlPartitionEscrowAdmissionEvidenceUint32 defines model for TrustControlPartitionEscrowAdmissionEvidenceUint32.
+type TrustControlPartitionEscrowAdmissionEvidenceUint32 = int64
+
+// TrustControlPartitionEscrowAllocationSet An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.
+type TrustControlPartitionEscrowAllocationSet struct {
+	Algorithm    TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm `json:"algorithm"`
+	AllocatorKey TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPublicKey          `json:"allocatorKey"`
+	Body         TrustControlPartitionEscrowAllocationSetBody                                `json:"body"`
+	Signature    TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignature          `json:"signature"`
+}
+
+// TrustControlPartitionEscrowAllocationSetAllocation defines model for TrustControlPartitionEscrowAllocationSetAllocation.
+type TrustControlPartitionEscrowAllocationSetAllocation struct {
+	AllocatedInvocations TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowUint32 `json:"allocatedInvocations"`
+
+	// AuthorityId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AuthorityId TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier `json:"authorityId"`
+
+	// PartitionId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	PartitionId TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier `json:"partitionId"`
+}
+
+// TrustControlPartitionEscrowAllocationSetBody defines model for TrustControlPartitionEscrowAllocationSetBody.
+type TrustControlPartitionEscrowAllocationSetBody struct {
+	AllocationEpoch      TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger `json:"allocationEpoch"`
+	AllocationPlanDigest TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest              `json:"allocationPlanDigest"`
+
+	// AllocationRootId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AllocationRootId TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier `json:"allocationRootId"`
+
+	// Allocations The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.
+	Allocations []TrustControlPartitionEscrowAllocationSetAllocation `json:"allocations"`
+
+	// AuthorityDomain A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AuthorityDomain TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier `json:"authorityDomain"`
+
+	// ExpiresAt Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.
+	ExpiresAt                TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger `json:"expiresAt"`
+	NotBefore                TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSafeInteger         `json:"notBefore"`
+	Quota                    TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuota               `json:"quota"`
+	QuotaCommitmentDigest    TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest              `json:"quotaCommitmentDigest"`
+	QuotaCommitmentExpiresAt TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger `json:"quotaCommitmentExpiresAt"`
+	Schema                   TrustControlPartitionEscrowAllocationSetBodySchema                           `json:"schema"`
+}
+
+// TrustControlPartitionEscrowAllocationSetBodySchema defines model for TrustControlPartitionEscrowAllocationSetBody.Schema.
+type TrustControlPartitionEscrowAllocationSetBodySchema string
+
+// TrustControlPartitionEscrowQuotaCommitment A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.
+type TrustControlPartitionEscrowQuotaCommitment struct {
+	Algorithm TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm `json:"algorithm"`
+	Body      TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBody               `json:"body"`
+	Signature TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignature          `json:"signature"`
+	SignerKey TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPublicKey          `json:"signerKey"`
+}
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowEd25519PublicKey defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowEd25519PublicKey.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowEd25519PublicKey = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowEd25519Signature defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowEd25519Signature.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowEd25519Signature = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowHybridPublicKey defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowHybridPublicKey.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowHybridPublicKey = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowHybridSignature defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowHybridSignature.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowHybridSignature = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP256PublicKey defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP256PublicKey.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP256PublicKey = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP256Signature defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP256Signature.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP256Signature = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP384PublicKey defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP384PublicKey.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP384PublicKey = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP384Signature defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP384Signature.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowP384Signature = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger = int64
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveUint32 defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveUint32.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveUint32 = int64
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPublicKey defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPublicKey.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPublicKey = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuota defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuota.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuota struct {
+	GrantIndex     *TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowUint32 `json:"grantIndex,omitempty"`
+	MaxInvocations TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowUint32  `json:"maxInvocations"`
+
+	// OwnerId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	OwnerId TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier   `json:"ownerId"`
+	Profile TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile `json:"profile"`
+}
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuota.Profile.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuotaProfile string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSafeInteger defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSafeInteger.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSafeInteger = int64
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignature defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignature.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignature = string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSignatureAlgorithm string
+
+// TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowUint32 defines model for TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowUint32.
+type TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowUint32 = int64
+
+// TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBody defines model for TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBody.
+type TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBody struct {
+	AllocationEpoch      TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger `json:"allocationEpoch"`
+	AllocationPlanDigest TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest              `json:"allocationPlanDigest"`
+
+	// AllocationRootId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AllocationRootId TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier `json:"allocationRootId"`
+
+	// AuthorityDomain A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AuthorityDomain TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowIdentifier `json:"authorityDomain"`
+	Quota           TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowQuota      `json:"quota"`
+	QuotaKeyDigest  TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest     `json:"quotaKeyDigest"`
+	Schema          TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBodySchema `json:"schema"`
+
+	// SourceExpiresAt Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+	SourceExpiresAt                TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowPositiveSafeInteger `json:"sourceExpiresAt"`
+	SourceNotBefore                TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowSafeInteger         `json:"sourceNotBefore"`
+	SourceTrustBindingDigest       TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest              `json:"sourceTrustBindingDigest"`
+	UnderlyingSourceArtifactDigest TrustControlPartitionEscrowQuotaCommitmentPartitionEscrowDigest              `json:"underlyingSourceArtifactDigest"`
+}
+
+// TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBodySchema defines model for TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBody.Schema.
+type TrustControlPartitionEscrowQuotaCommitmentQuotaCommitmentBodySchema string
+
+// TrustControlPartitionEscrowReceiptMetadata Receipt-side partition authority proof carrying the exact canonical admission-evidence JSON, its domain-separated digest, and an indexable authority summary.
+type TrustControlPartitionEscrowReceiptMetadata struct {
+	// CanonicalJson The exact RFC 8785 canonical JSON serialization of a partition-escrow admission evidence object. Runtime validation applies the one MiB bound to UTF-8 bytes.
+	CanonicalJson  string                                            `json:"canonical_json"`
+	EvidenceDigest TrustControlPartitionEscrowReceiptMetadataDigest  `json:"evidence_digest"`
+	Summary        TrustControlPartitionEscrowReceiptMetadataSummary `json:"summary"`
+}
+
+// TrustControlPartitionEscrowReceiptMetadataDigest defines model for TrustControlPartitionEscrowReceiptMetadataDigest.
+type TrustControlPartitionEscrowReceiptMetadataDigest = string
+
+// TrustControlPartitionEscrowReceiptMetadataIdentifier A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+type TrustControlPartitionEscrowReceiptMetadataIdentifier = string
+
+// TrustControlPartitionEscrowReceiptMetadataPositiveSafeInteger defines model for TrustControlPartitionEscrowReceiptMetadataPositiveSafeInteger.
+type TrustControlPartitionEscrowReceiptMetadataPositiveSafeInteger = int64
+
+// TrustControlPartitionEscrowReceiptMetadataPositiveUint32 defines model for TrustControlPartitionEscrowReceiptMetadataPositiveUint32.
+type TrustControlPartitionEscrowReceiptMetadataPositiveUint32 = int64
+
+// TrustControlPartitionEscrowReceiptMetadataSummary defines model for TrustControlPartitionEscrowReceiptMetadataSummary.
+type TrustControlPartitionEscrowReceiptMetadataSummary struct {
+	// AuthorityId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	AuthorityId            TrustControlPartitionEscrowReceiptMetadataIdentifier          `json:"authority_id"`
+	CounterNamespaceDigest TrustControlPartitionEscrowReceiptMetadataDigest              `json:"counter_namespace_digest"`
+	FencingToken           TrustControlPartitionEscrowReceiptMetadataPositiveSafeInteger `json:"fencing_token"`
+
+	// PartitionId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	PartitionId                 TrustControlPartitionEscrowReceiptMetadataIdentifier `json:"partition_id"`
+	ResolverConfigurationDigest TrustControlPartitionEscrowReceiptMetadataDigest     `json:"resolver_configuration_digest"`
+
+	// ResolverId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	ResolverId TrustControlPartitionEscrowReceiptMetadataIdentifier `json:"resolver_id"`
+
+	// ResolverImplementationId A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+	ResolverImplementationId      TrustControlPartitionEscrowReceiptMetadataIdentifier     `json:"resolver_implementation_id"`
+	ResolverImplementationVersion TrustControlPartitionEscrowReceiptMetadataPositiveUint32 `json:"resolver_implementation_version"`
+	StoreIdentityDigest           TrustControlPartitionEscrowReceiptMetadataDigest         `json:"store_identity_digest"`
 }
 
 // TrustControlTerminate One trust-control termination request that voluntarily releases a held authority lease before its TTL expires. Termination names the lease being released (`leaseId` plus `leaseEpoch`), the leader URL releasing it, and a typed `reason` so operators can distinguish leader handoff from quorum loss or operator-initiated stepdown. The contract is anchored by `spec/PROTOCOL.md` section 9, where loss of quorum or a leader change clears the lease expiry and bumps the election term. Wire field names are camelCase to match the sibling lease projection so the families stay consistent on the wire.
@@ -15141,5 +15639,119 @@ func (t *TrustControlAdmissionRequestBinding) UnmarshalJSON(b []byte) error {
 		}
 	}
 
+	return err
+}
+
+// AsTrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust returns the union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as a TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust
+func (t TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) AsTrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust() (TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust, error) {
+	var body TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust overwrites any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as the provided TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) FromTrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust(v TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust performs a merge with any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust, using the provided TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) MergeTrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust(v TrustControlPartitionEscrowAdmissionEvidenceGrantCapabilityTrust) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust returns the union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as a TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust
+func (t TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) AsTrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust() (TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust, error) {
+	var body TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust overwrites any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as the provided TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) FromTrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust(v TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust performs a merge with any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust, using the provided TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) MergeTrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust(v TrustControlPartitionEscrowAdmissionEvidenceAggregateCapabilityTrust) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust returns the union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as a TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust
+func (t TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) AsTrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust() (TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust, error) {
+	var body TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust overwrites any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as the provided TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) FromTrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust(v TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust performs a merge with any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust, using the provided TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) MergeTrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust(v TrustControlPartitionEscrowAdmissionEvidenceAggregateFamilyTrust) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust returns the union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as a TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust
+func (t TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) AsTrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust() (TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust, error) {
+	var body TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust overwrites any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust as the provided TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) FromTrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust(v TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust performs a merge with any union data inside the TrustControlPartitionEscrowAdmissionEvidenceSourceTrust, using the provided TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) MergeTrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust(v TrustControlPartitionEscrowAdmissionEvidenceBrokerCapabilityTrust) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TrustControlPartitionEscrowAdmissionEvidenceSourceTrust) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
 	return err
 }

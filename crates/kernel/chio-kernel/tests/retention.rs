@@ -12,7 +12,7 @@
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod retention {
     use std::fs;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::Duration;
 
     use chio_core::capability::{
         scope::{ChioScope, Operation, ToolGrant},

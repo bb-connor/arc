@@ -19,8 +19,9 @@ commands.
 Every file under `src/` except `trust_tier.rs` and the feature-gated
 `fuzz.rs` is `include!`-d directly into `lib.rs` rather than declared with
 `mod`, so they share one flat `chio_credentials` namespace and one set of
-imports declared at the top of `lib.rs`. `cargo-mutants` treats `lib.rs` as
-the single mutation entry point for this reason (`mutants.toml`).
+imports declared at the top of `lib.rs`. `cargo-mutants` does not expand
+`include!`, so only functions written directly in `lib.rs` or the real
+`trust_tier` module are currently discoverable (`mutants.toml`).
 
 | Path | Responsibility |
 |------|----------------|

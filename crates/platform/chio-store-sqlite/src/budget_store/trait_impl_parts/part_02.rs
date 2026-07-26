@@ -5,6 +5,10 @@ impl BudgetStore for SqliteBudgetStore {
         self.authority_profile
     }
 
+    fn budget_guarantee_level(&self) -> BudgetGuaranteeLevel {
+        BudgetGuaranteeLevel::SingleNodeAtomic
+    }
+
     fn supports_durable_atomic_payment_journal(&self) -> bool {
         self.authority_profile == chio_kernel::BudgetStoreProfile::SingleNodeDurable
     }
@@ -145,6 +149,114 @@ impl BudgetStore for SqliteBudgetStore {
         )?
         .is_some()
         {
+            let event_id = event_id.ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "reverse replay matched an event without event_id".to_string(),
+                )
+            })?;
+            let (event_seq, usage_seq) = transaction.query_row(
+                r#"
+                SELECT event_seq, usage_seq
+                FROM budget_mutation_events
+                WHERE event_id = ?1
+                "#,
+                params![event_id],
+                |row| {
+                    Ok((
+                        budget_u64_from_row(row, 0, "reverse event sequence")?,
+                        optional_budget_u64_from_row(row, 1, "reverse usage sequence")?,
+                    ))
+                },
+            )?;
+            if usage_seq != Some(event_seq) {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "reverse event `{event_id}` does not own its usage transition"
+                )));
+            }
+            let live_projection = transaction
+                .query_row(
+                    r#"
+                    SELECT invocation_count, total_cost_exposed,
+                           total_cost_realized_spend, seq
+                    FROM capability_grant_budgets
+                    WHERE capability_id = ?1 AND grant_index = ?2
+                    "#,
+                    params![capability_id, grant_index as i64],
+                    |row| {
+                        Ok((
+                            budget_u32_from_row(row, 0, "invocation_count")?,
+                            budget_u64_from_row(row, 1, "total_cost_exposed")?,
+                            budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
+                            budget_u64_from_row(row, 3, "legacy projection sequence")?,
+                        ))
+                    },
+                )
+                .optional()?
+                .ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "reverse event `{event_id}` lost its legacy projection"
+                    ))
+                })?;
+            checked_committed_cost_units(live_projection.1, live_projection.2)?;
+            let quota_key = BudgetQuotaKey::grant(capability_id, grant_index)?;
+            let persisted_maximum = transaction
+                .query_row(
+                    r#"
+                    SELECT max_invocations
+                    FROM budget_invocation_quota_usage
+                    WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
+                    "#,
+                    params![
+                        quota_key.profile().as_str(),
+                        quota_key.owner_id(),
+                        grant_index as i64,
+                    ],
+                    |row| budget_u32_from_row(row, 0, "quota max_invocations"),
+                )
+                .optional()?;
+            let maximum = if let Some(maximum) = persisted_maximum {
+                maximum
+            } else {
+                SqliteBudgetStore::compatibility_invocation_quota_maximum(
+                    &transaction,
+                    capability_id,
+                    grant_index,
+                )?
+                .ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "reverse event `{event_id}` lost its invocation quota"
+                    ))
+                })?
+            };
+            let compatibility_quota =
+                BudgetInvocationQuota::from_persisted_parts(quota_key, maximum)?;
+            SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+                &transaction,
+                std::slice::from_ref(&compatibility_quota),
+                compatibility_quota.key(),
+                live_projection.0,
+                SqliteInvocationQuotaMutationContext {
+                    mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                    action: SqliteInvocationQuotaMutationAction::Replay,
+                    event_seq: live_projection.3.max(event_seq),
+                    updated_at: unix_now(),
+                },
+            )?;
+            if let Some(hold_id) = hold_id {
+                let hold =
+                    SqliteBudgetStore::load_hold(&transaction, hold_id)?.ok_or_else(|| {
+                        BudgetStoreError::Invariant(format!(
+                            "reverse event `{event_id}` lost budget hold `{hold_id}`"
+                        ))
+                    })?;
+                if hold.disposition != HoldDisposition::Reversed
+                    || hold.remaining_exposure_units != 0
+                {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "reverse event `{event_id}` diverged from budget hold `{hold_id}`"
+                    )));
+                }
+            }
             transaction.rollback()?;
             return Ok(());
         }
@@ -171,7 +283,7 @@ impl BudgetStore for SqliteBudgetStore {
         let current = transaction
             .query_row(
                 r#"
-                SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
+                SELECT invocation_count, total_cost_exposed, total_cost_realized_spend, seq
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
@@ -181,12 +293,14 @@ impl BudgetStore for SqliteBudgetStore {
                         budget_u32_from_row(row, 0, "invocation_count")?,
                         budget_u64_from_row(row, 1, "total_cost_exposed")?,
                         budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
+                        budget_u64_from_row(row, 3, "legacy projection sequence")?,
                     ))
                 },
             )
             .optional()?;
 
-        let Some((invocation_count, total_cost_exposed, total_cost_realized_spend)) = current
+        let Some((invocation_count, total_cost_exposed, total_cost_realized_spend, projection_seq)) =
+            current
         else {
             transaction.rollback()?;
             return Err(BudgetStoreError::Invariant(
@@ -206,32 +320,68 @@ impl BudgetStore for SqliteBudgetStore {
                 "cannot reverse charge larger than total_cost_exposed".to_string(),
             ));
         }
-        let compatibility_maximum = SqliteBudgetStore::stage_compatibility_invocation_reverse(
+        let compatibility_maximum = SqliteBudgetStore::compatibility_invocation_quota_maximum(
             &transaction,
             capability_id,
             grant_index,
-            invocation_count,
-        )?;
+        )?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "missing compatibility invocation quota during reversal".to_string(),
+            )
+        })?;
 
         let new_total_cost_exposed = total_cost_exposed - cost_units;
         let seq = allocate_budget_replication_seq(&transaction)?;
-        transaction.execute(
-            r#"
-            UPDATE capability_grant_budgets
-            SET invocation_count = ?3,
-                updated_at = ?4,
-                seq = ?5,
-                total_cost_exposed = ?6
-            WHERE capability_id = ?1 AND grant_index = ?2
-            "#,
-            params![
+        let updated_at = unix_now();
+        let compatibility_quota = BudgetInvocationQuota::from_persisted_parts(
+            BudgetQuotaKey::grant(capability_id, grant_index)?,
+            compatibility_maximum,
+        )?;
+        SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+            &transaction,
+            std::slice::from_ref(&compatibility_quota),
+            compatibility_quota.key(),
+            invocation_count,
+            SqliteInvocationQuotaMutationContext {
+                mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                action: SqliteInvocationQuotaMutationAction::Replay,
+                event_seq: projection_seq,
+                updated_at,
+            },
+        )?;
+        let quota_mutation = SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+            &transaction,
+            std::slice::from_ref(&compatibility_quota),
+            compatibility_quota.key(),
+            invocation_count,
+            SqliteInvocationQuotaMutationContext {
+                mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                action: SqliteInvocationQuotaMutationAction::Reverse,
+                event_seq: seq,
+                updated_at,
+            },
+        )?;
+        let invocation_count_after = quota_mutation.primary_count_after;
+        SqliteBudgetStore::compare_and_persist_legacy_projection(
+            &transaction,
+            SqliteLegacyProjectionMutation {
                 capability_id,
-                grant_index as i64,
-                invocation_count - 1,
-                unix_now(),
-                seq as i64,
-                new_total_cost_exposed as i64,
-            ],
+                grant_index,
+                expected: Some(SqliteLegacyProjectionState {
+                    invocation_count,
+                    total_cost_exposed,
+                    total_cost_realized_spend,
+                    seq: projection_seq,
+                }),
+                after: SqliteLegacyProjectionState {
+                    invocation_count: invocation_count_after,
+                    total_cost_exposed: new_total_cost_exposed,
+                    total_cost_realized_spend,
+                    seq,
+                },
+                updated_at,
+            },
         )?;
         if let Some(hold_id) = hold_id {
             let next_authority = SqliteBudgetStore::validate_hold_authority(
@@ -270,20 +420,10 @@ impl BudgetStore for SqliteBudgetStore {
             None,
             None,
             None,
-            invocation_count - 1,
+            invocation_count_after,
             new_total_cost_exposed,
             total_cost_realized_spend,
         )?;
-        if let Some(maximum) = compatibility_maximum {
-            SqliteBudgetStore::persist_compatibility_invocation_capture(
-                &transaction,
-                capability_id,
-                grant_index,
-                Some(maximum),
-                invocation_count - 1,
-                seq,
-            )?;
-        }
         transaction.commit()?;
         Ok(())
     }
@@ -678,6 +818,20 @@ impl BudgetStore for SqliteBudgetStore {
         &self,
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if request
+            .invocation_admission_evidence()
+            .is_some_and(|evidence| evidence.partition_escrow_evidence().is_some())
+        {
+            return Err(BudgetStoreError::Invariant(
+                "direct SQLite budget authority cannot admit partition escrow evidence".to_string(),
+            ));
+        }
+        if request.requires_existing_authorization_replay() {
+            return Err(BudgetStoreError::Invariant(
+                "snapshot-derived authorization requires the committed replay operation"
+                    .to_string(),
+            ));
+        }
         validate_payment_journal_authorization_binding(
             request.payment_journal.as_ref(),
             request.admission_operation.as_ref(),
@@ -689,72 +843,7 @@ impl BudgetStore for SqliteBudgetStore {
         )?;
         let payment_journal = request.payment_journal.clone();
         if !request.invocation_quotas().is_empty() || request.revocation_set().is_some() {
-            if request.max_invocations.is_some() {
-                return Err(BudgetStoreError::Invariant(
-                    "composite budget hold must not also present legacy max_invocations"
-                        .to_string(),
-                ));
-            }
-            let invocation_quotas = request.invocation_quotas().to_vec();
-            let authorization_artifact_digests = request
-                .invocation_admission_evidence()
-                .and_then(|evidence| evidence.supplemental_artifact_digest())
-                .map(|digest| vec![digest.to_string()])
-                .unwrap_or_default();
-            let aggregate_family_evidence = match request
-                .invocation_admission_evidence()
-                .map(|evidence| {
-                    (
-                        evidence.aggregate_root_capability_id(),
-                        evidence.aggregate_binding_digest(),
-                    )
-                })
-                .unwrap_or((None, None))
-            {
-                (Some(root_capability_id), Some(root_binding_digest)) => {
-                    Some(SqliteAggregateFamilyEvidence {
-                        root_capability_id: root_capability_id.to_string(),
-                        root_binding_digest: root_binding_digest.to_string(),
-                    })
-                }
-                (None, None) => None,
-                _ => {
-                    return Err(BudgetStoreError::Invariant(
-                        "aggregate family admission evidence is incomplete".to_string(),
-                    ));
-                }
-            };
-            let revocation_set = request.revocation_set().cloned().ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "composite budget hold requires a canonical revocation set".to_string(),
-                )
-            })?;
-            let hold_id = request.hold_id.ok_or_else(|| {
-                BudgetStoreError::Invariant("composite budget hold requires hold_id".to_string())
-            })?;
-            let event_id = request.event_id.ok_or_else(|| {
-                BudgetStoreError::Invariant("composite budget hold requires event_id".to_string())
-            })?;
-            let admission_operation = request.admission_operation.ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "composite budget hold requires an admission operation binding".to_string(),
-                )
-            })?;
-            let input = SqliteCompositeAuthorizeInput {
-                operation_id: admission_operation.operation_id().to_string(),
-                request_binding_hash: admission_operation.request_binding_hash().to_string(),
-                capability_id: request.capability_id,
-                grant_index: request.grant_index,
-                requested_exposure_units: request.requested_exposure_units,
-                max_cost_per_invocation: request.max_cost_per_invocation,
-                max_total_cost_units: request.max_total_cost_units,
-                hold_id,
-                event_id,
-                authority: request.authority,
-                invocation_quotas,
-                revocation_set,
-                authorization_artifact_digests,
-            };
+            let (input, aggregate_family_evidence) = sqlite_composite_authorize_parts(&request)?;
             return self.authorize_composite_hold_with_journal(
                 input,
                 aggregate_family_evidence,
@@ -778,6 +867,33 @@ impl BudgetStore for SqliteBudgetStore {
             payment_journal.as_ref(),
         )?;
         load_authorize_decision_for_event(self, &event_id)
+    }
+
+    fn replay_budget_authorization(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if request
+            .invocation_admission_evidence()
+            .is_some_and(|evidence| evidence.partition_escrow_evidence().is_some())
+        {
+            return Err(BudgetStoreError::Invariant(
+                "direct SQLite budget authority cannot replay partition escrow evidence"
+                    .to_string(),
+            ));
+        }
+        if !request.requires_existing_authorization_replay() {
+            return Err(BudgetStoreError::Invariant(
+                "committed replay requires a snapshot-derived authorization request".to_string(),
+            ));
+        }
+        if request.payment_journal.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "committed authorization replay must not create a payment journal row".to_string(),
+            ));
+        }
+        let (input, aggregate_family_evidence) = sqlite_composite_authorize_parts(&request)?;
+        self.replay_composite_hold(input, aggregate_family_evidence)
     }
 
     fn capture_invocation_reservations(
@@ -1090,6 +1206,7 @@ impl BudgetStore for SqliteBudgetStore {
                 metering_profile: self.budget_metering_profile(),
                 budget_commit_index: Some(seq),
                 event_id: request.event_id,
+                partition_escrow_evidence: None,
             },
         })
     }
@@ -1196,10 +1313,105 @@ impl BudgetStore for SqliteBudgetStore {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<BudgetMutationRecord>, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let record = SqliteBudgetStore::load_exact_mutation_event(&transaction, event_id)?;
+        transaction.commit()?;
+        Ok(record)
+    }
+
     sqlite_budget_store_main_extensions!();
 }
 
 include!("main_extension_helpers.inc");
+
+fn sqlite_composite_authorize_parts(
+    request: &BudgetAuthorizeHoldRequest,
+) -> Result<
+    (
+        SqliteCompositeAuthorizeInput,
+        Option<SqliteAggregateFamilyEvidence>,
+    ),
+    BudgetStoreError,
+> {
+    if request.max_invocations.is_some() {
+        return Err(BudgetStoreError::Invariant(
+            "composite budget hold must not also present legacy max_invocations".to_string(),
+        ));
+    }
+    let evidence = request.invocation_admission_evidence().ok_or_else(|| {
+        BudgetStoreError::Invariant(
+            "composite budget hold requires verified invocation admission".to_string(),
+        )
+    })?;
+    let mut authorization_artifact_digests = Vec::with_capacity(2);
+    if let Some(digest) = evidence.supplemental_artifact_digest() {
+        authorization_artifact_digests.push(digest.to_string());
+    }
+    if let Some(escrow) = evidence.partition_escrow_evidence() {
+        authorization_artifact_digests.push(escrow.digest().map_err(|error| {
+            BudgetStoreError::Invariant(format!(
+                "partition escrow admission evidence digest failed: {error}"
+            ))
+        })?);
+    }
+    authorization_artifact_digests.sort();
+    authorization_artifact_digests.dedup();
+    let aggregate_family_evidence = match (
+        evidence.aggregate_root_capability_id(),
+        evidence.aggregate_binding_digest(),
+    ) {
+        (Some(root_capability_id), Some(root_binding_digest)) => {
+            Some(SqliteAggregateFamilyEvidence {
+                root_capability_id: root_capability_id.to_string(),
+                root_binding_digest: root_binding_digest.to_string(),
+            })
+        }
+        (None, None) => None,
+        _ => {
+            return Err(BudgetStoreError::Invariant(
+                "aggregate family admission evidence is incomplete".to_string(),
+            ));
+        }
+    };
+    let hold_id = request.hold_id.clone().ok_or_else(|| {
+        BudgetStoreError::Invariant("composite budget hold requires hold_id".to_string())
+    })?;
+    let event_id = request.event_id.clone().ok_or_else(|| {
+        BudgetStoreError::Invariant("composite budget hold requires event_id".to_string())
+    })?;
+    let admission_operation = request.admission_operation.as_ref().ok_or_else(|| {
+        BudgetStoreError::Invariant(
+            "composite budget hold requires an admission operation binding".to_string(),
+        )
+    })?;
+    Ok((
+        SqliteCompositeAuthorizeInput {
+            operation_id: admission_operation.operation_id().to_string(),
+            request_binding_hash: admission_operation.request_binding_hash().to_string(),
+            capability_id: request.capability_id.clone(),
+            grant_index: request.grant_index,
+            requested_exposure_units: request.requested_exposure_units,
+            max_cost_per_invocation: request.max_cost_per_invocation,
+            max_total_cost_units: request.max_total_cost_units,
+            hold_id,
+            event_id,
+            authority: request.authority.clone(),
+            invocation_quotas: evidence.quotas().to_vec(),
+            revocation_set: evidence.revocation_set().clone(),
+            authorization_artifact_digests,
+            partition_escrow_evidence: evidence
+                .partition_escrow_evidence()
+                .map(PartitionEscrowCommitEvidence::from_admission_evidence)
+                .transpose()?,
+        },
+        aggregate_family_evidence,
+    ))
+}
 
 fn effective_hold_event_id(requested: Option<&str>, kind: BudgetMutationKind) -> String {
     requested.map_or_else(
@@ -1249,8 +1461,9 @@ fn authorize_decision_from_record(
         guarantee_level: store.budget_guarantee_level(),
         budget_profile: store.budget_authority_profile(),
         metering_profile: store.budget_metering_profile(),
-        budget_commit_index: record.usage_seq,
+        budget_commit_index: Some(record.event_seq),
         event_id: Some(record.event_id.clone()),
+        partition_escrow_evidence: None,
     };
     if allowed {
         let monetary_state = if record.exposure_units > 0
@@ -1339,6 +1552,7 @@ fn hold_decision_from_record(
             metering_profile: store.budget_metering_profile(),
             budget_commit_index: record.usage_seq,
             event_id: Some(record.event_id.clone()),
+            partition_escrow_evidence: None,
         },
     })
 }

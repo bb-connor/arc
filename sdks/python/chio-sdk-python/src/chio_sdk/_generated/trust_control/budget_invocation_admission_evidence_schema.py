@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
+# Schema sha256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -23,6 +23,20 @@ class Digest(RootModel[str]):
 
 class Identifier(RootModel[str]):
     root: Annotated[str, Field(max_length=512, min_length=1)]
+
+
+class PartitionEscrowEvidence(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    canonicalJson: Annotated[str, Field(max_length=1048576, min_length=2)]
+    digest: Digest
+
+
+class PublicKey(RootModel[str]):
+    root: Annotated[
+        str, Field(pattern="^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$")
+    ]
 
 
 class Profile(Enum):
@@ -49,13 +63,24 @@ class RevocationSet(BaseModel):
     ids: Annotated[list[Identifier], Field(max_length=128, min_length=1)]
 
 
+class SafeInteger(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
 class SupplementalBinding(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     artifactDigest: Digest
+    brokerCapabilityId: Identifier
+    claimBindingDigest: Digest
+    expiresAt: SafeInteger
+    issuer: PublicKey
     negotiatedFeaturesDigest: Digest
+    notBefore: SafeInteger
     requestBindingHash: Digest
+    requestConstraintDigest: Digest
+    verifiedAt: SafeInteger
     verifierId: Identifier
 
 
@@ -76,5 +101,6 @@ class ChioBudgetInvocationAdmissionEvidence(BaseModel):
     invocationQuotas: Annotated[
         list[InvocationQuota], Field(max_length=8, min_length=1)
     ]
+    partitionEscrowEvidence: PartitionEscrowEvidence | None = None
     revocationSet: RevocationSet
     supplementalBinding: SupplementalBinding | None = None

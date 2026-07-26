@@ -1777,6 +1777,7 @@ fn make_provisional_charge(cost_charged: u64, currency: &str) -> BudgetChargeRes
                 crate::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: None,
             event_id: None,
+            partition_escrow_evidence: None,
         },
         admission_operation: None,
     }

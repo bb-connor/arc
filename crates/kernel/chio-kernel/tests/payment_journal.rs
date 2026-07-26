@@ -7,7 +7,7 @@
 mod support {
     #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::sync::atomic::AtomicUsize;
     use std::sync::{Arc, Mutex};
 
@@ -21,7 +21,7 @@ mod support {
         ToolCallRequest, ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE,
         DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
-    use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
+    use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteBudgetStore, SqliteReceiptStore};
 
     pub fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         chio_test_support::private_fs::unique_sqlite_path(prefix)
@@ -42,7 +42,11 @@ mod support {
         pub refund_transactions: Mutex<Vec<String>>,
         settlement_state_script:
             Mutex<HashMap<String, Result<chio_kernel::RailSettlementState, String>>>,
-        capture_error_script: Mutex<HashMap<String, String>>,
+        capture_error_script: Mutex<HashMap<String, (usize, String)>>,
+        operation_adapter: chio_kernel::SimPaymentAdapter,
+        operation_captures: Mutex<HashSet<String>>,
+        operation_releases: Mutex<HashSet<String>>,
+        operation_refunds: Mutex<HashSet<String>>,
     }
 
     impl CountingRail {
@@ -54,17 +58,38 @@ mod support {
                 refund_transactions: Mutex::new(Vec::new()),
                 settlement_state_script: Mutex::new(HashMap::new()),
                 capture_error_script: Mutex::new(HashMap::new()),
+                operation_adapter: chio_kernel::SimPaymentAdapter::new(),
+                operation_captures: Mutex::new(HashSet::new()),
+                operation_releases: Mutex::new(HashSet::new()),
+                operation_refunds: Mutex::new(HashSet::new()),
             }
         }
 
-        /// Script the next capture for `reference` to fail once, simulating
-        /// a transient rail failure after the settle intent was committed.
-        /// The scripted failure moves no money and does not count a capture.
-        pub fn script_capture_error_once(&self, reference: &str, detail: &str) {
+        /// Script the next `attempts` captures for `reference` to fail,
+        /// simulating a transient rail failure after the settle intent was
+        /// committed. Scripted failures move no money and do not count as
+        /// captures.
+        pub fn script_capture_errors(&self, reference: &str, attempts: usize, detail: &str) {
+            if attempts == 0 {
+                return;
+            }
             self.capture_error_script
                 .lock()
                 .expect("script lock")
-                .insert(reference.to_string(), detail.to_string());
+                .insert(reference.to_string(), (attempts, detail.to_string()));
+        }
+
+        fn take_capture_error(&self, reference: &str) -> Option<String> {
+            let mut scripts = self.capture_error_script.lock().expect("script lock");
+            let (detail, exhausted) = {
+                let (remaining, detail) = scripts.get_mut(reference)?;
+                *remaining = remaining.saturating_sub(1);
+                (detail.clone(), *remaining == 0)
+            };
+            if exhausted {
+                scripts.remove(reference);
+            }
+            Some(detail)
         }
 
         /// Script a specific `settlement_state` answer for one reference,
@@ -95,6 +120,14 @@ mod support {
             "x402"
         }
 
+        fn supports_operation_authorization_recovery(&self) -> bool {
+            true
+        }
+
+        fn supports_operation_payment_mutations(&self) -> bool {
+            true
+        }
+
         fn authorize(
             &self,
             request: &chio_kernel::PaymentAuthorizeRequest,
@@ -113,12 +146,7 @@ mod support {
             _currency: &str,
             reference: &str,
         ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
-            if let Some(detail) = self
-                .capture_error_script
-                .lock()
-                .expect("script lock")
-                .remove(reference)
-            {
+            if let Some(detail) = self.take_capture_error(reference) {
                 return Err(chio_kernel::PaymentError::Unavailable(detail));
             }
             self.captures
@@ -196,6 +224,109 @@ mod support {
                     metadata: serde_json::json!({}),
                 },
             })
+        }
+
+        fn authorize_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            request: &chio_kernel::PaymentAuthorizeRequest,
+        ) -> Result<chio_kernel::PaymentAuthorization, chio_kernel::PaymentError> {
+            self.operation_adapter.authorize_for_operation(
+                operation_id,
+                request_binding_hash,
+                request,
+            )
+        }
+
+        fn lookup_authorization_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+        ) -> Result<Option<chio_kernel::PaymentAuthorization>, chio_kernel::PaymentError> {
+            self.operation_adapter
+                .lookup_authorization_for_operation(operation_id, request_binding_hash)
+        }
+
+        fn capture_for_operation(
+            &self,
+            request: chio_kernel::OperationPaymentCaptureRequest<'_>,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            if let Some(detail) = self.take_capture_error(request.reference) {
+                return Err(chio_kernel::PaymentError::Unavailable(detail));
+            }
+            let result = self.operation_adapter.capture_for_operation(request)?;
+            if self
+                .operation_captures
+                .lock()
+                .expect("operation capture lock")
+                .insert(request.operation_id.to_string())
+            {
+                self.captures
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+            Ok(result)
+        }
+
+        fn release_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            authorization_id: &str,
+            reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            let result = self.operation_adapter.release_for_operation(
+                operation_id,
+                request_binding_hash,
+                authorization_id,
+                reference,
+            )?;
+            if self
+                .operation_releases
+                .lock()
+                .expect("operation release lock")
+                .insert(operation_id.to_string())
+            {
+                self.releases
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+            Ok(result)
+        }
+
+        fn refund_for_operation(
+            &self,
+            request: chio_kernel::OperationPaymentRefundRequest<'_>,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            let result = self.operation_adapter.refund_for_operation(request)?;
+            if self
+                .operation_refunds
+                .lock()
+                .expect("operation refund lock")
+                .insert(request.operation_id.to_string())
+            {
+                self.refunds
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.refund_transactions
+                    .lock()
+                    .expect("refund transaction trace")
+                    .push(request.transaction_id.to_string());
+            }
+            Ok(result)
+        }
+
+        fn settlement_state_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            reference: &str,
+            authorization_id: Option<&str>,
+        ) -> Result<chio_kernel::RailSettlementState, chio_kernel::PaymentError> {
+            self.operation_adapter.settlement_state_for_operation(
+                operation_id,
+                request_binding_hash,
+                reference,
+                authorization_id,
+            )
         }
     }
 
@@ -303,6 +434,7 @@ mod support {
     pub struct MoneyJournalHarness {
         pub kernel: ChioKernel,
         pub budget_store: Arc<SqliteBudgetStore>,
+        pub operation_store: Arc<SqliteAdmissionOperationStore>,
         pub receipt_store: Arc<SqliteReceiptStore>,
         pub rail: Arc<CountingRail>,
         pub capability: CapabilityToken,
@@ -310,6 +442,7 @@ mod support {
             Arc<Mutex<Vec<chio_kernel::payment::PaymentJournalRecord>>>,
         pub receipt_db_path: std::path::PathBuf,
         pub budget_db_path: std::path::PathBuf,
+        pub operation_db_path: std::path::PathBuf,
     }
 
     /// Payment adapter facade over a shared rail handle, so tests keep a
@@ -319,6 +452,14 @@ mod support {
     impl chio_kernel::PaymentAdapter for SharedRail {
         fn rail_id(&self) -> &str {
             self.0.rail_id()
+        }
+
+        fn supports_operation_authorization_recovery(&self) -> bool {
+            self.0.supports_operation_authorization_recovery()
+        }
+
+        fn supports_operation_payment_mutations(&self) -> bool {
+            self.0.supports_operation_payment_mutations()
         }
 
         fn authorize(
@@ -365,6 +506,69 @@ mod support {
         ) -> Result<chio_kernel::RailSettlementState, chio_kernel::PaymentError> {
             self.0.settlement_state(reference, authorization_id)
         }
+
+        fn authorize_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            request: &chio_kernel::PaymentAuthorizeRequest,
+        ) -> Result<chio_kernel::PaymentAuthorization, chio_kernel::PaymentError> {
+            self.0
+                .authorize_for_operation(operation_id, request_binding_hash, request)
+        }
+
+        fn lookup_authorization_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+        ) -> Result<Option<chio_kernel::PaymentAuthorization>, chio_kernel::PaymentError> {
+            self.0
+                .lookup_authorization_for_operation(operation_id, request_binding_hash)
+        }
+
+        fn capture_for_operation(
+            &self,
+            request: chio_kernel::OperationPaymentCaptureRequest<'_>,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.0.capture_for_operation(request)
+        }
+
+        fn release_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            authorization_id: &str,
+            reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.0.release_for_operation(
+                operation_id,
+                request_binding_hash,
+                authorization_id,
+                reference,
+            )
+        }
+
+        fn refund_for_operation(
+            &self,
+            request: chio_kernel::OperationPaymentRefundRequest<'_>,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.0.refund_for_operation(request)
+        }
+
+        fn settlement_state_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            reference: &str,
+            authorization_id: Option<&str>,
+        ) -> Result<chio_kernel::RailSettlementState, chio_kernel::PaymentError> {
+            self.0.settlement_state_for_operation(
+                operation_id,
+                request_binding_hash,
+                reference,
+                authorization_id,
+            )
+        }
     }
 
     pub fn money_journal_harness(
@@ -373,8 +577,10 @@ mod support {
     ) -> Result<MoneyJournalHarness, Box<dyn std::error::Error>> {
         let receipt_db_path = unique_db_path(&format!("{prefix}-receipts"));
         let budget_db_path = unique_db_path(&format!("{prefix}-budget"));
+        let operation_db_path = unique_db_path(&format!("{prefix}-operations"));
         let receipt_store = Arc::new(SqliteReceiptStore::open(&receipt_db_path)?);
         let budget_store = Arc::new(SqliteBudgetStore::open(&budget_db_path)?);
+        let operation_store = Arc::new(SqliteAdmissionOperationStore::open(&operation_db_path)?);
         let journal_rows_seen_at_invoke = Arc::new(Mutex::new(Vec::new()));
         let rail = Arc::new(CountingRail::new());
 
@@ -384,13 +590,16 @@ mod support {
             journal_rows_seen_at_invoke: Arc::clone(&journal_rows_seen_at_invoke),
             reported_cost_units,
         }));
-        kernel.set_payment_adapter(Box::new(SharedRail(Arc::clone(&rail))))?;
+        kernel.set_admission_operation_store_handle(
+            Arc::clone(&operation_store) as Arc<dyn chio_kernel::AdmissionOperationStore>
+        )?;
         kernel.set_budget_store_handle(
             Arc::clone(&budget_store) as Arc<dyn chio_kernel::BudgetStore>
         )?;
         kernel.set_receipt_store_handle(
             Arc::clone(&receipt_store) as Arc<dyn chio_kernel::ReceiptStore>
         )?;
+        kernel.set_payment_adapter(Box::new(SharedRail(Arc::clone(&rail))))?;
 
         let agent_keypair = Keypair::generate();
         let capability =
@@ -398,12 +607,14 @@ mod support {
         Ok(MoneyJournalHarness {
             kernel,
             budget_store,
+            operation_store,
             receipt_store,
             rail,
             capability,
             journal_rows_seen_at_invoke,
             receipt_db_path,
             budget_db_path,
+            operation_db_path,
         })
     }
 
@@ -432,13 +643,14 @@ mod support {
         pub fn cleanup(&self) {
             let _ = std::fs::remove_file(&self.receipt_db_path);
             let _ = std::fs::remove_file(&self.budget_db_path);
+            let _ = std::fs::remove_file(&self.operation_db_path);
         }
     }
 }
 
 use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::payment::PaymentJournalState;
-use chio_kernel::Verdict;
+use chio_kernel::{AdmissionOperationStore, Verdict};
 
 #[test]
 fn priced_call_walks_journal_to_closed() -> Result<(), Box<dyn std::error::Error>> {
@@ -462,10 +674,32 @@ fn priced_call_walks_journal_to_closed() -> Result<(), Box<dyn std::error::Error
         .expect("the in-flight journal row is visible during dispatch");
     assert_eq!(row.state, PaymentJournalState::Authorized);
     assert_eq!(row.rail, "x402");
-    assert_eq!(row.authorization_id.as_deref(), Some("auth-req-P"));
+    assert!(
+        row.authorization_id
+            .as_deref()
+            .is_some_and(|authorization_id| authorization_id.starts_with("sim-")),
+        "operation-owned authorization must come from the idempotent adapter"
+    );
     assert_eq!(row.amount_units, 100);
     assert!(row.hold_id.is_some());
+    let admission_operation = row
+        .admission_operation
+        .clone()
+        .expect("priced admission must bind its durable operation");
     drop(seen);
+
+    let operation = harness
+        .operation_store
+        .load(admission_operation.operation_id())?
+        .ok_or("priced admission operation must remain queryable")?;
+    assert_eq!(
+        operation.request_binding_hash(),
+        admission_operation.request_binding_hash()
+    );
+    assert_eq!(
+        operation.state(),
+        chio_kernel::AdmissionOperationState::Completed
+    );
 
     // After the receipt persists, the journal row is closed: no incomplete
     // row remains and the rail captured exactly once.
@@ -568,12 +802,12 @@ fn failed_settle_leaves_the_journal_open_for_boot_reconciliation(
     use chio_kernel::payment::PaymentSettleAction;
 
     let harness = support::money_journal_harness("chio-failed-settle", 75)?;
-    // The rail fails the capture once, transiently, AFTER the settle intent
-    // was durably committed (journal in Settling). The rail-side outcome is
-    // unknown: the HTTP request may have landed before the failure.
+    // The rail fails both bounded operation-owned capture attempts after the
+    // settle intent was durably committed (journal in Settling). The rail-side
+    // outcome is unknown: either request may have landed before the failure.
     harness
         .rail
-        .script_capture_error_once("req-F", "rail unreachable during capture");
+        .script_capture_errors("req-F", 2, "rail unreachable during capture");
 
     let response = harness
         .kernel
@@ -1487,6 +1721,8 @@ fn tenant_scoped_money_path_stamps_journal_row_and_reconciliation_receipt(
     );
     let orphan = chio_kernel::payment::PaymentJournalRecord {
         request_id: "req-T-crash".to_string(),
+        admission_operation: None,
+        authority: None,
         authorization_id: Some("auth-req-T-crash".to_string()),
         hold_id: Some("hold-req-T-crash".to_string()),
         ..row.clone()

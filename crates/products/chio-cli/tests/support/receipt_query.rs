@@ -819,6 +819,7 @@ pub(crate) fn make_financial_receipt_signed_by(
             realized_spend_units: cost_charged,
             committed_cost_units_after: cost_charged,
         }),
+        partition_escrow: None,
     };
     let metadata = serde_json::json!({
         "attribution": subject_key.map(|subject_key| ReceiptAttributionMetadata {
@@ -928,6 +929,7 @@ pub(crate) fn make_financial_receipt_with_budget_authority(
                 realized_spend_units: 75,
                 committed_cost_units_after: 75,
             }),
+            partition_escrow: None,
         }
     });
     ChioReceipt::sign(
@@ -1006,6 +1008,7 @@ pub(crate) fn make_financial_receipt_with_settlement_status(
                 cost_charged
             },
         }),
+        partition_escrow: None,
     };
     let metadata = serde_json::json!({
         "financial": FinancialReceiptMetadata {

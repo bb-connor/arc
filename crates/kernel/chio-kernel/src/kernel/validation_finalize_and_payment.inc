@@ -1,5 +1,5 @@
 impl ChioKernel {
-    fn reconcile_budget_charge(
+    pub(super) fn reconcile_budget_charge(
         &self,
         capability_id: &str,
         charge: &BudgetChargeResult,
@@ -7,7 +7,7 @@ impl ChioKernel {
     ) -> Result<BudgetReconcileHoldDecision, KernelError> {
         let authority = charge.authorize_metadata.authority.clone();
         self.with_budget_store(|store| {
-            Ok(store.reconcile_budget_hold(BudgetReconcileHoldRequest {
+            let reconciled = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
                 capability_id: capability_id.to_string(),
                 grant_index: charge.grant_index,
                 exposed_cost_units: charge.cost_charged,
@@ -16,7 +16,32 @@ impl ChioKernel {
                 event_id: Some(charge.reconcile_event_id()),
                 authority,
                 admission_operation: charge.admission_operation.clone(),
-            })?)
+            })?;
+            self.validate_budget_terminal_decision_for_store(
+                store,
+                &reconciled,
+                BudgetTerminalDecisionExpectation {
+                    authorization_metadata: &charge.authorize_metadata,
+                    expected_event_id: &charge.reconcile_event_id(),
+                    expected_authority: charge.authorize_metadata.authority.as_ref(),
+                    expected_capability_id: Some(capability_id),
+                    expected_grant_index: charge.grant_index,
+                    expected_hold_id: &charge.budget_hold_id,
+                    expected_admission_operation: charge.admission_operation.as_ref(),
+                    expected_mutation_kind:
+                        crate::budget_store::BudgetMutationKind::ReconcileSpend,
+                    expected_exposure_units: charge.cost_charged,
+                    expected_realized_spend_units: realized_cost_units.min(charge.cost_charged),
+                    expected_invocation_state: if charge.admission_operation.is_some() {
+                        BudgetInvocationReservationState::Captured
+                    } else {
+                        BudgetInvocationReservationState::Absent
+                    },
+                    expected_monetary_state: BudgetMonetaryHoldState::Reconciled,
+                    stage: "budget reconcile",
+                },
+            )?;
+            Ok(reconciled)
         })
     }
 
@@ -104,6 +129,8 @@ impl ChioKernel {
             // forged by a caller-supplied override. Pass it as the winning (second)
             // argument, matching the reconciled-hold path (see
             // `merge_budget_receipt_metadata`).
+            let mut extra_metadata = extra_metadata;
+            strip_reserved_economic_receipt_metadata(&mut extra_metadata);
             let metadata = merge_metadata_objects(extra_metadata, Some(payment_meta));
             return self.finalize_tool_output_with_metadata_and_security_context(
                 FinalizeToolOutputRequest {
@@ -122,7 +149,7 @@ impl ChioKernel {
         // authorization gate that dispatches a pass-through while the real tool
         // runs elsewhere) never yields a settled, reconciled authoritative
         // spend: nothing executed here, so there is no realized cost to
-        // reconcile. Reverse the pre-execution hold and emit a provisional
+        // reconcile. Release the pre-execution monetary exposure and emit a provisional
         // receipt. Guarded on the absence of a payment authorization because
         // such gates carry no prepayment; a prepaid invocation always runs
         // through the measured settlement path below.
@@ -379,11 +406,13 @@ impl ChioKernel {
 
         let limited_output = self.apply_stream_limits(output, elapsed)?;
         let budget_metadata =
-            self.budget_execution_receipt_metadata(&charge, Some(("reconciled", &reconcile)), None);
+            self.budget_execution_receipt_metadata(&charge, Some(("reconciled", &reconcile)), None)?;
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
+        let mut extra_metadata = extra_metadata;
+        strip_reserved_economic_receipt_metadata(&mut extra_metadata);
         let merged_extra_metadata = merge_metadata_objects(
-            financial_json,
             self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+            financial_json,
         );
 
         let post_invocation = if security_context.is_some() {
@@ -463,7 +492,7 @@ impl ChioKernel {
                     &charge,
                     Some(("reconciled", &reconcile)),
                     execution_nonce_id,
-                );
+                )?;
                 let merged = self.merge_budget_receipt_metadata(
                     post_invocation.extra_metadata,
                     budget_metadata,

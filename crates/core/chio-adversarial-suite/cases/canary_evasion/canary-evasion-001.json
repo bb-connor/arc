@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "canary_evasion_detected",
   "threat_id": "behavioral_sequence_attack",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -31,7 +31,9 @@
           "replacement": "Ok(None)"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/tripwire_after_dispatch/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/tripwire_after_dispatch/mutants.out/outcomes.json",
+          "sha256": "585d08bde39bc8b53e54ce2ba8774883d05d502cf5c6788035e68036aadcb3b2",
+          "inputs_sha256": "efcecfc80292b4efc73949501256a618938e3aef05d681c3c083b10072fceea9"
         }
       }
     ]

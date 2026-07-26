@@ -452,6 +452,7 @@ mod budget_handlers_tests {
         let mut digest_input = b"chio.revocation-set.v1\0".to_vec();
         digest_input.extend_from_slice(&canonical);
         let payload = CompositeBudgetAuthorizeRequest {
+            existing_only: false,
             operation_id: "operation-budget".to_string(),
             request_binding_hash: "44".repeat(32),
             capability_id: "cap-composite".to_string(),
@@ -487,6 +488,7 @@ mod budget_handlers_tests {
                 aggregate_root_capability_id: Some("cap-root".to_string()),
                 aggregate_binding_digest: Some("44".repeat(32)),
                 supplemental_binding: None,
+                partition_escrow_evidence: None,
             },
         };
         let authority = BudgetEventAuthority {
@@ -494,7 +496,8 @@ mod budget_handlers_tests {
             lease_id: "lease-7".to_string(),
             lease_epoch: 7,
         };
-        let prepared = sqlite_composite_authorize_input(&payload, authority.clone()).test_unwrap();
+        let prepared =
+            sqlite_composite_authorize_input(&payload, authority.clone(), None).test_unwrap();
         assert_eq!(prepared.input().authority.as_ref(), Some(&authority));
         assert_eq!(prepared.input().invocation_quotas.len(), 2);
         assert_eq!(
@@ -672,6 +675,7 @@ mod budget_handlers_tests {
             lease_ttl_ms: 750,
             guarantee_level: "ha_quorum_commit".to_string(),
             budget_commit_index: Some(42),
+            partition_escrow_evidence: None,
         };
         assert!(budget_authority_metadata_matches_event(
             &metadata, &authority

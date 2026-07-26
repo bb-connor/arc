@@ -16,19 +16,12 @@ pub(crate) enum ReservedHoldStamp<'a> {
         charge: &'a BudgetChargeResult,
         payment_reference: Option<String>,
     },
-    /// An invocation-only reserve whose invocation debit and zero-exposure hold
-    /// were committed atomically. The builder stamps that exact existing hold;
-    /// reverse-by-nonce or a stamp failure can return the invocation.
-    InvocationReservation {
-        reservation: &'a BudgetInvocationReservationResult,
-    },
 }
 
 impl ReservedHoldStamp<'_> {
     fn hold_id(&self) -> &str {
         match self {
             Self::Monetary { charge, .. } => charge.budget_hold_id.as_str(),
-            Self::InvocationReservation { reservation } => reservation.budget_hold_id.as_str(),
         }
     }
 }
@@ -279,41 +272,6 @@ impl ChioKernel {
                     // reconcile-by-nonce or the TTL reaper releases the parent's
                     // headroom when it closes.
                     self.record_reserved_sibling_share(charge.budget_hold_id.as_str(), cap);
-                }
-                ReservedHoldStamp::InvocationReservation { reservation } => {
-                    // An invocation reserve carries no monetary ceiling, but its
-                    // delegation lineage is still recorded so reconcile-by-nonce
-                    // stamps the true depth/root rather than zero.
-                    let envelope = crate::budget_store::ReservedHoldEnvelope {
-                        budget_total: None,
-                        delegation_depth: cap.delegation_chain.len() as u32,
-                        root_budget_holder: cap.issuer.to_hex(),
-                    };
-                    if let Err(error) = self.with_budget_store(|store| {
-                        Ok(store.mark_invocation_hold_reserved(
-                            reservation.budget_hold_id.as_str(),
-                            &cap.id,
-                            reservation.grant_index,
-                            reserved_until,
-                            &envelope,
-                        )?)
-                    }) {
-                        // Authorization already committed the invocation debit and
-                        // zero-exposure hold. A failed TTL stamp must reverse that
-                        // exact hold with its original authority metadata, then
-                        // release the delegated sibling-sum share. The receipt is
-                        // not yet persisted, so no orphaned receipt stands over the
-                        // released state.
-                        self.reverse_budget_invocation_reservation(&cap.id, reservation)?;
-                        self.release_admitted_capability_budget(cap)
-                            .map_err(KernelError::DelegationInvalid)?;
-                        return Err(error);
-                    }
-                    // The invocation hold is durable: keep the delegated child's
-                    // sibling-sum share admitted and record it against the hold so
-                    // reconcile-by-nonce or the TTL reaper releases the parent's
-                    // headroom when the hold closes, matching the monetary reserve.
-                    self.record_reserved_sibling_share(reservation.budget_hold_id.as_str(), cap);
                 }
             }
         }

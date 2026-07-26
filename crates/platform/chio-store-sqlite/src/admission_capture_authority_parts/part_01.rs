@@ -709,7 +709,7 @@ impl SqliteAdmissionCaptureAuthority {
                 None,
                 now,
             )?;
-            let budget_commit = denial_budget_metadata(&request);
+            let budget_commit = denial_budget_metadata(transaction, &request)?;
             let metadata = AdmissionCaptureMetadata::new(AdmissionCaptureMetadataInput {
                 operation_id: request.operation_id().to_string(),
                 checked_revocation_set_digest: request.bound_revocation_set_digest().to_string(),

@@ -18,6 +18,162 @@ use crate::execution_nonce::{
     InMemoryExecutionNonceStore, NonceBinding,
 };
 
+fn install_fixture_budget_admission_authorities(kernel: &mut ChioKernel, prefix: &str) {
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-operations"
+        )))
+        .expect("install fixture admission operation store");
+    kernel
+        .set_budget_store_handle(durable_atomic_test_budget_store(&format!(
+            "{prefix}-budget"
+        )))
+        .expect("install fixture budget store");
+}
+
+struct OperationDecliningNoncePaymentAdapter {
+    operation_adapter: crate::payment::SimPaymentAdapter,
+}
+
+impl OperationDecliningNoncePaymentAdapter {
+    fn new() -> Self {
+        Self {
+            operation_adapter: crate::payment::SimPaymentAdapter::new(),
+        }
+    }
+}
+
+impl PaymentAdapter for OperationDecliningNoncePaymentAdapter {
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        true
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        true
+    }
+
+    fn authorize(
+        &self,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        PaymentAdapter::authorize(&DecliningPaymentAdapter, request)
+    }
+
+    fn capture(
+        &self,
+        authorization_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        PaymentAdapter::capture(
+            &DecliningPaymentAdapter,
+            authorization_id,
+            amount_units,
+            currency,
+            reference,
+        )
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        PaymentAdapter::release(&DecliningPaymentAdapter, authorization_id, reference)
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        PaymentAdapter::refund(
+            &DecliningPaymentAdapter,
+            transaction_id,
+            amount_units,
+            currency,
+            reference,
+        )
+    }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        let _ = self
+            .operation_adapter
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)?;
+        if request.operation_id.as_deref() != Some(operation_id)
+            || request.request_binding_hash.as_deref() != Some(request_binding_hash)
+        {
+            return Err(PaymentError::RailError(
+                "payment authorization request does not match its admission operation".to_string(),
+            ));
+        }
+        Err(PaymentError::InsufficientFunds)
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        let _ = self
+            .operation_adapter
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)?;
+        Ok(None)
+    }
+
+    fn capture_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.operation_adapter.capture_for_operation(request)
+    }
+
+    fn release_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.operation_adapter.release_for_operation(
+            operation_id,
+            request_binding_hash,
+            authorization_id,
+            reference,
+        )
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.operation_adapter.refund_for_operation(request)
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        self.operation_adapter.settlement_state_for_operation(
+            operation_id,
+            request_binding_hash,
+            reference,
+            authorization_id,
+        )
+    }
+}
+
 struct SelectiveAuthorityArtifactTrustResolver {
     key: PublicKey,
     denied_artifact: std::sync::Arc<std::sync::Mutex<Option<Vec<u8>>>>,
@@ -597,7 +753,10 @@ fn strict_nonce_mode_ordinary_aggregate_admission_owns_replay_reservation() {
 fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter)).expect("install payment adapter");
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-payment-denial");
+    kernel
+        .set_payment_adapter(Box::new(OperationDecliningNoncePaymentAdapter::new()))
+        .expect("install payment adapter");
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "cost-srv".to_string(),
         invocations: invocations.clone(),
@@ -659,7 +818,7 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
 
     kernel
-        .set_payment_adapter(Box::new(DeterministicPaymentAdapter))
+        .set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()))
         .expect("install payment adapter");
     request.request_id = "req-nonce-payment-allow".to_string();
     let allowed = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -820,6 +979,7 @@ fn in_memory_store_ttl_grace_period_does_not_regress() {
 #[test]
 fn mediated_allow_receipt_records_bound_execution_nonce_id() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-mediated-allow");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig { nonce_ttl_secs: 30, nonce_store_capacity: 1024, require_nonce: false };
@@ -868,6 +1028,7 @@ fn reserving_authorization_keeps_hold_open_and_blocks_oversubscription() {
     use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
 
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-reservation-oversubscription");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig {
@@ -967,6 +1128,7 @@ fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
     use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
 
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-strict-retry-spend");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig {
@@ -1047,6 +1209,7 @@ fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
 
 fn reconcile_kernel_and_cap() -> (ChioKernel, Keypair, CapabilityToken, ExecutionNonceConfig) {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-reconcile");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig {
@@ -1268,6 +1431,7 @@ fn reconcile_by_nonce_clamps_realized_above_reserved() {
     use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
 
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-reconcile-clamp");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig {
@@ -1315,6 +1479,7 @@ fn reconcile_by_nonce_clamps_realized_above_reserved() {
 #[test]
 fn reserved_hold_ttl_reaper_settles_expired_authorization_at_worst_case() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-reservation-reaper");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig {
@@ -1499,6 +1664,7 @@ fn reconcile_by_nonce_normalizes_currency_for_zero_exposure_invocation() {
     // unchecked, caller-supplied currency must not reach the signed receipt: it is
     // normalized to the canonical inert value instead.
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-zero-exposure-currency");
     let agent_kp = Keypair::generate();
     let cfg = ExecutionNonceConfig {
         nonce_ttl_secs: 30,
@@ -1555,6 +1721,7 @@ fn reserving_authorization_succeeds_for_unregistered_tool_server() {
     // registered. This lets the sidecar stop registering caller-arbitrary server
     // ids (unbounded growth) into the kernel.
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-unregistered-reservation");
     let agent_kp = Keypair::generate();
     // Deliberately do NOT register "unreg-srv".
     let cfg = ExecutionNonceConfig {
@@ -1658,6 +1825,7 @@ fn dispatch_for_unregistered_tool_server_still_denies() {
 #[test]
 fn reserving_authorization_terminal_state_matches_receipt_decision_reason() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-reservation-reason");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig {
@@ -1747,6 +1915,7 @@ fn preflight_retry_terminal_state_matches_receipt_decision_reason() {
 #[test]
 fn reserving_authorization_rejects_presented_execution_nonce() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(&mut kernel, "nonce-presented-reservation");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let cfg = ExecutionNonceConfig {

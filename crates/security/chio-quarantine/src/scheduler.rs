@@ -194,7 +194,7 @@ impl<
         for work in &claimed {
             if work.tenant_id != request.tenant_id
                 || work.lease_owner_id != request.lease_owner_id
-                || work.lease_expires_at_unix_ms != lease_expires_at_unix_ms
+                || work.lease_expires_at_unix_ms < lease_expires_at_unix_ms
             {
                 return Err(SchedulerError::InvalidClaim);
             }

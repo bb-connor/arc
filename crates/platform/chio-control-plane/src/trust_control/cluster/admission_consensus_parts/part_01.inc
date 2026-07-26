@@ -32,7 +32,9 @@ struct AdmissionSecurityTable {
     rows: Vec<Vec<AdmissionGenesisValue>>,
 }
 
-use AdmissionGenesisValueType::{Integer as GenesisInteger, Text as GenesisText};
+use AdmissionGenesisValueType::{
+    Blob as GenesisBlob, Integer as GenesisInteger, Text as GenesisText,
+};
 
 const ADMISSION_GENESIS_TABLES: &[AdmissionGenesisTableSpec] = &[
     AdmissionGenesisTableSpec {
@@ -140,6 +142,12 @@ const ADMISSION_GENESIS_TABLES: &[AdmissionGenesisTableSpec] = &[
             ("lease_epoch", GenesisInteger),
             ("created_at", GenesisInteger),
             ("updated_at", GenesisInteger),
+            ("reserved_until", GenesisInteger),
+            ("reserved_currency", GenesisText),
+            ("reserved_payment_reference", GenesisText),
+            ("reserved_budget_total", GenesisInteger),
+            ("reserved_delegation_depth", GenesisInteger),
+            ("reserved_root_budget_holder", GenesisText),
         ],
     },
     AdmissionGenesisTableSpec {
@@ -161,6 +169,14 @@ const ADMISSION_GENESIS_TABLES: &[AdmissionGenesisTableSpec] = &[
             ("max_invocations", GenesisInteger),
             ("reserved_invocations_after", GenesisInteger),
             ("captured_invocations_after", GenesisInteger),
+        ],
+    },
+    AdmissionGenesisTableSpec {
+        name: "budget_composite_partition_escrow_evidence",
+        columns: &[
+            ("hold_id", GenesisText),
+            ("evidence_digest", GenesisText),
+            ("canonical_evidence", GenesisBlob),
         ],
     },
     AdmissionGenesisTableSpec {
@@ -300,6 +316,8 @@ const ADMISSION_GENESIS_TABLES: &[AdmissionGenesisTableSpec] = &[
 ];
 
 const ADMISSION_GENESIS_EXCLUDED_TABLES: &[&str] = &[
+    "chio_store_schema_versions",
+    "payment_journal",
     "budget_replication_meta",
     "budget_import_floors",
     "budget_ack_head_watermark",
@@ -354,6 +372,19 @@ struct AdmissionConsensusRejection {
 #[derive(Debug, Clone)]
 pub(crate) struct AdmissionConsensusStore {
     path: PathBuf,
+    read_only: bool,
+    database_identity_file:
+        Option<Arc<chio_store_sqlite::durable_sqlite::DurableSqliteFile>>,
+}
+
+#[derive(Debug, Clone)]
+struct CommittedAdmissionOperationSnapshot {
+    meta: AdmissionConsensusMetaView,
+    read_barrier: Option<AdmissionCommitProof>,
+    entry: Option<AdmissionLogEntry>,
+    result_commit_proof: Option<AdmissionCommitProof>,
+    result_commit_target: Option<AdmissionLogEntry>,
+    result: Option<AdmissionConsensusResult>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -464,7 +495,11 @@ impl AdmissionConsensusStore {
         let mut connection = Connection::open(&path)?;
         configure_connection(&connection)?;
         initialize_schema(&mut connection)?;
-        Ok(Self { path })
+        Ok(Self {
+            path,
+            read_only: false,
+            database_identity_file: None,
+        })
     }
 
     pub(crate) fn open_existing(path: impl AsRef<Path>) -> Result<Self, AdmissionConsensusError> {
@@ -478,7 +513,35 @@ impl AdmissionConsensusStore {
         configure_connection(&connection)?;
         load_meta(&connection)?;
         validate_consensus_result_schema(&connection)?;
-        Ok(Self { path })
+        Ok(Self {
+            path,
+            read_only: false,
+            database_identity_file: None,
+        })
+    }
+
+    pub(crate) fn open_existing_read_only(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, AdmissionConsensusError> {
+        let path = path.as_ref().to_path_buf();
+        validate_existing_consensus_file(&path)?;
+        let directory = chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory::open_for_database(
+            &path,
+        )
+        .map_err(|error| AdmissionConsensusError::Protocol(error.to_string()))?;
+        let database_identity_file = directory
+            .open_existing_database_read_only(&path)
+            .map_err(|error| AdmissionConsensusError::Protocol(error.to_string()))?;
+        let connection = database_identity_file
+            .open_read_only_connection()
+            .map_err(|error| AdmissionConsensusError::Protocol(error.to_string()))?;
+        configure_read_only_consensus_connection(&connection)?;
+        validate_read_only_consensus_connection(&connection)?;
+        Ok(Self {
+            path,
+            read_only: true,
+            database_identity_file: Some(database_identity_file),
+        })
     }
 
     pub(crate) fn validate_integrity(&self) -> Result<(), AdmissionConsensusError> {
@@ -489,6 +552,67 @@ impl AdmissionConsensusStore {
     pub(crate) fn meta(&self) -> Result<AdmissionConsensusMetaView, AdmissionConsensusError> {
         let connection = self.connection()?;
         load_meta(&connection)
+    }
+
+    fn committed_operation_snapshot(
+        &self,
+        operation_id: &str,
+    ) -> Result<CommittedAdmissionOperationSnapshot, AdmissionConsensusError> {
+        validate_operation_id(operation_id)?;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        validate_integrity(&transaction)?;
+        let meta = load_meta(&transaction)?;
+        let read_barrier = if meta.commit_index == 0 {
+            None
+        } else {
+            Some(load_commit_proof(&transaction, meta.commit_index)?.ok_or_else(|| {
+                AdmissionConsensusError::Protocol(
+                    "admission committed read barrier proof is missing".to_string(),
+                )
+            })?)
+        };
+        let entry = load_entry_by_operation(&transaction, operation_id)?;
+        if let Some(entry) = entry.as_ref() {
+            validate_entry(entry)?;
+        }
+        let result = load_result(&transaction, operation_id)?;
+        if let Some(result) = result.as_ref() {
+            validate_canonical_json(&result.response_json, "admission persisted result")?;
+            if sha256_hex(result.response_json.as_bytes()) != result.response_digest
+                || !is_lower_sha256(&result.security_projection_digest)
+                || entry.as_ref().is_none_or(|entry| {
+                    entry.index != result.log_index || entry.operation_id != result.operation_id
+                })
+            {
+                return Err(AdmissionConsensusError::Protocol(
+                    "admission persisted result does not match its entry or digest".to_string(),
+                ));
+            }
+        }
+        let result_commit_proof = match entry.as_ref() {
+            Some(entry) => load_commit_proof(&transaction, entry.index)?,
+            None => None,
+        };
+        let result_commit_target = match result_commit_proof.as_ref() {
+            Some(proof) => Some(
+                load_entry(&transaction, proof.current_term_commit_index)?.ok_or_else(|| {
+                    AdmissionConsensusError::Protocol(
+                        "admission result commit proof target is missing".to_string(),
+                    )
+                })?,
+            ),
+            None => None,
+        };
+        transaction.rollback()?;
+        Ok(CommittedAdmissionOperationSnapshot {
+            meta,
+            read_barrier,
+            entry,
+            result_commit_proof,
+            result_commit_target,
+            result,
+        })
     }
 
     fn genesis_projection(
@@ -1482,8 +1606,23 @@ impl AdmissionConsensusStore {
     }
 
     fn connection(&self) -> Result<Connection, AdmissionConsensusError> {
-        let connection = Connection::open(&self.path)?;
-        configure_connection(&connection)?;
-        Ok(connection)
+        if self.read_only {
+            let database_identity_file = self.database_identity_file.as_ref().ok_or_else(|| {
+                AdmissionConsensusError::Protocol(
+                    "read-only admission consensus store omitted its retained file identity"
+                        .to_string(),
+                )
+            })?;
+            let connection = database_identity_file
+                .open_read_only_connection()
+                .map_err(|error| AdmissionConsensusError::Protocol(error.to_string()))?;
+            configure_read_only_consensus_connection(&connection)?;
+            validate_read_only_consensus_connection(&connection)?;
+            Ok(connection)
+        } else {
+            let connection = Connection::open(&self.path)?;
+            configure_connection(&connection)?;
+            Ok(connection)
+        }
     }
 }

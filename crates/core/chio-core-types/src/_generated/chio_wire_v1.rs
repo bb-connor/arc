@@ -233334,6 +233334,7 @@ pub mod trust_control__admission_capture_metadata {
     ///    "guaranteeLevel": {
     ///      "enum": [
     ///        "single_node_atomic",
+    ///        "partition_escrowed",
     ///        "ha_linearizable"
     ///      ]
     ///    },
@@ -233368,6 +233369,24 @@ pub mod trust_control__admission_capture_metadata {
     ///    "operationId": {
     ///      "$ref": "#/$defs/identifier"
     ///    },
+    ///    "partitionEscrowEvidence": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "canonicalJson",
+    ///        "digest"
+    ///      ],
+    ///      "properties": {
+    ///        "canonicalJson": {
+    ///          "type": "string",
+    ///          "maxLength": 1048576,
+    ///          "minLength": 2
+    ///        },
+    ///        "digest": {
+    ///          "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
     ///    "revocationCommitIndex": {
     ///      "type": "integer",
     ///      "minimum": 0.0
@@ -233377,52 +233396,288 @@ pub mod trust_control__admission_capture_metadata {
     ///}
     /// ```
     /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
+    #[derive(Clone, Debug)]
     pub struct ChioAuthoritativeAdmissionCaptureReceiptProjection {
-        #[serde(
-            rename = "aggregateRootBindingDigest",
-            default,
-            skip_serializing_if = "::std::option::Option::is_none"
-        )]
         pub aggregate_root_binding_digest: ::std::option::Option<Digest>,
-        #[serde(
-            rename = "aggregateRootCapabilityId",
-            default,
-            skip_serializing_if = "::std::option::Option::is_none"
-        )]
         pub aggregate_root_capability_id: ::std::option::Option<Identifier>,
         pub authority: Authority,
-        #[serde(rename = "authorityCommitIndex")]
         pub authority_commit_index: u64,
-        #[serde(rename = "authorizationArtifactDigests")]
         pub authorization_artifact_digests: Vec<Digest>,
-        #[serde(rename = "budgetCommitIndex")]
         pub budget_commit_index: ::std::num::NonZeroU64,
-        #[serde(rename = "checkedRevocationSetDigest")]
         pub checked_revocation_set_digest: Digest,
-        #[serde(rename = "eventId")]
         pub event_id: Identifier,
-        #[serde(rename = "guaranteeLevel")]
         pub guarantee_level: ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel,
-        #[serde(rename = "holdId")]
         pub hold_id: Identifier,
-        #[serde(rename = "invocationQuotas")]
         pub invocation_quotas: ::std::vec::Vec<InvocationQuotaTransition>,
-        #[serde(rename = "invocationState")]
         pub invocation_state: ::serde_json::Value,
-        #[serde(
-            rename = "leaderEpoch",
-            default,
-            skip_serializing_if = "::std::option::Option::is_none"
-        )]
         pub leader_epoch: ::std::option::Option<::std::num::NonZeroU64>,
-        #[serde(rename = "monetaryState")]
         pub monetary_state: ChioAuthoritativeAdmissionCaptureReceiptProjectionMonetaryState,
-        #[serde(rename = "operationId")]
         pub operation_id: Identifier,
-        #[serde(rename = "revocationCommitIndex")]
+        pub partition_escrow_evidence: ::std::option::Option<
+            ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence,
+        >,
         pub revocation_commit_index: u64,
+    }
+    struct AdmissionCaptureOptionalField<T> {
+        value: ::std::option::Option<T>,
+        was_present: bool,
+    }
+    impl<T> ::std::default::Default for AdmissionCaptureOptionalField<T> {
+        fn default() -> Self {
+            Self {
+                value: None,
+                was_present: false,
+            }
+        }
+    }
+    impl<'de, T> ::serde::Deserialize<'de> for AdmissionCaptureOptionalField<T>
+    where
+        T: ::serde::Deserialize<'de>,
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            let value = <::std::option::Option<T> as ::serde::Deserialize>::deserialize(
+                deserializer,
+            )?;
+            Ok(Self {
+                value,
+                was_present: true,
+            })
+        }
+    }
+    #[derive(::serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct ChioAuthoritativeAdmissionCaptureReceiptProjectionWire {
+        #[serde(rename = "aggregateRootBindingDigest", default)]
+        aggregate_root_binding_digest: ::std::option::Option<Digest>,
+        #[serde(rename = "aggregateRootCapabilityId", default)]
+        aggregate_root_capability_id: ::std::option::Option<Identifier>,
+        authority: Authority,
+        #[serde(rename = "authorityCommitIndex")]
+        authority_commit_index: u64,
+        #[serde(rename = "authorizationArtifactDigests")]
+        authorization_artifact_digests: Vec<Digest>,
+        #[serde(rename = "budgetCommitIndex")]
+        budget_commit_index: ::std::num::NonZeroU64,
+        #[serde(rename = "checkedRevocationSetDigest")]
+        checked_revocation_set_digest: Digest,
+        #[serde(rename = "eventId")]
+        event_id: Identifier,
+        #[serde(rename = "guaranteeLevel")]
+        guarantee_level: ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel,
+        #[serde(rename = "holdId")]
+        hold_id: Identifier,
+        #[serde(rename = "invocationQuotas")]
+        invocation_quotas: ::std::vec::Vec<InvocationQuotaTransition>,
+        #[serde(rename = "invocationState")]
+        invocation_state: ::serde_json::Value,
+        #[serde(rename = "leaderEpoch", default)]
+        leader_epoch: AdmissionCaptureOptionalField<::std::num::NonZeroU64>,
+        #[serde(rename = "monetaryState")]
+        monetary_state: ChioAuthoritativeAdmissionCaptureReceiptProjectionMonetaryState,
+        #[serde(rename = "operationId")]
+        operation_id: Identifier,
+        #[serde(rename = "partitionEscrowEvidence", default)]
+        partition_escrow_evidence: AdmissionCaptureOptionalField<
+            ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence,
+        >,
+        #[serde(rename = "revocationCommitIndex")]
+        revocation_commit_index: u64,
+    }
+    impl ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        fn validate_guarantee_evidence(
+            &self,
+            leader_epoch_present: bool,
+            partition_escrow_evidence_present: bool,
+        ) -> ::std::result::Result<(), &'static str> {
+            use ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel::{
+                HaLinearizable, PartitionEscrowed, SingleNodeAtomic,
+            };
+            match self.guarantee_level {
+                SingleNodeAtomic => {
+                    if leader_epoch_present {
+                        return Err("single_node_atomic admission capture forbids leaderEpoch");
+                    }
+                    if partition_escrow_evidence_present {
+                        return Err(
+                            "single_node_atomic admission capture forbids partitionEscrowEvidence",
+                        );
+                    }
+                }
+                PartitionEscrowed => {
+                    if leader_epoch_present {
+                        return Err("partition_escrowed admission capture forbids leaderEpoch");
+                    }
+                    if self.partition_escrow_evidence.is_none() {
+                        return Err(
+                            "partition_escrowed admission capture requires partitionEscrowEvidence",
+                        );
+                    }
+                }
+                HaLinearizable => {
+                    if self.leader_epoch.is_none() {
+                        return Err("ha_linearizable admission capture requires leaderEpoch");
+                    }
+                    if partition_escrow_evidence_present {
+                        return Err(
+                            "ha_linearizable admission capture forbids partitionEscrowEvidence",
+                        );
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            let wire = <ChioAuthoritativeAdmissionCaptureReceiptProjectionWire as ::serde::Deserialize>::deserialize(
+                deserializer,
+            )?;
+            let leader_epoch_present = wire.leader_epoch.was_present;
+            let partition_escrow_evidence_present = wire.partition_escrow_evidence.was_present;
+            let value = Self {
+                aggregate_root_binding_digest: wire.aggregate_root_binding_digest,
+                aggregate_root_capability_id: wire.aggregate_root_capability_id,
+                authority: wire.authority,
+                authority_commit_index: wire.authority_commit_index,
+                authorization_artifact_digests: wire.authorization_artifact_digests,
+                budget_commit_index: wire.budget_commit_index,
+                checked_revocation_set_digest: wire.checked_revocation_set_digest,
+                event_id: wire.event_id,
+                guarantee_level: wire.guarantee_level,
+                hold_id: wire.hold_id,
+                invocation_quotas: wire.invocation_quotas,
+                invocation_state: wire.invocation_state,
+                leader_epoch: wire.leader_epoch.value,
+                monetary_state: wire.monetary_state,
+                operation_id: wire.operation_id,
+                partition_escrow_evidence: wire.partition_escrow_evidence.value,
+                revocation_commit_index: wire.revocation_commit_index,
+            };
+            value
+                .validate_guarantee_evidence(
+                    leader_epoch_present,
+                    partition_escrow_evidence_present,
+                )
+                .map_err(<D::Error as ::serde::de::Error>::custom)?;
+            Ok(value)
+        }
+    }
+    impl ::serde::Serialize for ChioAuthoritativeAdmissionCaptureReceiptProjection {
+        fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
+        where
+            S: ::serde::Serializer,
+        {
+            self.validate_guarantee_evidence(
+                self.leader_epoch.is_some(),
+                self.partition_escrow_evidence.is_some(),
+            )
+                .map_err(<S::Error as ::serde::ser::Error>::custom)?;
+            let mut state = serializer.serialize_struct(
+                "ChioAuthoritativeAdmissionCaptureReceiptProjection",
+                17,
+            )?;
+            if let Some(value) = &self.aggregate_root_binding_digest {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "aggregateRootBindingDigest",
+                    value,
+                )?;
+            }
+            if let Some(value) = &self.aggregate_root_capability_id {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "aggregateRootCapabilityId",
+                    value,
+                )?;
+            }
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "authority",
+                &self.authority,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "authorityCommitIndex",
+                &self.authority_commit_index,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "authorizationArtifactDigests",
+                &self.authorization_artifact_digests,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "budgetCommitIndex",
+                &self.budget_commit_index,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "checkedRevocationSetDigest",
+                &self.checked_revocation_set_digest,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "eventId",
+                &self.event_id,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "guaranteeLevel",
+                &self.guarantee_level,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "holdId",
+                &self.hold_id,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "invocationQuotas",
+                &self.invocation_quotas,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "invocationState",
+                &self.invocation_state,
+            )?;
+            if let Some(value) = &self.leader_epoch {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "leaderEpoch",
+                    value,
+                )?;
+            }
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "monetaryState",
+                &self.monetary_state,
+            )?;
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "operationId",
+                &self.operation_id,
+            )?;
+            if let Some(value) = &self.partition_escrow_evidence {
+                ::serde::ser::SerializeStruct::serialize_field(
+                    &mut state,
+                    "partitionEscrowEvidence",
+                    value,
+                )?;
+            }
+            ::serde::ser::SerializeStruct::serialize_field(
+                &mut state,
+                "revocationCommitIndex",
+                &self.revocation_commit_index,
+            )?;
+            ::serde::ser::SerializeStruct::end(state)
+        }
     }
     impl ::std::convert::From<&ChioAuthoritativeAdmissionCaptureReceiptProjection>
     for ChioAuthoritativeAdmissionCaptureReceiptProjection {
@@ -233438,6 +233693,7 @@ pub mod trust_control__admission_capture_metadata {
     ///{
     ///  "enum": [
     ///    "single_node_atomic",
+    ///    "partition_escrowed",
     ///    "ha_linearizable"
     ///  ]
     ///}
@@ -233458,6 +233714,8 @@ pub mod trust_control__admission_capture_metadata {
     pub enum ChioAuthoritativeAdmissionCaptureReceiptProjectionGuaranteeLevel {
         #[serde(rename = "single_node_atomic")]
         SingleNodeAtomic,
+        #[serde(rename = "partition_escrowed")]
+        PartitionEscrowed,
         #[serde(rename = "ha_linearizable")]
         HaLinearizable,
     }
@@ -233474,6 +233732,7 @@ pub mod trust_control__admission_capture_metadata {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::SingleNodeAtomic => f.write_str("single_node_atomic"),
+                Self::PartitionEscrowed => f.write_str("partition_escrowed"),
                 Self::HaLinearizable => f.write_str("ha_linearizable"),
             }
         }
@@ -233486,6 +233745,7 @@ pub mod trust_control__admission_capture_metadata {
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             match value {
                 "single_node_atomic" => Ok(Self::SingleNodeAtomic),
+                "partition_escrowed" => Ok(Self::PartitionEscrowed),
                 "ha_linearizable" => Ok(Self::HaLinearizable),
                 _ => Err("invalid value".into()),
             }
@@ -233624,6 +233884,145 @@ pub mod trust_control__admission_capture_metadata {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
+        }
+    }
+    ///`ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "canonicalJson",
+    ///    "digest"
+    ///  ],
+    ///  "properties": {
+    ///    "canonicalJson": {
+    ///      "type": "string",
+    ///      "maxLength": 1048576,
+    ///      "minLength": 2
+    ///    },
+    ///    "digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence {
+        #[serde(rename = "canonicalJson")]
+        pub canonical_json: ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson,
+        pub digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    }
+    impl ::std::convert::From<
+        &ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence,
+    > for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence {
+        fn from(
+            value: &ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidence,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 1048576,
+    ///  "minLength": 2
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref
+    for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<
+        ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson,
+    > for ::std::string::String {
+        fn from(
+            value: ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<
+        &ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson,
+    >
+    for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson {
+        fn from(
+            value: &ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1048576usize {
+                return Err("longer than 1048576 characters".into());
+            }
+            if value.chars().count() < 2usize {
+                return Err("shorter than 2 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioAuthoritativeAdmissionCaptureReceiptProjectionPartitionEscrowEvidenceCanonicalJson {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374`
@@ -233818,6 +234217,495 @@ pub mod trust_control__admission_capture_metadata {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition696e766f636174696f6e51756f7461`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "key",
+    ///    "maxInvocations"
+    ///  ],
+    ///  "properties": {
+    ///    "key": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_71756f74614b6579"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition696e766f636174696f6e51756f7461 {
+        pub key: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: u32,
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition696e766f636174696f6e51756f7461,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition696e766f636174696f6e51756f7461 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition696e766f636174696f6e51756f7461,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "canonicalJson",
+    ///    "digest"
+    ///  ],
+    ///  "properties": {
+    ///    "canonicalJson": {
+    ///      "type": "string",
+    ///      "maxLength": 1048576,
+    ///      "minLength": 2
+    ///    },
+    ///    "digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365 {
+        #[serde(rename = "canonicalJson")]
+        pub canonical_json: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson,
+        pub digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 1048576,
+    ///  "minLength": 2
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<
+        ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson,
+    > for ::std::string::String {
+        fn from(
+            value: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1048576usize {
+                return Err("longer than 1048576 characters".into());
+            }
+            if value.chars().count() < 2usize {
+                return Err("shorter than 2 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706172746974696f6e457363726f7745766964656e6365CanonicalJson {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579 {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<u32>,
+        #[serde(rename = "ownerId")]
+        pub owner_id: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        pub profile: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile,
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition71756f74614b6579Profile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition7265766f636174696f6e536574`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "digest",
+    ///    "ids"
+    ///  ],
+    ///  "properties": {
+    ///    "digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///      },
+    ///      "maxItems": 128,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition7265766f636174696f6e536574 {
+        pub digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub ids: Vec<
+            ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        >,
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition7265766f636174696f6e536574,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition7265766f636174696f6e536574 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition7265766f636174696f6e536574,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition737570706c656d656e74616c42696e64696e67`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "artifactDigest",
+    ///    "brokerCapabilityId",
+    ///    "claimBindingDigest",
+    ///    "expiresAt",
+    ///    "issuer",
+    ///    "negotiatedFeaturesDigest",
+    ///    "notBefore",
+    ///    "requestBindingHash",
+    ///    "requestConstraintDigest",
+    ///    "verifiedAt",
+    ///    "verifierId"
+    ///  ],
+    ///  "properties": {
+    ///    "artifactDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "brokerCapabilityId": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "claimBindingDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "expiresAt": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    },
+    ///    "negotiatedFeaturesDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "notBefore": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "requestBindingHash": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "requestConstraintDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "verifiedAt": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "verifierId": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition737570706c656d656e74616c42696e64696e67 {
+        #[serde(rename = "artifactDigest")]
+        pub artifact_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "brokerCapabilityId")]
+        pub broker_capability_id: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        #[serde(rename = "claimBindingDigest")]
+        pub claim_binding_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "expiresAt")]
+        pub expires_at: SafeInteger,
+        pub issuer: PublicKey,
+        #[serde(rename = "negotiatedFeaturesDigest")]
+        pub negotiated_features_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "notBefore")]
+        pub not_before: SafeInteger,
+        #[serde(rename = "requestBindingHash")]
+        pub request_binding_hash: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "requestConstraintDigest")]
+        pub request_constraint_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "verifiedAt")]
+        pub verified_at: SafeInteger,
+        #[serde(rename = "verifierId")]
+        pub verifier_id: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition737570706c656d656e74616c42696e64696e67,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition737570706c656d656e74616c42696e64696e67 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition737570706c656d656e74616c42696e64696e67,
+        ) -> Self {
+            value.clone()
         }
     }
     ///`Digest`
@@ -234265,6 +235153,215 @@ pub mod trust_control__admission_capture_metadata {
             value.parse()
         }
     }
+    ///`PartitionEscrowEvidence`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "canonicalJson",
+    ///    "digest"
+    ///  ],
+    ///  "properties": {
+    ///    "canonicalJson": {
+    ///      "type": "string",
+    ///      "maxLength": 1048576,
+    ///      "minLength": 2
+    ///    },
+    ///    "digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PartitionEscrowEvidence {
+        #[serde(rename = "canonicalJson")]
+        pub canonical_json: PartitionEscrowEvidenceCanonicalJson,
+        pub digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    }
+    impl ::std::convert::From<&PartitionEscrowEvidence> for PartitionEscrowEvidence {
+        fn from(value: &PartitionEscrowEvidence) -> Self {
+            value.clone()
+        }
+    }
+    ///`PartitionEscrowEvidenceCanonicalJson`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 1048576,
+    ///  "minLength": 2
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEvidenceCanonicalJson(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEvidenceCanonicalJson {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEvidenceCanonicalJson>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEvidenceCanonicalJson) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEvidenceCanonicalJson>
+    for PartitionEscrowEvidenceCanonicalJson {
+        fn from(value: &PartitionEscrowEvidenceCanonicalJson) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEvidenceCanonicalJson {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1048576usize {
+                return Err("longer than 1048576 characters".into());
+            }
+            if value.chars().count() < 2usize {
+                return Err("shorter than 2 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEvidenceCanonicalJson {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PublicKey> for ::std::string::String {
+        fn from(value: PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PublicKey> for PublicKey {
+        fn from(value: &PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`QuotaKey`
     ///
     /// <details><summary>JSON schema</summary>
@@ -234460,6 +235557,71 @@ pub mod trust_control__admission_capture_metadata {
             value.clone()
         }
     }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
     ///`SupplementalBinding`
     ///
     /// <details><summary>JSON schema</summary>
@@ -234469,19 +235631,47 @@ pub mod trust_control__admission_capture_metadata {
     ///  "type": "object",
     ///  "required": [
     ///    "artifactDigest",
+    ///    "brokerCapabilityId",
+    ///    "claimBindingDigest",
+    ///    "expiresAt",
+    ///    "issuer",
     ///    "negotiatedFeaturesDigest",
+    ///    "notBefore",
     ///    "requestBindingHash",
+    ///    "requestConstraintDigest",
+    ///    "verifiedAt",
     ///    "verifierId"
     ///  ],
     ///  "properties": {
     ///    "artifactDigest": {
     ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
     ///    },
+    ///    "brokerCapabilityId": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "claimBindingDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "expiresAt": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    },
     ///    "negotiatedFeaturesDigest": {
     ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
     ///    },
+    ///    "notBefore": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
     ///    "requestBindingHash": {
     ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "requestConstraintDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "verifiedAt": {
+    ///      "$ref": "#/$defs/safeInteger"
     ///    },
     ///    "verifierId": {
     ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
@@ -234496,10 +235686,23 @@ pub mod trust_control__admission_capture_metadata {
     pub struct SupplementalBinding {
         #[serde(rename = "artifactDigest")]
         pub artifact_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "brokerCapabilityId")]
+        pub broker_capability_id: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        #[serde(rename = "claimBindingDigest")]
+        pub claim_binding_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "expiresAt")]
+        pub expires_at: SafeInteger,
+        pub issuer: PublicKey,
         #[serde(rename = "negotiatedFeaturesDigest")]
         pub negotiated_features_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "notBefore")]
+        pub not_before: SafeInteger,
         #[serde(rename = "requestBindingHash")]
         pub request_binding_hash: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "requestConstraintDigest")]
+        pub request_constraint_digest: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "verifiedAt")]
+        pub verified_at: SafeInteger,
         #[serde(rename = "verifierId")]
         pub verifier_id: ChioResource74727573742d636f6e74726f6c2f6275646765742d696e766f636174696f6e2d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
     }
@@ -236052,6 +237255,9 @@ pub mod trust_control__budget_invocation_admission_evidence {
     ///      "maxItems": 8,
     ///      "minItems": 1
     ///    },
+    ///    "partitionEscrowEvidence": {
+    ///      "$ref": "#/$defs/partitionEscrowEvidence"
+    ///    },
     ///    "revocationSet": {
     ///      "$ref": "#/$defs/revocationSet"
     ///    },
@@ -236080,6 +237286,12 @@ pub mod trust_control__budget_invocation_admission_evidence {
         pub aggregate_root_capability_id: ::std::option::Option<Identifier>,
         #[serde(rename = "invocationQuotas")]
         pub invocation_quotas: ::std::vec::Vec<InvocationQuota>,
+        #[serde(
+            rename = "partitionEscrowEvidence",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub partition_escrow_evidence: ::std::option::Option<PartitionEscrowEvidence>,
         #[serde(rename = "revocationSet")]
         pub revocation_set: RevocationSet,
         #[serde(
@@ -236292,6 +237504,215 @@ pub mod trust_control__budget_invocation_admission_evidence {
             value.clone()
         }
     }
+    ///`PartitionEscrowEvidence`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "canonicalJson",
+    ///    "digest"
+    ///  ],
+    ///  "properties": {
+    ///    "canonicalJson": {
+    ///      "type": "string",
+    ///      "maxLength": 1048576,
+    ///      "minLength": 2
+    ///    },
+    ///    "digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PartitionEscrowEvidence {
+        #[serde(rename = "canonicalJson")]
+        pub canonical_json: PartitionEscrowEvidenceCanonicalJson,
+        pub digest: Digest,
+    }
+    impl ::std::convert::From<&PartitionEscrowEvidence> for PartitionEscrowEvidence {
+        fn from(value: &PartitionEscrowEvidence) -> Self {
+            value.clone()
+        }
+    }
+    ///`PartitionEscrowEvidenceCanonicalJson`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 1048576,
+    ///  "minLength": 2
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEvidenceCanonicalJson(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEvidenceCanonicalJson {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEvidenceCanonicalJson>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEvidenceCanonicalJson) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEvidenceCanonicalJson>
+    for PartitionEscrowEvidenceCanonicalJson {
+        fn from(value: &PartitionEscrowEvidenceCanonicalJson) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEvidenceCanonicalJson {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1048576usize {
+                return Err("longer than 1048576 characters".into());
+            }
+            if value.chars().count() < 2usize {
+                return Err("shorter than 2 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEvidenceCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEvidenceCanonicalJson {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PublicKey> for ::std::string::String {
+        fn from(value: PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PublicKey> for PublicKey {
+        fn from(value: &PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`QuotaKey`
     ///
     /// <details><summary>JSON schema</summary>
@@ -236485,6 +237906,71 @@ pub mod trust_control__budget_invocation_admission_evidence {
             value.clone()
         }
     }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
     ///`SupplementalBinding`
     ///
     /// <details><summary>JSON schema</summary>
@@ -236494,19 +237980,47 @@ pub mod trust_control__budget_invocation_admission_evidence {
     ///  "type": "object",
     ///  "required": [
     ///    "artifactDigest",
+    ///    "brokerCapabilityId",
+    ///    "claimBindingDigest",
+    ///    "expiresAt",
+    ///    "issuer",
     ///    "negotiatedFeaturesDigest",
+    ///    "notBefore",
     ///    "requestBindingHash",
+    ///    "requestConstraintDigest",
+    ///    "verifiedAt",
     ///    "verifierId"
     ///  ],
     ///  "properties": {
     ///    "artifactDigest": {
     ///      "$ref": "#/$defs/digest"
     ///    },
+    ///    "brokerCapabilityId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "claimBindingDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "expiresAt": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    },
     ///    "negotiatedFeaturesDigest": {
     ///      "$ref": "#/$defs/digest"
     ///    },
+    ///    "notBefore": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
     ///    "requestBindingHash": {
     ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "requestConstraintDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "verifiedAt": {
+    ///      "$ref": "#/$defs/safeInteger"
     ///    },
     ///    "verifierId": {
     ///      "$ref": "#/$defs/identifier"
@@ -236521,10 +238035,23 @@ pub mod trust_control__budget_invocation_admission_evidence {
     pub struct SupplementalBinding {
         #[serde(rename = "artifactDigest")]
         pub artifact_digest: Digest,
+        #[serde(rename = "brokerCapabilityId")]
+        pub broker_capability_id: Identifier,
+        #[serde(rename = "claimBindingDigest")]
+        pub claim_binding_digest: Digest,
+        #[serde(rename = "expiresAt")]
+        pub expires_at: SafeInteger,
+        pub issuer: PublicKey,
         #[serde(rename = "negotiatedFeaturesDigest")]
         pub negotiated_features_digest: Digest,
+        #[serde(rename = "notBefore")]
+        pub not_before: SafeInteger,
         #[serde(rename = "requestBindingHash")]
         pub request_binding_hash: Digest,
+        #[serde(rename = "requestConstraintDigest")]
+        pub request_constraint_digest: Digest,
+        #[serde(rename = "verifiedAt")]
+        pub verified_at: SafeInteger,
         #[serde(rename = "verifierId")]
         pub verifier_id: Identifier,
     }
@@ -237195,6 +238722,13636 @@ pub mod trust_control__lease {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+}
+pub mod trust_control__partition_escrow_admission_evidence {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`AggregateCapabilityTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_id",
+    ///    "kind",
+    ///    "revocation_set_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "kind": {
+    ///      "const": "aggregateCapability"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct AggregateCapabilityTrust {
+        pub capability_id: Identifier,
+        pub kind: ::serde_json::Value,
+        pub revocation_set_digest: Digest,
+    }
+    impl ::std::convert::From<&AggregateCapabilityTrust> for AggregateCapabilityTrust {
+        fn from(value: &AggregateCapabilityTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///`AggregateFamilyTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "family_owner",
+    ///    "kind",
+    ///    "revocation_set_digest",
+    ///    "root_binding_digest",
+    ///    "root_capability_id"
+    ///  ],
+    ///  "properties": {
+    ///    "family_owner": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "kind": {
+    ///      "const": "aggregateFamily"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "root_binding_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "root_capability_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct AggregateFamilyTrust {
+        pub family_owner: Digest,
+        pub kind: ::serde_json::Value,
+        pub revocation_set_digest: Digest,
+        pub root_binding_digest: Digest,
+        pub root_capability_id: Identifier,
+    }
+    impl ::std::convert::From<&AggregateFamilyTrust> for AggregateFamilyTrust {
+        fn from(value: &AggregateFamilyTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///`Allocation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocatedInvocations",
+    ///    "authorityId",
+    ///    "partitionId"
+    ///  ],
+    ///  "properties": {
+    ///    "allocatedInvocations": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "authorityId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "partitionId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Allocation {
+        #[serde(rename = "allocatedInvocations")]
+        pub allocated_invocations: u32,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "authorityId")]
+        pub authority_id: AllocationAuthorityId,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "partitionId")]
+        pub partition_id: AllocationPartitionId,
+    }
+    impl ::std::convert::From<&Allocation> for Allocation {
+        fn from(value: &Allocation) -> Self {
+            value.clone()
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct AllocationAuthorityId(::std::string::String);
+    impl ::std::ops::Deref for AllocationAuthorityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<AllocationAuthorityId> for ::std::string::String {
+        fn from(value: AllocationAuthorityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&AllocationAuthorityId> for AllocationAuthorityId {
+        fn from(value: &AllocationAuthorityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for AllocationAuthorityId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for AllocationAuthorityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct AllocationPartitionId(::std::string::String);
+    impl ::std::ops::Deref for AllocationPartitionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<AllocationPartitionId> for ::std::string::String {
+        fn from(value: AllocationPartitionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&AllocationPartitionId> for AllocationPartitionId {
+        fn from(value: &AllocationPartitionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for AllocationPartitionId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for AllocationPartitionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Body`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "allocations",
+    ///    "authorityDomain",
+    ///    "expiresAt",
+    ///    "notBefore",
+    ///    "quota",
+    ///    "quotaCommitmentDigest",
+    ///    "quotaCommitmentExpiresAt",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "allocations": {
+    ///      "description": "The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/allocation"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "authorityDomain": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "expiresAt": {
+    ///      "description": "Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.",
+    ///      "allOf": [
+    ///        {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        }
+    ///      ]
+    ///    },
+    ///    "notBefore": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "quota": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "maxInvocations",
+    ///        "ownerId",
+    ///        "profile"
+    ///      ],
+    ///      "properties": {
+    ///        "grantIndex": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "maxInvocations": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "ownerId": {
+    ///          "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///        },
+    ///        "profile": {
+    ///          "enum": [
+    ///            "chio.grant-invocation.v1",
+    ///            "chio.aggregate-capability-invocation.v1",
+    ///            "chio.aggregate-family-invocation.v1",
+    ///            "chio.broker-capability-execution.v1"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "quotaCommitmentDigest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "quotaCommitmentExpiresAt": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-allocation-set.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Body {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: ::std::num::NonZeroU64,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: BodyAllocationPlanDigest,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: BodyAllocationRootId,
+        ///The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.
+        pub allocations: Vec<Allocation>,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: BodyAuthorityDomain,
+        ///Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.
+        #[serde(rename = "expiresAt")]
+        pub expires_at: ::std::num::NonZeroU64,
+        #[serde(rename = "notBefore")]
+        pub not_before: i64,
+        pub quota: BodyQuota,
+        #[serde(rename = "quotaCommitmentDigest")]
+        pub quota_commitment_digest: BodyQuotaCommitmentDigest,
+        #[serde(rename = "quotaCommitmentExpiresAt")]
+        pub quota_commitment_expires_at: ::std::num::NonZeroU64,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Body> for Body {
+        fn from(value: &Body) -> Self {
+            value.clone()
+        }
+    }
+    ///`BodyAllocationPlanDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAllocationPlanDigest(::std::string::String);
+    impl ::std::ops::Deref for BodyAllocationPlanDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAllocationPlanDigest> for ::std::string::String {
+        fn from(value: BodyAllocationPlanDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAllocationPlanDigest> for BodyAllocationPlanDigest {
+        fn from(value: &BodyAllocationPlanDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAllocationPlanDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAllocationPlanDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAllocationRootId(::std::string::String);
+    impl ::std::ops::Deref for BodyAllocationRootId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAllocationRootId> for ::std::string::String {
+        fn from(value: BodyAllocationRootId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAllocationRootId> for BodyAllocationRootId {
+        fn from(value: &BodyAllocationRootId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAllocationRootId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAllocationRootId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAuthorityDomain(::std::string::String);
+    impl ::std::ops::Deref for BodyAuthorityDomain {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAuthorityDomain> for ::std::string::String {
+        fn from(value: BodyAuthorityDomain) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAuthorityDomain> for BodyAuthorityDomain {
+        fn from(value: &BodyAuthorityDomain) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAuthorityDomain {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAuthorityDomain {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`BodyQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct BodyQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: BodyQuotaProfile,
+    }
+    impl ::std::convert::From<&BodyQuota> for BodyQuota {
+        fn from(value: &BodyQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`BodyQuotaCommitmentDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyQuotaCommitmentDigest(::std::string::String);
+    impl ::std::ops::Deref for BodyQuotaCommitmentDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyQuotaCommitmentDigest> for ::std::string::String {
+        fn from(value: BodyQuotaCommitmentDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyQuotaCommitmentDigest> for BodyQuotaCommitmentDigest {
+        fn from(value: &BodyQuotaCommitmentDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyQuotaCommitmentDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyQuotaCommitmentDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`BodyQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum BodyQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for BodyQuotaProfile {
+        fn from(value: &BodyQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for BodyQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for BodyQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`BrokerCapabilityTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "broker_capability_id",
+    ///    "claim_binding_digest",
+    ///    "kind",
+    ///    "negotiated_features_digest",
+    ///    "quota_owner_id",
+    ///    "request_binding_hash",
+    ///    "request_constraint_digest",
+    ///    "revocation_set_digest",
+    ///    "verifier_id"
+    ///  ],
+    ///  "properties": {
+    ///    "broker_capability_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "claim_binding_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "kind": {
+    ///      "const": "brokerCapability"
+    ///    },
+    ///    "negotiated_features_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "quota_owner_id": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "request_binding_hash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "request_constraint_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "verifier_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct BrokerCapabilityTrust {
+        pub broker_capability_id: Identifier,
+        pub claim_binding_digest: Digest,
+        pub kind: ::serde_json::Value,
+        pub negotiated_features_digest: Digest,
+        pub quota_owner_id: Digest,
+        pub request_binding_hash: Digest,
+        pub request_constraint_digest: Digest,
+        pub revocation_set_digest: Digest,
+        pub verifier_id: Identifier,
+    }
+    impl ::std::convert::From<&BrokerCapabilityTrust> for BrokerCapabilityTrust {
+        fn from(value: &BrokerCapabilityTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///Canonical historical proof that a durable partition authority verified and admitted one or more source-backed invocation quotas.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-admission-evidence.schema.json",
+    ///  "title": "Chio partition-escrow admission evidence",
+    ///  "description": "Canonical historical proof that a durable partition authority verified and admitted one or more source-backed invocation quotas.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authorityDomain",
+    ///    "authorityId",
+    ///    "durableStore",
+    ///    "partitionId",
+    ///    "quotas",
+    ///    "resolver",
+    ///    "schema",
+    ///    "verifiedAt"
+    ///  ],
+    ///  "properties": {
+    ///    "authorityDomain": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "authorityId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "durableStore": {
+    ///      "$ref": "#/$defs/durableStore"
+    ///    },
+    ///    "partitionId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "quotas": {
+    ///      "description": "Quota keys and certificate bindings must be unique under runtime validation.",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/quotaEvidence"
+    ///      },
+    ///      "maxItems": 8,
+    ///      "minItems": 1
+    ///    },
+    ///    "resolver": {
+    ///      "$ref": "#/$defs/resolver"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-admission-evidence.v1"
+    ///    },
+    ///    "verifiedAt": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false,
+    ///  "$comment": "Runtime validation additionally binds authorityId to durableStore.storeIdentityDigest, recomputes counterNamespaceDigest, and verifies every digest, signature, time window, source-trust relation, and summary equality."
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioPartitionEscrowAdmissionEvidence {
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: Identifier,
+        #[serde(rename = "authorityId")]
+        pub authority_id: Identifier,
+        #[serde(rename = "durableStore")]
+        pub durable_store: DurableStore,
+        #[serde(rename = "partitionId")]
+        pub partition_id: Identifier,
+        ///Quota keys and certificate bindings must be unique under runtime validation.
+        pub quotas: ::std::vec::Vec<QuotaEvidence>,
+        pub resolver: Resolver,
+        pub schema: ::serde_json::Value,
+        #[serde(rename = "verifiedAt")]
+        pub verified_at: SafeInteger,
+    }
+    impl ::std::convert::From<&ChioPartitionEscrowAdmissionEvidence>
+    for ChioPartitionEscrowAdmissionEvidence {
+        fn from(value: &ChioPartitionEscrowAdmissionEvidence) -> Self {
+            value.clone()
+        }
+    }
+    ///An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio signed partition-escrow allocation set",
+    ///  "description": "An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "allocatorKey",
+    ///    "body",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "enum": [
+    ///        "ed25519",
+    ///        "p256",
+    ///        "p384",
+    ///        "hybrid"
+    ///      ]
+    ///    },
+    ///    "allocatorKey": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "body": {
+    ///      "$ref": "#/$defs/body"
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedPartitionEscrowAllocationSet {
+        pub algorithm: ChioSignedPartitionEscrowAllocationSetAlgorithm,
+        #[serde(rename = "allocatorKey")]
+        pub allocator_key: ChioSignedPartitionEscrowAllocationSetAllocatorKey,
+        pub body: Body,
+        pub signature: ChioSignedPartitionEscrowAllocationSetSignature,
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSet>
+    for ChioSignedPartitionEscrowAllocationSet {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSet) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetAllocatorKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedPartitionEscrowAllocationSetAllocatorKey(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedPartitionEscrowAllocationSetAllocatorKey>
+    for ::std::string::String {
+        fn from(value: ChioSignedPartitionEscrowAllocationSetAllocatorKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSetAllocatorKey>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetAllocatorKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedPartitionEscrowAllocationSetSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedPartitionEscrowAllocationSetSignature>
+    for ::std::string::String {
+        fn from(value: ChioSignedPartitionEscrowAllocationSetSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSetSignature>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio signed partition-escrow quota commitment",
+    ///  "description": "A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "body",
+    ///    "signature",
+    ///    "signerKey"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "$ref": "#/$defs/partitionEscrowSignatureAlgorithm"
+    ///    },
+    ///    "body": {
+    ///      "$ref": "#/$defs/quotaCommitmentBody"
+    ///    },
+    ///    "signature": {
+    ///      "$ref": "#/$defs/partitionEscrowSignature"
+    ///    },
+    ///    "signerKey": {
+    ///      "$ref": "#/$defs/partitionEscrowPublicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedPartitionEscrowQuotaCommitment {
+        pub algorithm: PartitionEscrowSignatureAlgorithm,
+        pub body: QuotaCommitmentBody,
+        pub signature: PartitionEscrowSignature,
+        #[serde(rename = "signerKey")]
+        pub signer_key: PartitionEscrowPublicKey,
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowQuotaCommitment>
+    for ChioSignedPartitionEscrowQuotaCommitment {
+        fn from(value: &ChioSignedPartitionEscrowQuotaCommitment) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Digest(::std::string::String);
+    impl ::std::ops::Deref for Digest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for ::std::string::String {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Digest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Digest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`DurableStore`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "counterNamespaceDigest",
+    ///    "fencingToken",
+    ///    "storeIdentityDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "counterNamespaceDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "fencingToken": {
+    ///      "$ref": "#/$defs/positiveSafeInteger"
+    ///    },
+    ///    "storeIdentityDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DurableStore {
+        #[serde(rename = "counterNamespaceDigest")]
+        pub counter_namespace_digest: Digest,
+        #[serde(rename = "fencingToken")]
+        pub fencing_token: PositiveSafeInteger,
+        #[serde(rename = "storeIdentityDigest")]
+        pub store_identity_digest: Digest,
+    }
+    impl ::std::convert::From<&DurableStore> for DurableStore {
+        fn from(value: &DurableStore) -> Self {
+            value.clone()
+        }
+    }
+    ///`GrantCapabilityTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_id",
+    ///    "grant_index",
+    ///    "kind",
+    ///    "revocation_set_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "grant_index": {
+    ///      "$ref": "#/$defs/uint32"
+    ///    },
+    ///    "kind": {
+    ///      "const": "grantCapability"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct GrantCapabilityTrust {
+        pub capability_id: Identifier,
+        pub grant_index: Uint32,
+        pub kind: ::serde_json::Value,
+        pub revocation_set_digest: Digest,
+    }
+    impl ::std::convert::From<&GrantCapabilityTrust> for GrantCapabilityTrust {
+        fn from(value: &GrantCapabilityTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowDigest(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowDigest> for ::std::string::String {
+        fn from(value: PartitionEscrowDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowDigest> for PartitionEscrowDigest {
+        fn from(value: &PartitionEscrowDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519PublicKey>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519PublicKey>
+    for PartitionEscrowEd25519PublicKey {
+        fn from(value: &PartitionEscrowEd25519PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{128}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519Signature>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519Signature>
+    for PartitionEscrowEd25519Signature {
+        fn from(value: &PartitionEscrowEd25519Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{128}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{128}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridPublicKey>
+    for PartitionEscrowHybridPublicKey {
+        fn from(value: &PartitionEscrowHybridPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridSignature>
+    for PartitionEscrowHybridSignature {
+        fn from(value: &PartitionEscrowHybridSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowIdentifier(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowIdentifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowIdentifier> for ::std::string::String {
+        fn from(value: PartitionEscrowIdentifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowIdentifier> for PartitionEscrowIdentifier {
+        fn from(value: &PartitionEscrowIdentifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowIdentifier {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowIdentifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]{130}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP256PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256PublicKey>
+    for PartitionEscrowP256PublicKey {
+        fn from(value: &PartitionEscrowP256PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]{130}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]{130}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP256Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256Signature>
+    for PartitionEscrowP256Signature {
+        fn from(value: &PartitionEscrowP256Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]{194}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP384PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384PublicKey>
+    for PartitionEscrowP384PublicKey {
+        fn from(value: &PartitionEscrowP384PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]{194}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]{194}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP384Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384Signature>
+    for PartitionEscrowP384Signature {
+        fn from(value: &PartitionEscrowP384Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowPositiveSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveSafeInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveSafeInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveSafeInteger>
+    for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveSafeInteger>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: &PartitionEscrowPositiveSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveSafeInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPositiveUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveUint32(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveUint32 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveUint32> for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveUint32>
+    for PartitionEscrowPositiveUint32 {
+        fn from(value: &PartitionEscrowPositiveUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PartitionEscrowPositiveUint32 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveUint32 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPublicKey> for PartitionEscrowPublicKey {
+        fn from(value: &PartitionEscrowPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PartitionEscrowQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: PartitionEscrowQuotaProfile,
+    }
+    impl ::std::convert::From<&PartitionEscrowQuota> for PartitionEscrowQuota {
+        fn from(value: &PartitionEscrowQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`PartitionEscrowQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowQuotaProfile {
+        fn from(value: &PartitionEscrowQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSafeInteger(pub i64);
+    impl ::std::ops::Deref for PartitionEscrowSafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSafeInteger> for i64 {
+        fn from(value: PartitionEscrowSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSafeInteger>
+    for PartitionEscrowSafeInteger {
+        fn from(value: &PartitionEscrowSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for PartitionEscrowSafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSignature> for PartitionEscrowSignature {
+        fn from(value: &PartitionEscrowSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowSignatureAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowSignatureAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowSignatureAlgorithm {
+        fn from(value: &PartitionEscrowSignatureAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSignatureAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignatureAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowUint32(pub u32);
+    impl ::std::ops::Deref for PartitionEscrowUint32 {
+        type Target = u32;
+        fn deref(&self) -> &u32 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowUint32> for u32 {
+        fn from(value: PartitionEscrowUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowUint32> for PartitionEscrowUint32 {
+        fn from(value: &PartitionEscrowUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<u32> for PartitionEscrowUint32 {
+        fn from(value: u32) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowUint32 {
+        type Err = <u32 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PositiveSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PositiveSafeInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PositiveSafeInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PositiveSafeInteger> for ::std::num::NonZeroU64 {
+        fn from(value: PositiveSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PositiveSafeInteger> for PositiveSafeInteger {
+        fn from(value: &PositiveSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PositiveSafeInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PositiveSafeInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PositiveSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PositiveUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PositiveUint32(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PositiveUint32 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PositiveUint32> for ::std::num::NonZeroU64 {
+        fn from(value: PositiveUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PositiveUint32> for PositiveUint32 {
+        fn from(value: &PositiveUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PositiveUint32 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PositiveUint32 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PositiveUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PublicKey> for ::std::string::String {
+        fn from(value: PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PublicKey> for PublicKey {
+        fn from(value: &PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`QuotaCommitmentBody`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "authorityDomain",
+    ///    "quota",
+    ///    "quotaKeyDigest",
+    ///    "schema",
+    ///    "sourceExpiresAt",
+    ///    "sourceNotBefore",
+    ///    "sourceTrustBindingDigest",
+    ///    "underlyingSourceArtifactDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "authorityDomain": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "quota": {
+    ///      "$ref": "#/$defs/partitionEscrowQuota"
+    ///    },
+    ///    "quotaKeyDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-quota-commitment.v1"
+    ///    },
+    ///    "sourceExpiresAt": {
+    ///      "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.",
+    ///      "allOf": [
+    ///        {
+    ///          "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "sourceNotBefore": {
+    ///      "$ref": "#/$defs/partitionEscrowSafeInteger"
+    ///    },
+    ///    "sourceTrustBindingDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "underlyingSourceArtifactDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaCommitmentBody {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: PartitionEscrowDigest,
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: PartitionEscrowIdentifier,
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: PartitionEscrowIdentifier,
+        pub quota: PartitionEscrowQuota,
+        #[serde(rename = "quotaKeyDigest")]
+        pub quota_key_digest: PartitionEscrowDigest,
+        pub schema: ::serde_json::Value,
+        ///Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+        #[serde(rename = "sourceExpiresAt")]
+        pub source_expires_at: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "sourceNotBefore")]
+        pub source_not_before: PartitionEscrowSafeInteger,
+        #[serde(rename = "sourceTrustBindingDigest")]
+        pub source_trust_binding_digest: PartitionEscrowDigest,
+        #[serde(rename = "underlyingSourceArtifactDigest")]
+        pub underlying_source_artifact_digest: PartitionEscrowDigest,
+    }
+    impl ::std::convert::From<&QuotaCommitmentBody> for QuotaCommitmentBody {
+        fn from(value: &QuotaCommitmentBody) -> Self {
+            value.clone()
+        }
+    }
+    ///`QuotaEvidence`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "allocationSet",
+    ///    "allocationSetDigest",
+    ///    "globalQuota",
+    ///    "localAllocatedInvocations",
+    ///    "quotaCertificateBindingDigest",
+    ///    "quotaCommitment",
+    ///    "quotaCommitmentDigest",
+    ///    "quotaDescriptorDigest",
+    ///    "quotaKeyDigest",
+    ///    "sourceExpiresAt",
+    ///    "sourceNotBefore",
+    ///    "sourceSigner",
+    ///    "sourceTrust",
+    ///    "sourceTrustBindingDigest",
+    ///    "totalAllocatedInvocations",
+    ///    "underlyingSourceArtifactDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "$ref": "#/$defs/positiveSafeInteger"
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "allocationSet": {
+    ///      "title": "Chio signed partition-escrow allocation set",
+    ///      "description": "An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "algorithm",
+    ///        "allocatorKey",
+    ///        "body",
+    ///        "signature"
+    ///      ],
+    ///      "properties": {
+    ///        "algorithm": {
+    ///          "enum": [
+    ///            "ed25519",
+    ///            "p256",
+    ///            "p384",
+    ///            "hybrid"
+    ///          ]
+    ///        },
+    ///        "allocatorKey": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        },
+    ///        "body": {
+    ///          "$ref": "#/$defs/body"
+    ///        },
+    ///        "signature": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "allocationSetDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "globalQuota": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "maxInvocations",
+    ///        "ownerId",
+    ///        "profile"
+    ///      ],
+    ///      "properties": {
+    ///        "grantIndex": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "maxInvocations": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "ownerId": {
+    ///          "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///        },
+    ///        "profile": {
+    ///          "enum": [
+    ///            "chio.grant-invocation.v1",
+    ///            "chio.aggregate-capability-invocation.v1",
+    ///            "chio.aggregate-family-invocation.v1",
+    ///            "chio.broker-capability-execution.v1"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "localAllocatedInvocations": {
+    ///      "$ref": "#/$defs/uint32"
+    ///    },
+    ///    "quotaCertificateBindingDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "quotaCommitment": {
+    ///      "title": "Chio signed partition-escrow quota commitment",
+    ///      "description": "A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "algorithm",
+    ///        "body",
+    ///        "signature",
+    ///        "signerKey"
+    ///      ],
+    ///      "properties": {
+    ///        "algorithm": {
+    ///          "$ref": "#/$defs/partitionEscrowSignatureAlgorithm"
+    ///        },
+    ///        "body": {
+    ///          "$ref": "#/$defs/quotaCommitmentBody"
+    ///        },
+    ///        "signature": {
+    ///          "$ref": "#/$defs/partitionEscrowSignature"
+    ///        },
+    ///        "signerKey": {
+    ///          "$ref": "#/$defs/partitionEscrowPublicKey"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "quotaCommitmentDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "quotaDescriptorDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "quotaKeyDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "sourceExpiresAt": {
+    ///      "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.",
+    ///      "allOf": [
+    ///        {
+    ///          "$ref": "#/$defs/positiveSafeInteger"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "sourceNotBefore": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "sourceSigner": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    },
+    ///    "sourceTrust": {
+    ///      "$ref": "#/$defs/sourceTrust"
+    ///    },
+    ///    "sourceTrustBindingDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "totalAllocatedInvocations": {
+    ///      "$ref": "#/$defs/uint32"
+    ///    },
+    ///    "underlyingSourceArtifactDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaEvidence {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: PositiveSafeInteger,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: Digest,
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: Identifier,
+        #[serde(rename = "allocationSet")]
+        pub allocation_set: ChioSignedPartitionEscrowAllocationSet,
+        #[serde(rename = "allocationSetDigest")]
+        pub allocation_set_digest: Digest,
+        #[serde(rename = "globalQuota")]
+        pub global_quota: QuotaEvidenceGlobalQuota,
+        #[serde(rename = "localAllocatedInvocations")]
+        pub local_allocated_invocations: Uint32,
+        #[serde(rename = "quotaCertificateBindingDigest")]
+        pub quota_certificate_binding_digest: Digest,
+        #[serde(rename = "quotaCommitment")]
+        pub quota_commitment: ChioSignedPartitionEscrowQuotaCommitment,
+        #[serde(rename = "quotaCommitmentDigest")]
+        pub quota_commitment_digest: Digest,
+        #[serde(rename = "quotaDescriptorDigest")]
+        pub quota_descriptor_digest: Digest,
+        #[serde(rename = "quotaKeyDigest")]
+        pub quota_key_digest: Digest,
+        ///Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+        #[serde(rename = "sourceExpiresAt")]
+        pub source_expires_at: PositiveSafeInteger,
+        #[serde(rename = "sourceNotBefore")]
+        pub source_not_before: SafeInteger,
+        #[serde(rename = "sourceSigner")]
+        pub source_signer: PublicKey,
+        #[serde(rename = "sourceTrust")]
+        pub source_trust: SourceTrust,
+        #[serde(rename = "sourceTrustBindingDigest")]
+        pub source_trust_binding_digest: Digest,
+        #[serde(rename = "totalAllocatedInvocations")]
+        pub total_allocated_invocations: Uint32,
+        #[serde(rename = "underlyingSourceArtifactDigest")]
+        pub underlying_source_artifact_digest: Digest,
+    }
+    impl ::std::convert::From<&QuotaEvidence> for QuotaEvidence {
+        fn from(value: &QuotaEvidence) -> Self {
+            value.clone()
+        }
+    }
+    ///`QuotaEvidenceGlobalQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaEvidenceGlobalQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: QuotaEvidenceGlobalQuotaProfile,
+    }
+    impl ::std::convert::From<&QuotaEvidenceGlobalQuota> for QuotaEvidenceGlobalQuota {
+        fn from(value: &QuotaEvidenceGlobalQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`QuotaEvidenceGlobalQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum QuotaEvidenceGlobalQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for QuotaEvidenceGlobalQuotaProfile {
+        fn from(value: &QuotaEvidenceGlobalQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for QuotaEvidenceGlobalQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for QuotaEvidenceGlobalQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for QuotaEvidenceGlobalQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for QuotaEvidenceGlobalQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for QuotaEvidenceGlobalQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Resolver`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "configurationDigest",
+    ///    "implementationId",
+    ///    "implementationVersion",
+    ///    "resolverId"
+    ///  ],
+    ///  "properties": {
+    ///    "configurationDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "implementationId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "implementationVersion": {
+    ///      "$ref": "#/$defs/positiveUint32"
+    ///    },
+    ///    "resolverId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Resolver {
+        #[serde(rename = "configurationDigest")]
+        pub configuration_digest: Digest,
+        #[serde(rename = "implementationId")]
+        pub implementation_id: Identifier,
+        #[serde(rename = "implementationVersion")]
+        pub implementation_version: PositiveUint32,
+        #[serde(rename = "resolverId")]
+        pub resolver_id: Identifier,
+    }
+    impl ::std::convert::From<&Resolver> for Resolver {
+        fn from(value: &Resolver) -> Self {
+            value.clone()
+        }
+    }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/grantCapabilityTrust"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/aggregateCapabilityTrust"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/aggregateFamilyTrust"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/brokerCapabilityTrust"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum SourceTrust {
+        GrantCapabilityTrust(GrantCapabilityTrust),
+        AggregateCapabilityTrust(AggregateCapabilityTrust),
+        AggregateFamilyTrust(AggregateFamilyTrust),
+        BrokerCapabilityTrust(BrokerCapabilityTrust),
+    }
+    impl ::std::convert::From<&Self> for SourceTrust {
+        fn from(value: &SourceTrust) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<GrantCapabilityTrust> for SourceTrust {
+        fn from(value: GrantCapabilityTrust) -> Self {
+            Self::GrantCapabilityTrust(value)
+        }
+    }
+    impl ::std::convert::From<AggregateCapabilityTrust> for SourceTrust {
+        fn from(value: AggregateCapabilityTrust) -> Self {
+            Self::AggregateCapabilityTrust(value)
+        }
+    }
+    impl ::std::convert::From<AggregateFamilyTrust> for SourceTrust {
+        fn from(value: AggregateFamilyTrust) -> Self {
+            Self::AggregateFamilyTrust(value)
+        }
+    }
+    impl ::std::convert::From<BrokerCapabilityTrust> for SourceTrust {
+        fn from(value: BrokerCapabilityTrust) -> Self {
+            Self::BrokerCapabilityTrust(value)
+        }
+    }
+    ///`Uint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Uint32(pub u32);
+    impl ::std::ops::Deref for Uint32 {
+        type Target = u32;
+        fn deref(&self) -> &u32 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uint32> for u32 {
+        fn from(value: Uint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uint32> for Uint32 {
+        fn from(value: &Uint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<u32> for Uint32 {
+        fn from(value: u32) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Uint32 {
+        type Err = <u32 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Uint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Uint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Uint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+}
+pub mod trust_control__partition_escrow_allocation_set {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`Allocation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocatedInvocations",
+    ///    "authorityId",
+    ///    "partitionId"
+    ///  ],
+    ///  "properties": {
+    ///    "allocatedInvocations": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "authorityId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "partitionId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Allocation {
+        #[serde(rename = "allocatedInvocations")]
+        pub allocated_invocations: u32,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "authorityId")]
+        pub authority_id: AllocationAuthorityId,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "partitionId")]
+        pub partition_id: AllocationPartitionId,
+    }
+    impl ::std::convert::From<&Allocation> for Allocation {
+        fn from(value: &Allocation) -> Self {
+            value.clone()
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct AllocationAuthorityId(::std::string::String);
+    impl ::std::ops::Deref for AllocationAuthorityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<AllocationAuthorityId> for ::std::string::String {
+        fn from(value: AllocationAuthorityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&AllocationAuthorityId> for AllocationAuthorityId {
+        fn from(value: &AllocationAuthorityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for AllocationAuthorityId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for AllocationAuthorityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct AllocationPartitionId(::std::string::String);
+    impl ::std::ops::Deref for AllocationPartitionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<AllocationPartitionId> for ::std::string::String {
+        fn from(value: AllocationPartitionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&AllocationPartitionId> for AllocationPartitionId {
+        fn from(value: &AllocationPartitionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for AllocationPartitionId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for AllocationPartitionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Body`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "allocations",
+    ///    "authorityDomain",
+    ///    "expiresAt",
+    ///    "notBefore",
+    ///    "quota",
+    ///    "quotaCommitmentDigest",
+    ///    "quotaCommitmentExpiresAt",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "allocations": {
+    ///      "description": "The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/allocation"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "authorityDomain": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "expiresAt": {
+    ///      "description": "Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.",
+    ///      "allOf": [
+    ///        {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        }
+    ///      ]
+    ///    },
+    ///    "notBefore": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "quota": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "maxInvocations",
+    ///        "ownerId",
+    ///        "profile"
+    ///      ],
+    ///      "properties": {
+    ///        "grantIndex": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "maxInvocations": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "ownerId": {
+    ///          "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///        },
+    ///        "profile": {
+    ///          "enum": [
+    ///            "chio.grant-invocation.v1",
+    ///            "chio.aggregate-capability-invocation.v1",
+    ///            "chio.aggregate-family-invocation.v1",
+    ///            "chio.broker-capability-execution.v1"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "quotaCommitmentDigest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "quotaCommitmentExpiresAt": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-allocation-set.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Body {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: ::std::num::NonZeroU64,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: BodyAllocationPlanDigest,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: BodyAllocationRootId,
+        ///The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.
+        pub allocations: Vec<Allocation>,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: BodyAuthorityDomain,
+        ///Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.
+        #[serde(rename = "expiresAt")]
+        pub expires_at: ::std::num::NonZeroU64,
+        #[serde(rename = "notBefore")]
+        pub not_before: i64,
+        pub quota: BodyQuota,
+        #[serde(rename = "quotaCommitmentDigest")]
+        pub quota_commitment_digest: BodyQuotaCommitmentDigest,
+        #[serde(rename = "quotaCommitmentExpiresAt")]
+        pub quota_commitment_expires_at: ::std::num::NonZeroU64,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Body> for Body {
+        fn from(value: &Body) -> Self {
+            value.clone()
+        }
+    }
+    ///`BodyAllocationPlanDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAllocationPlanDigest(::std::string::String);
+    impl ::std::ops::Deref for BodyAllocationPlanDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAllocationPlanDigest> for ::std::string::String {
+        fn from(value: BodyAllocationPlanDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAllocationPlanDigest> for BodyAllocationPlanDigest {
+        fn from(value: &BodyAllocationPlanDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAllocationPlanDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAllocationPlanDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAllocationRootId(::std::string::String);
+    impl ::std::ops::Deref for BodyAllocationRootId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAllocationRootId> for ::std::string::String {
+        fn from(value: BodyAllocationRootId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAllocationRootId> for BodyAllocationRootId {
+        fn from(value: &BodyAllocationRootId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAllocationRootId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAllocationRootId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAuthorityDomain(::std::string::String);
+    impl ::std::ops::Deref for BodyAuthorityDomain {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAuthorityDomain> for ::std::string::String {
+        fn from(value: BodyAuthorityDomain) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAuthorityDomain> for BodyAuthorityDomain {
+        fn from(value: &BodyAuthorityDomain) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAuthorityDomain {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAuthorityDomain {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`BodyQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct BodyQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: BodyQuotaProfile,
+    }
+    impl ::std::convert::From<&BodyQuota> for BodyQuota {
+        fn from(value: &BodyQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`BodyQuotaCommitmentDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyQuotaCommitmentDigest(::std::string::String);
+    impl ::std::ops::Deref for BodyQuotaCommitmentDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyQuotaCommitmentDigest> for ::std::string::String {
+        fn from(value: BodyQuotaCommitmentDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyQuotaCommitmentDigest> for BodyQuotaCommitmentDigest {
+        fn from(value: &BodyQuotaCommitmentDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyQuotaCommitmentDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyQuotaCommitmentDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`BodyQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum BodyQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for BodyQuotaProfile {
+        fn from(value: &BodyQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for BodyQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for BodyQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-allocation-set.schema.json",
+    ///  "title": "Chio signed partition-escrow allocation set",
+    ///  "description": "An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "allocatorKey",
+    ///    "body",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "enum": [
+    ///        "ed25519",
+    ///        "p256",
+    ///        "p384",
+    ///        "hybrid"
+    ///      ]
+    ///    },
+    ///    "allocatorKey": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "body": {
+    ///      "$ref": "#/$defs/body"
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedPartitionEscrowAllocationSet {
+        pub algorithm: ChioSignedPartitionEscrowAllocationSetAlgorithm,
+        #[serde(rename = "allocatorKey")]
+        pub allocator_key: ChioSignedPartitionEscrowAllocationSetAllocatorKey,
+        pub body: Body,
+        pub signature: ChioSignedPartitionEscrowAllocationSetSignature,
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSet>
+    for ChioSignedPartitionEscrowAllocationSet {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSet) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetAllocatorKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedPartitionEscrowAllocationSetAllocatorKey(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedPartitionEscrowAllocationSetAllocatorKey>
+    for ::std::string::String {
+        fn from(value: ChioSignedPartitionEscrowAllocationSetAllocatorKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSetAllocatorKey>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetAllocatorKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedPartitionEscrowAllocationSetSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedPartitionEscrowAllocationSetSignature>
+    for ::std::string::String {
+        fn from(value: ChioSignedPartitionEscrowAllocationSetSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSetSignature>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowDigest(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowDigest> for ::std::string::String {
+        fn from(value: PartitionEscrowDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowDigest> for PartitionEscrowDigest {
+        fn from(value: &PartitionEscrowDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519PublicKey>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519PublicKey>
+    for PartitionEscrowEd25519PublicKey {
+        fn from(value: &PartitionEscrowEd25519PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{128}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519Signature>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519Signature>
+    for PartitionEscrowEd25519Signature {
+        fn from(value: &PartitionEscrowEd25519Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{128}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{128}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridPublicKey>
+    for PartitionEscrowHybridPublicKey {
+        fn from(value: &PartitionEscrowHybridPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridSignature>
+    for PartitionEscrowHybridSignature {
+        fn from(value: &PartitionEscrowHybridSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowIdentifier(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowIdentifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowIdentifier> for ::std::string::String {
+        fn from(value: PartitionEscrowIdentifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowIdentifier> for PartitionEscrowIdentifier {
+        fn from(value: &PartitionEscrowIdentifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowIdentifier {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowIdentifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]{130}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP256PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256PublicKey>
+    for PartitionEscrowP256PublicKey {
+        fn from(value: &PartitionEscrowP256PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]{130}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]{130}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP256Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256Signature>
+    for PartitionEscrowP256Signature {
+        fn from(value: &PartitionEscrowP256Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]{194}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP384PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384PublicKey>
+    for PartitionEscrowP384PublicKey {
+        fn from(value: &PartitionEscrowP384PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]{194}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]{194}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP384Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384Signature>
+    for PartitionEscrowP384Signature {
+        fn from(value: &PartitionEscrowP384Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowPositiveSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveSafeInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveSafeInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveSafeInteger>
+    for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveSafeInteger>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: &PartitionEscrowPositiveSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveSafeInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPositiveUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveUint32(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveUint32 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveUint32> for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveUint32>
+    for PartitionEscrowPositiveUint32 {
+        fn from(value: &PartitionEscrowPositiveUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PartitionEscrowPositiveUint32 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveUint32 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPublicKey> for PartitionEscrowPublicKey {
+        fn from(value: &PartitionEscrowPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PartitionEscrowQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: PartitionEscrowQuotaProfile,
+    }
+    impl ::std::convert::From<&PartitionEscrowQuota> for PartitionEscrowQuota {
+        fn from(value: &PartitionEscrowQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`PartitionEscrowQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowQuotaProfile {
+        fn from(value: &PartitionEscrowQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSafeInteger(pub i64);
+    impl ::std::ops::Deref for PartitionEscrowSafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSafeInteger> for i64 {
+        fn from(value: PartitionEscrowSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSafeInteger>
+    for PartitionEscrowSafeInteger {
+        fn from(value: &PartitionEscrowSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for PartitionEscrowSafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSignature> for PartitionEscrowSignature {
+        fn from(value: &PartitionEscrowSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowSignatureAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowSignatureAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowSignatureAlgorithm {
+        fn from(value: &PartitionEscrowSignatureAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSignatureAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignatureAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowUint32(pub u32);
+    impl ::std::ops::Deref for PartitionEscrowUint32 {
+        type Target = u32;
+        fn deref(&self) -> &u32 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowUint32> for u32 {
+        fn from(value: PartitionEscrowUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowUint32> for PartitionEscrowUint32 {
+        fn from(value: &PartitionEscrowUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<u32> for PartitionEscrowUint32 {
+        fn from(value: u32) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowUint32 {
+        type Err = <u32 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`QuotaCommitmentBody`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "authorityDomain",
+    ///    "quota",
+    ///    "quotaKeyDigest",
+    ///    "schema",
+    ///    "sourceExpiresAt",
+    ///    "sourceNotBefore",
+    ///    "sourceTrustBindingDigest",
+    ///    "underlyingSourceArtifactDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "authorityDomain": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "quota": {
+    ///      "$ref": "#/$defs/partitionEscrowQuota"
+    ///    },
+    ///    "quotaKeyDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-quota-commitment.v1"
+    ///    },
+    ///    "sourceExpiresAt": {
+    ///      "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.",
+    ///      "allOf": [
+    ///        {
+    ///          "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "sourceNotBefore": {
+    ///      "$ref": "#/$defs/partitionEscrowSafeInteger"
+    ///    },
+    ///    "sourceTrustBindingDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "underlyingSourceArtifactDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaCommitmentBody {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: PartitionEscrowDigest,
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: PartitionEscrowIdentifier,
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: PartitionEscrowIdentifier,
+        pub quota: PartitionEscrowQuota,
+        #[serde(rename = "quotaKeyDigest")]
+        pub quota_key_digest: PartitionEscrowDigest,
+        pub schema: ::serde_json::Value,
+        ///Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+        #[serde(rename = "sourceExpiresAt")]
+        pub source_expires_at: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "sourceNotBefore")]
+        pub source_not_before: PartitionEscrowSafeInteger,
+        #[serde(rename = "sourceTrustBindingDigest")]
+        pub source_trust_binding_digest: PartitionEscrowDigest,
+        #[serde(rename = "underlyingSourceArtifactDigest")]
+        pub underlying_source_artifact_digest: PartitionEscrowDigest,
+    }
+    impl ::std::convert::From<&QuotaCommitmentBody> for QuotaCommitmentBody {
+        fn from(value: &QuotaCommitmentBody) -> Self {
+            value.clone()
+        }
+    }
+}
+pub mod trust_control__partition_escrow_quota_commitment {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-quota-commitment.schema.json",
+    ///  "title": "Chio signed partition-escrow quota commitment",
+    ///  "description": "A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "body",
+    ///    "signature",
+    ///    "signerKey"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "$ref": "#/$defs/partitionEscrowSignatureAlgorithm"
+    ///    },
+    ///    "body": {
+    ///      "$ref": "#/$defs/quotaCommitmentBody"
+    ///    },
+    ///    "signature": {
+    ///      "$ref": "#/$defs/partitionEscrowSignature"
+    ///    },
+    ///    "signerKey": {
+    ///      "$ref": "#/$defs/partitionEscrowPublicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedPartitionEscrowQuotaCommitment {
+        pub algorithm: PartitionEscrowSignatureAlgorithm,
+        pub body: QuotaCommitmentBody,
+        pub signature: PartitionEscrowSignature,
+        #[serde(rename = "signerKey")]
+        pub signer_key: PartitionEscrowPublicKey,
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowQuotaCommitment>
+    for ChioSignedPartitionEscrowQuotaCommitment {
+        fn from(value: &ChioSignedPartitionEscrowQuotaCommitment) -> Self {
+            value.clone()
+        }
+    }
+    ///`PartitionEscrowDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowDigest(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowDigest> for ::std::string::String {
+        fn from(value: PartitionEscrowDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowDigest> for PartitionEscrowDigest {
+        fn from(value: &PartitionEscrowDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519PublicKey>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519PublicKey>
+    for PartitionEscrowEd25519PublicKey {
+        fn from(value: &PartitionEscrowEd25519PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{128}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519Signature>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519Signature>
+    for PartitionEscrowEd25519Signature {
+        fn from(value: &PartitionEscrowEd25519Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{128}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{128}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridPublicKey>
+    for PartitionEscrowHybridPublicKey {
+        fn from(value: &PartitionEscrowHybridPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridSignature>
+    for PartitionEscrowHybridSignature {
+        fn from(value: &PartitionEscrowHybridSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowIdentifier(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowIdentifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowIdentifier> for ::std::string::String {
+        fn from(value: PartitionEscrowIdentifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowIdentifier> for PartitionEscrowIdentifier {
+        fn from(value: &PartitionEscrowIdentifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowIdentifier {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowIdentifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]{130}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP256PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256PublicKey>
+    for PartitionEscrowP256PublicKey {
+        fn from(value: &PartitionEscrowP256PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]{130}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]{130}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP256Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256Signature>
+    for PartitionEscrowP256Signature {
+        fn from(value: &PartitionEscrowP256Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]{194}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP384PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384PublicKey>
+    for PartitionEscrowP384PublicKey {
+        fn from(value: &PartitionEscrowP384PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]{194}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]{194}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP384Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384Signature>
+    for PartitionEscrowP384Signature {
+        fn from(value: &PartitionEscrowP384Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowPositiveSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveSafeInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveSafeInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveSafeInteger>
+    for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveSafeInteger>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: &PartitionEscrowPositiveSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveSafeInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPositiveUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveUint32(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveUint32 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveUint32> for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveUint32>
+    for PartitionEscrowPositiveUint32 {
+        fn from(value: &PartitionEscrowPositiveUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PartitionEscrowPositiveUint32 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveUint32 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPublicKey> for PartitionEscrowPublicKey {
+        fn from(value: &PartitionEscrowPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PartitionEscrowQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: PartitionEscrowQuotaProfile,
+    }
+    impl ::std::convert::From<&PartitionEscrowQuota> for PartitionEscrowQuota {
+        fn from(value: &PartitionEscrowQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`PartitionEscrowQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowQuotaProfile {
+        fn from(value: &PartitionEscrowQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSafeInteger(pub i64);
+    impl ::std::ops::Deref for PartitionEscrowSafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSafeInteger> for i64 {
+        fn from(value: PartitionEscrowSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSafeInteger>
+    for PartitionEscrowSafeInteger {
+        fn from(value: &PartitionEscrowSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for PartitionEscrowSafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSignature> for PartitionEscrowSignature {
+        fn from(value: &PartitionEscrowSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowSignatureAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowSignatureAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowSignatureAlgorithm {
+        fn from(value: &PartitionEscrowSignatureAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSignatureAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignatureAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowUint32(pub u32);
+    impl ::std::ops::Deref for PartitionEscrowUint32 {
+        type Target = u32;
+        fn deref(&self) -> &u32 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowUint32> for u32 {
+        fn from(value: PartitionEscrowUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowUint32> for PartitionEscrowUint32 {
+        fn from(value: &PartitionEscrowUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<u32> for PartitionEscrowUint32 {
+        fn from(value: u32) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowUint32 {
+        type Err = <u32 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`QuotaCommitmentBody`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "authorityDomain",
+    ///    "quota",
+    ///    "quotaKeyDigest",
+    ///    "schema",
+    ///    "sourceExpiresAt",
+    ///    "sourceNotBefore",
+    ///    "sourceTrustBindingDigest",
+    ///    "underlyingSourceArtifactDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "authorityDomain": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "quota": {
+    ///      "$ref": "#/$defs/partitionEscrowQuota"
+    ///    },
+    ///    "quotaKeyDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-quota-commitment.v1"
+    ///    },
+    ///    "sourceExpiresAt": {
+    ///      "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.",
+    ///      "allOf": [
+    ///        {
+    ///          "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "sourceNotBefore": {
+    ///      "$ref": "#/$defs/partitionEscrowSafeInteger"
+    ///    },
+    ///    "sourceTrustBindingDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "underlyingSourceArtifactDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaCommitmentBody {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: PartitionEscrowDigest,
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: PartitionEscrowIdentifier,
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: PartitionEscrowIdentifier,
+        pub quota: PartitionEscrowQuota,
+        #[serde(rename = "quotaKeyDigest")]
+        pub quota_key_digest: PartitionEscrowDigest,
+        pub schema: ::serde_json::Value,
+        ///Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+        #[serde(rename = "sourceExpiresAt")]
+        pub source_expires_at: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "sourceNotBefore")]
+        pub source_not_before: PartitionEscrowSafeInteger,
+        #[serde(rename = "sourceTrustBindingDigest")]
+        pub source_trust_binding_digest: PartitionEscrowDigest,
+        #[serde(rename = "underlyingSourceArtifactDigest")]
+        pub underlying_source_artifact_digest: PartitionEscrowDigest,
+    }
+    impl ::std::convert::From<&QuotaCommitmentBody> for QuotaCommitmentBody {
+        fn from(value: &QuotaCommitmentBody) -> Self {
+            value.clone()
+        }
+    }
+}
+pub mod trust_control__partition_escrow_receipt_metadata {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(
+                &self,
+                f: &mut ::std::fmt::Formatter<'_>,
+            ) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`AggregateCapabilityTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_id",
+    ///    "kind",
+    ///    "revocation_set_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "kind": {
+    ///      "const": "aggregateCapability"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct AggregateCapabilityTrust {
+        pub capability_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        pub kind: ::serde_json::Value,
+        pub revocation_set_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    }
+    impl ::std::convert::From<&AggregateCapabilityTrust> for AggregateCapabilityTrust {
+        fn from(value: &AggregateCapabilityTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///`AggregateFamilyTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "family_owner",
+    ///    "kind",
+    ///    "revocation_set_digest",
+    ///    "root_binding_digest",
+    ///    "root_capability_id"
+    ///  ],
+    ///  "properties": {
+    ///    "family_owner": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "kind": {
+    ///      "const": "aggregateFamily"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "root_binding_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "root_capability_id": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct AggregateFamilyTrust {
+        pub family_owner: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub kind: ::serde_json::Value,
+        pub revocation_set_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub root_binding_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub root_capability_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+    }
+    impl ::std::convert::From<&AggregateFamilyTrust> for AggregateFamilyTrust {
+        fn from(value: &AggregateFamilyTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///`Allocation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocatedInvocations",
+    ///    "authorityId",
+    ///    "partitionId"
+    ///  ],
+    ///  "properties": {
+    ///    "allocatedInvocations": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "authorityId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "partitionId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Allocation {
+        #[serde(rename = "allocatedInvocations")]
+        pub allocated_invocations: u32,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "authorityId")]
+        pub authority_id: AllocationAuthorityId,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "partitionId")]
+        pub partition_id: AllocationPartitionId,
+    }
+    impl ::std::convert::From<&Allocation> for Allocation {
+        fn from(value: &Allocation) -> Self {
+            value.clone()
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct AllocationAuthorityId(::std::string::String);
+    impl ::std::ops::Deref for AllocationAuthorityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<AllocationAuthorityId> for ::std::string::String {
+        fn from(value: AllocationAuthorityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&AllocationAuthorityId> for AllocationAuthorityId {
+        fn from(value: &AllocationAuthorityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for AllocationAuthorityId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AllocationAuthorityId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for AllocationAuthorityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct AllocationPartitionId(::std::string::String);
+    impl ::std::ops::Deref for AllocationPartitionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<AllocationPartitionId> for ::std::string::String {
+        fn from(value: AllocationPartitionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&AllocationPartitionId> for AllocationPartitionId {
+        fn from(value: &AllocationPartitionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for AllocationPartitionId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AllocationPartitionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for AllocationPartitionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Body`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "allocations",
+    ///    "authorityDomain",
+    ///    "expiresAt",
+    ///    "notBefore",
+    ///    "quota",
+    ///    "quotaCommitmentDigest",
+    ///    "quotaCommitmentExpiresAt",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "allocations": {
+    ///      "description": "The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/allocation"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "authorityDomain": {
+    ///      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "expiresAt": {
+    ///      "description": "Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.",
+    ///      "allOf": [
+    ///        {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        }
+    ///      ]
+    ///    },
+    ///    "notBefore": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "quota": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "maxInvocations",
+    ///        "ownerId",
+    ///        "profile"
+    ///      ],
+    ///      "properties": {
+    ///        "grantIndex": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "maxInvocations": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "ownerId": {
+    ///          "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///        },
+    ///        "profile": {
+    ///          "enum": [
+    ///            "chio.grant-invocation.v1",
+    ///            "chio.aggregate-capability-invocation.v1",
+    ///            "chio.aggregate-family-invocation.v1",
+    ///            "chio.broker-capability-execution.v1"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "quotaCommitmentDigest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "quotaCommitmentExpiresAt": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-allocation-set.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Body {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: ::std::num::NonZeroU64,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: BodyAllocationPlanDigest,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: BodyAllocationRootId,
+        ///The complete allocation set. Runtime validation additionally requires bytewise ordering, unique partition and authority identifiers, and a sum no greater than quota.maxInvocations.
+        pub allocations: Vec<Allocation>,
+        ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: BodyAuthorityDomain,
+        ///Exclusive allocation expiry. Runtime validation also requires notBefore < expiresAt <= quotaCommitmentExpiresAt.
+        #[serde(rename = "expiresAt")]
+        pub expires_at: ::std::num::NonZeroU64,
+        #[serde(rename = "notBefore")]
+        pub not_before: i64,
+        pub quota: BodyQuota,
+        #[serde(rename = "quotaCommitmentDigest")]
+        pub quota_commitment_digest: BodyQuotaCommitmentDigest,
+        #[serde(rename = "quotaCommitmentExpiresAt")]
+        pub quota_commitment_expires_at: ::std::num::NonZeroU64,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Body> for Body {
+        fn from(value: &Body) -> Self {
+            value.clone()
+        }
+    }
+    ///`BodyAllocationPlanDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAllocationPlanDigest(::std::string::String);
+    impl ::std::ops::Deref for BodyAllocationPlanDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAllocationPlanDigest> for ::std::string::String {
+        fn from(value: BodyAllocationPlanDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAllocationPlanDigest> for BodyAllocationPlanDigest {
+        fn from(value: &BodyAllocationPlanDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAllocationPlanDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAllocationPlanDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAllocationPlanDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAllocationRootId(::std::string::String);
+    impl ::std::ops::Deref for BodyAllocationRootId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAllocationRootId> for ::std::string::String {
+        fn from(value: BodyAllocationRootId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAllocationRootId> for BodyAllocationRootId {
+        fn from(value: &BodyAllocationRootId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAllocationRootId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAllocationRootId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAllocationRootId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyAuthorityDomain(::std::string::String);
+    impl ::std::ops::Deref for BodyAuthorityDomain {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyAuthorityDomain> for ::std::string::String {
+        fn from(value: BodyAuthorityDomain) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyAuthorityDomain> for BodyAuthorityDomain {
+        fn from(value: &BodyAuthorityDomain) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyAuthorityDomain {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyAuthorityDomain {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyAuthorityDomain {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`BodyQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct BodyQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: BodyQuotaProfile,
+    }
+    impl ::std::convert::From<&BodyQuota> for BodyQuota {
+        fn from(value: &BodyQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`BodyQuotaCommitmentDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct BodyQuotaCommitmentDigest(::std::string::String);
+    impl ::std::ops::Deref for BodyQuotaCommitmentDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<BodyQuotaCommitmentDigest> for ::std::string::String {
+        fn from(value: BodyQuotaCommitmentDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&BodyQuotaCommitmentDigest> for BodyQuotaCommitmentDigest {
+        fn from(value: &BodyQuotaCommitmentDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for BodyQuotaCommitmentDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyQuotaCommitmentDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for BodyQuotaCommitmentDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`BodyQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum BodyQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for BodyQuotaProfile {
+        fn from(value: &BodyQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for BodyQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for BodyQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BodyQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`BrokerCapabilityTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "broker_capability_id",
+    ///    "claim_binding_digest",
+    ///    "kind",
+    ///    "negotiated_features_digest",
+    ///    "quota_owner_id",
+    ///    "request_binding_hash",
+    ///    "request_constraint_digest",
+    ///    "revocation_set_digest",
+    ///    "verifier_id"
+    ///  ],
+    ///  "properties": {
+    ///    "broker_capability_id": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "claim_binding_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "kind": {
+    ///      "const": "brokerCapability"
+    ///    },
+    ///    "negotiated_features_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "quota_owner_id": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "request_binding_hash": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "request_constraint_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "verifier_id": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct BrokerCapabilityTrust {
+        pub broker_capability_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        pub claim_binding_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub kind: ::serde_json::Value,
+        pub negotiated_features_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub quota_owner_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub request_binding_hash: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub request_constraint_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub revocation_set_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        pub verifier_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+    }
+    impl ::std::convert::From<&BrokerCapabilityTrust> for BrokerCapabilityTrust {
+        fn from(value: &BrokerCapabilityTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///Receipt-side partition authority proof carrying the exact canonical admission-evidence JSON, its domain-separated digest, and an indexable authority summary.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-receipt-metadata.schema.json",
+    ///  "title": "Chio partition-escrow financial receipt metadata",
+    ///  "description": "Receipt-side partition authority proof carrying the exact canonical admission-evidence JSON, its domain-separated digest, and an indexable authority summary.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "canonical_json",
+    ///    "evidence_digest",
+    ///    "summary"
+    ///  ],
+    ///  "properties": {
+    ///    "canonical_json": {
+    ///      "description": "The exact RFC 8785 canonical JSON serialization of a partition-escrow admission evidence object. Runtime validation applies the one MiB bound to UTF-8 bytes.",
+    ///      "type": "string",
+    ///      "maxLength": 1048576,
+    ///      "minLength": 1,
+    ///      "contentMediaType": "application/json",
+    ///      "contentSchema": {
+    ///        "$comment": "Runtime validation additionally binds authorityId to durableStore.storeIdentityDigest, recomputes counterNamespaceDigest, and verifies every digest, signature, time window, source-trust relation, and summary equality.",
+    ///        "additionalProperties": false,
+    ///        "description": "Canonical historical proof that a durable partition authority verified and admitted one or more source-backed invocation quotas.",
+    ///        "properties": {
+    ///          "authorityDomain": {
+    ///            "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///          },
+    ///          "authorityId": {
+    ///            "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///          },
+    ///          "durableStore": {
+    ///            "$ref": "#/$defs/durableStore"
+    ///          },
+    ///          "partitionId": {
+    ///            "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///          },
+    ///          "quotas": {
+    ///            "description": "Quota keys and certificate bindings must be unique under runtime validation.",
+    ///            "items": {
+    ///              "$ref": "#/$defs/quotaEvidence"
+    ///            },
+    ///            "maxItems": 8,
+    ///            "minItems": 1,
+    ///            "type": "array"
+    ///          },
+    ///          "resolver": {
+    ///            "$ref": "#/$defs/resolver"
+    ///          },
+    ///          "schema": {
+    ///            "const": "chio.partition-escrow-admission-evidence.v1"
+    ///          },
+    ///          "verifiedAt": {
+    ///            "$ref": "#/$defs/safeInteger"
+    ///          }
+    ///        },
+    ///        "required": [
+    ///          "schema",
+    ///          "verifiedAt",
+    ///          "resolver",
+    ///          "durableStore",
+    ///          "authorityDomain",
+    ///          "partitionId",
+    ///          "authorityId",
+    ///          "quotas"
+    ///        ],
+    ///        "title": "Chio partition-escrow admission evidence",
+    ///        "type": "object"
+    ///      }
+    ///    },
+    ///    "evidence_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "summary": {
+    ///      "$ref": "#/$defs/summary"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false,
+    ///  "$comment": "Runtime validation recomputes evidence_digest from canonical_json and requires every summary field to equal the corresponding admission-evidence field."
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioPartitionEscrowFinancialReceiptMetadata {
+        ///The exact RFC 8785 canonical JSON serialization of a partition-escrow admission evidence object. Runtime validation applies the one MiB bound to UTF-8 bytes.
+        pub canonical_json: ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson,
+        pub evidence_digest: Digest,
+        pub summary: Summary,
+    }
+    impl ::std::convert::From<&ChioPartitionEscrowFinancialReceiptMetadata>
+    for ChioPartitionEscrowFinancialReceiptMetadata {
+        fn from(value: &ChioPartitionEscrowFinancialReceiptMetadata) -> Self {
+            value.clone()
+        }
+    }
+    ///The exact RFC 8785 canonical JSON serialization of a partition-escrow admission evidence object. Runtime validation applies the one MiB bound to UTF-8 bytes.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The exact RFC 8785 canonical JSON serialization of a partition-escrow admission evidence object. Runtime validation applies the one MiB bound to UTF-8 bytes.",
+    ///  "type": "string",
+    ///  "maxLength": 1048576,
+    ///  "minLength": 1,
+    ///  "contentMediaType": "application/json",
+    ///  "contentSchema": {
+    ///    "$comment": "Runtime validation additionally binds authorityId to durableStore.storeIdentityDigest, recomputes counterNamespaceDigest, and verifies every digest, signature, time window, source-trust relation, and summary equality.",
+    ///    "additionalProperties": false,
+    ///    "description": "Canonical historical proof that a durable partition authority verified and admitted one or more source-backed invocation quotas.",
+    ///    "properties": {
+    ///      "authorityDomain": {
+    ///        "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///      },
+    ///      "authorityId": {
+    ///        "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///      },
+    ///      "durableStore": {
+    ///        "$ref": "#/$defs/durableStore"
+    ///      },
+    ///      "partitionId": {
+    ///        "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///      },
+    ///      "quotas": {
+    ///        "description": "Quota keys and certificate bindings must be unique under runtime validation.",
+    ///        "items": {
+    ///          "$ref": "#/$defs/quotaEvidence"
+    ///        },
+    ///        "maxItems": 8,
+    ///        "minItems": 1,
+    ///        "type": "array"
+    ///      },
+    ///      "resolver": {
+    ///        "$ref": "#/$defs/resolver"
+    ///      },
+    ///      "schema": {
+    ///        "const": "chio.partition-escrow-admission-evidence.v1"
+    ///      },
+    ///      "verifiedAt": {
+    ///        "$ref": "#/$defs/safeInteger"
+    ///      }
+    ///    },
+    ///    "required": [
+    ///      "schema",
+    ///      "verifiedAt",
+    ///      "resolver",
+    ///      "durableStore",
+    ///      "authorityDomain",
+    ///      "partitionId",
+    ///      "authorityId",
+    ///      "quotas"
+    ///    ],
+    ///    "title": "Chio partition-escrow admission evidence",
+    ///    "type": "object"
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson>
+    for ::std::string::String {
+        fn from(
+            value: ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson>
+    for ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson {
+        fn from(
+            value: &ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1048576usize {
+                return Err("longer than 1048576 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioPartitionEscrowFinancialReceiptMetadataCanonicalJson {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<
+        ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    > for ::std::string::String {
+        fn from(
+            value: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374 {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<
+        ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+    > for ::std::string::String {
+        fn from(
+            value: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572 {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572(
+        pub ::std::num::NonZeroU64,
+    );
+    impl ::std::ops::Deref
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<
+        ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572,
+    > for ::std::num::NonZeroU64 {
+        fn from(
+            value: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332(
+        pub ::std::num::NonZeroU64,
+    );
+    impl ::std::ops::Deref
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<
+        ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332,
+    > for ::std::num::NonZeroU64 {
+        fn from(
+            value: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<
+        &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332,
+    >
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        fn from(
+            value: &ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String>
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display
+    for ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio signed partition-escrow allocation set",
+    ///  "description": "An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "allocatorKey",
+    ///    "body",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "enum": [
+    ///        "ed25519",
+    ///        "p256",
+    ///        "p384",
+    ///        "hybrid"
+    ///      ]
+    ///    },
+    ///    "allocatorKey": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "body": {
+    ///      "$ref": "#/$defs/body"
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedPartitionEscrowAllocationSet {
+        pub algorithm: ChioSignedPartitionEscrowAllocationSetAlgorithm,
+        #[serde(rename = "allocatorKey")]
+        pub allocator_key: ChioSignedPartitionEscrowAllocationSetAllocatorKey,
+        pub body: Body,
+        pub signature: ChioSignedPartitionEscrowAllocationSetSignature,
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSet>
+    for ChioSignedPartitionEscrowAllocationSet {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSet) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetAllocatorKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedPartitionEscrowAllocationSetAllocatorKey(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedPartitionEscrowAllocationSetAllocatorKey>
+    for ::std::string::String {
+        fn from(value: ChioSignedPartitionEscrowAllocationSetAllocatorKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSetAllocatorKey>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetAllocatorKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioSignedPartitionEscrowAllocationSetAllocatorKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedPartitionEscrowAllocationSetSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedPartitionEscrowAllocationSetSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedPartitionEscrowAllocationSetSignature>
+    for ::std::string::String {
+        fn from(value: ChioSignedPartitionEscrowAllocationSetSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowAllocationSetSignature>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        fn from(value: &ChioSignedPartitionEscrowAllocationSetSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioSignedPartitionEscrowAllocationSetSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio signed partition-escrow quota commitment",
+    ///  "description": "A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "body",
+    ///    "signature",
+    ///    "signerKey"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "$ref": "#/$defs/partitionEscrowSignatureAlgorithm"
+    ///    },
+    ///    "body": {
+    ///      "$ref": "#/$defs/quotaCommitmentBody"
+    ///    },
+    ///    "signature": {
+    ///      "$ref": "#/$defs/partitionEscrowSignature"
+    ///    },
+    ///    "signerKey": {
+    ///      "$ref": "#/$defs/partitionEscrowPublicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedPartitionEscrowQuotaCommitment {
+        pub algorithm: PartitionEscrowSignatureAlgorithm,
+        pub body: QuotaCommitmentBody,
+        pub signature: PartitionEscrowSignature,
+        #[serde(rename = "signerKey")]
+        pub signer_key: PartitionEscrowPublicKey,
+    }
+    impl ::std::convert::From<&ChioSignedPartitionEscrowQuotaCommitment>
+    for ChioSignedPartitionEscrowQuotaCommitment {
+        fn from(value: &ChioSignedPartitionEscrowQuotaCommitment) -> Self {
+            value.clone()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Digest(::std::string::String);
+    impl ::std::ops::Deref for Digest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for ::std::string::String {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Digest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Digest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`DurableStore`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "counterNamespaceDigest",
+    ///    "fencingToken",
+    ///    "storeIdentityDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "counterNamespaceDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "fencingToken": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_706f73697469766553616665496e7465676572"
+    ///    },
+    ///    "storeIdentityDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DurableStore {
+        #[serde(rename = "counterNamespaceDigest")]
+        pub counter_namespace_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "fencingToken")]
+        pub fencing_token: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572,
+        #[serde(rename = "storeIdentityDigest")]
+        pub store_identity_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    }
+    impl ::std::convert::From<&DurableStore> for DurableStore {
+        fn from(value: &DurableStore) -> Self {
+            value.clone()
+        }
+    }
+    ///`GrantCapabilityTrust`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_id",
+    ///    "grant_index",
+    ///    "kind",
+    ///    "revocation_set_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "grant_index": {
+    ///      "$ref": "#/$defs/uint32"
+    ///    },
+    ///    "kind": {
+    ///      "const": "grantCapability"
+    ///    },
+    ///    "revocation_set_digest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct GrantCapabilityTrust {
+        pub capability_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        pub grant_index: Uint32,
+        pub kind: ::serde_json::Value,
+        pub revocation_set_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    }
+    impl ::std::convert::From<&GrantCapabilityTrust> for GrantCapabilityTrust {
+        fn from(value: &GrantCapabilityTrust) -> Self {
+            value.clone()
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowDigest(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowDigest> for ::std::string::String {
+        fn from(value: PartitionEscrowDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowDigest> for PartitionEscrowDigest {
+        fn from(value: &PartitionEscrowDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519PublicKey>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519PublicKey>
+    for PartitionEscrowEd25519PublicKey {
+        fn from(value: &PartitionEscrowEd25519PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{64}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowEd25519Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{128}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowEd25519Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowEd25519Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowEd25519Signature>
+    for ::std::string::String {
+        fn from(value: PartitionEscrowEd25519Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowEd25519Signature>
+    for PartitionEscrowEd25519Signature {
+        fn from(value: &PartitionEscrowEd25519Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowEd25519Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[0-9a-f]{128}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{128}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowEd25519Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowEd25519Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridPublicKey>
+    for PartitionEscrowHybridPublicKey {
+        fn from(value: &PartitionEscrowHybridPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowHybridSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowHybridSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowHybridSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowHybridSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowHybridSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowHybridSignature>
+    for PartitionEscrowHybridSignature {
+        fn from(value: &PartitionEscrowHybridSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowHybridSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowHybridSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowHybridSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowIdentifier(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowIdentifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowIdentifier> for ::std::string::String {
+        fn from(value: PartitionEscrowIdentifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowIdentifier> for PartitionEscrowIdentifier {
+        fn from(value: &PartitionEscrowIdentifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowIdentifier {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^[^\\u0000]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowIdentifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]{130}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP256PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256PublicKey>
+    for PartitionEscrowP256PublicKey {
+        fn from(value: &PartitionEscrowP256PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]{130}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]{130}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP256Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p256:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP256Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP256Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP256Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP256Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP256Signature>
+    for PartitionEscrowP256Signature {
+        fn from(value: &PartitionEscrowP256Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP256Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p256:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p256:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP256Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP256Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]{194}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384PublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowP384PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384PublicKey>
+    for PartitionEscrowP384PublicKey {
+        fn from(value: &PartitionEscrowP384PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]{194}$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]{194}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowP384Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^p384:[0-9a-f]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowP384Signature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowP384Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowP384Signature> for ::std::string::String {
+        fn from(value: PartitionEscrowP384Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowP384Signature>
+    for PartitionEscrowP384Signature {
+        fn from(value: &PartitionEscrowP384Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowP384Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            { ::regress::Regex::new("^p384:[0-9a-f]+$").unwrap() });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^p384:[0-9a-f]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowP384Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowP384Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowPositiveSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveSafeInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveSafeInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveSafeInteger>
+    for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveSafeInteger>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: &PartitionEscrowPositiveSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64>
+    for PartitionEscrowPositiveSafeInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveSafeInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPositiveUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPositiveUint32(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PartitionEscrowPositiveUint32 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPositiveUint32> for ::std::num::NonZeroU64 {
+        fn from(value: PartitionEscrowPositiveUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPositiveUint32>
+    for PartitionEscrowPositiveUint32 {
+        fn from(value: &PartitionEscrowPositiveUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PartitionEscrowPositiveUint32 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPositiveUint32 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowPositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowPositiveUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowPublicKey(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowPublicKey> for ::std::string::String {
+        fn from(value: PartitionEscrowPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowPublicKey> for PartitionEscrowPublicKey {
+        fn from(value: &PartitionEscrowPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PartitionEscrowQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: PartitionEscrowQuotaProfile,
+    }
+    impl ::std::convert::From<&PartitionEscrowQuota> for PartitionEscrowQuota {
+        fn from(value: &PartitionEscrowQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`PartitionEscrowQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowQuotaProfile {
+        fn from(value: &PartitionEscrowQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSafeInteger(pub i64);
+    impl ::std::ops::Deref for PartitionEscrowSafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSafeInteger> for i64 {
+        fn from(value: PartitionEscrowSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSafeInteger>
+    for PartitionEscrowSafeInteger {
+        fn from(value: &PartitionEscrowSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for PartitionEscrowSafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowSafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PartitionEscrowSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowSignature(::std::string::String);
+    impl ::std::ops::Deref for PartitionEscrowSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowSignature> for ::std::string::String {
+        fn from(value: PartitionEscrowSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowSignature> for PartitionEscrowSignature {
+        fn from(value: &PartitionEscrowSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PartitionEscrowSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PartitionEscrowSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PartitionEscrowSignatureAlgorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum PartitionEscrowSignatureAlgorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for PartitionEscrowSignatureAlgorithm {
+        fn from(value: &PartitionEscrowSignatureAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowSignatureAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowSignatureAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for PartitionEscrowSignatureAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PartitionEscrowUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PartitionEscrowUint32(pub u32);
+    impl ::std::ops::Deref for PartitionEscrowUint32 {
+        type Target = u32;
+        fn deref(&self) -> &u32 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PartitionEscrowUint32> for u32 {
+        fn from(value: PartitionEscrowUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PartitionEscrowUint32> for PartitionEscrowUint32 {
+        fn from(value: &PartitionEscrowUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<u32> for PartitionEscrowUint32 {
+        fn from(value: u32) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PartitionEscrowUint32 {
+        type Err = <u32 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PartitionEscrowUint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PartitionEscrowUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PositiveSafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PositiveSafeInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PositiveSafeInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PositiveSafeInteger> for ::std::num::NonZeroU64 {
+        fn from(value: PositiveSafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PositiveSafeInteger> for PositiveSafeInteger {
+        fn from(value: &PositiveSafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PositiveSafeInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PositiveSafeInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PositiveSafeInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PositiveSafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PositiveUint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PositiveUint32(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PositiveUint32 {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PositiveUint32> for ::std::num::NonZeroU64 {
+        fn from(value: PositiveUint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PositiveUint32> for PositiveUint32 {
+        fn from(value: &PositiveUint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PositiveUint32 {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PositiveUint32 {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PositiveUint32 {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PositiveUint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PublicKey> for ::std::string::String {
+        fn from(value: PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PublicKey> for PublicKey {
+        fn from(value: &PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`QuotaCommitmentBody`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "authorityDomain",
+    ///    "quota",
+    ///    "quotaKeyDigest",
+    ///    "schema",
+    ///    "sourceExpiresAt",
+    ///    "sourceNotBefore",
+    ///    "sourceTrustBindingDigest",
+    ///    "underlyingSourceArtifactDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "authorityDomain": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "quota": {
+    ///      "$ref": "#/$defs/partitionEscrowQuota"
+    ///    },
+    ///    "quotaKeyDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.partition-escrow-quota-commitment.v1"
+    ///    },
+    ///    "sourceExpiresAt": {
+    ///      "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.",
+    ///      "allOf": [
+    ///        {
+    ///          "$ref": "#/$defs/partitionEscrowPositiveSafeInteger"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "sourceNotBefore": {
+    ///      "$ref": "#/$defs/partitionEscrowSafeInteger"
+    ///    },
+    ///    "sourceTrustBindingDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    },
+    ///    "underlyingSourceArtifactDigest": {
+    ///      "$ref": "#/$defs/partitionEscrowDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaCommitmentBody {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: PartitionEscrowDigest,
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: PartitionEscrowIdentifier,
+        #[serde(rename = "authorityDomain")]
+        pub authority_domain: PartitionEscrowIdentifier,
+        pub quota: PartitionEscrowQuota,
+        #[serde(rename = "quotaKeyDigest")]
+        pub quota_key_digest: PartitionEscrowDigest,
+        pub schema: ::serde_json::Value,
+        ///Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+        #[serde(rename = "sourceExpiresAt")]
+        pub source_expires_at: PartitionEscrowPositiveSafeInteger,
+        #[serde(rename = "sourceNotBefore")]
+        pub source_not_before: PartitionEscrowSafeInteger,
+        #[serde(rename = "sourceTrustBindingDigest")]
+        pub source_trust_binding_digest: PartitionEscrowDigest,
+        #[serde(rename = "underlyingSourceArtifactDigest")]
+        pub underlying_source_artifact_digest: PartitionEscrowDigest,
+    }
+    impl ::std::convert::From<&QuotaCommitmentBody> for QuotaCommitmentBody {
+        fn from(value: &QuotaCommitmentBody) -> Self {
+            value.clone()
+        }
+    }
+    ///`QuotaEvidence`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocationEpoch",
+    ///    "allocationPlanDigest",
+    ///    "allocationRootId",
+    ///    "allocationSet",
+    ///    "allocationSetDigest",
+    ///    "globalQuota",
+    ///    "localAllocatedInvocations",
+    ///    "quotaCertificateBindingDigest",
+    ///    "quotaCommitment",
+    ///    "quotaCommitmentDigest",
+    ///    "quotaDescriptorDigest",
+    ///    "quotaKeyDigest",
+    ///    "sourceExpiresAt",
+    ///    "sourceNotBefore",
+    ///    "sourceSigner",
+    ///    "sourceTrust",
+    ///    "sourceTrustBindingDigest",
+    ///    "totalAllocatedInvocations",
+    ///    "underlyingSourceArtifactDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "allocationEpoch": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_706f73697469766553616665496e7465676572"
+    ///    },
+    ///    "allocationPlanDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "allocationRootId": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "allocationSet": {
+    ///      "title": "Chio signed partition-escrow allocation set",
+    ///      "description": "An allocator-signed, complete partition allocation plan derived from one source-signed quota commitment.",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "algorithm",
+    ///        "allocatorKey",
+    ///        "body",
+    ///        "signature"
+    ///      ],
+    ///      "properties": {
+    ///        "algorithm": {
+    ///          "enum": [
+    ///            "ed25519",
+    ///            "p256",
+    ///            "p384",
+    ///            "hybrid"
+    ///          ]
+    ///        },
+    ///        "allocatorKey": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        },
+    ///        "body": {
+    ///          "$ref": "#/$defs/body"
+    ///        },
+    ///        "signature": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "allocationSetDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "globalQuota": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "maxInvocations",
+    ///        "ownerId",
+    ///        "profile"
+    ///      ],
+    ///      "properties": {
+    ///        "grantIndex": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "maxInvocations": {
+    ///          "$ref": "#/$defs/partitionEscrowUint32"
+    ///        },
+    ///        "ownerId": {
+    ///          "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///        },
+    ///        "profile": {
+    ///          "enum": [
+    ///            "chio.grant-invocation.v1",
+    ///            "chio.aggregate-capability-invocation.v1",
+    ///            "chio.aggregate-family-invocation.v1",
+    ///            "chio.broker-capability-execution.v1"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "localAllocatedInvocations": {
+    ///      "$ref": "#/$defs/uint32"
+    ///    },
+    ///    "quotaCertificateBindingDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "quotaCommitment": {
+    ///      "title": "Chio signed partition-escrow quota commitment",
+    ///      "description": "A source-key-signed commitment binding one global invocation quota to an exact source artifact and complete partition allocation plan.",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "algorithm",
+    ///        "body",
+    ///        "signature",
+    ///        "signerKey"
+    ///      ],
+    ///      "properties": {
+    ///        "algorithm": {
+    ///          "$ref": "#/$defs/partitionEscrowSignatureAlgorithm"
+    ///        },
+    ///        "body": {
+    ///          "$ref": "#/$defs/quotaCommitmentBody"
+    ///        },
+    ///        "signature": {
+    ///          "$ref": "#/$defs/partitionEscrowSignature"
+    ///        },
+    ///        "signerKey": {
+    ///          "$ref": "#/$defs/partitionEscrowPublicKey"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "quotaCommitmentDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "quotaDescriptorDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "quotaKeyDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "sourceExpiresAt": {
+    ///      "description": "Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.",
+    ///      "allOf": [
+    ///        {
+    ///          "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_706f73697469766553616665496e7465676572"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "sourceNotBefore": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "sourceSigner": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    },
+    ///    "sourceTrust": {
+    ///      "$ref": "#/$defs/sourceTrust"
+    ///    },
+    ///    "sourceTrustBindingDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "totalAllocatedInvocations": {
+    ///      "$ref": "#/$defs/uint32"
+    ///    },
+    ///    "underlyingSourceArtifactDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaEvidence {
+        #[serde(rename = "allocationEpoch")]
+        pub allocation_epoch: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572,
+        #[serde(rename = "allocationPlanDigest")]
+        pub allocation_plan_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "allocationRootId")]
+        pub allocation_root_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        #[serde(rename = "allocationSet")]
+        pub allocation_set: ChioSignedPartitionEscrowAllocationSet,
+        #[serde(rename = "allocationSetDigest")]
+        pub allocation_set_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "globalQuota")]
+        pub global_quota: QuotaEvidenceGlobalQuota,
+        #[serde(rename = "localAllocatedInvocations")]
+        pub local_allocated_invocations: Uint32,
+        #[serde(rename = "quotaCertificateBindingDigest")]
+        pub quota_certificate_binding_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "quotaCommitment")]
+        pub quota_commitment: ChioSignedPartitionEscrowQuotaCommitment,
+        #[serde(rename = "quotaCommitmentDigest")]
+        pub quota_commitment_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "quotaDescriptorDigest")]
+        pub quota_descriptor_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "quotaKeyDigest")]
+        pub quota_key_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        ///Exclusive source authority expiry. Runtime validation also requires this value to be greater than sourceNotBefore.
+        #[serde(rename = "sourceExpiresAt")]
+        pub source_expires_at: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766553616665496e7465676572,
+        #[serde(rename = "sourceNotBefore")]
+        pub source_not_before: SafeInteger,
+        #[serde(rename = "sourceSigner")]
+        pub source_signer: PublicKey,
+        #[serde(rename = "sourceTrust")]
+        pub source_trust: SourceTrust,
+        #[serde(rename = "sourceTrustBindingDigest")]
+        pub source_trust_binding_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "totalAllocatedInvocations")]
+        pub total_allocated_invocations: Uint32,
+        #[serde(rename = "underlyingSourceArtifactDigest")]
+        pub underlying_source_artifact_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+    }
+    impl ::std::convert::From<&QuotaEvidence> for QuotaEvidence {
+        fn from(value: &QuotaEvidence) -> Self {
+            value.clone()
+        }
+    }
+    ///`QuotaEvidenceGlobalQuota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "maxInvocations",
+    ///    "ownerId",
+    ///    "profile"
+    ///  ],
+    ///  "properties": {
+    ///    "grantIndex": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "maxInvocations": {
+    ///      "$ref": "#/$defs/partitionEscrowUint32"
+    ///    },
+    ///    "ownerId": {
+    ///      "$ref": "#/$defs/partitionEscrowIdentifier"
+    ///    },
+    ///    "profile": {
+    ///      "enum": [
+    ///        "chio.grant-invocation.v1",
+    ///        "chio.aggregate-capability-invocation.v1",
+    ///        "chio.aggregate-family-invocation.v1",
+    ///        "chio.broker-capability-execution.v1"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct QuotaEvidenceGlobalQuota {
+        #[serde(
+            rename = "grantIndex",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub grant_index: ::std::option::Option<PartitionEscrowUint32>,
+        #[serde(rename = "maxInvocations")]
+        pub max_invocations: PartitionEscrowUint32,
+        #[serde(rename = "ownerId")]
+        pub owner_id: PartitionEscrowIdentifier,
+        pub profile: QuotaEvidenceGlobalQuotaProfile,
+    }
+    impl ::std::convert::From<&QuotaEvidenceGlobalQuota> for QuotaEvidenceGlobalQuota {
+        fn from(value: &QuotaEvidenceGlobalQuota) -> Self {
+            value.clone()
+        }
+    }
+    ///`QuotaEvidenceGlobalQuotaProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.grant-invocation.v1",
+    ///    "chio.aggregate-capability-invocation.v1",
+    ///    "chio.aggregate-family-invocation.v1",
+    ///    "chio.broker-capability-execution.v1"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd
+    )]
+    pub enum QuotaEvidenceGlobalQuotaProfile {
+        #[serde(rename = "chio.grant-invocation.v1")]
+        ChioGrantInvocationV1,
+        #[serde(rename = "chio.aggregate-capability-invocation.v1")]
+        ChioAggregateCapabilityInvocationV1,
+        #[serde(rename = "chio.aggregate-family-invocation.v1")]
+        ChioAggregateFamilyInvocationV1,
+        #[serde(rename = "chio.broker-capability-execution.v1")]
+        ChioBrokerCapabilityExecutionV1,
+    }
+    impl ::std::convert::From<&Self> for QuotaEvidenceGlobalQuotaProfile {
+        fn from(value: &QuotaEvidenceGlobalQuotaProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for QuotaEvidenceGlobalQuotaProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioGrantInvocationV1 => f.write_str("chio.grant-invocation.v1"),
+                Self::ChioAggregateCapabilityInvocationV1 => {
+                    f.write_str("chio.aggregate-capability-invocation.v1")
+                }
+                Self::ChioAggregateFamilyInvocationV1 => {
+                    f.write_str("chio.aggregate-family-invocation.v1")
+                }
+                Self::ChioBrokerCapabilityExecutionV1 => {
+                    f.write_str("chio.broker-capability-execution.v1")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for QuotaEvidenceGlobalQuotaProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.grant-invocation.v1" => Ok(Self::ChioGrantInvocationV1),
+                "chio.aggregate-capability-invocation.v1" => {
+                    Ok(Self::ChioAggregateCapabilityInvocationV1)
+                }
+                "chio.aggregate-family-invocation.v1" => {
+                    Ok(Self::ChioAggregateFamilyInvocationV1)
+                }
+                "chio.broker-capability-execution.v1" => {
+                    Ok(Self::ChioBrokerCapabilityExecutionV1)
+                }
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for QuotaEvidenceGlobalQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for QuotaEvidenceGlobalQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for QuotaEvidenceGlobalQuotaProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Resolver`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "configurationDigest",
+    ///    "implementationId",
+    ///    "implementationVersion",
+    ///    "resolverId"
+    ///  ],
+    ///  "properties": {
+    ///    "configurationDigest": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_646967657374"
+    ///    },
+    ///    "implementationId": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    },
+    ///    "implementationVersion": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_706f73697469766555696e743332"
+    ///    },
+    ///    "resolverId": {
+    ///      "$ref": "#/$defs/__chio_resource_74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6e_definition_6964656e746966696572"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Resolver {
+        #[serde(rename = "configurationDigest")]
+        pub configuration_digest: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition646967657374,
+        #[serde(rename = "implementationId")]
+        pub implementation_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+        #[serde(rename = "implementationVersion")]
+        pub implementation_version: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition706f73697469766555696e743332,
+        #[serde(rename = "resolverId")]
+        pub resolver_id: ChioResource74727573742d636f6e74726f6c2f706172746974696f6e2d657363726f772d61646d697373696f6e2d65766964656e63652e736368656d612e6a736f6eDefinition6964656e746966696572,
+    }
+    impl ::std::convert::From<&Resolver> for Resolver {
+        fn from(value: &Resolver) -> Self {
+            value.clone()
+        }
+    }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The kind discriminator is camelCase. Variant payload fields remain snake_case because that is the exact serde representation.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/grantCapabilityTrust"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/aggregateCapabilityTrust"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/aggregateFamilyTrust"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/brokerCapabilityTrust"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum SourceTrust {
+        GrantCapabilityTrust(GrantCapabilityTrust),
+        AggregateCapabilityTrust(AggregateCapabilityTrust),
+        AggregateFamilyTrust(AggregateFamilyTrust),
+        BrokerCapabilityTrust(BrokerCapabilityTrust),
+    }
+    impl ::std::convert::From<&Self> for SourceTrust {
+        fn from(value: &SourceTrust) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<GrantCapabilityTrust> for SourceTrust {
+        fn from(value: GrantCapabilityTrust) -> Self {
+            Self::GrantCapabilityTrust(value)
+        }
+    }
+    impl ::std::convert::From<AggregateCapabilityTrust> for SourceTrust {
+        fn from(value: AggregateCapabilityTrust) -> Self {
+            Self::AggregateCapabilityTrust(value)
+        }
+    }
+    impl ::std::convert::From<AggregateFamilyTrust> for SourceTrust {
+        fn from(value: AggregateFamilyTrust) -> Self {
+            Self::AggregateFamilyTrust(value)
+        }
+    }
+    impl ::std::convert::From<BrokerCapabilityTrust> for SourceTrust {
+        fn from(value: BrokerCapabilityTrust) -> Self {
+            Self::BrokerCapabilityTrust(value)
+        }
+    }
+    ///`Summary`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authority_id",
+    ///    "counter_namespace_digest",
+    ///    "fencing_token",
+    ///    "partition_id",
+    ///    "resolver_configuration_digest",
+    ///    "resolver_id",
+    ///    "resolver_implementation_id",
+    ///    "resolver_implementation_version",
+    ///    "store_identity_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "authority_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "counter_namespace_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "fencing_token": {
+    ///      "$ref": "#/$defs/positiveSafeInteger"
+    ///    },
+    ///    "partition_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "resolver_configuration_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "resolver_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "resolver_implementation_id": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "resolver_implementation_version": {
+    ///      "$ref": "#/$defs/positiveUint32"
+    ///    },
+    ///    "store_identity_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Summary {
+        pub authority_id: Identifier,
+        pub counter_namespace_digest: Digest,
+        pub fencing_token: PositiveSafeInteger,
+        pub partition_id: Identifier,
+        pub resolver_configuration_digest: Digest,
+        pub resolver_id: Identifier,
+        pub resolver_implementation_id: Identifier,
+        pub resolver_implementation_version: PositiveUint32,
+        pub store_identity_digest: Digest,
+    }
+    impl ::std::convert::From<&Summary> for Summary {
+        fn from(value: &Summary) -> Self {
+            value.clone()
+        }
+    }
+    ///`Uint32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 4294967295.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Uint32(pub u32);
+    impl ::std::ops::Deref for Uint32 {
+        type Target = u32;
+        fn deref(&self) -> &u32 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uint32> for u32 {
+        fn from(value: Uint32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uint32> for Uint32 {
+        fn from(value: &Uint32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<u32> for Uint32 {
+        fn from(value: u32) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for Uint32 {
+        type Err = <u32 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for Uint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for Uint32 {
+        type Error = <u32 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for Uint32 {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
         }
     }
 }

@@ -1,6 +1,8 @@
 #[derive(Clone, Debug)]
 pub struct ProductionResponseSchedulerConfig {
     pub tenant_id: TenantId,
+    /// Stable scheduler identity. Each process gets a separate random claim
+    /// incarnation and can take over this owner's prior work only after expiry.
     pub lease_owner_id: LeaseOwnerId,
     pub scheduler_policy: SchedulerPolicy,
     pub renewal_margin_ms: u64,
@@ -40,6 +42,8 @@ pub struct SqliteResponseWorkerPort {
     scheduler: Arc<DynResponseScheduler>,
     clock: Arc<dyn SecurityClock>,
     config: ProductionResponseSchedulerConfig,
+    claim_incarnation_id: RecordId,
+    operation_lock: Mutex<()>,
     owned_leases: Mutex<BTreeMap<String, OwnedLease>>,
 }
 
@@ -62,6 +66,7 @@ impl SqliteResponseWorkerPort {
             health_port,
             clock,
             config,
+            None,
         )
     }
 
@@ -84,6 +89,31 @@ impl SqliteResponseWorkerPort {
             health_port,
             clock,
             config,
+            None,
+        )
+    }
+
+    #[cfg(test)]
+    fn new_with_claim_incarnation_for_test(
+        store: Arc<SqliteSecurityStateStore>,
+        effects: Arc<dyn EffectPort>,
+        receipts: Arc<dyn SecurityReceiptSink>,
+        alerts: Arc<dyn SecurityAlertPort>,
+        health_port: Arc<dyn SchedulerHealthPort>,
+        clock: Arc<dyn SecurityClock>,
+        config: ProductionResponseSchedulerConfig,
+        claim_incarnation_id: RecordId,
+    ) -> Result<Self, ResponseWorkerTickError> {
+        Self::new_internal(
+            store,
+            None,
+            effects,
+            receipts,
+            alerts,
+            health_port,
+            clock,
+            config,
+            Some(claim_incarnation_id),
         )
     }
 
@@ -96,8 +126,13 @@ impl SqliteResponseWorkerPort {
         health_port: Arc<dyn SchedulerHealthPort>,
         clock: Arc<dyn SecurityClock>,
         config: ProductionResponseSchedulerConfig,
+        claim_incarnation_id: Option<RecordId>,
     ) -> Result<Self, ResponseWorkerTickError> {
         config.validate()?;
+        let claim_incarnation_id = match claim_incarnation_id {
+            Some(claim_incarnation_id) => claim_incarnation_id,
+            None => response_worker_claim_incarnation_id()?,
+        };
         let scheduler_store: Arc<dyn ResponseSchedulerStore> = store.clone();
         let executor: Arc<dyn ScheduledResponseExecutor> = Arc::new(ResponseExecutor::new(
             Arc::clone(&scheduler_store),
@@ -121,6 +156,8 @@ impl SqliteResponseWorkerPort {
             scheduler,
             clock,
             config,
+            claim_incarnation_id,
+            operation_lock: Mutex::new(()),
             owned_leases: Mutex::new(BTreeMap::new()),
         };
         worker.ensure_ready()?;
@@ -128,10 +165,14 @@ impl SqliteResponseWorkerPort {
     }
 
     fn claim(&self, tick_sequence: u64) -> Result<Vec<ScheduledWork>, ResponseWorkerTickError> {
+        if self.cleanup_expired_terminal_leases()? {
+            return Err(ResponseWorkerTickError::TerminalSchedulerCleanupPending);
+        }
         let now_unix_ms = self.clock.now_unix_ms()?;
         let claim_id = worker_claim_id(
             &self.config.tenant_id,
             &self.config.lease_owner_id,
+            &self.claim_incarnation_id,
             tick_sequence,
             now_unix_ms,
         )?;
@@ -146,20 +187,33 @@ impl SqliteResponseWorkerPort {
             .lock()
             .map_err(|_| PortError::unavailable())?;
         for work in &claimed {
-            if owned
-                .insert(
-                    work.action_id.as_str().to_owned(),
-                    OwnedLease {
-                        work: work.clone(),
-                        safe_to_release: true,
-                    },
-                )
-                .is_some()
-            {
-                return Err(ResponseWorkerTickError::Port(PortError::integrity_failure()));
+            if let Some(previous) = owned.get(work.action_id.as_str()) {
+                if previous.work.tenant_id != work.tenant_id
+                    || previous.work.action_id != work.action_id
+                    || previous.work.fencing_token >= work.fencing_token
+                {
+                    return Err(ResponseWorkerTickError::Port(PortError::integrity_failure()));
+                }
             }
         }
+        for work in &claimed {
+            owned.insert(
+                work.action_id.as_str().to_owned(),
+                OwnedLease {
+                    work: work.clone(),
+                    safe_to_release: true,
+                },
+            );
+        }
         Ok(claimed)
+    }
+
+    fn cleanup_expired_terminal_leases(&self) -> Result<bool, ResponseWorkerTickError> {
+        let (_, terminal_remaining) = self.store.cleanup_expired_terminal_scheduler_leases(
+            &self.config.tenant_id,
+            self.config.scheduler_policy.max_claims,
+        )?;
+        Ok(terminal_remaining)
     }
 
     fn prepare_work(&self, work: &ScheduledWork) -> Result<ScheduledWork, ResponseWorkerTickError> {
@@ -190,6 +244,24 @@ impl SqliteResponseWorkerPort {
         Ok(())
     }
 
+    fn forget_invalid_owned(&self, action_id: &ActionId) -> Result<(), ResponseWorkerTickError> {
+        let work = self
+            .owned_leases
+            .lock()
+            .map_err(|_| PortError::unavailable())?
+            .get(action_id.as_str())
+            .map(|lease| lease.work.clone());
+        if let Some(work) = work {
+            if matches!(
+                self.store.validate_lease(&work),
+                Err(error) if error.kind() == PortErrorKind::Conflict
+            ) {
+                self.forget_owned(action_id)?;
+            }
+        }
+        Ok(())
+    }
+
     fn release_safe_owned(&self) -> Result<(), ResponseWorkerTickError> {
         let safe = {
             let owned = self
@@ -203,10 +275,22 @@ impl SqliteResponseWorkerPort {
                 .collect::<Vec<_>>()
         };
         for work in safe {
-            self.scheduler.release_for_shutdown(&work)?;
-            self.forget_owned(&work.action_id)?;
+            match self.scheduler.release_for_shutdown(&work) {
+                Ok(()) => self.forget_owned(&work.action_id)?,
+                Err(SchedulerError::Store(error)) if error.kind() == PortErrorKind::Conflict => {
+                    self.forget_owned(&work.action_id)?;
+                }
+                Err(error) => return Err(error.into()),
+            }
         }
         Ok(())
+    }
+
+    fn operation_guard(&self) -> std::sync::MutexGuard<'_, ()> {
+        match self.operation_lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
     }
 }
 
@@ -228,6 +312,7 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
         tick_sequence: u64,
         shutdown_requested: bool,
     ) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
+        let _operation_guard = self.operation_guard();
         if shutdown_requested {
             self.release_safe_owned()?;
             return Err(ResponseWorkerTickError::WorkerStopped);
@@ -254,9 +339,12 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
             lease_lost_action_ids: Vec::new(),
         };
         for work in claimed {
-            let current = self.prepare_work(&work)?;
-            let now_unix_ms = self.clock.now_unix_ms()?;
-            match self.scheduler.process(&current, now_unix_ms) {
+            let processed = (|| -> Result<SchedulerWorkOutcome, ResponseWorkerTickError> {
+                let current = self.prepare_work(&work)?;
+                let now_unix_ms = self.clock.now_unix_ms()?;
+                Ok(self.scheduler.process(&current, now_unix_ms)?)
+            })();
+            match processed {
                 Ok(SchedulerWorkOutcome::Completed { action_id, .. }) => {
                     self.forget_owned(&action_id)?;
                     report.completed_action_ids.push(action_id);
@@ -271,8 +359,9 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
                     report.lease_lost_action_ids.push(action_id);
                 }
                 Err(error) => {
+                    self.forget_invalid_owned(&work.action_id)?;
                     self.release_safe_owned()?;
-                    return Err(error.into());
+                    return Err(error);
                 }
             }
         }
@@ -280,6 +369,7 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
     }
 
     fn shutdown(&self) -> Result<(), ResponseWorkerTickError> {
+        let _operation_guard = self.operation_guard();
         self.release_safe_owned()?;
         if let Some(outbox) = &self.declassification_outbox {
             outbox.drain_to_zero()?;
@@ -313,19 +403,35 @@ fn outbox_health_status(
 struct WorkerClaimCommitment<'a> {
     tenant_id: &'a str,
     lease_owner_id: &'a str,
+    claim_incarnation_id: &'a str,
     tick_sequence: u64,
     now_unix_ms: u64,
+}
+
+fn response_worker_claim_incarnation_id() -> Result<RecordId, ResponseWorkerTickError> {
+    let mut incarnation_bytes = [0_u8; 32];
+    OsRng
+        .try_fill_bytes(&mut incarnation_bytes)
+        .map_err(|_| PortError::unavailable())?;
+    RecordId::new(format!(
+        "response-worker-incarnation-{}",
+        hex::encode(incarnation_bytes)
+    ))
+    .map_err(PortError::from)
+    .map_err(ResponseWorkerTickError::from)
 }
 
 fn worker_claim_id(
     tenant_id: &TenantId,
     lease_owner_id: &LeaseOwnerId,
+    claim_incarnation_id: &RecordId,
     tick_sequence: u64,
     now_unix_ms: u64,
 ) -> Result<RecordId, ResponseWorkerTickError> {
     let canonical = canonical_json_bytes(&WorkerClaimCommitment {
         tenant_id: tenant_id.as_str(),
         lease_owner_id: lease_owner_id.as_str(),
+        claim_incarnation_id: claim_incarnation_id.as_str(),
         tick_sequence,
         now_unix_ms,
     })
@@ -363,12 +469,7 @@ pub struct ActiveDefenseServiceRegistry {
     state: RwLock<ActiveDefenseRegistryState>,
     changes: watch::Sender<u64>,
     #[cfg(test)]
-    reservation_pause: Mutex<
-        Option<(
-            Arc<std::sync::Barrier>,
-            Arc<std::sync::Barrier>,
-        )>,
-    >,
+    reservation_pause: Mutex<Option<(Arc<std::sync::Barrier>, Arc<std::sync::Barrier>)>>,
 }
 
 impl Default for ActiveDefenseServiceRegistry {

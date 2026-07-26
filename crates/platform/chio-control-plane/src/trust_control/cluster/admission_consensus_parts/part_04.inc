@@ -1,4 +1,5 @@
 fn apply_combined_capture(
+    config: &TrustServiceConfig,
     transaction: &Transaction<'_>,
     entry: &AdmissionLogEntry,
     proof: &AdmissionCommitProof,
@@ -39,6 +40,11 @@ fn apply_combined_capture(
         last_observed_revocation_index: command.request.last_observed_revocation_index,
     })
     .map_err(|error| error.to_string())?;
+    let partition_escrow_evidence = validated_partition_escrow_hold_evidence(
+        config,
+        transaction,
+        &command.request.hold_id,
+    )?;
     let decision = match SqliteAdmissionCaptureAuthority::capture_admission_in_transaction(
         transaction,
         capture_request,
@@ -48,11 +54,23 @@ fn apply_combined_capture(
     };
     let response = match decision {
         AdmissionCaptureDecision::Captured { budget, metadata } => {
+            if metadata.budget_commit().partition_escrow_evidence
+                != partition_escrow_evidence
+            {
+                return Err(
+                    "combined capture changed its persisted partition escrow evidence".to_string(),
+                );
+            }
             let budget_seq = budget.metadata.budget_commit_index.ok_or_else(|| {
                 "combined capture result has no persisted budget sequence".to_string()
             })?;
             let (metadata_view, commit_view) =
-                consensus_budget_evidence(proof, &authority, budget_seq);
+                consensus_budget_evidence(
+                    proof,
+                    &authority,
+                    budget_seq,
+                    partition_escrow_evidence.as_ref(),
+                );
             let budget_request = CaptureInvocationReservationsRequest {
                 operation_id: command.request.operation_id.clone(),
                 request_binding_hash: command.request.request_binding_hash.clone(),
@@ -107,15 +125,33 @@ fn apply_combined_capture(
                     budget_commit_index: metadata.budget_commit().budget_commit_index,
                     revocation_commit_index: metadata.revocation_commit_index(),
                     authority_commit_index: metadata.authority_commit_index(),
-                    leader_epoch: proof.leader_epoch,
-                    guarantee_level: BudgetGuaranteeLevelView::HaLinearizable,
+                    leader_epoch: partition_escrow_evidence
+                        .is_none()
+                        .then_some(proof.leader_epoch),
+                    guarantee_level: if partition_escrow_evidence.is_some() {
+                        BudgetGuaranteeLevelView::PartitionEscrowed
+                    } else {
+                        BudgetGuaranteeLevelView::HaLinearizable
+                    },
+                    partition_escrow_evidence: partition_escrow_evidence
+                        .as_ref()
+                        .map(partition_escrow_evidence_view),
                     authority: command.request.budget_authority.clone(),
                     invocation_state,
                     monetary_state,
                 },
             }
         }
-        AdmissionCaptureDecision::Denied(denial) => CombinedAdmissionCaptureResponse {
+        AdmissionCaptureDecision::Denied(denial) => {
+            if denial.metadata().budget_commit().partition_escrow_evidence
+                != partition_escrow_evidence
+            {
+                return Err(
+                    "combined capture denial changed its persisted partition escrow evidence"
+                        .to_string(),
+                );
+            }
+            CombinedAdmissionCaptureResponse {
             operation_id: command.request.operation_id.clone(),
             request_binding_hash: command.request.request_binding_hash.clone(),
             capability_id: command.request.capability_id.clone(),
@@ -154,13 +190,23 @@ fn apply_combined_capture(
                 budget_commit_index: denial.metadata().budget_commit().budget_commit_index,
                 revocation_commit_index: denial.metadata().revocation_commit_index(),
                 authority_commit_index: denial.metadata().authority_commit_index(),
-                leader_epoch: proof.leader_epoch,
-                guarantee_level: BudgetGuaranteeLevelView::HaLinearizable,
+                leader_epoch: partition_escrow_evidence
+                    .is_none()
+                    .then_some(proof.leader_epoch),
+                guarantee_level: if partition_escrow_evidence.is_some() {
+                    BudgetGuaranteeLevelView::PartitionEscrowed
+                } else {
+                    BudgetGuaranteeLevelView::HaLinearizable
+                },
+                partition_escrow_evidence: partition_escrow_evidence
+                    .as_ref()
+                    .map(partition_escrow_evidence_view),
                 authority: command.request.budget_authority.clone(),
                 invocation_state: BudgetInvocationReservationStateView::Authorized,
                 monetary_state: BudgetMonetaryHoldStateView::Exposed,
             },
-        },
+            }
+        }
     };
     canonical_result(&response)
 }
@@ -220,6 +266,7 @@ fn consensus_budget_evidence(
     proof: &AdmissionCommitProof,
     authority: &BudgetEventAuthority,
     budget_seq: u64,
+    partition_escrow_evidence: Option<&PartitionEscrowCommitEvidence>,
 ) -> (BudgetAuthorityMetadataView, BudgetWriteCommitView) {
     let metadata = BudgetAuthorityMetadataView {
         authority_id: authority.authority_id.clone(),
@@ -229,8 +276,14 @@ fn consensus_budget_evidence(
         lease_epoch: authority.lease_epoch,
         lease_expires_at: u64::MAX,
         lease_ttl_ms: u64::MAX,
-        guarantee_level: "ha_linearizable".to_string(),
+        guarantee_level: if partition_escrow_evidence.is_some() {
+            "partition_escrowed".to_string()
+        } else {
+            "ha_linearizable".to_string()
+        },
         budget_commit_index: Some(proof.index),
+        partition_escrow_evidence: partition_escrow_evidence
+            .map(partition_escrow_evidence_view),
     };
     let commit = BudgetWriteCommitView {
         budget_seq,
@@ -245,6 +298,15 @@ fn consensus_budget_evidence(
         lease_epoch: authority.lease_epoch,
     };
     (metadata, commit)
+}
+
+fn partition_escrow_evidence_view(
+    evidence: &PartitionEscrowCommitEvidence,
+) -> BudgetPartitionEscrowEvidenceView {
+    BudgetPartitionEscrowEvidenceView {
+        canonical_json: evidence.canonical_json().to_string(),
+        digest: evidence.evidence_digest().to_string(),
+    }
 }
 
 fn open_capture_authority(
@@ -288,6 +350,11 @@ fn frozen_budget_rejection(error: BudgetStoreError) -> Result<String, String> {
             StatusCode::CONFLICT.as_u16(),
             "budget_arithmetic_conflict",
             message,
+        ),
+        BudgetStoreError::MissingCommittedReplay(message) => canonical_rejection(
+            StatusCode::CONFLICT.as_u16(),
+            "budget_committed_replay_missing",
+            format!("budget_committed_replay_missing: {message}"),
         ),
         BudgetStoreError::Invariant(message) => Err(message),
         BudgetStoreError::Sqlite(error) => Err(error.to_string()),
@@ -425,6 +492,82 @@ pub(crate) async fn handle_internal_admission_capture_query(
         Err(_) => plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "admission capture replica query worker failed before completion",
+        ),
+    }
+}
+
+pub(crate) async fn handle_internal_committed_composite_authorization_query(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(replica_request): Json<CommittedCompositeAuthorizationReplicaQueryRequest>,
+) -> Response {
+    if let Err(response) = validate_cluster_peer_json_request(
+        &headers,
+        &state.config,
+        "POST",
+        INTERNAL_COMPOSITE_AUTHORIZE_QUERY_PATH,
+        &replica_request,
+    ) {
+        return response;
+    }
+    let CommittedCompositeAuthorizationReplicaQueryRequest {
+        request_nonce,
+        request,
+    } = replica_request;
+    if !request.existing_only {
+        return plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "committed composite authorization query requires existingOnly",
+        );
+    }
+    let (node_id, _, membership) = match admission_members_read_only(&state) {
+        Ok(members) => members,
+        Err(error) => return consensus_http_error(error),
+    };
+    let config = state.config.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        query_committed_composite_authorization_replica(
+            &config,
+            &membership,
+            &node_id,
+            &request,
+            &request_nonce,
+        )
+    })
+    .await;
+    match result {
+        Ok(Ok(response)) => Json(response).into_response(),
+        Ok(Err(error)) => consensus_http_error(error),
+        Err(_) => plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "committed composite authorization replica query worker failed before completion",
+        ),
+    }
+}
+
+pub(crate) async fn handle_budget_mutation_event_replica_query(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<BudgetMutationEventQueryRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let (node_id, _, membership) = match admission_members_read_only(&state) {
+        Ok(members) => members,
+        Err(error) => return consensus_http_error(error),
+    };
+    let config = state.config.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        query_budget_mutation_event_replica(&config, &membership, &node_id, &request)
+    })
+    .await;
+    match result {
+        Ok(Ok(response)) => Json(response).into_response(),
+        Ok(Err(error)) => consensus_http_error(error),
+        Err(_) => plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "budget mutation event replica query worker failed before completion",
         ),
     }
 }
@@ -635,985 +778,391 @@ fn configure_connection(connection: &Connection) -> Result<(), rusqlite::Error> 
     )
 }
 
-fn initialize_schema(connection: &mut Connection) -> Result<(), AdmissionConsensusError> {
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute_batch(
-        r#"
-        CREATE TABLE IF NOT EXISTS admission_consensus_meta (
-            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-            schema_version INTEGER NOT NULL CHECK (schema_version = 3),
-            current_term INTEGER NOT NULL CHECK (current_term >= 0),
-            baseline_state_digest TEXT
-                CHECK (
-                    baseline_state_digest IS NULL
-                    OR (
-                        length(baseline_state_digest) = 64
-                        AND baseline_state_digest NOT GLOB '*[^0-9a-f]*'
-                    )
-                ),
-            membership_digest TEXT
-                CHECK (
-                    membership_digest IS NULL
-                    OR (
-                        length(membership_digest) = 64
-                        AND membership_digest NOT GLOB '*[^0-9a-f]*'
-                    )
-                ),
-            voted_for TEXT,
-            last_log_index INTEGER NOT NULL CHECK (last_log_index >= 0),
-            last_log_term INTEGER NOT NULL CHECK (last_log_term >= 0),
-            commit_index INTEGER NOT NULL CHECK (commit_index >= 0),
-            last_applied INTEGER NOT NULL CHECK (last_applied >= 0),
-            applied_state_digest TEXT NOT NULL
-                CHECK (
-                    length(applied_state_digest) = 64
-                    AND applied_state_digest NOT GLOB '*[^0-9a-f]*'
-                ),
-            CHECK (last_applied <= commit_index),
-            CHECK (commit_index <= last_log_index)
-        );
-
-        CREATE TABLE IF NOT EXISTS admission_consensus_log (
-            log_index INTEGER PRIMARY KEY CHECK (log_index > 0),
-            leader_epoch INTEGER NOT NULL CHECK (leader_epoch > 0),
-            operation_id TEXT NOT NULL UNIQUE,
-            command_kind TEXT NOT NULL CHECK (command_kind IN (
-                'leadership_barrier', 'increment_invocation', 'composite_authorize',
-                'capture_invocations',
-                'reverse_exposure', 'release_exposure', 'reconcile_spend',
-                'capture_exposure', 'revoke', 'combined_capture'
-            )),
-            canonical_command TEXT NOT NULL,
-            command_digest TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS admission_consensus_commits (
-            log_index INTEGER PRIMARY KEY REFERENCES admission_consensus_log(log_index),
-            leader_epoch INTEGER NOT NULL CHECK (leader_epoch > 0),
-            current_term_commit_index INTEGER NOT NULL
-                CHECK (current_term_commit_index >= log_index),
-            leader_id TEXT NOT NULL,
-            membership_digest TEXT NOT NULL
-                CHECK (
-                    length(membership_digest) = 64
-                    AND membership_digest NOT GLOB '*[^0-9a-f]*'
-                ),
-            quorum_size INTEGER NOT NULL CHECK (quorum_size > 0),
-            witness_urls_json TEXT NOT NULL,
-            protocol_version TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS admission_consensus_results (
-            operation_id TEXT PRIMARY KEY REFERENCES admission_consensus_log(operation_id),
-            log_index INTEGER NOT NULL UNIQUE REFERENCES admission_consensus_log(log_index),
-            response_json TEXT NOT NULL,
-            response_digest TEXT NOT NULL,
-            security_projection_digest TEXT NOT NULL
-                CHECK (
-                    length(security_projection_digest) = 64
-                    AND security_projection_digest NOT GLOB '*[^0-9a-f]*'
-                )
-        );
-
-        CREATE TABLE IF NOT EXISTS admission_consensus_genesis (
-            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-            projection_json TEXT NOT NULL,
-            projection_digest TEXT NOT NULL
-                CHECK (
-                    length(projection_digest) = 64
-                    AND projection_digest NOT GLOB '*[^0-9a-f]*'
-                )
-        );
-        "#,
-    )?;
-    let has_baseline = {
-        let mut statement = transaction.prepare("PRAGMA table_info(admission_consensus_meta)")?;
-        let columns = statement
-            .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<Result<Vec<_>, _>>()?;
-        columns
-            .iter()
-            .any(|column| column == "baseline_state_digest")
-    };
-    if !has_baseline {
-        transaction.execute_batch(
-            r#"
-            ALTER TABLE admission_consensus_meta
-            ADD COLUMN baseline_state_digest TEXT
-                CHECK (
-                    baseline_state_digest IS NULL
-                    OR (
-                        length(baseline_state_digest) = 64
-                        AND baseline_state_digest NOT GLOB '*[^0-9a-f]*'
-                    )
-                );
-            "#,
-        )?;
+fn validate_existing_consensus_file(path: &Path) -> Result<(), AdmissionConsensusError> {
+    let path_text = path.to_string_lossy();
+    let lower = path_text.to_ascii_lowercase();
+    let memory_uri = lower.starts_with("file:")
+        && (lower.contains("?mode=memory") || lower.contains("&mode=memory"));
+    if path_text.is_empty()
+        || path_text == ":memory:"
+        || memory_uri
+        || lower.starts_with("file::memory:")
+    {
+        return Err(AdmissionConsensusError::Protocol(
+            "committed admission replay requires an existing durable SQLite file".to_string(),
+        ));
     }
-    transaction.execute(
-        r#"
-        INSERT OR IGNORE INTO admission_consensus_meta (
-            singleton, schema_version, current_term, baseline_state_digest,
-            membership_digest, voted_for,
-            last_log_index, last_log_term, commit_index, last_applied,
-            applied_state_digest
-        ) VALUES (1, 3, 0, NULL, NULL, NULL, 0, 0, 0, 0, ?1)
-        "#,
-        params![initial_applied_state_digest()],
-    )?;
-    transaction.commit()?;
-    load_meta(connection)?;
-    validate_consensus_result_schema(connection)?;
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+        AdmissionConsensusError::Protocol(format!(
+            "committed admission replay database cannot be inspected: {error}"
+        ))
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
+        return Err(AdmissionConsensusError::Protocol(
+            "committed admission replay path is not an existing regular file".to_string(),
+        ));
+    }
     Ok(())
 }
 
-fn validate_consensus_result_schema(
+fn configure_read_only_consensus_connection(
     connection: &Connection,
 ) -> Result<(), AdmissionConsensusError> {
-    let mut statement = connection.prepare("PRAGMA table_info(admission_consensus_results)")?;
-    let columns = statement
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, i64>(3)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|(name, value_type, not_null)| {
-        name == "security_projection_digest"
-            && value_type.eq_ignore_ascii_case("TEXT")
-            && *not_null == 1
-    }) {
+    connection.busy_timeout(Duration::from_secs(5))?;
+    connection.execute_batch(
+        "PRAGMA query_only = ON; PRAGMA foreign_keys = ON; PRAGMA trusted_schema = OFF;",
+    )?;
+    let query_only: i64 =
+        connection.query_row("PRAGMA query_only", [], |row| row.get(0))?;
+    let foreign_keys: i64 =
+        connection.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
+    let trusted_schema: i64 =
+        connection.query_row("PRAGMA trusted_schema", [], |row| row.get(0))?;
+    let journal_mode: String =
+        connection.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
+    if query_only != 1
+        || foreign_keys != 1
+        || trusted_schema != 0
+        || !journal_mode.eq_ignore_ascii_case("wal")
+    {
         return Err(AdmissionConsensusError::Protocol(
-            "admission consensus result schema does not provide the v2 security projection digest"
+            "committed admission replay did not obtain an exact query-only WAL reader"
                 .to_string(),
         ));
     }
     Ok(())
 }
 
-fn validate_integrity(connection: &Connection) -> Result<(), AdmissionConsensusError> {
-    let meta = load_meta(connection)?;
-    if meta
-        .membership_digest
-        .as_deref()
-        .is_some_and(|digest| !is_lower_sha256(digest))
-        || meta
-            .baseline_state_digest
-            .as_deref()
-            .is_some_and(|digest| !is_lower_sha256(digest))
-        || (meta.membership_digest.is_none() && meta.baseline_state_digest.is_some())
-        || !is_lower_sha256(&meta.applied_state_digest)
-        || meta.current_term < meta.last_log_term
-        || meta
-            .voted_for
-            .as_deref()
-            .is_some_and(|candidate| validate_node_id(candidate).is_err())
-        || (meta.membership_digest.is_none()
-            && (meta.current_term != 0 || meta.last_log_index != 0))
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission persisted membership binding is invalid".to_string(),
-        ));
-    }
-    let genesis_projection = load_genesis_projection(connection)?;
-    match (
-        meta.baseline_state_digest.as_deref(),
-        genesis_projection.as_ref(),
-    ) {
-        (Some(expected), Some(projection))
-            if admission_genesis_projection_digest(projection)? == expected => {}
-        (None, None) => {}
-        _ => {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission persisted genesis projection does not match its baseline".to_string(),
-            ));
-        }
-    }
-    let entries = load_all_entries(connection)?;
-    if entries.len() != usize_index(meta.last_log_index, "admission last log index")? {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission log is not contiguous".to_string(),
-        ));
-    }
-    for (offset, entry) in entries.iter().enumerate() {
-        if entry.index != one_based_offset(offset, "admission log offset")? {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission log contains an index gap".to_string(),
-            ));
-        }
-        validate_entry(entry)?;
-    }
-    if entries
-        .windows(2)
-        .any(|pair| pair[0].leader_epoch > pair[1].leader_epoch)
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission log terms are not monotonic".to_string(),
-        ));
-    }
-    if let Some(last) = entries.last() {
-        if last.index != meta.last_log_index || last.leader_epoch != meta.last_log_term {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission persisted log head does not match the log".to_string(),
-            ));
-        }
-    } else if meta.last_log_index != 0 || meta.last_log_term != 0 {
-        return Err(AdmissionConsensusError::Protocol(
-            "empty admission log has a nonzero head".to_string(),
-        ));
-    }
-    for index in 1..=meta.commit_index {
-        let proof = load_commit_proof(connection, index)?.ok_or_else(|| {
-            AdmissionConsensusError::Protocol(format!("admission commit proof {index} is missing"))
-        })?;
-        validate_commit_proof(&proof)?;
-        if meta.membership_digest.as_deref() != Some(proof.membership_digest.as_str()) {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission commit proof membership differs from persisted state".to_string(),
-            ));
-        }
-        if proof.leader_epoch > meta.current_term {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission commit proof exceeds the persisted term".to_string(),
-            ));
-        }
-        let entry = load_entry(connection, index)?.ok_or_else(|| {
-            AdmissionConsensusError::Protocol(format!("admission entry {index} is missing"))
-        })?;
-        if entry.leader_epoch > proof.leader_epoch {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission commit proof predates its log entry".to_string(),
-            ));
-        }
-        if load_entry(connection, proof.current_term_commit_index)?
-            .is_none_or(|entry| entry.leader_epoch != proof.leader_epoch)
-        {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission commit proof has no current-term commit target".to_string(),
-            ));
-        }
-    }
-    let results = load_results(connection)?;
-    if results.len() != usize_index(meta.last_applied, "admission applied result index")? {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission result coverage does not match last-applied".to_string(),
-        ));
-    }
-    let mut applied_state_digest = initial_applied_state_digest();
-    for (offset, result) in results.iter().enumerate() {
-        let index = one_based_offset(offset, "admission result offset")?;
-        let entry = load_entry(connection, index)?.ok_or_else(|| {
-            AdmissionConsensusError::Protocol(format!("admission entry {index} is missing"))
-        })?;
-        validate_canonical_json(&result.response_json, "admission persisted result")?;
-        if result.log_index != index
-            || result.operation_id != entry.operation_id
-            || sha256_hex(result.response_json.as_bytes()) != result.response_digest
-            || !is_lower_sha256(&result.security_projection_digest)
-        {
-            return Err(AdmissionConsensusError::Protocol(format!(
-                "admission result {index} does not match its entry or digest"
-            )));
-        }
-        applied_state_digest = next_applied_state_digest(
-            &applied_state_digest,
-            &result.response_digest,
-            &result.security_projection_digest,
-        )?;
-    }
-    if meta.applied_state_digest != applied_state_digest {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission applied-state digest does not match persisted results".to_string(),
-        ));
-    }
-    let expected_security_projection = if meta.baseline_state_digest.is_none() {
-        None
-    } else if let Some(result) = results.last() {
-        Some(result.security_projection_digest.clone())
-    } else if let Some(genesis_projection) = genesis_projection.as_ref() {
-        Some(admission_security_projection_digest(genesis_projection)?)
-    } else {
-        None
-    };
-    if let Some(expected) = expected_security_projection {
-        let live = capture_admission_security_projection_digest_from_connection(connection)?;
-        if live != expected {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission live security projection differs from the committed result chain"
-                    .to_string(),
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn load_meta(
+fn validate_read_only_consensus_connection(
     connection: &Connection,
-) -> Result<AdmissionConsensusMetaView, AdmissionConsensusError> {
-    let raw = connection.query_row(
-        r#"
-        SELECT current_term, baseline_state_digest, membership_digest, voted_for,
-               last_log_index, last_log_term, commit_index, last_applied,
-               applied_state_digest
-        FROM admission_consensus_meta
-        WHERE singleton = 1 AND schema_version = ?1
-        "#,
-        params![CONSENSUS_SCHEMA_VERSION],
-        |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, Option<String>>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, Option<String>>(3)?,
-                row.get::<_, i64>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, i64>(6)?,
-                row.get::<_, i64>(7)?,
-                row.get::<_, String>(8)?,
-            ))
-        },
-    )?;
-    Ok(AdmissionConsensusMetaView {
-        current_term: nonnegative_u64(raw.0, "current term")?,
-        baseline_state_digest: raw.1,
-        membership_digest: raw.2,
-        voted_for: raw.3,
-        last_log_index: nonnegative_u64(raw.4, "last log index")?,
-        last_log_term: nonnegative_u64(raw.5, "last log term")?,
-        commit_index: nonnegative_u64(raw.6, "commit index")?,
-        last_applied: nonnegative_u64(raw.7, "last applied")?,
-        applied_state_digest: raw.8,
-    })
-}
-
-fn load_genesis_projection(
-    connection: &Connection,
-) -> Result<Option<AdmissionGenesisProjection>, AdmissionConsensusError> {
-    let stored = connection
-        .query_row(
-            r#"
-            SELECT projection_json, projection_digest
-            FROM admission_consensus_genesis
-            WHERE singleton = 1
-            "#,
-            [],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-        )
-        .optional()?;
-    let Some((projection_json, projection_digest)) = stored else {
-        return Ok(None);
-    };
-    let projection: AdmissionGenesisProjection =
-        serde_json::from_str(&projection_json).map_err(|error| {
-            AdmissionConsensusError::Protocol(format!(
-                "persisted admission genesis projection is invalid: {error}"
-            ))
-        })?;
-    let canonical = canonical_json_bytes(&projection).map_err(|error| {
-        AdmissionConsensusError::Protocol(format!(
-            "persisted admission genesis projection cannot be canonicalized: {error}"
-        ))
-    })?;
-    if canonical != projection_json.as_bytes()
-        || admission_genesis_projection_digest(&projection)? != projection_digest
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "persisted admission genesis projection or digest is noncanonical".to_string(),
-        ));
-    }
-    Ok(Some(projection))
-}
-
-fn persist_genesis_projection(
-    transaction: &Transaction<'_>,
-    projection: &AdmissionGenesisProjection,
 ) -> Result<(), AdmissionConsensusError> {
-    let projection_digest = admission_genesis_projection_digest(projection)?;
-    let projection_json = String::from_utf8(canonical_json_bytes(projection).map_err(|error| {
-        AdmissionConsensusError::Protocol(format!(
-            "admission genesis projection cannot be canonicalized: {error}"
-        ))
-    })?)
-    .map_err(|_| {
-        AdmissionConsensusError::Protocol(
-            "admission genesis projection canonical JSON is not UTF-8".to_string(),
-        )
-    })?;
-    if let Some(existing) = load_genesis_projection(transaction)? {
-        if existing != *projection {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission genesis projection differs from persisted state".to_string(),
-            ));
-        }
-        return Ok(());
-    }
-    transaction.execute(
-        r#"
-        INSERT INTO admission_consensus_genesis (
-            singleton, projection_json, projection_digest
-        ) VALUES (1, ?1, ?2)
-        "#,
-        params![projection_json, projection_digest],
-    )?;
-    Ok(())
-}
-
-fn bind_membership(
-    transaction: &Transaction<'_>,
-    membership: &AdmissionMembership,
-) -> Result<AdmissionConsensusMetaView, AdmissionConsensusError> {
-    let mut meta = load_meta(transaction)?;
-    match meta.membership_digest.as_deref() {
-        Some(digest)
-            if digest == membership.digest()
-                && meta.baseline_state_digest == membership.baseline_digest =>
-        {
-            if meta
-                .voted_for
-                .as_deref()
-                .is_some_and(|candidate| !membership.contains(candidate))
-            {
-                return Err(AdmissionConsensusError::Protocol(
-                    "admission persisted vote is not a configured member".to_string(),
-                ));
-            }
-            match (
-                membership.genesis_projection.as_ref(),
-                load_genesis_projection(transaction)?,
-            ) {
-                (Some(expected), Some(persisted)) if *expected == persisted => {}
-                (None, None) if membership.baseline_digest.is_none() => {}
-                _ => {
-                    return Err(AdmissionConsensusError::Protocol(
-                        "admission membership genesis differs from persisted state".to_string(),
-                    ));
-                }
-            }
-            if membership.genesis_projection.is_some() {
-                normalize_admission_transport_cache(transaction)?;
-            }
-            return Ok(meta);
-        }
-        Some(_) => {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission consensus membership differs from persisted state".to_string(),
-            ));
-        }
-        None => {}
-    }
-    match membership.genesis_projection.as_ref() {
-        Some(projection) => {
-            if membership.baseline_digest.as_deref()
-                != Some(admission_genesis_projection_digest(projection)?.as_str())
-            {
-                return Err(AdmissionConsensusError::Protocol(
-                    "admission membership baseline does not match its genesis projection"
-                        .to_string(),
-                ));
-            }
-            normalize_admission_transport_cache(transaction)?;
-            persist_genesis_projection(transaction, projection)?;
-        }
-        None if membership.baseline_digest.is_none() => {}
-        None => {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission membership baseline omitted its genesis projection".to_string(),
-            ));
-        }
-    }
-    let updated = transaction.execute(
-        r#"
-        UPDATE admission_consensus_meta
-        SET membership_digest = ?1, baseline_state_digest = ?2
-        WHERE singleton = 1
-          AND membership_digest IS NULL
-          AND baseline_state_digest IS NULL
-        "#,
-        params![membership.digest(), membership.baseline_digest],
-    )?;
-    if updated != 1 {
+    validate_read_only_consensus_schema(connection)?;
+    load_meta(connection)?;
+    validate_consensus_result_schema(connection)?;
+    let integrity_check: String =
+        connection.query_row("PRAGMA integrity_check(1)", [], |row| row.get(0))?;
+    if integrity_check != "ok" {
         return Err(AdmissionConsensusError::Protocol(
-            "admission membership binding changed concurrently".to_string(),
+            "committed admission replay database failed SQLite integrity_check".to_string(),
         ));
     }
-    meta.membership_digest = Some(membership.digest().to_string());
-    meta.baseline_state_digest = membership.baseline_digest.clone();
-    Ok(meta)
-}
-
-fn vote_response(
-    membership: &AdmissionMembership,
-    term: u64,
-    vote_granted: bool,
-) -> AdmissionRequestVoteResponse {
-    AdmissionRequestVoteResponse {
-        protocol_version: ADMISSION_CONSENSUS_PROTOCOL_VERSION.to_string(),
-        membership_digest: membership.digest().to_string(),
-        term,
-        vote_granted,
-    }
-}
-
-fn append_rejection(
-    membership: &AdmissionMembership,
-    meta: &AdmissionConsensusMetaView,
-    rejection: &str,
-) -> AdmissionAppendEntriesResponse {
-    AdmissionAppendEntriesResponse {
-        protocol_version: ADMISSION_CONSENSUS_PROTOCOL_VERSION.to_string(),
-        membership_digest: membership.digest().to_string(),
-        term: meta.current_term,
-        accepted: false,
-        match_index: meta.last_log_index,
-        commit_index: meta.commit_index,
-        applied_index: meta.last_applied,
-        applied_state_digest: meta.applied_state_digest.clone(),
-        rejection: Some(rejection.to_string()),
-    }
-}
-
-fn reject_append_after_hard_state(
-    transaction: Transaction<'_>,
-    membership: &AdmissionMembership,
-    rejection: &str,
-) -> Result<AdmissionAppendEntriesResponse, AdmissionConsensusError> {
-    transaction
-        .execute_batch("ROLLBACK TO chio_admission_append; RELEASE chio_admission_append")?;
-    let durable = load_meta(&transaction)?;
-    let response = append_rejection(membership, &durable, rejection);
-    transaction.commit()?;
-    Ok(response)
-}
-
-fn validate_node_id(value: &str) -> Result<(), AdmissionConsensusError> {
-    if value.is_empty() || value.len() > 2048 || value.bytes().any(|byte| byte == 0) {
+    let mut foreign_key_check = connection.prepare("PRAGMA foreign_key_check")?;
+    if foreign_key_check.query([])?.next()?.is_some() {
         return Err(AdmissionConsensusError::Protocol(
-            "admission consensus node id is invalid".to_string(),
+            "committed admission replay database failed SQLite foreign_key_check".to_string(),
         ));
     }
-    Ok(())
+    drop(foreign_key_check);
+    validate_integrity(connection)
 }
 
-fn validate_operation_id(value: &str) -> Result<(), AdmissionConsensusError> {
-    if value.is_empty() || value.len() > 512 || value.bytes().any(|byte| byte == 0) {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission consensus operation id is invalid".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn scoped_operation_id(
-    command_kind: AdmissionCommandKind,
-    external_operation_id: &str,
-) -> Result<String, AdmissionConsensusError> {
-    validate_operation_id(external_operation_id)?;
-    let canonical = canonical_json_bytes(&json!({
-        "commandKind": command_kind_label(command_kind),
-        "operationId": external_operation_id,
-    }))
-    .map_err(|error| {
-        AdmissionConsensusError::Protocol(format!(
-            "admission operation scope canonicalization failed: {error}"
-        ))
-    })?;
-    let mut preimage = Vec::with_capacity(ADMISSION_OPERATION_DOMAIN.len() + canonical.len());
-    preimage.extend_from_slice(ADMISSION_OPERATION_DOMAIN);
-    preimage.extend_from_slice(&canonical);
-    Ok(sha256_hex(&preimage))
-}
-
-fn initial_applied_state_digest() -> String {
-    sha256_hex(ADMISSION_APPLIED_STATE_DOMAIN)
-}
-
-fn initial_security_projection_digest() -> String {
-    sha256_hex(ADMISSION_SECURITY_PROJECTION_DOMAIN)
-}
-
-fn next_applied_state_digest(
-    previous_digest: &str,
-    result_digest: &str,
-    security_projection_digest: &str,
-) -> Result<String, AdmissionConsensusError> {
-    if !is_lower_sha256(previous_digest)
-        || !is_lower_sha256(result_digest)
-        || !is_lower_sha256(security_projection_digest)
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission applied-state digest input is invalid".to_string(),
-        ));
-    }
-    let mut preimage = Vec::with_capacity(
-        ADMISSION_APPLIED_STATE_DOMAIN.len()
-            + previous_digest.len()
-            + result_digest.len()
-            + security_projection_digest.len(),
-    );
-    preimage.extend_from_slice(ADMISSION_APPLIED_STATE_DOMAIN);
-    preimage.extend_from_slice(previous_digest.as_bytes());
-    preimage.extend_from_slice(result_digest.as_bytes());
-    preimage.extend_from_slice(security_projection_digest.as_bytes());
-    Ok(sha256_hex(&preimage))
-}
-
-fn validate_entry(entry: &AdmissionLogEntry) -> Result<(), AdmissionConsensusError> {
-    if entry.index == 0 || entry.leader_epoch == 0 {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission log index and leader epoch must be positive".to_string(),
-        ));
-    }
-    validate_operation_id(&entry.operation_id)?;
-    validate_canonical_json(&entry.canonical_command, "admission command")?;
-    if sha256_hex(entry.canonical_command.as_bytes()) != entry.command_digest {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission command digest does not match canonical command bytes".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_canonical_json(value: &str, label: &str) -> Result<(), AdmissionConsensusError> {
-    let parsed: Value = serde_json::from_str(value).map_err(|error| {
-        AdmissionConsensusError::Protocol(format!("{label} is not valid JSON: {error}"))
-    })?;
-    let canonical = canonical_json_bytes(&parsed).map_err(|error| {
-        AdmissionConsensusError::Protocol(format!("{label} cannot be canonicalized: {error}"))
-    })?;
-    if canonical != value.as_bytes() {
+fn validate_read_only_consensus_schema(
+    connection: &Connection,
+) -> Result<(), AdmissionConsensusError> {
+    const TABLE_PROBES: &[(&str, &str)] = &[
+        (
+            "admission_consensus_meta",
+            r#"
+            SELECT singleton, schema_version, current_term, baseline_state_digest,
+                   membership_digest, voted_for, last_log_index, last_log_term,
+                   commit_index, last_applied, applied_state_digest
+            FROM admission_consensus_meta WHERE 0
+            "#,
+        ),
+        (
+            "admission_consensus_log",
+            r#"
+            SELECT log_index, leader_epoch, operation_id, command_kind,
+                   canonical_command, command_digest
+            FROM admission_consensus_log WHERE 0
+            "#,
+        ),
+        (
+            "admission_consensus_commits",
+            r#"
+            SELECT log_index, leader_epoch, current_term_commit_index,
+                   leader_id, membership_digest, quorum_size,
+                   witness_urls_json, protocol_version
+            FROM admission_consensus_commits WHERE 0
+            "#,
+        ),
+        (
+            "admission_consensus_results",
+            r#"
+            SELECT operation_id, log_index, response_json, response_digest,
+                   security_projection_digest
+            FROM admission_consensus_results WHERE 0
+            "#,
+        ),
+        (
+            "admission_consensus_genesis",
+            r#"
+            SELECT singleton, projection_json, projection_digest
+            FROM admission_consensus_genesis WHERE 0
+            "#,
+        ),
+        (
+            "admission_consensus_partition_escrow_authority",
+            r#"
+            SELECT singleton, descriptor_digest, membership_digest
+            FROM admission_consensus_partition_escrow_authority WHERE 0
+            "#,
+        ),
+    ];
+    let application_id: i32 =
+        connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+    if application_id != chio_store_sqlite::CHIO_SQLITE_APPLICATION_ID {
         return Err(AdmissionConsensusError::Protocol(format!(
-            "{label} is not canonical JSON"
+            "committed admission replay database has application_id {application_id:#x}, expected {:#x}",
+            chio_store_sqlite::CHIO_SQLITE_APPLICATION_ID
         )));
     }
-    Ok(())
-}
-
-fn validate_commit_proof(proof: &AdmissionCommitProof) -> Result<(), AdmissionConsensusError> {
-    if proof.protocol_version != ADMISSION_CONSENSUS_PROTOCOL_VERSION
-        || !is_lower_sha256(&proof.membership_digest)
-        || proof.index == 0
-        || proof.leader_epoch == 0
-        || proof.current_term_commit_index < proof.index
-        || proof.quorum_size == 0
-        || proof.witness_urls.len() < proof.quorum_size
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission commit proof is incomplete".to_string(),
-        ));
-    }
-    validate_node_id(&proof.leader_id)?;
-    let unique = proof.witness_urls.iter().collect::<BTreeSet<_>>();
-    if unique.len() != proof.witness_urls.len()
-        || proof.witness_urls.windows(2).any(|pair| pair[0] >= pair[1])
-        || !proof.witness_urls.iter().any(|url| url == &proof.leader_id)
-        || proof
-            .witness_urls
-            .iter()
-            .any(|url| validate_node_id(url).is_err())
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission commit proof witnesses are invalid".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_commit_proof_for_membership(
-    proof: &AdmissionCommitProof,
-    membership: &AdmissionMembership,
-) -> Result<(), AdmissionConsensusError> {
-    validate_commit_proof(proof)?;
-    if proof.membership_digest != membership.digest()
-        || proof.quorum_size != membership.quorum_size()
-        || proof
-            .witness_urls
-            .iter()
-            .any(|witness| !membership.contains(witness))
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission commit proof does not match configured membership".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_snapshot(snapshot: &AdmissionConsensusSnapshot) -> Result<(), AdmissionConsensusError> {
-    if snapshot.protocol_version != ADMISSION_CONSENSUS_PROTOCOL_VERSION
-        || snapshot
-            .meta
-            .membership_digest
-            .as_deref()
-            .is_none_or(|digest| !is_lower_sha256(digest))
-        || !is_lower_sha256(&snapshot.meta.applied_state_digest)
-        || snapshot.meta.current_term > i64::MAX as u64
-        || snapshot.meta.current_term < snapshot.meta.last_log_term
-        || snapshot.meta.last_applied != snapshot.meta.commit_index
-        || snapshot.entries.len()
-            != usize_index(snapshot.meta.last_log_index, "admission snapshot log index")?
-        || snapshot.commit_proofs.len()
-            != usize_index(
-                snapshot.meta.commit_index,
-                "admission snapshot commit index",
-            )?
-        || snapshot.results.len()
-            != usize_index(
-                snapshot.meta.last_applied,
-                "admission snapshot applied index",
-            )?
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission consensus snapshot metadata is inconsistent".to_string(),
-        ));
-    }
-    match (
-        snapshot.meta.baseline_state_digest.as_deref(),
-        snapshot.genesis_projection.as_ref(),
-    ) {
-        (Some(expected), Some(projection))
-            if admission_genesis_projection_digest(projection)? == expected => {}
-        (None, None) => {}
-        _ => {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission consensus snapshot genesis is missing or corrupted".to_string(),
-            ));
-        }
-    }
-    for (offset, entry) in snapshot.entries.iter().enumerate() {
-        validate_entry(entry)?;
-        if entry.index != one_based_offset(offset, "admission snapshot log offset")? {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission snapshot log is not contiguous".to_string(),
-            ));
-        }
-    }
-    if snapshot
-        .entries
-        .windows(2)
-        .any(|pair| pair[0].leader_epoch > pair[1].leader_epoch)
-        || snapshot
-            .entries
-            .last()
-            .map_or(snapshot.meta.last_log_term != 0, |entry| {
-                entry.leader_epoch != snapshot.meta.last_log_term
-            })
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission snapshot log terms are inconsistent".to_string(),
-        ));
-    }
-    for (offset, proof) in snapshot.commit_proofs.iter().enumerate() {
-        validate_commit_proof(proof)?;
-        if proof.index != one_based_offset(offset, "admission snapshot proof offset")? {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission snapshot commit proofs are not exact and contiguous".to_string(),
-            ));
-        }
-        if snapshot.meta.membership_digest.as_deref() != Some(proof.membership_digest.as_str()) {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission snapshot proof membership does not match metadata".to_string(),
-            ));
-        }
-        if proof.leader_epoch > snapshot.meta.current_term
-            || proof.current_term_commit_index > snapshot.meta.commit_index
-        {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission snapshot proof exceeds the committed term or index".to_string(),
-            ));
-        }
-        let entry_offset = usize_index(
-            checked_predecessor(proof.index, "admission snapshot proof index")?,
-            "admission snapshot proof offset",
-        )?;
-        if snapshot
-            .entries
-            .get(entry_offset)
-            .is_none_or(|entry| entry.leader_epoch > proof.leader_epoch)
-        {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission snapshot proof does not match its entry".to_string(),
-            ));
-        }
-        let current_term_offset = usize_index(
-            checked_predecessor(
-                proof.current_term_commit_index,
-                "admission snapshot current-term commit index",
-            )?,
-            "admission snapshot current-term commit offset",
-        )?;
-        if snapshot
-            .entries
-            .get(current_term_offset)
-            .is_none_or(|entry| entry.leader_epoch != proof.leader_epoch)
-        {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission snapshot proof has no current-term commit target".to_string(),
-            ));
-        }
-    }
-    let mut applied_state_digest = initial_applied_state_digest();
-    for (offset, result) in snapshot.results.iter().enumerate() {
-        validate_canonical_json(&result.response_json, "admission snapshot result")?;
-        let expected_index = one_based_offset(offset, "admission snapshot result offset")?;
-        let entry_offset = usize_index(
-            checked_predecessor(result.log_index, "admission snapshot result index")?,
-            "admission snapshot result offset",
-        )?;
-        if result.log_index != expected_index
-            || sha256_hex(result.response_json.as_bytes()) != result.response_digest
-            || !is_lower_sha256(&result.security_projection_digest)
-            || snapshot
-                .entries
-                .get(entry_offset)
-                .is_none_or(|entry| entry.operation_id != result.operation_id)
-        {
-            return Err(AdmissionConsensusError::Protocol(
-                "admission snapshot result does not match its log entry".to_string(),
-            ));
-        }
-        applied_state_digest = next_applied_state_digest(
-            &applied_state_digest,
-            &result.response_digest,
-            &result.security_projection_digest,
-        )?;
-    }
-    if snapshot.meta.applied_state_digest != applied_state_digest {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission snapshot applied-state digest does not match its results".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_snapshot_for_membership(
-    snapshot: &AdmissionConsensusSnapshot,
-    membership: &AdmissionMembership,
-) -> Result<(), AdmissionConsensusError> {
-    validate_snapshot(snapshot)?;
-    if snapshot.meta.membership_digest.as_deref() != Some(membership.digest())
-        || snapshot.meta.baseline_state_digest != membership.baseline_digest
-        || snapshot.genesis_projection != membership.genesis_projection
-        || snapshot
-            .meta
-            .voted_for
-            .as_deref()
-            .is_some_and(|candidate| !membership.contains(candidate))
-    {
-        return Err(AdmissionConsensusError::Protocol(
-            "admission snapshot membership differs from configured membership".to_string(),
-        ));
-    }
-    for proof in &snapshot.commit_proofs {
-        validate_commit_proof_for_membership(proof, membership)?;
-    }
-    Ok(())
-}
-
-fn is_lower_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
-}
-
-fn previous_entry_matches(
-    connection: &Connection,
-    index: u64,
-    term: u64,
-) -> Result<bool, AdmissionConsensusError> {
-    if index == 0 {
-        return Ok(term == 0);
-    }
-    Ok(load_entry(connection, index)?.is_some_and(|entry| entry.leader_epoch == term))
-}
-
-fn insert_entry(
-    transaction: &Transaction<'_>,
-    entry: &AdmissionLogEntry,
-) -> Result<(), AdmissionConsensusError> {
-    transaction.execute(
-        r#"
-        INSERT INTO admission_consensus_log (
-            log_index, leader_epoch, operation_id, command_kind,
-            canonical_command, command_digest
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-        "#,
-        params![
-            sqlite_u64(entry.index)?,
-            sqlite_u64(entry.leader_epoch)?,
-            entry.operation_id,
-            command_kind_label(entry.command_kind),
-            entry.canonical_command,
-            entry.command_digest,
-        ],
-    )?;
-    Ok(())
-}
-
-fn update_log_head(
-    transaction: &Transaction<'_>,
-    index: u64,
-    term: u64,
-) -> Result<(), AdmissionConsensusError> {
-    transaction.execute(
-        r#"
-        UPDATE admission_consensus_meta
-        SET last_log_index = ?1, last_log_term = ?2
-        WHERE singleton = 1
-        "#,
-        params![sqlite_u64(index)?, sqlite_u64(term)?],
-    )?;
-    Ok(())
-}
-
-fn load_entry(
-    connection: &Connection,
-    index: u64,
-) -> Result<Option<AdmissionLogEntry>, AdmissionConsensusError> {
-    let raw = connection
+    let schema_versions_sql = connection
         .query_row(
-            r#"
-            SELECT log_index, leader_epoch, operation_id, command_kind,
-                   canonical_command, command_digest
-            FROM admission_consensus_log
-            WHERE log_index = ?1
-            "#,
-            params![sqlite_u64(index)?],
-            read_entry_raw,
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chio_store_schema_versions'",
+            [],
+            |row| row.get::<_, String>(0),
         )
         .optional()?;
-    raw.map(entry_from_raw).transpose()
-}
+    let schema_versions_sql = schema_versions_sql
+        .as_deref()
+        .map(normalize_consensus_schema_sql)
+        .ok_or_else(|| {
+            AdmissionConsensusError::Protocol(
+                "committed admission replay schema is missing exact version metadata"
+                    .to_string(),
+            )
+        })?;
+    if !schema_versions_sql
+        .contains(&normalize_consensus_schema_sql("store_key TEXT PRIMARY KEY"))
+        || !schema_versions_sql
+            .contains(&normalize_consensus_schema_sql("version INTEGER NOT NULL"))
+    {
+        return Err(AdmissionConsensusError::Protocol(
+            "committed admission replay version metadata does not match the v1 schema contract"
+                .to_string(),
+        ));
+    }
+    let (budget_schema_rows, minimum_version, maximum_version): (
+        i64,
+        Option<i32>,
+        Option<i32>,
+    ) = connection.query_row(
+        r#"
+        SELECT COUNT(*), MIN(version), MAX(version)
+        FROM chio_store_schema_versions WHERE store_key = 'budget'
+        "#,
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    if budget_schema_rows != 1 || minimum_version != Some(1) || maximum_version != Some(1) {
+        return Err(AdmissionConsensusError::Protocol(
+            "committed admission replay requires exactly one budget schema version 1 row"
+                .to_string(),
+        ));
+    }
+    for (table, probe) in TABLE_PROBES {
+        let object_type = connection
+            .query_row(
+                "SELECT type FROM sqlite_master WHERE name = ?1",
+                [table],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if object_type.as_deref() != Some("table") {
+            return Err(AdmissionConsensusError::Protocol(format!(
+                "committed admission replay schema is missing table `{table}`"
+            )));
+        }
+        let _statement = connection.prepare(probe)?;
+    }
 
-fn load_entry_by_operation(
-    connection: &Connection,
-    operation_id: &str,
-) -> Result<Option<AdmissionLogEntry>, AdmissionConsensusError> {
-    let raw = connection
-        .query_row(
+    for (table, expected_sql) in [
+        (
+            "admission_consensus_meta",
             r#"
-            SELECT log_index, leader_epoch, operation_id, command_kind,
-                   canonical_command, command_digest
-            FROM admission_consensus_log
-            WHERE operation_id = ?1
+            CREATE TABLE admission_consensus_meta (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                schema_version INTEGER NOT NULL CHECK (schema_version = 3),
+                current_term INTEGER NOT NULL CHECK (current_term >= 0),
+                baseline_state_digest TEXT
+                    CHECK (
+                        baseline_state_digest IS NULL
+                        OR (
+                            length(baseline_state_digest) = 64
+                            AND baseline_state_digest NOT GLOB '*[^0-9a-f]*'
+                        )
+                    ),
+                membership_digest TEXT
+                    CHECK (
+                        membership_digest IS NULL
+                        OR (
+                            length(membership_digest) = 64
+                            AND membership_digest NOT GLOB '*[^0-9a-f]*'
+                        )
+                    ),
+                voted_for TEXT,
+                last_log_index INTEGER NOT NULL CHECK (last_log_index >= 0),
+                last_log_term INTEGER NOT NULL CHECK (last_log_term >= 0),
+                commit_index INTEGER NOT NULL CHECK (commit_index >= 0),
+                last_applied INTEGER NOT NULL CHECK (last_applied >= 0),
+                applied_state_digest TEXT NOT NULL
+                    CHECK (
+                        length(applied_state_digest) = 64
+                        AND applied_state_digest NOT GLOB '*[^0-9a-f]*'
+                    ),
+                CHECK (last_applied <= commit_index),
+                CHECK (commit_index <= last_log_index)
+            )
             "#,
-            params![operation_id],
-            read_entry_raw,
-        )
-        .optional()?;
-    raw.map(entry_from_raw).transpose()
+        ),
+        (
+            "admission_consensus_log",
+            r#"
+            CREATE TABLE admission_consensus_log (
+                log_index INTEGER PRIMARY KEY CHECK (log_index > 0),
+                leader_epoch INTEGER NOT NULL CHECK (leader_epoch > 0),
+                operation_id TEXT NOT NULL UNIQUE,
+                command_kind TEXT NOT NULL CHECK (command_kind IN (
+                    'leadership_barrier', 'increment_invocation', 'composite_authorize',
+                    'capture_invocations',
+                    'reverse_exposure', 'release_exposure', 'reconcile_spend',
+                    'capture_exposure', 'revoke', 'combined_capture'
+                )),
+                canonical_command TEXT NOT NULL,
+                command_digest TEXT NOT NULL
+            )
+            "#,
+        ),
+        (
+            "admission_consensus_commits",
+            r#"
+            CREATE TABLE admission_consensus_commits (
+                log_index INTEGER PRIMARY KEY REFERENCES admission_consensus_log(log_index),
+                leader_epoch INTEGER NOT NULL CHECK (leader_epoch > 0),
+                current_term_commit_index INTEGER NOT NULL
+                    CHECK (current_term_commit_index >= log_index),
+                leader_id TEXT NOT NULL,
+                membership_digest TEXT NOT NULL
+                    CHECK (
+                        length(membership_digest) = 64
+                        AND membership_digest NOT GLOB '*[^0-9a-f]*'
+                    ),
+                quorum_size INTEGER NOT NULL CHECK (quorum_size > 0),
+                witness_urls_json TEXT NOT NULL,
+                protocol_version TEXT NOT NULL
+            )
+            "#,
+        ),
+        (
+            "admission_consensus_results",
+            r#"
+            CREATE TABLE admission_consensus_results (
+                operation_id TEXT PRIMARY KEY REFERENCES admission_consensus_log(operation_id),
+                log_index INTEGER NOT NULL UNIQUE REFERENCES admission_consensus_log(log_index),
+                response_json TEXT NOT NULL,
+                response_digest TEXT NOT NULL,
+                security_projection_digest TEXT NOT NULL
+                    CHECK (
+                        length(security_projection_digest) = 64
+                        AND security_projection_digest NOT GLOB '*[^0-9a-f]*'
+                    )
+            )
+            "#,
+        ),
+        (
+            "admission_consensus_genesis",
+            r#"
+            CREATE TABLE admission_consensus_genesis (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                projection_json TEXT NOT NULL,
+                projection_digest TEXT NOT NULL
+                    CHECK (
+                        length(projection_digest) = 64
+                        AND projection_digest NOT GLOB '*[^0-9a-f]*'
+                    )
+            )
+            "#,
+        ),
+        (
+            "admission_consensus_partition_escrow_authority",
+            r#"
+            CREATE TABLE admission_consensus_partition_escrow_authority (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                descriptor_digest TEXT NOT NULL
+                    CHECK (
+                        length(descriptor_digest) = 64
+                        AND descriptor_digest NOT GLOB '*[^0-9a-f]*'
+                    ),
+                membership_digest TEXT NOT NULL
+                    CHECK (
+                        length(membership_digest) = 64
+                        AND membership_digest NOT GLOB '*[^0-9a-f]*'
+                    )
+            )
+            "#,
+        ),
+    ] {
+        let sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            [table],
+            |row| row.get(0),
+        )?;
+        if normalize_consensus_schema_sql(&sql) != normalize_consensus_schema_sql(expected_sql) {
+            return Err(AdmissionConsensusError::Protocol(format!(
+                "committed admission replay table `{table}` does not match the v3 schema contract"
+            )));
+        }
+    }
+
+    for (name, expected) in [
+        (
+            "admission_revocation_insert_requires_authority",
+            r#"
+            CREATE TRIGGER admission_revocation_insert_requires_authority
+            BEFORE INSERT ON revoked_capabilities
+            BEGIN
+                SELECT RAISE(ABORT, 'revocation write requires combined admission authority');
+            END
+            "#,
+        ),
+        (
+            "admission_revocation_update_requires_authority",
+            r#"
+            CREATE TRIGGER admission_revocation_update_requires_authority
+            BEFORE UPDATE ON revoked_capabilities
+            BEGIN
+                SELECT RAISE(ABORT, 'revocation write requires combined admission authority');
+            END
+            "#,
+        ),
+        (
+            "admission_revocation_delete_requires_authority",
+            r#"
+            CREATE TRIGGER admission_revocation_delete_requires_authority
+            BEFORE DELETE ON revoked_capabilities
+            BEGIN
+                SELECT RAISE(ABORT, 'revocation write requires combined admission authority');
+            END
+            "#,
+        ),
+    ] {
+        let sql = connection
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?1",
+                [name],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if sql.as_deref().map(normalize_consensus_schema_sql)
+            != Some(normalize_consensus_schema_sql(expected))
+        {
+            return Err(AdmissionConsensusError::Protocol(format!(
+                "committed admission replay schema lacks exact authority guard `{name}`"
+            )));
+        }
+    }
+    Ok(())
 }
 
-type EntryRaw = (i64, i64, String, String, String, String);
-
-fn read_entry_raw(row: &rusqlite::Row<'_>) -> rusqlite::Result<EntryRaw> {
-    Ok((
-        row.get(0)?,
-        row.get(1)?,
-        row.get(2)?,
-        row.get(3)?,
-        row.get(4)?,
-        row.get(5)?,
-    ))
-}
+include!("part_04_tail.inc");

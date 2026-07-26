@@ -573,6 +573,7 @@ mod tests {
             invocation_quotas: quotas,
             revocation_set: revocation_set.clone(),
             authorization_artifact_digests: vec![artifact_digest.clone()],
+            partition_escrow_evidence: None,
         };
         let trusted = must(
             adapter.register_admission(
@@ -865,6 +866,7 @@ mod tests {
             invocation_quotas: invocation_quotas(&request),
             revocation_set: revocation_set.clone(),
             authorization_artifact_digests: vec![artifact_digest],
+            partition_escrow_evidence: None,
         };
         must(
             adapter.register_admission(
@@ -1049,6 +1051,7 @@ mod tests {
                         capability_digest(&request.capability),
                         "digest compensation capability",
                     )],
+                    partition_escrow_evidence: None,
                 },
                 None,
                 Vec::new(),
@@ -1217,6 +1220,7 @@ mod tests {
                         capability_digest(&request.capability),
                         "digest partial restore capability",
                     )],
+                    partition_escrow_evidence: None,
                 },
                 None,
                 Vec::new(),
@@ -1410,7 +1414,21 @@ mod tests {
         let operation_id = "kernel-revocation-capture-operation".to_string();
         let request_binding_hash = "77".repeat(32);
         let hold_id = "kernel-revocation-capture-hold".to_string();
-        let revocation_set = revocation_set(&request);
+        let ancestor_ids = [
+            "kernel-ancestor-root".to_string(),
+            "kernel-ancestor-parent".to_string(),
+        ];
+        let revocation_set = revocation_set_with_ancestors(&request, &ancestor_ids);
+        assert_eq!(
+            revocation_set.ids(),
+            &[
+                request.capability.body.capability_id.clone(),
+                request.capability.body.revocation_id.clone(),
+                "kernel-ancestor-parent".to_string(),
+                "kernel-ancestor-root".to_string(),
+                capability_id.clone(),
+            ]
+        );
         let authorization_artifact_digest = must(
             capability_digest(&request.capability),
             "digest production broker capability",
@@ -1448,6 +1466,7 @@ mod tests {
                     authorization_artifact_digests: vec![
                         authorization_artifact_digest.clone(),
                     ],
+                    partition_escrow_evidence: None,
                 }),
             "authorize production capture hold",
         )

@@ -6,7 +6,7 @@ use super::report_rendering::{
 };
 use super::report_validation::{
     normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_empty_request,
-    validate_cluster_peer_json_request,
+    validate_cluster_peer_json_request, validate_service_auth,
 };
 use super::*;
 
@@ -24,12 +24,16 @@ mod pull_budget;
 mod snapshots;
 
 pub(crate) use admission_consensus::{
+    bind_initial_partition_escrow_admission_membership, handle_budget_mutation_event_replica_query,
     handle_internal_admission_append_entries, handle_internal_admission_capture_query,
     handle_internal_admission_proposal, handle_internal_admission_request_vote,
     handle_internal_admission_snapshot, handle_internal_admission_snapshot_install,
+    handle_internal_committed_composite_authorization_query,
     handle_internal_invocation_capture_query, initialize_admission_consensus,
-    propose_admission_command, query_admission_capture_consensus,
-    query_invocation_capture_consensus,
+    persist_initial_partition_escrow_authority_pin, propose_admission_command,
+    provisionable_partition_escrow_admission_membership_digest, query_admission_capture_consensus,
+    query_committed_composite_authorization, query_invocation_capture_consensus,
+    validate_partition_escrow_admission_membership,
 };
 pub(crate) use consensus::{
     budget_authority_guarantee_level, budget_authority_metadata_view, build_cluster_state,

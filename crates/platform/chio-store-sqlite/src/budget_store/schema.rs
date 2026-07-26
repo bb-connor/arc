@@ -92,6 +92,20 @@ pub(super) fn ensure_composite_budget_schema(
             CHECK (length(artifact_digest) = 64)
         );
 
+        CREATE TABLE IF NOT EXISTS budget_composite_partition_escrow_evidence (
+            hold_id TEXT PRIMARY KEY,
+            evidence_digest TEXT NOT NULL,
+            canonical_evidence BLOB NOT NULL,
+            CHECK (length(evidence_digest) = 64),
+            CHECK (length(canonical_evidence) > 0 AND length(canonical_evidence) <= 1048576),
+            FOREIGN KEY (hold_id)
+                REFERENCES budget_composite_authorizations(hold_id)
+                ON UPDATE RESTRICT ON DELETE RESTRICT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_budget_partition_escrow_evidence_digest
+            ON budget_composite_partition_escrow_evidence(evidence_digest);
+
         CREATE TABLE IF NOT EXISTS budget_composite_holds (
             hold_id TEXT PRIMARY KEY,
             operation_id TEXT NOT NULL,
@@ -214,11 +228,139 @@ pub(super) fn ensure_composite_budget_schema(
             SELECT RAISE(ABORT, 'immutable composite authorization artifact');
         END;
 
+        CREATE TRIGGER IF NOT EXISTS budget_partition_escrow_evidence_update_forbidden
+        BEFORE UPDATE ON budget_composite_partition_escrow_evidence
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable partition escrow authorization evidence');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS budget_partition_escrow_evidence_delete_forbidden
+        BEFORE DELETE ON budget_composite_partition_escrow_evidence
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable partition escrow authorization evidence');
+        END;
+
         "#,
     )?;
     ensure_aggregate_family_evidence_columns(connection)?;
     reject_unsafe_aggregate_family_authorizations(connection)?;
     reject_unsafe_composite_managed_grants(connection)?;
+    reject_unsafe_partition_escrow_authorizations(connection)?;
+    validate_partition_escrow_evidence_rows(connection)?;
+    Ok(())
+}
+
+pub(super) fn migrate_and_stamp_budget_schema(
+    connection: &mut Connection,
+    on_disk_version: i32,
+) -> Result<(), BudgetStoreError> {
+    match on_disk_version {
+        0 => {
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            transaction.execute_batch(
+                r#"
+                DROP TRIGGER IF EXISTS budget_partition_escrow_evidence_insert_guard;
+                DROP TRIGGER IF EXISTS partition_escrow_budget_store_config_update_forbidden;
+                DROP TRIGGER IF EXISTS partition_escrow_budget_store_config_delete_forbidden;
+                DROP TABLE IF EXISTS partition_escrow_budget_store_config;
+
+                CREATE TRIGGER budget_partition_escrow_evidence_insert_guard
+                BEFORE INSERT ON budget_composite_partition_escrow_evidence
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM budget_composite_authorizations
+                    WHERE hold_id = NEW.hold_id
+                ) OR NOT EXISTS (
+                    SELECT 1 FROM budget_composite_authorization_artifacts
+                    WHERE hold_id = NEW.hold_id AND artifact_digest = NEW.evidence_digest
+                )
+                BEGIN
+                    SELECT RAISE(ABORT, 'partition escrow evidence lacks authorization binding');
+                END;
+                "#,
+            )?;
+            crate::stamp_schema_version(
+                &transaction,
+                super::store::BUDGET_STORE_SCHEMA_KEY,
+                super::store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+            )
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+            transaction.commit()?;
+        }
+        super::store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION => {
+            validate_partition_escrow_schema_v1(connection)?;
+        }
+        unsupported => {
+            return Err(BudgetStoreError::Invariant(format!(
+                "unsupported budget schema version {unsupported}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_partition_escrow_schema_v1(connection: &Connection) -> Result<(), BudgetStoreError> {
+    let obsolete_table_exists = connection.query_row(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'partition_escrow_budget_store_config'
+        )
+        "#,
+        [],
+        |row| row.get::<_, bool>(0),
+    )?;
+    let trigger_sql = connection
+        .query_row(
+            r#"
+            SELECT sql FROM sqlite_master
+            WHERE type = 'trigger'
+              AND name = 'budget_partition_escrow_evidence_insert_guard'
+            "#,
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    let trigger_is_current = trigger_sql.is_some_and(|sql| {
+        !sql.contains("partition_escrow_budget_store_config")
+            && sql.contains("budget_composite_authorizations")
+            && sql.contains("budget_composite_authorization_artifacts")
+    });
+    if obsolete_table_exists || !trigger_is_current {
+        return Err(BudgetStoreError::Invariant(
+            "budget schema v1 contains obsolete partition escrow authority state or an invalid evidence guard"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn reject_unsafe_partition_escrow_authorizations(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let inconsistent = connection.query_row(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM budget_composite_partition_escrow_evidence AS evidence
+            WHERE NOT EXISTS (
+                SELECT 1 FROM budget_composite_authorizations AS authorization
+                WHERE authorization.hold_id = evidence.hold_id
+            ) OR NOT EXISTS (
+                SELECT 1 FROM budget_composite_authorization_artifacts AS artifact
+                WHERE artifact.hold_id = evidence.hold_id
+                  AND artifact.artifact_digest = evidence.evidence_digest
+            )
+        )
+        "#,
+        [],
+        |row| row.get::<_, bool>(0),
+    )?;
+    if inconsistent {
+        return Err(BudgetStoreError::Invariant(
+            "partition escrow authorization evidence is orphaned or unbound".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -550,6 +692,46 @@ fn reject_unsafe_aggregate_family_authorizations(
     Ok(())
 }
 
+/// Validate every pure semantic invariant needed by an existing-only replay.
+/// This helper performs queries only and deliberately excludes all schema
+/// creation, repair, migration, and trigger installation paths.
+pub(super) fn validate_read_only_budget_semantics(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    validate_partition_escrow_schema_v1(connection)?;
+    reject_unsafe_partition_escrow_authorizations(connection)?;
+    reject_unsafe_composite_managed_grants(connection)?;
+    reject_inconsistent_composite_budget_ownership(connection)?;
+    reject_unsafe_aggregate_family_authorizations(connection)?;
+    reject_unsafe_budget_admission_operation_bindings(connection)?;
+    reject_unsafe_payment_journal_operation_bindings(connection)
+}
+
+fn validate_partition_escrow_evidence_rows(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT evidence_digest, canonical_evidence
+        FROM budget_composite_partition_escrow_evidence
+        ORDER BY hold_id ASC
+        "#,
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+    })?;
+    for row in rows {
+        let (evidence_digest, canonical_evidence) = row?;
+        let canonical_json = String::from_utf8(canonical_evidence).map_err(|_| {
+            BudgetStoreError::Invariant(
+                "partition escrow commit evidence is not UTF-8 JSON".to_string(),
+            )
+        })?;
+        PartitionEscrowCommitEvidence::from_canonical_json(canonical_json, evidence_digest)?;
+    }
+    Ok(())
+}
+
 pub(super) fn ensure_budget_admission_operation_columns(
     connection: &Connection,
 ) -> Result<(), BudgetStoreError> {
@@ -586,46 +768,7 @@ pub(super) fn ensure_budget_admission_operation_columns(
             }
         }
     }
-    let unsafe_rows = connection.query_row(
-        r#"
-        SELECT EXISTS(
-            SELECT 1 FROM budget_composite_authorizations
-            WHERE operation_id IS NULL OR request_binding_hash IS NULL
-            UNION ALL
-            SELECT 1 FROM budget_composite_holds
-            WHERE operation_id IS NULL OR request_binding_hash IS NULL
-            UNION ALL
-            SELECT 1 FROM budget_composite_mutation_snapshots
-            WHERE operation_id IS NULL OR request_binding_hash IS NULL
-            UNION ALL
-            SELECT 1
-            FROM budget_mutation_events AS event
-            JOIN budget_composite_authorizations AS authorization
-              ON authorization.hold_id = event.hold_id
-            WHERE event.operation_id IS NULL OR event.request_binding_hash IS NULL
-            UNION ALL
-            SELECT 1
-            FROM budget_authorization_holds AS hold
-            JOIN budget_composite_authorizations AS authorization
-              ON authorization.hold_id = hold.hold_id
-            WHERE hold.operation_id IS NULL OR hold.request_binding_hash IS NULL
-            UNION ALL
-            SELECT 1 FROM budget_mutation_events
-            WHERE (operation_id IS NULL) != (request_binding_hash IS NULL)
-            UNION ALL
-            SELECT 1 FROM budget_authorization_holds
-            WHERE (operation_id IS NULL) != (request_binding_hash IS NULL)
-        )
-        "#,
-        [],
-        |row| row.get::<_, i64>(0),
-    )?;
-    if unsafe_rows != 0 {
-        return Err(BudgetStoreError::Invariant(
-            "budget database contains admission-owned rows without complete operation_id and request_binding_hash; ownership cannot be inferred safely"
-                .to_string(),
-        ));
-    }
+    reject_unsafe_budget_admission_operation_bindings(connection)?;
     connection.execute_batch(
         r#"
         CREATE TRIGGER IF NOT EXISTS budget_authorization_hold_admission_owner_immutable
@@ -668,6 +811,52 @@ pub(super) fn ensure_budget_admission_operation_columns(
     Ok(())
 }
 
+fn reject_unsafe_budget_admission_operation_bindings(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let unsafe_rows = connection.query_row(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM budget_composite_authorizations
+            WHERE operation_id IS NULL OR request_binding_hash IS NULL
+            UNION ALL
+            SELECT 1 FROM budget_composite_holds
+            WHERE operation_id IS NULL OR request_binding_hash IS NULL
+            UNION ALL
+            SELECT 1 FROM budget_composite_mutation_snapshots
+            WHERE operation_id IS NULL OR request_binding_hash IS NULL
+            UNION ALL
+            SELECT 1
+            FROM budget_mutation_events AS event
+            JOIN budget_composite_authorizations AS authorization
+              ON authorization.hold_id = event.hold_id
+            WHERE event.operation_id IS NULL OR event.request_binding_hash IS NULL
+            UNION ALL
+            SELECT 1
+            FROM budget_authorization_holds AS hold
+            JOIN budget_composite_authorizations AS authorization
+              ON authorization.hold_id = hold.hold_id
+            WHERE hold.operation_id IS NULL OR hold.request_binding_hash IS NULL
+            UNION ALL
+            SELECT 1 FROM budget_mutation_events
+            WHERE (operation_id IS NULL) != (request_binding_hash IS NULL)
+            UNION ALL
+            SELECT 1 FROM budget_authorization_holds
+            WHERE (operation_id IS NULL) != (request_binding_hash IS NULL)
+        )
+        "#,
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if unsafe_rows != 0 {
+        return Err(BudgetStoreError::Invariant(
+            "budget database contains admission-owned rows without complete operation_id and request_binding_hash; ownership cannot be inferred safely"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn ensure_payment_journal_operation_columns(
     connection: &Connection,
 ) -> Result<(), BudgetStoreError> {
@@ -701,6 +890,30 @@ pub(super) fn ensure_payment_journal_operation_columns(
          WHERE budget_exposure_units IS NULL",
         [],
     )?;
+    reject_unsafe_payment_journal_operation_bindings(connection)?;
+    connection.execute_batch(
+        r#"
+        CREATE TRIGGER IF NOT EXISTS payment_journal_recovery_binding_immutable
+        BEFORE UPDATE OF operation_id, request_binding_hash, authority_id, lease_id, lease_epoch,
+                         budget_exposure_units
+        ON payment_journal
+        WHEN OLD.operation_id IS NOT NEW.operation_id
+          OR OLD.request_binding_hash IS NOT NEW.request_binding_hash
+          OR OLD.authority_id IS NOT NEW.authority_id
+          OR OLD.lease_id IS NOT NEW.lease_id
+          OR OLD.lease_epoch IS NOT NEW.lease_epoch
+          OR OLD.budget_exposure_units IS NOT NEW.budget_exposure_units
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable payment journal recovery binding');
+        END;
+        "#,
+    )?;
+    Ok(())
+}
+
+fn reject_unsafe_payment_journal_operation_bindings(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
     let unsafe_rows = connection.query_row(
         r#"
         SELECT EXISTS(
@@ -730,23 +943,6 @@ pub(super) fn ensure_payment_journal_operation_columns(
             "payment journal contains an incomplete or invalid operation binding".to_string(),
         ));
     }
-    connection.execute_batch(
-        r#"
-        CREATE TRIGGER IF NOT EXISTS payment_journal_recovery_binding_immutable
-        BEFORE UPDATE OF operation_id, request_binding_hash, authority_id, lease_id, lease_epoch,
-                         budget_exposure_units
-        ON payment_journal
-        WHEN OLD.operation_id IS NOT NEW.operation_id
-          OR OLD.request_binding_hash IS NOT NEW.request_binding_hash
-          OR OLD.authority_id IS NOT NEW.authority_id
-          OR OLD.lease_id IS NOT NEW.lease_id
-          OR OLD.lease_epoch IS NOT NEW.lease_epoch
-          OR OLD.budget_exposure_units IS NOT NEW.budget_exposure_units
-        BEGIN
-            SELECT RAISE(ABORT, 'immutable payment journal recovery binding');
-        END;
-        "#,
-    )?;
     Ok(())
 }
 

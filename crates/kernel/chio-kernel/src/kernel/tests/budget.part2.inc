@@ -5,6 +5,7 @@ fn assert_monetary_post_dispatch_error_releases_exposure(
     nested: bool,
 ) {
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, request_id);
     kernel.register_tool_server(server);
     let subject_kp = Keypair::generate();
     let mut grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
@@ -178,11 +179,13 @@ fn assert_post_dispatch_cleanup_failure_projection(
     let mut kernel = make_kernel(make_monetary_config());
     match source {
         CleanupFailureSource::Payment => {
+            install_bounded_budget_authorities(&mut kernel, request_id);
             kernel
                 .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
                 .expect("payment adapter");
         }
         CleanupFailureSource::BudgetStore => {
+            install_bounded_admission_operation_store(&mut kernel, request_id);
             kernel
                 .set_budget_store_handle(std::sync::Arc::new(FailingReleaseBudgetStore::new()))
                 .expect("budget store");
@@ -274,17 +277,16 @@ fn assert_post_dispatch_cleanup_failure_projection(
     let budget_hold_id = metadata["budget_authority"]["hold_id"].as_str().unwrap();
     assert!(hold_ids.iter().any(|id| id == budget_hold_id));
     if matches!(source, CleanupFailureSource::Payment) {
-        assert!(hold_ids.iter().any(|id| id == "auth_failing_release"));
+        let payment_authorization_id =
+            FailingReleasePaymentAdapter::operation_authorization_id(request_id, 100, "USD");
+        assert!(hold_ids.iter().any(|id| id == &payment_authorization_id));
     }
 }
 
 #[test]
-fn post_dispatch_cleanup_failure_rejects_forged_budget_authority() {
+fn public_metadata_rejects_forged_budget_authority_before_dispatch() {
     let entries = std::sync::Arc::new(AtomicU64::new(0));
     let mut kernel = make_kernel(make_monetary_config());
-    kernel
-        .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
-        .expect("payment adapter");
     kernel.register_tool_server(Box::new(FailingAfterSideEffectServer::new(
         "cost-srv",
         vec!["compute"],
@@ -308,532 +310,932 @@ fn post_dispatch_cleanup_failure_rejects_forged_budget_authority() {
         "cost-srv",
     );
 
-    let response = kernel
+    let error = kernel
         .evaluate_tool_call_blocking_with_metadata(
             &request,
             Some(forged_budget_authority_metadata()),
         )
-        .expect("cleanup failure must preserve the connector denial");
-    assert!(response.receipt.is_denied());
-    assert_eq!(entries.load(Ordering::SeqCst), 1);
-    let metadata = response.receipt.metadata.as_ref().unwrap();
-    assert_forged_budget_authority_removed(&response.receipt);
+        .expect_err("caller budget authority metadata must fail before dispatch");
+    assert!(matches!(
+        error,
+        KernelError::InvalidReceiptMetadata(reason) if reason.contains("budget_authority")
+    ));
     assert_eq!(
-        metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["step"],
-        "payment_release"
+        entries.load(Ordering::SeqCst),
+        0,
+        "reserved metadata must be rejected before the tool server runs"
     );
+    assert_eq!(kernel.receipt_log().len(), 0);
 }
 
-#[test]
-fn post_dispatch_cleanup_fault_preserves_cancelled_top_level() {
-    let entries = std::sync::Arc::new(AtomicU64::new(0));
-    assert_post_dispatch_cleanup_failure_projection(
-        Box::new(CancellationAfterSideEffectServer::new(
-            "cost-srv",
-            vec!["compute"],
-            std::sync::Arc::clone(&entries),
-        )),
-        entries,
-        "req-cleanup-fault-cancelled-top",
-        false,
-        CleanupFailureSource::Payment,
-        CleanupFailureTerminal::Cancelled,
-    );
+struct PartitionEscrowCleanupTestStore {
+    inner: InMemoryBudgetStore,
+    binding: crate::budget_store::PartitionEscrowStoreBinding,
+    partition_escrow_evidence: crate::budget_store::PartitionEscrowCommitEvidence,
 }
 
-#[test]
-fn post_dispatch_cleanup_fault_preserves_incomplete_top_level() {
-    let entries = std::sync::Arc::new(AtomicU64::new(0));
-    assert_post_dispatch_cleanup_failure_projection(
-        Box::new(IncompleteAfterSideEffectServer::new(
-            "cost-srv",
-            vec!["compute"],
-            std::sync::Arc::clone(&entries),
-        )),
-        entries,
-        "req-cleanup-fault-incomplete-top",
-        false,
-        CleanupFailureSource::BudgetStore,
-        CleanupFailureTerminal::Incomplete,
-    );
-}
-
-#[test]
-fn post_dispatch_cleanup_fault_preserves_denied_top_level() {
-    let entries = std::sync::Arc::new(AtomicU64::new(0));
-    assert_post_dispatch_cleanup_failure_projection(
-        Box::new(FailingAfterSideEffectServer::new(
-            "cost-srv",
-            vec!["compute"],
-            std::sync::Arc::clone(&entries),
-        )),
-        entries,
-        "req-cleanup-fault-denied-top",
-        false,
-        CleanupFailureSource::Payment,
-        CleanupFailureTerminal::Denied,
-    );
-}
-
-#[test]
-fn post_dispatch_cleanup_fault_preserves_cancelled_nested() {
-    let entries = std::sync::Arc::new(AtomicU64::new(0));
-    assert_post_dispatch_cleanup_failure_projection(
-        Box::new(CancellationAfterSideEffectServer::new(
-            "cost-srv",
-            vec!["compute"],
-            std::sync::Arc::clone(&entries),
-        )),
-        entries,
-        "req-cleanup-fault-cancelled-nested",
-        true,
-        CleanupFailureSource::BudgetStore,
-        CleanupFailureTerminal::Cancelled,
-    );
-}
-
-#[test]
-fn post_dispatch_cleanup_fault_preserves_incomplete_nested() {
-    let entries = std::sync::Arc::new(AtomicU64::new(0));
-    assert_post_dispatch_cleanup_failure_projection(
-        Box::new(IncompleteAfterSideEffectServer::new(
-            "cost-srv",
-            vec!["compute"],
-            std::sync::Arc::clone(&entries),
-        )),
-        entries,
-        "req-cleanup-fault-incomplete-nested",
-        true,
-        CleanupFailureSource::Payment,
-        CleanupFailureTerminal::Incomplete,
-    );
-}
-
-#[test]
-fn post_dispatch_cleanup_fault_preserves_denied_nested() {
-    let entries = std::sync::Arc::new(AtomicU64::new(0));
-    assert_post_dispatch_cleanup_failure_projection(
-        Box::new(FailingAfterSideEffectServer::new(
-            "cost-srv",
-            vec!["compute"],
-            std::sync::Arc::clone(&entries),
-        )),
-        entries,
-        "req-cleanup-fault-denied-nested",
-        true,
-        CleanupFailureSource::BudgetStore,
-        CleanupFailureTerminal::Denied,
-    );
-}
-
-#[test]
-fn monetary_full_pipeline_three_invocations_third_denied() {
-    // max_total_cost=250, max_cost_per_invocation=100.
-    // Invocation 1: charges 100, total = 100. Allowed.
-    // Invocation 2: charges 100, total = 200. Allowed.
-    // Invocation 3: would charge 100, total would be 300 > 250. Denied.
-    let mut kernel = make_kernel(make_monetary_config());
-    let agent_kp = Keypair::generate();
-    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
-
-    let grant = make_monetary_grant("cost-srv", "compute", 100, 250, "USD");
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-
-    let make_req = |id: &str| ToolCallRequest {
-        request_id: id.to_string(),
-        capability: cap.clone(),
-        tool_name: "compute".to_string(),
-        server_id: "cost-srv".to_string(),
-        agent_id: agent_kp.public_key().to_hex(),
-        arguments: serde_json::json!({}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        model_metadata: None,
-        supplemental_authorization: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
-
-    let r1 = kernel
-        .evaluate_tool_call_blocking(&make_req("req-1"))
-        .unwrap();
-    assert_eq!(r1.verdict, Verdict::Allow, "first invocation should pass");
-
-    let r2 = kernel
-        .evaluate_tool_call_blocking(&make_req("req-2"))
-        .unwrap();
-    assert_eq!(r2.verdict, Verdict::Allow, "second invocation should pass");
-
-    let r3 = kernel
-        .evaluate_tool_call_blocking(&make_req("req-3"))
-        .unwrap();
-    assert_eq!(
-        r3.verdict,
-        Verdict::Deny,
-        "third invocation should be denied"
-    );
-
-    // Verify the denial receipt has financial metadata.
-    let metadata = r3.receipt.metadata.as_ref().expect("should have metadata");
-    assert!(metadata.get("financial").is_some());
-}
-
-#[test]
-fn multi_grant_budget_remaining_uses_matched_grant_total() {
-    let mut kernel = make_kernel(make_monetary_config());
-    let agent_kp = Keypair::generate();
-    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
-
-    let grant_a = make_monetary_grant("cost-srv", "compute-a", 100, 500, "USD");
-    let grant_b = make_monetary_grant("cost-srv", "compute-b", 40, 200, "USD");
-    let cap = kernel
-        .issue_capability(
-            &agent_kp.public_key(),
-            make_scope(vec![grant_a, grant_b]),
-            3600,
-        )
-        .unwrap();
-
-    let invoke = |request_id: &str, tool_name: &str| ToolCallRequest {
-        request_id: request_id.to_string(),
-        capability: cap.clone(),
-        tool_name: tool_name.to_string(),
-        server_id: "cost-srv".to_string(),
-        agent_id: agent_kp.public_key().to_hex(),
-        arguments: serde_json::json!({}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        model_metadata: None,
-        supplemental_authorization: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
-
-    let _ = kernel
-        .evaluate_tool_call_blocking(&invoke("req-a", "compute-a"))
-        .unwrap();
-    let response_b = kernel
-        .evaluate_tool_call_blocking(&invoke("req-b", "compute-b"))
-        .unwrap();
-
-    let metadata = response_b
-        .receipt
-        .metadata
-        .as_ref()
-        .expect("should have metadata");
-    let financial = metadata
-        .get("financial")
-        .expect("should have financial metadata");
-    assert_eq!(financial["grant_index"].as_u64(), Some(1));
-    assert_eq!(financial["cost_charged"].as_u64(), Some(40));
-    assert_eq!(financial["budget_total"].as_u64(), Some(200));
-    assert_eq!(financial["budget_remaining"].as_u64(), Some(160));
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn async_evaluate_tool_call_supports_shared_kernel_concurrency() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier};
-
-    struct ConcurrentServer {
-        barrier: Arc<Barrier>,
-        current: Arc<AtomicUsize>,
-        max_concurrent: Arc<AtomicUsize>,
-    }
-
-    #[async_trait::async_trait]
-    impl ToolServerConnection for ConcurrentServer {
-        fn server_id(&self) -> &str {
-            "srv"
-        }
-
-        fn tool_names(&self) -> Vec<String> {
-            vec!["echo".to_string()]
-        }
-
-        async fn invoke(
-            &self,
-            tool_name: &str,
-            arguments: serde_json::Value,
-            _bridge: Option<&mut dyn NestedFlowBridge>,
-        ) -> Result<serde_json::Value, KernelError> {
-            assert_eq!(tool_name, "echo");
-
-            let concurrent = self.current.fetch_add(1, Ordering::SeqCst) + 1;
-            let _ =
-                self.max_concurrent
-                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |observed| {
-                        (concurrent > observed).then_some(concurrent)
-                    });
-
-            self.barrier.wait();
-            std::thread::sleep(Duration::from_millis(25));
-            self.current.fetch_sub(1, Ordering::SeqCst);
-
-            Ok(arguments)
+impl PartitionEscrowCleanupTestStore {
+    fn partition_authority(&self) -> crate::budget_store::BudgetEventAuthority {
+        crate::budget_store::BudgetEventAuthority {
+            authority_id: self.binding.store_identity_digest().to_string(),
+            lease_id: format!(
+                "partition-escrow:fence:{}",
+                self.binding.fencing_token()
+            ),
+            lease_epoch: self.binding.fencing_token(),
         }
     }
 
-    let barrier = Arc::new(Barrier::new(2));
-    let max_concurrent = Arc::new(AtomicUsize::new(0));
+    fn stamp_partition_metadata(&self, metadata: &mut crate::budget_store::BudgetCommitMetadata) {
+        metadata.guarantee_level = crate::budget_store::BudgetGuaranteeLevel::PartitionEscrowed;
+        metadata.partition_escrow_evidence = Some(self.partition_escrow_evidence.clone());
+        metadata.authority = Some(self.partition_authority());
+    }
 
-    let mut configured_kernel = make_kernel(make_config());
-    configured_kernel.register_tool_server(Box::new(ConcurrentServer {
-        barrier: barrier.clone(),
-        current: Arc::new(AtomicUsize::new(0)),
-        max_concurrent: max_concurrent.clone(),
-    }));
+    fn stamp_partition_mutation(
+        &self,
+        mut decision: crate::budget_store::BudgetHoldMutationDecision,
+    ) -> crate::budget_store::BudgetHoldMutationDecision {
+        self.stamp_partition_metadata(&mut decision.metadata);
+        decision
+    }
 
-    let agent_kp = Keypair::generate();
-    let capability = configured_kernel
-        .issue_capability(
-            &agent_kp.public_key(),
-            make_scope(vec![ToolGrant {
-                server_id: "srv".to_string(),
-                tool_name: "echo".to_string(),
-                operations: vec![Operation::Invoke],
-                constraints: vec![],
-                max_invocations: None,
-                max_cost_per_invocation: None,
-                max_total_cost: None,
-                dpop_required: None,
-            }]),
-            3600,
+    fn admission_capture_decision(
+        request: &crate::admission_capture_authority::AdmissionCaptureRequest,
+        budget: crate::budget_store::BudgetHoldMutationDecision,
+    ) -> Result<
+        crate::admission_capture_authority::AdmissionCaptureDecision,
+        crate::admission_capture_authority::AdmissionCaptureError,
+    > {
+        let authority_commit_index = budget.metadata.budget_commit_index.ok_or_else(|| {
+            crate::admission_capture_authority::AdmissionCaptureError::InvalidRequest(
+                "partition test capture omitted its budget commit index".to_string(),
+            )
+        })?;
+        let metadata = crate::admission_capture_authority::AdmissionCaptureMetadata::new(
+            crate::admission_capture_authority::AdmissionCaptureMetadataInput {
+                operation_id: request.operation_id().to_string(),
+                checked_revocation_set_digest: request
+                    .bound_revocation_set_digest()
+                    .to_string(),
+                aggregate_root_capability_id: request
+                    .aggregate_root_capability_id()
+                    .map(str::to_string),
+                aggregate_root_binding_digest: request
+                    .aggregate_root_binding_digest()
+                    .map(str::to_string),
+                budget_commit: budget.metadata.clone(),
+                revocation_commit_index: request.last_observed_revocation_index().unwrap_or(0),
+                authority_commit_index,
+                leader_epoch: None,
+            },
+        )?;
+        Ok(
+            crate::admission_capture_authority::AdmissionCaptureDecision::Captured {
+                budget: Box::new(budget),
+                metadata,
+            },
         )
-        .unwrap();
+    }
+}
 
-    let kernel = Arc::new(configured_kernel);
-    let make_request = |request_id: &str| ToolCallRequest {
-        request_id: request_id.to_string(),
-        capability: capability.clone(),
-        tool_name: "echo".to_string(),
-        server_id: "srv".to_string(),
-        agent_id: agent_kp.public_key().to_hex(),
-        arguments: serde_json::json!({ "request_id": request_id }),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        model_metadata: None,
-        supplemental_authorization: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
+impl crate::budget_store::BudgetStore for PartitionEscrowCleanupTestStore {
+    fn authority_profile(&self) -> crate::budget_store::BudgetStoreProfile {
+        crate::budget_store::BudgetStoreProfile::SharedLinearizable
+    }
 
-    let thread_a = {
-        let kernel = kernel.clone();
-        let request = make_request("req-a");
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            rt.block_on(async move { kernel.evaluate_tool_call(&request).await })
+    fn budget_authority_profile(&self) -> crate::budget_store::BudgetAuthorityProfile {
+        crate::budget_store::BudgetAuthorityProfile::AuthoritativeHoldEvent
+    }
+
+    fn budget_metering_profile(&self) -> crate::budget_store::BudgetMeteringProfile {
+        crate::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual
+    }
+
+    fn try_increment(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::try_increment(
+            &self.inner,
+            capability_id,
+            grant_index,
+            max_invocations,
+        )
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::try_charge_cost(
+            &self.inner,
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+        )
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::reverse_charge_cost(
+            &self.inner,
+            capability_id,
+            grant_index,
+            cost_units,
+        )
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::reduce_charge_cost(
+            &self.inner,
+            capability_id,
+            grant_index,
+            cost_units,
+        )
+    }
+
+    fn settle_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::settle_charge_cost(
+            &self.inner,
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+        )
+    }
+
+    fn list_usages(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<crate::budget_store::BudgetUsageRecord>, crate::budget_store::BudgetStoreError>
+    {
+        crate::budget_store::BudgetStore::list_usages(&self.inner, limit, capability_id)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<crate::budget_store::BudgetUsageRecord>, crate::budget_store::BudgetStoreError>
+    {
+        crate::budget_store::BudgetStore::get_usage(&self.inner, capability_id, grant_index)
+    }
+
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<
+        Option<crate::budget_store::BudgetMutationRecord>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        crate::budget_store::BudgetStore::get_mutation_event_by_id(&self.inner, event_id).map(
+            |record| {
+                record.map(|mut record| {
+                    record.authority = Some(self.partition_authority());
+                    record
+                })
+            },
+        )
+    }
+
+    fn authorize_budget_hold(
+        &self,
+        mut request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetAuthorizeHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        let request_evidence = request
+            .invocation_admission_evidence()
+            .and_then(|evidence| evidence.partition_escrow_evidence())
+            .map(crate::budget_store::PartitionEscrowCommitEvidence::from_admission_evidence)
+            .transpose()?;
+        if request_evidence.as_ref() != Some(&self.partition_escrow_evidence) {
+            return Err(crate::budget_store::BudgetStoreError::Invariant(
+                "partition cleanup test authorization changed its escrow evidence".to_string(),
+            ));
+        }
+        request.authority = Some(self.partition_authority());
+        let mut decision =
+            crate::budget_store::BudgetStore::authorize_budget_hold(&self.inner, request)?;
+        let metadata = match &mut decision {
+            crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                &mut authorized.metadata
+            }
+            crate::budget_store::BudgetAuthorizeHoldDecision::Denied(denied) => {
+                &mut denied.metadata
+            }
+        };
+        self.stamp_partition_metadata(metadata);
+        Ok(decision)
+    }
+
+    fn replay_budget_authorization(
+        &self,
+        mut request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetAuthorizeHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        request.authority = Some(self.partition_authority());
+        let mut decision =
+            crate::budget_store::BudgetStore::replay_budget_authorization(&self.inner, request)?;
+        let metadata = match &mut decision {
+            crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                &mut authorized.metadata
+            }
+            crate::budget_store::BudgetAuthorizeHoldDecision::Denied(denied) => {
+                &mut denied.metadata
+            }
+        };
+        self.stamp_partition_metadata(metadata);
+        Ok(decision)
+    }
+
+    fn reverse_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReverseHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetReverseHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        let decision =
+            crate::budget_store::BudgetStore::reverse_budget_hold(&self.inner, request)?;
+        Ok(self.stamp_partition_mutation(decision))
+    }
+
+    fn release_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReleaseHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetReleaseHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        let decision =
+            crate::budget_store::BudgetStore::release_budget_hold(&self.inner, request)?;
+        Ok(self.stamp_partition_mutation(decision))
+    }
+
+    fn reconcile_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReconcileHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetReconcileHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        let decision =
+            crate::budget_store::BudgetStore::reconcile_budget_hold(&self.inner, request)?;
+        Ok(self.stamp_partition_mutation(decision))
+    }
+
+    fn capture_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetCaptureHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetCaptureHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        let decision =
+            crate::budget_store::BudgetStore::capture_budget_hold(&self.inner, request)?;
+        Ok(self.stamp_partition_mutation(decision))
+    }
+
+    fn capture_invocation_reservations(
+        &self,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<
+        crate::budget_store::BudgetHoldMutationDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        let decision = crate::budget_store::BudgetStore::capture_invocation_reservations(
+            &self.inner,
+            request,
+        )?;
+        Ok(self.stamp_partition_mutation(decision))
+    }
+
+    fn query_invocation_capture(
+        &self,
+        request: &crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<
+        Option<crate::budget_store::BudgetHoldMutationDecision>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        crate::budget_store::BudgetStore::query_invocation_capture(&self.inner, request).map(
+            |decision| decision.map(|decision| self.stamp_partition_mutation(decision)),
+        )
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<
+        Option<crate::budget_store::BudgetHoldSnapshot>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        crate::budget_store::BudgetStore::get_budget_hold(&self.inner, hold_id).map(|hold| {
+            hold.map(|mut hold| {
+                self.stamp_partition_metadata(&mut hold.authorization_metadata);
+                hold
+            })
         })
-    };
-    let thread_b = {
-        let kernel = kernel.clone();
-        let request = make_request("req-b");
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            rt.block_on(async move { kernel.evaluate_tool_call(&request).await })
-        })
-    };
+    }
 
-    let (response_a, response_b) = tokio::time::timeout(Duration::from_secs(2), async move {
-        let response_a = thread_a.join().expect("thread a should not panic");
-        let response_b = thread_b.join().expect("thread b should not panic");
-        (response_a, response_b)
-    })
-    .await
-    .expect("shared kernel evaluation should not deadlock");
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::mark_hold_reserved(
+            &self.inner,
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
 
-    let response_a = response_a.unwrap();
-    let response_b = response_b.unwrap();
-    assert_eq!(response_a.verdict, Verdict::Allow);
-    assert_eq!(response_b.verdict, Verdict::Allow);
-    assert!(
-        max_concurrent.load(Ordering::SeqCst) >= 2,
-        "expected concurrent server invocations on a shared kernel"
-    );
+    fn mark_invocation_hold_reserved(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::mark_invocation_hold_reserved(
+            &self.inner,
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        )
+    }
+
+    fn mark_admission_operation_hold_reserved(
+        &self,
+        hold_id: &str,
+        admission_operation: &crate::budget_store::BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::mark_admission_operation_hold_reserved(
+            &self.inner,
+            hold_id,
+            admission_operation,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
+
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::reserve_invocation_hold(
+            &self.inner,
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        )
+    }
+
+    fn reap_expired_reserved_holds(
+        &self,
+        now_unix_secs: i64,
+    ) -> Result<usize, crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::reap_expired_reserved_holds(
+            &self.inner,
+            now_unix_secs,
+        )
+    }
+
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::list_open_delegated_reserved_hold_ids(&self.inner)
+    }
+
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::request_id_has_reserved_hold(&self.inner, request_id)
+    }
+
+    fn budget_guarantee_level(&self) -> crate::budget_store::BudgetGuaranteeLevel {
+        crate::budget_store::BudgetGuaranteeLevel::PartitionEscrowed
+    }
+
+    fn partition_escrow_store_binding(
+        &self,
+    ) -> Result<
+        Option<crate::budget_store::PartitionEscrowStoreBinding>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        Ok(Some(self.binding.clone()))
+    }
+}
+
+impl crate::admission_capture_authority::AdmissionCaptureAuthority
+    for PartitionEscrowCleanupTestStore
+{
+    fn query_admission_capture(
+        &self,
+        request: &crate::admission_capture_authority::AdmissionCaptureRequest,
+    ) -> Result<
+        Option<crate::admission_capture_authority::AdmissionCaptureDecision>,
+        crate::admission_capture_authority::AdmissionCaptureError,
+    > {
+        crate::budget_store::BudgetStore::query_invocation_capture(self, request.budget())
+            .map_err(crate::admission_capture_authority::AdmissionCaptureError::from)?
+            .map(|budget| Self::admission_capture_decision(request, budget))
+            .transpose()
+    }
+
+    fn capture_admission(
+        &self,
+        request: crate::admission_capture_authority::AdmissionCaptureRequest,
+    ) -> Result<
+        crate::admission_capture_authority::AdmissionCaptureDecision,
+        crate::admission_capture_authority::AdmissionCaptureError,
+    > {
+        let budget = crate::budget_store::BudgetStore::capture_invocation_reservations(
+            self,
+            request.budget().clone(),
+        )?;
+        Self::admission_capture_decision(&request, budget)
+    }
+}
+
+fn assert_partition_cleanup_failure_message_is_non_leaking(message: &str) {
+    for exhausted_dimension_detail in [
+        "exhausted-owner-secret",
+        "chio.grant-invocation.v1",
+        "17",
+        "937",
+        "413729",
+        "grant_index",
+        "max_invocations",
+        "invocation_count",
+        "reserved_invocations_after",
+        "captured_invocations_after",
+        "committed_cost_units_after",
+        "max_total_cost_units",
+        "grant",
+        "aggregate",
+        "broker",
+        "invocation",
+        "monetary",
+        "cost",
+    ] {
+        assert!(
+            !message.contains(exhausted_dimension_detail),
+            "cleanup evidence failure leaked `{exhausted_dimension_detail}`: {message}"
+        );
+    }
+}
+
+fn assert_partition_cleanup_evidence_failure_is_non_leaking(result: Result<(), KernelError>) {
+    let message = match result {
+        Err(KernelError::GuardDenied(message)) => message,
+        other => panic!("partition escrow cleanup evidence must fail closed, got {other:?}"),
+    };
+    assert_partition_cleanup_failure_message_is_non_leaking(&message);
 }
 
 #[test]
-fn tool_invocation_cost_serde_roundtrip() {
-    let cost = ToolInvocationCost {
-        units: 500,
-        currency: "USD".to_string(),
-        breakdown: None,
+fn partition_escrow_cleanup_denial_rejects_malformed_missing_or_mismatched_evidence_without_dimension_leak(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_core_types::partition_escrow::{
+        verify_partition_escrow_quota_commitment, PartitionEscrowAllocation,
+        PartitionEscrowAllocationPlan, PartitionEscrowAllocationPlanBinding,
+        PartitionEscrowAllocationSetBody, PartitionEscrowQuota, PartitionEscrowQuotaCommitmentBody,
+        PartitionEscrowQuotaSourceBinding, SignedPartitionEscrowAllocationSet,
+        SignedPartitionEscrowQuotaCommitment,
     };
-    let json = serde_json::to_string(&cost).unwrap();
-    let restored: ToolInvocationCost = serde_json::from_str(&json).unwrap();
-    assert_eq!(restored.units, 500);
-    assert_eq!(restored.currency, "USD");
-    assert!(restored.breakdown.is_none());
 
-    // With breakdown
-    let cost_with = ToolInvocationCost {
-        units: 200,
-        currency: "EUR".to_string(),
-        breakdown: Some(serde_json::json!({"compute": 150, "network": 50})),
+    #[derive(serde::Serialize)]
+    #[serde(tag = "kind", rename_all = "camelCase")]
+    enum CleanupSourceTrust<'a> {
+        GrantCapability {
+            capability_id: &'a str,
+            grant_index: u32,
+            revocation_set_digest: &'a str,
+        },
+    }
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CleanupSourceTrustBinding<'a> {
+        schema: &'static str,
+        profile: &'a str,
+        quota_key_digest: String,
+        quota_descriptor_digest: String,
+        underlying_source_artifact_digest: &'a str,
+        source_signer: &'a PublicKey,
+        source_not_before: u64,
+        source_expires_at: u64,
+        profile_trust: CleanupSourceTrust<'a>,
+    }
+
+    let signer = Keypair::from_seed(&[91; 32]);
+    let subject = Keypair::from_seed(&[92; 32]);
+    let capability_id = "partition-cleanup-capability";
+    let now = current_unix_timestamp();
+    let issued_at = now.saturating_sub(10);
+    let expires_at = now.saturating_add(300);
+    let allocation_expires_at = expires_at.saturating_sub(1);
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: capability_id.to_string(),
+            issuer: signer.public_key(),
+            subject: subject.public_key(),
+            scope: ChioScope::default(),
+            issued_at,
+            expires_at,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &signer,
+    )?;
+    let invocation_admission =
+        crate::budget_store::VerifiedInvocationAdmission::grant_only(capability_id, 0, Some(5))?;
+    let quota = PartitionEscrowQuota::new("chio.grant-invocation.v1", capability_id, Some(0), 5)?;
+    let authority_id = "71".repeat(32);
+    let allocations = vec![
+        PartitionEscrowAllocation::new("partition-a", &authority_id, 2)?,
+        PartitionEscrowAllocation::new("partition-b", "authority-b", 3)?,
+    ];
+    let plan = PartitionEscrowAllocationPlan::new(
+        PartitionEscrowAllocationPlanBinding::new(
+            "production",
+            "partition-cleanup-root",
+            1,
+            quota.clone(),
+            capability.expires_at,
+            issued_at,
+            allocation_expires_at,
+        )?,
+        allocations.clone(),
+    )?;
+    let source_artifact_digest =
+        crate::threshold_approval::authorization_capability_hash(&capability)?;
+    let revocation_set_digest = invocation_admission.revocation_set().digest().to_string();
+    let source_signer = signer.public_key();
+    let source_trust_binding = CleanupSourceTrustBinding {
+        schema: "chio.partition-escrow-source-trust-binding.v1",
+        profile: quota.profile(),
+        quota_key_digest: quota.key_digest()?,
+        quota_descriptor_digest: quota.descriptor_digest()?,
+        underlying_source_artifact_digest: &source_artifact_digest,
+        source_signer: &source_signer,
+        source_not_before: capability.issued_at,
+        source_expires_at: capability.expires_at,
+        profile_trust: CleanupSourceTrust::GrantCapability {
+            capability_id,
+            grant_index: 0,
+            revocation_set_digest: &revocation_set_digest,
+        },
     };
-    let json_with = serde_json::to_string(&cost_with).unwrap();
-    let restored_with: ToolInvocationCost = serde_json::from_str(&json_with).unwrap();
-    assert_eq!(restored_with.units, 200);
-    assert!(restored_with.breakdown.is_some());
-}
+    let source_trust_canonical = chio_core::canonical_json_bytes(&source_trust_binding)?;
+    let mut source_trust_preimage = b"chio.partition-escrow-source-trust-binding.v1\0".to_vec();
+    source_trust_preimage.extend_from_slice(&source_trust_canonical);
+    let source_trust_digest = chio_core::sha256_hex(&source_trust_preimage);
+    let quota_commitment = SignedPartitionEscrowQuotaCommitment::sign(
+        PartitionEscrowQuotaCommitmentBody::new(
+            &plan,
+            PartitionEscrowQuotaSourceBinding::new(
+                source_artifact_digest,
+                source_trust_digest,
+                capability.issued_at,
+                capability.expires_at,
+            )?,
+        )?,
+        &signer,
+    )?;
+    let certificate = verify_partition_escrow_quota_commitment(&quota_commitment, now)?;
+    let allocation_set = SignedPartitionEscrowAllocationSet::sign(
+        PartitionEscrowAllocationSetBody::new(
+            &certificate,
+            issued_at,
+            allocation_expires_at,
+            allocations,
+        )?,
+        &signer,
+    )?;
+    let source = crate::partition_escrow::verify_grant_partition_escrow_source(
+        &quota_commitment,
+        &capability,
+        &invocation_admission,
+        0,
+        now,
+    )?;
+    let counter_namespace_digest =
+        crate::partition_escrow::partition_escrow_counter_namespace_digest(
+            "partition-a",
+            &authority_id,
+        )?;
+    let registry = crate::partition_escrow::PartitionEscrowRegistry::new(
+        crate::partition_escrow::PartitionEscrowRegistryInput {
+            authority_domain: "production".to_string(),
+            partition_id: "partition-a".to_string(),
+            authority_id: authority_id.clone(),
+            resolver_id: "static-partition-escrow-registry".to_string(),
+            resolver_implementation_id: "chio-kernel-static-partition-escrow".to_string(),
+            resolver_implementation_version: 1,
+            store_identity_digest: authority_id.clone(),
+            counter_namespace_digest: counter_namespace_digest.clone(),
+            fencing_token: 1,
+            entries: vec![crate::partition_escrow::PartitionEscrowRegistryEntryInput {
+                quota_commitment,
+                allocation_set,
+            }],
+        },
+    )?;
+    let admission = registry.resolve(&[source], now)?;
+    let commit_evidence =
+        crate::budget_store::PartitionEscrowCommitEvidence::from_admission_evidence(
+            admission.evidence(),
+        )?;
+    let verified_partition_admission = invocation_admission
+        .clone()
+        .install_partition_escrow(&admission)?;
+    let binding = crate::budget_store::PartitionEscrowStoreBinding::new(
+        authority_id.clone(),
+        counter_namespace_digest,
+        1,
+    )?;
+    let store = std::sync::Arc::new(PartitionEscrowCleanupTestStore {
+        inner: InMemoryBudgetStore::new(),
+        binding,
+        partition_escrow_evidence: commit_evidence.clone(),
+    });
+    let mut kernel = make_kernel(make_config());
+    kernel.set_budget_store_handle(store.clone())?;
+    kernel.set_admission_capture_authority(store.clone())?;
+    kernel.install_partition_escrow_registry(std::sync::Arc::new(registry))?;
 
-#[test]
-fn cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units() {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time")
-        .as_secs();
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_price_oracle(Box::new(StaticPriceOracle::new([(
-        ("ETH".to_string(), "USD".to_string()),
-        Ok(ExchangeRate {
-            base: "ETH".to_string(),
-            quote: "USD".to_string(),
-            rate_numerator: 300_000,
-            rate_denominator: 100,
-            updated_at: now.saturating_sub(45),
-            fetched_at: now,
-            source: "chainlink".to_string(),
-            feed_reference: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70".to_string(),
-            max_age_seconds: 600,
-            conversion_margin_bps: 200,
-            confidence_numerator: None,
-            confidence_denominator: None,
-        }),
-    )])));
-    kernel.register_tool_server(Box::new(MonetaryCostServer::new(
-        "cost-srv",
-        1_000_000_000_000_000,
-        "ETH",
-    )));
+    let event_id = "partition-cleanup-authorize";
+    let hold_id = "partition-cleanup-hold";
+    let authority = store.partition_authority();
+    let exhausted_quota = crate::budget_store::BudgetInvocationQuota::from_persisted_parts(
+        crate::budget_store::BudgetQuotaKey::grant("exhausted-owner-secret", 17)?,
+        413_729,
+    )?;
+    let denied = crate::budget_store::DeniedBudgetHold {
+        hold_id: Some(hold_id.to_string()),
+        attempted_exposure_units: 937,
+        committed_cost_units_after: 937,
+        invocation_count_after: 413_729,
+        invocation_counts_after: vec![crate::budget_store::BudgetInvocationQuotaUsage {
+            quota: exhausted_quota,
+            reserved_invocations_after: 413_729,
+            captured_invocations_after: 0,
+        }],
+        invocation_state: crate::budget_store::BudgetInvocationReservationState::Denied,
+        monetary_state: crate::budget_store::BudgetMonetaryHoldState::None,
+        revocation_set: None,
+        metadata: crate::budget_store::BudgetCommitMetadata {
+            authority: Some(authority.clone()),
+            guarantee_level: crate::budget_store::BudgetGuaranteeLevel::PartitionEscrowed,
+            budget_profile: crate::budget_store::BudgetAuthorityProfile::AuthoritativeHoldEvent,
+            metering_profile:
+                crate::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+            budget_commit_index: Some(1),
+            event_id: Some(event_id.to_string()),
+            partition_escrow_evidence: Some(commit_evidence.clone()),
+        },
+    };
+    let validation = |denied: &crate::budget_store::DeniedBudgetHold| {
+        kernel.validate_budget_cleanup_denial(
+            super::admission_cleanup::BudgetCleanupDenialValidation {
+                store: store.as_ref(),
+                denied,
+                expected_hold_id: Some(hold_id),
+                expected_exposure: 937,
+                expected_event_id: event_id,
+                expected_authority: Some(&authority),
+                expected_revocation_set: None,
+            },
+        )
+    };
+    validation(&denied)?;
 
-    let agent_kp = Keypair::generate();
-    let grant = make_monetary_grant("cost-srv", "compute", 400, 1_000, "USD");
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
+    // Malformed bytes cannot be represented by the typed metadata field. The
+    // strict constructor is therefore the cleanup metadata admission boundary.
+    let Err(malformed_error) =
+        crate::budget_store::PartitionEscrowCommitEvidence::from_canonical_json(
+            "{\"schema\":\"chio.partition-escrow-admission-evidence.v1\"}".to_string(),
+            "00".repeat(32),
+        )
+    else {
+        panic!("malformed partition escrow evidence must fail closed");
+    };
+    assert_partition_cleanup_failure_message_is_non_leaking(&malformed_error.to_string());
+    let Err(digest_mismatch_error) =
+        crate::budget_store::PartitionEscrowCommitEvidence::from_canonical_json(
+            commit_evidence.canonical_json().to_string(),
+            "ff".repeat(32),
+        )
+    else {
+        panic!("partition escrow evidence with a mismatched digest must fail closed");
+    };
+    assert_partition_cleanup_failure_message_is_non_leaking(&digest_mismatch_error.to_string());
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: "req-cross-currency-ok".to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({}),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            model_metadata: None,
-            supplemental_authorization: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
-        })
-        .unwrap();
+    let mut missing_evidence = denied.clone();
+    missing_evidence.metadata.partition_escrow_evidence = None;
+    assert_partition_cleanup_evidence_failure_is_non_leaking(validation(&missing_evidence));
 
-    assert_eq!(response.verdict, Verdict::Allow);
-    let metadata = response.receipt.metadata.as_ref().expect("metadata");
-    let financial = metadata.get("financial").expect("financial");
-    assert_eq!(financial["cost_charged"].as_u64(), Some(306));
-    assert_eq!(financial["budget_remaining"].as_u64(), Some(694));
-    assert_eq!(financial["settlement_status"], "settled");
-    assert_eq!(financial["oracle_evidence"]["base"], "ETH");
-    assert_eq!(financial["oracle_evidence"]["quote"], "USD");
-    assert_eq!(
-        financial["oracle_evidence"]["converted_cost_units"].as_u64(),
-        Some(306)
+    let mut mismatched_value: serde_json::Value =
+        serde_json::from_str(commit_evidence.canonical_json())?;
+    mismatched_value["durableStore"]["counterNamespaceDigest"] =
+        serde_json::Value::String("72".repeat(32));
+    let mismatched_canonical = chio_core::canonical_json_bytes(&mismatched_value)?;
+    let mismatched_evidence =
+        crate::partition_escrow::PartitionEscrowAdmissionEvidence::from_canonical_json_bytes(
+            &mismatched_canonical,
+        )?;
+    let mismatched_commit_evidence =
+        crate::budget_store::PartitionEscrowCommitEvidence::from_admission_evidence(
+            &mismatched_evidence,
+        )?;
+    let mut mismatched_denial = denied;
+    mismatched_denial.metadata.partition_escrow_evidence =
+        Some(mismatched_commit_evidence.clone());
+    assert_partition_cleanup_evidence_failure_is_non_leaking(validation(&mismatched_denial));
+
+    let source_operation = crate::budget_store::BudgetAdmissionOperationBinding::new(
+        "partition-source-cleanup-operation".to_string(),
+        "83".repeat(32),
+    )?;
+    let mut authorization = crate::budget_store::BudgetAuthorizeHoldRequest::legacy(
+        capability_id.to_string(),
+        0,
+        None,
+        0,
+        None,
+        None,
+        Some("partition-source-cleanup-hold".to_string()),
+        Some("partition-source-cleanup-authorize".to_string()),
+        Some(authority.clone()),
     );
-    assert_eq!(
-        financial["cost_breakdown"]["oracle_conversion"]["status"],
-        "applied"
-    );
+    authorization.admission_operation = Some(source_operation.clone());
+    authorization.install_verified_invocation_admission(verified_partition_admission)?;
+    let authorization_artifact_digests =
+        super::ordinary_admission::admission_authorization_artifact_digests(
+            authorization
+                .invocation_admission_evidence()
+                .ok_or("partition source cleanup admission evidence is unavailable")?,
+        )?;
+    let decision = crate::budget_store::BudgetStore::authorize_budget_hold(
+        store.as_ref(),
+        authorization.clone(),
+    )?;
+    kernel.validate_budget_authorization_decision_for_store(
+        store.as_ref(),
+        &authorization,
+        &decision,
+        &authorization_artifact_digests,
+        "partition source cleanup authorization",
+    )?;
+    let crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(mut authorized) = decision
+    else {
+        panic!("partition source cleanup authorization must succeed");
+    };
+    authorized.metadata.partition_escrow_evidence = Some(mismatched_commit_evidence.clone());
+    let forged_decision =
+        crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(authorized.clone());
+    assert!(matches!(
+        kernel.validate_budget_authorization_decision_for_store(
+            store.as_ref(),
+            &authorization,
+            &forged_decision,
+            &authorization_artifact_digests,
+            "partition source cleanup authorization",
+        ),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("partition escrow commit does not match")
+    ));
+    authorized.metadata.partition_escrow_evidence =
+        super::ordinary_admission::authorization_partition_escrow_commit_evidence(
+            &authorization,
+            "partition source cleanup authorization",
+        )?;
+
+    let capture_denial = crate::admission_capture_authority::AdmissionCaptureDenial::revoked(
+        vec![capability_id.to_string()],
+        crate::admission_capture_authority::AdmissionCaptureMetadata::new(
+            crate::admission_capture_authority::AdmissionCaptureMetadataInput {
+                operation_id: source_operation.operation_id().to_string(),
+                checked_revocation_set_digest: "84".repeat(32),
+                aggregate_root_capability_id: None,
+                aggregate_root_binding_digest: None,
+                budget_commit: crate::budget_store::BudgetCommitMetadata {
+                    authority: Some(authority.clone()),
+                    guarantee_level:
+                        crate::budget_store::BudgetGuaranteeLevel::PartitionEscrowed,
+                    budget_profile:
+                        crate::budget_store::BudgetAuthorityProfile::AuthoritativeHoldEvent,
+                    metering_profile: crate::budget_store::BudgetMeteringProfile::
+                        MaxCostPreauthorizeThenReconcileActual,
+                    budget_commit_index: None,
+                    event_id: Some("partition-source-cleanup-capture".to_string()),
+                    partition_escrow_evidence: Some(mismatched_commit_evidence),
+                },
+                revocation_commit_index: 1,
+                authority_commit_index: 1,
+                leader_epoch: None,
+            },
+        )?,
+    )?;
+    assert!(matches!(
+        super::ordinary_admission::validate_capture_denial_partition_escrow_evidence(
+            &authorized,
+            &capture_denial,
+            "partition source cleanup capture denial",
+        ),
+        Err(KernelError::BudgetCaptureRecoveryRequired(message))
+            if message.contains("partition escrow evidence did not match authorization")
+    ));
+
+    let reverse_event_id = "partition-source-cleanup-reverse";
+    let reversed = crate::budget_store::BudgetStore::reverse_budget_hold(
+        store.as_ref(),
+        crate::budget_store::BudgetReverseHoldRequest {
+            capability_id: capability_id.to_string(),
+            grant_index: 0,
+            reversed_exposure_units: 0,
+            hold_id: Some("partition-source-cleanup-hold".to_string()),
+            event_id: Some(reverse_event_id.to_string()),
+            authority: Some(authority.clone()),
+            admission_operation: Some(source_operation.clone()),
+        },
+    )?;
+    kernel.validate_budget_terminal_decision_for_store(
+        store.as_ref(),
+        &reversed,
+        super::ordinary_admission::BudgetTerminalDecisionExpectation {
+            authorization_metadata: &authorized.metadata,
+            expected_event_id: reverse_event_id,
+            expected_authority: Some(&authority),
+            expected_capability_id: Some(capability_id),
+            expected_grant_index: 0,
+            expected_hold_id: "partition-source-cleanup-hold",
+            expected_admission_operation: Some(&source_operation),
+            expected_mutation_kind: crate::budget_store::BudgetMutationKind::ReverseInvocations,
+            expected_exposure_units: 0,
+            expected_realized_spend_units: 0,
+            expected_invocation_state:
+                crate::budget_store::BudgetInvocationReservationState::Reversed,
+            expected_monetary_state: crate::budget_store::BudgetMonetaryHoldState::None,
+            stage: "partition source cleanup reverse",
+        },
+    )?;
+
+    Ok(())
 }
 
-#[test]
-fn cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settlement() {
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.register_tool_server(Box::new(MonetaryCostServer::new(
-        "cost-srv",
-        1_000_000_000_000_000,
-        "ETH",
-    )));
-
-    let agent_kp = Keypair::generate();
-    let grant = make_monetary_grant("cost-srv", "compute", 400, 1_000, "USD");
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: "req-cross-currency-failed".to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({}),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            model_metadata: None,
-            supplemental_authorization: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
-        })
-        .unwrap();
-
-    assert_eq!(response.verdict, Verdict::Allow);
-    let metadata = response.receipt.metadata.as_ref().expect("metadata");
-    let financial = metadata.get("financial").expect("financial");
-    assert_eq!(financial["cost_charged"].as_u64(), Some(400));
-    assert_eq!(financial["budget_remaining"].as_u64(), Some(600));
-    assert_eq!(financial["settlement_status"], "failed");
-    assert!(financial.get("oracle_evidence").is_none());
-    assert_eq!(
-        financial["cost_breakdown"]["oracle_conversion"]["status"],
-        "failed"
-    );
-}
-
-#[tokio::test]
-async fn echo_server_invoke_with_cost_returns_none() {
-    let server = EchoServer::new("srv-a", vec!["echo"]);
-    let args = serde_json::json!({"msg": "hello"});
-    let (value, cost) = server
-        .invoke_with_cost("echo", args, None)
-        .await
-        .expect("invoke_with_cost should succeed");
-    assert!(cost.is_none(), "EchoServer should return None cost");
-    assert!(value.is_object());
-}
-
-// ---------------------------------------------------------------------------
-// DPoP wiring tests
-// ---------------------------------------------------------------------------
+include!("budget_part2_tail.inc");

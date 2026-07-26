@@ -2,7 +2,11 @@
 #[test]
 fn handler_error_classification_table_separates_service_faults() {
     let cases = vec![
-        (BrokerError::InvalidRequest("test".to_string()), false, "invalid_request"),
+        (
+            BrokerError::InvalidRequest("test".to_string()),
+            false,
+            "invalid_request",
+        ),
         (
             BrokerError::AuthorizationDenied("test".to_string()),
             false,
@@ -14,7 +18,11 @@ fn handler_error_classification_table_separates_service_faults() {
             "authority_unavailable",
         ),
         (BrokerError::Conflict("test".to_string()), false, "conflict"),
-        (BrokerError::Invariant("test".to_string()), true, "invariant"),
+        (
+            BrokerError::Invariant("test".to_string()),
+            true,
+            "invariant",
+        ),
         (BrokerError::Storage("test".to_string()), true, "storage"),
         (BrokerError::Upstream("test".to_string()), false, "upstream"),
         (
@@ -42,6 +50,86 @@ fn handler_error_classification_table_separates_service_faults() {
             assert_eq!(response.error_code.as_deref(), Some(diagnostic_code));
         }
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn pre_evidence_execute_fault_closes_only_its_client_connection() {
+    let classified = classify_broker_ipc_handler_result(
+        IpcOperation::Execute,
+        Err(BrokerError::InvalidRequest(
+            "malformed execute payload".to_string(),
+        )),
+    );
+
+    assert!(matches!(
+        classified,
+        Err(BrokerIpcServeFailure::Client(BrokerError::InvalidRequest(message)))
+            if message == "malformed execute payload"
+    ));
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn pre_evidence_execute_fault_does_not_stop_the_endpoint() {
+    use std::os::unix::net::UnixStream;
+    use std::time::Duration;
+
+    let directory = tempfile::tempdir().test_expect("IPC directory");
+    let socket_path = directory.path().join("broker.sock");
+    let uid = rustix::process::geteuid().as_raw();
+    let endpoint = UnixBrokerEndpoint::bind(
+        &socket_path,
+        Arc::new(EndpointTestHandler {
+            invalid_envelope: false,
+            response_gate: None,
+            response_bytes: None,
+        }),
+        uid,
+        uid,
+    )
+    .test_expect("bind endpoint");
+    let server = thread::spawn(move || (endpoint.serve_one(), endpoint.serve_one()));
+
+    let request = |operation| AuthenticatedIpcRequest {
+        operation,
+        tenant_scope: "tenant-pre-evidence-fault".to_string(),
+        authorization: vec![1].into(),
+        payload: vec![2].into(),
+    };
+    let mut execute = UnixStream::connect(&socket_path).test_expect("connect execute client");
+    execute
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .test_expect("execute read timeout");
+    let execute_frame = canonical_ipc_request_bytes(&request(IpcOperation::Execute))
+        .test_expect("execute request frame");
+    write_bounded_frame(&mut execute, &execute_frame).test_expect("write execute request");
+    assert!(read_bounded_frame(&mut execute).is_err());
+
+    let mut status = UnixStream::connect(&socket_path).test_expect("connect status client");
+    status
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .test_expect("status read timeout");
+    let status_frame = canonical_ipc_request_bytes(&request(IpcOperation::Status))
+        .test_expect("status request frame");
+    write_bounded_frame(&mut status, &status_frame).test_expect("write status request");
+    let response_frame = read_bounded_frame(&mut status).test_expect("status response frame");
+    let response: IpcResponse =
+        serde_json::from_slice(&response_frame).test_expect("status response envelope");
+
+    let (execute_outcome, status_outcome) = server.join().test_expect("endpoint server thread");
+    assert_eq!(
+        execute_outcome.test_expect("execute client fault"),
+        BrokerIpcServeOutcome::ClientFault {
+            diagnostic_code: "conflict"
+        }
+    );
+    assert_eq!(
+        status_outcome.test_expect("status response"),
+        BrokerIpcServeOutcome::ResponseWritten
+    );
+    assert!(!response.accepted);
+    assert_eq!(response.error_code.as_deref(), Some("conflict"));
 }
 
 #[cfg(unix)]
@@ -91,11 +179,11 @@ fn response_envelope_validation_table_enforces_success_and_error_shapes() {
         error_code: error_code.map(str::to_string),
     };
     let cases = vec![
+        (response(IpcOperation::Status, true, vec![1], None), true),
         (
-            response(IpcOperation::Status, true, vec![1], None),
-            true,
+            response(IpcOperation::Status, true, Vec::new(), None),
+            false,
         ),
-        (response(IpcOperation::Status, true, Vec::new(), None), false),
         (
             response(
                 IpcOperation::Status,
@@ -117,7 +205,10 @@ fn response_envelope_validation_table_enforces_success_and_error_shapes() {
             response(IpcOperation::Status, false, vec![1], Some("conflict")),
             false,
         ),
-        (response(IpcOperation::Status, false, Vec::new(), None), false),
+        (
+            response(IpcOperation::Status, false, Vec::new(), None),
+            false,
+        ),
         (
             response(IpcOperation::Execute, false, Vec::new(), Some("conflict")),
             false,
@@ -147,9 +238,141 @@ fn response_envelope_validation_table_enforces_success_and_error_shapes() {
         "_conflict",
         "conflict_",
         "conflict__code",
+        ".conflict",
+        "conflict.",
+        "-conflict",
+        "conflict-",
+        "chio.broker.authorization_denied",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     ] {
         assert!(!is_well_formed_broker_ipc_error_code(invalid));
+    }
+}
+
+#[cfg(unix)]
+fn signed_ipc_execute_failure(diagnostic_code: &str) -> BrokerExecuteFailure {
+    let receipt = sign_failure_receipt(
+        BrokerFailureReceiptBody {
+            schema: BROKER_FAILURE_RECEIPT_SCHEMA.to_string(),
+            receipt_id: "broker-failure-terminal-ipc-validator".to_string(),
+            issued_at_unix_seconds: 1,
+            stage: BrokerFailureStage::Admission,
+            outcome: BrokerFailureOutcome::Denied,
+            diagnostic_code: diagnostic_code.to_string(),
+            request_digest: "ab".repeat(32),
+            capability_digest: None,
+            attempt_id: None,
+            invocation_id: None,
+            hold_id: None,
+            parent_capability_id: None,
+            broker_capability_id: None,
+            dispatch_knowledge: BrokerDispatchKnowledge::NotStarted,
+        },
+        &Ed25519Backend::new(Keypair::from_seed(&[91; 32])),
+    )
+    .test_expect("signed IPC execute failure");
+    let receipt_reference = format!(
+        "broker-failure-receipt-sha256-{}",
+        failure_receipt_digest(&receipt).test_expect("failure receipt digest")
+    );
+    BrokerExecuteFailure {
+        diagnostic_code: diagnostic_code.to_string(),
+        receipt_reference,
+        receipt,
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn response_envelope_accepts_exact_canonical_signed_execute_failure() {
+    let failure = signed_ipc_execute_failure("chio.broker.authorization_denied");
+    let response = IpcResponse {
+        operation: IpcOperation::Execute,
+        accepted: false,
+        response: canonical_json_bytes(&failure).test_expect("canonical execute failure"),
+        error_code: Some(failure.diagnostic_code.clone()),
+    };
+
+    validate_broker_ipc_response_envelope(IpcOperation::Execute, &response)
+        .test_expect("signed execute denial envelope");
+}
+
+#[cfg(unix)]
+#[test]
+fn response_envelope_rejects_malformed_or_tampered_execute_failures() {
+    let diagnostic_code = "chio.broker.authorization_denied";
+    let failure = signed_ipc_execute_failure(diagnostic_code);
+    let envelope = |operation, failure: &BrokerExecuteFailure, error_code: &str| IpcResponse {
+        operation,
+        accepted: false,
+        response: canonical_json_bytes(failure).test_expect("canonical execute failure"),
+        error_code: Some(error_code.to_string()),
+    };
+
+    let mut diagnostic_rebound = failure.clone();
+    diagnostic_rebound.diagnostic_code = "chio.broker.conflict".to_string();
+
+    let mut signed_body_tampered = failure.clone();
+    signed_body_tampered.diagnostic_code = "chio.broker.conflict".to_string();
+    signed_body_tampered.receipt.body.diagnostic_code = "chio.broker.conflict".to_string();
+    signed_body_tampered.receipt_reference = format!(
+        "broker-failure-receipt-sha256-{}",
+        failure_receipt_digest(&signed_body_tampered.receipt)
+            .test_expect("tampered failure receipt digest")
+    );
+
+    let mut reference_tampered = failure.clone();
+    reference_tampered.receipt_reference =
+        format!("broker-failure-receipt-sha256-{}", "00".repeat(32));
+
+    let malformed = IpcResponse {
+        operation: IpcOperation::Execute,
+        accepted: false,
+        response: b"{}".to_vec(),
+        error_code: Some(diagnostic_code.to_string()),
+    };
+    let noncanonical = IpcResponse {
+        operation: IpcOperation::Execute,
+        accepted: false,
+        response: serde_json::to_vec_pretty(&failure).test_expect("noncanonical execute failure"),
+        error_code: Some(diagnostic_code.to_string()),
+    };
+    let empty_execute_denial = IpcResponse {
+        operation: IpcOperation::Execute,
+        accepted: false,
+        response: Vec::new(),
+        error_code: Some(diagnostic_code.to_string()),
+    };
+    let wrong_domain_failure = signed_ipc_execute_failure("chio.kernel.authorization_denied");
+    let candidates = [
+        envelope(IpcOperation::Execute, &failure, "chio.broker.conflict"),
+        envelope(
+            IpcOperation::Execute,
+            &diagnostic_rebound,
+            "chio.broker.conflict",
+        ),
+        envelope(
+            IpcOperation::Execute,
+            &signed_body_tampered,
+            "chio.broker.conflict",
+        ),
+        envelope(IpcOperation::Execute, &reference_tampered, diagnostic_code),
+        envelope(IpcOperation::Status, &failure, diagnostic_code),
+        envelope(
+            IpcOperation::Execute,
+            &wrong_domain_failure,
+            "chio.kernel.authorization_denied",
+        ),
+        malformed,
+        noncanonical,
+        empty_execute_denial,
+    ];
+
+    for candidate in candidates {
+        assert!(
+            validate_broker_ipc_response_envelope(candidate.operation, &candidate).is_err(),
+            "invalid denial envelope was accepted: {candidate:?}"
+        );
     }
 }
 
@@ -205,18 +428,17 @@ fn trickling_same_uid_client_cannot_extend_the_absolute_read_deadline() {
         .test_expect("request length")
         .to_be_bytes();
     let mut written = 0_usize;
-    for byte in length
-        .into_iter()
-        .chain(encoded.iter().copied())
-        .take(20)
-    {
+    for byte in length.into_iter().chain(encoded.iter().copied()).take(20) {
         if trickling.write_all(&[byte]).is_err() {
             break;
         }
         written += 1;
         thread::sleep(Duration::from_millis(35));
     }
-    assert!(written < 20, "trickle traffic extended the absolute read deadline");
+    assert!(
+        written < 20,
+        "trickle traffic extended the absolute read deadline"
+    );
 
     let mut responsive = UnixStream::connect(&socket_path).test_expect("connect next client");
     responsive
@@ -498,22 +720,19 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
 
     use crate::privileged_audit::{
         read_privileged_audit_challenge_frame, read_privileged_audit_evidence_frame,
-        verify_broker_privileged_audit_challenge_reference,
-        write_privileged_audit_commit_frame, write_privileged_audit_open_frame,
-        BrokerPrivilegedAuditCommitRequest, BrokerPrivilegedAuditEndpoint,
-        BrokerPrivilegedAuditEndpointConfig, BrokerPrivilegedAuditOpenRequest,
-        BrokerPrivilegedAuditServeOutcome,
+        verify_broker_privileged_audit_challenge_reference, write_privileged_audit_commit_frame,
+        write_privileged_audit_open_frame, BrokerPrivilegedAuditCommitRequest,
+        BrokerPrivilegedAuditEndpoint, BrokerPrivilegedAuditEndpointConfig,
+        BrokerPrivilegedAuditOpenRequest, BrokerPrivilegedAuditServeOutcome,
         BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA,
     };
 
     let fixture = fixture(1, false, false);
     let (request, _trusted) = execution(&fixture, 144, 1);
     let (reference_head, reference_body) = audit_reference_parts(&fixture, &request, true);
-    let reference_precommitment = crate::audit::BrokerAuditReferencePrecommitment::generate(
-        &reference_head,
-        &reference_body,
-    )
-    .test_expect("runner reference precommitment");
+    let reference_precommitment =
+        crate::audit::BrokerAuditReferencePrecommitment::generate(&reference_head, &reference_body)
+            .test_expect("runner reference precommitment");
     assert_eq!(
         reference_precommitment.commitment_sha256(),
         crate::audit::broker_audit_reference_commitment_sha256(
@@ -617,10 +836,9 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
         fixture.audit_runner.as_ref(),
     )
     .test_expect("sign privileged audit runner authorization");
-    let governed_intent = crate::audit::broker_audit_governed_intent_for_runner_authorization(
-        &runner_authorization,
-    )
-    .test_expect("derive privileged audit governed intent");
+    let governed_intent =
+        crate::audit::broker_audit_governed_intent_for_runner_authorization(&runner_authorization)
+            .test_expect("derive privileged audit governed intent");
     let admin = governed_audit_authorization(&fixture, &governed_intent);
     let commit = BrokerPrivilegedAuditCommitRequest {
         schema: BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA.to_string(),
@@ -671,11 +889,9 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
 
     let mut rebound_head = reference_head;
     rebound_head[0] ^= 1;
-    let rebound_precommitment = crate::audit::BrokerAuditReferencePrecommitment::generate(
-        &rebound_head,
-        &reference_body,
-    )
-    .test_expect("rebound runner reference precommitment");
+    let rebound_precommitment =
+        crate::audit::BrokerAuditReferencePrecommitment::generate(&rebound_head, &reference_body)
+            .test_expect("rebound runner reference precommitment");
     assert!(verify_broker_privileged_audit_challenge_reference(
         &evidence.challenge,
         &trusted_broker,
@@ -722,11 +938,9 @@ fn privileged_audit_socket_propagates_terminal_persistence_failure() {
     let fixture = fixture(1, false, false);
     let (request, _trusted) = execution(&fixture, 145, 1);
     let (reference_head, reference_body) = audit_reference_parts(&fixture, &request, true);
-    let reference_precommitment = crate::audit::BrokerAuditReferencePrecommitment::generate(
-        &reference_head,
-        &reference_body,
-    )
-    .test_expect("runner reference precommitment");
+    let reference_precommitment =
+        crate::audit::BrokerAuditReferencePrecommitment::generate(&reference_head, &reference_body)
+            .test_expect("runner reference precommitment");
     let directory = tempfile::tempdir().test_expect("privileged audit socket directory");
     let socket_path = directory.path().join("privileged-audit").join("audit.sock");
     let service_uid = rustix::process::geteuid().as_raw();
@@ -921,7 +1135,7 @@ fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
             expires_at_unix_seconds: 21,
         },
     )
-        .test_expect("verify matching comparison");
+    .test_expect("verify matching comparison");
     crate::audit::verify_broker_audit_evidence(
         crate::audit::BrokerAuditEvidenceBundle {
             comparison: &mismatching.comparison,
@@ -940,7 +1154,7 @@ fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
             expires_at_unix_seconds: 21,
         },
     )
-        .test_expect("verify mismatching comparison");
+    .test_expect("verify mismatching comparison");
     for comparison in [&matching, &mismatching] {
         let canonical = comparison
             .canonical_bytes()
@@ -1011,13 +1225,8 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
     let (request, _trusted) = execution(&fixture, 143, 1);
     let (reference, reference_precommitment) =
         audit_reference_for_execution(&fixture, &request, true);
-    let (verified_runner, admin, signed_runner) = authorized_audit(
-        &fixture,
-        &request,
-        &reference,
-        "audit-evidence-143",
-        20,
-    );
+    let (verified_runner, admin, signed_runner) =
+        authorized_audit(&fixture, &request, &reference, "audit-evidence-143", 20);
     let completed = fixture
         .service
         .audit_compare_outbound_request(
@@ -1273,13 +1482,8 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
     let (request, _trusted) = execution(&fixture, 142, 1);
     let (reference, _reference_precommitment) =
         audit_reference_for_execution(&fixture, &request, true);
-    let (verified_runner, admin, signed_runner) = authorized_audit(
-        &fixture,
-        &request,
-        &reference,
-        "audit-governed-142",
-        20,
-    );
+    let (verified_runner, admin, signed_runner) =
+        authorized_audit(&fixture, &request, &reference, "audit-governed-142", 20);
     let governed_intent = verified_runner.governed_intent_sha256().to_string();
 
     let (wrong_reference, _wrong_reference_precommitment) =

@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "rotation_partial_commit_detected",
   "threat_id": "kernel_impersonation",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -31,7 +31,9 @@
           "replacement": "Ok(())"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/rotation_partial_commit/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/rotation_partial_commit/mutants.out/outcomes.json",
+          "sha256": "726c29b7cf9a9079cf44da7694d68cf5cc543f658201dd28be76f6787fefe8d1",
+          "inputs_sha256": "407a9fc24ad0318c6a986cd0bd34768cf2184ab157dede834d8463377f00eafe"
         }
       }
     ]

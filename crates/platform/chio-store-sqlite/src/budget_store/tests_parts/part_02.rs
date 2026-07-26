@@ -219,6 +219,24 @@ fn composite_reverse_restores_every_reserved_quota_and_survives_restart() {
         reopened.reverse_budget_hold(reverse_request).unwrap(),
         reversed
     );
+    let exact = reopened
+        .get_mutation_event_by_id("event-reverse-composite-1")
+        .unwrap()
+        .expect("exact composite reverse event");
+    assert_eq!(
+        exact.invocation_counts_after,
+        reversed.invocation_counts_after
+    );
+    assert_eq!(exact.invocation_state, reversed.invocation_state);
+    assert_eq!(exact.monetary_state, reversed.monetary_state);
+    assert_eq!(exact.revocation_set, reversed.revocation_set);
+    assert_eq!(
+        exact
+            .total_cost_exposed_after
+            .checked_add(exact.total_cost_realized_spend_after)
+            .expect("committed total"),
+        reversed.committed_cost_units_after
+    );
     assert_eq!(
         reopened
             .get_usage("leaf", 0)
@@ -1086,7 +1104,8 @@ fn denied_sqlite_charge_exact_replay_preserves_quota_event_sequence() {
 }
 
 #[test]
-fn sqlite_legacy_reverse_updates_the_shared_quota_and_replays_exactly() {
+fn sqlite_legacy_reverse_updates_the_shared_quota_and_replays_exactly(
+) -> Result<(), BudgetStoreError> {
     let path = unique_db_path("chio-charge-reverse-shared-quota");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
@@ -1111,25 +1130,18 @@ fn sqlite_legacy_reverse_updates_the_shared_quota_and_replays_exactly() {
             Some("event-reverse-shared"),
         )
         .unwrap();
-    store
-        .reverse_charge_cost_with_ids(
-            "cap-reverse-shared",
-            0,
-            5,
-            Some("hold-reverse-shared"),
-            Some("event-reverse-shared"),
-        )
-        .unwrap();
-    assert!(store
-        .try_increment("cap-reverse-shared", 0, Some(1))
-        .unwrap());
-
-    let (legacy_count, captured): (u32, u32) = store
-        .connection()
-        .unwrap()
-        .query_row(
-            r#"
-            SELECT legacy.invocation_count, quota.captured_invocations
+    let reverse_event = store
+        .list_mutation_events(10, Some("cap-reverse-shared"), Some(0))?
+        .into_iter()
+        .find(|event| event.event_id == "event-reverse-shared")
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant("reverse mutation event was not persisted".to_string())
+        })?;
+    assert_eq!(reverse_event.usage_seq, Some(reverse_event.event_seq));
+    let after_reverse: (u32, u32, u32, u64) = store.connection()?.query_row(
+        r#"
+            SELECT legacy.invocation_count, quota.reserved_invocations,
+                   quota.captured_invocations, quota.seq
             FROM capability_grant_budgets AS legacy
             JOIN budget_invocation_quota_usage AS quota
               ON quota.profile = 'chio.grant-invocation.v1'
@@ -1138,13 +1150,56 @@ fn sqlite_legacy_reverse_updates_the_shared_quota_and_replays_exactly() {
             WHERE legacy.capability_id = 'cap-reverse-shared'
               AND legacy.grant_index = 0
             "#,
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+        [],
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                test_row_u64(row, 3)?,
+            ))
+        },
+    )?;
+    assert_eq!(after_reverse, (0, 0, 0, reverse_event.event_seq));
+    drop(store);
+
+    let reopened = SqliteBudgetStore::open(&path)?;
+    reopened
+        .reverse_charge_cost_with_ids(
+            "cap-reverse-shared",
+            0,
+            5,
+            Some("hold-reverse-shared"),
+            Some("event-reverse-shared"),
         )
         .unwrap();
-    assert_eq!((legacy_count, captured), (1, 1));
+    let after_replay: (u32, u32, u32, u64) = reopened.connection()?.query_row(
+        r#"
+            SELECT legacy.invocation_count, quota.reserved_invocations,
+                   quota.captured_invocations, quota.seq
+            FROM capability_grant_budgets AS legacy
+            JOIN budget_invocation_quota_usage AS quota
+              ON quota.profile = 'chio.grant-invocation.v1'
+             AND quota.owner_id = legacy.capability_id
+             AND quota.grant_index_key = legacy.grant_index
+            WHERE legacy.capability_id = 'cap-reverse-shared'
+              AND legacy.grant_index = 0
+            "#,
+        [],
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                test_row_u64(row, 3)?,
+            ))
+        },
+    )?;
+    assert_eq!(after_replay, after_reverse);
+    assert!(reopened.try_increment("cap-reverse-shared", 0, Some(1))?);
 
     let _ = fs::remove_file(path);
+    Ok(())
 }
 
 #[test]

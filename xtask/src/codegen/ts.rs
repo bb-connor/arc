@@ -103,10 +103,12 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
         })?;
         let raw_ts = run_json2ts(&json2ts, &clean_input.join(schema_relative_path))?;
         let normalized = normalize_ts_chunk(&raw_ts);
-        let normalized = if ns_name == "Security_DetectorHealthReceiptBodyV1" {
-            harden_detector_health_ts_chunk(&normalized)?
-        } else {
-            normalized
+        let normalized = match ns_name.as_str() {
+            "Security_DetectorHealthReceiptBodyV1" => harden_detector_health_ts_chunk(&normalized)?,
+            "TrustControl_AdmissionCaptureMetadata" => {
+                harden_admission_capture_ts_chunk(&normalized)?
+            }
+            _ => normalized,
         };
         body.push_str(
             "// -----------------------------------------------------------------------------\n",
@@ -357,4 +359,199 @@ export type ChioDetectorHealthReceiptBodyV1 = DetectorHealthReceiptBase &
         ));
     }
     Ok(raw.replacen(needle, replacement, 1))
+}
+
+fn harden_admission_capture_ts_chunk(raw: &str) -> Result<String, XtaskError> {
+    const TYPE_DECLARATION: &str =
+        "export type ChioAuthoritativeAdmissionCaptureReceiptProjection = ";
+    const NEXT_DECLARATION: &str = "\nexport type Digest = ";
+
+    if raw.contains("AdmissionCaptureMetadataBase") {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts admission capture helper type already exists".to_string(),
+        ));
+    }
+    if raw.match_indices(TYPE_DECLARATION).count() != 1 {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts admission capture type declaration is not unique".to_string(),
+        ));
+    }
+    let start = raw.find(TYPE_DECLARATION).ok_or_else(|| {
+        XtaskError::ToolFailed(
+            "codegen ts admission capture type declaration is missing".to_string(),
+        )
+    })?;
+    let relative_end = raw[start..].find(NEXT_DECLARATION).ok_or_else(|| {
+        XtaskError::ToolFailed("codegen ts admission capture type boundary is missing".to_string())
+    })?;
+    let end = start + relative_end;
+    let mut base = raw[start..end].to_string();
+
+    let guarantee = take_admission_capture_ts_property(
+        &mut base,
+        "guaranteeLevel",
+        "codegen ts admission capture guarantee field",
+    )?;
+    for level in [
+        "\"single_node_atomic\"",
+        "\"partition_escrowed\"",
+        "\"ha_linearizable\"",
+    ] {
+        if guarantee.matches(level).count() != 1 {
+            return Err(XtaskError::ToolFailed(format!(
+                "codegen ts admission capture guarantee field does not contain exactly one {level}"
+            )));
+        }
+    }
+    if guarantee.matches('"').count() != 6 {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts admission capture guarantee field contains an unexpected variant"
+                .to_string(),
+        ));
+    }
+
+    let leader = take_admission_capture_ts_property(
+        &mut base,
+        "leaderEpoch?",
+        "codegen ts admission capture leader field",
+    )?;
+    let leader_type = admission_capture_ts_property_type(&leader, "leaderEpoch?")?;
+    if leader_type != "number" {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts admission capture leader field changed type".to_string(),
+        ));
+    }
+
+    let proof = take_admission_capture_ts_property(
+        &mut base,
+        "partitionEscrowEvidence?",
+        "codegen ts admission capture escrow field",
+    )?;
+    let proof_type = admission_capture_ts_property_type(&proof, "partitionEscrowEvidence?")?;
+    if proof_type.is_empty() || proof_type.contains('|') {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts admission capture escrow field changed type".to_string(),
+        ));
+    }
+
+    if !base.starts_with(TYPE_DECLARATION) || !base.ends_with(';') {
+        return Err(XtaskError::ToolFailed(
+            "codegen ts admission capture base type changed shape".to_string(),
+        ));
+    }
+    let base = base.replacen(TYPE_DECLARATION, "type AdmissionCaptureMetadataBase = ", 1);
+    let hardened = format!(
+        r#"{base}
+export type ChioAuthoritativeAdmissionCaptureReceiptProjection =
+  AdmissionCaptureMetadataBase &
+  (
+    | {{
+        guaranteeLevel: "single_node_atomic";
+        leaderEpoch?: never;
+        partitionEscrowEvidence?: never;
+      }}
+    | {{
+        guaranteeLevel: "partition_escrowed";
+        leaderEpoch?: never;
+        partitionEscrowEvidence: {proof_type};
+      }}
+    | {{
+        guaranteeLevel: "ha_linearizable";
+        leaderEpoch: {leader_type};
+        partitionEscrowEvidence?: never;
+      }}
+  );"#
+    );
+
+    let mut output = String::with_capacity(raw.len() + hardened.len() - (end - start));
+    output.push_str(&raw[..start]);
+    output.push_str(&hardened);
+    output.push_str(&raw[end..]);
+    Ok(output)
+}
+
+fn take_admission_capture_ts_property(
+    body: &mut String,
+    field: &str,
+    context: &str,
+) -> Result<String, XtaskError> {
+    let prefix = format!("\n  {field}:");
+    if body.match_indices(&prefix).count() != 1 {
+        return Err(XtaskError::ToolFailed(format!("{context} is not unique")));
+    }
+    let start = body
+        .find(&prefix)
+        .ok_or_else(|| XtaskError::ToolFailed(format!("{context} is missing")))?;
+    let relative_end = body[start + 1..]
+        .find(";\n")
+        .ok_or_else(|| XtaskError::ToolFailed(format!("{context} boundary is missing")))?;
+    let end = start + 1 + relative_end + 2;
+    let declaration = body[start + 1..end - 1].trim_start().to_string();
+    body.replace_range(start..end, "\n");
+    Ok(declaration)
+}
+
+fn admission_capture_ts_property_type<'a>(
+    declaration: &'a str,
+    field: &str,
+) -> Result<&'a str, XtaskError> {
+    let prefix = format!("{field}:");
+    declaration
+        .strip_prefix(&prefix)
+        .and_then(|value| value.strip_suffix(';'))
+        .map(str::trim)
+        .ok_or_else(|| {
+            XtaskError::ToolFailed(format!(
+                "codegen ts admission capture {field} declaration changed shape"
+            ))
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::harden_admission_capture_ts_chunk;
+
+    const GENERATED_ADMISSION_CAPTURE: &str = r#"export type ChioAuthoritativeAdmissionCaptureReceiptProjection = {
+  [k: string]: unknown;
+} & {
+  authority: Authority;
+  guaranteeLevel: "single_node_atomic" | "partition_escrowed" | "ha_linearizable";
+  leaderEpoch?: number;
+  operationId: Identifier;
+  partitionEscrowEvidence?: PartitionEscrowEvidence;
+};
+export type Digest = string;
+export interface PartitionEscrowEvidence {
+  canonicalJson: string;
+  digest: Digest;
+}"#;
+
+    #[test]
+    fn admission_capture_hardener_emits_exact_guarantee_matrix() {
+        let hardened = match harden_admission_capture_ts_chunk(GENERATED_ADMISSION_CAPTURE) {
+            Ok(value) => value,
+            Err(error) => panic!("admission capture hardening failed: {error}"),
+        };
+
+        assert!(hardened.contains("type AdmissionCaptureMetadataBase ="));
+        assert!(hardened.contains("guaranteeLevel: \"single_node_atomic\";\n        leaderEpoch?: never;\n        partitionEscrowEvidence?: never;"));
+        assert!(hardened.contains("guaranteeLevel: \"partition_escrowed\";\n        leaderEpoch?: never;\n        partitionEscrowEvidence: PartitionEscrowEvidence;"));
+        assert!(hardened.contains("guaranteeLevel: \"ha_linearizable\";\n        leaderEpoch: number;\n        partitionEscrowEvidence?: never;"));
+        assert!(hardened.contains("operationId: Identifier;"));
+        assert!(hardened.contains("export interface PartitionEscrowEvidence"));
+        assert!(harden_admission_capture_ts_chunk(&hardened).is_err());
+    }
+
+    #[test]
+    fn admission_capture_hardener_rejects_generator_shape_drift() {
+        let missing_proof = GENERATED_ADMISSION_CAPTURE
+            .replace("  partitionEscrowEvidence?: PartitionEscrowEvidence;\n", "");
+        assert!(harden_admission_capture_ts_chunk(&missing_proof).is_err());
+
+        let extra_guarantee = GENERATED_ADMISSION_CAPTURE.replace(
+            "\"ha_linearizable\"",
+            "\"ha_linearizable\" | \"advisory_posthoc\"",
+        );
+        assert!(harden_admission_capture_ts_chunk(&extra_guarantee).is_err());
+    }
 }

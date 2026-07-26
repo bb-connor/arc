@@ -1,5 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use chio_test_support::prelude::*;
 use proptest::prelude::*;
 
 use super::*;
@@ -64,8 +65,17 @@ fn composite_property_request(hold_index: u8, maxima: [u32; 3]) -> BudgetAuthori
                 verifier_id: "property-verifier".to_string(),
                 request_binding_hash: "22".repeat(32),
                 negotiated_features_digest: "33".repeat(32),
+                issuer: chio_core::crypto::Keypair::from_seed(&[71; 32]).public_key(),
+                not_before: 90,
+                expires_at: 300,
+                request_constraint_digest: "34".repeat(32),
+                broker_capability_id: "property-broker-capability".to_string(),
+                claim_binding_digest: "35".repeat(32),
+                verified_at: 100,
             }),
+            partition_escrow_evidence: None,
         }),
+        authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
         payment_journal: None,
     }
 }
@@ -96,10 +106,22 @@ proptest! {
         let BudgetAuthorizeHoldDecision::Denied(denied) = denied else {
             return Err(TestCaseError::fail("exhausted composite hold was authorized"));
         };
+        let denial_seq = denied
+            .metadata
+            .budget_commit_index
+            .ok_or_else(|| TestCaseError::fail("denial omitted its decision event sequence"))?;
         prop_assert!(denied
             .invocation_counts_after
             .iter()
             .all(|usage| usage.invocation_count_after().expect("count") == 1));
+        let denial_event = store
+            .list_mutation_events(10, Some(CAPABILITY_ID), Some(GRANT_INDEX))
+            .test_expect("list denial event")
+            .into_iter()
+            .find(|event| event.event_id == "property-event-2-authorize")
+            .test_expect("denial event");
+        prop_assert_eq!(denial_event.event_seq, denial_seq);
+        prop_assert_eq!(denial_event.usage_seq, None);
         let usage = store
             .get_usage(CAPABILITY_ID, GRANT_INDEX)
             .expect("read usage")

@@ -4,16 +4,15 @@ use super::*;
 /// origin `authority_id`, and origin `lease_epoch`.
 pub type BudgetEventWitness = (u64, Option<String>, Option<u64>);
 /// Grant key to `(maximum, captured, replication sequence)`.
-type SuppliedCompatibilityQuotas =
-    std::collections::BTreeMap<(String, u32), (u32, u32, u64)>;
+type SuppliedCompatibilityQuotas = std::collections::BTreeMap<(String, u32), (u32, u32, u64)>;
 /// Grant key to `(invocation count, replication sequence)`.
 type SuppliedCompatibilityUsages = std::collections::BTreeMap<(String, u32), (u32, u64)>;
 const MAX_DIAGNOSTIC_ABANDONED_EVENT_SEQS: usize = 100_000;
 const SQLITE_LOCK_WAIT: Duration = Duration::from_secs(5);
 const SQLITE_WAL_RETRY_INTERVAL: Duration = Duration::from_millis(10);
-const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
-const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
-const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
+pub(super) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
+pub(super) const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
+pub(super) const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
 pub(super) fn retry_write_ahead_logging(
     mut enable: impl FnMut() -> rusqlite::Result<String>,
@@ -220,14 +219,18 @@ impl SqliteBudgetStore {
         }
 
         let connection = Connection::open(path)?;
-        crate::check_schema_version(
+        let on_disk_version = crate::check_schema_version(
             &connection,
             BUDGET_STORE_SCHEMA_KEY,
             BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
             BUDGET_STORE_LEGACY_ANCHOR_TABLES,
         )
         .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-        Self::from_connection(connection, BudgetStoreProfile::SingleNodeDurable)
+        Self::from_connection(
+            connection,
+            BudgetStoreProfile::SingleNodeDurable,
+            on_disk_version,
+        )
     }
 
     /// Open a durable budget authority through one retained trusted parent.
@@ -244,7 +247,7 @@ impl SqliteBudgetStore {
                     | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
             )
             .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-        crate::check_schema_version(
+        let on_disk_version = crate::check_schema_version(
             &connection,
             BUDGET_STORE_SCHEMA_KEY,
             BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
@@ -255,25 +258,28 @@ impl SqliteBudgetStore {
             connection,
             BudgetStoreProfile::SingleNodeDurable,
             Some(database_identity_file),
+            on_disk_version,
         )
     }
 
     pub fn open_in_memory() -> Result<Self, BudgetStoreError> {
         let connection = Connection::open_in_memory()?;
-        Self::from_connection(connection, BudgetStoreProfile::EphemeralLocal)
+        Self::from_connection(connection, BudgetStoreProfile::EphemeralLocal, 0)
     }
 
     fn from_connection(
         connection: Connection,
         authority_profile: BudgetStoreProfile,
+        on_disk_version: i32,
     ) -> Result<Self, BudgetStoreError> {
-        Self::from_connection_with_identity(connection, authority_profile, None)
+        Self::from_connection_with_identity(connection, authority_profile, None, on_disk_version)
     }
 
     fn from_connection_with_identity(
         mut connection: Connection,
         authority_profile: BudgetStoreProfile,
         database_identity_file: Option<Arc<crate::durable_sqlite::DurableSqliteFile>>,
+        on_disk_version: i32,
     ) -> Result<Self, BudgetStoreError> {
         connection.busy_timeout(SQLITE_LOCK_WAIT)?;
         if authority_profile == BudgetStoreProfile::SingleNodeDurable {
@@ -529,12 +535,7 @@ impl SqliteBudgetStore {
         ensure_budget_authorization_claims(&mut connection)?;
         ensure_composite_budget_namespace_guards(&connection)?;
         initialize_budget_replication_seq(&mut connection)?;
-        crate::stamp_schema_version(
-            &connection,
-            BUDGET_STORE_SCHEMA_KEY,
-            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        migrate_and_stamp_budget_schema(&mut connection, on_disk_version)?;
         if let Some(database_identity_file) = database_identity_file.as_ref() {
             database_identity_file
                 .validate_live_connection(&connection)
@@ -1661,6 +1662,9 @@ impl SqliteBudgetStore {
                     seq = ?7
                 WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
                   AND max_invocations = ?8
+                  AND reserved_invocations = ?9
+                  AND captured_invocations = ?10
+                  AND seq = ?11
                 "#,
                 params![
                     key.profile().as_str(),
@@ -1671,6 +1675,12 @@ impl SqliteBudgetStore {
                     record.updated_at,
                     sqlite_seq,
                     i64::from(maximum),
+                    i64::from(existing.usage.reserved_invocations_after),
+                    i64::from(existing.usage.captured_invocations_after),
+                    sqlite_integer_from_u64(
+                        existing.seq,
+                        "expected invocation quota usage sequence",
+                    )?,
                 ],
             )?;
             if updated != 1 {
@@ -1682,7 +1692,7 @@ impl SqliteBudgetStore {
             return Ok(());
         }
 
-        transaction.execute(
+        let inserted = transaction.execute(
             r#"
             INSERT INTO budget_invocation_quota_usage (
                 profile, owner_id, grant_index_key, max_invocations,
@@ -1700,6 +1710,12 @@ impl SqliteBudgetStore {
                 sqlite_seq,
             ],
         )?;
+        if inserted != 1 {
+            return Err(BudgetStoreError::Invariant(format!(
+                "invocation quota `{}` was not replicated exactly once",
+                key.owner_id()
+            )));
+        }
         Ok(())
     }
 
@@ -1746,6 +1762,12 @@ impl SqliteBudgetStore {
             &usage.capability_id,
             usage.grant_index,
         )?;
+        if quota_was_supplied && quota.is_none() {
+            return Err(BudgetStoreError::Invariant(format!(
+                "replicated usage for grant `{}` lost its supplied invocation quota",
+                usage.capability_id
+            )));
+        }
         if usage.invocation_count > 0 && !quota_was_supplied {
             return Err(BudgetStoreError::Invariant(format!(
                 "replicated usage for grant `{}` omitted its immutable invocation quota",
@@ -1779,7 +1801,7 @@ impl SqliteBudgetStore {
             "budget realized-spend total",
         )?;
         raise_budget_replication_seq_floor(transaction, record.seq)?;
-        transaction.execute(
+        let persisted = transaction.execute(
             r#"
             INSERT INTO capability_grant_budgets (
                 capability_id,
@@ -1823,6 +1845,12 @@ impl SqliteBudgetStore {
                 total_cost_realized_spend,
             ],
         )?;
+        if persisted != 1 {
+            return Err(BudgetStoreError::Invariant(format!(
+                "legacy budget projection `{}` was not replicated exactly once",
+                record.capability_id
+            )));
+        }
         Ok(())
     }
 }

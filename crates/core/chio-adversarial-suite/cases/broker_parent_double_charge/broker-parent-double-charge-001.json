@@ -5,14 +5,14 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_parent_double_charge_detected",
   "threat_id": "resource_exhaustion_dos",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
       {
         "id": "quota_identity_control",
         "package": "chio-store-sqlite",
-        "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests_parts/part_01.rs",
+        "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests_parts/part_01_tail.inc",
         "target_kind": "lib",
         "test_name": "budget_store::tests::broker_logical_operation_charges_parent_and_broker_quotas_once"
       }
@@ -32,7 +32,9 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_parent_double_charge/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/broker_parent_double_charge/mutants.out/outcomes.json",
+          "sha256": "3a976fb49ecf080207eaa47986d4d634a5c96a33217134e67b5414eba4af8909",
+          "inputs_sha256": "dd052645d073e3b75ffc7892b0862b4d225a3ac68a37ec4a86b677c727302365"
         }
       }
     ]

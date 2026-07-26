@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::proxy::mediated::MediationKernelInputs;
 use chio_http_serve::{
     apply_server_hygiene, run_until_drained, ServeError, ServeHygieneConfig, ShutdownController,
 };
@@ -282,15 +283,14 @@ pub(crate) fn prepare_revocation_store(
 }
 
 /// Open the exact revocation authority retained during topology preparation.
+pub(crate) type OpenedRevocationStore = (
+    Option<Arc<dyn chio_kernel::RevocationStore>>,
+    HashSet<String>,
+);
+
 pub(crate) fn open_prepared_revocation_store(
     prepared: PreparedRevocationStore,
-) -> Result<
-    (
-        Option<Arc<dyn chio_kernel::RevocationStore>>,
-        HashSet<String>,
-    ),
-    ProtectError,
-> {
+) -> Result<OpenedRevocationStore, ProtectError> {
     match prepared {
         PreparedRevocationStore::Durable {
             resolved_path,
@@ -1242,16 +1242,16 @@ impl ProtectProxy {
         };
         let payment_adapter = self.payment_adapter;
         let mediation_kernel = match budget_store.as_ref() {
-            Some(store) => Some(Mutex::new(build_mediation_kernel(
-                &keypair,
-                Arc::clone(store),
-                mediation_receipt_store,
-                revocation_store.clone(),
-                &trusted_capability_issuers,
-                Vec::new(),
+            Some(store) => Some(Mutex::new(build_mediation_kernel(MediationKernelInputs {
+                signer: &keypair,
+                budget_store: Arc::clone(store),
+                receipt_store: mediation_receipt_store,
+                revocation_store: revocation_store.clone(),
+                trusted_capability_issuers: &trusted_capability_issuers,
+                tool_servers: Vec::new(),
                 payment_adapter,
-                mediation_admission_authorities,
-            )?)),
+                admission_authorities: mediation_admission_authorities,
+            })?)),
             None => None,
         };
 

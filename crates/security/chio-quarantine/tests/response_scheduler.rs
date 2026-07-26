@@ -110,6 +110,7 @@ struct SchedulerState {
     retry: Option<SchedulerRetryState>,
     next_fencing_token: u64,
     fail_health_ack_once: bool,
+    claim_expiry_extension_ms: u64,
 }
 
 #[derive(Default)]
@@ -134,6 +135,12 @@ impl SchedulerStore {
         self.state()
             .unwrap_or_else(|error| panic!("scheduler state: {error}"))
             .fail_health_ack_once = true;
+    }
+
+    fn set_claim_expiry_extension_ms(&self, extension_ms: u64) {
+        self.state()
+            .unwrap_or_else(|error| panic!("scheduler state: {error}"))
+            .claim_expiry_extension_ms = extension_ms;
     }
 
     fn retry(&self) -> Option<SchedulerRetryState> {
@@ -279,7 +286,9 @@ impl ResponseStore for SchedulerStore {
             tenant_id,
             action_id,
             lease_owner_id: request.lease_owner_id.clone(),
-            lease_expires_at_unix_ms: request.lease_expires_at_unix_ms,
+            lease_expires_at_unix_ms: request
+                .lease_expires_at_unix_ms
+                .saturating_add(state.claim_expiry_extension_ms),
             fencing_token: state.next_fencing_token,
         };
         state.work = Some(work.clone());
@@ -613,6 +622,26 @@ impl SchedulerHealthPort for TestHealthSink {
             None => Ok(None),
         }
     }
+}
+
+#[test]
+fn scheduler_claim_accepts_a_valid_renewed_successor_expiry() {
+    let store = Arc::new(SchedulerStore::default());
+    let _planned = plan(Arc::clone(&store));
+    store.set_claim_expiry_extension_ms(50);
+    let scheduler = ResponseScheduler::new(
+        Arc::clone(&store),
+        Arc::new(UnavailableExecutor::default()),
+        Arc::new(TestHealthSink::default()),
+        policy(),
+    )
+    .unwrap_or_else(|error| panic!("scheduler: {error}"));
+
+    let claimed = scheduler
+        .claim(&tick(1_000, "renewed-successor-claim"))
+        .unwrap_or_else(|error| panic!("renewed successor claim failed: {error}"));
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(claimed[0].lease_expires_at_unix_ms, 1_150);
 }
 
 #[test]

@@ -313,19 +313,11 @@ fn validate_all_automatic_response_dispatch_fences(connection: &Connection) -> P
         .map_err(|_| PortError::integrity_failure())?;
     drop(statement);
     for (tenant_id, action_id, dispatch_id) in identities {
-        let tenant_id =
-            TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?;
-        let action_id =
-            ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?;
-        let dispatch_id =
-            RecordId::new(dispatch_id).map_err(|_| PortError::integrity_failure())?;
-        if load_automatic_response_dispatch_fence(
-            connection,
-            &tenant_id,
-            &action_id,
-            &dispatch_id,
-        )?
-        .is_none()
+        let tenant_id = TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?;
+        let action_id = ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?;
+        let dispatch_id = RecordId::new(dispatch_id).map_err(|_| PortError::integrity_failure())?;
+        if load_automatic_response_dispatch_fence(connection, &tenant_id, &action_id, &dispatch_id)?
+            .is_none()
         {
             return Err(PortError::integrity_failure());
         }
@@ -362,9 +354,7 @@ const fn response_dispatch_commit_mode(mode: ResponseDispatchCommitMode) -> &'st
 fn parse_response_dispatch_commit_mode(value: &str) -> PortResult<ResponseDispatchCommitMode> {
     match value {
         "fresh" => Ok(ResponseDispatchCommitMode::Fresh),
-        "governed_committed_resume" => {
-            Ok(ResponseDispatchCommitMode::GovernedCommittedResume)
-        }
+        "governed_committed_resume" => Ok(ResponseDispatchCommitMode::GovernedCommittedResume),
         "governed_committed_expired_resume" => {
             Ok(ResponseDispatchCommitMode::GovernedCommittedExpiredResume)
         }
@@ -693,21 +683,13 @@ fn validate_scheduler_fence(
     fencing_token: u64,
     trusted_now_unix_ms: u64,
 ) -> PortResult<()> {
-    let stored: Option<(String, i64, i64)> = connection
-        .query_row(
-            "SELECT tenant_id, fencing_token, lease_expires_at FROM security_scheduler_leases WHERE tenant_id = ?1 AND action_id = ?2",
-            params![tenant_id, action_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let Some((stored_tenant, stored_token, stored_expiry)) = stored else {
+    let tenant_id = TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?;
+    let stored =
+        load_valid_scheduler_lease(connection, &tenant_id, action_id, trusted_now_unix_ms, true)?;
+    let Some(stored) = stored else {
         return Err(PortError::invalid_data());
     };
-    if stored_tenant != tenant_id
-        || from_i64(stored_token)? != fencing_token
-        || from_i64(stored_expiry)? <= trusted_now_unix_ms
-    {
+    if stored.fencing_token != fencing_token {
         return Err(PortError::conflict());
     }
     Ok(())
@@ -721,21 +703,13 @@ fn validate_scheduler_lease_binding(
     fencing_token: u64,
     trusted_now_unix_ms: u64,
 ) -> PortResult<()> {
-    let stored: Option<(String, i64, i64)> = connection
-        .query_row(
-            "SELECT lease_owner_id, fencing_token, lease_expires_at FROM security_scheduler_leases WHERE tenant_id = ?1 AND action_id = ?2",
-            params![tenant_id, action_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let Some((stored_owner, stored_token, stored_expiry)) = stored else {
+    let tenant_id = TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?;
+    let stored =
+        load_valid_scheduler_lease(connection, &tenant_id, action_id, trusted_now_unix_ms, true)?;
+    let Some(stored) = stored else {
         return Err(PortError::invalid_data());
     };
-    if stored_owner != lease_owner_id.as_str()
-        || from_i64(stored_token)? != fencing_token
-        || from_i64(stored_expiry)? <= trusted_now_unix_ms
-    {
+    if stored.lease_owner_id != *lease_owner_id || stored.fencing_token != fencing_token {
         return Err(PortError::conflict());
     }
     Ok(())

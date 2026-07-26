@@ -808,9 +808,12 @@ pub struct MutationCampaign {
     pub control_id: String,
     /// Cargo package mutated by cargo-mutants.
     pub package: String,
-    /// Repository-relative production Rust source file.
+    /// Repository-relative Rust source file.
+    ///
+    /// The evidence checker requires exact cargo-mutants source-inventory
+    /// membership before a campaign can run.
     pub source: String,
-    /// Literal function-name fragment used to select cargo-mutants output.
+    /// Exact native cargo-mutants function name.
     pub function: String,
     /// Minimum number of caught mutants required for this selection.
     pub minimum_caught: u32,

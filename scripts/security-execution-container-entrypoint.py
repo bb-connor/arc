@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import contextlib
 import ctypes
+import errno
 import hashlib
 import json
 import os
+import posixpath
 import selectors
 import secrets
 import signal
@@ -29,6 +31,7 @@ CANDIDATE_UID = 65532
 CANDIDATE_GID = 65532
 VERIFIER_UID = 65533
 VERIFIER_GID = 65533
+TRUSTED_STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v2."
 SOURCE = Path("/source")
 LINUX_CAMPAIGNS = (
     "broker_plaintext_custody",
@@ -216,10 +219,18 @@ ALL_REFRESH_INVENTORY = (
     ),
 )
 ALL_CAMPAIGNS = tuple(campaign for campaign, _outcome, _case in ALL_REFRESH_INVENTORY)
+OUTCOME_PATH_BY_CAMPAIGN = {
+    campaign: outcome for campaign, outcome, _case in ALL_REFRESH_INVENTORY
+}
+ALL_OUTCOME_PATHS = tuple(
+    OUTCOME_PATH_BY_CAMPAIGN[campaign] for campaign in ALL_CAMPAIGNS
+)
+LINUX_OUTCOME_PATHS = tuple(
+    OUTCOME_PATH_BY_CAMPAIGN[campaign] for campaign in LINUX_CAMPAIGNS
+)
 ALL_REFRESH_PATHS = tuple(
     sorted(
         {
-            "audits/evidence/threats/pii_phi_exposure.json",
             "crates/core/chio-adversarial-suite/manifest.json",
             *(outcome for _campaign, outcome, _case in ALL_REFRESH_INVENTORY),
             *(case for _campaign, _outcome, case in ALL_REFRESH_INVENTORY),
@@ -241,7 +252,24 @@ REFRESH_PATHS = (
     "crates/core/chio-adversarial-suite/cases/sandbox_syscall_escape/sandbox-syscall-escape-001.json",
     "crates/core/chio-adversarial-suite/manifest.json",
 )
+REFRESH_CONTRACT_SPINES = (
+    "audits",
+    "audits/evidence",
+    "audits/evidence/mutants",
+    "crates",
+    "crates/core",
+    "crates/core/chio-adversarial-suite",
+)
+REFRESH_CONTRACT_TREES = (
+    "audits/evidence/mutants/security",
+    "audits/evidence/threats",
+    "crates/core/chio-adversarial-suite/cases",
+)
+REFRESH_CONTRACT_FILES = (
+    "crates/core/chio-adversarial-suite/manifest.json",
+)
 TRUSTED_CHECKER = Path("/opt/chio-security/check-security-adversarial-evidence.py")
+TRUSTED_CARGO_MUTANTS = Path("/usr/local/cargo/bin/cargo-mutants")
 TRUSTED_GATE_ROOT = Path("/opt/chio-security/gates")
 TRUSTED_ENTRYPOINT = Path("/opt/chio-security/entrypoint.py")
 TRUSTED_COMMAND_CLIENT = Path("/opt/chio-security/command-client.py")
@@ -319,6 +347,43 @@ def validate_trusted_regular_file(
         raise EntrypointError(f"{description} is mutable or aliased")
 
 
+def validate_trusted_directory(
+    path: Path, *, expected_mode: int, description: str
+) -> None:
+    try:
+        observed = path.lstat()
+    except OSError as error:
+        raise EntrypointError(f"{description} is unavailable") from error
+    if (
+        not stat.S_ISDIR(observed.st_mode)
+        or stat.S_ISLNK(observed.st_mode)
+        or observed.st_uid != 0
+        or observed.st_gid != 0
+        or stat.S_IMODE(observed.st_mode) != expected_mode
+    ):
+        raise EntrypointError(f"{description} is mutable or aliased")
+
+
+def validate_trusted_cargo_mutants() -> None:
+    for ancestor in (
+        Path("/"),
+        Path("/usr"),
+        Path("/usr/local"),
+        Path("/usr/local/cargo"),
+        Path("/usr/local/cargo/bin"),
+    ):
+        validate_trusted_directory(
+            ancestor,
+            expected_mode=0o755,
+            description=f"trusted cargo-mutants ancestor {ancestor}",
+        )
+    validate_trusted_regular_file(
+        TRUSTED_CARGO_MUTANTS,
+        expected_mode=0o555,
+        description="trusted cargo-mutants executable",
+    )
+
+
 @contextlib.contextmanager
 def effective_identity(uid: int, gid: int):
     original_uid = os.geteuid()
@@ -370,7 +435,82 @@ def configure_child_subreaper() -> None:
         raise EntrypointError("trusted supervisor child subreaper is not active")
 
 
-def validate_supervisor_boundary() -> tuple[int, int]:
+class CapabilityHeader(ctypes.Structure):
+    _fields_ = [("version", ctypes.c_uint32), ("pid", ctypes.c_int)]
+
+
+class CapabilityData(ctypes.Structure):
+    _fields_ = [
+        ("effective", ctypes.c_uint32),
+        ("permitted", ctypes.c_uint32),
+        ("inheritable", ctypes.c_uint32),
+    ]
+
+
+def require_supervisor_capabilities(expected: str, description: str) -> None:
+    status = Path("/proc/self/status").read_text(encoding="ascii")
+    observed = {
+        line.split(":", 1)[0]: line.split("\t", 1)[1]
+        for line in status.splitlines()
+        if line.startswith(("CapEff:\t", "CapPrm:\t", "CapInh:\t", "CapAmb:\t"))
+    }
+    if observed != {
+        "CapEff": expected,
+        "CapPrm": expected,
+        "CapInh": "0000000000000000",
+        "CapAmb": "0000000000000000",
+    }:
+        raise EntrypointError(f"trusted supervisor capability set is not {description}")
+
+
+def drop_setup_chown_capability() -> None:
+    if sys.platform != "linux":
+        raise EntrypointError("setup capability retirement requires Linux")
+    linux_capability_version_3 = 0x20080522
+    cap_chown_mask = 1
+    header = CapabilityHeader(linux_capability_version_3, 0)
+    data = (CapabilityData * 2)()
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        capget = libc.capget
+        capset = libc.capset
+    except AttributeError as error:
+        raise EntrypointError(
+            "Linux libc does not expose portable capget/capset wrappers"
+        ) from error
+    capget.argtypes = [
+        ctypes.POINTER(CapabilityHeader),
+        ctypes.POINTER(CapabilityData),
+    ]
+    capget.restype = ctypes.c_int
+    capset.argtypes = [
+        ctypes.POINTER(CapabilityHeader),
+        ctypes.POINTER(CapabilityData),
+    ]
+    capset.restype = ctypes.c_int
+    if capget(ctypes.byref(header), data) != 0:
+        raise EntrypointError(
+            f"unable to read setup capabilities: errno {ctypes.get_errno()}"
+        )
+    if (
+        data[0].effective & cap_chown_mask == 0
+        or data[0].permitted & cap_chown_mask == 0
+        or data[0].inheritable & cap_chown_mask != 0
+    ):
+        raise EntrypointError("setup-only CHOWN capability is unavailable")
+    data[0].effective &= ~cap_chown_mask
+    data[0].permitted &= ~cap_chown_mask
+    data[0].inheritable &= ~cap_chown_mask
+    if capset(ctypes.byref(header), data) != 0:
+        raise EntrypointError(
+            f"unable to drop setup-only CHOWN capability: errno {ctypes.get_errno()}"
+        )
+    require_supervisor_capabilities(
+        "00000000000000c0", "SETUID/SETGID only after private-state setup"
+    )
+
+
+def validate_supervisor_boundary(*, setup: bool) -> tuple[int, int]:
     if os.geteuid() != 0 or os.getegid() != 0:
         raise EntrypointError("trusted supervisor must start as container root")
     os.setgroups([])
@@ -385,12 +525,13 @@ def validate_supervisor_boundary() -> tuple[int, int]:
     status = Path("/proc/self/status").read_text(encoding="ascii")
     if "NoNewPrivs:\t1\n" not in status or "Seccomp:\t2\n" not in status:
         raise EntrypointError("trusted supervisor lacks no-new-privileges or seccomp")
-    capability_line = next(
-        (line for line in status.splitlines() if line.startswith("CapEff:\t")), ""
-    )
-    if capability_line != "CapEff:\t00000000000000c0":
-        raise EntrypointError(
-            "trusted supervisor capability set is not SETUID/SETGID only"
+    if setup:
+        require_supervisor_capabilities(
+            "00000000000000c1", "setup-only CHOWN plus SETUID/SETGID"
+        )
+    else:
+        require_supervisor_capabilities(
+            "00000000000000c0", "internal broker SETUID/SETGID only"
         )
     return host_uid, host_gid
 
@@ -471,7 +612,6 @@ def verifier_environment(socket_path: Path, token: str, gate_root: Path) -> dict
         "CHIO_ENTERPRISE_SECURITY_RUNNER": "1",
         "CHIO_SECURITY_BROKER_SOCKET": os.fspath(socket_path),
         "CHIO_SECURITY_BROKER_TOKEN": token,
-        "CHIO_SECURITY_CANDIDATE_ARTIFACTS": "/target/artifacts",
         "CHIO_SECURITY_CAGE_INVENTORY_CHECKER": "/opt/chio-security/gates/check-cage-all-target-inventory.py",
         "CHIO_SECURITY_CAGE_LINUX_RUNNER": "/opt/chio-security/gates/check-cage-linux-enforcement.sh",
         "CHIO_SECURITY_EXACT_INVENTORY_CHECKER": "/opt/chio-security/gates/check-exact-cargo-test-inventory.py",
@@ -501,11 +641,448 @@ def verifier_environment(socket_path: Path, token: str, gate_root: Path) -> dict
     }
 
 
+def trusted_refresh_state_path(workspace: Path | None = None) -> Path:
+    selected = workspace or WORKSPACE
+    try:
+        canonical_workspace = selected.resolve(strict=True)
+        workspace_metadata = canonical_workspace.lstat()
+        parent_metadata = canonical_workspace.parent.lstat()
+    except (OSError, RuntimeError) as error:
+        raise EntrypointError("trusted refresh workspace identity is unavailable") from error
+    if (
+        canonical_workspace != selected
+        or not stat.S_ISDIR(workspace_metadata.st_mode)
+        or stat.S_ISLNK(workspace_metadata.st_mode)
+        or not stat.S_ISDIR(parent_metadata.st_mode)
+        or stat.S_ISLNK(parent_metadata.st_mode)
+        or parent_metadata.st_dev != workspace_metadata.st_dev
+    ):
+        raise EntrypointError("trusted refresh workspace identity is invalid")
+    identity = {
+        "canonical_path": os.fspath(canonical_workspace),
+        "device": workspace_metadata.st_dev,
+        "inode": workspace_metadata.st_ino,
+    }
+    payload = (json.dumps(identity, indent=2, ensure_ascii=False) + "\n").encode(
+        "utf-8"
+    )
+    digest = hashlib.sha256(payload).hexdigest()
+    return canonical_workspace.parent / f"{TRUSTED_STATE_DIRECTORY_PREFIX}{digest}"
+
+
+def validate_trusted_refresh_state(path: Path) -> None:
+    expected = trusted_refresh_state_path()
+    try:
+        metadata = path.lstat()
+        workspace_metadata = WORKSPACE.lstat()
+    except OSError as error:
+        raise EntrypointError("trusted refresh state is unavailable") from error
+    if (
+        path != expected
+        or not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != VERIFIER_UID
+        or metadata.st_gid != VERIFIER_GID
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+        or metadata.st_nlink != 2
+        or metadata.st_dev != workspace_metadata.st_dev
+    ):
+        raise EntrypointError("trusted refresh state identity is invalid")
+
+
+def require_candidate_cannot_replace_trusted_state(path: Path) -> None:
+    renamed = path.with_name(f"{path.name}.candidate-replaced")
+    with effective_identity(CANDIDATE_UID, CANDIDATE_GID):
+        try:
+            os.rename(path, renamed)
+        except PermissionError:
+            pass
+        else:
+            raise EntrypointError("candidate can rename trusted refresh state")
+        try:
+            path.rmdir()
+        except PermissionError:
+            pass
+        else:
+            raise EntrypointError("candidate can remove trusted refresh state")
+
+
+def candidate_workspace_inventory() -> tuple[
+    tuple[str, str, int, int, int, str | None], ...
+]:
+    try:
+        canonical_workspace = WORKSPACE.resolve(strict=True)
+        workspace_metadata = WORKSPACE.lstat()
+    except (OSError, RuntimeError) as error:
+        raise EntrypointError("candidate workspace identity is unavailable") from error
+    if (
+        not WORKSPACE.is_absolute()
+        or canonical_workspace != WORKSPACE
+        or not stat.S_ISDIR(workspace_metadata.st_mode)
+        or stat.S_ISLNK(workspace_metadata.st_mode)
+        or workspace_metadata.st_uid != CANDIDATE_UID
+        or workspace_metadata.st_gid != VERIFIER_GID
+    ):
+        raise EntrypointError("candidate workspace identity is invalid")
+    workspace_device = workspace_metadata.st_dev
+    entries: list[tuple[str, str, int, int, int, str | None]] = []
+
+    def inspect(path: Path) -> str:
+        try:
+            metadata = path.lstat()
+        except OSError as error:
+            raise EntrypointError(
+                f"candidate workspace path is unavailable: {path}"
+            ) from error
+        try:
+            relative = "." if path == WORKSPACE else path.relative_to(WORKSPACE).as_posix()
+        except ValueError as error:
+            raise EntrypointError("candidate workspace inventory escaped its root") from error
+        if (
+            metadata.st_dev != workspace_device
+            or metadata.st_uid != CANDIDATE_UID
+            or metadata.st_gid != VERIFIER_GID
+        ):
+            raise EntrypointError(
+                f"candidate workspace path ownership changed: {relative}"
+            )
+        mode = stat.S_IMODE(metadata.st_mode)
+        link_target: str | None = None
+        if stat.S_ISDIR(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+            kind = "directory"
+        elif stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+            if metadata.st_nlink != 1:
+                raise EntrypointError(
+                    f"candidate workspace regular file is aliased: {relative}"
+                )
+            kind = "regular"
+        elif stat.S_ISLNK(metadata.st_mode):
+            if metadata.st_nlink != 1:
+                raise EntrypointError(
+                    f"candidate workspace symbolic link is aliased: {relative}"
+                )
+            try:
+                link_target = os.readlink(path)
+                parsed_target = Path(link_target)
+                lexical_target = posixpath.normpath(
+                    posixpath.join(posixpath.dirname(relative), link_target)
+                )
+                resolved_target = (path.parent / parsed_target).resolve(strict=True)
+                resolved_target.relative_to(WORKSPACE)
+                target_metadata = resolved_target.lstat()
+            except (OSError, RuntimeError, ValueError) as error:
+                raise EntrypointError(
+                    f"candidate workspace symbolic link escapes its root: {relative}"
+                ) from error
+            if (
+                not link_target
+                or "\x00" in link_target
+                or parsed_target.is_absolute()
+                or lexical_target == ".."
+                or lexical_target.startswith("../")
+                or target_metadata.st_dev != workspace_device
+            ):
+                raise EntrypointError(
+                    f"candidate workspace symbolic link is invalid: {relative}"
+                )
+            kind = "symlink"
+        else:
+            raise EntrypointError(
+                f"candidate workspace contains a special file: {relative}"
+            )
+        entries.append(
+            (
+                relative,
+                kind,
+                metadata.st_dev,
+                metadata.st_ino,
+                mode,
+                link_target,
+            )
+        )
+        return kind
+
+    inspect(WORKSPACE)
+
+    def walk_error(error: OSError) -> None:
+        raise EntrypointError("unable to inventory candidate workspace") from error
+
+    for current, directories, files in os.walk(
+        WORKSPACE, topdown=True, followlinks=False, onerror=walk_error
+    ):
+        current_path = Path(current)
+        directories.sort()
+        files.sort()
+        traversable: list[str] = []
+        for name in directories:
+            if inspect(current_path / name) == "directory":
+                traversable.append(name)
+        directories[:] = traversable
+        for name in files:
+            inspect(current_path / name)
+    relatives = [entry[0] for entry in entries]
+    if len(relatives) != len(set(relatives)):
+        raise EntrypointError("candidate workspace inventory contains duplicate paths")
+    return tuple(sorted(entries))
+
+
+def validate_frozen_candidate_workspace(
+    snapshot: tuple[tuple[str, str, int, int, int, str | None], ...]
+) -> None:
+    expected_relatives = {entry[0] for entry in snapshot}
+    observed_relatives: set[str] = set()
+
+    def walk_error(error: OSError) -> None:
+        raise EntrypointError("unable to validate frozen candidate workspace") from error
+
+    for relative, kind, device, inode, original_mode, link_target in snapshot:
+        path = WORKSPACE if relative == "." else WORKSPACE / relative
+        try:
+            metadata = path.lstat()
+        except OSError as error:
+            raise EntrypointError(
+                f"frozen candidate workspace path is unavailable: {relative}"
+            ) from error
+        observed_relatives.add(relative)
+        expected_mode = 0o755 if kind == "directory" or original_mode & 0o111 else 0o644
+        observed_kind = (
+            "symlink"
+            if stat.S_ISLNK(metadata.st_mode)
+            else "directory"
+            if stat.S_ISDIR(metadata.st_mode)
+            else "regular"
+            if stat.S_ISREG(metadata.st_mode)
+            else "special"
+        )
+        if (
+            observed_kind != kind
+            or metadata.st_dev != device
+            or metadata.st_ino != inode
+            or metadata.st_uid != VERIFIER_UID
+            or metadata.st_gid != VERIFIER_GID
+            or (kind != "symlink" and stat.S_IMODE(metadata.st_mode) != expected_mode)
+            or (kind in ("regular", "symlink") and metadata.st_nlink != 1)
+        ):
+            raise EntrypointError(
+                f"frozen candidate workspace identity changed: {relative}"
+            )
+        if kind == "symlink":
+            try:
+                observed_target = os.readlink(path)
+                resolved_target = (path.parent / observed_target).resolve(strict=True)
+                resolved_target.relative_to(WORKSPACE)
+            except (OSError, RuntimeError, ValueError) as error:
+                raise EntrypointError(
+                    f"frozen candidate workspace symbolic link changed: {relative}"
+                ) from error
+            if observed_target != link_target:
+                raise EntrypointError(
+                    f"frozen candidate workspace symbolic link changed: {relative}"
+                )
+    try:
+        for current, directories, files in os.walk(
+            WORKSPACE,
+            topdown=True,
+            followlinks=False,
+            onerror=walk_error,
+        ):
+            current_path = Path(current)
+            for name in (*directories, *files):
+                path = current_path / name
+                observed_relatives.add(path.relative_to(WORKSPACE).as_posix())
+    except (OSError, ValueError) as error:
+        raise EntrypointError("unable to validate frozen candidate workspace") from error
+    if observed_relatives != expected_relatives:
+        raise EntrypointError("frozen candidate workspace path inventory changed")
+
+
+def freeze_candidate_workspace() -> tuple[
+    tuple[str, str, int, int, int, str | None], ...
+]:
+    snapshot = candidate_workspace_inventory()
+    try:
+        with effective_identity(0, VERIFIER_GID):
+            for relative, kind, _device, _inode, original_mode, _target in reversed(
+                snapshot
+            ):
+                path = WORKSPACE if relative == "." else WORKSPACE / relative
+                os.chown(
+                    path,
+                    VERIFIER_UID,
+                    VERIFIER_GID,
+                    follow_symlinks=False,
+                )
+                if kind != "symlink":
+                    mode = (
+                        0o755
+                        if kind == "directory" or original_mode & 0o111
+                        else 0o644
+                    )
+                    os.chmod(path, mode, follow_symlinks=False)
+    except OSError as error:
+        raise EntrypointError("unable to freeze candidate workspace") from error
+    validate_frozen_candidate_workspace(snapshot)
+    return snapshot
+
+
+def require_candidate_cannot_mutate_workspace(
+    snapshot: tuple[tuple[str, str, int, int, int, str | None], ...]
+) -> None:
+    denied_errors = {errno.EACCES, errno.EPERM, errno.EROFS}
+
+    def require_denied(label: str, operation, rollback=None) -> None:
+        try:
+            descriptor = operation()
+        except OSError as error:
+            if error.errno in denied_errors:
+                return
+            raise EntrypointError(
+                f"candidate workspace mutation probe failed unexpectedly: {label}"
+            ) from error
+        if isinstance(descriptor, int):
+            os.close(descriptor)
+        if rollback is not None:
+            try:
+                rollback()
+            except OSError as error:
+                raise EntrypointError(
+                    f"candidate workspace mutation probe could not roll back: {label}"
+                ) from error
+        raise EntrypointError(f"candidate can mutate frozen workspace: {label}")
+
+    regular_paths = [
+        WORKSPACE / relative
+        for relative, kind, _device, _inode, _mode, _target in snapshot
+        if kind == "regular" and relative != "."
+    ]
+    symlink_paths = [
+        WORKSPACE / relative
+        for relative, kind, _device, _inode, _mode, _target in snapshot
+        if kind == "symlink"
+    ]
+    directory_paths = [
+        WORKSPACE if relative == "." else WORKSPACE / relative
+        for relative, kind, _device, _inode, _mode, _target in snapshot
+        if kind == "directory"
+    ]
+    protected_names = (
+        WORKSPACE,
+        *(WORKSPACE / relative for relative in REFRESH_CONTRACT_SPINES),
+        *(WORKSPACE / relative for relative in REFRESH_CONTRACT_TREES),
+        *(WORKSPACE / relative for relative in REFRESH_CONTRACT_FILES),
+    )
+    hardlink_root = WORKSPACE.parent / ".chio-candidate-workspace-link-probe"
+    if hardlink_root.exists() or hardlink_root.is_symlink():
+        raise EntrypointError("candidate workspace hardlink probe root already exists")
+    hardlink_root.mkdir(mode=0o700)
+    os.chown(hardlink_root, CANDIDATE_UID, CANDIDATE_GID)
+    os.chmod(hardlink_root, 0o700)
+    try:
+        with effective_identity(CANDIDATE_UID, CANDIDATE_GID):
+            for path in regular_paths:
+                require_denied(
+                    f"write {path}",
+                    lambda path=path: os.open(
+                        path,
+                        os.O_WRONLY
+                        | os.O_APPEND
+                        | getattr(os, "O_CLOEXEC", 0)
+                        | getattr(os, "O_NOFOLLOW", 0),
+                    ),
+                )
+            for path in directory_paths:
+                sentinel = path / ".chio-candidate-workspace-create-probe"
+                require_denied(
+                    f"create below {path}",
+                    lambda sentinel=sentinel: os.open(
+                        sentinel,
+                        os.O_WRONLY
+                        | os.O_CREAT
+                        | os.O_EXCL
+                        | getattr(os, "O_CLOEXEC", 0)
+                        | getattr(os, "O_NOFOLLOW", 0),
+                        0o600,
+                    ),
+                    lambda sentinel=sentinel: sentinel.unlink(),
+                )
+            for path in protected_names:
+                replacement = path.with_name(
+                    f"{path.name}.chio-candidate-workspace-rename-probe"
+                )
+                require_denied(
+                    f"rename {path}",
+                    lambda path=path, replacement=replacement: os.rename(
+                        path, replacement
+                    ),
+                    lambda path=path, replacement=replacement: os.rename(
+                        replacement, path
+                    ),
+                )
+            for relative in REFRESH_CONTRACT_FILES:
+                path = WORKSPACE / relative
+                require_denied(
+                    f"unlink {path}", lambda path=path: os.unlink(path)
+                )
+            for relative in REFRESH_CONTRACT_TREES:
+                path = WORKSPACE / relative
+                require_denied(
+                    f"rmdir {path}", lambda path=path: os.rmdir(path)
+                )
+            for path in symlink_paths:
+                target = os.readlink(path)
+                require_denied(
+                    f"retarget {path}",
+                    lambda path=path: os.unlink(path),
+                    lambda path=path, target=target: os.symlink(target, path),
+                )
+            if regular_paths:
+                hardlink_probe = hardlink_root / "candidate-link"
+                require_denied(
+                    f"hardlink {regular_paths[0]}",
+                    lambda: os.link(
+                        regular_paths[0], hardlink_probe, follow_symlinks=False
+                    ),
+                    lambda: hardlink_probe.unlink(),
+                )
+                original_mode = stat.S_IMODE(regular_paths[0].lstat().st_mode)
+                require_denied(
+                    f"chmod {regular_paths[0]}",
+                    lambda: os.chmod(regular_paths[0], 0o666),
+                    lambda: os.chmod(regular_paths[0], original_mode),
+                )
+    finally:
+        try:
+            with effective_identity(CANDIDATE_UID, CANDIDATE_GID):
+                for child in hardlink_root.iterdir():
+                    child.unlink()
+        finally:
+            hardlink_root.rmdir()
+    validate_frozen_candidate_workspace(snapshot)
+
+
+def prepare_refresh_workspace() -> Path:
+    if WORKSPACE != Path("/private/candidate"):
+        raise EntrypointError("private candidate workspace authority changed")
+    try:
+        WORKSPACE.mkdir(mode=0o770)
+        os.chown(WORKSPACE, CANDIDATE_UID, VERIFIER_GID)
+        os.chmod(WORKSPACE, 0o770)
+        state = trusted_refresh_state_path()
+        state.mkdir(mode=0o700)
+        os.chown(state, VERIFIER_UID, VERIFIER_GID)
+        os.chmod(state, 0o700)
+    except OSError as error:
+        raise EntrypointError("unable to create isolated refresh workspace") from error
+    validate_trusted_refresh_state(state)
+    require_candidate_cannot_replace_trusted_state(state)
+    return state
+
+
 def prepare_private_runtime() -> None:
     host_uid = numeric_environment("CHIO_HOST_UID")
     host_gid = numeric_environment("CHIO_HOST_GID")
     for path, uid, gid in (
-        (Path("/private"), CANDIDATE_UID, CANDIDATE_GID),
+        (Path("/private"), 0, 0),
         (Path("/baseline"), 0, 0),
         (Path("/cargo-home"), CANDIDATE_UID, CANDIDATE_GID),
         (Path("/target"), CANDIDATE_UID, CANDIDATE_GID),
@@ -526,6 +1103,7 @@ def prepare_private_runtime() -> None:
         raise EntrypointError("isolated source mount is unavailable")
     with effective_identity(CANDIDATE_UID, CANDIDATE_GID):
         os.chmod("/target", 0o755)
+    prepare_refresh_workspace()
     VERIFIER_ROOT.mkdir(mode=0o770, parents=True, exist_ok=False)
     assign_owned_group(VERIFIER_ROOT, VERIFIER_GID)
     os.chmod(VERIFIER_ROOT, 0o770)
@@ -536,20 +1114,6 @@ def prepare_private_runtime() -> None:
             os.chmod(path, 0o700)
     CANDIDATE_STATE_ROOT.mkdir(mode=0o711, parents=True, exist_ok=False)
     os.chmod(CANDIDATE_STATE_ROOT, 0o711)
-    try:
-        setup = subprocess.run(
-            ["/bin/mkdir", "-m", "0755", "-p", os.fspath(WORKSPACE)],
-            check=False,
-            env=candidate_environment(),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=30,
-            **workspace_copy_process_options(),
-        )
-    finally:
-        quiesce_process_namespace()
-    if setup.returncode != 0:
-        raise EntrypointError("unable to create the private candidate runtime")
     try:
         copy_source = subprocess.run(
             [
@@ -570,21 +1134,8 @@ def prepare_private_runtime() -> None:
         quiesce_process_namespace()
     if copy_source.returncode != 0:
         raise EntrypointError("unable to copy the isolated candidate source")
-    with effective_identity(CANDIDATE_UID, VERIFIER_GID):
-        for current, directories, files in os.walk(WORKSPACE):
-            current_path = Path(current)
-            current_mode = stat.S_IMODE(current_path.lstat().st_mode) & 0o777
-            os.chmod(
-                current_path,
-                current_mode | ((current_mode & 0o700) >> 3),
-            )
-            for name in (*directories, *files):
-                path = current_path / name
-                observed = path.lstat()
-                if stat.S_ISLNK(observed.st_mode):
-                    continue
-                mode = stat.S_IMODE(observed.st_mode) & 0o777
-                os.chmod(path, mode | ((mode & 0o700) >> 3))
+    workspace_snapshot = freeze_candidate_workspace()
+    require_candidate_cannot_mutate_workspace(workspace_snapshot)
     validate_trusted_regular_file(
         TRUSTED_ENTRYPOINT,
         expected_mode=0o555,
@@ -618,12 +1169,14 @@ def prepare_private_runtime() -> None:
         expected_mode=0o444,
         description="trusted seccomp profile",
     )
+    validate_trusted_cargo_mutants()
     expected_seccomp = os.environ.get("CHIO_SECCOMP_PROFILE_SHA256", "")
     installed_seccomp = hashlib.sha256(TRUSTED_SECCOMP_PROFILE.read_bytes()).hexdigest()
     if expected_seccomp != installed_seccomp:
         raise EntrypointError(
             "trusted seccomp profile digest does not match the host binding"
         )
+    drop_setup_chown_capability()
 
 
 def initialize_baseline() -> None:
@@ -1391,6 +1944,93 @@ def trusted_checker_arguments(*arguments: str) -> list[str]:
     ]
 
 
+def pending_campaigns(timeout_seconds: int) -> frozenset[str]:
+    payload = run_trusted_bounded(
+        trusted_checker_arguments("--list-pending"), timeout_seconds
+    )
+    try:
+        rendered = payload.decode("ascii")
+    except UnicodeDecodeError as error:
+        raise EntrypointError("pending campaign inventory is not ASCII") from error
+    if rendered and not rendered.endswith("\n"):
+        raise EntrypointError("pending campaign inventory is not line-delimited")
+    observed = tuple(rendered.splitlines())
+    if (
+        observed != tuple(sorted(observed))
+        or len(observed) != len(set(observed))
+        or any(campaign not in ALL_CAMPAIGNS for campaign in observed)
+    ):
+        raise EntrypointError("pending campaign inventory is not exact")
+    return frozenset(observed)
+
+
+def decode_git_paths(payload: bytes, description: str) -> tuple[str, ...]:
+    if not payload:
+        return ()
+    if not payload.endswith(b"\0"):
+        raise EntrypointError(f"{description} is not NUL-delimited")
+    try:
+        observed = tuple(
+            field.decode("utf-8") for field in payload.removesuffix(b"\0").split(b"\0")
+        )
+    except UnicodeDecodeError as error:
+        raise EntrypointError(f"{description} is not UTF-8") from error
+    if not observed or any(not field for field in observed):
+        raise EntrypointError(f"{description} contains an empty path")
+    return observed
+
+
+def new_evidence_file_patch(
+    relative_path: str,
+    timeout_seconds: int,
+    allowed_paths: tuple[str, ...],
+) -> bytes:
+    if allowed_paths not in (LINUX_OUTCOME_PATHS, ALL_OUTCOME_PATHS):
+        raise EntrypointError("new evidence outcome allowlist is not a fixed mode")
+    if relative_path not in allowed_paths:
+        raise EntrypointError("new evidence path is outside the mode outcome allowlist")
+    path = WORKSPACE / relative_path
+    try:
+        metadata = path.lstat()
+    except OSError as error:
+        raise EntrypointError("new Linux outcome is unavailable") from error
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or stat.S_IMODE(metadata.st_mode) != 0o644
+        or metadata.st_uid != VERIFIER_UID
+        or metadata.st_gid != VERIFIER_GID
+        or metadata.st_nlink != 1
+    ):
+        raise EntrypointError("new Linux outcome identity is invalid")
+    patch = run_trusted_bounded(
+        [
+            "/bin/bash",
+            "-c",
+            (
+                "set -euo pipefail\n"
+                "set +e\n"
+                "/usr/bin/git diff --binary --no-ext-diff --no-textconv "
+                "--no-renames --no-index -- /dev/null \"$1\"\n"
+                "diff_status=$?\n"
+                "set -e\n"
+                "test \"${diff_status}\" -eq 1\n"
+            ),
+            "chio-new-linux-outcome-diff",
+            relative_path,
+        ],
+        timeout_seconds,
+    )
+    expected_prefix = (
+        f"diff --git a/{relative_path} b/{relative_path}\n"
+        "new file mode 100644\n"
+    ).encode("utf-8")
+    expected_destination = f"--- /dev/null\n+++ b/{relative_path}\n".encode("utf-8")
+    if not patch.startswith(expected_prefix) or expected_destination not in patch:
+        raise EntrypointError("new Linux outcome patch identity is invalid")
+    return patch
+
+
 def execution_boundary_record() -> bytes:
     image_id = os.environ.get("CHIO_SECURITY_IMAGE_ID", "")
     seccomp_digest = os.environ.get("CHIO_SECCOMP_PROFILE_SHA256", "")
@@ -1403,6 +2043,7 @@ def execution_boundary_record() -> bytes:
     ):
         raise EntrypointError("execution image or seccomp identity is invalid")
     trusted_files = {
+        "cargo-mutants": TRUSTED_CARGO_MUTANTS,
         "check-security-adversarial-evidence.py": TRUSTED_CHECKER,
         "command-client.py": TRUSTED_COMMAND_CLIENT,
         "entrypoint.py": TRUSTED_ENTRYPOINT,
@@ -1537,8 +2178,6 @@ def linux_enforcement(timeout_seconds: int) -> None:
             trusted_checker_arguments(
                 "--campaign",
                 campaign,
-                "--output",
-                f"/target/artifacts/final-{campaign}",
             )
         )
     campaign_log = run_sequence(campaign_commands, timeout_seconds)
@@ -1590,50 +2229,70 @@ def refresh_evidence(
     *,
     full_inventory: bool,
 ) -> None:
+    if full_inventory:
+        expected_campaigns = ALL_CAMPAIGNS
+        expected_paths = ALL_REFRESH_PATHS
+        promotable_campaigns = ALL_CAMPAIGNS
+        new_outcome_paths = ALL_OUTCOME_PATHS
+    else:
+        expected_campaigns = LINUX_CAMPAIGNS
+        expected_paths = REFRESH_PATHS
+        promotable_campaigns = LINUX_CAMPAIGNS
+        new_outcome_paths = LINUX_OUTCOME_PATHS
+    if campaigns != expected_campaigns or paths != expected_paths:
+        raise EntrypointError("evidence refresh mode inventory is not exact")
+    pending = pending_campaigns(timeout_seconds)
+    commands = []
+    for campaign in campaigns:
+        if campaign in pending:
+            if campaign not in promotable_campaigns:
+                raise EntrypointError(
+                    "campaign is outside the mode's initial promotion inventory"
+                )
+            commands.append(
+                trusted_checker_arguments("--promote-pending-outcome", campaign)
+            )
+        else:
+            commands.append(trusted_checker_arguments("--refresh-outcome", campaign))
     run_sequence(
-        [
-            trusted_checker_arguments("--refresh-outcome", campaign)
-            for campaign in campaigns
-        ],
+        commands,
         timeout_seconds,
     )
     run_trusted_bounded(
         trusted_checker_arguments("--require-complete"), timeout_seconds
     )
+    tracked_patch, untracked_payload, ignored = repository_inventory(timeout_seconds)
     names = run_trusted_bounded(
         ["/usr/bin/git", "diff", "--name-only", "-z", "--no-ext-diff", "HEAD", "--"],
         timeout_seconds,
     )
-    observed = tuple(
-        sorted(name.decode("utf-8") for name in names.split(b"\0") if name)
+    tracked_paths = decode_git_paths(names, "refreshed tracked evidence inventory")
+    untracked_paths = decode_git_paths(
+        untracked_payload, "refreshed untracked evidence inventory"
     )
+    if set(tracked_paths) & set(untracked_paths):
+        raise EntrypointError("refreshed evidence path inventories overlap")
+    expected_untracked = tuple(
+        sorted(
+            OUTCOME_PATH_BY_CAMPAIGN[campaign]
+            for campaign in campaigns
+            if campaign in pending
+        )
+    )
+    if tuple(sorted(untracked_paths)) != expected_untracked:
+        raise EntrypointError("initial promotion created an unexpected untracked path")
+    observed = tuple(sorted((*tracked_paths, *untracked_paths)))
     if observed != tuple(sorted(paths)):
         raise EntrypointError(
             "refreshed evidence changed paths outside the exact allowlist"
         )
-    untracked = run_trusted_bounded(
-        ["/usr/bin/git", "ls-files", "--others", "--exclude-standard", "-z"],
-        timeout_seconds,
-    )
-    if untracked:
-        raise EntrypointError("refreshed evidence created an untracked path")
-    ignored = run_trusted_bounded(
-        [
-            "/usr/bin/git",
-            "ls-files",
-            "--others",
-            "--ignored",
-            "--exclude-standard",
-            "-z",
-        ],
-        timeout_seconds,
-    )
     if ignored:
         raise EntrypointError("refreshed evidence created an ignored path")
-    patch = run_trusted_bounded(
-        ["/usr/bin/git", "diff", "--binary", "--no-ext-diff", "HEAD", "--"],
-        timeout_seconds,
+    new_file_patches = b"".join(
+        new_evidence_file_patch(path, timeout_seconds, new_outcome_paths)
+        for path in expected_untracked
     )
+    patch = tracked_patch + new_file_patches
     if not patch:
         raise EntrypointError("refreshed evidence patch is empty")
     source_sha = candidate_environment()["SOURCE_SHA"]
@@ -1661,7 +2320,9 @@ def refresh_evidence(
         inventory_payload = (
             json.dumps(inventory, sort_keys=True, separators=(",", ":")) + "\n"
         ).encode("utf-8")
-    require_exact_repository_inventory((patch, b"", b""), timeout_seconds)
+    require_exact_repository_inventory(
+        (tracked_patch, untracked_payload, ignored), timeout_seconds
+    )
     if inventory_payload is not None:
         publish_regular(
             "all-evidence-inventory.json",
@@ -1734,12 +2395,13 @@ def main() -> int:
     args = parse_args()
     if not 10 <= args.timeout_seconds <= 21600:
         raise EntrypointError("operation timeout is outside the trusted bound")
-    validate_supervisor_boundary()
     internal_arguments = (
         args.broker_server,
         args.gate_root,
     )
-    if any(value is not None for value in internal_arguments):
+    internal_invocation = any(value is not None for value in internal_arguments)
+    validate_supervisor_boundary(setup=not internal_invocation)
+    if internal_invocation:
         broker_token = os.environ.get("CHIO_SECURITY_BROKER_TOKEN", "")
         if (
             args.operation is not None

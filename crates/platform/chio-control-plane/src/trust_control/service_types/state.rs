@@ -112,25 +112,36 @@ pub(crate) struct RemoteReceiptStore {
 
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
+    pub(crate) partition_escrow_authority:
+        Option<Arc<super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority>>,
     pub(crate) cached_usage: Mutex<HashMap<(String, u32), BudgetUsageRecord>>,
-    pub(crate) composite_holds: Mutex<HashMap<String, RemoteCompositeHoldEvidence>>,
+    pub(crate) composite_holds: Arc<Mutex<HashMap<String, RemoteCompositeHoldEvidence>>>,
 }
 
 pub(crate) struct RemoteAdmissionCaptureAuthority {
     pub(crate) client: TrustControlClient,
+    pub(crate) partition_escrow_authority:
+        Option<Arc<super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority>>,
+    pub(crate) composite_holds: Arc<Mutex<HashMap<String, RemoteCompositeHoldEvidence>>>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteCompositeHoldEvidence {
+    pub(crate) authorization_event_id: String,
+    pub(crate) last_event_id: String,
+    pub(crate) last_event_seq: u64,
     pub(crate) admission_operation: BudgetAdmissionOperationBinding,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) invocation_quotas: Vec<BudgetInvocationQuota>,
     pub(crate) invocation_counts_after: Vec<BudgetInvocationQuotaUsage>,
+    pub(crate) invocation_state: BudgetInvocationReservationState,
     pub(crate) revocation_set: CanonicalRevocationSet,
     pub(crate) authorized_exposure_units: u64,
+    pub(crate) remaining_exposure_units: u64,
     pub(crate) monetary_state: BudgetMonetaryHoldState,
     pub(crate) authority: BudgetEventAuthority,
+    pub(crate) partition_escrow_evidence: Option<PartitionEscrowCommitEvidence>,
 }
 
 impl TrustServiceState {

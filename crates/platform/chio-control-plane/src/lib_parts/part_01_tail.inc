@@ -467,3 +467,15 @@ pub struct OrdinaryAdmissionRuntimeConfig<'a> {
     pub control_url: Option<&'a str>,
     pub control_token: Option<&'a str>,
 }
+
+/// Closed product composition for an externally signed partition-escrow
+/// authority. Construction consumes the kernel so a partially installed
+/// authority topology cannot escape on failure.
+pub struct PartitionEscrowRemoteAdmissionRuntimeConfig<'a> {
+    pub control_url: &'a str,
+    pub control_token: &'a str,
+    pub admission_operation_db_path: &'a Path,
+    pub authority: Arc<
+        trust_control::service_runtime::budget::SealedPartitionEscrowRemoteAuthority,
+    >,
+}

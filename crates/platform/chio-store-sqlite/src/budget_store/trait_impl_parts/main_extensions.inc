@@ -43,41 +43,128 @@ fn expire_open_hold(&self, hold_id: &str) -> Result<bool, BudgetStoreError> {
     let Some((capability_id, grant_index, remaining, invocation_count_debited)) = row else {
         return Ok(false);
     };
-    let remaining = remaining.max(0);
-    let now = unix_now();
-    transaction.execute(
-        "UPDATE capability_grant_budgets \
-         SET total_cost_exposed = MAX(total_cost_exposed - ?1, 0), \
-             invocation_count = CASE WHEN ?5 THEN MAX(invocation_count - 1, 0) \
-                                     ELSE invocation_count END, \
-             updated_at = ?2 \
-         WHERE capability_id = ?3 AND grant_index = ?4",
-        params![remaining, now, capability_id, grant_index, invocation_count_debited],
-    )?;
-    transaction.execute(
-        "UPDATE budget_authorization_holds \
-         SET disposition = 'expired', remaining_exposure_units = 0, updated_at = ?1 \
-         WHERE hold_id = ?2",
-        params![now, hold_id],
-    )?;
-    let usage: Option<(u64, u32, u64, u64)> = transaction
+    let grant_index = usize::try_from(grant_index).map_err(|_| {
+        BudgetStoreError::Invariant(format!(
+            "budget hold `{hold_id}` has an invalid grant index"
+        ))
+    })?;
+    let remaining = u64::try_from(remaining).map_err(|_| {
+        BudgetStoreError::Invariant(format!(
+            "budget hold `{hold_id}` has negative remaining exposure"
+        ))
+    })?;
+    let current = transaction
         .query_row(
-            "SELECT seq, invocation_count, total_cost_exposed, total_cost_realized_spend \
-             FROM capability_grant_budgets WHERE capability_id = ?1 AND grant_index = ?2",
-            params![capability_id, grant_index],
+            r#"
+            SELECT invocation_count, total_cost_exposed,
+                   total_cost_realized_spend, seq
+            FROM capability_grant_budgets
+            WHERE capability_id = ?1 AND grant_index = ?2
+            "#,
+            params![capability_id, grant_index as i64],
             |row| {
-                Ok((
-                    budget_u64_from_row(row, 0, "seq")?,
-                    budget_u32_from_row(row, 1, "invocation_count")?,
-                    budget_u64_from_row(row, 2, "total_cost_exposed")?,
-                    budget_u64_from_row(row, 3, "total_cost_realized_spend")?,
-                ))
+                Ok(SqliteLegacyProjectionState {
+                    invocation_count: budget_u32_from_row(row, 0, "invocation_count")?,
+                    total_cost_exposed: budget_u64_from_row(row, 1, "total_cost_exposed")?,
+                    total_cost_realized_spend: budget_u64_from_row(
+                        row,
+                        2,
+                        "total_cost_realized_spend",
+                    )?,
+                    seq: budget_u64_from_row(row, 3, "legacy projection sequence")?,
+                })
             },
         )
-        .optional()?;
-    let (usage_seq, invocation_count_after, exposed_after, realized_after) =
-        usage.unwrap_or((0, 0, 0, 0));
+        .optional()?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` lost its legacy projection"
+            ))
+        })?;
+    let exposed_after = current
+        .total_cost_exposed
+        .checked_sub(remaining)
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` exceeds its legacy exposure"
+            ))
+        })?;
+    let now = unix_now();
     let event_seq = allocate_budget_replication_seq(&transaction)?;
+    let invocation_count_after = if invocation_count_debited {
+        if current.invocation_count == 0 {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` lost its invocation debit"
+            )));
+        }
+        let maximum = SqliteBudgetStore::compatibility_invocation_quota_maximum(
+            &transaction,
+            &capability_id,
+            grant_index,
+        )?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` lost its invocation quota"
+            ))
+        })?;
+        let quota = BudgetInvocationQuota::from_persisted_parts(
+            BudgetQuotaKey::grant(&capability_id, grant_index)?,
+            maximum,
+        )?;
+        SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+            &transaction,
+            std::slice::from_ref(&quota),
+            quota.key(),
+            current.invocation_count,
+            SqliteInvocationQuotaMutationContext {
+                mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                action: SqliteInvocationQuotaMutationAction::Replay,
+                event_seq: current.seq,
+                updated_at: now,
+            },
+        )?;
+        SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+            &transaction,
+            std::slice::from_ref(&quota),
+            quota.key(),
+            current.invocation_count,
+            SqliteInvocationQuotaMutationContext {
+                mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                action: SqliteInvocationQuotaMutationAction::Reverse,
+                event_seq,
+                updated_at: now,
+            },
+        )?
+        .primary_count_after
+    } else {
+        current.invocation_count
+    };
+    SqliteBudgetStore::compare_and_persist_legacy_projection(
+        &transaction,
+        SqliteLegacyProjectionMutation {
+            capability_id: &capability_id,
+            grant_index,
+            expected: Some(current),
+            after: SqliteLegacyProjectionState {
+                invocation_count: invocation_count_after,
+                total_cost_exposed: exposed_after,
+                total_cost_realized_spend: current.total_cost_realized_spend,
+                seq: event_seq,
+            },
+            updated_at: now,
+        },
+    )?;
+    let hold_changed = transaction.execute(
+        "UPDATE budget_authorization_holds \
+         SET disposition = 'expired', remaining_exposure_units = 0, updated_at = ?1 \
+         WHERE hold_id = ?2 AND disposition = 'open'",
+        params![now, hold_id],
+    )?;
+    if hold_changed != 1 {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget hold `{hold_id}` changed during expiry"
+        )));
+    }
     SqliteBudgetStore::append_mutation_event(
         &transaction,
         Some(&format!("{hold_id}:expire")),
@@ -88,15 +175,15 @@ fn expire_open_hold(&self, hold_id: &str) -> Result<bool, BudgetStoreError> {
         BudgetMutationKind::ExpireHold,
         Some(true),
         event_seq,
-        Some(usage_seq),
-        remaining as u64,
+        Some(event_seq),
+        remaining,
         0,
         None,
         None,
         None,
         invocation_count_after,
         exposed_after,
-        realized_after,
+        current.total_cost_realized_spend,
     )?;
     transaction.commit()?;
     Ok(true)

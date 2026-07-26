@@ -106,10 +106,12 @@ jobs:
           bash scripts/tests/check-rust-public-surface.test.sh
           python3 scripts/check-architecture-docs.py
           bash ./scripts/check-security-provenance.sh
+          python3 ./scripts/check-protocol-provenance.py
           python3 ./scripts/check-enterprise-provenance.py
           python3 ./scripts/check-linux-enforcement-stack.py
           bash ./scripts/check-security-dependencies.sh
           bash ./scripts/tests/check-security-provenance.test.sh
+          bash ./scripts/tests/check-protocol-provenance.test.sh
           bash ./scripts/tests/check-enterprise-provenance.test.sh
           bash ./scripts/tests/check-linux-enforcement-stack.test.sh
           bash ./scripts/tests/check-security-dependencies.test.sh
@@ -127,6 +129,7 @@ jobs:
           bash ./scripts/tests/check-protocol-peer-negotiation.test.sh
           bash ./scripts/tests/check-flow-security.test.sh
           bash ./scripts/tests/check-deception-security.test.sh
+          bash ./scripts/tests/check-temporal-security.test.sh
           bash ./scripts/tests/check-response-recovery.test.sh
           bash ./scripts/tests/check-cage-enforcement.test.sh
           python3 ./scripts/check-mcp-admin-credential-contract.py
@@ -139,6 +142,27 @@ jobs:
 
       - name: Formal traceability gate
         run: bash scripts/check-mapping.sh
+
+      - name: Temporal security gate
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        shell: /bin/bash --noprofile --norc -p -e {0}
+        run: |
+          set -euo pipefail
+          readonly temporal_runner="scripts/check-temporal-security.sh"
+          readonly temporal_self_test="scripts/tests/check-temporal-security.test.sh"
+          test -f "${temporal_runner}"
+          test ! -L "${temporal_runner}"
+          test -x "${temporal_runner}"
+          test -f "${temporal_self_test}"
+          test ! -L "${temporal_self_test}"
+          test -x "${temporal_self_test}"
+          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' 'af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06' "${temporal_self_test}" | /usr/bin/sha256sum --check --strict
+          /bin/bash -p "${temporal_self_test}"
+          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          /bin/bash -p "${temporal_runner}"
 
       - name: Anchor batch async witness lint
         run: bash ./scripts/check-anchor-batch-async-witness.sh
@@ -234,6 +258,12 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/check-protocol-primitives-concurrency.sh
+
+      - name: Protocol-primitives focused gate
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: ./scripts/check-protocol-primitives-focused.sh --all
 
       - name: Protocol peer-negotiation gate
         env:
@@ -413,8 +443,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Require every security dependency
+        env:
+          COMMITTED_LINUX_EVIDENCE_SHA: ${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}
         run: |
           set -euo pipefail
+          [[ "${COMMITTED_LINUX_EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           test '${{ needs.check.result }}' = success
           test '${{ needs.kani-public-pr.result }}' = success
           test '${{ needs.formal-proof-contract.result }}' = success

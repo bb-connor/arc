@@ -1,3 +1,24 @@
+fn install_runtime_bounded_budget_authorities(kernel: &mut ChioKernel, prefix: &str) {
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-operations"
+        )))
+        .expect("install runtime admission operation store");
+    kernel
+        .set_budget_store_handle(durable_atomic_test_budget_store(&format!(
+            "{prefix}-budget"
+        )))
+        .expect("install runtime budget store");
+}
+
+fn install_runtime_bounded_admission_operation_store(kernel: &mut ChioKernel, prefix: &str) {
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-operations"
+        )))
+        .expect("install runtime admission operation store");
+}
+
 #[test]
 fn chio_runtime_admission_retains_reservations_on_ambiguous_incomplete(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -381,6 +402,7 @@ fn chio_runtime_live_parent_and_vendor_calls_expose_package_valid_receipts(
 async fn drop_guard_release_failure_omits_monetary_terminal() {
     let started = std::sync::Arc::new(tokio::sync::Notify::new());
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_admission_operation_store(&mut kernel, "drop-guard-release-failure");
     kernel
         .set_budget_store(Box::new(FailingReleaseBudgetStore::new()))
         .expect("install budget store");
@@ -484,6 +506,7 @@ fn make_fabricated_drop_charge() -> BudgetChargeResult {
                 crate::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: None,
             event_id: None,
+            partition_escrow_evidence: None,
         },
         admission_operation: None,
     }

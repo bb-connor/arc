@@ -86,6 +86,25 @@ impl ChioKernel {
             publication.approval_store.authority_profile(),
             self.dispatch_worker_count,
         )?;
+        if self.partition_escrow_registry.is_some()
+            && !Arc::ptr_eq(&self.budget_store, &publication.budget_store)
+        {
+            return Err(KernelError::Internal(
+                "governed runtime publication cannot replace a partition-escrow-bound budget store"
+                    .to_string(),
+            ));
+        }
+        Self::validate_hard_budget_store_profile(
+            publication.budget_store.as_ref(),
+            self.dispatch_worker_count,
+            self.partition_escrow_registry.as_deref(),
+        )?;
+        if self.partition_escrow_registry.is_some() && self.admission_capture_authority.is_none() {
+            return Err(KernelError::Internal(
+                "partition escrow governed admission requires an exact admission capture authority"
+                    .to_string(),
+            ));
+        }
         if !publication
             .budget_store
             .authority_profile()

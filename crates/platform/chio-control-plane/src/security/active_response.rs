@@ -69,7 +69,7 @@ mod tests {
         ResponseTarget,
     };
     use chio_store_sqlite::SqliteSecurityStateStore;
-    use rusqlite::{params, Connection};
+    use rusqlite::Connection;
     use std::collections::BTreeMap;
     use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
@@ -1477,7 +1477,7 @@ mod tests {
 
     #[test]
     fn existing_dispatch_rejects_a_foreign_live_scheduler_lease() {
-        let harness = Harness::new();
+        let harness = Harness::with_lease_duration(2_000);
         let request = harness.automatic_request();
         harness.effects.set_mode(EffectMode::Unknown);
         let first = require_error(harness.executor.execute_source(&request));
@@ -1485,21 +1485,16 @@ mod tests {
             first,
             ActiveResponseExecutorError::OutcomeUnknown(_)
         ));
-
-        let connection = Connection::open(&harness.database_path)
-            .unwrap_or_else(|error| panic!("open scheduler takeover connection: {error}"));
-        let changed = connection
-            .execute(
-                "UPDATE security_scheduler_leases SET lease_owner_id = ?1, fencing_token = fencing_token + 1 WHERE tenant_id = ?2 AND action_id = ?3",
-                params![
-                    "ordinary-scheduler-worker",
-                    request.response_plan.tenant_id.as_str(),
-                    request.response_plan.action_id.as_str(),
-                ],
-            )
-            .unwrap_or_else(|error| panic!("install scheduler takeover: {error}"));
-        assert_eq!(changed, 1);
-        drop(connection);
+        let applying = harness.response_snapshot(&request);
+        let expired_lease = applying
+            .applying_lease_expires_at_unix_ms
+            .unwrap_or_else(|| panic!("applying response is missing its scheduler lease"));
+        harness.wait_until_after_real_deadline(expired_lease);
+        let foreign_executor = harness.executor_with_lease_owner("ordinary-scheduler-worker");
+        assert!(matches!(
+            require_error(foreign_executor.execute_source(&request)),
+            ActiveResponseExecutorError::OutcomeUnknown(_)
+        ));
         harness.effects.set_mode(EffectMode::Normal);
 
         let error = require_error(harness.executor.execute_source(&request));
@@ -1543,7 +1538,7 @@ mod tests {
 
     #[test]
     fn takeover_recovers_completed_effect_result_across_fencing_token_rotation() {
-        let harness = Harness::new();
+        let harness = Harness::with_lease_duration(2_000);
         let request = harness.automatic_request();
 
         harness.effects.set_mode(EffectMode::Unknown);
@@ -1563,21 +1558,11 @@ mod tests {
         ));
         assert_eq!(harness.effects.executions(), 1);
         assert_eq!(harness.effects.last_fencing_token(), Some(1));
-
-        let connection = Connection::open(&harness.database_path)
-            .unwrap_or_else(|error| panic!("open scheduler takeover connection: {error}"));
-        let changed = connection
-            .execute(
-                "UPDATE security_scheduler_leases SET lease_owner_id = ?1, fencing_token = fencing_token + 1 WHERE tenant_id = ?2 AND action_id = ?3",
-                params![
-                    TEST_ACTIVE_RESPONSE_LEASE_OWNER_ID,
-                    request.response_plan.tenant_id.as_str(),
-                    request.response_plan.action_id.as_str(),
-                ],
-            )
-            .unwrap_or_else(|error| panic!("rotate scheduler fencing token: {error}"));
-        assert_eq!(changed, 1);
-        drop(connection);
+        let applying = harness.response_snapshot(&request);
+        let expired_lease = applying
+            .applying_lease_expires_at_unix_ms
+            .unwrap_or_else(|| panic!("applying response is missing its scheduler lease"));
+        harness.wait_until_after_real_deadline(expired_lease);
 
         let recovered = require_success(
             harness.executor.execute_source(&request),

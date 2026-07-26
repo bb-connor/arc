@@ -13,6 +13,9 @@ fn classify_broker_ipc_handler_result(
         {
             Err(BrokerIpcServeFailure::Internal(error))
         }
+        Err(error) if operation == IpcOperation::Execute => {
+            Err(BrokerIpcServeFailure::Client(error))
+        }
         Err(error) => Ok(IpcResponse {
             operation,
             accepted: false,
@@ -34,6 +37,13 @@ fn validate_broker_ipc_response_envelope(
         && response.response.len() <= MAX_WIRE_BYTES
         && if response.accepted {
             !response.response.is_empty() && response.error_code.is_none()
+        } else if operation == IpcOperation::Execute {
+            !response.response.is_empty()
+                && response
+                    .error_code
+                    .as_deref()
+                    .is_some_and(is_well_formed_broker_execute_diagnostic_code)
+                && validate_signed_broker_execute_failure(response)
         } else {
             response.response.is_empty()
                 && response
@@ -55,8 +65,7 @@ fn is_well_formed_broker_ipc_error_code(code: &str) -> bool {
     if bytes.is_empty()
         || bytes.len() > MAX_BROKER_IPC_ERROR_CODE_BYTES
         || !bytes[0].is_ascii_lowercase()
-        || !(bytes[bytes.len() - 1].is_ascii_lowercase()
-            || bytes[bytes.len() - 1].is_ascii_digit())
+        || !(bytes[bytes.len() - 1].is_ascii_lowercase() || bytes[bytes.len() - 1].is_ascii_digit())
     {
         return false;
     }
@@ -64,6 +73,33 @@ fn is_well_formed_broker_ipc_error_code(code: &str) -> bool {
         .iter()
         .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
         && !bytes.windows(2).any(|pair| pair == b"__")
+}
+
+#[cfg(unix)]
+fn validate_signed_broker_execute_failure(response: &IpcResponse) -> bool {
+    let Some(error_code) = response.error_code.as_deref() else {
+        return false;
+    };
+    if !is_well_formed_broker_execute_diagnostic_code(error_code) {
+        return false;
+    }
+    let Ok(failure) = serde_json::from_slice::<BrokerExecuteFailure>(&response.response) else {
+        return false;
+    };
+    let Ok(canonical) = canonical_json_bytes(&failure) else {
+        return false;
+    };
+    if canonical != response.response
+        || failure.diagnostic_code != error_code
+        || failure.receipt.body.diagnostic_code != error_code
+    {
+        return false;
+    }
+    let Ok(receipt_digest) = failure_receipt_digest(&failure.receipt) else {
+        return false;
+    };
+    failure.receipt_reference == format!("broker-failure-receipt-sha256-{receipt_digest}")
+        && verify_failure_receipt(&failure.receipt, &failure.receipt.signer).is_ok()
 }
 
 #[cfg(unix)]

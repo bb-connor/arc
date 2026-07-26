@@ -299,6 +299,14 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
             .list_mutation_events(limit, capability_id, grant_index)
     }
 
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetMutationRecord>, BudgetStoreError> {
+        let _transaction = self.lock_transaction()?;
+        self.budget.get_mutation_event_by_id(event_id)
+    }
+
     fn budget_authority_profile(&self) -> crate::budget_store::BudgetAuthorityProfile {
         self.budget.budget_authority_profile()
     }
@@ -418,6 +426,14 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
             }
         }
         Ok(decision)
+    }
+
+    fn replay_budget_authorization(
+        &self,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        let _transaction = self.lock_transaction()?;
+        self.budget.replay_budget_authorization(request)
     }
 
     fn reverse_budget_hold(
@@ -584,15 +600,11 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
     }
 }
 
-fn durable_atomic_test_budget_store(
-    _prefix: &str,
-) -> std::sync::Arc<DurableAtomicTestBudgetStore> {
+fn durable_atomic_test_budget_store(_prefix: &str) -> std::sync::Arc<DurableAtomicTestBudgetStore> {
     std::sync::Arc::new(DurableAtomicTestBudgetStore::new())
 }
 
-fn durable_test_admission_operation_store(
-    _prefix: &str,
-) -> std::sync::Arc<ProfiledTestStore> {
+fn durable_test_admission_operation_store(_prefix: &str) -> std::sync::Arc<ProfiledTestStore> {
     std::sync::Arc::new(ProfiledTestStore::new(
         AdmissionOperationStoreProfile::SingleNodeDurable,
     ))

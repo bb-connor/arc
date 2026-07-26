@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_orphan_hold_detected",
   "threat_id": "resource_exhaustion_dos",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -32,7 +32,9 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_orphan_hold/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/broker_orphan_hold/mutants.out/outcomes.json",
+          "sha256": "157f5601ef2dd89de59117c2f4c4bf11012babb428effcc8f3afc9c43a1a4927",
+          "inputs_sha256": "9f9bf0c4cd4b0a4d3ec1830291b84a9193d9fd0dc2e98abf0c4161307f561214"
         }
       }
     ]

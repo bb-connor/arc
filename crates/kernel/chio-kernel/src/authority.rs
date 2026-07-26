@@ -144,8 +144,7 @@ impl CapabilityAuthorityClock for SystemCapabilityAuthorityClock {
         let duration = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| CapabilityAuthorityClockError::BeforeUnixEpoch)?;
-        u64::try_from(duration.as_millis())
-            .map_err(|_| CapabilityAuthorityClockError::NumericRange)
+        u64::try_from(duration.as_millis()).map_err(|_| CapabilityAuthorityClockError::NumericRange)
     }
 }
 

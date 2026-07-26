@@ -214,13 +214,31 @@ mod support {
         }
     }
 
-    /// Payment rail whose authorize hands out a fixed reference; capture,
-    /// release, and refund settle locally so monetary evaluations complete.
-    pub struct RecordingRail;
+    /// Payment rail whose legacy calls use fixed local references while its
+    /// bounded path delegates to the operation-idempotent simulation adapter.
+    pub struct RecordingRail {
+        operation_adapter: chio_kernel::SimPaymentAdapter,
+    }
+
+    impl RecordingRail {
+        fn new() -> Self {
+            Self {
+                operation_adapter: chio_kernel::SimPaymentAdapter::new(),
+            }
+        }
+    }
 
     impl chio_kernel::PaymentAdapter for RecordingRail {
         fn rail_id(&self) -> &str {
             "x402"
+        }
+
+        fn supports_operation_authorization_recovery(&self) -> bool {
+            true
+        }
+
+        fn supports_operation_payment_mutations(&self) -> bool {
+            true
         }
 
         fn authorize(
@@ -273,6 +291,72 @@ mod support {
                 metadata: serde_json::json!({}),
             })
         }
+
+        fn authorize_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            request: &chio_kernel::PaymentAuthorizeRequest,
+        ) -> Result<chio_kernel::PaymentAuthorization, chio_kernel::PaymentError> {
+            self.operation_adapter.authorize_for_operation(
+                operation_id,
+                request_binding_hash,
+                request,
+            )
+        }
+
+        fn lookup_authorization_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+        ) -> Result<Option<chio_kernel::PaymentAuthorization>, chio_kernel::PaymentError> {
+            self.operation_adapter
+                .lookup_authorization_for_operation(operation_id, request_binding_hash)
+        }
+
+        fn capture_for_operation(
+            &self,
+            request: chio_kernel::OperationPaymentCaptureRequest<'_>,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.operation_adapter.capture_for_operation(request)
+        }
+
+        fn release_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            authorization_id: &str,
+            reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.operation_adapter.release_for_operation(
+                operation_id,
+                request_binding_hash,
+                authorization_id,
+                reference,
+            )
+        }
+
+        fn refund_for_operation(
+            &self,
+            request: chio_kernel::OperationPaymentRefundRequest<'_>,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.operation_adapter.refund_for_operation(request)
+        }
+
+        fn settlement_state_for_operation(
+            &self,
+            operation_id: &str,
+            request_binding_hash: &str,
+            reference: &str,
+            authorization_id: Option<&str>,
+        ) -> Result<chio_kernel::RailSettlementState, chio_kernel::PaymentError> {
+            self.operation_adapter.settlement_state_for_operation(
+                operation_id,
+                request_binding_hash,
+                reference,
+                authorization_id,
+            )
+        }
     }
 
     pub struct JournalHarness {
@@ -283,6 +367,7 @@ mod support {
         pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
         pub rail_refs_seen_at_invoke: ObservedRailRefs,
         pub db_path: std::path::PathBuf,
+        auxiliary_db_paths: Vec<std::path::PathBuf>,
     }
 
     impl JournalHarness {
@@ -308,6 +393,13 @@ mod support {
                 model_metadata: None,
                 federated_origin_kernel_id: None,
                 declassification_grant: None,
+            }
+        }
+
+        pub fn cleanup(&self) {
+            let _ = std::fs::remove_file(&self.db_path);
+            for path in &self.auxiliary_db_paths {
+                let _ = std::fs::remove_file(path);
             }
         }
     }
@@ -392,6 +484,7 @@ mod support {
         let invoked = Arc::new(AtomicUsize::new(0));
         let open_intents_seen_at_invoke = Arc::new(Mutex::new(Vec::new()));
         let rail_refs_seen_at_invoke = Arc::new(Mutex::new(Vec::new()));
+        let mut auxiliary_db_paths = Vec::new();
 
         let mut kernel = ChioKernel::new(journal_config(Keypair::generate()));
         kernel.register_tool_server(Box::new(ProbeServer {
@@ -401,15 +494,19 @@ mod support {
             rail_refs_seen_at_invoke: Arc::clone(&rail_refs_seen_at_invoke),
             fail_after_effect,
         }));
-        if monetary {
-            kernel.set_payment_adapter(Box::new(RecordingRail))?;
-            // With the journal enabled and a payment adapter installed, the
-            // money path requires a journal-capable budget store; the
-            // default in-memory store fails closed.
+        if monetary || max_invocations.is_some() {
+            let operation_db_path = unique_kernel_db_path("chio-intent-journal-operations");
             let budget_db_path = unique_kernel_db_path("chio-intent-journal-budget");
+            kernel.set_admission_operation_store_handle(Arc::new(
+                chio_store_sqlite::SqliteAdmissionOperationStore::open(&operation_db_path)?,
+            ))?;
             kernel.set_budget_store_handle(Arc::new(
                 chio_store_sqlite::SqliteBudgetStore::open(&budget_db_path)?,
             ))?;
+            auxiliary_db_paths.extend([operation_db_path, budget_db_path]);
+        }
+        if monetary {
+            kernel.set_payment_adapter(Box::new(RecordingRail::new()))?;
         }
         if reject_first_intent_write {
             kernel.set_receipt_store_handle(Arc::new(IntentRejectingStore {
@@ -434,6 +531,7 @@ mod support {
             open_intents_seen_at_invoke,
             rail_refs_seen_at_invoke,
             db_path,
+            auxiliary_db_paths,
         })
     }
 }
@@ -853,7 +951,7 @@ fn side_effecting_dispatch_sees_durable_intent_and_read_only_pays_nothing(
         "a read-only call must not add an intent row (saw {seen:?})"
     );
 
-    let _ = std::fs::remove_file(&harness.db_path);
+    harness.cleanup();
     Ok(())
 }
 
@@ -902,7 +1000,7 @@ fn intent_write_failure_denies_before_dispatch_without_leaking_hold(
         "the retry dispatches exactly once"
     );
 
-    let _ = std::fs::remove_file(&harness.db_path);
+    harness.cleanup();
     Ok(())
 }
 
@@ -927,7 +1025,7 @@ fn allow_receipt_consumes_the_intent_leaving_no_orphan() -> Result<(), Box<dyn s
     assert_eq!(harness.store.dead_letter_dispatch_intent_count()?, 0);
     assert!(harness.store.receipt_store_health()?.healthy);
 
-    let _ = std::fs::remove_file(&harness.db_path);
+    harness.cleanup();
     Ok(())
 }
 
@@ -950,7 +1048,7 @@ fn post_dispatch_tool_error_still_consumes_the_intent() -> Result<(), Box<dyn st
         "the deny receipt consumed the intent"
     );
 
-    let _ = std::fs::remove_file(&harness.db_path);
+    harness.cleanup();
     Ok(())
 }
 
@@ -978,17 +1076,21 @@ fn monetary_intent_carries_rail_and_authorization_id_before_dispatch(
         .lock()
         .expect("rail probe lock")
         .clone();
-    assert_eq!(
-        refs,
-        vec![(Some("x402".to_string()), Some("auth-42".to_string()))],
-        "the open monetary intent names its rail and authorization id"
+    assert_eq!(refs.len(), 1, "one monetary intent must be visible");
+    let (rail, authorization_id) = &refs[0];
+    assert_eq!(rail.as_deref(), Some("x402"));
+    assert!(
+        authorization_id
+            .as_deref()
+            .is_some_and(|authorization_id| authorization_id.starts_with("sim-")),
+        "the open monetary intent names its operation-owned authorization id"
     );
 
     // The allow receipt still consumes the monetary intent.
     harness.store.flush_receipt_writes()?;
     assert_eq!(harness.store.open_dispatch_intent_count()?, 0);
 
-    let _ = std::fs::remove_file(&harness.db_path);
+    harness.cleanup();
     Ok(())
 }
 

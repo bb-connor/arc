@@ -7,8 +7,12 @@
 
 use crate::crypto::PublicKey;
 use crate::receipt::body::ChioReceipt;
+use crate::receipt::economics::FinancialBudgetAuthorityReceiptMetadata;
 use crate::receipt::kinds::{BoundaryClass, ReceiptKind, TrustLevel};
+use crate::receipt::metadata::ReceiptAttributionMetadata;
 use alloc::string::{String, ToString};
+
+use super::partition_escrow::is_valid_partition_escrow_receipt_metadata;
 
 /// Receipt-profile identifier for a fully authoritative mediated-spend receipt.
 pub const MEDIATED_SPEND_PROFILE: &str = "chio.mediated_spend.v1";
@@ -135,6 +139,14 @@ pub enum NotAuthoritativeReason {
     UnknownGuaranteeLevel {
         actual: String,
     },
+    /// A receipt labels its budget guarantee as `partition_escrowed` but omits
+    /// the complete canonical authority proof.
+    MissingPartitionEscrowEvidence,
+    /// A partition-escrow proof is malformed, cryptographically invalid, not
+    /// bound to its digest or summary, or present under another guarantee. This
+    /// deliberately does not disclose which quota or authority dimension
+    /// failed.
+    InvalidPartitionEscrowEvidence,
 }
 
 /// Project the raw `budget_authority.mediated_spend.profile` string from a
@@ -148,6 +160,137 @@ fn mediated_spend_profile(receipt: &ChioReceipt) -> Option<&str> {
         .get("mediated_spend")?
         .get("profile")?
         .as_str()
+}
+
+fn partition_escrow_digest_is_bound_to_admission(
+    receipt: &ChioReceipt,
+    evidence_digest: &str,
+) -> bool {
+    const MAX_AUTHORIZATION_ARTIFACT_DIGESTS: usize = 8;
+
+    let Some(digests) = receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| {
+            metadata.pointer("/protocol_admission/authorize/authorization_artifact_digests")
+        })
+        .and_then(serde_json::Value::as_array)
+    else {
+        return false;
+    };
+    if digests.is_empty() || digests.len() > MAX_AUTHORIZATION_ARTIFACT_DIGESTS {
+        return false;
+    }
+
+    let mut previous = None;
+    let mut evidence_matches = 0_u8;
+    for value in digests {
+        let Some(digest) = value.as_str() else {
+            return false;
+        };
+        if digest.len() != 64
+            || !digest
+                .as_bytes()
+                .iter()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
+            || previous.is_some_and(|prior| prior >= digest)
+        {
+            return false;
+        }
+        if digest == evidence_digest {
+            evidence_matches = evidence_matches.saturating_add(1);
+        }
+        previous = Some(digest);
+    }
+    evidence_matches == 1
+}
+
+fn attributed_grant_index(receipt: &ChioReceipt) -> Option<u32> {
+    receipt
+        .metadata
+        .as_ref()?
+        .get("attribution")
+        .cloned()
+        .and_then(|value| serde_json::from_value::<ReceiptAttributionMetadata>(value).ok())?
+        .grant_index
+}
+
+fn validated_budget_authority(
+    receipt: &ChioReceipt,
+) -> Result<FinancialBudgetAuthorityReceiptMetadata, NotAuthoritativeReason> {
+    if !matches!(receipt.verify_signature(), Ok(true)) {
+        return Err(NotAuthoritativeReason::ReceiptSignatureInvalid);
+    }
+    let raw_budget_authority = receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("budget_authority"));
+    let raw_guarantee = raw_budget_authority
+        .and_then(|authority| authority.get("guarantee_level"))
+        .and_then(serde_json::Value::as_str);
+    let raw_partition_escrow_present = raw_budget_authority
+        .and_then(|authority| authority.get("partition_escrow"))
+        .is_some();
+    let budget = match receipt.financial_budget_authority_metadata() {
+        Some(budget) => budget,
+        None if raw_guarantee == Some("partition_escrowed") => {
+            return Err(if raw_partition_escrow_present {
+                NotAuthoritativeReason::InvalidPartitionEscrowEvidence
+            } else {
+                NotAuthoritativeReason::MissingPartitionEscrowEvidence
+            });
+        }
+        None if raw_partition_escrow_present => {
+            return Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence);
+        }
+        None => return Err(NotAuthoritativeReason::MissingBudgetAuthority),
+    };
+    match (
+        budget.guarantee_level.as_str(),
+        budget.partition_escrow.as_ref(),
+    ) {
+        ("partition_escrowed", None) => {
+            return Err(NotAuthoritativeReason::MissingPartitionEscrowEvidence);
+        }
+        ("partition_escrowed", Some(evidence)) => {
+            let Some(grant_index) = attributed_grant_index(receipt) else {
+                return Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence);
+            };
+            let raw_financial_present = receipt
+                .metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata.get("financial").is_some());
+            match receipt.financial_metadata() {
+                Some(financial) if financial.grant_index != grant_index => {
+                    return Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence);
+                }
+                None if raw_financial_present => {
+                    return Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence);
+                }
+                _ => {}
+            }
+            if !is_valid_partition_escrow_receipt_metadata(
+                evidence,
+                &receipt.capability_id,
+                grant_index,
+            ) || !partition_escrow_digest_is_bound_to_admission(
+                receipt,
+                &evidence.evidence_digest,
+            ) {
+                return Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence);
+            }
+        }
+        (_, None) => {}
+        (_, Some(_)) => {
+            return Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence);
+        }
+    }
+    if !is_recognized_guarantee_level(&budget.guarantee_level) {
+        return Err(NotAuthoritativeReason::UnknownGuaranteeLevel {
+            actual: budget.guarantee_level.clone(),
+        });
+    }
+    Ok(budget)
 }
 
 /// Structurally checkable conjunction over the kernel signature. Fail-closed:
@@ -186,6 +329,13 @@ pub fn is_authoritative_spend_receipt(
         return Err(NotAuthoritativeReason::NotAllowDecision);
     }
     // (b) an atomically committed, reconciled hold that actually moved exposure.
+    validated_budget_authority(receipt)?;
+    // A guarantee-floor check may validate invocation-only partition escrow
+    // receipts, but an authoritative spend must carry the monetary projection
+    // whose settled amount it claims.
+    if receipt.financial_metadata().is_none() {
+        return Err(NotAuthoritativeReason::MissingBudgetAuthority);
+    }
     let budget = BudgetAuthorityReceiptRef::from_receipt(receipt)
         .ok_or(NotAuthoritativeReason::MissingBudgetAuthority)?;
     if budget.hold_id.is_empty() {
@@ -279,7 +429,10 @@ pub fn is_recognized_guarantee_level(level: &str) -> bool {
 /// Returns `Ok(())` only when the receipt's guarantee level is at least the
 /// operator floor. Fail-closed on a missing budget-authority block or on an
 /// unrecognized floor (a misconfigured floor must not silently admit every
-/// receipt by ranking as the weakest level).
+/// receipt by ranking as the weakest level). Every level requires a valid outer
+/// receipt signature before ranking. A `partition_escrowed` receipt must also
+/// carry a valid complete proof bound by that signature; the guarantee string
+/// alone never satisfies a floor.
 pub fn receipt_meets_guarantee_floor(
     receipt: &ChioReceipt,
     minimum_level: &str,
@@ -289,18 +442,7 @@ pub fn receipt_meets_guarantee_floor(
             minimum: minimum_level.to_string(),
         });
     }
-    let budget = BudgetAuthorityReceiptRef::from_receipt(receipt)
-        .ok_or(NotAuthoritativeReason::MissingBudgetAuthority)?;
-    // The receipt's own guarantee level must be a recognized level before it can
-    // be ranked. An unrecognized level ranks 0 (weakest), so against the weakest
-    // valid floor (`advisory_posthoc`, also rank 0) the rank comparison below is
-    // `0 < 0 == false` and a typoed or forged claim would pass. Reject it here so
-    // the verifier fails closed on a malformed truthfulness claim.
-    if !is_recognized_guarantee_level(&budget.guarantee_level) {
-        return Err(NotAuthoritativeReason::UnknownGuaranteeLevel {
-            actual: budget.guarantee_level.clone(),
-        });
-    }
+    let budget = validated_budget_authority(receipt)?;
     if guarantee_level_rank(&budget.guarantee_level) < guarantee_level_rank(minimum_level) {
         return Err(NotAuthoritativeReason::GuaranteeLevelBelowFloor {
             minimum: minimum_level.to_string(),
@@ -317,8 +459,18 @@ mod tests {
     use crate::crypto::{Keypair, PublicKey};
     use crate::receipt::body::{ChioReceipt, ChioReceiptBody};
     use crate::receipt::decision::{Decision, ToolCallAction};
+    use crate::receipt::economics::{
+        FinancialPartitionEscrowReceiptMetadata, FinancialPartitionEscrowReceiptSummary,
+    };
     use crate::receipt::kinds::{
         BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
+    };
+    use crate::{
+        canonical_json_bytes, verify_partition_escrow_quota_commitment, PartitionEscrowAllocation,
+        PartitionEscrowAllocationPlan, PartitionEscrowAllocationPlanBinding,
+        PartitionEscrowAllocationSetBody, PartitionEscrowQuota, PartitionEscrowQuotaCommitmentBody,
+        PartitionEscrowQuotaSourceBinding, SignedPartitionEscrowAllocationSet,
+        SignedPartitionEscrowQuotaCommitment,
     };
 
     /// Minimal test double for a kernel-signed execution nonce.
@@ -420,6 +572,215 @@ mod tests {
         }
     }
 
+    fn partition_escrow_evidence_digest(canonical: &[u8]) -> String {
+        let domain = b"chio.partition-escrow-admission-evidence.v1\0";
+        let mut input = Vec::with_capacity(domain.len() + canonical.len());
+        input.extend_from_slice(domain);
+        input.extend_from_slice(canonical);
+        crate::sha256_hex(&input)
+    }
+
+    fn partition_escrow_counter_namespace_digest(partition_id: &str, authority_id: &str) -> String {
+        let canonical = canonical_json_bytes(&serde_json::json!({
+            "partitionId": partition_id,
+            "authorityId": authority_id,
+        }))
+        .unwrap();
+        let domain = b"chio.partition-escrow-counter-namespace.v1\0";
+        let mut input = Vec::with_capacity(domain.len() + canonical.len());
+        input.extend_from_slice(domain);
+        input.extend_from_slice(&canonical);
+        crate::sha256_hex(&input)
+    }
+
+    fn valid_partition_escrow_receipt_metadata_for(
+        capability_id: &str,
+        grant_index: u32,
+    ) -> FinancialPartitionEscrowReceiptMetadata {
+        let signer = Keypair::generate();
+        let store_identity_digest = "aa".repeat(32);
+        let counter_namespace_digest =
+            partition_escrow_counter_namespace_digest("partition-a", &store_identity_digest);
+        let source_artifact_digest = "11".repeat(32);
+        let revocation_set_digest = "22".repeat(32);
+        let resolver_configuration_digest = "33".repeat(32);
+        let quota = PartitionEscrowQuota::new(
+            "chio.grant-invocation.v1",
+            capability_id,
+            Some(grant_index),
+            10,
+        )
+        .unwrap();
+        let source_trust = serde_json::json!({
+            "kind": "grantCapability",
+            "capability_id": capability_id,
+            "grant_index": grant_index,
+            "revocation_set_digest": revocation_set_digest,
+        });
+        let source_trust_binding = serde_json::json!({
+            "schema": "chio.partition-escrow-source-trust-binding.v1",
+            "profile": quota.profile(),
+            "quotaKeyDigest": quota.key_digest().unwrap(),
+            "quotaDescriptorDigest": quota.descriptor_digest().unwrap(),
+            "underlyingSourceArtifactDigest": source_artifact_digest,
+            "sourceSigner": signer.public_key(),
+            "sourceNotBefore": 100,
+            "sourceExpiresAt": 200,
+            "profileTrust": source_trust,
+        });
+        let source_trust_canonical = canonical_json_bytes(&source_trust_binding).unwrap();
+        let source_trust_domain = b"chio.partition-escrow-source-trust-binding.v1\0";
+        let mut source_trust_input =
+            Vec::with_capacity(source_trust_domain.len() + source_trust_canonical.len());
+        source_trust_input.extend_from_slice(source_trust_domain);
+        source_trust_input.extend_from_slice(&source_trust_canonical);
+        let source_trust_digest = crate::sha256_hex(&source_trust_input);
+        let allocations =
+            vec![
+                PartitionEscrowAllocation::new("partition-a", &store_identity_digest, 10).unwrap(),
+            ];
+        let plan = PartitionEscrowAllocationPlan::new(
+            PartitionEscrowAllocationPlanBinding::new(
+                "authority-domain",
+                "allocation-root",
+                7,
+                quota.clone(),
+                200,
+                100,
+                180,
+            )
+            .unwrap(),
+            allocations.clone(),
+        )
+        .unwrap();
+        let commitment = SignedPartitionEscrowQuotaCommitment::sign(
+            PartitionEscrowQuotaCommitmentBody::new(
+                &plan,
+                PartitionEscrowQuotaSourceBinding::new(
+                    &source_artifact_digest,
+                    &source_trust_digest,
+                    100,
+                    200,
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+            &signer,
+        )
+        .unwrap();
+        let certificate = verify_partition_escrow_quota_commitment(&commitment, 120).unwrap();
+        let allocation_set = SignedPartitionEscrowAllocationSet::sign(
+            PartitionEscrowAllocationSetBody::new(&certificate, 100, 180, allocations).unwrap(),
+            &signer,
+        )
+        .unwrap();
+        let evidence = serde_json::json!({
+            "schema": "chio.partition-escrow-admission-evidence.v1",
+            "verifiedAt": 120,
+            "resolver": {
+                "resolverId": "resolver-a",
+                "implementationId": "resolver-implementation-a",
+                "implementationVersion": 1,
+                "configurationDigest": resolver_configuration_digest,
+            },
+            "durableStore": {
+                "storeIdentityDigest": store_identity_digest,
+                "counterNamespaceDigest": counter_namespace_digest,
+                "fencingToken": 7,
+            },
+            "authorityDomain": "authority-domain",
+            "partitionId": "partition-a",
+            "authorityId": store_identity_digest,
+            "quotas": [{
+                "globalQuota": quota,
+                "localAllocatedInvocations": 10,
+                "quotaKeyDigest": certificate.quota().key_digest().unwrap(),
+                "quotaDescriptorDigest": certificate.quota().descriptor_digest().unwrap(),
+                "quotaCertificateBindingDigest": certificate.binding_digest().unwrap(),
+                "quotaCommitmentDigest": certificate.commitment_digest(),
+                "underlyingSourceArtifactDigest": source_artifact_digest,
+                "sourceTrustBindingDigest": source_trust_digest,
+                "sourceNotBefore": 100,
+                "sourceExpiresAt": 200,
+                "sourceSigner": signer.public_key(),
+                "sourceTrust": source_trust,
+                "allocationPlanDigest": certificate.allocation_plan_digest(),
+                "allocationRootId": "allocation-root",
+                "allocationEpoch": 7,
+                "allocationSetDigest": allocation_set.digest().unwrap(),
+                "totalAllocatedInvocations": 10,
+                "quotaCommitment": commitment,
+                "allocationSet": allocation_set,
+            }],
+        });
+        let canonical = canonical_json_bytes(&evidence).unwrap();
+        FinancialPartitionEscrowReceiptMetadata {
+            canonical_json: String::from_utf8(canonical.clone()).unwrap(),
+            evidence_digest: partition_escrow_evidence_digest(&canonical),
+            summary: FinancialPartitionEscrowReceiptSummary {
+                resolver_id: "resolver-a".to_string(),
+                resolver_implementation_id: "resolver-implementation-a".to_string(),
+                resolver_implementation_version: 1,
+                resolver_configuration_digest,
+                store_identity_digest: store_identity_digest.clone(),
+                counter_namespace_digest,
+                fencing_token: 7,
+                partition_id: "partition-a".to_string(),
+                authority_id: store_identity_digest,
+            },
+        }
+    }
+
+    fn valid_partition_escrow_receipt_metadata() -> FinancialPartitionEscrowReceiptMetadata {
+        valid_partition_escrow_receipt_metadata_for("cap-1", 0)
+    }
+
+    fn receipt_with_partition_escrow_metadata(
+        kp: &Keypair,
+        metadata: FinancialPartitionEscrowReceiptMetadata,
+    ) -> ChioReceipt {
+        let mut receipt = authoritative_receipt(kp);
+        let evidence_digest = metadata.evidence_digest.clone();
+        let receipt_metadata = receipt
+            .metadata
+            .as_mut()
+            .and_then(serde_json::Value::as_object_mut)
+            .unwrap();
+        {
+            let authority = receipt_metadata
+                .get_mut("budget_authority")
+                .and_then(serde_json::Value::as_object_mut)
+                .unwrap();
+            authority.insert(
+                "guarantee_level".to_string(),
+                serde_json::json!("partition_escrowed"),
+            );
+            authority.insert(
+                "partition_escrow".to_string(),
+                serde_json::to_value(metadata).unwrap(),
+            );
+        }
+        receipt_metadata.insert(
+            "attribution".to_string(),
+            serde_json::to_value(ReceiptAttributionMetadata {
+                subject_key: kp.public_key().to_hex(),
+                issuer_key: kp.public_key().to_hex(),
+                delegation_depth: 0,
+                grant_index: Some(0),
+            })
+            .unwrap(),
+        );
+        receipt_metadata.insert(
+            "protocol_admission".to_string(),
+            serde_json::json!({
+                "authorize": {
+                    "authorization_artifact_digests": [evidence_digest],
+                }
+            }),
+        );
+        ChioReceipt::sign(receipt.body(), kp).unwrap()
+    }
+
     #[test]
     fn authoritative_receipt_with_bound_nonce_passes() {
         let kp = Keypair::generate();
@@ -428,6 +789,233 @@ mod tests {
         assert_eq!(
             is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn authoritative_partition_receipt_without_proof_is_rejected() {
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        receipt
+            .metadata
+            .as_mut()
+            .and_then(|value| value.get_mut("budget_authority"))
+            .and_then(serde_json::Value::as_object_mut)
+            .unwrap()
+            .insert(
+                "guarantee_level".to_string(),
+                serde_json::json!("partition_escrowed"),
+            );
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::MissingPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn authoritative_partition_receipt_with_invalid_proof_is_rejected() {
+        let kp = Keypair::generate();
+        let mut evidence = valid_partition_escrow_receipt_metadata();
+        evidence.summary.fencing_token += 1;
+        let receipt = receipt_with_partition_escrow_metadata(&kp, evidence);
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn authoritative_partition_receipt_with_valid_proof_passes() {
+        let kp = Keypair::generate();
+        let receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn partition_proof_for_another_capability_is_rejected_by_both_verifiers() {
+        let kp = Keypair::generate();
+        let receipt = receipt_with_partition_escrow_metadata(
+            &kp,
+            valid_partition_escrow_receipt_metadata_for("cap-2", 0),
+        );
+        let nonce = good_nonce(&kp, &receipt);
+
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn partition_proof_for_another_grant_is_rejected_by_both_verifiers() {
+        let kp = Keypair::generate();
+        let receipt = receipt_with_partition_escrow_metadata(
+            &kp,
+            valid_partition_escrow_receipt_metadata_for("cap-1", 1),
+        );
+        let nonce = good_nonce(&kp, &receipt);
+
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn partition_proof_not_used_for_this_admission_is_rejected_by_both_verifiers() {
+        let kp = Keypair::generate();
+        let proof = valid_partition_escrow_receipt_metadata();
+        let other_admission_digest = valid_partition_escrow_receipt_metadata().evidence_digest;
+        assert_ne!(proof.evidence_digest, other_admission_digest);
+        let mut receipt = receipt_with_partition_escrow_metadata(&kp, proof);
+        *receipt
+            .metadata
+            .as_mut()
+            .and_then(|metadata| {
+                metadata
+                    .pointer_mut("/protocol_admission/authorize/authorization_artifact_digests/0")
+            })
+            .unwrap() = serde_json::json!(other_admission_digest);
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        let nonce = good_nonce(&kp, &receipt);
+
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn partition_guarantee_floor_accepts_invocation_only_receipt_but_spend_requires_financial() {
+        let kp = Keypair::generate();
+        let mut receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        receipt
+            .metadata
+            .as_mut()
+            .and_then(serde_json::Value::as_object_mut)
+            .unwrap()
+            .remove("financial");
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        let nonce = good_nonce(&kp, &receipt);
+
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::MissingBudgetAuthority)
+        );
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn partition_guarantee_floor_rejects_missing_signed_grant_attribution() {
+        let kp = Keypair::generate();
+        let mut receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        receipt
+            .metadata
+            .as_mut()
+            .and_then(serde_json::Value::as_object_mut)
+            .unwrap()
+            .remove("attribution");
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn partition_guarantee_floor_rejects_mismatched_signed_grant_attribution() {
+        let kp = Keypair::generate();
+        let mut receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        receipt.metadata.as_mut().unwrap()["attribution"]["grant_index"] = serde_json::json!(1);
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn partition_guarantee_floor_rejects_financial_grant_disagreeing_with_attribution() {
+        let kp = Keypair::generate();
+        let mut receipt = receipt_with_partition_escrow_metadata(
+            &kp,
+            valid_partition_escrow_receipt_metadata_for("cap-1", 1),
+        );
+        receipt.metadata.as_mut().unwrap()["attribution"]["grant_index"] = serde_json::json!(1);
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn partition_guarantee_floor_rejects_malformed_present_financial_metadata() {
+        let kp = Keypair::generate();
+        let mut receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        receipt.metadata.as_mut().unwrap()["financial"] = serde_json::json!({
+            "grant_index": 0,
+        });
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn partition_proof_with_multiple_grant_quotas_is_rejected() {
+        let kp = Keypair::generate();
+        let mut metadata = valid_partition_escrow_receipt_metadata();
+        let mut evidence: serde_json::Value =
+            serde_json::from_str(&metadata.canonical_json).unwrap();
+        let other_evidence: serde_json::Value = serde_json::from_str(
+            &valid_partition_escrow_receipt_metadata_for("cap-2", 0).canonical_json,
+        )
+        .unwrap();
+        evidence["quotas"]
+            .as_array_mut()
+            .unwrap()
+            .push(other_evidence["quotas"][0].clone());
+        let canonical = canonical_json_bytes(&evidence).unwrap();
+        metadata.canonical_json = String::from_utf8(canonical.clone()).unwrap();
+        metadata.evidence_digest = partition_escrow_evidence_digest(&canonical);
+        let receipt = receipt_with_partition_escrow_metadata(&kp, metadata);
+
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
         );
     }
 
@@ -606,6 +1194,124 @@ mod tests {
         assert_eq!(
             receipt_meets_guarantee_floor(&receipt, "advisory_posthoc"),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn partition_escrow_guarantee_requires_and_validates_complete_proof() {
+        let kp = Keypair::generate();
+        let receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Ok(())
+        );
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "advisory_posthoc"),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn partition_escrow_label_without_proof_is_rejected_explicitly() {
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        receipt.metadata.as_mut().unwrap()["budget_authority"]["guarantee_level"] =
+            serde_json::json!("partition_escrowed");
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "advisory_posthoc"),
+            Err(NotAuthoritativeReason::MissingPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn invalid_partition_escrow_dimensions_share_one_non_leaking_reason() {
+        let kp = Keypair::generate();
+
+        let mut digest_mismatch = valid_partition_escrow_receipt_metadata();
+        digest_mismatch.evidence_digest = "ff".repeat(32);
+        let receipt = receipt_with_partition_escrow_metadata(&kp, digest_mismatch);
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+
+        let mut summary_mismatch = valid_partition_escrow_receipt_metadata();
+        summary_mismatch.summary.fencing_token += 1;
+        let receipt = receipt_with_partition_escrow_metadata(&kp, summary_mismatch);
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+
+        let mut namespace_mismatch = valid_partition_escrow_receipt_metadata();
+        let mut evidence: serde_json::Value =
+            serde_json::from_str(&namespace_mismatch.canonical_json).unwrap();
+        let arbitrary_namespace = "cc".repeat(32);
+        evidence["durableStore"]["counterNamespaceDigest"] =
+            serde_json::json!(&arbitrary_namespace);
+        let canonical = canonical_json_bytes(&evidence).unwrap();
+        namespace_mismatch.canonical_json = String::from_utf8(canonical.clone()).unwrap();
+        namespace_mismatch.evidence_digest = partition_escrow_evidence_digest(&canonical);
+        namespace_mismatch.summary.counter_namespace_digest = arbitrary_namespace;
+        let receipt = receipt_with_partition_escrow_metadata(&kp, namespace_mismatch);
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+
+        let mut signed_allocation_mismatch = valid_partition_escrow_receipt_metadata();
+        let mut evidence: serde_json::Value =
+            serde_json::from_str(&signed_allocation_mismatch.canonical_json).unwrap();
+        evidence["quotas"][0]["allocationSet"]["body"]["allocations"][0]["allocatedInvocations"] =
+            serde_json::json!(9);
+        let canonical = canonical_json_bytes(&evidence).unwrap();
+        signed_allocation_mismatch.canonical_json = String::from_utf8(canonical.clone()).unwrap();
+        signed_allocation_mismatch.evidence_digest = partition_escrow_evidence_digest(&canonical);
+        let receipt = receipt_with_partition_escrow_metadata(&kp, signed_allocation_mismatch);
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn escrow_proof_under_another_guarantee_is_rejected() {
+        let kp = Keypair::generate();
+        let mut receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        receipt.metadata.as_mut().unwrap()["budget_authority"]["guarantee_level"] =
+            serde_json::json!("ha_linearizable");
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "single_node_atomic"),
+            Err(NotAuthoritativeReason::InvalidPartitionEscrowEvidence)
+        );
+    }
+
+    #[test]
+    fn valid_inner_escrow_proof_requires_its_outer_receipt_signature() {
+        let kp = Keypair::generate();
+        let mut receipt =
+            receipt_with_partition_escrow_metadata(&kp, valid_partition_escrow_receipt_metadata());
+        receipt.tool_name = "tampered-after-signing".to_string();
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::ReceiptSignatureInvalid)
+        );
+    }
+
+    #[test]
+    fn unsigned_guarantee_upgrade_is_rejected_before_ranking() {
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        receipt.metadata.as_mut().unwrap()["budget_authority"]["guarantee_level"] =
+            serde_json::json!("ha_linearizable");
+
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "ha_linearizable"),
+            Err(NotAuthoritativeReason::ReceiptSignatureInvalid)
         );
     }
 

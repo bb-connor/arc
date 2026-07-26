@@ -51,6 +51,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 struct SqliteReceiptStore {
     connection: Mutex<Connection>,
+    database_identity: chio_core::Hash,
     // Test-double analogue of the real store's writer-actor signer install
     // (`enable_background_checkpoints`). `None` until installed;
     // `max_batch == 0` disables checkpointing (ADR-0008).
@@ -147,8 +148,12 @@ impl SqliteReceiptStore {
                     ON chio_dispatch_intents(COALESCE(tenant_id, ''), request_id);
                 "#,
         )?;
+        let database_identity =
+            chio_core::Hash::from_hex(&chio_core::sha256_hex(path.to_string_lossy().as_bytes()))
+                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
         Ok(Self {
             connection: Mutex::new(connection),
+            database_identity,
             background_checkpoint_signer: Mutex::new(None),
         })
     }
@@ -485,6 +490,34 @@ impl ReceiptStore for SqliteReceiptStore {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.append_chio_receipt_returning_seq(receipt)?;
         Ok(())
+    }
+
+    fn durable_storage_identity(&self) -> Result<Option<chio_core::Hash>, ReceiptStoreError> {
+        Ok(Some(self.database_identity))
+    }
+
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
+    }
+
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        self.connection()?
+            .query_row(
+                "SELECT raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+                params![receipt_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .map(|raw_json| serde_json::from_str(&raw_json))
+            .transpose()
+            .map_err(Into::into)
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        self.connection.is_poisoned()
     }
 
     fn supports_durable_dispatch_intent_journal(&self) -> bool {
@@ -1080,7 +1113,7 @@ fn make_config() -> KernelConfig {
         keypair: make_keypair(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "test-policy-hash".to_string(),
+        policy_hash: "11".repeat(32),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -1550,7 +1583,6 @@ struct FilesystemResourceProvider;
 struct ExamplePromptProvider;
 struct DeterministicPaymentAdapter;
 struct DecliningPaymentAdapter;
-struct PrepaidSettledPaymentAdapter;
 
 impl EchoServer {
     fn new(id: &str, tools: Vec<&str>) -> Self {

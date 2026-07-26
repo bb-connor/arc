@@ -1,4 +1,6 @@
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_security_types::ports::{
@@ -11,7 +13,7 @@ use chio_security_types::ports::{
     SessionId, TenantId,
 };
 use chio_security_types::{ResponseEffectKind, ResponseTarget};
-use chio_store_sqlite::SqliteSecurityStateStore;
+use chio_store_sqlite::{security_state::SecurityStateClock, SqliteSecurityStateStore};
 use tempfile::tempdir;
 
 fn now_unix_ms() -> u64 {
@@ -19,6 +21,24 @@ fn now_unix_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_else(|error| panic!("clock before Unix epoch: {error}"));
     u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
+}
+
+struct MutableSecurityStateClock(AtomicU64);
+
+impl MutableSecurityStateClock {
+    fn new(now_unix_ms: u64) -> Self {
+        Self(AtomicU64::new(now_unix_ms))
+    }
+
+    fn set(&self, now_unix_ms: u64) {
+        self.0.store(now_unix_ms, Ordering::Release);
+    }
+}
+
+impl SecurityStateClock for MutableSecurityStateClock {
+    fn now_unix_ms(&self) -> PortResult<u64> {
+        Ok(self.0.load(Ordering::Acquire))
+    }
 }
 
 fn tenant() -> TenantId {
@@ -321,8 +341,12 @@ fn action_rebinding_and_stale_scheduler_fences_fail_closed() {
     let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("egress-fence.db");
     let now = now_unix_ms();
-    let store =
-        SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
+    let clock = Arc::new(MutableSecurityStateClock::new(now));
+    let store = SqliteSecurityStateStore::open_with_trusted_clock(
+        &path,
+        Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+    )
+    .unwrap_or_else(|error| panic!("open store: {error}"));
     let work = scheduled_action(&store, "action-a", "claim-a", now);
     let restriction = contribution("effect-a", &["server-a"], now + 60_000);
     let request = EgressRestrictionApplyRequest {
@@ -357,19 +381,7 @@ fn action_rebinding_and_stale_scheduler_fences_fail_closed() {
     rebound_request.command.request.action_id = rebound_action;
     let rebound = require_error(store.apply_egress_restriction(&rebound_request));
     assert_eq!(rebound.kind(), PortErrorKind::Conflict);
-    drop(store);
-
-    rusqlite::Connection::open(&path)
-        .and_then(|connection| {
-            connection.execute(
-                "UPDATE security_scheduler_leases SET lease_expires_at = 0 WHERE action_id = 'action-a'",
-                [],
-            )?;
-            Ok(())
-        })
-        .unwrap_or_else(|error| panic!("expire scheduler lease: {error}"));
-    let store = SqliteSecurityStateStore::open(&path)
-        .unwrap_or_else(|error| panic!("reopen store: {error}"));
+    clock.set(work.lease_expires_at_unix_ms.saturating_add(1));
     let stale = require_error(
         store.remove_egress_restriction(&EgressRestrictionRemoveRequest {
             key: key(),

@@ -986,6 +986,7 @@ fn composite_budget_request(
             "construct canonical budget revocation set",
         )?,
         authorization_artifact_digests: Vec::new(),
+        partition_escrow_evidence: None,
     })
 }
 

@@ -570,6 +570,7 @@ impl BrokerExecutionBudget for ConformanceBudget {
                 invocation_quotas: quotas,
                 revocation_set: self.revocation_set.clone(),
                 authorization_artifact_digests: vec![self.authorization_artifact_digest.clone()],
+                partition_escrow_evidence: None,
             })
             .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?;
         Self::map_authorization(decision)

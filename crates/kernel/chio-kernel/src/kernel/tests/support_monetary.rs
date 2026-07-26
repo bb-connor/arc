@@ -80,53 +80,67 @@ fn forged_budget_authority_metadata() -> serde_json::Value {
     })
 }
 
-fn assert_forged_budget_authority_removed(receipt: &ChioReceipt) {
-    let metadata = receipt
-        .metadata
-        .as_ref()
-        .expect("cleanup fault receipt must carry metadata");
-    let budget = &metadata["budget_authority"];
-    assert!(
-        budget["terminal"].is_null(),
-        "a failed cleanup must not retain a caller-forged terminal: {budget}"
-    );
-    let financial_budget_authority = receipt
-        .financial_budget_authority_metadata()
-        .expect("cleanup fault receipt must retain typed budget authorization metadata");
-    assert!(financial_budget_authority.terminal.is_none());
-    let reason = metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["reason"]
-        .as_str()
-        .expect("cleanup fault must carry its redacted failure reason");
-    assert!(reason.contains("[REDACTED-API-KEY]"));
-    assert!(!reason.contains("sk_live_"));
-    assert_ne!(budget["hold_id"], "forged-budget-hold");
-    assert_ne!(budget["budget_term"], "forged-budget-term");
-    assert_ne!(budget["authority"]["authority_id"], "forged-authority");
-    assert!(budget["forged_marker"].is_null());
-    assert_eq!(
-        metadata["chio_runtime"]["admission_id"],
-        "legitimate-admission-metadata"
-    );
-    assert_eq!(
-        metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
-        true
-    );
-    assert_eq!(metadata["route"]["bridge"], "collision-test");
+trait TestBudgetFault: Send + Sync {
+    const FAIL_REVERSE: bool;
+    const FAIL_RELEASE: bool;
 }
 
-struct FailingReleaseBudgetStore {
-    inner: InMemoryBudgetStore,
+struct ReleaseBudgetFault;
+
+impl TestBudgetFault for ReleaseBudgetFault {
+    const FAIL_REVERSE: bool = false;
+    const FAIL_RELEASE: bool = true;
 }
 
-impl FailingReleaseBudgetStore {
-    fn new() -> Self {
+struct ReverseBudgetFault;
+
+impl TestBudgetFault for ReverseBudgetFault {
+    const FAIL_REVERSE: bool = true;
+    const FAIL_RELEASE: bool = false;
+}
+
+struct FaultingDurableAtomicBudgetStore<F> {
+    inner: std::sync::Arc<DurableAtomicTestBudgetStore>,
+    fault: std::marker::PhantomData<F>,
+}
+
+impl<F> FaultingDurableAtomicBudgetStore<F> {
+    fn with_durable_atomic_inner() -> Self {
         Self {
-            inner: InMemoryBudgetStore::new(),
+            inner: std::sync::Arc::new(DurableAtomicTestBudgetStore::new()),
+            fault: std::marker::PhantomData,
         }
     }
 }
 
-impl BudgetStore for FailingReleaseBudgetStore {
+type FailingReleaseBudgetStore = FaultingDurableAtomicBudgetStore<ReleaseBudgetFault>;
+type ReverseFailingBudgetStore = FaultingDurableAtomicBudgetStore<ReverseBudgetFault>;
+
+impl FaultingDurableAtomicBudgetStore<ReleaseBudgetFault> {
+    fn new() -> Self {
+        Self::with_durable_atomic_inner()
+    }
+}
+
+impl FaultingDurableAtomicBudgetStore<ReverseBudgetFault> {
+    fn new() -> Self {
+        Self::with_durable_atomic_inner()
+    }
+}
+
+impl<F: TestBudgetFault> BudgetStore for FaultingDurableAtomicBudgetStore<F> {
+    fn authority_profile(&self) -> crate::budget_store::BudgetStoreProfile {
+        self.inner.authority_profile()
+    }
+
+    fn supports_durable_atomic_payment_journal(&self) -> bool {
+        self.inner.supports_durable_atomic_payment_journal()
+    }
+
+    fn budget_guarantee_level(&self) -> crate::budget_store::BudgetGuaranteeLevel {
+        self.inner.budget_guarantee_level()
+    }
+
     fn try_increment(
         &self,
         capability_id: &str,
@@ -156,14 +170,113 @@ impl BudgetStore for FailingReleaseBudgetStore {
         )
     }
 
+    fn try_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner.try_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+        )
+    }
+
+    fn try_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner.try_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+            authority,
+        )
+    }
+
     fn reverse_charge_cost(
         &self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
     ) -> Result<(), BudgetStoreError> {
+        if F::FAIL_REVERSE {
+            return Err(BudgetStoreError::Invariant(
+                "reverse store unreachable".to_string(),
+            ));
+        }
         self.inner
             .reverse_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn reverse_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<(), BudgetStoreError> {
+        if F::FAIL_REVERSE {
+            return Err(BudgetStoreError::Invariant(
+                "reverse store unreachable".to_string(),
+            ));
+        }
+        self.inner.reverse_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+        )
+    }
+
+    fn reverse_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        if F::FAIL_REVERSE {
+            return Err(BudgetStoreError::Invariant(
+                "reverse store unreachable".to_string(),
+            ));
+        }
+        self.inner.reverse_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+            authority,
+        )
     }
 
     fn reduce_charge_cost(
@@ -174,6 +287,42 @@ impl BudgetStore for FailingReleaseBudgetStore {
     ) -> Result<(), BudgetStoreError> {
         self.inner
             .reduce_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn reduce_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.reduce_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+        )
+    }
+
+    fn reduce_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.reduce_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+            authority,
+        )
     }
 
     fn settle_charge_cost(
@@ -191,13 +340,319 @@ impl BudgetStore for FailingReleaseBudgetStore {
         )
     }
 
+    fn settle_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.settle_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+            hold_id,
+            event_id,
+        )
+    }
+
+    fn settle_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.settle_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+            hold_id,
+            event_id,
+            authority,
+        )
+    }
+
+    fn list_mutation_events(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+        grant_index: Option<usize>,
+    ) -> Result<Vec<crate::budget_store::BudgetMutationRecord>, BudgetStoreError> {
+        self.inner
+            .list_mutation_events(limit, capability_id, grant_index)
+    }
+
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetMutationRecord>, BudgetStoreError> {
+        self.inner.get_mutation_event_by_id(event_id)
+    }
+
+    fn budget_authority_profile(&self) -> crate::budget_store::BudgetAuthorityProfile {
+        self.inner.budget_authority_profile()
+    }
+
+    fn budget_metering_profile(&self) -> crate::budget_store::BudgetMeteringProfile {
+        self.inner.budget_metering_profile()
+    }
+
+    fn partition_escrow_store_binding(
+        &self,
+    ) -> Result<Option<crate::budget_store::PartitionEscrowStoreBinding>, BudgetStoreError> {
+        self.inner.partition_escrow_store_binding()
+    }
+
+    fn list_open_holds_older_than(
+        &self,
+        older_than_unix_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<crate::budget_store::OpenHoldSummary>, BudgetStoreError> {
+        self.inner
+            .list_open_holds_older_than(older_than_unix_ms, limit)
+    }
+
+    fn expire_open_hold(&self, hold_id: &str) -> Result<bool, BudgetStoreError> {
+        self.inner.expire_open_hold(hold_id)
+    }
+
+    fn recover_unstamped_caller_reservations(&self) -> Result<usize, BudgetStoreError> {
+        self.inner.recover_unstamped_caller_reservations()
+    }
+
+    fn open_hold_count(&self) -> Result<u64, BudgetStoreError> {
+        self.inner.open_hold_count()
+    }
+
+    fn record_payment_journal(
+        &self,
+        entry: &crate::payment::PaymentJournalRecord,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.record_payment_journal(entry)
+    }
+
+    fn advance_payment_journal(
+        &self,
+        request_id: &str,
+        expected: crate::payment::PaymentJournalState,
+        next: crate::payment::PaymentJournalState,
+        authorization_id: Option<&str>,
+        transaction_id: Option<&str>,
+        settle: Option<crate::payment::PaymentSettleIntent>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.advance_payment_journal(
+            request_id,
+            expected,
+            next,
+            authorization_id,
+            transaction_id,
+            settle,
+        )
+    }
+
+    fn close_payment_journal(&self, request_id: &str) -> Result<bool, BudgetStoreError> {
+        self.inner.close_payment_journal(request_id)
+    }
+
+    fn list_incomplete_payment_journal(
+        &self,
+        older_than_unix_ms: u64,
+    ) -> Result<Vec<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        self.inner
+            .list_incomplete_payment_journal(older_than_unix_ms)
+    }
+
+    fn get_payment_journal(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        self.inner.get_payment_journal(request_id)
+    }
+
+    fn payment_journal_reconcile_failed_rail(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<String>, BudgetStoreError> {
+        self.inner.payment_journal_reconcile_failed_rail(request_id)
+    }
+
+    fn authorize_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        self.inner.authorize_budget_hold(request)
+    }
+
+    fn replay_budget_authorization(
+        &self,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        self.inner.replay_budget_authorization(request)
+    }
+
+    fn reverse_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReverseHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
+        if F::FAIL_REVERSE {
+            return Err(BudgetStoreError::Invariant(
+                "reverse store unreachable".to_string(),
+            ));
+        }
+        self.inner.reverse_budget_hold(request)
+    }
+
     fn release_budget_hold(
         &self,
-        _request: crate::budget_store::BudgetReleaseHoldRequest,
+        request: crate::budget_store::BudgetReleaseHoldRequest,
     ) -> Result<crate::budget_store::BudgetReleaseHoldDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "injected budget release failure sk_live_abcdefghijklmnopqrstuvwx".to_string(),
-        ))
+        if F::FAIL_RELEASE {
+            return Err(BudgetStoreError::Invariant(
+                "injected budget release failure sk_live_abcdefghijklmnopqrstuvwx".to_string(),
+            ));
+        }
+        self.inner.release_budget_hold(request)
+    }
+
+    fn reconcile_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReconcileHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReconcileHoldDecision, BudgetStoreError> {
+        self.inner.reconcile_budget_hold(request)
+    }
+
+    fn capture_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetCaptureHoldRequest,
+    ) -> Result<crate::budget_store::BudgetCaptureHoldDecision, BudgetStoreError> {
+        self.inner.capture_budget_hold(request)
+    }
+
+    fn capture_invocation_reservations(
+        &self,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<crate::budget_store::BudgetHoldMutationDecision, BudgetStoreError> {
+        self.inner.capture_invocation_reservations(request)
+    }
+
+    fn query_invocation_capture(
+        &self,
+        request: &crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<Option<crate::budget_store::BudgetHoldMutationDecision>, BudgetStoreError> {
+        self.inner.query_invocation_capture(request)
+    }
+
+    fn reap_orphaned_holds(
+        &self,
+        realized_by_hold: &std::collections::HashMap<String, u64>,
+    ) -> Result<(usize, usize), BudgetStoreError> {
+        self.inner.reap_orphaned_holds(realized_by_hold)
+    }
+
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
+        self.inner.count_open_holds()
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
+        self.inner.get_budget_hold(hold_id)
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.mark_hold_reserved(
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
+
+    fn mark_invocation_hold_reserved(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.mark_invocation_hold_reserved(
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        )
+    }
+
+    fn mark_admission_operation_hold_reserved(
+        &self,
+        hold_id: &str,
+        admission_operation: &crate::budget_store::BudgetAdmissionOperationBinding,
+        reserved_until_unix_secs: i64,
+        currency: Option<&str>,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.mark_admission_operation_hold_reserved(
+            hold_id,
+            admission_operation,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
+
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.reserve_invocation_hold(
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        )
+    }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        self.inner.reap_expired_reserved_holds(now_unix_secs)
+    }
+
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        self.inner.list_open_delegated_reserved_hold_ids()
+    }
+
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        self.inner.request_id_has_reserved_hold(request_id)
     }
 
     fn list_usages(
@@ -468,6 +923,16 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
     let path = unique_receipt_db_path(prefix);
     let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = make_kernel(make_monetary_config());
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-monetary-operations"
+        )))
+        .expect("sibling monetary admission operation store");
+    kernel
+        .set_budget_store_handle(durable_atomic_test_budget_store(&format!(
+            "{prefix}-monetary-budget"
+        )))
+        .expect("sibling monetary budget store");
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
 
     let parent_kp = make_keypair();
@@ -558,6 +1023,16 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
     let path = unique_receipt_db_path(prefix);
     let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = make_kernel(make_monetary_config());
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-invocation-operations"
+        )))
+        .expect("sibling invocation admission operation store");
+    kernel
+        .set_budget_store_handle(durable_atomic_test_budget_store(&format!(
+            "{prefix}-invocation-budget"
+        )))
+        .expect("sibling invocation budget store");
     kernel.register_tool_server(Box::new(EchoServer::new("limited-srv", vec!["compute"])));
 
     let parent_kp = make_keypair();
@@ -575,10 +1050,26 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
     seed_store
         .record_capability_snapshot(&parent, None)
         .unwrap();
+    let aggregate_root =
+        chio_core::capability::aggregate_budget::verify_direct_aggregate_root_record(
+            &parent,
+            &[kernel.config.keypair.public_key()],
+        )
+        .unwrap();
+    let aggregate_root_id = parent.id.clone();
     drop(seed_store);
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
+    kernel.set_aggregate_family_root_resolver(std::sync::Arc::new(move |requested_id: &str| {
+        if requested_id == aggregate_root_id {
+            Ok(aggregate_root.clone())
+        } else {
+            Err(
+                chio_core::capability::aggregate_budget::AggregateFamilyRootResolutionError::Missing,
+            )
+        }
+    }));
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
@@ -1432,391 +1923,4 @@ impl PaymentAdapter for TrackingPaymentAdapter {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment_and_receipt() {
-    let started = std::sync::Arc::new(tokio::sync::Notify::new());
-    let payment = TrackingPaymentAdapter::new();
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
-    kernel.register_tool_server(Box::new(PendingMonetaryServer {
-        id: "cost-srv".to_string(),
-        started: std::sync::Arc::clone(&started),
-    }));
-
-    struct AbortEvidenceGuard;
-    impl Guard for AbortEvidenceGuard {
-        fn name(&self) -> &str {
-            "abort-evidence"
-        }
-
-        fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
-            Ok(GuardDecision::allow_with_evidence(vec![GuardEvidence {
-                guard_name: "abort-evidence".to_string(),
-                verdict: true,
-                details: Some("pre-invocation evidence recorded before abort".to_string()),
-            }]))
-        }
-    }
-    kernel.add_guard(Box::new(AbortEvidenceGuard));
-
-    let agent_kp = Keypair::generate();
-    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-    let request = ToolCallRequest {
-        request_id: "req-drop-after-admission".to_string(),
-        capability: cap.clone(),
-        tool_name: "compute".to_string(),
-        server_id: "cost-srv".to_string(),
-        agent_id: agent_kp.public_key().to_hex(),
-        arguments: serde_json::json!({}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        model_metadata: None,
-        supplemental_authorization: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
-
-    let kernel = std::sync::Arc::new(kernel);
-    let eval = {
-        let kernel = std::sync::Arc::clone(&kernel);
-        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
-    };
-
-    tokio::time::timeout(Duration::from_secs(1), started.notified())
-        .await
-        .expect("pending monetary tool should be invoked before abort");
-    eval.abort();
-    let join = eval
-        .await
-        .expect_err("aborted evaluation should not complete");
-    assert!(join.is_cancelled());
-
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 1);
-    assert_eq!(usage.total_cost_exposed, 0);
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
-    assert_eq!(
-        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
-        1
-    );
-    assert_eq!(
-        payment.released.load(std::sync::atomic::Ordering::SeqCst),
-        1
-    );
-    assert_eq!(
-        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
-        0
-    );
-
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1);
-    let receipt = receipt_log.get(0).unwrap();
-    assert!(receipt.is_cancelled());
-    assert_eq!(receipt.evidence.len(), 1);
-    assert_eq!(receipt.evidence[0].guard_name, "abort-evidence");
-    let terminal = &receipt.metadata.as_ref().unwrap()["budget_authority"]["terminal"];
-    assert_eq!(terminal["disposition"], "released");
-    assert!(terminal["event_id"]
-        .as_str()
-        .is_some_and(|event_id| event_id.ends_with(":release")));
-}
-
-#[derive(Clone, Copy)]
-enum DropCleanupFailureSource {
-    Payment,
-    BudgetStore,
-}
-
-async fn assert_post_dispatch_drop_cleanup_fault(
-    source: DropCleanupFailureSource,
-    extra_metadata: Option<serde_json::Value>,
-) {
-    let has_forged_budget_authority = extra_metadata.is_some();
-    let started = std::sync::Arc::new(tokio::sync::Notify::new());
-    let mut kernel = make_kernel(make_monetary_config());
-    match source {
-        DropCleanupFailureSource::Payment => {
-            kernel
-                .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
-                .expect("install payment adapter");
-        }
-        DropCleanupFailureSource::BudgetStore => {
-            kernel
-                .set_budget_store_handle(std::sync::Arc::new(FailingReleaseBudgetStore::new()))
-                .expect("budget store");
-        }
-    }
-    kernel.register_tool_server(Box::new(PendingMonetaryServer {
-        id: "cost-srv".to_string(),
-        started: std::sync::Arc::clone(&started),
-    }));
-
-    let agent_kp = Keypair::generate();
-    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-    let request = make_request(
-        "req-post-dispatch-drop-cleanup-fault",
-        &cap,
-        "compute",
-        "cost-srv",
-    );
-
-    let kernel = std::sync::Arc::new(kernel);
-    let eval = {
-        let kernel = std::sync::Arc::clone(&kernel);
-        tokio::spawn(async move {
-            kernel
-                .evaluate_tool_call_with_metadata(&request, extra_metadata)
-                .await
-        })
-    };
-    tokio::time::timeout(Duration::from_secs(1), started.notified())
-        .await
-        .expect("pending monetary tool should be entered before abort");
-    eval.abort();
-    assert!(eval.await.unwrap_err().is_cancelled());
-
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 1);
-    assert_eq!(usage.total_cost_exposed, 100);
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1);
-    let receipt = receipt_log.get(0).unwrap();
-    assert!(receipt.is_cancelled());
-    let metadata = receipt.metadata.as_ref().unwrap();
-    assert!(metadata["budget_authority"]["terminal"].is_null());
-    let financial_budget_authority = receipt
-        .financial_budget_authority_metadata()
-        .expect("cleanup fault receipt must retain typed budget authorization metadata");
-    assert!(financial_budget_authority.terminal.is_none());
-    assert_eq!(
-        metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
-        true
-    );
-    let fault = &metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0];
-    let expected_step = match source {
-        DropCleanupFailureSource::Payment => "payment_release",
-        DropCleanupFailureSource::BudgetStore => "budget_hold_release",
-    };
-    assert_eq!(fault["step"], expected_step);
-    let reason = fault["reason"].as_str().unwrap();
-    assert!(reason.contains("[REDACTED-API-KEY]"));
-    assert!(!reason.contains("sk_live_"));
-    assert!(fault["attempted_release_event_id"]
-        .as_str()
-        .is_some_and(|event_id| event_id.ends_with(":release")));
-    let hold_ids = fault["hold_ids"].as_array().unwrap();
-    assert!(hold_ids.iter().any(|id| id == &cap.id));
-    let budget_hold_id = metadata["budget_authority"]["hold_id"].as_str().unwrap();
-    assert!(hold_ids.iter().any(|id| id == budget_hold_id));
-    if matches!(source, DropCleanupFailureSource::Payment) {
-        assert!(hold_ids.iter().any(|id| id == "auth_failing_release"));
-    }
-    if has_forged_budget_authority {
-        assert_forged_budget_authority_removed(receipt);
-    }
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn post_dispatch_drop_payment_cleanup_failure_is_signed() {
-    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::Payment, None).await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn post_dispatch_drop_budget_cleanup_failure_is_signed() {
-    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::BudgetStore, None).await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn post_dispatch_drop_cleanup_failure_rejects_forged_budget_authority() {
-    let metadata = forged_budget_authority_metadata();
-    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::Payment, Some(metadata))
-        .await;
-}
-
-fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {
-    ToolGrant {
-        server_id: server.to_string(),
-        tool_name: tool.to_string(),
-        operations: vec![Operation::Invoke],
-        constraints: vec![],
-        max_invocations: None,
-        max_cost_per_invocation: None,
-        max_total_cost: None,
-        dpop_required: Some(true),
-    }
-}
-
-/// Build a kernel that has a DPoP store configured and a single DPoP-required grant.
-fn make_dpop_kernel_and_cap(
-    agent_kp: &Keypair,
-    server: &str,
-    tool: &str,
-) -> (ChioKernel, CapabilityToken) {
-    let config = KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![],
-        max_delegation_depth: 5,
-        policy_hash: "dpop-test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: crate::MemoryBudgetConfig::defaults(),
-        deadlines: crate::HotPathDeadlineConfig::default(),
-        dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
-    };
-    let mut kernel = make_kernel(config);
-    kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
-
-    let nonce_store = dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300));
-    kernel.set_dpop_store(nonce_store, dpop::DpopConfig::default());
-
-    let grant = make_dpop_grant(server, tool);
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-
-    (kernel, cap)
-}
-
-/// Build a valid DPoP proof for a given request context.
-fn make_dpop_proof(
-    agent_kp: &Keypair,
-    cap: &CapabilityToken,
-    server: &str,
-    tool: &str,
-    arguments: &serde_json::Value,
-    nonce: &str,
-) -> dpop::DpopProof {
-    let args_bytes =
-        chio_core::canonical::canonical_json_bytes(arguments).expect("canonical_json_bytes failed");
-    let action_hash = chio_core::crypto::sha256_hex(&args_bytes);
-    let now_secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("time error")
-        .as_secs();
-    let body = dpop::DpopProofBody {
-        schema: dpop::DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: server.to_string(),
-        tool_name: tool.to_string(),
-        action_hash,
-        nonce: nonce.to_string(),
-        issued_at: now_secs,
-        agent_key: agent_kp.public_key(),
-    };
-    dpop::DpopProof::sign(body, agent_kp).expect("DPoP sign failed")
-}
-
-/// A budget store spy that authorizes holds normally but returns `Err` on every
-/// reverse. Used to exercise pre-dispatch and recovery reversal failures.
-struct ReverseFailingBudgetStore {
-    inner: InMemoryBudgetStore,
-}
-
-impl ReverseFailingBudgetStore {
-    fn new() -> Self {
-        Self {
-            inner: InMemoryBudgetStore::new(),
-        }
-    }
-}
-
-impl BudgetStore for ReverseFailingBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "reverse store unreachable".to_string(),
-        ))
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    fn list_usages(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.list_usages(limit, capability_id)
-    }
-
-    fn get_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.get_usage(capability_id, grant_index)
-    }
-}
+include!("support_monetary_tail.inc");

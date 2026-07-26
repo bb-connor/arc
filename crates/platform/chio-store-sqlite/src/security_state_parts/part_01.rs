@@ -96,6 +96,15 @@ use chio_security_types::{
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
+const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
+const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
+    "security_transitions",
+    "security_flow_contexts",
+    "security_response_effects",
+    "security_scheduler_retries",
+    "chio_tool_receipts",
+];
 const MAX_EVENT_SCAN_RESULTS: u32 = 4_096;
 const MAX_SCHEDULER_CLAIMS: u32 = 1_024;
 const MAX_CLOCK_SKEW_MS: u64 = 5_000;
@@ -776,12 +785,12 @@ impl SqliteSecurityStateStore {
                 fs::create_dir_all(parent).map_err(|_| PortError::unavailable())?;
             }
         }
-        SqliteEncryptedBlobStore::open(path).map_err(|_| PortError::unavailable())?;
         let connection = Connection::open(path).map_err(sqlite_error)?;
         connection
             .busy_timeout(Duration::from_secs(5))
             .map_err(sqlite_error)?;
         migrate(&connection)?;
+        SqliteEncryptedBlobStore::open(path).map_err(|_| PortError::unavailable())?;
         #[cfg(unix)]
         let database_path = absolute_database_path(path)?;
         #[cfg(unix)]

@@ -495,7 +495,17 @@ fn high_level_reverse_retry_returns_original_persisted_snapshot_after_later_writ
         first.metadata.event_id.as_deref(),
         Some("event-reverse-snapshot")
     );
+    assert_eq!(
+        first.invocation_state,
+        BudgetInvocationReservationState::Reversed
+    );
     assert_eq!(first.monetary_state, BudgetMonetaryHoldState::Reversed);
+    let exact = store
+        .get_mutation_event_by_id("event-reverse-snapshot")
+        .unwrap()
+        .expect("exact legacy reverse event");
+    assert_eq!(exact.invocation_state, first.invocation_state);
+    assert_eq!(exact.monetary_state, first.monetary_state);
     assert!(first.metadata.budget_commit_index.is_some());
 
     let _ = fs::remove_file(path);

@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "containment_rollback_detected",
   "threat_id": "resource_exhaustion_dos",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -56,7 +56,9 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json",
+          "sha256": "75859a4914889c6917c31429665bcc842e0cf891b1f02e1bb5a98d8274453691",
+          "inputs_sha256": "fb96fbea5e3d29530f850127125bf042a434efbcd73eb88427b0cff79936e1ad"
         }
       },
       {
@@ -71,7 +73,9 @@
           "replacement": "Ok([0; 32])"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json",
+          "sha256": "8908bff5092eef5e17ca86222a5dfe3043b756acd561f1aaf081257e26f0a7a7",
+          "inputs_sha256": "a40dc37b33d946e4e608299cc1ba002246f8d4c7dabfe60ebef5054c51adc826"
         }
       },
       {
@@ -88,7 +92,9 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/root_only_lift/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/root_only_lift/mutants.out/outcomes.json",
+          "sha256": "c529914a0c1991adf0d0f8e8304ea59be86eb6ca23df025b001f500aac59c723",
+          "inputs_sha256": "b7b76f498c654a114de35c5903d878b40c776aac4ee28ae923cdf43444aae9e3"
         }
       },
       {
@@ -103,7 +109,9 @@
           "replacement": "true"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json",
+          "sha256": "2af189520e4c71e54566c2ed1b35f714f576d032bc07d838b8ae3f99f98f0ef5",
+          "inputs_sha256": "660f220401b474fb753399246b4fe6f08fcdf2cd8a6a2dec548c98e93c19614f"
         }
       }
     ]

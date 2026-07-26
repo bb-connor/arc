@@ -2,14 +2,15 @@ use super::super::active_defense_handlers::{
     handle_active_defense_event, handle_active_defense_health,
 };
 use super::super::cluster::{
-    handle_internal_admission_append_entries, handle_internal_admission_capture_query,
-    handle_internal_admission_proposal, handle_internal_admission_request_vote,
-    handle_internal_admission_snapshot, handle_internal_admission_snapshot_install,
-    handle_internal_authority_snapshot, handle_internal_budgets_delta,
-    handle_internal_child_receipts_delta, handle_internal_cluster_snapshot,
-    handle_internal_cluster_status, handle_internal_invocation_capture_query,
-    handle_internal_lineage_delta, handle_internal_revocations_delta,
-    handle_internal_tool_receipts_delta,
+    handle_budget_mutation_event_replica_query, handle_internal_admission_append_entries,
+    handle_internal_admission_capture_query, handle_internal_admission_proposal,
+    handle_internal_admission_request_vote, handle_internal_admission_snapshot,
+    handle_internal_admission_snapshot_install, handle_internal_authority_snapshot,
+    handle_internal_budgets_delta, handle_internal_child_receipts_delta,
+    handle_internal_cluster_snapshot, handle_internal_cluster_status,
+    handle_internal_committed_composite_authorization_query,
+    handle_internal_invocation_capture_query, handle_internal_lineage_delta,
+    handle_internal_revocations_delta, handle_internal_tool_receipts_delta,
 };
 use super::super::dashboard_auth::{
     handle_create_dashboard_session, handle_delete_dashboard_session, handle_get_dashboard_session,
@@ -331,6 +332,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             post(handle_authorize_composite_budget_hold),
         )
         .route(
+            BUDGET_AUTHORIZE_HOLD_QUERY_PATH,
+            post(handle_query_committed_composite_budget_authorization),
+        )
+        .route(
             BUDGET_CAPTURE_INVOCATIONS_PATH,
             post(handle_capture_invocation_reservations),
         )
@@ -356,6 +361,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             post(handle_capture_budget_hold),
         )
         .route(
+            BUDGET_MUTATION_EVENT_QUERY_PATH,
+            post(handle_budget_mutation_event_replica_query),
+        )
+        .route(
             INTERNAL_CLUSTER_STATUS_PATH,
             get(handle_internal_cluster_status),
         )
@@ -378,6 +387,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(
             INTERNAL_ADMISSION_CAPTURE_QUERY_PATH,
             post(handle_internal_admission_capture_query),
+        )
+        .route(
+            INTERNAL_COMPOSITE_AUTHORIZE_QUERY_PATH,
+            post(handle_internal_committed_composite_authorization_query),
         )
         .route(
             INTERNAL_INVOCATION_CAPTURE_QUERY_PATH,
@@ -752,6 +765,7 @@ mod tests {
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: None,
+            partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -1334,9 +1348,11 @@ mod tests {
 
         for path in [
             BUDGET_AUTHORIZE_HOLD_PATH,
+            BUDGET_AUTHORIZE_HOLD_QUERY_PATH,
             BUDGET_CAPTURE_INVOCATIONS_PATH,
             ADMISSION_CAPTURE_PATH,
             ADMISSION_CAPTURE_QUERY_PATH,
+            INTERNAL_COMPOSITE_AUTHORIZE_QUERY_PATH,
         ] {
             let request = Request::builder()
                 .method("GET")

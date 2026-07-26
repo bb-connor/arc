@@ -40,7 +40,7 @@ run_complete_inventory() {
 run_baseline() {
   run_committed_inventory \
     "kernel budget characterization" \
-    47 d303cf87af81c0345c0f7b027abc585beae02de147ce343ce462e2998e295144 \
+    50 fe54c7ed948b9b5682d5e7608ca191cac0e5a24dae3495dcb6a7aeb00167514e \
     cargo test -p chio-kernel --lib kernel::tests::budget::
   run_committed_inventory \
     "kernel approval characterization" \
@@ -52,7 +52,7 @@ run_baseline() {
     cargo test -p chio-kernel --lib kernel::tests::budget_governed_call_chain::
   run_committed_inventory \
     "SQLite budget characterization" \
-    148 50a700ff183acddad12aafc19454daba121175a97a1f2235da10cb43f4242277 \
+    175 4a5e1864b6ebe24ae81469c5f37785c9a5deeffac71354e8fc1064a9d657616d \
     cargo test -p chio-store-sqlite --lib budget_store::tests::
 }
 
@@ -82,15 +82,15 @@ run_model() {
 run_persistence() {
   run_committed_inventory \
     "SQLite composite budget persistence" \
-    148 50a700ff183acddad12aafc19454daba121175a97a1f2235da10cb43f4242277 \
+    175 4a5e1864b6ebe24ae81469c5f37785c9a5deeffac71354e8fc1064a9d657616d \
     cargo test -p chio-store-sqlite --lib budget_store::tests::
   run_committed_inventory \
     "control-plane budget composition" \
-    30 9529b68ef730fa89fdcf97a765785065b4974a2094e9d504436f61abe0873fe1 \
+    32 996f514d745a7ba92c9ff9291da0bf28d4c4211c404298517204ff5f0e3427f3 \
     cargo test -p chio-control-plane --lib trust_control::service_runtime::tests::budget::
   run_committed_inventory \
     "control-plane admission consensus" \
-    61 32fbb12defdf3e5d9f64e4a9524e5cde07f06d963cda7f168c6d2bb2e4a3476e \
+    62 2fed4cdd3f8c1531c26d9382d4a156ae2dccaf4b2348c9b21f354ef96dba0207 \
     cargo test -p chio-control-plane --lib trust_control::cluster::admission_consensus::tests::
   run_complete_inventory \
     "protocol primitives tier 1 conformance" \
@@ -98,10 +98,11 @@ run_persistence() {
     cargo test -p chio-conformance --test protocol_primitives_t1
   run_complete_inventory \
     "protocol primitives tier 2 conformance" \
-    10 57e3a4d278a7a51b9fb48ee2ac86a2bf16ef791d60cc0a81e38d12f1eae42db5 \
+    11 ae029fe7e13da54f4ee41ff44209a673b973754ef1ad0188a4895cd25a849f6a \
     cargo test -p chio-conformance --test protocol_primitives_t2
 }
 
+python3 scripts/check-protocol-provenance.py
 python3 scripts/check-protocol-primitives-vectors.py
 
 case "${lane}" in

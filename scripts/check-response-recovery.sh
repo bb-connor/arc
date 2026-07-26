@@ -75,6 +75,8 @@ main() {
   # The executor supplies the six crash boundaries. Each concrete backend must
   # also prove exact apply/remove recovery through its durable adapter contract.
   run_tests "every effect kind six-boundary crash matrix" cargo test -p chio-quarantine --test response_executor executor_every_effect_kind_six_boundary_crash_matrix_converges_exactly_once -- --exact
+  run_tests "stale takeover cannot apply pending effect" cargo test -p chio-quarantine --test response_executor executor_crash_stale_takeover_pending_apply_never_calls_effect_port -- --exact
+  run_tests "stale takeover cannot roll back pending effect" cargo test -p chio-quarantine --test response_executor executor_crash_stale_takeover_pending_rollback_never_calls_effect_port -- --exact
   run_tests "EscalateAlert backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart -- --exact
   run_tests "ThrottleSession backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart -- --exact
   run_tests "RestrictEgress backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped -- --exact
@@ -85,7 +87,13 @@ main() {
   # TTL dispatch and every restrictive compositional store must preserve the
   # remaining contribution when overlapping effects are removed out of order.
   run_tests "scheduler exact TTL dispatch" cargo test -p chio-quarantine --test response_scheduler scheduler_ttl_exact_early_delayed_and_large_forward_jump_dispatch_once -- --exact
+  run_tests "scheduler sustained retry pages at threshold" cargo test -p chio-quarantine --test response_scheduler scheduler_ttl_sustained_retry_age_pages_at_threshold -- --exact
+  run_tests "scheduler unknown outcome remains nonterminal" cargo test -p chio-quarantine --test response_scheduler scheduler_ttl_unknown_effect_outcome_retries_and_pages_without_false_completion -- --exact
+  run_tests "scheduler restart routes persisted work" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_restart_routes_persisted_apply_and_rollback_states -- --exact
+  run_tests "scheduler broken executor cannot complete work" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_broken_executor_cannot_complete_nonterminal_state -- --exact
   run_tests "scheduler rejects clock rollback" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_direct_process_rejects_clock_rollback -- --exact
+  run_tests "scheduler renewal preserves current fence" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_renewal_preserves_token_and_only_current_lease_releases -- --exact
+  run_tests "terminal scheduler work rejects renewal" cargo test -p chio-store-sqlite --test response_dispatch terminal_response_work_rejects_scheduler_lease_renewal -- --exact
   run_tests "executor overlapping reverse removal" cargo test -p chio-quarantine --test response_executor executor_overlap_removes_contributions_in_reverse_application_order -- --exact
   run_tests "ThrottleSession overlapping out-of-order removal" cargo test -p chio-store-sqlite --test session_throttles overlapping_windows_are_a_conjunction_and_remove_out_of_order -- --exact
   run_tests "RestrictEgress overlapping out-of-order removal" cargo test -p chio-store-sqlite --test egress_restrictions restrictions_survive_restart_and_overlap_removes_out_of_order -- --exact
@@ -104,6 +112,8 @@ main() {
 
   # Exercise both the scheduler state machine and the production SQLite worker.
   run_tests "scheduler stale-worker lease takeover" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_contention_waits_for_expiry_and_stale_takeover_loses -- --exact
+  run_tests "production worker restart replays claim and releases lease" cargo test -p chio-control-plane --lib security::scheduler_worker::tests::sqlite_worker_restart_replays_lost_claim_ack_and_shutdown_releases_lease -- --exact
+  run_tests "production worker claims simultaneous due work deterministically" cargo test -p chio-control-plane --lib security::scheduler_worker::tests::sqlite_worker_claims_simultaneously_due_actions_transactionally_in_deterministic_order -- --exact
   run_tests "production worker stale-fence takeover" cargo test -p chio-control-plane --lib security::scheduler_worker::tests::sqlite_worker_stale_fence_loses_after_expiry_takeover -- --exact
 
   # Receipt validation and durable production evidence must agree on the exact

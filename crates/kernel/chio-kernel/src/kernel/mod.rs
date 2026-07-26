@@ -115,24 +115,65 @@ pub type ServerId = String;
 
 const MANIFEST_SECURITY_METADATA_KEY: &str = "chio_manifest_security_v1";
 const PROTOCOL_ADMISSION_METADATA_KEY: &str = "protocol_admission";
+const BUDGET_AUTHORITY_METADATA_KEY: &str = "budget_authority";
+const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
+const FINANCIAL_METADATA_KEY: &str = "financial";
+const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
+
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 6] = [
+    MANIFEST_SECURITY_METADATA_KEY,
+    PROTOCOL_ADMISSION_METADATA_KEY,
+    BUDGET_AUTHORITY_METADATA_KEY,
+    BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
+    FINANCIAL_METADATA_KEY,
+    GOVERNED_TRANSACTION_METADATA_KEY,
+];
+
+fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let object = metadata.and_then(serde_json::Value::as_object)?;
+    RESERVED_RECEIPT_METADATA_KEYS
+        .iter()
+        .copied()
+        .find(|key| object.contains_key(*key))
+}
+
+fn strip_reserved_receipt_metadata(metadata: &mut Option<serde_json::Value>) {
+    let Some(object) = metadata.as_mut().and_then(serde_json::Value::as_object_mut) else {
+        return;
+    };
+    for key in RESERVED_RECEIPT_METADATA_KEYS {
+        object.remove(key);
+    }
+}
+
+fn strip_reserved_economic_receipt_metadata(metadata: &mut Option<serde_json::Value>) {
+    let Some(object) = metadata.as_mut().and_then(serde_json::Value::as_object_mut) else {
+        return;
+    };
+    object.remove(FINANCIAL_METADATA_KEY);
+    object.remove(GOVERNED_TRANSACTION_METADATA_KEY);
+}
 
 fn reject_reserved_receipt_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Result<(), KernelError> {
-    let Some(object) = metadata.and_then(serde_json::Value::as_object) else {
+    let Some(key) = reserved_receipt_metadata_key(metadata) else {
         return Ok(());
     };
-    if object.contains_key(MANIFEST_SECURITY_METADATA_KEY) {
-        return Err(KernelError::InvalidReceiptMetadata(format!(
-            "{MANIFEST_SECURITY_METADATA_KEY} is reserved for registry-validated kernel entrypoints"
-        )));
-    }
-    if object.contains_key(PROTOCOL_ADMISSION_METADATA_KEY) {
-        return Err(KernelError::InvalidReceiptMetadata(format!(
-            "{PROTOCOL_ADMISSION_METADATA_KEY} is reserved for kernel-derived admission receipts"
-        )));
-    }
-    Ok(())
+    let purpose = match key {
+        MANIFEST_SECURITY_METADATA_KEY => "registry-validated kernel entrypoints",
+        PROTOCOL_ADMISSION_METADATA_KEY => "kernel-derived admission receipts",
+        BUDGET_AUTHORITY_METADATA_KEY | BUDGET_DENIAL_AUTHORITY_METADATA_KEY => {
+            "kernel-derived budget receipts"
+        }
+        FINANCIAL_METADATA_KEY | GOVERNED_TRANSACTION_METADATA_KEY => {
+            "kernel-derived economic receipts"
+        }
+        _ => "kernel-derived receipts",
+    };
+    Err(KernelError::InvalidReceiptMetadata(format!(
+        "{key} is reserved for {purpose}"
+    )))
 }
 
 fn registry_validated_manifest_security_metadata(
@@ -1095,28 +1136,13 @@ impl BudgetChargeResult {
     }
 }
 
-/// Result of an atomic invocation-only caller reservation.
-///
-/// Unlike [`BudgetChargeResult`], this mutation carries no monetary envelope.
-/// The budget store has already committed both the invocation debit and its
-/// zero-exposure hold, and the response path only stamps that existing hold.
-#[derive(Clone)]
-pub(crate) struct BudgetInvocationReservationResult {
-    grant_index: usize,
-    budget_hold_id: String,
-    authorize_metadata: BudgetCommitMetadata,
-}
-
-impl BudgetInvocationReservationResult {
-    fn reverse_event_id(&self) -> String {
-        format!("{}:reverse", self.budget_hold_id)
-    }
-}
-
 pub(crate) enum PreExecutionBudgetMutation {
     None,
-    Invocation { grant_index: usize },
-    InvocationReservation(Box<BudgetInvocationReservationResult>),
+    #[cfg_attr(not(test), allow(dead_code))]
+    Invocation {
+        grant_index: usize,
+    },
+    #[cfg_attr(not(test), allow(dead_code))]
     Charge(Box<BudgetChargeResult>),
     Admission(Box<OrdinaryAdmissionMutation>),
 }
@@ -1126,17 +1152,14 @@ impl PreExecutionBudgetMutation {
         match self {
             Self::Charge(charge) => Some(charge),
             Self::Admission(admission) => admission.charge_result(),
-            Self::None | Self::Invocation { .. } | Self::InvocationReservation(_) => None,
+            Self::None | Self::Invocation { .. } => None,
         }
     }
 
     pub(super) fn ordinary_admission(&self) -> Option<&OrdinaryAdmissionMutation> {
         match self {
             Self::Admission(admission) => Some(admission.as_ref()),
-            Self::None
-            | Self::Invocation { .. }
-            | Self::InvocationReservation(_)
-            | Self::Charge(_) => None,
+            Self::None | Self::Invocation { .. } | Self::Charge(_) => None,
         }
     }
 
@@ -1144,7 +1167,7 @@ impl PreExecutionBudgetMutation {
         match self {
             Self::Admission(admission) => Some(admission.admission_operation()),
             Self::Charge(charge) => charge.admission_operation.as_ref(),
-            Self::None | Self::Invocation { .. } | Self::InvocationReservation(_) => None,
+            Self::None | Self::Invocation { .. } => None,
         }
     }
 }

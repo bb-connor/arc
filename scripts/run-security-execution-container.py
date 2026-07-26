@@ -91,7 +91,7 @@ EXPECTED_TMPFS = {
     "/cargo-home": (
         "rw,nosuid,nodev,noexec,size=2147483648,uid=65532,gid=65532,mode=0700"
     ),
-    "/private": "rw,nosuid,nodev,size=2147483648,uid=65532,gid=65532,mode=0755",
+    "/private": "rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755",
     "/target": "rw,nosuid,nodev,size=8589934592,uid=65532,gid=65532,mode=0700",
     "/tmp": "rw,nosuid,nodev,size=536870912,mode=1777",
 }
@@ -102,6 +102,7 @@ EXPECTED_ULIMITS = (
 )
 TRUSTED_BOUNDARY_FILE_KEYS = frozenset(
     {
+        "cargo-mutants",
         "check-cage-all-target-inventory.py",
         "check-cage-enforcement.sh",
         "check-cage-linux-enforcement.sh",
@@ -876,6 +877,8 @@ def container_create_arguments(
         "--cap-drop",
         "ALL",
         "--cap-add",
+        "CHOWN",
+        "--cap-add",
         "SETGID",
         "--cap-add",
         "SETUID",
@@ -903,7 +906,7 @@ def container_create_arguments(
         "--tmpfs",
         "/tmp:rw,nosuid,nodev,size=536870912,mode=1777",
         "--tmpfs",
-        "/private:rw,nosuid,nodev,size=2147483648,uid=65532,gid=65532,mode=0755",
+        "/private:rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755",
         "--tmpfs",
         "/baseline:rw,nosuid,nodev,noexec,size=268435456,mode=0755",
         "--tmpfs",
@@ -963,7 +966,7 @@ def validate_container_create_arguments(arguments: list[str]) -> None:
         raise BoundaryError("Docker create operation contract changed")
 
     value_flags = {
-        "--cap-add": 2,
+        "--cap-add": 3,
         "--cap-drop": 1,
         "--cidfile": 1,
         "--cpus": 1,
@@ -1003,7 +1006,7 @@ def validate_container_create_arguments(arguments: list[str]) -> None:
         raise BoundaryError("Docker create option inventory changed")
 
     exact_values = {
-        "--cap-add": ["SETGID", "SETUID"],
+        "--cap-add": ["CHOWN", "SETGID", "SETUID"],
         "--cap-drop": ["ALL"],
         "--cpus": ["4"],
         "--log-driver": ["none"],
@@ -1168,7 +1171,7 @@ def validate_created_container(
     expected_host = {
         "AutoRemove": False,
         "Binds": None,
-        "CapAdd": ["CAP_SETGID", "CAP_SETUID"],
+        "CapAdd": ["CAP_CHOWN", "CAP_SETGID", "CAP_SETUID"],
         "CapDrop": ["ALL"],
         "CgroupnsMode": "private",
         "DeviceRequests": None,
@@ -1383,8 +1386,18 @@ def collect_outputs(
                 or not isinstance(inventory.get("campaigns"), list)
                 or len(set(inventory["campaigns"])) != 35
                 or not isinstance(inventory.get("paths"), list)
-                or len(set(inventory["paths"])) != 65
+                or len(set(inventory["paths"])) != 64
                 or not isinstance(execution_boundary, dict)
+                or set(execution_boundary)
+                != {
+                    "image_id",
+                    "platform",
+                    "schema",
+                    "seccomp_profile_sha256",
+                    "trusted_file_sha256",
+                }
+                or execution_boundary.get("schema")
+                != "chio.security-execution-boundary.v1"
                 or execution_boundary.get("image_id") != expected_image
                 or execution_boundary.get("platform") != "linux/amd64"
                 or execution_boundary.get("seccomp_profile_sha256")

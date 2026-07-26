@@ -166,7 +166,7 @@ fn restore_admission_decision(
                 checked_revocation_set_digest: stored.revocation_set_digest.clone(),
                 aggregate_root_capability_id: stored.aggregate_root_capability_id.clone(),
                 aggregate_root_binding_digest: stored.aggregate_root_binding_digest.clone(),
-                budget_commit: denial_budget_metadata(request),
+                budget_commit: denial_budget_metadata(transaction, request)?,
                 revocation_commit_index,
                 authority_commit_index,
                 leader_epoch: None,
@@ -363,15 +363,70 @@ fn persist_admission_event(
     Ok(())
 }
 
-fn denial_budget_metadata(request: &AdmissionCaptureRequest) -> BudgetCommitMetadata {
-    BudgetCommitMetadata {
+fn denial_budget_metadata(
+    transaction: &Connection,
+    request: &AdmissionCaptureRequest,
+) -> Result<BudgetCommitMetadata, BudgetStoreError> {
+    let hold_id = request.budget().hold_id.as_deref().ok_or_else(|| {
+        BudgetStoreError::Invariant(
+            "admission capture denial omitted its authorized hold id".to_string(),
+        )
+    })?;
+    let partition_escrow_evidence = transaction
+        .query_row(
+            r#"
+            SELECT evidence_digest, canonical_evidence
+            FROM budget_composite_partition_escrow_evidence
+            WHERE hold_id = ?1
+            "#,
+            params![hold_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?)),
+        )
+        .optional()?
+        .map(|(evidence_digest, canonical_evidence)| {
+            if canonical_evidence.is_empty()
+                || canonical_evidence.len()
+                    > chio_kernel::budget_store::MAX_PARTITION_ESCROW_ADMISSION_EVIDENCE_BYTES
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "persisted partition escrow evidence is empty or oversized".to_string(),
+                ));
+            }
+            if !request
+                .authorization_artifact_digests()
+                .iter()
+                .any(|digest| digest == &evidence_digest)
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "partition escrow evidence is absent from the capture authorization artifacts"
+                        .to_string(),
+                ));
+            }
+            let canonical_json = String::from_utf8(canonical_evidence).map_err(|error| {
+                BudgetStoreError::Invariant(format!(
+                    "persisted partition escrow evidence is not UTF-8 JSON: {error}"
+                ))
+            })?;
+            chio_kernel::budget_store::PartitionEscrowCommitEvidence::from_canonical_json(
+                canonical_json,
+                evidence_digest,
+            )
+        })
+        .transpose()?;
+    let guarantee_level = if partition_escrow_evidence.is_some() {
+        BudgetGuaranteeLevel::PartitionEscrowed
+    } else {
+        BudgetGuaranteeLevel::SingleNodeAtomic
+    };
+    Ok(BudgetCommitMetadata {
         authority: request.budget().authority.clone(),
-        guarantee_level: BudgetGuaranteeLevel::SingleNodeAtomic,
+        guarantee_level,
         budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
         metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
         budget_commit_index: None,
         event_id: request.budget().event_id.clone(),
-    }
+        partition_escrow_evidence,
+    })
 }
 
 fn stored_budget_authority(
@@ -509,10 +564,18 @@ mod tests {
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use chio_core::partition_escrow::{
+        verify_partition_escrow_quota_commitment, PartitionEscrowAllocation,
+        PartitionEscrowAllocationPlan, PartitionEscrowAllocationPlanBinding,
+        PartitionEscrowAllocationSetBody, PartitionEscrowQuota, PartitionEscrowQuotaCommitmentBody,
+        PartitionEscrowQuotaSourceBinding, SignedPartitionEscrowAllocationSet,
+        SignedPartitionEscrowQuotaCommitment,
+    };
+    use chio_core::{canonical_json_bytes, sha256_hex, Keypair};
     use chio_kernel::budget_store::{
         AuthorizedBudgetHold, BudgetAdmissionOperationBinding, BudgetAuthorizeHoldDecision,
         BudgetCaptureInvocationRequest, BudgetEventAuthority, BudgetInvocationQuota,
-        BudgetQuotaKey, BudgetQuotaProfile,
+        BudgetQuotaKey, BudgetQuotaProfile, PartitionEscrowCommitEvidence,
     };
     use chio_kernel::supplemental_quota::CanonicalRevocationSet;
     use chio_kernel::{
@@ -572,6 +635,146 @@ mod tests {
         }
     }
 
+    fn partition_escrow_digest(canonical: &[u8]) -> String {
+        let mut input = b"chio.partition-escrow-admission-evidence.v1\0".to_vec();
+        input.extend_from_slice(canonical);
+        sha256_hex(&input)
+    }
+
+    fn partition_counter_namespace_digest(partition_id: &str, authority_id: &str) -> String {
+        let canonical = canonical_json_bytes(&serde_json::json!({
+            "partitionId": partition_id,
+            "authorityId": authority_id,
+        }))
+        .expect("canonical partition counter namespace");
+        let mut input = b"chio.partition-escrow-counter-namespace.v1\0".to_vec();
+        input.extend_from_slice(&canonical);
+        sha256_hex(&input)
+    }
+
+    fn partition_escrow_commit_evidence() -> PartitionEscrowCommitEvidence {
+        let signer = Keypair::from_seed(&[61; 32]);
+        let authority_id = "aa".repeat(32);
+        let counter_namespace_digest =
+            partition_counter_namespace_digest("partition-a", &authority_id);
+        let source_artifact_digest = "11".repeat(32);
+        let revocation_set_digest = LEAF_SET_DIGEST.to_string();
+        let quota =
+            PartitionEscrowQuota::new("chio.grant-invocation.v1", "leaf", Some(0), 2)
+                .expect("partition quota");
+        let source_trust = serde_json::json!({
+            "kind": "grantCapability",
+            "capability_id": "leaf",
+            "grant_index": 0,
+            "revocation_set_digest": revocation_set_digest,
+        });
+        let source_trust_binding = serde_json::json!({
+            "schema": "chio.partition-escrow-source-trust-binding.v1",
+            "profile": quota.profile(),
+            "quotaKeyDigest": quota.key_digest().expect("partition quota key digest"),
+            "quotaDescriptorDigest": quota
+                .descriptor_digest()
+                .expect("partition quota descriptor digest"),
+            "underlyingSourceArtifactDigest": source_artifact_digest,
+            "sourceSigner": signer.public_key(),
+            "sourceNotBefore": 100,
+            "sourceExpiresAt": 200,
+            "profileTrust": source_trust,
+        });
+        let source_trust_canonical =
+            canonical_json_bytes(&source_trust_binding).expect("canonical source trust binding");
+        let mut source_trust_input =
+            b"chio.partition-escrow-source-trust-binding.v1\0".to_vec();
+        source_trust_input.extend_from_slice(&source_trust_canonical);
+        let source_trust_digest = sha256_hex(&source_trust_input);
+        let allocations = vec![
+            PartitionEscrowAllocation::new("partition-a", &authority_id, 2)
+                .expect("partition allocation"),
+        ];
+        let plan = PartitionEscrowAllocationPlan::new(
+            PartitionEscrowAllocationPlanBinding::new(
+                "authority-domain",
+                "allocation-root",
+                7,
+                quota.clone(),
+                200,
+                100,
+                180,
+            )
+            .expect("partition allocation binding"),
+            allocations.clone(),
+        )
+        .expect("partition allocation plan");
+        let commitment = SignedPartitionEscrowQuotaCommitment::sign(
+            PartitionEscrowQuotaCommitmentBody::new(
+                &plan,
+                PartitionEscrowQuotaSourceBinding::new(
+                    &source_artifact_digest,
+                    &source_trust_digest,
+                    100,
+                    200,
+                )
+                .expect("partition source binding"),
+            )
+            .expect("partition commitment body"),
+            &signer,
+        )
+        .expect("signed partition commitment");
+        let certificate = verify_partition_escrow_quota_commitment(&commitment, 120)
+            .expect("verified partition commitment");
+        let allocation_set = SignedPartitionEscrowAllocationSet::sign(
+            PartitionEscrowAllocationSetBody::new(&certificate, 100, 180, allocations)
+                .expect("partition allocation set body"),
+            &signer,
+        )
+        .expect("signed partition allocation set");
+        let evidence = serde_json::json!({
+            "schema": "chio.partition-escrow-admission-evidence.v1",
+            "verifiedAt": 120,
+            "resolver": {
+                "resolverId": "resolver-a",
+                "implementationId": "resolver-implementation-a",
+                "implementationVersion": 1,
+                "configurationDigest": "33".repeat(32),
+            },
+            "durableStore": {
+                "storeIdentityDigest": authority_id,
+                "counterNamespaceDigest": counter_namespace_digest,
+                "fencingToken": 7,
+            },
+            "authorityDomain": "authority-domain",
+            "partitionId": "partition-a",
+            "authorityId": authority_id,
+            "quotas": [{
+                "globalQuota": quota,
+                "localAllocatedInvocations": 2,
+                "quotaKeyDigest": certificate.quota().key_digest().expect("certificate quota key digest"),
+                "quotaDescriptorDigest": certificate.quota().descriptor_digest().expect("certificate quota descriptor digest"),
+                "quotaCertificateBindingDigest": certificate.binding_digest().expect("certificate binding digest"),
+                "quotaCommitmentDigest": certificate.commitment_digest(),
+                "underlyingSourceArtifactDigest": source_artifact_digest,
+                "sourceTrustBindingDigest": source_trust_digest,
+                "sourceNotBefore": 100,
+                "sourceExpiresAt": 200,
+                "sourceSigner": signer.public_key(),
+                "sourceTrust": source_trust,
+                "allocationPlanDigest": certificate.allocation_plan_digest(),
+                "allocationRootId": "allocation-root",
+                "allocationEpoch": 7,
+                "allocationSetDigest": allocation_set.digest().expect("allocation set digest"),
+                "totalAllocatedInvocations": 2,
+                "quotaCommitment": commitment,
+                "allocationSet": allocation_set,
+            }],
+        });
+        let canonical = canonical_json_bytes(&evidence).expect("canonical partition evidence");
+        PartitionEscrowCommitEvidence::from_canonical_json(
+            String::from_utf8(canonical.clone()).expect("UTF-8 partition evidence"),
+            partition_escrow_digest(&canonical),
+        )
+        .expect("valid partition commit evidence")
+    }
+
     fn authorize_hold(
         path: &std::path::Path,
         artifacts: Vec<String>,
@@ -609,11 +812,53 @@ mod tests {
                 invocation_quotas: vec![quota],
                 revocation_set: leaf_revocation_set(),
                 authorization_artifact_digests: artifacts,
+                partition_escrow_evidence: None,
             })
             .expect("authorize composite hold");
         match decision {
             BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,
             BudgetAuthorizeHoldDecision::Denied(_) => panic!("composite hold was denied"),
+        }
+    }
+
+    fn authorize_partition_hold(
+        path: &std::path::Path,
+        operation_id: &str,
+        evidence: PartitionEscrowCommitEvidence,
+    ) -> AuthorizedBudgetHold {
+        let store = SqliteBudgetStore::open(path).expect("open partition budget store");
+        let key = BudgetQuotaKey::from_persisted_parts(
+            BudgetQuotaProfile::GrantInvocation,
+            "leaf".to_string(),
+            Some(0),
+        )
+        .expect("partition quota key");
+        let quota =
+            BudgetInvocationQuota::from_persisted_parts(key, 2).expect("partition local quota");
+        let artifacts = vec![evidence.evidence_digest().to_string()];
+        let decision = store
+            .authorize_composite_hold(SqliteCompositeAuthorizeInput {
+                operation_id: operation_id.to_string(),
+                request_binding_hash: admission_request_binding_hash(),
+                capability_id: "leaf".to_string(),
+                grant_index: 0,
+                requested_exposure_units: 100,
+                max_cost_per_invocation: Some(100),
+                max_total_cost_units: Some(1_000),
+                hold_id: "hold-1".to_string(),
+                event_id: "authorize-1".to_string(),
+                authority: None,
+                invocation_quotas: vec![quota],
+                revocation_set: leaf_revocation_set(),
+                authorization_artifact_digests: artifacts,
+                partition_escrow_evidence: Some(evidence),
+            })
+            .expect("authorize partition composite hold");
+        match decision {
+            BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,
+            BudgetAuthorizeHoldDecision::Denied(_) => {
+                panic!("partition composite hold was denied")
+            }
         }
     }
 
@@ -961,6 +1206,85 @@ mod tests {
             reopened
                 .capture_admission(request)
                 .expect("exact denial retry after restart"),
+            denied
+        );
+        assert_eq!(quota_counts(&path), (1, 0));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn partition_revocation_denial_preserves_exact_authorization_proof_across_replay() {
+        let path = unique_db_path("chio-admission-partition-revoked-first");
+        let evidence = partition_escrow_commit_evidence();
+        let artifacts = vec![evidence.evidence_digest().to_string()];
+        authorize_partition_hold(&path, "operation-partition", evidence.clone());
+        let authority = SqliteAdmissionCaptureAuthority::open(&path)
+            .expect("open partition capture authority");
+        let write = authority.revoke("leaf").expect("route partition revocation");
+        let request = capture_request(
+            "operation-partition",
+            "capture-partition",
+            leaf_revocation_set(),
+            artifacts,
+            Some(write.revocation_commit_index()),
+        );
+
+        let denied = authority
+            .capture_admission(request.clone())
+            .expect("deny partition admission");
+        let AdmissionCaptureDecision::Denied(denial) = &denied else {
+            panic!("expected partition revocation denial");
+        };
+        assert_eq!(
+            denial.metadata().budget_commit().guarantee_level,
+            BudgetGuaranteeLevel::PartitionEscrowed
+        );
+        assert_eq!(
+            denial
+                .metadata()
+                .budget_commit()
+                .partition_escrow_evidence
+                .as_ref(),
+            Some(&evidence)
+        );
+        assert_eq!(quota_counts(&path), (1, 0));
+        assert_eq!(
+            authority
+                .query_admission_capture(&request)
+                .expect("query exact partition denial")
+                .expect("persisted exact partition denial"),
+            denied
+        );
+        assert_eq!(
+            authority
+                .capture_admission(request.clone())
+                .expect("exact partition denial retry"),
+            denied
+        );
+        drop(authority);
+
+        let reopened = SqliteAdmissionCaptureAuthority::open(&path)
+            .expect("reopen partition capture authority");
+        let reopened_query = reopened
+            .query_admission_capture(&request)
+            .expect("query partition denial after restart")
+            .expect("persisted partition denial after restart");
+        let AdmissionCaptureDecision::Denied(reopened_denial) = &reopened_query else {
+            panic!("expected restored partition revocation denial");
+        };
+        assert_eq!(
+            reopened_denial
+                .metadata()
+                .budget_commit()
+                .partition_escrow_evidence
+                .as_ref(),
+            Some(&evidence)
+        );
+        assert_eq!(reopened_query, denied);
+        assert_eq!(
+            reopened
+                .capture_admission(request.clone())
+                .expect("exact partition denial retry after restart"),
             denied
         );
         assert_eq!(quota_counts(&path), (1, 0));

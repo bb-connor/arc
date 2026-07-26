@@ -23,10 +23,12 @@ python3 scripts/check-rust-public-surface.py
 bash scripts/tests/check-rust-public-surface.test.sh
 python3 scripts/check-architecture-docs.py
 ./scripts/check-security-provenance.sh
+python3 scripts/check-protocol-provenance.py
 python3 scripts/check-enterprise-provenance.py
 python3 scripts/check-linux-enforcement-stack.py
 ./scripts/check-security-dependencies.sh
 bash scripts/tests/check-security-provenance.test.sh
+bash scripts/tests/check-protocol-provenance.test.sh
 bash scripts/tests/check-enterprise-provenance.test.sh
 bash scripts/tests/check-linux-enforcement-stack.test.sh
 bash scripts/tests/check-security-dependencies.test.sh
@@ -35,6 +37,7 @@ bash scripts/tests/check-security-dependencies.test.sh
 ./scripts/check-http-egress-contract.sh
 bash scripts/tests/check-http-egress-contract.test.sh
 bash scripts/tests/check-protocol-primitives-concurrency.test.sh
+bash scripts/tests/check-protocol-primitives-focused.test.sh
 bash scripts/tests/check-protocol-peer-negotiation.test.sh
 
 ./scripts/check-anchor-batch-async-witness.sh
@@ -61,6 +64,7 @@ bash scripts/tests/provider-fixture-claims.test.sh
 cargo clippy --workspace --lib --bins --examples -- -D warnings
 cargo build --workspace
 cargo test --workspace --exclude chio-wasm-guards
+./scripts/check-protocol-primitives-focused.sh --all
 ./scripts/check-protocol-primitives-concurrency.sh
 ./scripts/check-protocol-peer-negotiation.sh
 cargo test -p chio-wasm-guards --lib

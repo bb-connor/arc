@@ -1,3 +1,7 @@
+use super::store::{
+    SqliteInvocationQuotaMutationAction, SqliteInvocationQuotaMutationContext,
+    SqliteInvocationQuotaMutationMode, SqliteLegacyProjectionMutation, SqliteLegacyProjectionState,
+};
 use super::*;
 use chio_kernel::budget_store::{
     AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
@@ -196,6 +200,16 @@ impl SqliteBudgetStore {
                 },
             )
             .optional()?;
+        let expected_projection = row.map(
+            |(invocation_count, total_cost_exposed, total_cost_realized_spend, seq)| {
+                SqliteLegacyProjectionState {
+                    invocation_count,
+                    total_cost_exposed,
+                    total_cost_realized_spend,
+                    seq,
+                }
+            },
+        );
         let (current_count, current_exposed, current_realized, current_usage_seq) =
             row.unwrap_or((0, 0, 0, 0));
         let existing_event_seq = if existing_allowed.is_some() {
@@ -221,18 +235,30 @@ impl SqliteBudgetStore {
         } else {
             None
         };
-        SqliteBudgetStore::stage_compatibility_invocation_quota(
+        let compatibility_quota = BudgetInvocationQuota::from_persisted_parts(
+            BudgetQuotaKey::grant(capability_id, grant_index)?,
+            max_invocations.unwrap_or(u32::MAX),
+        )?;
+        SqliteBudgetStore::reject_composite_managed_grant(
             &transaction,
             capability_id,
             grant_index,
-            max_invocations,
-            current_count,
-            existing_event_seq
-                .map(|event_seq| event_seq.max(current_usage_seq))
-                .unwrap_or(current_usage_seq),
         )?;
-
         if let Some(existing_allowed) = existing_allowed {
+            SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+                &transaction,
+                std::slice::from_ref(&compatibility_quota),
+                compatibility_quota.key(),
+                current_count,
+                SqliteInvocationQuotaMutationContext {
+                    mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                    action: SqliteInvocationQuotaMutationAction::Replay,
+                    event_seq: existing_event_seq
+                        .unwrap_or(current_usage_seq)
+                        .max(current_usage_seq),
+                    updated_at: unix_now(),
+                },
+            )?;
             let existing_allowed = existing_allowed.ok_or_else(|| {
                 BudgetStoreError::Invariant(
                     "persisted budget authorization is missing its frozen decision".to_string(),
@@ -363,13 +389,17 @@ impl SqliteBudgetStore {
                             total_cost_exposed_after,
                             total_cost_realized_spend_after,
                         )?;
-                        SqliteBudgetStore::persist_compatibility_invocation_capture(
+                        SqliteBudgetStore::compare_and_mutate_invocation_quotas(
                             &transaction,
-                            capability_id,
-                            grant_index,
-                            max_invocations,
+                            std::slice::from_ref(&compatibility_quota),
+                            compatibility_quota.key(),
                             invocation_count_after,
-                            event_seq,
+                            SqliteInvocationQuotaMutationContext {
+                                mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                                action: SqliteInvocationQuotaMutationAction::Replay,
+                                event_seq,
+                                updated_at: unix_now(),
+                            },
                         )?;
                         if let Some(journal) = journal {
                             insert_payment_journal_tx(&transaction, journal, true)?;
@@ -388,53 +418,13 @@ impl SqliteBudgetStore {
             }
         }
 
-        let mut allowed = true;
+        let current_total = checked_committed_cost_units(current_exposed, current_realized)?;
+        let committed_if_allowed = current_total.checked_add(cost_units);
+        let monetary_denied = max_cost_per_invocation.is_some_and(|max| cost_units > max)
+            || max_total_cost_units
+                .is_some_and(|max| committed_if_allowed.is_none_or(|committed| committed > max));
 
-        if let Some(max) = max_invocations {
-            if current_count >= max {
-                allowed = false;
-            }
-        }
-        if let Some(max_per) = max_cost_per_invocation {
-            if cost_units > max_per {
-                allowed = false;
-            }
-        }
-        if let Some(max_total) = max_total_cost_units {
-            let current_total = checked_committed_cost_units(current_exposed, current_realized)?;
-            let new_total = current_total.checked_add(cost_units).ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "authorized exposure + cost_units overflowed u64".to_string(),
-                )
-            })?;
-            if new_total > max_total {
-                allowed = false;
-            }
-        }
-        if let (Some(hold_id), Some(event_id)) = (hold_id, event_id) {
-            SqliteBudgetStore::claim_authorization_attempt(
-                &transaction,
-                hold_id,
-                event_id,
-                capability_id,
-                grant_index,
-                cost_units,
-                max_invocations,
-                max_cost_per_invocation,
-                max_total_cost_units,
-                authority,
-                Some(allowed),
-            )?;
-        }
-
-        let (
-            invocation_count_after,
-            total_cost_exposed_after,
-            total_cost_realized_spend_after,
-            event_seq,
-            usage_seq,
-        );
-        if allowed {
+        if !monetary_denied {
             if let Some(hold_id) = hold_id {
                 let retry_follows_rollback = if claim_follows_rollback {
                     true
@@ -522,13 +512,18 @@ impl SqliteBudgetStore {
                                     total_cost_exposed_after,
                                     total_cost_realized_spend_after,
                                 )?;
-                                SqliteBudgetStore::persist_compatibility_invocation_capture(
+                                SqliteBudgetStore::compare_and_mutate_invocation_quotas(
                                     &transaction,
-                                    capability_id,
-                                    grant_index,
-                                    max_invocations,
+                                    std::slice::from_ref(&compatibility_quota),
+                                    compatibility_quota.key(),
                                     invocation_count_after,
-                                    event_seq,
+                                    SqliteInvocationQuotaMutationContext {
+                                        mode:
+                                            SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                                        action: SqliteInvocationQuotaMutationAction::Replay,
+                                        event_seq,
+                                        updated_at: unix_now(),
+                                    },
                                 )?;
                                 if let Some(journal) = journal {
                                     insert_payment_journal_tx(&transaction, journal, true)?;
@@ -606,13 +601,17 @@ impl SqliteBudgetStore {
                                 total_cost_exposed_after,
                                 total_cost_realized_spend_after,
                             )?;
-                            SqliteBudgetStore::persist_compatibility_invocation_capture(
+                            SqliteBudgetStore::compare_and_mutate_invocation_quotas(
                                 &transaction,
-                                capability_id,
-                                grant_index,
-                                max_invocations,
+                                std::slice::from_ref(&compatibility_quota),
+                                compatibility_quota.key(),
                                 invocation_count_after,
-                                seq,
+                                SqliteInvocationQuotaMutationContext {
+                                    mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                                    action: SqliteInvocationQuotaMutationAction::Replay,
+                                    event_seq: seq,
+                                    updated_at: unix_now(),
+                                },
                             )?;
                             if let Some(journal) = journal {
                                 insert_payment_journal_tx(&transaction, journal, true)?;
@@ -631,44 +630,83 @@ impl SqliteBudgetStore {
                     )));
                 }
             }
+        }
+
+        let updated_at = unix_now();
+        let event_seq = allocate_budget_replication_seq(&transaction)?;
+        let quota_mutation = SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+            &transaction,
+            std::slice::from_ref(&compatibility_quota),
+            compatibility_quota.key(),
+            current_count,
+            SqliteInvocationQuotaMutationContext {
+                mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                action: SqliteInvocationQuotaMutationAction::Attempt {
+                    external_denied: monetary_denied,
+                },
+                event_seq,
+                updated_at,
+            },
+        )?;
+        let allowed = quota_mutation.allowed;
+        let persisted_cost_units =
+            if quota_mutation.quota_exhausted && cost_units > i64::MAX as u64 {
+                0
+            } else {
+                cost_units
+            };
+        let persisted_max_cost_per_invocation = if quota_mutation.quota_exhausted {
+            max_cost_per_invocation.filter(|value| *value <= i64::MAX as u64)
+        } else {
+            max_cost_per_invocation
+        };
+        let persisted_max_total_cost_units = if quota_mutation.quota_exhausted {
+            max_total_cost_units.filter(|value| *value <= i64::MAX as u64)
+        } else {
+            max_total_cost_units
+        };
+        if let (Some(hold_id), Some(event_id)) = (hold_id, event_id) {
+            SqliteBudgetStore::claim_authorization_attempt(
+                &transaction,
+                hold_id,
+                event_id,
+                capability_id,
+                grant_index,
+                persisted_cost_units,
+                max_invocations,
+                persisted_max_cost_per_invocation,
+                persisted_max_total_cost_units,
+                authority,
+                Some(allowed),
+            )?;
+        }
+        let invocation_count_after = quota_mutation.primary_count_after;
+        let (total_cost_exposed_after, total_cost_realized_spend_after, usage_seq) = if allowed {
+            committed_if_allowed.ok_or_else(|| {
+                BudgetStoreError::Overflow(
+                    "authorized exposure + cost_units overflowed u64".to_string(),
+                )
+            })?;
             let new_total_cost_exposed =
                 current_exposed.checked_add(cost_units).ok_or_else(|| {
                     BudgetStoreError::Overflow(
                         "total_cost_exposed + cost_units overflowed u64".to_string(),
                     )
                 })?;
-            let next_invocation_count = current_count.checked_add(1).ok_or_else(|| {
-                BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
-            })?;
-            let updated_at = unix_now();
-            let seq = allocate_budget_replication_seq(&transaction)?;
-            transaction.execute(
-                r#"
-                INSERT INTO capability_grant_budgets (
+            SqliteBudgetStore::compare_and_persist_legacy_projection(
+                &transaction,
+                SqliteLegacyProjectionMutation {
                     capability_id,
                     grant_index,
-                    invocation_count,
+                    expected: expected_projection,
+                    after: SqliteLegacyProjectionState {
+                        invocation_count: invocation_count_after,
+                        total_cost_exposed: new_total_cost_exposed,
+                        total_cost_realized_spend: current_realized,
+                        seq: event_seq,
+                    },
                     updated_at,
-                    seq,
-                    total_cost_exposed,
-                    total_cost_realized_spend
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-                ON CONFLICT(capability_id, grant_index) DO UPDATE SET
-                    invocation_count = excluded.invocation_count,
-                    updated_at = excluded.updated_at,
-                    seq = excluded.seq,
-                    total_cost_exposed = excluded.total_cost_exposed,
-                    total_cost_realized_spend = excluded.total_cost_realized_spend
-                "#,
-                params![
-                    capability_id,
-                    grant_index as i64,
-                    i64::from(next_invocation_count),
-                    updated_at,
-                    seq as i64,
-                    new_total_cost_exposed as i64,
-                    current_realized as i64,
-                ],
+                },
             )?;
             if let Some(hold_id) = hold_id {
                 SqliteBudgetStore::create_hold(
@@ -680,18 +718,10 @@ impl SqliteBudgetStore {
                     authority,
                 )?;
             }
-            invocation_count_after = next_invocation_count;
-            total_cost_exposed_after = new_total_cost_exposed;
-            total_cost_realized_spend_after = current_realized;
-            event_seq = seq;
-            usage_seq = Some(seq);
+            (new_total_cost_exposed, current_realized, Some(event_seq))
         } else {
-            event_seq = allocate_budget_replication_seq(&transaction)?;
-            invocation_count_after = current_count;
-            total_cost_exposed_after = current_exposed;
-            total_cost_realized_spend_after = current_realized;
-            usage_seq = None;
-        }
+            (current_exposed, current_realized, None)
+        };
         SqliteBudgetStore::append_mutation_event(
             &transaction,
             event_id,
@@ -703,22 +733,14 @@ impl SqliteBudgetStore {
             Some(allowed),
             event_seq,
             usage_seq,
-            cost_units,
+            persisted_cost_units,
             0,
             max_invocations,
-            max_cost_per_invocation,
-            max_total_cost_units,
+            persisted_max_cost_per_invocation,
+            persisted_max_total_cost_units,
             invocation_count_after,
             total_cost_exposed_after,
             total_cost_realized_spend_after,
-        )?;
-        SqliteBudgetStore::persist_compatibility_invocation_capture(
-            &transaction,
-            capability_id,
-            grant_index,
-            max_invocations,
-            invocation_count_after,
-            event_seq,
         )?;
         if allowed {
             if let Some(journal) = journal {

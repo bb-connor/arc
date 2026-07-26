@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod audit;
 pub mod authority_ipc;
@@ -9,6 +9,7 @@ pub mod conformance;
 pub mod daemon;
 pub mod daemon_runtime;
 pub mod generic_https;
+pub mod inherited_fd;
 pub mod ipc_client;
 pub mod migration;
 pub mod privileged_audit;
@@ -26,6 +27,8 @@ pub mod store;
 
 mod backend;
 mod encrypted_blob_backend;
+#[cfg(all(test, target_os = "linux"))]
+mod process_boundary_tests;
 
 pub use encrypted_blob_backend::{EncryptedBlobSecretBackend, SealedKeyFd, SealedSigningKeyFd};
 

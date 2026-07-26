@@ -72,6 +72,16 @@ fn invoke(
     let invocation_directory = root.path().join(label);
     std::fs::create_dir_all(&invocation_directory)
         .unwrap_or_else(|error| panic!("create invocation directory: {error}"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        std::fs::set_permissions(
+            &invocation_directory,
+            std::fs::Permissions::from_mode(0o700),
+        )
+        .unwrap_or_else(|error| panic!("secure invocation directory: {error}"));
+    }
     let invocation_directory = std::fs::canonicalize(&invocation_directory)
         .unwrap_or_else(|error| panic!("canonicalize invocation directory: {error}"));
     let receipt_path = invocation_directory.join("receipts.sqlite");
@@ -189,7 +199,8 @@ fn invoke(
 
 #[test]
 fn enterprise_invocation_composes_all_controls_and_mutations_fail_closed() {
-    let root = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let root = chio_test_support::private_fs::private_tempdir("chio-enterprise-composition-")
+        .unwrap_or_else(|error| panic!("private tempdir: {error}"));
 
     let success = invoke(&root, "success", EnterpriseCompositionMutation::None);
     assert_eq!(

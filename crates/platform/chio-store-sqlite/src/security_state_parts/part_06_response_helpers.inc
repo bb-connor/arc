@@ -102,15 +102,15 @@ fn validate_scheduler_work(
     work: &ScheduledWork,
     trusted_now_unix_ms: u64,
 ) -> PortResult<()> {
-    let stored = load_scheduler_lease(
+    let stored = load_valid_scheduler_lease(
         connection,
-        &SchedulerWorkKey {
-            tenant_id: work.tenant_id.clone(),
-            action_id: work.action_id.clone(),
-        },
+        &work.tenant_id,
+        work.action_id.as_str(),
+        trusted_now_unix_ms,
+        true,
     )?
     .ok_or_else(PortError::conflict)?;
-    if stored != *work || stored.lease_expires_at_unix_ms <= trusted_now_unix_ms {
+    if stored != *work {
         return Err(PortError::conflict());
     }
     Ok(())
@@ -145,38 +145,58 @@ fn load_scheduler_claim(
     request_hash: &[u8; 32],
     trusted_now: u64,
 ) -> PortResult<Option<Vec<ScheduledWork>>> {
-    type StoredClaim = (Vec<u8>, String, i64, i64);
+    type StoredClaim = (Vec<u8>, String, i64, i64, i64);
     let stored: Option<StoredClaim> = connection
         .query_row(
             r#"
-            SELECT request_hash, lease_owner_id, lease_expires_at, result_count
+            SELECT request_hash, lease_owner_id, lease_expires_at,
+                   result_count, committed_at
             FROM security_scheduler_claims
             WHERE tenant_id = ?1 AND claim_id = ?2
             "#,
             params![request.tenant_id.as_str(), request.claim_id.as_str()],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .optional()
         .map_err(sqlite_error)?;
-    let Some((stored_hash, stored_owner, stored_expiry, stored_count)) = stored else {
+    let Some((stored_hash, stored_owner, stored_expiry, stored_count, committed_at)) = stored
+    else {
         return Ok(None);
     };
     let stored_expiry = from_i64(stored_expiry)?;
+    if committed_at < 0 {
+        return Err(PortError::integrity_failure());
+    }
+    let committed_at = from_i64(committed_at)?;
     if stored_hash.as_slice() != request_hash
         || stored_owner != request.lease_owner_id.as_str()
         || stored_expiry != request.lease_expires_at_unix_ms
     {
         return Err(PortError::conflict());
     }
-    if stored_expiry <= trusted_now {
-        return Err(PortError::conflict());
+    if committed_at > trusted_now || committed_at >= stored_expiry {
+        return Err(PortError::integrity_failure());
     }
     let expected_count =
         usize::try_from(from_i64(stored_count)?).map_err(|_| PortError::integrity_failure())?;
+    let requested_limit =
+        usize::try_from(request.max_claims).map_err(|_| PortError::integrity_failure())?;
+    if expected_count > requested_limit {
+        return Err(PortError::integrity_failure());
+    }
     let mut statement = connection
         .prepare(
             r#"
-            SELECT action_id, lease_owner_id, lease_expires_at, fencing_token
+            SELECT action_id, claim_ordinal, lease_owner_id,
+                   lease_expires_at, fencing_token
             FROM security_scheduler_leases
             WHERE tenant_id = ?1 AND claim_id = ?2
             ORDER BY claim_ordinal
@@ -189,32 +209,63 @@ fn load_scheduler_claim(
             |row| {
                 Ok((
                     row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
                     row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
                 ))
             },
         )
         .map_err(sqlite_error)?;
-    let mut claimed = Vec::with_capacity(expected_count);
+    let mut stored_work = Vec::with_capacity(expected_count);
     for row in rows {
-        let (action_id, lease_owner_id, lease_expires_at, fencing_token) =
+        let (action_id, claim_ordinal, lease_owner_id, lease_expires_at, fencing_token) =
             row.map_err(sqlite_error)?;
-        if lease_owner_id != request.lease_owner_id.as_str()
-            || from_i64(lease_expires_at)? != request.lease_expires_at_unix_ms
+        stored_work.push((
+            action_id,
+            claim_ordinal,
+            lease_owner_id,
+            lease_expires_at,
+            fencing_token,
+        ));
+    }
+    drop(statement);
+    if stored_work.len() < expected_count {
+        return Err(PortError::conflict());
+    }
+    if stored_work.len() > expected_count {
+        return Err(PortError::integrity_failure());
+    }
+    let mut claimed = Vec::with_capacity(expected_count);
+    for (expected_ordinal, row) in stored_work.into_iter().enumerate() {
+        let (action_id, claim_ordinal, lease_owner_id, lease_expires_at, fencing_token) = row;
+        let claim_ordinal = from_i64(claim_ordinal)?;
+        if claim_ordinal
+            != u64::try_from(expected_ordinal).map_err(|_| PortError::integrity_failure())?
+            || lease_owner_id != request.lease_owner_id.as_str()
+            || from_i64(lease_expires_at)? < stored_expiry
         {
             return Err(PortError::integrity_failure());
         }
-        claimed.push(ScheduledWork {
+        let work = ScheduledWork {
             tenant_id: request.tenant_id.clone(),
             action_id: ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?,
             lease_owner_id: request.lease_owner_id.clone(),
-            lease_expires_at_unix_ms: request.lease_expires_at_unix_ms,
+            lease_expires_at_unix_ms: from_i64(lease_expires_at)?,
             fencing_token: from_i64(fencing_token)?,
-        });
-    }
-    if claimed.len() != expected_count {
-        return Err(PortError::integrity_failure());
+        };
+        let validated = load_valid_scheduler_lease(
+            connection,
+            &work.tenant_id,
+            work.action_id.as_str(),
+            trusted_now,
+            true,
+        )?
+        .ok_or_else(PortError::integrity_failure)?;
+        if validated != work {
+            return Err(PortError::integrity_failure());
+        }
+        claimed.push(work);
     }
     Ok(Some(claimed))
 }
@@ -410,8 +461,8 @@ fn validate_response_dispatch_request(
     let snapshot = decode_response_snapshot(&request.response_plan)?;
     let mut normalized_snapshot = snapshot.clone();
     normalized_snapshot.dispatch_authorization_hash = None;
-    let normalized_bytes = canonical_json_bytes(&normalized_snapshot)
-        .map_err(|_| PortError::invalid_data())?;
+    let normalized_bytes =
+        canonical_json_bytes(&normalized_snapshot).map_err(|_| PortError::invalid_data())?;
     let normalized_body_hash = Digest32::new(*sha256(&normalized_bytes).as_bytes());
     let execution_dispatch = snapshot
         .execution_dispatch
@@ -436,19 +487,15 @@ fn validate_response_dispatch_request(
             <= decoded_authorization.authorized_at_unix_ms
         || request.initial_lease.lease_expires_at_unix_ms > snapshot.plan.expires_at_unix_ms
         || execution_dispatch.dispatch_id != decoded_authorization.key.dispatch_id
-        || execution_dispatch.executor_authority_id
-            != decoded_authorization.executor_authority_id
+        || execution_dispatch.executor_authority_id != decoded_authorization.executor_authority_id
         || execution_dispatch.executor_authority_generation
             != decoded_authorization.executor_authority_generation
         || execution_dispatch.authorization_capability_hash
             != decoded_authorization.authorization_capability_hash
-        || execution_dispatch.governed_intent_hash
-            != decoded_authorization.governed_intent_hash
-        || execution_dispatch.policy_decision_hash
-            != decoded_authorization.policy_decision_hash
+        || execution_dispatch.governed_intent_hash != decoded_authorization.governed_intent_hash
+        || execution_dispatch.policy_decision_hash != decoded_authorization.policy_decision_hash
         || execution_dispatch.approval != decoded_authorization.approval
-        || execution_dispatch.authorized_at_unix_ms
-            != decoded_authorization.authorized_at_unix_ms
+        || execution_dispatch.authorized_at_unix_ms != decoded_authorization.authorized_at_unix_ms
     {
         return Err(PortError::invalid_data());
     }
@@ -467,18 +514,16 @@ fn validate_response_dispatch_request(
         request.mode,
         ResponseDispatchCommitMode::GovernedCommittedResume
             | ResponseDispatchCommitMode::GovernedCommittedExpiredResume
-    )
-        && !matches!(
-            (
-                &snapshot.plan.approval_requirement,
-                &decoded_authorization.approval,
-            ),
-            (
-                ResponseApprovalRequirement::Governed { .. },
-                ResponseDispatchApproval::Governed { .. }
-            )
+    ) && !matches!(
+        (
+            &snapshot.plan.approval_requirement,
+            &decoded_authorization.approval,
+        ),
+        (
+            ResponseApprovalRequirement::Governed { .. },
+            ResponseDispatchApproval::Governed { .. }
         )
-    {
+    ) {
         return Err(PortError::invalid_data());
     }
     validate_initial_dispatch_history(&snapshot, &decoded_authorization)?;

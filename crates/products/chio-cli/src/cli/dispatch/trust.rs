@@ -30,6 +30,8 @@ pub(crate) fn dispatch_trust(
     session_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    partition_escrow_authority_descriptor: Option<PathBuf>,
+    partition_escrow_authority_signer: Option<chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     match command {
         TrustCommands::Serve {
@@ -108,6 +110,8 @@ pub(crate) fn dispatch_trust(
                 &peer_urls,
                 cluster_sync_interval_ms,
                 roster_policy_file.as_deref(),
+                partition_escrow_authority_descriptor.as_deref(),
+                partition_escrow_authority_signer.as_ref(),
         ),
         TrustCommands::Provider { command } => match command {
             TrustProviderCommands::List {

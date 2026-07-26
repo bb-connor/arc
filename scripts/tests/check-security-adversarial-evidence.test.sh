@@ -7,6 +7,18 @@ test -x scripts/check-security-adversarial-evidence.sh
 bash -n scripts/check-security-adversarial-evidence.sh
 python3 -m py_compile scripts/check-security-adversarial-evidence.py
 
+if enterprise_promotion_output="$(
+  CHIO_ENTERPRISE_SECURITY_RUNNER=1 \
+    python3 scripts/check-security-adversarial-evidence.py \
+      --promote-outcome forbidden /candidate/outcomes.json 2>&1
+)"; then
+  echo "enterprise legacy outcome promotion passed unexpectedly" >&2
+  exit 1
+fi
+grep -Fq \
+  "legacy --promote-outcome is forbidden in the enterprise boundary" \
+  <<<"${enterprise_promotion_output}"
+
 full_validation="$(./scripts/check-security-adversarial-evidence.sh)"
 test "$full_validation" = "validated 28 security adversarial cases and 35 mutation selections"
 pending_campaigns="$(./scripts/check-security-adversarial-evidence.sh --list-pending)"
@@ -28,6 +40,7 @@ import json
 import os
 import signal
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -38,14 +51,6 @@ gate = root / "scripts/check-security-adversarial-evidence.sh"
 temporal = root / (
     "crates/core/chio-adversarial-suite/cases/temporal_evasion/"
     "temporal-evasion-001.json"
-)
-canary = root / (
-    "crates/core/chio-adversarial-suite/cases/canary_evasion/"
-    "canary-evasion-001.json"
-)
-native_outcome = root / (
-    "audits/evidence/mutants/security/ingest_time_substitution/"
-    "mutants.out/outcomes.json"
 )
 module_spec = importlib.util.spec_from_file_location(
     "security_adversarial_evidence",
@@ -63,18 +68,22 @@ def write_json(path: Path, body: object) -> None:
     path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
 
 
-def invoke(cases: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+def invoke(
+    cases: Path,
+    *extra: str,
+    invocation_root: Path = root,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             str(gate),
             "--root",
-            str(root),
+            str(invocation_root),
             "--cases",
             str(cases),
             "--fixture",
             *extra,
         ],
-        cwd=root,
+        cwd=invocation_root,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -94,12 +103,114 @@ def expect_rejected(result: subprocess.CompletedProcess[str], needle: str) -> No
 with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") as raw:
     temp = Path(raw).resolve()
 
-    valid_cases = temp / "valid"
+    valid_root = temp / "valid-root"
+    valid_root.mkdir()
+    (valid_root / "Cargo.toml").write_text(
+        (
+            "[workspace]\n"
+            "members = [\n"
+            "  \"crates/fixture-package\",\n"
+            "  \"crates/core/chio-adversarial-suite\",\n"
+            "]\n"
+            "resolver = \"2\"\n"
+        ),
+        encoding="utf-8",
+    )
+    (valid_root / "Cargo.lock").write_text("version = 3\n", encoding="utf-8")
+    valid_package = valid_root / "crates/fixture-package"
+    valid_package.mkdir(parents=True)
+    (valid_package / "Cargo.toml").write_text(
+        (
+            "[package]\n"
+            "name = \"fixture-package\"\n"
+            "version = \"0.0.0\"\n"
+            "edition = \"2021\"\n"
+        ),
+        encoding="utf-8",
+    )
+    valid_source = valid_package / "src/lib.rs"
+    valid_source.parent.mkdir()
+    valid_source.write_text(
+        "fn fixture_function() -> bool { true }\n"
+        "#[test]\nfn fixture_test() {}\n",
+        encoding="utf-8",
+    )
+    valid_evidence_package = valid_root / "crates/core/chio-adversarial-suite"
+    valid_evidence_package.mkdir(parents=True)
+    (valid_evidence_package / "Cargo.toml").write_text(
+        (
+            "[package]\n"
+            "name = \"fixture-evidence\"\n"
+            "version = \"0.0.0\"\n"
+            "edition = \"2021\"\n"
+        ),
+        encoding="utf-8",
+    )
+    valid_evidence_source = valid_evidence_package / "src/lib.rs"
+    valid_evidence_source.parent.mkdir()
+    valid_evidence_source.write_text(
+        "pub fn evidence_fixture() -> bool { true }\n", encoding="utf-8"
+    )
+    valid_cases = valid_evidence_package / "cases"
     valid_case_path = valid_cases / "temporal_evasion/temporal-evasion-001.json"
     valid_case = json.loads(temporal.read_text(encoding="utf-8"))
+    valid_case["artifact"]["controls"][0].update(
+        {
+            "package": "fixture-package",
+            "test_source": "crates/fixture-package/src/lib.rs",
+            "test_name": "fixture_test",
+        }
+    )
+    valid_campaign_body = valid_case["artifact"]["campaigns"][0]
+    valid_campaign_body.update(
+        {
+            "package": "fixture-package",
+            "source": "crates/fixture-package/src/lib.rs",
+            "function": "fixture_function",
+            "minimum_caught": 1,
+            "mutant": {"genre": "FnValue", "replacement": "false"},
+        }
+    )
+    valid_campaign_body["outcomes"].pop("sha256", None)
+    valid_campaign_body["outcomes"].pop("inputs_sha256", None)
     write_json(valid_case_path, valid_case)
+    valid_outcome_body = {
+        "caught": 1,
+        "missed": 0,
+        "timeout": 0,
+        "unviable": 0,
+        "success": 0,
+        "total_mutants": 1,
+        "outcomes": [
+            {"scenario": "Baseline", "summary": "Success"},
+            {
+                "scenario": {
+                    "Mutant": {
+                        "package": "fixture-package",
+                        "file": "crates/fixture-package/src/lib.rs",
+                        "function": {
+                            "function_name": "fixture_function",
+                            "return_type": "-> bool",
+                            "span": {
+                                "start": {"line": 1, "column": 1},
+                                "end": {"line": 1, "column": 39},
+                            },
+                        },
+                        "span": {
+                            "start": {"line": 1, "column": 33},
+                            "end": {"line": 1, "column": 37},
+                        },
+                        "replacement": "false",
+                        "genre": "FnValue",
+                    }
+                },
+                "summary": "CaughtMutant",
+            },
+        ],
+    }
+    valid_outcome = valid_root / valid_campaign_body["outcomes"]["path"]
     _valid_cases, valid_index = checker.load_cases(
-        root,
+        valid_root,
         valid_cases,
         False,
         True,
@@ -108,17 +219,22 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     _loaded_case, valid_campaign, valid_control = valid_index[
         "ingest_time_substitution"
     ]
+    write_json(valid_outcome, valid_outcome_body)
+    valid_case["artifact"]["campaigns"][0]["outcomes"]["sha256"] = (
+        hashlib.sha256(valid_outcome.read_bytes()).hexdigest()
+    )
     valid_case["artifact"]["campaigns"][0]["outcomes"]["inputs_sha256"] = (
         checker.campaign_input_digest(
-            root,
-            checker.package_roots(root),
+            valid_root,
+            checker.package_roots(valid_root),
             valid_campaign,
             valid_control,
             valid_case_path,
         )
     )
+    valid_case["pending"] = False
     write_json(valid_case_path, valid_case)
-    valid = invoke(valid_cases)
+    valid = invoke(valid_cases, invocation_root=valid_root)
     if valid.returncode != 0:
         raise AssertionError(valid.stdout)
 
@@ -134,7 +250,9 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         legacy_cases / "temporal_evasion/temporal-evasion-001.json",
         legacy,
     )
-    expect_rejected(invoke(legacy_cases), "artifact: field mismatch")
+    expect_rejected(
+        invoke(legacy_cases, invocation_root=valid_root), "artifact: field mismatch"
+    )
 
     unknown_cases = temp / "unknown"
     unknown = copy.deepcopy(valid_case)
@@ -143,7 +261,10 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         unknown_cases / "temporal_evasion/temporal-evasion-001.json",
         unknown,
     )
-    expect_rejected(invoke(unknown_cases), "unknown=['unexpectedField']")
+    expect_rejected(
+        invoke(unknown_cases, invocation_root=valid_root),
+        "unknown=['unexpectedField']",
+    )
 
     digest_cases = temp / "digest"
     digest = copy.deepcopy(valid_case)
@@ -152,7 +273,9 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         digest_cases / "temporal_evasion/temporal-evasion-001.json",
         digest,
     )
-    expect_rejected(invoke(digest_cases), "digest mismatch")
+    expect_rejected(
+        invoke(digest_cases, invocation_root=valid_root), "digest mismatch"
+    )
 
     unbound_inputs_cases = temp / "unbound-inputs"
     unbound_inputs = copy.deepcopy(valid_case)
@@ -164,24 +287,27 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         unbound_inputs,
     )
     expect_rejected(
-        invoke(unbound_inputs_cases),
+        invoke(unbound_inputs_cases, invocation_root=valid_root),
         "outcome and input digests must be bound together",
     )
 
     missing_cases = temp / "missing"
-    missing = json.loads(canary.read_text(encoding="utf-8"))
+    missing = copy.deepcopy(valid_case)
     missing["pending"] = False
     missing["artifact"]["campaigns"][0]["outcomes"].pop("sha256", None)
     missing["artifact"]["campaigns"][0]["outcomes"].pop(
         "inputs_sha256", None
     )
     write_json(
-        missing_cases / "canary_evasion/canary-evasion-001.json",
+        missing_cases / "temporal_evasion/temporal-evasion-001.json",
         missing,
     )
-    expect_rejected(invoke(missing_cases), "outcome exists without a bound digest")
+    expect_rejected(
+        invoke(missing_cases, invocation_root=valid_root),
+        "outcome exists without a bound digest",
+    )
 
-    base_outcome = json.loads(native_outcome.read_text(encoding="utf-8"))
+    base_outcome = copy.deepcopy(valid_outcome_body)
     missed = copy.deepcopy(base_outcome)
     missed["outcomes"][1]["summary"] = "MissedMutant"
     missed["caught"] -= 1
@@ -194,6 +320,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             "--verify-outcome",
             "ingest_time_substitution",
             str(missed_path),
+            invocation_root=valid_root,
         ),
         "missed, timed out, unviable, or surviving mutant",
     )
@@ -210,6 +337,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             "--verify-outcome",
             "ingest_time_substitution",
             str(unviable_path),
+            invocation_root=valid_root,
         ),
         "missed, timed out, unviable, or surviving mutant",
     )
@@ -518,6 +646,14 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             "\n"
             "[dev-dependencies]\n"
             "fixture-test-helper = { path = \"../fixture-test-helper\" }\n"
+            "\n"
+            "[[bin]]\n"
+            "name = \"fixture-explicit\"\n"
+            "path = \"custom/explicit.rs\"\n"
+            "\n"
+            "[[bin]]\n"
+            "name = \"fixture-inc-root\"\n"
+            "path = \"custom/root.inc\"\n"
         ),
         encoding="utf-8",
     )
@@ -529,9 +665,140 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             "fn fixture_function_changed() -> bool { true }\n"
             "#[test]\nfn fixture_test() {}\n"
             "#[test]\nfn fixture_test_changed() {}\n"
+            "mod fixture_module;\n"
+            "#[path = \"path_modules/fixture_path.rs\"]\n"
+            "mod fixture_path_module;\n"
+            "#[path = \"path_modules/fixture_path.inc\"]\n"
+            "mod fixture_path_inc_module;\n"
+            "mod directory_module;\n"
+            "mod dual_module;\n"
+            "include!(\"dual_module.rs\");\n"
+            "include!(\"included_fragment.rs\");\n"
+            "include!(\"included_fragment.inc\");\n"
+            "#[cfg(test)]\nmod test_only_module;\n"
+            "#[cfg_attr(mutants, mutants::skip)]\nmod skipped_module;\n"
+            "mod inner_skipped_module;\n"
+            "mod inline_outer {\n"
+            "    #[path = \"nested/path_nested.rs\"]\n"
+            "    mod nested_path;\n"
+            "    mod nested_default;\n"
+            "}\n"
+            "#[path = \"same_line.rs\"] mod same_line_path;\n"
+            "#[path =\n"
+            "    \"multiline_path.rs\"]\n"
+            "mod multiline_path;\n"
+            "mod race_source;\n"
+            "// mod line_commented_module;\n"
+            "/*\nmod block_commented_module;\n*/\n"
+            "const RAW_MODULE_TEXT: &str = r#\"\n"
+            "mod raw_string_module;\n"
+            "\"#;\n"
+            "macro_rules! fake_module_declaration {\n"
+            "    () => { mod macro_module; };\n"
+            "}\n"
         ),
         encoding="utf-8",
     )
+    fixture_module = package_root / "src/fixture_module.rs"
+    fixture_module.write_text(
+        "fn fixture_module_function() -> bool { true }\n", encoding="utf-8"
+    )
+    fixture_path_module = package_root / "src/path_modules/fixture_path.rs"
+    fixture_path_module.parent.mkdir()
+    fixture_path_module.write_text(
+        "fn fixture_path_function() -> bool { true }\n", encoding="utf-8"
+    )
+    fixture_path_inc_module = package_root / "src/path_modules/fixture_path.inc"
+    fixture_path_inc_module.write_text(
+        "fn fixture_path_inc_function() -> bool { true }\n", encoding="utf-8"
+    )
+    directory_module = package_root / "src/directory_module/mod.rs"
+    directory_module.parent.mkdir()
+    directory_module.write_text(
+        "fn directory_module_function() -> bool { true }\n", encoding="utf-8"
+    )
+    dual_module = package_root / "src/dual_module.rs"
+    dual_module.write_text(
+        "fn dual_module_function() -> bool { true }\n", encoding="utf-8"
+    )
+    included_rs_fragment = package_root / "src/included_fragment.rs"
+    included_rs_fragment.write_text(
+        "fn included_rs_function() -> bool { true }\n", encoding="utf-8"
+    )
+    included_inc_fragment = package_root / "src/included_fragment.inc"
+    included_inc_fragment.write_text(
+        "fn included_inc_function() -> bool { true }\n", encoding="utf-8"
+    )
+    orphan_rs_fragment = package_root / "src/orphan_fragment.rs"
+    orphan_rs_fragment.write_text(
+        "fn orphan_rs_function() -> bool { true }\n", encoding="utf-8"
+    )
+    orphan_inc_fragment = package_root / "src/orphan_fragment.inc"
+    orphan_inc_fragment.write_text(
+        "fn orphan_inc_function() -> bool { true }\n", encoding="utf-8"
+    )
+    test_only_module = package_root / "src/test_only_module.rs"
+    test_only_module.write_text(
+        "fn test_only_function() -> bool { true }\n", encoding="utf-8"
+    )
+    skipped_module = package_root / "src/skipped_module.rs"
+    skipped_module.write_text(
+        "fn skipped_function() -> bool { true }\n", encoding="utf-8"
+    )
+    inner_skipped_module = package_root / "src/inner_skipped_module.rs"
+    inner_skipped_module.write_text(
+        "#![cfg_attr(mutants, mutants::skip)]\n"
+        "fn inner_skipped_function() -> bool { true }\n",
+        encoding="utf-8",
+    )
+    nested_path_module = package_root / "src/inline_outer/nested/path_nested.rs"
+    nested_path_module.parent.mkdir(parents=True)
+    nested_path_module.write_text(
+        "fn nested_path_function() -> bool { true }\n", encoding="utf-8"
+    )
+    nested_default_module = package_root / "src/inline_outer/nested_default.rs"
+    nested_default_module.write_text(
+        "fn nested_default_function() -> bool { true }\n", encoding="utf-8"
+    )
+    same_line_module = package_root / "src/same_line.rs"
+    same_line_module.write_text(
+        "fn same_line_function() -> bool { true }\n", encoding="utf-8"
+    )
+    multiline_path_module = package_root / "src/multiline_path.rs"
+    multiline_path_module.write_text(
+        "fn multiline_path_function() -> bool { true }\n", encoding="utf-8"
+    )
+    race_source = package_root / "src/race_source.rs"
+    race_source_payload = b"fn captured_only_function() -> bool { true }\n"
+    race_source.write_bytes(race_source_payload)
+    for hidden_module, hidden_function in (
+        ("line_commented_module", "line_commented_function"),
+        ("block_commented_module", "block_commented_function"),
+        ("raw_string_module", "raw_string_function"),
+        ("macro_module", "macro_module_function"),
+    ):
+        (package_root / f"src/{hidden_module}.rs").write_text(
+            f"fn {hidden_function}() -> bool {{ true }}\n", encoding="utf-8"
+        )
+    fixture_binary = package_root / "src/bin/fixture-tool.rs"
+    fixture_binary.parent.mkdir()
+    fixture_binary.write_text(
+        "fn fixture_binary_function() -> bool { true }\nfn main() {}\n",
+        encoding="utf-8",
+    )
+    explicit_fixture_binary = package_root / "custom/explicit.rs"
+    explicit_fixture_binary.parent.mkdir()
+    explicit_fixture_binary.write_text(
+        "fn fixture_explicit_binary_function() -> bool { true }\nfn main() {}\n",
+        encoding="utf-8",
+    )
+    explicit_inc_binary = package_root / "custom/root.inc"
+    explicit_inc_binary.write_text(
+        "fn fixture_inc_root_function() -> bool { true }\nfn main() {}\n",
+        encoding="utf-8",
+    )
+    fixture_module_alias = package_root / "src/fixture_module_alias.rs"
+    fixture_module_alias.symlink_to("fixture_module.rs")
     shared_input_root = promotion_root / "tests/shared-fixture-inputs"
     shared_input_root.mkdir(parents=True)
     shared_input_source = shared_input_root / "shared.rs"
@@ -668,6 +935,98 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     candidate_path = candidate_root / "mutants.out/outcomes.json"
     write_json(candidate_path, promotion_outcome)
     candidate_bytes = candidate_path.read_bytes()
+    _pending_cases, pending_index = checker.load_cases(
+        promotion_root, promotion_case_path.parents[1], False, True
+    )
+    pending_record = pending_index["ingest_time_substitution"]
+    pending_inputs = checker.campaign_input_snapshot(
+        promotion_root,
+        checker.package_roots(promotion_root),
+        pending_record[1],
+        pending_record[2],
+        pending_record[0].path,
+    )
+    original_case_bytes = promotion_case_path.read_bytes()
+    original_manifest_bytes = manifest_path.read_bytes()
+    canonical_outcome = promotion_root / promotion_campaign["outcomes"]["path"]
+    for label, expected_payload, expected_inputs, expected_error in (
+        (
+            "changed outcome",
+            candidate_bytes + b" ",
+            pending_inputs,
+            "outcome changed after the promotion run",
+        ),
+        (
+            "changed input closure",
+            candidate_bytes,
+            ("0" * 64, pending_inputs[1]),
+            "source or control changed before promotion",
+        ),
+    ):
+        try:
+            checker.promote_outcome(
+                promotion_root,
+                checker.package_roots(promotion_root),
+                pending_record,
+                str(candidate_root),
+                expected_outcome_payload=expected_payload,
+                expected_inputs_snapshot=expected_inputs,
+            )
+        except checker.EvidenceError as error:
+            if expected_error not in str(error):
+                raise AssertionError(
+                    f"unexpected {label} promotion rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError(f"promotion accepted {label}")
+        if (
+            canonical_outcome.exists()
+            or promotion_case_path.read_bytes() != original_case_bytes
+            or manifest_path.read_bytes() != original_manifest_bytes
+            or checker.trusted_transaction_exists(promotion_root)
+        ):
+            raise AssertionError(f"failed {label} promotion changed repository state")
+
+    bootstrap_root = temp / "pending-bootstrap-root"
+    shutil.copytree(promotion_root, bootstrap_root)
+    bootstrap_case_path = bootstrap_root / promotion_case_path.relative_to(promotion_root)
+    _bootstrap_cases, bootstrap_index = checker.load_cases(
+        bootstrap_root, bootstrap_case_path.parents[1], False, True
+    )
+    actual_run_campaign = checker.run_campaign
+
+    def successful_pending_runner(
+        _root: Path,
+        _campaign: object,
+        _control: object,
+        output_root: Path,
+        _environment: object,
+    ) -> Path:
+        outcome = output_root / "mutants.out/outcomes.json"
+        write_json(outcome, promotion_outcome)
+        return outcome
+
+    checker.run_campaign = successful_pending_runner
+    try:
+        bootstrap_destination, bootstrap_digest, bootstrap_complete = (
+            checker.promote_pending_outcome(
+                bootstrap_root,
+                checker.package_roots(bootstrap_root),
+                bootstrap_index["ingest_time_substitution"],
+                {},
+            )
+        )
+    finally:
+        checker.run_campaign = actual_run_campaign
+    if (
+        bootstrap_destination.read_bytes() != candidate_bytes
+        or bootstrap_digest != hashlib.sha256(candidate_bytes).hexdigest()
+        or bootstrap_complete is not True
+        or json.loads(bootstrap_case_path.read_text(encoding="utf-8"))["pending"]
+        is not False
+    ):
+        raise AssertionError("pending campaign bootstrap did not bind its fresh outcome")
+
     promoted = subprocess.run(
         [
             str(gate),
@@ -688,7 +1047,6 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     )
     if promoted.returncode != 0:
         raise AssertionError(promoted.stdout)
-    canonical_outcome = promotion_root / promotion_campaign["outcomes"]["path"]
     if canonical_outcome.read_bytes() != candidate_bytes:
         raise AssertionError("promotion did not preserve the validated outcome bytes")
     promoted_case = json.loads(promotion_case_path.read_text(encoding="utf-8"))
@@ -1034,6 +1392,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         "crates/fixture-package/src/generated_fragment.toml",
         "crates/fixture-package/src/generated_fragment.inc.txt",
         "crates/fixture-package/src/../generated_fragment.inc",
+        "crates/fixture-package/src/generated_fragment.rs\ninjected.rs",
         "/crates/fixture-package/src/generated_fragment.inc",
     ):
         try:
@@ -1042,6 +1401,1125 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             pass
         else:
             raise AssertionError(f"unsafe Rust path passed: {unsafe_rust_path}")
+
+    source_validation_packages = checker.package_roots(promotion_root)
+    source_validation_control = checker.validate_control(
+        promotion_root,
+        source_validation_packages,
+        promotion_case["artifact"]["controls"][0],
+        promotion_case["id"],
+    )
+    source_validation_controls = {
+        source_validation_control["id"]: source_validation_control
+    }
+
+    trusted_tool = Path("/usr/local/cargo/bin/cargo-mutants")
+    if (
+        checker.TRUSTED_CARGO_MUTANTS != trusted_tool
+        or checker.TRUSTED_CARGO_MUTANTS_ANCESTORS
+        != (
+            Path("/"),
+            Path("/usr"),
+            Path("/usr/local"),
+            Path("/usr/local/cargo"),
+            Path("/usr/local/cargo/bin"),
+        )
+    ):
+        raise AssertionError("cargo-mutants executable authority is not fixed")
+
+    def synthetic_metadata(
+        kind: int,
+        mode: int,
+        *,
+        inode: int = 1,
+        links: int = 1,
+        uid: int = 0,
+        gid: int = 0,
+    ) -> os.stat_result:
+        return os.stat_result(
+            (kind | mode, inode, 1, links, uid, gid, 0, 0, 0, 0)
+        )
+
+    trusted_ancestor = synthetic_metadata(stat.S_IFDIR, 0o755, links=2)
+    trusted_executable = synthetic_metadata(stat.S_IFREG, 0o555)
+    checker.require_trusted_cargo_mutants_ancestor(
+        trusted_ancestor, Path("/usr/local/cargo/bin")
+    )
+    checker.require_trusted_cargo_mutants_file(
+        trusted_executable, trusted_tool
+    )
+    trusted_host_executable = synthetic_metadata(stat.S_IFREG, 0o755)
+    checker.require_host_cargo_mutants_file(
+        trusted_host_executable, Path("/trusted-host/cargo-mutants")
+    )
+    for hostile_ancestor in (
+        synthetic_metadata(stat.S_IFLNK, 0o755),
+        synthetic_metadata(stat.S_IFDIR, 0o775, links=2),
+        synthetic_metadata(stat.S_IFDIR, 0o755, links=2, uid=65532),
+        synthetic_metadata(stat.S_IFDIR, 0o755, links=2, gid=65532),
+    ):
+        try:
+            checker.require_trusted_cargo_mutants_ancestor(
+                hostile_ancestor, Path("/usr/local/cargo/bin")
+            )
+        except checker.EvidenceError:
+            pass
+        else:
+            raise AssertionError("mutable cargo-mutants ancestor was accepted")
+    for hostile_executable in (
+        synthetic_metadata(stat.S_IFLNK, 0o555),
+        synthetic_metadata(stat.S_IFDIR, 0o555, links=2),
+        synthetic_metadata(stat.S_IFREG, 0o755),
+        synthetic_metadata(stat.S_IFREG, 0o555, links=2),
+        synthetic_metadata(stat.S_IFREG, 0o555, uid=65532),
+        synthetic_metadata(stat.S_IFREG, 0o555, gid=65532),
+    ):
+        try:
+            checker.require_trusted_cargo_mutants_file(
+                hostile_executable, trusted_tool
+            )
+        except checker.EvidenceError:
+            pass
+        else:
+            raise AssertionError("mutable cargo-mutants executable was accepted")
+    for hostile_host_executable in (
+        synthetic_metadata(stat.S_IFLNK, 0o755),
+        synthetic_metadata(stat.S_IFDIR, 0o755, links=2),
+        synthetic_metadata(stat.S_IFREG, 0o644),
+        synthetic_metadata(stat.S_IFREG, 0o755, links=2),
+    ):
+        try:
+            checker.require_host_cargo_mutants_file(
+                hostile_host_executable, Path("/trusted-host/cargo-mutants")
+            )
+        except checker.EvidenceError:
+            pass
+        else:
+            raise AssertionError("unsafe host cargo-mutants executable was accepted")
+    try:
+        checker.require_unchanged_cargo_mutants_identity(
+            trusted_executable,
+            synthetic_metadata(stat.S_IFREG, 0o555, inode=2),
+            trusted_tool,
+        )
+    except checker.EvidenceError:
+        pass
+    else:
+        raise AssertionError("replaced cargo-mutants executable was accepted")
+    try:
+        checker.require_unchanged_cargo_mutants_identity(
+            trusted_ancestor,
+            synthetic_metadata(stat.S_IFDIR, 0o755, inode=2, links=2),
+            Path("/usr/local/cargo/bin"),
+        )
+    except checker.EvidenceError:
+        pass
+    else:
+        raise AssertionError("replaced cargo-mutants ancestor was accepted")
+
+    trusted_tool_metadata = {
+        path: trusted_ancestor
+        for path in checker.TRUSTED_CARGO_MUTANTS_ANCESTORS
+    }
+    trusted_tool_metadata[trusted_tool] = trusted_executable
+    trusted_tool_lstats: list[Path] = []
+    actual_path_lstat = checker.Path.lstat
+    actual_path_resolve = checker.Path.resolve
+
+    def trusted_lstat(path: Path) -> os.stat_result:
+        trusted_tool_lstats.append(path)
+        return trusted_tool_metadata[path]
+
+    def identity_resolve(path: Path, strict: bool = False) -> Path:
+        _ = strict
+        return path
+
+    checker.Path.lstat = trusted_lstat
+    checker.Path.resolve = identity_resolve
+    actual_which = checker.shutil.which
+
+    def forbidden_host_lookup(_name: str) -> str | None:
+        raise AssertionError("enterprise cargo-mutants fell back to PATH")
+
+    checker.shutil.which = forbidden_host_lookup
+    try:
+        authenticated_inventory = checker.CargoMutantsSourceInventory()
+        if (
+            checker.cargo_mutants_executable(
+                promotion_root,
+                authenticated_inventory,
+                {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"},
+            )
+            != trusted_tool
+            or authenticated_inventory.executable != trusted_tool
+        ):
+            raise AssertionError("fixed cargo-mutants executable was not retained")
+    finally:
+        checker.Path.lstat = actual_path_lstat
+        checker.Path.resolve = actual_path_resolve
+        checker.shutil.which = actual_which
+    expected_tool_lstats = [
+        *checker.TRUSTED_CARGO_MUTANTS_ANCESTORS,
+        trusted_tool,
+        *checker.TRUSTED_CARGO_MUTANTS_ANCESTORS,
+        trusted_tool,
+    ]
+    if trusted_tool_lstats != expected_tool_lstats:
+        raise AssertionError(
+            f"cargo-mutants authority chain was not authenticated twice: "
+            f"{trusted_tool_lstats}"
+        )
+    for replaced_path in (checker.TRUSTED_CARGO_MUTANTS_ANCESTORS[-1], trusted_tool):
+        replacement_reads: dict[Path, int] = {}
+
+        def replaced_identity_lstat(path: Path) -> os.stat_result:
+            replacement_reads[path] = replacement_reads.get(path, 0) + 1
+            original = trusted_tool_metadata[path]
+            if path == replaced_path and replacement_reads[path] == 2:
+                return synthetic_metadata(
+                    stat.S_IFREG if path == trusted_tool else stat.S_IFDIR,
+                    0o555 if path == trusted_tool else 0o755,
+                    inode=2,
+                    links=1 if path == trusted_tool else 2,
+                )
+            return original
+
+        checker.Path.lstat = replaced_identity_lstat
+        checker.Path.resolve = identity_resolve
+        checker.shutil.which = forbidden_host_lookup
+        try:
+            checker.cargo_mutants_executable(
+                promotion_root,
+                checker.CargoMutantsSourceInventory(),
+                {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"},
+            )
+        except checker.EvidenceError as error:
+            if "identity changed" not in str(error):
+                raise AssertionError(
+                    f"unexpected cargo-mutants replacement rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError(
+                f"replaced cargo-mutants authority passed: {replaced_path}"
+            )
+        finally:
+            checker.Path.lstat = actual_path_lstat
+            checker.Path.resolve = actual_path_resolve
+            checker.shutil.which = actual_which
+
+    actual_enterprise_cargo_mutants_executable = (
+        checker.enterprise_cargo_mutants_executable
+    )
+    actual_os_open = checker.os.open
+    actual_os_fstat = checker.os.fstat
+    actual_os_close = checker.os.close
+    actual_path_lstat = checker.Path.lstat
+    pinned_authentications: list[Path] = []
+    pinned_closes: list[int] = []
+
+    def pinned_enterprise_executable(_root: Path) -> Path:
+        pinned_authentications.append(trusted_tool)
+        return trusted_tool
+
+    def pinned_open(path: Path, flags: int) -> int:
+        if path != trusted_tool or flags & getattr(checker.os, "O_NOFOLLOW", 0) == 0:
+            raise AssertionError("cargo-mutants descriptor open was not exact")
+        return 97
+
+    checker.enterprise_cargo_mutants_executable = pinned_enterprise_executable
+    checker.os.open = pinned_open
+    checker.os.fstat = lambda descriptor: (
+        trusted_executable
+        if descriptor == 97
+        else (_ for _ in ()).throw(AssertionError("unexpected descriptor"))
+    )
+    checker.os.close = lambda descriptor: pinned_closes.append(descriptor)
+    checker.Path.lstat = lambda path: trusted_tool_metadata[path]
+    try:
+        with checker.cargo_mutants_subprocess_options(
+            promotion_root,
+            [str(trusted_tool), "mutants", "--version"],
+            {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"},
+            checker.metadata_identity(trusted_executable),
+        ) as (execution_options, observed_identity):
+            if execution_options != {
+                "executable": "/proc/self/fd/97",
+                "pass_fds": (97,),
+            } or observed_identity != checker.metadata_identity(trusted_executable):
+                raise AssertionError(
+                    f"cargo-mutants execution was not descriptor-pinned: "
+                    f"{execution_options}, {observed_identity}"
+                )
+        if (
+            pinned_authentications != [trusted_tool, trusted_tool, trusted_tool]
+            or pinned_closes != [97]
+        ):
+            raise AssertionError("descriptor-pinned cargo-mutants was not reauthenticated")
+
+        pinned_authentications.clear()
+        pinned_closes.clear()
+        replacement_executable = synthetic_metadata(
+            stat.S_IFREG, 0o555, inode=2
+        )
+        checker.os.fstat = lambda descriptor: (
+            replacement_executable
+            if descriptor == 97
+            else (_ for _ in ()).throw(AssertionError("unexpected descriptor"))
+        )
+        checker.Path.lstat = lambda path: (
+            replacement_executable
+            if path == trusted_tool
+            else (_ for _ in ()).throw(AssertionError(f"unexpected path: {path}"))
+        )
+        try:
+            with checker.cargo_mutants_subprocess_options(
+                promotion_root,
+                [str(trusted_tool), "mutants", "--list-files", "--json"],
+                {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"},
+                checker.metadata_identity(trusted_executable),
+            ):
+                pass
+        except checker.EvidenceError as error:
+            if "differs from the version-verified inode" not in str(error):
+                raise AssertionError(
+                    f"unexpected cross-command inode rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("post-version cargo-mutants replacement was accepted")
+        if pinned_closes != [97]:
+            raise AssertionError("post-version replacement descriptor was not closed")
+
+        pinned_authentications.clear()
+        pinned_closes.clear()
+        checker.os.fstat = lambda descriptor: (
+            trusted_executable
+            if descriptor == 97
+            else (_ for _ in ()).throw(AssertionError("unexpected descriptor"))
+        )
+        named_reads = [0]
+
+        def replaced_named_executable(path: Path) -> os.stat_result:
+            if path != trusted_tool:
+                raise AssertionError(f"unexpected named executable: {path}")
+            named_reads[0] += 1
+            if named_reads[0] == 2:
+                return synthetic_metadata(stat.S_IFREG, 0o555, inode=2)
+            return trusted_executable
+
+        checker.Path.lstat = replaced_named_executable
+        try:
+            with checker.cargo_mutants_subprocess_options(
+                promotion_root,
+                [str(trusted_tool), "mutants", "--version"],
+                {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"},
+                checker.metadata_identity(trusted_executable),
+            ):
+                pass
+        except checker.EvidenceError as error:
+            if "identity changed" not in str(error):
+                raise AssertionError(
+                    f"unexpected pinned executable replacement rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("named cargo-mutants replacement after exec was accepted")
+        if pinned_closes != [97]:
+            raise AssertionError("replaced cargo-mutants descriptor was not closed")
+    finally:
+        checker.enterprise_cargo_mutants_executable = (
+            actual_enterprise_cargo_mutants_executable
+        )
+        checker.os.open = actual_os_open
+        checker.os.fstat = actual_os_fstat
+        checker.os.close = actual_os_close
+        checker.Path.lstat = actual_path_lstat
+
+    host_tool = temp / "host-cargo-bin/cargo-mutants"
+    host_tool.parent.mkdir()
+    host_tool.write_text("host cargo-mutants fixture\n", encoding="utf-8")
+    host_tool.chmod(0o755)
+    workspace_tool = promotion_root / "cargo-mutants"
+    workspace_tool.write_text("workspace cargo-mutants fixture\n", encoding="utf-8")
+    workspace_tool.chmod(0o755)
+    checker.shutil.which = lambda _name: str(workspace_tool)
+    try:
+        checker.cargo_mutants_executable(
+            promotion_root, checker.CargoMutantsSourceInventory(), {}
+        )
+    except checker.EvidenceError as error:
+        if "cannot be workspace-owned" not in str(error):
+            raise AssertionError(
+                f"unexpected workspace cargo-mutants rejection: {error}"
+            ) from error
+    else:
+        raise AssertionError("workspace-owned host cargo-mutants was accepted")
+    checker.shutil.which = lambda _name: str(host_tool)
+
+    inventory_commands: list[list[str]] = []
+    inventory_version = [checker.PINNED_CARGO_MUTANTS_VERSION]
+    inventory_paths = ["crates/fixture-package/src/lib.rs"]
+    inventory_package = ["fixture-package"]
+    inventory_payload_override: list[str | None] = [None]
+    inventory_enterprise_identities: list[tuple[int, int]] = []
+    actual_subprocess_run = checker.subprocess.run
+    actual_cargo_mutants_subprocess_options = (
+        checker.cargo_mutants_subprocess_options
+    )
+    actual_enterprise_cargo_mutants_executable = (
+        checker.enterprise_cargo_mutants_executable
+    )
+    inventory_enterprise_authentications: list[Path] = []
+
+    def inventory_enterprise_executable(_root: Path) -> Path:
+        inventory_enterprise_authentications.append(trusted_tool)
+        return trusted_tool
+
+    @checker.contextmanager
+    def inventory_execution_options(
+        _root: Path,
+        command: list[str],
+        environment: dict[str, str] | None,
+        expected_identity: tuple[int, int] | None = None,
+    ) -> object:
+        if checker.enterprise_security_runner(environment):
+            if command[:2] != [str(trusted_tool), "mutants"]:
+                raise AssertionError(
+                    f"enterprise inventory bypassed trusted executable: {command}"
+                )
+            observed_identity = (
+                inventory_enterprise_identities.pop(0)
+                if inventory_enterprise_identities
+                else (1, 1)
+            )
+            if (
+                expected_identity is not None
+                and expected_identity != observed_identity
+            ):
+                raise checker.EvidenceError(
+                    "cargo-mutants differs from the version-verified inode"
+                )
+            yield (
+                {
+                    "executable": "/proc/self/fd/97",
+                    "pass_fds": (97,),
+                },
+                observed_identity,
+            )
+        else:
+            if expected_identity is not None:
+                raise AssertionError("host inventory received an enterprise identity")
+            yield {}, None
+
+    def fake_cargo_mutants(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        inventory_commands.append(list(command))
+        if kwargs.get("cwd") != promotion_root:
+            raise AssertionError("cargo-mutants inventory used the wrong workspace")
+        if command[0] == str(trusted_tool):
+            if (
+                kwargs.get("executable") != "/proc/self/fd/97"
+                or kwargs.get("pass_fds") != (97,)
+            ):
+                raise AssertionError(
+                    "enterprise inventory command was not descriptor-pinned"
+                )
+        elif "executable" in kwargs or "pass_fds" in kwargs:
+            raise AssertionError("host inventory unexpectedly used verifier execution")
+        if command in (
+            [str(host_tool), "mutants", "--version"],
+            [str(trusted_tool), "mutants", "--version"],
+        ):
+            stdout = inventory_version[0] + "\n"
+        elif command[:2] in (
+            [str(host_tool), "mutants"],
+            [str(trusted_tool), "mutants"],
+        ) and command[2:] == [
+            "--no-config",
+            "-p",
+            "fixture-package",
+            "--list-files",
+            "--json",
+        ]:
+            stdout = inventory_payload_override[0] or (
+                json.dumps(
+                    [
+                        {"path": path, "package": inventory_package[0]}
+                        for path in inventory_paths
+                    ]
+                )
+                + "\n"
+            )
+        else:
+            raise AssertionError(f"unexpected cargo-mutants command: {command}")
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    checker.cargo_mutants_subprocess_options = inventory_execution_options
+    checker.enterprise_cargo_mutants_executable = inventory_enterprise_executable
+    checker.subprocess.run = fake_cargo_mutants
+    try:
+        if checker.require_cargo_mutants_version(
+            host_tool, promotion_root, {}
+        ) is not None:
+            raise AssertionError("host cargo-mutants version acquired enterprise identity")
+        enterprise_environment = {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"}
+        if checker.require_cargo_mutants_version(
+            trusted_tool, promotion_root, enterprise_environment
+        ) != (1, 1):
+            raise AssertionError("enterprise cargo-mutants version lost its inode")
+        if inventory_commands != [
+            [str(host_tool), "mutants", "--version"],
+            [str(trusted_tool), "mutants", "--version"],
+        ]:
+            raise AssertionError(
+                f"cargo-mutants version return-shape probe drifted: "
+                f"{inventory_commands}"
+            )
+        inventory_commands.clear()
+
+        command_inventory = checker.CargoMutantsSourceInventory()
+        first_inventory = checker.cargo_mutants_source_inventory(
+            promotion_root,
+            source_validation_packages["fixture-package"],
+            "fixture-package",
+            command_inventory,
+        )
+        second_inventory = checker.cargo_mutants_source_inventory(
+            promotion_root,
+            source_validation_packages["fixture-package"],
+            "fixture-package",
+            command_inventory,
+        )
+        if (
+            first_inventory != frozenset(inventory_paths)
+            or second_inventory is not first_inventory
+            or command_inventory.executable != host_tool
+            or inventory_commands
+            != [
+                [str(host_tool), "mutants", "--version"],
+                [
+                    str(host_tool),
+                    "mutants",
+                    "--no-config",
+                    "-p",
+                    "fixture-package",
+                    "--list-files",
+                    "--json",
+                ],
+            ]
+        ):
+            raise AssertionError("cargo-mutants source inventory was not exact and cached")
+
+        inventory_commands.clear()
+        enterprise_inventory = checker.CargoMutantsSourceInventory(
+            executable=trusted_tool
+        )
+        enterprise_sources = checker.cargo_mutants_source_inventory(
+            promotion_root,
+            source_validation_packages["fixture-package"],
+            "fixture-package",
+            enterprise_inventory,
+            enterprise_environment,
+        )
+        if (
+            enterprise_sources != frozenset(inventory_paths)
+            or enterprise_inventory.verified_identity != (1, 1)
+            or inventory_commands
+            != [
+                [str(trusted_tool), "mutants", "--version"],
+                [
+                    str(trusted_tool),
+                    "mutants",
+                    "--no-config",
+                    "-p",
+                    "fixture-package",
+                    "--list-files",
+                    "--json",
+                ],
+            ]
+        ):
+            raise AssertionError(
+                "enterprise source inventory bypassed the fixed cargo-mutants"
+            )
+
+        try:
+            checker.cargo_mutants_executable(
+                promotion_root,
+                checker.CargoMutantsSourceInventory(executable=host_tool),
+                enterprise_environment,
+            )
+        except checker.EvidenceError:
+            pass
+        else:
+            raise AssertionError("enterprise accepted a PATH-resolved cargo-mutants")
+        if inventory_enterprise_authentications != [trusted_tool, trusted_tool]:
+            raise AssertionError(
+                "enterprise cached cargo-mutants paths were not reauthenticated"
+            )
+
+        inventory_enterprise_identities[:] = [(1, 1), (1, 2)]
+        inventory_commands.clear()
+        try:
+            checker.cargo_mutants_source_inventory(
+                promotion_root,
+                source_validation_packages["fixture-package"],
+                "fixture-package",
+                checker.CargoMutantsSourceInventory(executable=trusted_tool),
+                enterprise_environment,
+            )
+        except checker.EvidenceError as error:
+            if "differs from the version-verified inode" not in str(error):
+                raise AssertionError(
+                    f"unexpected cross-command inventory rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError(
+                "cargo-mutants replacement between version and inventory was accepted"
+            )
+        if inventory_commands != [
+            [str(trusted_tool), "mutants", "--version"]
+        ]:
+            raise AssertionError(
+                "replacement inventory executed after its inode binding changed"
+            )
+
+        inventory_commands.clear()
+        inventory_version[0] = "cargo-mutants 25.3.2"
+        try:
+            checker.cargo_mutants_source_inventory(
+                promotion_root,
+                source_validation_packages["fixture-package"],
+                "fixture-package",
+                checker.CargoMutantsSourceInventory(),
+            )
+        except checker.EvidenceError as error:
+            if "cargo-mutants version mismatch" not in str(error):
+                raise AssertionError(
+                    f"unexpected cargo-mutants version rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("unpinned cargo-mutants version was accepted")
+
+        inventory_paths[:] = [
+            "crates/fixture-package/src/../src/lib.rs"
+        ]
+        try:
+            checker.cargo_mutants_source_inventory(
+                promotion_root,
+                source_validation_packages["fixture-package"],
+                "fixture-package",
+                checker.CargoMutantsSourceInventory(
+                    executable=host_tool, version_checked=True
+                ),
+            )
+        except checker.EvidenceError as error:
+            if "invalid repository-relative path" not in str(error):
+                raise AssertionError(
+                    f"unexpected noncanonical inventory rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("noncanonical cargo-mutants source path was accepted")
+
+        inventory_paths[:] = [
+            "crates/fixture-package/src/cover.rs\n"
+            "crates/fixture-package/src/injected.rs"
+        ]
+        inventory_commands.clear()
+        try:
+            checker.cargo_mutants_source_inventory(
+                promotion_root,
+                source_validation_packages["fixture-package"],
+                "fixture-package",
+                checker.CargoMutantsSourceInventory(
+                    executable=host_tool, version_checked=True
+                ),
+            )
+        except checker.EvidenceError as error:
+            if "unsafe Rust path" not in str(error):
+                raise AssertionError(
+                    f"unexpected newline inventory rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError(
+                "JSON-escaped symlink/newline cargo-mutants inventory was accepted"
+            )
+
+        inventory_paths[:] = ["crates/fixture-package/src/lib.rs"]
+        inventory_package[0] = "different-package"
+        try:
+            checker.cargo_mutants_source_inventory(
+                promotion_root,
+                source_validation_packages["fixture-package"],
+                "fixture-package",
+                checker.CargoMutantsSourceInventory(
+                    executable=host_tool, version_checked=True
+                ),
+            )
+        except checker.EvidenceError as error:
+            if "package binding differs" not in str(error):
+                raise AssertionError(
+                    f"unexpected inventory package rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("cross-package JSON source inventory was accepted")
+
+        inventory_package[0] = "fixture-package"
+        inventory_payload_override[0] = (
+            '[{"path":"crates/fixture-package/src/lib.rs",'
+            '"package":"fixture-package","extra":true}]\n'
+        )
+        try:
+            checker.cargo_mutants_source_inventory(
+                promotion_root,
+                source_validation_packages["fixture-package"],
+                "fixture-package",
+                checker.CargoMutantsSourceInventory(
+                    executable=host_tool, version_checked=True
+                ),
+            )
+        except checker.EvidenceError as error:
+            if "field mismatch" not in str(error):
+                raise AssertionError(
+                    f"unexpected inventory schema rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("extended JSON source inventory schema was accepted")
+        inventory_payload_override[0] = None
+    finally:
+        checker.subprocess.run = actual_subprocess_run
+        checker.shutil.which = actual_which
+        checker.cargo_mutants_subprocess_options = (
+            actual_cargo_mutants_subprocess_options
+        )
+        checker.enterprise_cargo_mutants_executable = (
+            actual_enterprise_cargo_mutants_executable
+        )
+
+    for artifact_environment, expected_error in (
+        (
+            {"CHIO_SECURITY_CANDIDATE_ARTIFACTS": "/target/artifacts"},
+            "candidate artifact authority is forbidden",
+        ),
+        (
+            {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"},
+            "verifier artifact authority is absent",
+        ),
+        (
+            {"CHIO_SECURITY_VERIFIER_ARTIFACTS": "/target/verifier"},
+            "only valid in the enterprise boundary",
+        ),
+        (
+            {
+                "CHIO_ENTERPRISE_SECURITY_RUNNER": "1",
+                "CHIO_SECURITY_VERIFIER_ARTIFACTS": "/target/artifacts",
+            },
+            "escaped its state root",
+        ),
+        (
+            {
+                "CHIO_ENTERPRISE_SECURITY_RUNNER": "1",
+                "CHIO_SECURITY_VERIFIER_ARTIFACTS": (
+                    "/baseline/candidate-state/not-a-token/verifier/artifacts"
+                ),
+            },
+            "is not exact",
+        ),
+    ):
+        try:
+            checker.verifier_artifact_root(artifact_environment)
+        except checker.EvidenceError as error:
+            if expected_error not in str(error):
+                raise AssertionError(
+                    f"unexpected artifact-authority rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError(
+                f"unsafe artifact authority passed: {artifact_environment}"
+            )
+
+    trusted_artifact_directory = synthetic_metadata(
+        stat.S_IFDIR,
+        0o700,
+        links=2,
+        uid=checker.ENTERPRISE_VERIFIER_UID,
+        gid=checker.ENTERPRISE_VERIFIER_GID,
+    )
+    checker.require_directory_authority(
+        trusted_artifact_directory,
+        Path("/baseline/candidate-state/token/verifier/artifacts"),
+        uid=checker.ENTERPRISE_VERIFIER_UID,
+        gid=checker.ENTERPRISE_VERIFIER_GID,
+        mode=0o700,
+    )
+    if checker.ENTERPRISE_BASELINE_MODE != 0o555:
+        raise AssertionError("frozen baseline authority mode is not exact")
+    for hostile_artifact_directory in (
+        synthetic_metadata(
+            stat.S_IFLNK,
+            0o700,
+            uid=checker.ENTERPRISE_VERIFIER_UID,
+            gid=checker.ENTERPRISE_VERIFIER_GID,
+        ),
+        synthetic_metadata(
+            stat.S_IFDIR,
+            0o770,
+            links=2,
+            uid=checker.ENTERPRISE_VERIFIER_UID,
+            gid=checker.ENTERPRISE_VERIFIER_GID,
+        ),
+        synthetic_metadata(
+            stat.S_IFDIR,
+            0o700,
+            links=2,
+            uid=65532,
+            gid=65532,
+        ),
+    ):
+        try:
+            checker.require_directory_authority(
+                hostile_artifact_directory,
+                Path("/baseline/candidate-state/token/verifier/artifacts"),
+                uid=checker.ENTERPRISE_VERIFIER_UID,
+                gid=checker.ENTERPRISE_VERIFIER_GID,
+                mode=0o700,
+            )
+        except checker.EvidenceError:
+            pass
+        else:
+            raise AssertionError("candidate-writable artifact authority was accepted")
+
+    artifact_token = "a" * 64
+    artifact_authority = Path(
+        f"/baseline/candidate-state/{artifact_token}/verifier/artifacts"
+    )
+    artifact_verifier_root = artifact_authority.parent
+    artifact_gate_root = artifact_verifier_root.parent
+    artifact_metadata = {
+        Path("/baseline"): synthetic_metadata(stat.S_IFDIR, 0o555, links=2),
+        checker.ENTERPRISE_STATE_ROOT: synthetic_metadata(
+            stat.S_IFDIR, 0o711, links=2
+        ),
+        artifact_gate_root: synthetic_metadata(stat.S_IFDIR, 0o711, links=2),
+        artifact_verifier_root: synthetic_metadata(
+            stat.S_IFDIR,
+            0o770,
+            links=2,
+            gid=checker.ENTERPRISE_VERIFIER_GID,
+        ),
+        artifact_authority: trusted_artifact_directory,
+    }
+    actual_path_lstat = checker.Path.lstat
+    actual_path_resolve = checker.Path.resolve
+    artifact_lstats: list[Path] = []
+
+    def artifact_lstat(path: Path) -> os.stat_result:
+        artifact_lstats.append(path)
+        return artifact_metadata[path]
+
+    checker.Path.lstat = artifact_lstat
+    checker.Path.resolve = identity_resolve
+    artifact_environment = {
+        "CHIO_ENTERPRISE_SECURITY_RUNNER": "1",
+        "CHIO_SECURITY_VERIFIER_ARTIFACTS": str(artifact_authority),
+    }
+    try:
+        if checker.verifier_artifact_root(artifact_environment) != artifact_authority:
+            raise AssertionError("verifier artifact authority was not authenticated")
+        if artifact_lstats != [*artifact_metadata, *artifact_metadata]:
+            raise AssertionError(
+                f"verifier artifact authority was not authenticated twice: "
+                f"{artifact_lstats}"
+            )
+
+        artifact_identity_reads: dict[Path, int] = {}
+
+        def replaced_artifact_lstat(path: Path) -> os.stat_result:
+            artifact_identity_reads[path] = artifact_identity_reads.get(path, 0) + 1
+            if path == artifact_authority and artifact_identity_reads[path] == 2:
+                return synthetic_metadata(
+                    stat.S_IFDIR,
+                    0o700,
+                    inode=2,
+                    links=2,
+                    uid=checker.ENTERPRISE_VERIFIER_UID,
+                    gid=checker.ENTERPRISE_VERIFIER_GID,
+                )
+            return artifact_metadata[path]
+
+        checker.Path.lstat = replaced_artifact_lstat
+        try:
+            checker.verifier_artifact_root(artifact_environment)
+        except checker.EvidenceError as error:
+            if "authority changed" not in str(error):
+                raise AssertionError(
+                    f"unexpected verifier artifact replacement rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("replaced verifier artifact authority was accepted")
+
+        checker.Path.lstat = artifact_lstat
+        artifact_metadata[Path("/baseline")] = synthetic_metadata(
+            stat.S_IFDIR, 0o755, links=2
+        )
+        try:
+            checker.verifier_artifact_root(artifact_environment)
+        except checker.EvidenceError:
+            pass
+        else:
+            raise AssertionError("mutable baseline authority was accepted")
+    finally:
+        checker.Path.lstat = actual_path_lstat
+        checker.Path.resolve = actual_path_resolve
+
+    verifier_output_authority = temp / "verifier-output-authority"
+    verifier_output_authority.mkdir()
+    actual_verifier_artifact_root = checker.verifier_artifact_root
+    checker.verifier_artifact_root = lambda _environment: verifier_output_authority
+    try:
+        allowed_output = verifier_output_authority / "campaign"
+        if checker.validate_mutation_output_root(allowed_output, {}) != (
+            verifier_output_authority
+        ):
+            raise AssertionError("verifier mutation output authority was not retained")
+        for rejected_output in (
+            verifier_output_authority,
+            temp / "escaped-verifier-output",
+            Path("relative-verifier-output"),
+        ):
+            try:
+                checker.validate_mutation_output_root(rejected_output, {})
+            except checker.EvidenceError:
+                pass
+            else:
+                raise AssertionError(
+                    f"unsafe verifier mutation output passed: {rejected_output}"
+                )
+        with checker.mutation_output_workspace({}, "fixture-output") as output:
+            if output.parent != verifier_output_authority or output.exists():
+                raise AssertionError("mutation workspace escaped verifier authority")
+    finally:
+        checker.verifier_artifact_root = actual_verifier_artifact_root
+
+    source_inventory = checker.CargoMutantsSourceInventory()
+    discoverable_sources = checker.cargo_mutants_source_inventory(
+        promotion_root,
+        source_validation_packages["fixture-package"],
+        "fixture-package",
+        source_inventory,
+    )
+    expected_discoverable_sources = {
+        "crates/fixture-package/src/lib.rs",
+        "crates/fixture-package/src/fixture_module.rs",
+        "crates/fixture-package/src/path_modules/fixture_path.rs",
+        "crates/fixture-package/src/path_modules/fixture_path.inc",
+        "crates/fixture-package/src/directory_module/mod.rs",
+        "crates/fixture-package/src/dual_module.rs",
+        "crates/fixture-package/src/inline_outer/nested/path_nested.rs",
+        "crates/fixture-package/src/inline_outer/nested_default.rs",
+        "crates/fixture-package/src/same_line.rs",
+        "crates/fixture-package/src/multiline_path.rs",
+        "crates/fixture-package/src/race_source.rs",
+        "crates/fixture-package/src/inner_skipped_module.rs",
+        "crates/fixture-package/src/bin/fixture-tool.rs",
+        "crates/fixture-package/custom/explicit.rs",
+        "crates/fixture-package/custom/root.inc",
+    }
+    expected_undiscoverable_sources = {
+        "crates/fixture-package/src/included_fragment.inc",
+        "crates/fixture-package/src/included_fragment.rs",
+        "crates/fixture-package/src/orphan_fragment.inc",
+        "crates/fixture-package/src/orphan_fragment.rs",
+        "crates/fixture-package/src/test_only_module.rs",
+        "crates/fixture-package/src/skipped_module.rs",
+        "crates/fixture-package/src/line_commented_module.rs",
+        "crates/fixture-package/src/block_commented_module.rs",
+        "crates/fixture-package/src/raw_string_module.rs",
+        "crates/fixture-package/src/macro_module.rs",
+        "crates/fixture-package/src/fixture_module_alias.rs",
+    }
+    missing_discoverable_sources = expected_discoverable_sources - discoverable_sources
+    unexpected_discoverable_sources = (
+        expected_undiscoverable_sources & discoverable_sources
+    )
+    if missing_discoverable_sources or unexpected_discoverable_sources:
+        raise AssertionError(
+            "cargo-mutants live discovery differed from the fixture contract: "
+            f"missing={sorted(missing_discoverable_sources)}, "
+            f"unexpected={sorted(unexpected_discoverable_sources)}"
+        )
+
+    def validate_fixture_campaign_source(source: str, function: str) -> None:
+        campaign = copy.deepcopy(promotion_campaign)
+        campaign["source"] = source
+        campaign["function"] = function
+        checker.validate_campaign(
+            promotion_root,
+            source_validation_packages,
+            campaign,
+            source_validation_controls,
+            promotion_case["id"],
+            source_inventory=source_inventory,
+        )
+
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/lib.rs", "fixture_function"
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/fixture_module.rs",
+        "fixture_module_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/path_modules/fixture_path.rs",
+        "fixture_path_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/path_modules/fixture_path.inc",
+        "fixture_path_inc_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/directory_module/mod.rs",
+        "directory_module_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/dual_module.rs",
+        "dual_module_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/inline_outer/nested/path_nested.rs",
+        "nested_path_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/inline_outer/nested_default.rs",
+        "nested_default_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/same_line.rs",
+        "same_line_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/multiline_path.rs",
+        "multiline_path_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/inner_skipped_module.rs",
+        "inner_skipped_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/src/bin/fixture-tool.rs",
+        "fixture_binary_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/custom/explicit.rs",
+        "fixture_explicit_binary_function",
+    )
+    validate_fixture_campaign_source(
+        "crates/fixture-package/custom/root.inc",
+        "fixture_inc_root_function",
+    )
+    try:
+        validate_fixture_campaign_source(
+            "crates/fixture-package/src/fixture_module_alias.rs",
+            "fixture_module_function",
+        )
+    except checker.EvidenceError as error:
+        if "symlink" not in str(error):
+            raise AssertionError(
+                f"unexpected mutation-source symlink rejection: {error}"
+            ) from error
+    else:
+        raise AssertionError("symlink alias passed mutation-source validation")
+
+    outside_race_source = temp / "outside-race-source.rs"
+    outside_race_source.write_text(
+        "fn outside_only_function() -> bool { true }\n", encoding="utf-8"
+    )
+    actual_repository_reader = checker.read_regular_file_below_root
+    race_injected = [False]
+
+    def swap_source_after_no_follow_read(
+        repository_root: Path, path: Path, label: str
+    ) -> bytes:
+        payload = actual_repository_reader(repository_root, path, label)
+        if path == race_source and not race_injected[0]:
+            race_injected[0] = True
+            race_source.unlink()
+            race_source.symlink_to(outside_race_source)
+        return payload
+
+    checker.read_regular_file_below_root = swap_source_after_no_follow_read
+    try:
+        try:
+            validate_fixture_campaign_source(
+                "crates/fixture-package/src/race_source.rs",
+                "outside_only_function",
+            )
+        except checker.EvidenceError as error:
+            if "function outside_only_function is absent" not in str(error):
+                raise AssertionError(
+                    f"unexpected no-follow snapshot rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError("mutation source was reopened after no-follow capture")
+    finally:
+        checker.read_regular_file_below_root = actual_repository_reader
+        if race_source.is_symlink():
+            race_source.unlink()
+        race_source.write_bytes(race_source_payload)
+    if not race_injected[0]:
+        raise AssertionError("mutation-source replacement race was not exercised")
+
+    for rejected_source, rejected_function in (
+        (
+            "crates/fixture-package/src/included_fragment.inc",
+            "included_inc_function",
+        ),
+        (
+            "crates/fixture-package/src/included_fragment.rs",
+            "included_rs_function",
+        ),
+        (
+            "crates/fixture-package/src/orphan_fragment.inc",
+            "orphan_inc_function",
+        ),
+        (
+            "crates/fixture-package/src/orphan_fragment.rs",
+            "orphan_rs_function",
+        ),
+        (
+            "crates/fixture-package/src/test_only_module.rs",
+            "test_only_function",
+        ),
+        (
+            "crates/fixture-package/src/skipped_module.rs",
+            "skipped_function",
+        ),
+        (
+            "crates/fixture-package/src/line_commented_module.rs",
+            "line_commented_function",
+        ),
+        (
+            "crates/fixture-package/src/block_commented_module.rs",
+            "block_commented_function",
+        ),
+        (
+            "crates/fixture-package/src/raw_string_module.rs",
+            "raw_string_function",
+        ),
+        (
+            "crates/fixture-package/src/macro_module.rs",
+            "macro_module_function",
+        ),
+    ):
+        try:
+            validate_fixture_campaign_source(rejected_source, rejected_function)
+        except checker.EvidenceError as error:
+            if "not cargo-mutants-discoverable" not in str(error):
+                raise AssertionError(
+                    f"unexpected mutation-source rejection: {error}"
+                ) from error
+        else:
+            raise AssertionError(
+                f"undiscoverable mutation source passed: {rejected_source}"
+            )
 
     legacy_broad_outcome = copy.deepcopy(promotion_outcome)
     legacy_mutant = copy.deepcopy(fixture_mutant)
@@ -2182,6 +3660,14 @@ checker.atomic_replace_many(
         promotion_case_path = promotion_crash_root / "case.json"
         promotion_manifest_path = promotion_crash_root / "manifest.json"
         promotion_outcome_path = promotion_crash_root / "outcome.json"
+        promotion_state_path = checker.trusted_state_path(promotion_crash_root)
+        promotion_state_path.mkdir(mode=0o700)
+        promotion_state_before = promotion_state_path.lstat()
+        checker.require_owned_directory_metadata(
+            promotion_state_before, str(promotion_state_path)
+        )
+        if promotion_state_before.st_nlink not in (1, 2):
+            raise AssertionError("precreated trusted state has unexpected link count")
         promotion_case_path.write_bytes(b"old case\n")
         promotion_manifest_path.write_bytes(b"old manifest\n")
         crashed = subprocess.run(
@@ -2205,6 +3691,16 @@ checker.atomic_replace_many(
             )
         with checker.refresh_lock(promotion_crash_root):
             recovery = checker.recover_atomic_replace_journal(promotion_crash_root)
+        promotion_state_after = promotion_state_path.lstat()
+        checker.require_owned_directory_metadata(
+            promotion_state_after, str(promotion_state_path)
+        )
+        if (
+            checker.metadata_identity(promotion_state_after)
+            != checker.metadata_identity(promotion_state_before)
+            or promotion_state_after.st_nlink != promotion_state_before.st_nlink
+        ):
+            raise AssertionError("recovery replaced or relinked precreated trusted state")
         if kill_point == "manifest.json":
             if recovery != "committed":
                 raise AssertionError(f"fully published promotion was not committed: {recovery}")
@@ -2449,6 +3945,78 @@ checker.atomic_replace_many(
 
     checker.run_control = lambda *_args, **_kwargs: None
     checker.validate_outcomes = lambda *_args, **_kwargs: None
+    actual_cargo_mutants_executable = checker.cargo_mutants_executable
+    actual_require_cargo_mutants_version = checker.require_cargo_mutants_version
+    actual_validate_mutation_output_root = checker.validate_mutation_output_root
+    actual_cargo_mutants_subprocess_options = (
+        checker.cargo_mutants_subprocess_options
+    )
+    campaign_authentications: list[Path] = []
+    campaign_version_checks: list[Path] = []
+    campaign_execution_bindings: list[tuple[str, ...]] = []
+    enterprise_campaign_environment = {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"}
+
+    def authenticated_campaign_output(
+        _output: Path, environment: dict[str, str]
+    ) -> None:
+        if environment.get("CHIO_ENTERPRISE_SECURITY_RUNNER") != "1":
+            raise AssertionError("campaign output validation left enterprise mode")
+        return None
+
+    def authenticated_campaign_executable(
+        _root: Path, cache: object, environment: dict[str, str] | None = None
+    ) -> Path:
+        if (
+            environment is None
+            or environment.get("CHIO_ENTERPRISE_SECURITY_RUNNER") != "1"
+        ):
+            raise AssertionError("campaign cargo-mutants authentication left enterprise mode")
+        cache.executable = trusted_tool
+        campaign_authentications.append(trusted_tool)
+        return trusted_tool
+
+    def authenticated_campaign_version(
+        executable: Path,
+        _root: Path,
+        environment: dict[str, str] | None = None,
+    ) -> tuple[int, int]:
+        if executable != trusted_tool:
+            raise AssertionError("campaign version check used an untrusted executable")
+        if (
+            environment is None
+            or environment.get("CHIO_ENTERPRISE_SECURITY_RUNNER") != "1"
+        ):
+            raise AssertionError("campaign cargo-mutants version left enterprise mode")
+        campaign_version_checks.append(executable)
+        return (1, 1)
+
+    @checker.contextmanager
+    def authenticated_campaign_execution(
+        _root: Path,
+        command: list[str],
+        environment: dict[str, str] | None,
+        expected_identity: tuple[int, int] | None = None,
+    ) -> object:
+        if (
+            environment is None
+            or environment.get("CHIO_ENTERPRISE_SECURITY_RUNNER") != "1"
+            or command[:2] != [str(trusted_tool), "mutants"]
+            or expected_identity != (1, 1)
+        ):
+            raise AssertionError("campaign execution left its pinned enterprise engine")
+        campaign_execution_bindings.append(tuple(command))
+        yield (
+            {
+                "executable": "/proc/self/fd/97",
+                "pass_fds": (97,),
+            },
+            (1, 1),
+        )
+
+    checker.validate_mutation_output_root = authenticated_campaign_output
+    checker.cargo_mutants_executable = authenticated_campaign_executable
+    checker.require_cargo_mutants_version = authenticated_campaign_version
+    checker.cargo_mutants_subprocess_options = authenticated_campaign_execution
 
     campaign_root = temp / "campaign-root"
     campaign_source = campaign_root / "src/lib.rs"
@@ -2467,7 +4035,18 @@ checker.atomic_replace_many(
     runner_native = copy.deepcopy(fixture_mutant)
     runner_native["file"] = "src/lib.rs"
 
-    def observe_preflight(command: list[str], *_args: object) -> object:
+    def observe_preflight(
+        command: list[str],
+        *_args: object,
+        **kwargs: object,
+    ) -> object:
+        if command[:2] != [str(trusted_tool), "mutants"]:
+            raise AssertionError(f"preflight bypassed trusted cargo-mutants: {command}")
+        if kwargs.get("execution_options") != {
+            "executable": "/proc/self/fd/97",
+            "pass_fds": (97,),
+        }:
+            raise AssertionError("preflight was not bound to its authenticated inode")
         for required in ("--no-config", "--list", "--json", "--no-shuffle"):
             if required not in command:
                 raise AssertionError(f"missing mutation preflight option: {required}")
@@ -2481,7 +4060,18 @@ checker.atomic_replace_many(
 
     checker.run_json_checked = observe_preflight
 
-    def observe_output_parent(command: list[str], *_args: object) -> str:
+    def observe_output_parent(
+        command: list[str],
+        *_args: object,
+        **kwargs: object,
+    ) -> str:
+        if command[:2] != [str(trusted_tool), "mutants"]:
+            raise AssertionError(f"campaign bypassed trusted cargo-mutants: {command}")
+        if kwargs.get("execution_options") != {
+            "executable": "/proc/self/fd/97",
+            "pass_fds": (97,),
+        }:
+            raise AssertionError("campaign was not bound to its authenticated inode")
         output = Path(command[command.index("--output") + 1])
         if output != campaign_output:
             raise AssertionError(f"unexpected mutation output root: {output}")
@@ -2532,12 +4122,23 @@ checker.atomic_replace_many(
             "test_name": "fixture_test",
         },
         campaign_output,
-        {},
+        enterprise_campaign_environment,
     )
     if returned != campaign_output / "mutants.out/outcomes.json":
         raise AssertionError(f"unexpected campaign outcome path: {returned}")
 
-    def observe_cross_package(command: list[str], *_args: object) -> str:
+    def observe_cross_package(
+        command: list[str],
+        *_args: object,
+        **kwargs: object,
+    ) -> str:
+        if command[:2] != [str(trusted_tool), "mutants"]:
+            raise AssertionError(f"campaign bypassed trusted cargo-mutants: {command}")
+        if kwargs.get("execution_options") != {
+            "executable": "/proc/self/fd/97",
+            "pass_fds": (97,),
+        }:
+            raise AssertionError("campaign was not bound to its authenticated inode")
         if "--test-package" not in command:
             raise AssertionError("cross-package control omitted --test-package")
         test_package_index = command.index("--test-package")
@@ -2569,7 +4170,7 @@ checker.atomic_replace_many(
             "test_name": "cross_package_test",
         },
         cross_package_output,
-        {},
+        enterprise_campaign_environment,
     )
     if cross_package_returned != cross_package_output / "mutants.out/outcomes.json":
         raise AssertionError(
@@ -2629,8 +4230,12 @@ checker.atomic_replace_many(
 
     campaign_output = temp / "corrupt-campaign-output"
 
-    def leave_source_changed(command: list[str], *args: object) -> str:
-        observed = observe_output_parent(command, *args)
+    def leave_source_changed(
+        command: list[str],
+        *args: object,
+        **kwargs: object,
+    ) -> str:
+        observed = observe_output_parent(command, *args, **kwargs)
         campaign_source.write_text("fn fixture_function() { panic!() }\n", encoding="utf-8")
         return observed
 
@@ -2648,13 +4253,25 @@ checker.atomic_replace_many(
                 "test_name": "fixture_test",
             },
             campaign_output,
-            {},
+            enterprise_campaign_environment,
         )
     except checker.EvidenceError as error:
         if "left the source changed" not in str(error):
             raise AssertionError(f"unexpected source-integrity rejection: {error}") from error
     else:
         raise AssertionError("in-place mutation left changed source without rejection")
+    if (
+        campaign_authentications != [trusted_tool, trusted_tool, trusted_tool]
+        or campaign_version_checks != [trusted_tool, trusted_tool, trusted_tool]
+        or len(campaign_execution_bindings) != 6
+    ):
+        raise AssertionError("campaign executions did not bind the pinned engine")
+    checker.cargo_mutants_executable = actual_cargo_mutants_executable
+    checker.require_cargo_mutants_version = actual_require_cargo_mutants_version
+    checker.validate_mutation_output_root = actual_validate_mutation_output_root
+    checker.cargo_mutants_subprocess_options = (
+        actual_cargo_mutants_subprocess_options
+    )
 
 print("Security adversarial evidence gate contract passed")
 PY

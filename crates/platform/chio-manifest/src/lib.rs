@@ -18,11 +18,6 @@ mod admission;
 mod input_schema;
 mod validation;
 
-include!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/lib_parts/part_01.inc"
-));
-
 /// Verify a signed manifest against a known public key.
 pub fn verify_manifest(
     signed: &SignedManifest,
@@ -40,3 +35,8 @@ pub fn verify_manifest(
         Err(ManifestError::VerificationFailed)
     }
 }
+
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/lib_parts/part_01.inc"
+));

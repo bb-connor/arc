@@ -17,6 +17,7 @@ impl InMemoryBudgetStoreInner {
             metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index,
             event_id: Some(event_id),
+            partition_escrow_evidence: None,
         }
     }
 
@@ -48,7 +49,7 @@ impl InMemoryBudgetStoreInner {
             return Ok(None);
         };
         if &existing.request != request {
-            return Err(BudgetStoreError::Invariant(format!(
+            return Err(BudgetStoreError::Conflict(format!(
                 "budget event_id `{event_id}` was reused for a different composite mutation"
             )));
         }
@@ -82,6 +83,191 @@ impl InMemoryBudgetStoreInner {
             reserved_invocations_after: counter.reserved_count,
             captured_invocations_after: counter.captured_count,
         }
+    }
+
+    fn compare_and_mutate_invocation_quotas<F>(
+        &mut self,
+        quotas: &[BudgetInvocationQuota],
+        primary_key: &BudgetQuotaKey,
+        primary_usage_count: u32,
+        mode: InvocationQuotaMutationMode,
+        action: InvocationQuotaMutationAction,
+        external_gate: F,
+    ) -> Result<InvocationQuotaMutationOutcome, BudgetStoreError>
+    where
+        F: FnOnce() -> Result<bool, BudgetStoreError>,
+    {
+        if mode == InvocationQuotaMutationMode::CaptureCompatibility {
+            let [quota] = quotas else {
+                return Err(BudgetStoreError::Invariant(
+                    "compatibility capture requires exactly one primary grant quota".to_string(),
+                ));
+            };
+            if &quota.key != primary_key
+                || primary_key.profile != BudgetQuotaProfile::GrantInvocation
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "compatibility capture requires exactly one primary grant quota".to_string(),
+                ));
+            }
+        }
+        let mut staged = Vec::with_capacity(quotas.len());
+        let mut quota_exhausted = false;
+        for quota in quotas {
+            quota.validate()?;
+            let counter = if let Some(existing) = self.invocation_quotas.get(&quota.key) {
+                if existing.max_invocations != quota.max_invocations {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "invocation quota `{}` was presented with a different maximum",
+                        quota.key.owner_id
+                    )));
+                }
+                existing.clone()
+            } else {
+                InvocationQuotaCounter {
+                    max_invocations: quota.max_invocations,
+                    reserved_count: 0,
+                    captured_count: if &quota.key == primary_key {
+                        primary_usage_count
+                    } else {
+                        0
+                    },
+                    compatibility_reversible_count: if mode
+                        == InvocationQuotaMutationMode::CaptureCompatibility
+                        && action == InvocationQuotaMutationAction::Reverse
+                        && &quota.key == primary_key
+                    {
+                        primary_usage_count
+                    } else {
+                        0
+                    },
+                }
+            };
+            let current_count = counter.invocation_count()?;
+            if current_count > quota.max_invocations {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "invocation quota `{}` maximum is below existing usage",
+                    quota.key.owner_id
+                )));
+            }
+            if mode == InvocationQuotaMutationMode::CaptureCompatibility
+                && counter.reserved_count != 0
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "compatibility capture cannot mutate reserved invocation authority".to_string(),
+                ));
+            }
+            quota_exhausted |= current_count == quota.max_invocations;
+            staged.push((quota.clone(), counter));
+        }
+        let primary_before = staged
+            .iter()
+            .find(|(quota, _)| &quota.key == primary_key)
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant("missing primary quota counter".to_string())
+            })?
+            .1
+            .invocation_count()?;
+        if primary_before != primary_usage_count {
+            return Err(BudgetStoreError::Invariant(
+                "grant usage projection diverged from structured invocation quota".to_string(),
+            ));
+        }
+
+        let allowed = match action {
+            InvocationQuotaMutationAction::Attempt => {
+                let external_denied = if quota_exhausted {
+                    false
+                } else {
+                    external_gate()?
+                };
+                let allowed = !quota_exhausted && !external_denied;
+                if allowed {
+                    for (_, counter) in &mut staged {
+                        match mode {
+                            InvocationQuotaMutationMode::Reserve => {
+                                counter.reserved_count =
+                                    counter.reserved_count.checked_add(1).ok_or_else(|| {
+                                        BudgetStoreError::Overflow(
+                                            "reserved invocation count overflowed u32".to_string(),
+                                        )
+                                    })?;
+                            }
+                            InvocationQuotaMutationMode::CaptureCompatibility => {
+                                counter.captured_count =
+                                    counter.captured_count.checked_add(1).ok_or_else(|| {
+                                        BudgetStoreError::Overflow(
+                                            "captured invocation count overflowed u32".to_string(),
+                                        )
+                                    })?;
+                                counter.compatibility_reversible_count = counter
+                                    .compatibility_reversible_count
+                                    .checked_add(1)
+                                    .ok_or_else(|| {
+                                        BudgetStoreError::Overflow(
+                                            "compatibility reversible invocation count overflowed u32"
+                                                .to_string(),
+                                        )
+                                    })?;
+                            }
+                        }
+                    }
+                }
+                allowed
+            }
+            InvocationQuotaMutationAction::Reverse => {
+                if mode != InvocationQuotaMutationMode::CaptureCompatibility {
+                    return Err(BudgetStoreError::Invariant(
+                        "only compatibility capture authority can be reversed".to_string(),
+                    ));
+                }
+                for (_, counter) in &mut staged {
+                    if counter.compatibility_reversible_count == 0 {
+                        return Err(BudgetStoreError::Invariant(
+                            "compatibility capture has no reversible invocation".to_string(),
+                        ));
+                    }
+                    counter.captured_count =
+                        counter.captured_count.checked_sub(1).ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "compatibility capture has no captured invocation".to_string(),
+                            )
+                        })?;
+                    counter.compatibility_reversible_count = counter
+                        .compatibility_reversible_count
+                        .checked_sub(1)
+                        .ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "compatibility capture has no reversible invocation".to_string(),
+                            )
+                        })?;
+                }
+                true
+            }
+        };
+
+        let invocation_counts_after = staged
+            .iter()
+            .map(|(quota, counter)| Self::usage_from_counter(quota, counter))
+            .collect::<Vec<_>>();
+        for usage in &invocation_counts_after {
+            usage.validate()?;
+        }
+        let primary_count_after = invocation_counts_after
+            .iter()
+            .find(|usage| &usage.quota.key == primary_key)
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant("missing primary quota snapshot".to_string())
+            })?
+            .invocation_count_after()?;
+        for (quota, counter) in staged {
+            self.invocation_quotas.insert(quota.key, counter);
+        }
+        Ok(InvocationQuotaMutationOutcome {
+            allowed,
+            invocation_counts_after,
+            primary_count_after,
+        })
     }
 
     fn invocation_usages(
@@ -180,7 +366,7 @@ impl InMemoryBudgetStoreInner {
         }
         if let Some(existing) = self.composite_authorizations.get(hold_id) {
             if existing.request != request {
-                return Err(BudgetStoreError::Invariant(format!(
+                return Err(BudgetStoreError::Conflict(format!(
                     "budget hold `{hold_id}` was reused for a different authorization"
                 )));
             }
@@ -225,103 +411,59 @@ impl InMemoryBudgetStoreInner {
             Some(primary_usage) => primary_usage,
             None => Self::default_usage_record(&request.capability_id, request.grant_index)?,
         };
-        let mut staged_counters = Vec::with_capacity(request.invocation_quotas().len());
-        let mut quota_exhausted = false;
-        for quota in request.invocation_quotas() {
-            let counter = if let Some(existing) = self.invocation_quotas.get(&quota.key) {
-                if existing.max_invocations != quota.max_invocations {
-                    return Err(BudgetStoreError::Invariant(format!(
-                        "invocation quota `{}` was presented with a different maximum",
-                        quota.key.owner_id
-                    )));
-                }
-                existing.clone()
-            } else {
-                InvocationQuotaCounter {
-                    max_invocations: quota.max_invocations,
-                    reserved_count: 0,
-                    captured_count: if quota.key == primary_key {
-                        primary_usage.invocation_count
-                    } else {
-                        0
-                    },
-                    compatibility_reversible_count: 0,
-                }
-            };
-            let current_count = counter.invocation_count()?;
-            if current_count > quota.max_invocations {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "invocation quota `{}` maximum is below existing usage",
-                    quota.key.owner_id
-                )));
-            }
-            if current_count == quota.max_invocations {
-                quota_exhausted = true;
-            }
-            staged_counters.push((quota.clone(), counter));
-        }
-        let staged_primary_count = staged_counters
-            .iter()
-            .find(|(quota, _)| quota.key == primary_key)
-            .ok_or_else(|| {
-                BudgetStoreError::Invariant("missing primary quota counter".to_string())
-            })?
-            .1
-            .invocation_count()?;
-        if staged_primary_count != primary_usage.invocation_count {
-            return Err(BudgetStoreError::Invariant(
-                "grant usage projection diverged from composite invocation quota".to_string(),
-            ));
-        }
-
         let monetary_present = Self::monetary_present(&request);
         let current_committed = primary_usage.committed_cost_units()?;
-        let new_committed = current_committed
-            .checked_add(request.requested_exposure_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "committed cost + requested exposure overflowed u64".to_string(),
-                )
-            })?;
-        let new_exposure = primary_usage
-            .total_cost_exposed
-            .checked_add(request.requested_exposure_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "total exposed cost + requested exposure overflowed u64".to_string(),
-                )
-            })?;
-        let monetary_denied = request
-            .max_cost_per_invocation
-            .is_some_and(|maximum| request.requested_exposure_units > maximum)
-            || request
-                .max_total_cost_units
-                .is_some_and(|maximum| new_committed > maximum);
-        let allowed = !quota_exhausted && !monetary_denied;
+        let mut new_committed = current_committed;
+        let mut new_exposure = primary_usage.total_cost_exposed;
         let seq = self.next_composite_seq()?;
         let recorded_at = unix_now();
-
-        if allowed {
-            for (_, counter) in &mut staged_counters {
-                counter.reserved_count =
-                    counter.reserved_count.checked_add(1).ok_or_else(|| {
+        let grant_index = u32::try_from(request.grant_index).map_err(|_| {
+            BudgetStoreError::Invariant("budget grant index exceeds u32".to_string())
+        })?;
+        let quota_mutation = self.compare_and_mutate_invocation_quotas(
+            request.invocation_quotas(),
+            &primary_key,
+            primary_usage.invocation_count,
+            InvocationQuotaMutationMode::Reserve,
+            InvocationQuotaMutationAction::Attempt,
+            || {
+                if request.max_cost_per_invocation.is_some_and(|maximum| {
+                    request.requested_exposure_units > maximum
+                }) {
+                    return Ok(true);
+                }
+                let prospective_committed =
+                    match current_committed.checked_add(request.requested_exposure_units) {
+                        Some(prospective) => prospective,
+                        None if request.max_total_cost_units.is_some() => return Ok(true),
+                        None => {
+                            return Err(BudgetStoreError::Overflow(
+                                "committed cost + requested exposure overflowed u64".to_string(),
+                            ));
+                        }
+                    };
+                if request
+                    .max_total_cost_units
+                    .is_some_and(|maximum| prospective_committed > maximum)
+                {
+                    return Ok(true);
+                }
+                let prospective_exposure = primary_usage
+                    .total_cost_exposed
+                    .checked_add(request.requested_exposure_units)
+                    .ok_or_else(|| {
                         BudgetStoreError::Overflow(
-                            "reserved invocation count overflowed u32".to_string(),
+                            "total exposed cost + requested exposure overflowed u64".to_string(),
                         )
                     })?;
-            }
-        }
-        let invocation_counts_after = staged_counters
-            .iter()
-            .map(|(quota, counter)| Self::usage_from_counter(quota, counter))
-            .collect::<Vec<_>>();
-        let primary_count_after = invocation_counts_after
-            .iter()
-            .find(|usage| usage.quota.key == primary_key)
-            .ok_or_else(|| {
-                BudgetStoreError::Invariant("missing primary quota snapshot".to_string())
-            })?
-            .invocation_count_after()?;
+                new_committed = prospective_committed;
+                new_exposure = prospective_exposure;
+                Ok(false)
+            },
+        )?;
+        let allowed = quota_mutation.allowed;
+        let invocation_counts_after = quota_mutation.invocation_counts_after;
+        let primary_count_after = quota_mutation.primary_count_after;
         let invocation_state = if allowed {
             BudgetInvocationReservationState::Authorized
         } else {
@@ -337,11 +479,8 @@ impl InMemoryBudgetStoreInner {
         } else {
             current_committed
         };
-        let metadata = Self::composite_metadata(
-            request.authority.clone(),
-            allowed.then_some(seq),
-            event_id.to_string(),
-        );
+        let metadata =
+            Self::composite_metadata(request.authority.clone(), Some(seq), event_id.to_string());
         let decision = if allowed {
             BudgetAuthorizeHoldDecision::Authorized(AuthorizedBudgetHold {
                 hold_id: request.hold_id.clone(),
@@ -368,9 +507,6 @@ impl InMemoryBudgetStoreInner {
             })
         };
 
-        let grant_index = u32::try_from(request.grant_index).map_err(|_| {
-            BudgetStoreError::Invariant("budget grant index exceeds u32".to_string())
-        })?;
         let record = BudgetMutationRecord {
             admission_operation: request.admission_operation.clone(),
             event_id: event_id.to_string(),
@@ -402,9 +538,6 @@ impl InMemoryBudgetStoreInner {
         };
 
         self.next_seq = seq;
-        for (quota, counter) in staged_counters {
-            self.invocation_quotas.insert(quota.key, counter);
-        }
         if allowed {
             let entry = self
                 .counts
@@ -425,6 +558,7 @@ impl InMemoryBudgetStoreInner {
                     authorized_exposure_units: request.requested_exposure_units,
                     remaining_exposure_units: request.requested_exposure_units,
                     authority: request.authority.clone(),
+                    authorization_metadata: metadata.clone(),
                     admission_operation: request.admission_operation.clone(),
                     reserved_until: None,
                     reserved_currency: None,
@@ -451,6 +585,78 @@ impl InMemoryBudgetStoreInner {
         );
         if manages_multiple_quotas {
             self.multi_quota_managed_grants.insert(primary_key);
+        }
+        Ok(decision)
+    }
+
+    fn replay_composite_budget_authorization(
+        &self,
+        mut request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if !request.requires_existing_authorization_replay() {
+            return Err(BudgetStoreError::Invariant(
+                "committed replay requires a snapshot-derived authorization request".to_string(),
+            ));
+        }
+        request.authorization_policy = BudgetAuthorizationPolicy::FreshOrReplay;
+        if request.invocation_quotas().is_empty() || request.invocation_admission.is_none() {
+            return Err(BudgetStoreError::Invariant(
+                "committed replay requires verified composite invocation admission".to_string(),
+            ));
+        }
+        if request.admission_operation.is_none() {
+            return Err(BudgetStoreError::Invariant(
+                "committed replay requires admission operation ownership".to_string(),
+            ));
+        }
+        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "committed replay requires a composite budget hold_id".to_string(),
+            )
+        })?;
+        let event_id = request.event_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "committed replay requires a composite budget event_id".to_string(),
+            )
+        })?;
+        let mutation_request = CompositeMutationRequest::Authorize(Box::new(request.clone()));
+        let Some(decision) = self.composite_duplicate(event_id, &mutation_request)? else {
+            if let Some(existing) = self.composite_authorizations.get(hold_id) {
+                if existing.request != request {
+                    return Err(BudgetStoreError::Conflict(format!(
+                        "budget hold `{hold_id}` was reused for a different authorization"
+                    )));
+                }
+                return Err(BudgetStoreError::Invariant(format!(
+                    "budget hold `{hold_id}` omits its committed authorization event"
+                )));
+            }
+            if self.legacy_authorization_hold_ids.contains(hold_id)
+                || self.holds.contains_key(hold_id)
+                || self.composite_holds.contains_key(hold_id)
+            {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "authorization replay for hold `{hold_id}` has partial or cross-namespace state"
+                )));
+            }
+            return Err(BudgetStoreError::MissingCommittedReplay(format!(
+                "no authorization is committed for hold `{hold_id}` and event `{event_id}`"
+            )));
+        };
+        let CompositeMutationDecision::Authorize(decision) = decision else {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget event_id `{event_id}` has the wrong decision kind"
+            )));
+        };
+        let existing = self.composite_authorizations.get(hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "budget event_id `{event_id}` omits its committed authorization record"
+            ))
+        })?;
+        if existing.request != request || existing.decision != decision {
+            return Err(BudgetStoreError::Conflict(format!(
+                "budget hold `{hold_id}` does not match its committed authorization replay"
+            )));
         }
         Ok(decision)
     }
@@ -1156,6 +1362,7 @@ impl InMemoryBudgetStoreInner {
                 reserved_delegation_depth: hold.reserved_delegation_depth,
                 reserved_root_budget_holder: hold.reserved_root_budget_holder.clone(),
                 authority: hold.authority.clone(),
+                authorization_metadata: hold.authorization_metadata.clone(),
             }));
         }
         let Some(hold) = self.composite_holds.get(hold_id) else {
@@ -1198,6 +1405,7 @@ impl InMemoryBudgetStoreInner {
             reserved_delegation_depth: hold.reserved_delegation_depth,
             reserved_root_budget_holder: hold.reserved_root_budget_holder.clone(),
             authority: hold.authority.clone(),
+            authorization_metadata: hold.authorization_metadata.clone(),
         }))
     }
 
@@ -1311,12 +1519,10 @@ impl InMemoryBudgetStoreInner {
             hold.invocation_state,
             BudgetInvocationReservationState::Authorized
                 | BudgetInvocationReservationState::Captured
-        )
-            || !matches!(
-                hold.monetary_state,
-                BudgetMonetaryHoldState::None | BudgetMonetaryHoldState::Exposed
-            )
-        {
+        ) || !matches!(
+            hold.monetary_state,
+            BudgetMonetaryHoldState::None | BudgetMonetaryHoldState::Exposed
+        ) {
             return Err(BudgetStoreError::Invariant(format!(
                 "composite budget hold `{hold_id}` is not open for caller reservation"
             )));
@@ -1380,6 +1586,11 @@ impl InMemoryBudgetStoreInner {
                 invocation_count_debited: true,
                 disposition: BudgetHoldDisposition::Open,
                 authority: None,
+                authorization_metadata: Self::composite_metadata(
+                    None,
+                    None,
+                    format!("{hold_id}:authorize"),
+                ),
                 reserved_until: Some(reserved_until_unix_secs),
                 reserved_currency: None,
                 reserved_payment_reference: None,

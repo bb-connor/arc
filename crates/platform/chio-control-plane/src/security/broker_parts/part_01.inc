@@ -231,6 +231,7 @@ impl SupplementalQuotaVerifier for BrokerSupplementalQuotaVerifier {
             destination: context.destination.clone(),
             arguments_digest: context.arguments_digest.clone(),
             request_binding_hash: context.request_binding_hash.clone(),
+            not_before: capability.body.not_before_unix_seconds,
             expires_at: capability.body.expires_at_unix_seconds,
             broker_capability_id: capability.body.capability_id,
             issuer: capability.body.issuer,
@@ -1549,6 +1550,7 @@ impl SupplementalAdmissionRegistrar for AuthoritativeBrokerExecutionAdapter {
             invocation_quotas: budget.invocation_quotas().to_vec(),
             revocation_set,
             authorization_artifact_digests: vec![artifact_digest.to_string()],
+            partition_escrow_evidence: None,
         };
         if prepared.hold_id != plan.hold_id() || prepared.event_id != plan.authorize_event_id() {
             return Err(SupplementalQuotaError::ContextMismatch(

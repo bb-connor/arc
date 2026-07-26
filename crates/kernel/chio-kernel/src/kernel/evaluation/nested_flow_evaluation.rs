@@ -575,7 +575,10 @@ impl ChioKernel {
                                     now,
                                     std::slice::from_ref(&matched),
                                     cap,
-                                    deny_metadata,
+                                    self.merge_budget_receipt_metadata(
+                                        deny_metadata,
+                                        serde_json::json!({}),
+                                    ),
                                 )
                             },
                         );
@@ -608,15 +611,16 @@ impl ChioKernel {
                             deny_metadata = merge_metadata_objects(deny_metadata, Some(metadata));
                             let msg = error.to_string();
                             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed admission compensated before dispatch (nested flow)");
+                            let deny_metadata =
+                                self.sanitize_budget_authorization_denial_metadata(deny_metadata);
                             return self.with_pre_invocation_guard_evidence(
                                 &pre_invocation_guard_evidence,
                                 || {
-                                    self.build_monetary_deny_response_with_metadata(
+                                    self.build_deny_response_with_metadata(
                                         request,
-                                        &msg,
+                                        "invocation budget authorization denied",
                                         now,
-                                        std::slice::from_ref(&matched),
-                                        cap,
+                                        Some(matched_grant_index),
                                         deny_metadata,
                                     )
                                 },
@@ -642,6 +646,10 @@ impl ChioKernel {
                     let msg = runtime_admission
                         .reason
                         .unwrap_or_else(|| "runtime admission denied".to_string());
+                    let runtime_admission_metadata = self
+                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            runtime_admission_metadata,
+                        );
                     warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
                     return self.with_pre_invocation_guard_evidence(
                         &pre_invocation_guard_evidence,
@@ -672,19 +680,17 @@ impl ChioKernel {
                             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                                 runtime_admission_metadata,
                             );
+                        let deny_metadata =
+                            self.sanitize_budget_authorization_denial_metadata(deny_metadata);
                         return self.with_pre_invocation_guard_evidence(
                             &pre_invocation_guard_evidence,
                             || {
-                                self.build_monetary_deny_response_with_metadata(
+                                self.build_deny_response_with_metadata(
                                     request,
-                                    &msg,
+                                    "invocation budget authorization denied",
                                     now,
-                                    std::slice::from_ref(&matched),
-                                    cap,
-                                    self.merge_budget_receipt_metadata(
-                                        deny_metadata,
-                                        self.budget_backend_receipt_metadata()?,
-                                    ),
+                                    Some(matched_grant_index),
+                                    deny_metadata,
                                 )
                             },
                         );
@@ -1228,7 +1234,7 @@ impl ChioKernel {
                     runtime_admission_metadata.clone(),
                     budget_mutation.charge_result(),
                     &cleanup,
-                );
+                )?;
                 self.record_url_elicitation_post_dispatch_receipt(
                     request,
                     &error.to_string(),
@@ -1256,7 +1262,7 @@ impl ChioKernel {
                     runtime_admission_metadata.clone(),
                     budget_mutation.charge_result(),
                     &cleanup,
-                );
+                )?;
                 if request_id == parent_context.request_id {
                     self.with_session_mut(&parent_context.session_id, |session| {
                         session.request_cancellation(&parent_context.request_id)?;
@@ -1295,7 +1301,7 @@ impl ChioKernel {
                     runtime_admission_metadata.clone(),
                     budget_mutation.charge_result(),
                     &cleanup,
-                );
+                )?;
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
@@ -1331,7 +1337,7 @@ impl ChioKernel {
                     runtime_admission_metadata.clone(),
                     budget_mutation.charge_result(),
                     &cleanup,
-                );
+                )?;
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
@@ -1369,7 +1375,7 @@ impl ChioKernel {
                     runtime_admission_metadata.clone(),
                     budget_mutation.charge_result(),
                     &cleanup,
-                );
+                )?;
                 let response =
                     self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                         let deny_metadata = self

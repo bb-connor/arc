@@ -10,6 +10,8 @@ mod errors;
 mod init;
 #[path = "service_runtime/issuance.rs"]
 pub mod issuance;
+#[path = "service_runtime/partition_escrow_authority.rs"]
+pub mod partition_escrow_authority;
 #[path = "service_runtime/pinned_authority.rs"]
 mod pinned_authority;
 #[path = "service_runtime/public_registry.rs"]

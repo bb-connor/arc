@@ -82,6 +82,8 @@ pub(crate) fn cmd_trust_serve(
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
     roster_policy_file: Option<&Path>,
+    partition_escrow_authority_descriptor: Option<&Path>,
+    partition_escrow_authority_signer: Option<&chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     if service_token.trim().is_empty() {
         return Err(CliError::cli_other_error(
@@ -156,6 +158,21 @@ pub(crate) fn cmd_trust_serve(
         .unwrap_or((None, None));
     let roster_policy = roster_policy_file.map(load_roster_policy).transpose()?;
     let cluster_members = parse_cluster_members(cluster_members)?;
+    let partition_escrow_authority = match (
+        partition_escrow_authority_descriptor,
+        partition_escrow_authority_signer,
+    ) {
+        (None, None) => None,
+        (Some(descriptor_path), Some(trusted_signer)) => Some(
+            load_partition_escrow_remote_authority(descriptor_path, trusted_signer)?,
+        ),
+        _ => {
+            return Err(CliError::cli_other_error(
+                "partition-escrow authority descriptor and pinned signer must be configured together"
+                    .to_string(),
+            ));
+        }
+    };
     trust_control::serve(trust_control::TrustServiceConfig {
         listen,
         service_token: service_token.to_string(),
@@ -172,6 +189,7 @@ pub(crate) fn cmd_trust_serve(
         authority_db_path: authority_db_path.map(Path::to_path_buf),
         authority_keyring_config_path: authority_keyring_config_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        partition_escrow_authority,
         enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
         federation_policies_file: federation_policies_file.map(Path::to_path_buf),
         scim_lifecycle_file: scim_lifecycle_file.map(Path::to_path_buf),

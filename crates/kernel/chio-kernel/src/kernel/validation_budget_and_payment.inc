@@ -1,4 +1,68 @@
 impl ChioKernel {
+    fn partition_escrow_receipt_metadata(
+        authorize: &BudgetCommitMetadata,
+        terminal: Option<&BudgetCommitMetadata>,
+    ) -> Result<
+        Option<chio_core_types::receipt::economics::FinancialPartitionEscrowReceiptMetadata>,
+        KernelError,
+    >
+    {
+        if authorize.guarantee_level != BudgetGuaranteeLevel::PartitionEscrowed {
+            if authorize.partition_escrow_evidence.is_some()
+                || terminal.is_some_and(|metadata| {
+                    metadata.guarantee_level != authorize.guarantee_level
+                        || metadata.partition_escrow_evidence.is_some()
+                })
+            {
+                return Err(KernelError::Internal(
+                    "non-partition receipt lineage carried partition escrow evidence or changed guarantee"
+                        .to_string(),
+                ));
+            }
+            return Ok(None);
+        }
+        let commit_evidence = authorize.partition_escrow_evidence.as_ref().ok_or_else(|| {
+            KernelError::Internal(
+                "partition-escrowed receipt lineage omitted signed allocation evidence".to_string(),
+            )
+        })?;
+        if terminal.is_some_and(|metadata| {
+            metadata.guarantee_level != BudgetGuaranteeLevel::PartitionEscrowed
+                || metadata.partition_escrow_evidence.as_ref() != Some(commit_evidence)
+        }) {
+            return Err(KernelError::Internal(
+                "partition escrow receipt lineage changed after authorization".to_string(),
+            ));
+        }
+        let evidence = commit_evidence.evidence().map_err(|error| {
+            KernelError::Internal(format!(
+                "partition escrow receipt evidence is invalid: {error}"
+            ))
+        })?;
+        let resolver = evidence.resolver();
+        let durable_store = evidence.durable_store();
+        Ok(Some(
+            chio_core_types::receipt::economics::FinancialPartitionEscrowReceiptMetadata {
+                canonical_json: commit_evidence.canonical_json().to_string(),
+                evidence_digest: commit_evidence.evidence_digest().to_string(),
+                summary:
+                    chio_core_types::receipt::economics::FinancialPartitionEscrowReceiptSummary {
+                        resolver_id: resolver.resolver_id().to_string(),
+                        resolver_implementation_id: resolver.implementation_id().to_string(),
+                        resolver_implementation_version: resolver.implementation_version(),
+                        resolver_configuration_digest: resolver.configuration_digest().to_string(),
+                        store_identity_digest: durable_store.store_identity_digest().to_string(),
+                        counter_namespace_digest: durable_store
+                            .counter_namespace_digest()
+                            .to_string(),
+                        fencing_token: durable_store.fencing_token(),
+                        partition_id: evidence.partition_id().to_string(),
+                        authority_id: evidence.authority_id().to_string(),
+                    },
+            },
+        ))
+    }
+
     pub(crate) fn local_budget_event_authority(&self) -> BudgetEventAuthority {
         BudgetEventAuthority {
             authority_id: format!("kernel:{}", self.public_key().to_hex()),
@@ -7,22 +71,18 @@ impl ChioKernel {
         }
     }
 
-    pub(crate) fn budget_backend_receipt_metadata(&self) -> Result<serde_json::Value, KernelError> {
-        let (guarantee_level, authority_profile, metering_profile) =
-            self.with_budget_store(|store| {
-                Ok((
-                    store.budget_guarantee_level().as_str().to_string(),
-                    store.budget_authority_profile().as_str().to_string(),
-                    store.budget_metering_profile().as_str().to_string(),
-                ))
-            })?;
-        Ok(serde_json::json!({
-            "budget_authority": {
-                "guarantee_level": guarantee_level,
-                "authority_profile": authority_profile,
-                "metering_profile": metering_profile,
-            }
-        }))
+    pub(crate) fn budget_event_authority(&self) -> BudgetEventAuthority {
+        self.partition_escrow_registry.as_ref().map_or_else(
+            || self.local_budget_event_authority(),
+            |registry| {
+                let fencing_token = registry.durable_store().fencing_token();
+                BudgetEventAuthority {
+                    authority_id: registry.authority_id().to_string(),
+                    lease_id: format!("{}:fence:{fencing_token}", registry.partition_id()),
+                    lease_epoch: fencing_token,
+                }
+            },
+        )
     }
 
     pub(crate) fn budget_execution_receipt_metadata(
@@ -30,7 +90,86 @@ impl ChioKernel {
         charge: &BudgetChargeResult,
         terminal_event: Option<(&str, &BudgetHoldMutationDecision)>,
         execution_nonce_id: Option<&str>,
-    ) -> serde_json::Value {
+    ) -> Result<serde_json::Value, KernelError> {
+        if let Some((disposition, terminal)) = terminal_event {
+            let (
+                expected_event_id,
+                expected_realized_spend_units,
+                expected_invocation_state,
+                expected_monetary_state,
+                expected_mutation_kind,
+            ) = match disposition {
+                "reversed" => (
+                    charge.reverse_event_id(),
+                    0,
+                    BudgetInvocationReservationState::Reversed,
+                    if charge.cost_charged == 0 {
+                        BudgetMonetaryHoldState::None
+                    } else {
+                        BudgetMonetaryHoldState::Reversed
+                    },
+                    if charge.admission_operation.is_some() {
+                        crate::budget_store::BudgetMutationKind::ReverseInvocations
+                    } else {
+                        crate::budget_store::BudgetMutationKind::ReverseExposure
+                    },
+                ),
+                "released" => (
+                    charge.release_event_id(),
+                    0,
+                    if charge.admission_operation.is_some() {
+                        BudgetInvocationReservationState::Captured
+                    } else {
+                        BudgetInvocationReservationState::Absent
+                    },
+                    BudgetMonetaryHoldState::Released,
+                    crate::budget_store::BudgetMutationKind::ReleaseExposure,
+                ),
+                "reconciled" => (
+                    charge.reconcile_event_id(),
+                    terminal.realized_spend_units,
+                    if charge.admission_operation.is_some() {
+                        BudgetInvocationReservationState::Captured
+                    } else {
+                        BudgetInvocationReservationState::Absent
+                    },
+                    BudgetMonetaryHoldState::Reconciled,
+                    crate::budget_store::BudgetMutationKind::ReconcileSpend,
+                ),
+                _ => {
+                    return Err(KernelError::Internal(
+                        "unsupported budget receipt terminal disposition".to_string(),
+                    ));
+                }
+            };
+            if terminal.realized_spend_units > charge.cost_charged {
+                return Err(KernelError::GuardDenied(
+                    "receipt budget terminal realized spend exceeds its authorized exposure"
+                        .to_string(),
+                ));
+            }
+            self.with_budget_store(|store| {
+                self.validate_budget_terminal_decision_for_store(
+                    store,
+                    terminal,
+                    BudgetTerminalDecisionExpectation {
+                        authorization_metadata: &charge.authorize_metadata,
+                        expected_event_id: &expected_event_id,
+                        expected_authority: charge.authorize_metadata.authority.as_ref(),
+                        expected_capability_id: None,
+                        expected_grant_index: charge.grant_index,
+                        expected_hold_id: &charge.budget_hold_id,
+                        expected_admission_operation: charge.admission_operation.as_ref(),
+                        expected_mutation_kind,
+                        expected_exposure_units: charge.cost_charged,
+                        expected_realized_spend_units,
+                        expected_invocation_state,
+                        expected_monetary_state,
+                        stage: "receipt terminal projection",
+                    },
+                )
+            })?;
+        }
         let mut budget_authority = serde_json::Map::new();
         budget_authority.insert(
             "guarantee_level".to_string(),
@@ -59,6 +198,15 @@ impl ChioKernel {
                     "lease_id": &authority.lease_id,
                     "lease_epoch": authority.lease_epoch,
                 }),
+            );
+        }
+        if let Some(partition_escrow) = Self::partition_escrow_receipt_metadata(
+            &charge.authorize_metadata,
+            terminal_event.map(|(_, event)| &event.metadata),
+        )? {
+            budget_authority.insert(
+                "partition_escrow".to_string(),
+                serde_json::json!(partition_escrow),
             );
         }
 
@@ -125,59 +273,7 @@ impl ChioKernel {
             );
         }
 
-        serde_json::json!({ "budget_authority": budget_authority })
-    }
-
-    pub(crate) fn budget_invocation_reservation_receipt_metadata(
-        &self,
-        reservation: &BudgetInvocationReservationResult,
-    ) -> serde_json::Value {
-        let mut budget_authority = serde_json::Map::new();
-        budget_authority.insert(
-            "guarantee_level".to_string(),
-            serde_json::json!(reservation.authorize_metadata.guarantee_level.as_str()),
-        );
-        budget_authority.insert(
-            "authority_profile".to_string(),
-            serde_json::json!(reservation.authorize_metadata.budget_profile.as_str()),
-        );
-        budget_authority.insert(
-            "metering_profile".to_string(),
-            serde_json::json!(reservation.authorize_metadata.metering_profile.as_str()),
-        );
-        budget_authority.insert(
-            "hold_id".to_string(),
-            serde_json::json!(&reservation.budget_hold_id),
-        );
-        if let Some(budget_term) = reservation.authorize_metadata.budget_term() {
-            budget_authority.insert("budget_term".to_string(), serde_json::json!(budget_term));
-        }
-        if let Some(authority) = reservation.authorize_metadata.authority.as_ref() {
-            budget_authority.insert(
-                "authority".to_string(),
-                serde_json::json!({
-                    "authority_id": &authority.authority_id,
-                    "lease_id": &authority.lease_id,
-                    "lease_epoch": authority.lease_epoch,
-                }),
-            );
-        }
-        let mut authorize = serde_json::Map::new();
-        if let Some(event_id) = reservation.authorize_metadata.event_id.as_ref() {
-            authorize.insert("event_id".to_string(), serde_json::json!(event_id));
-        }
-        if let Some(commit_index) = reservation.authorize_metadata.budget_commit_index {
-            authorize.insert(
-                "budget_commit_index".to_string(),
-                serde_json::json!(commit_index),
-            );
-        }
-        authorize.insert("exposure_units".to_string(), serde_json::json!(0));
-        budget_authority.insert(
-            "authorize".to_string(),
-            serde_json::Value::Object(authorize),
-        );
-        serde_json::json!({ "budget_authority": budget_authority })
+        Ok(serde_json::json!({ "budget_authority": budget_authority }))
     }
 
     pub(crate) fn merge_budget_receipt_metadata(
@@ -187,11 +283,11 @@ impl ChioKernel {
     ) -> Option<serde_json::Value> {
         let mut merged = match extra_metadata {
             Some(serde_json::Value::Object(mut metadata)) => {
-                // budget_authority is a kernel-reserved namespace. Discard the
-                // entire caller-supplied block before inserting verified store
-                // and kernel state so omitted authoritative fields cannot be
-                // inherited from untrusted metadata.
+                // Budget authority namespaces are kernel-reserved. Discard
+                // caller-supplied blocks before inserting verified state so
+                // omitted authoritative fields cannot be inherited.
                 metadata.remove("budget_authority");
+                metadata.remove("budget_denial_authority");
                 metadata
             }
             _ => serde_json::Map::new(),
@@ -206,6 +302,21 @@ impl ChioKernel {
         Some(serde_json::Value::Object(merged))
     }
 
+    pub(crate) fn sanitize_budget_authorization_denial_metadata(
+        &self,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let mut sanitized = self.merge_budget_receipt_metadata(
+            extra_metadata,
+            serde_json::Value::Object(serde_json::Map::new()),
+        )?;
+        if let serde_json::Value::Object(metadata) = &mut sanitized {
+            metadata.remove("financial");
+            metadata.remove("governed_transaction");
+        }
+        Some(sanitized)
+    }
+
     /// Check and decrement the invocation budget for a capability.
     ///
     /// Returns the matched grant index and the exact pre-execution budget mutation.
@@ -217,15 +328,17 @@ impl ChioKernel {
         caller_reservation: bool,
         caller_receipt_metadata: Option<&serde_json::Value>,
     ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
-        let mut saw_exhausted_budget = false;
-
-        for matching in matching_grants {
+        if let Some(matching) = matching_grants.first() {
             let grant = matching.grant;
             let has_monetary =
                 grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
             if caller_reservation
+                || has_monetary
+                || grant.max_invocations.is_some()
                 || cap.aggregate_invocation_budget.is_some()
                 || request.supplemental_authorization.is_some()
+                || self.partition_escrow_registry.is_some()
+                || Self::is_governed_mustprepay_request(request)
             {
                 let mutation = self.coordinate_ordinary_protocol_admission(
                     request,
@@ -238,172 +351,10 @@ impl ChioKernel {
                 )?;
                 return Ok((matching.index, mutation));
             }
-
-            // Caller-mediated invocation-only reservations authorize a
-            // zero-exposure hold in the same transaction as their invocation
-            // debit. That hold carries the no-payment startup-recovery marker
-            // until its nonce TTL is stamped.
-            let invocation_only_caller_reservation =
-                caller_reservation && !has_monetary && grant.max_invocations.is_some();
-            if has_monetary || invocation_only_caller_reservation {
-                // Use worst-case max_cost_per_invocation as the pre-execution debit.
-                let cost_units = grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .map(|m| m.units)
-                    .unwrap_or(0);
-                let currency = grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .map(|m| m.currency.clone())
-                    .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
-                    .unwrap_or_else(|| "USD".to_string());
-                let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
-                let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
-                let budget_total = max_total.unwrap_or(u64::MAX);
-                let budget_hold_id = format!(
-                    "budget-hold:{}:{}:{}",
-                    request.request_id, cap.id, matching.index
-                );
-                let authorize_event_id = if caller_reservation {
-                    format!(
-                        "{budget_hold_id}{}",
-                        crate::budget_store::CALLER_NO_PAYMENT_RESERVATION_AUTHORIZE_EVENT_SUFFIX
-                    )
-                } else {
-                    format!("{budget_hold_id}:authorize")
-                };
-                let authority = self.local_budget_event_authority();
-
-                // The recoverable money record commits in the SAME
-                // transaction as the hold write, before the rail is touched:
-                // a crash in any later window resolves through the journal
-                // instead of leaving moved funds with no trace.
-                // ReserveForCaller is different: a non-MustPrepay reservation
-                // deliberately moves no rail funds. Writing HoldPlaced there
-                // would make startup recovery reverse a hold the caller owns.
-                let payment_journal = (has_monetary
-                    && self.payment_journal_active()
-                    && (!caller_reservation
-                        || Self::is_governed_mustprepay_request(request)))
-                    .then(|| {
-                        let now_ms = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|elapsed| elapsed.as_millis().min(u64::MAX as u128) as u64)
-                            .unwrap_or(0);
-                        let rail = self
-                            .payment_adapter
-                            .as_ref()
-                            .map(|adapter| adapter.rail_id().to_string())
-                            .unwrap_or_default();
-                        // Resolved exactly as the terminal receipt and the
-                        // dispatch intent resolve it (request-scoped entry
-                        // first, thread-local scope otherwise), so a recovered
-                        // charge's reconciliation receipt is never dropped from
-                        // the owning tenant's receipt view.
-                        let tenant_id = self
-                            .receipt_tenant_id_for_request(Some(&request.request_id))
-                            .unwrap_or_else(current_scoped_receipt_tenant_id);
-                        crate::payment::PaymentJournalRecord {
-                            request_id: request.request_id.clone(),
-                            capability_id: cap.id.clone(),
-                            grant_index: matching.index as u32,
-                            admission_operation: None,
-                            authority: Some(authority.clone()),
-                            hold_id: Some(budget_hold_id.clone()),
-                            rail,
-                            authorization_id: None,
-                            transaction_id: None,
-                            amount_units: cost_units,
-                            budget_exposure_units: cost_units,
-                            settle_action: None,
-                            settle_amount_units: None,
-                            currency: currency.clone(),
-                            state: crate::payment::PaymentJournalState::HoldPlaced,
-                            created_at_unix_ms: now_ms,
-                            tenant_id,
-                        }
-                    });
-
-                let decision = self.with_budget_store(|store| {
-                    let mut hold = BudgetAuthorizeHoldRequest::legacy(
-                        cap.id.clone(),
-                        matching.index,
-                        grant.max_invocations,
-                        cost_units,
-                        max_per,
-                        max_total,
-                        Some(budget_hold_id.clone()),
-                        Some(authorize_event_id),
-                        Some(authority.clone()),
-                    );
-                    hold.payment_journal = payment_journal.clone();
-                    Ok(store.authorize_budget_hold(hold)?)
-                })?;
-                match decision {
-                    BudgetAuthorizeHoldDecision::Authorized(authorized) => {
-                        if invocation_only_caller_reservation {
-                            let reservation = BudgetInvocationReservationResult {
-                                grant_index: matching.index,
-                                budget_hold_id: authorized
-                                    .hold_id
-                                    .unwrap_or_else(|| budget_hold_id.clone()),
-                                authorize_metadata: authorized.metadata,
-                            };
-                            return Ok((
-                                matching.index,
-                                PreExecutionBudgetMutation::InvocationReservation(Box::new(
-                                    reservation,
-                                )),
-                            ));
-                        }
-                        let charge = BudgetChargeResult {
-                            grant_index: matching.index,
-                            cost_charged: cost_units,
-                            currency,
-                            budget_total,
-                            new_committed_cost_units: authorized.committed_cost_units_after,
-                            budget_hold_id: authorized
-                                .hold_id
-                                .unwrap_or_else(|| budget_hold_id.clone()),
-                            authorize_metadata: authorized.metadata,
-                            admission_operation: None,
-                        };
-                        return Ok((
-                            matching.index,
-                            PreExecutionBudgetMutation::Charge(Box::new(charge)),
-                        ));
-                    }
-                    BudgetAuthorizeHoldDecision::Denied(_) => {
-                        saw_exhausted_budget = true;
-                    }
-                }
-            } else {
-                if grant.max_invocations.is_none() {
-                    return Ok((matching.index, PreExecutionBudgetMutation::None));
-                }
-
-                if self.with_budget_store(|store| {
-                    Ok(store.try_increment(&cap.id, matching.index, grant.max_invocations)?)
-                })? {
-                    return Ok((
-                        matching.index,
-                        PreExecutionBudgetMutation::Invocation {
-                            grant_index: matching.index,
-                        },
-                    ));
-                }
-                saw_exhausted_budget = true;
-            }
+            return Ok((matching.index, PreExecutionBudgetMutation::None));
         }
 
-        if saw_exhausted_budget {
-            Err(KernelError::BudgetExhausted(cap.id.clone()))
-        } else {
-            // No matching grant had any limit -- allow with the first grant's index.
-            let first_index = matching_grants.first().map(|m| m.index).unwrap_or(0);
-            Ok((first_index, PreExecutionBudgetMutation::None))
-        }
+        Ok((0, PreExecutionBudgetMutation::None))
     }
 
     pub(crate) fn reverse_budget_charge(
@@ -413,7 +364,7 @@ impl ChioKernel {
     ) -> Result<BudgetReverseHoldDecision, KernelError> {
         let authority = charge.authorize_metadata.authority.clone();
         self.with_budget_store(|store| {
-            Ok(store.reverse_budget_hold(BudgetReverseHoldRequest {
+            let reversed = store.reverse_budget_hold(BudgetReverseHoldRequest {
                 capability_id: capability_id.to_string(),
                 grant_index: charge.grant_index,
                 reversed_exposure_units: charge.cost_charged,
@@ -421,7 +372,35 @@ impl ChioKernel {
                 event_id: Some(charge.reverse_event_id()),
                 authority,
                 admission_operation: charge.admission_operation.clone(),
-            })?)
+            })?;
+            self.validate_budget_terminal_decision_for_store(
+                store,
+                &reversed,
+                BudgetTerminalDecisionExpectation {
+                    authorization_metadata: &charge.authorize_metadata,
+                    expected_event_id: &charge.reverse_event_id(),
+                    expected_authority: charge.authorize_metadata.authority.as_ref(),
+                    expected_capability_id: Some(capability_id),
+                    expected_grant_index: charge.grant_index,
+                    expected_hold_id: &charge.budget_hold_id,
+                    expected_admission_operation: charge.admission_operation.as_ref(),
+                    expected_mutation_kind: if charge.admission_operation.is_some() {
+                        crate::budget_store::BudgetMutationKind::ReverseInvocations
+                    } else {
+                        crate::budget_store::BudgetMutationKind::ReverseExposure
+                    },
+                    expected_exposure_units: charge.cost_charged,
+                    expected_realized_spend_units: 0,
+                    expected_invocation_state: BudgetInvocationReservationState::Reversed,
+                    expected_monetary_state: if charge.cost_charged == 0 {
+                        BudgetMonetaryHoldState::None
+                    } else {
+                        BudgetMonetaryHoldState::Reversed
+                    },
+                    stage: "budget reverse",
+                },
+            )?;
+            Ok(reversed)
         })
     }
 
@@ -432,7 +411,7 @@ impl ChioKernel {
     ) -> Result<BudgetReleaseHoldDecision, KernelError> {
         let authority = charge.authorize_metadata.authority.clone();
         self.with_budget_store(|store| {
-            Ok(store.release_budget_hold(BudgetReleaseHoldRequest {
+            let released = store.release_budget_hold(BudgetReleaseHoldRequest {
                 capability_id: capability_id.to_string(),
                 grant_index: charge.grant_index,
                 released_exposure_units: charge.cost_charged,
@@ -440,26 +419,32 @@ impl ChioKernel {
                 event_id: Some(charge.release_event_id()),
                 authority,
                 admission_operation: charge.admission_operation.clone(),
-            })?)
-        })
-    }
-
-    pub(crate) fn reverse_budget_invocation_reservation(
-        &self,
-        capability_id: &str,
-        reservation: &BudgetInvocationReservationResult,
-    ) -> Result<BudgetReverseHoldDecision, KernelError> {
-        let authority = reservation.authorize_metadata.authority.clone();
-        self.with_budget_store(|store| {
-            Ok(store.reverse_budget_hold(BudgetReverseHoldRequest {
-                capability_id: capability_id.to_string(),
-                grant_index: reservation.grant_index,
-                reversed_exposure_units: 0,
-                hold_id: Some(reservation.budget_hold_id.clone()),
-                event_id: Some(reservation.reverse_event_id()),
-                authority,
-                admission_operation: None,
-            })?)
+            })?;
+            self.validate_budget_terminal_decision_for_store(
+                store,
+                &released,
+                BudgetTerminalDecisionExpectation {
+                    authorization_metadata: &charge.authorize_metadata,
+                    expected_event_id: &charge.release_event_id(),
+                    expected_authority: charge.authorize_metadata.authority.as_ref(),
+                    expected_capability_id: Some(capability_id),
+                    expected_grant_index: charge.grant_index,
+                    expected_hold_id: &charge.budget_hold_id,
+                    expected_admission_operation: charge.admission_operation.as_ref(),
+                    expected_mutation_kind:
+                        crate::budget_store::BudgetMutationKind::ReleaseExposure,
+                    expected_exposure_units: charge.cost_charged,
+                    expected_realized_spend_units: 0,
+                    expected_invocation_state: if charge.admission_operation.is_some() {
+                        BudgetInvocationReservationState::Captured
+                    } else {
+                        BudgetInvocationReservationState::Absent
+                    },
+                    expected_monetary_state: BudgetMonetaryHoldState::Released,
+                    stage: "budget release",
+                },
+            )?;
+            Ok(released)
         })
     }
 
@@ -478,9 +463,6 @@ impl ChioKernel {
                 })?;
                 Ok(None)
             }
-            PreExecutionBudgetMutation::InvocationReservation(reservation) => self
-                .reverse_budget_invocation_reservation(&cap.id, reservation)
-                .map(Some),
             PreExecutionBudgetMutation::Admission(admission) => self
                 .reverse_ordinary_protocol_admission(cap, admission.as_ref())
                 .map(Some),
@@ -504,9 +486,10 @@ impl ChioKernel {
     /// Finalize a tool output whose realized cost was not measured on this path.
     ///
     /// A tool server that reports `measures_realized_cost() == false` did not
-    /// execute the target tool, so no realized cost exists here. The kernel must
-    /// not sign a settled, reconciled authoritative spend for it: instead it
-    /// reverses the pre-execution hold (nothing was spent on this path) and
+    /// execute the target tool, so no realized monetary cost exists here. The
+    /// kernel must not sign a settled, reconciled authoritative spend for it:
+    /// instead it releases the pre-execution monetary exposure while retaining
+    /// the captured invocation and
     /// emits a provisional allow receipt whose budget authority carries a
     /// `reversed` terminal and whose settlement stays `pending`. Such a receipt
     /// is rejected by `is_authoritative_spend_receipt` (the hold is not
@@ -523,8 +506,8 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
-        let reverse = self.reverse_budget_charge(&cap.id, &charge)?;
-        let running_committed_cost_units = reverse.committed_cost_units_after;
+        let release = self.release_budget_charge(&cap.id, &charge)?;
+        let running_committed_cost_units = release.committed_cost_units_after;
         let budget_remaining = charge
             .budget_total
             .saturating_sub(running_committed_cost_units);
@@ -552,10 +535,12 @@ impl ChioKernel {
         // receipt makes no `mediated_spend` profile claim: this is a provisional
         // confirmation, not an authoritative spend.
         let budget_metadata =
-            self.budget_execution_receipt_metadata(&charge, Some(("reversed", &reverse)), None);
+            self.budget_execution_receipt_metadata(&charge, Some(("released", &release)), None)?;
+        let mut extra_metadata = extra_metadata;
+        strip_reserved_economic_receipt_metadata(&mut extra_metadata);
         let merged = merge_metadata_objects(
-            financial_json,
             self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+            financial_json,
         );
         let post_invocation = if security_context.is_some() {
             self.apply_post_invocation_pipeline(

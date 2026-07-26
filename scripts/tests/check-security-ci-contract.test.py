@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import re
@@ -26,6 +27,53 @@ if SPEC is None or SPEC.loader is None:
 CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
+
+
+def assert_live_call_count(label: str, body: str, expected: int) -> None:
+    tree = ast.parse(body)
+    function = tree.body[0]
+    if not isinstance(function, ast.FunctionDef):
+        raise AssertionError(f"{label}: fixture is not a function")
+    observed = len(
+        CHECKER.live_calls(function, "gate", CHECKER.ast_parent_map(tree))
+    )
+    if observed != expected:
+        raise AssertionError(f"{label}: expected {expected} live calls, got {observed}")
+
+
+for reachability_label, reachability_body, reachability_expected in (
+    ("live call", "def f():\n    gate()\n", 1),
+    ("return terminator", "def f():\n    return\n    gate()\n", 0),
+    ("raise terminator", "def f():\n    raise RuntimeError\n    gate()\n", 0),
+    ("literal loop terminator", "def f():\n    while True:\n        return\n    gate()\n", 0),
+    (
+        "singleton loop terminator",
+        "def f():\n    for _ in (None,):\n        return\n    gate()\n",
+        0,
+    ),
+    (
+        "irrefutable match terminator",
+        "def f(value):\n    match value:\n        case _:\n            return\n    gate()\n",
+        0,
+    ),
+    (
+        "finally terminator",
+        "def f():\n    try:\n        return\n    finally:\n        pass\n    gate()\n",
+        0,
+    ),
+    ("short-circuit and", "def f():\n    False and gate()\n", 0),
+    ("short-circuit or", "def f():\n    True or gate()\n", 0),
+    ("dead conditional expression", "def f():\n    gate() if False else None\n", 0),
+    ("deferred comprehension", "def f():\n    [gate() for _ in ()]\n", 0),
+    (
+        "unknown branch fallthrough",
+        "def f(flag):\n    if flag:\n        return\n    gate()\n",
+        1,
+    ),
+):
+    assert_live_call_count(
+        reachability_label, reachability_body, reachability_expected
+    )
 
 ZERO_BOOTSTRAP_SHA = "0" * 40
 NONZERO_BOOTSTRAP_SHA = "0123456789abcdef0123456789abcdef01234567"
@@ -62,10 +110,12 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/check-linux-enforcement-stack.py"),
     Path("scripts/check-secret-broker-boundary.sh"),
     Path("scripts/check-security-adversarial-evidence.py"),
+    Path("scripts/check-temporal-security.sh"),
     Path("scripts/run-security-execution-container.py"),
     Path("scripts/security-execution-command-client.py"),
     Path("scripts/security-execution-container-entrypoint.py"),
     Path("scripts/tests/run-security-execution-container.test.py"),
+    Path("scripts/tests/check-temporal-security.test.sh"),
 )
 
 
@@ -873,6 +923,24 @@ assert_boundary_file_rejected(
     "image authority graph changed",
 )
 assert_boundary_file_rejected(
+    "security image leaves cargo-mutants writable",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
+        "chmod 0755 /usr/local/cargo/bin/cargo-mutants",
+    ),
+    "image Cargo tool closure changed",
+)
+assert_boundary_file_rejected(
+    "security image leaves cargo-mutants ancestors writable",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
+        "chmod 0777 /usr/local/cargo /usr/local/cargo/bin",
+    ),
+    "image Cargo tool closure changed",
+)
+assert_boundary_file_rejected(
     "security seccomp permits namespace creation",
     Path("deploy/docker/security-evidence-seccomp.json"),
     replace_once('"unshare"', '"chio-unshare"'),
@@ -1138,6 +1206,348 @@ assert_boundary_file_rejected(
     "candidate repository publication graph changed",
 )
 assert_boundary_file_rejected(
+    "security entrypoint keeps setup-only CHOWN after private-state creation",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    drop_setup_chown_capability()\n",
+        "    pass\n",
+    ),
+    "trusted security entrypoint file modes changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint drops CHOWN before trusted-state ownership setup",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    workspace_snapshot = freeze_candidate_workspace()\n",
+        "    drop_setup_chown_capability()\n"
+        "    workspace_snapshot = freeze_candidate_workspace()\n",
+    ),
+    "trusted immutable-workspace capability handoff changed",
+)
+for label, terminator in (
+    ("return", "    return\n"),
+    ("raise", '    raise EntrypointError("unreachable decoy")\n'),
+    ("literal loop", "    while True:\n        return\n"),
+    (
+        "irrefutable match",
+        "    match None:\n        case _:\n            return\n",
+    ),
+):
+    assert_boundary_file_rejected(
+        f"security entrypoint rejects {label} before workspace freeze",
+        Path("scripts/security-execution-container-entrypoint.py"),
+        replace_once(
+            "    workspace_snapshot = freeze_candidate_workspace()\n",
+            terminator + "    workspace_snapshot = freeze_candidate_workspace()\n",
+        ),
+        "trusted immutable-workspace capability handoff changed",
+    )
+assert_boundary_file_rejected(
+    "security entrypoint rejects generator private setup",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "def prepare_private_runtime() -> None:\n",
+        "def prepare_private_runtime() -> None:\n    yield None\n",
+    ),
+    "generator inventory changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint rejects generator main",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "def main() -> int:\n",
+        "def main() -> int:\n    yield from ()\n",
+    ),
+    "generator inventory changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint rejects unreviewed function graph changes",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    workspace_snapshot = freeze_candidate_workspace()\n",
+        "    unused_authority_decoy = None\n"
+        "    workspace_snapshot = freeze_candidate_workspace()\n",
+    ),
+    "function graph commitment changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint rejects unreviewed byte changes",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "def prepare_private_runtime() -> None:\n",
+        "def prepare_private_runtime() -> None:\n    # reviewed source commitment\n",
+    ),
+    "source commitment changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint lets the broker require setup-only CHOWN",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        '            "00000000000000c0", "internal broker SETUID/SETGID only"\n',
+        '            "00000000000000c1", "setup-only CHOWN plus SETUID/SETGID"\n',
+    ),
+    "trusted root supervisor boundary changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint forces setup capability mode for internal brokers",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    validate_supervisor_boundary(setup=not internal_invocation)\n",
+        "    validate_supervisor_boundary(setup=True)\n",
+    ),
+    "trusted supervisor invocation mode changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits candidate trusted-state replacement probe",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    require_candidate_cannot_replace_trusted_state(state)\n",
+        "    pass\n",
+    ),
+    "trusted refresh-state bootstrap changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits verifier workspace freeze",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    workspace_snapshot = freeze_candidate_workspace()\n",
+        "    workspace_snapshot = ()\n",
+    ),
+    "trusted security entrypoint file modes changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint restores candidate workspace ownership",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "                    VERIFIER_UID,\n"
+        "                    VERIFIER_GID,\n"
+        "                    follow_symlinks=False,\n",
+        "                    CANDIDATE_UID,\n"
+        "                    CANDIDATE_GID,\n"
+        "                    follow_symlinks=False,\n",
+    ),
+    "candidate workspace ownership freeze changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint follows workspace symlinks while freezing",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "                    follow_symlinks=False,\n",
+        "                    follow_symlinks=True,\n",
+    ),
+    "candidate workspace ownership freeze changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits workspace root inventory",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once("    inspect(WORKSPACE)\n", "    pass\n"),
+    "candidate workspace pre-freeze inventory changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint permits symlink lexical escape and reentry",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        '                or lexical_target == ".."\n'
+        '                or lexical_target.startswith("../")\n',
+        "",
+    ),
+    "candidate workspace pre-freeze inventory changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits a protected contract spine",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once('    "crates",\n', ""),
+    "entrypoint identity inventory changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits candidate rename probe",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "lambda path=path, replacement=replacement: os.rename(\n"
+        "                        path, replacement\n"
+        "                    ),\n",
+        "lambda: (_ for _ in ()).throw(PermissionError()),\n",
+    ),
+    "candidate immutable-workspace hostile probe changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits candidate contract-file unlink probe",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        '                    f"unlink {path}", lambda path=path: os.unlink(path)\n',
+        "                    f\"unlink {path}\", "
+        "lambda: (_ for _ in ()).throw(PermissionError())\n",
+    ),
+    "candidate immutable-workspace hostile probe changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits candidate contract-tree rmdir probe",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        '                    f"rmdir {path}", lambda path=path: os.rmdir(path)\n',
+        "                    f\"rmdir {path}\", "
+        "lambda: (_ for _ in ()).throw(PermissionError())\n",
+    ),
+    "candidate immutable-workspace hostile probe changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint omits candidate hardlink probe",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "lambda: os.link(\n"
+        "                        regular_paths[0], hardlink_probe, follow_symlinks=False\n"
+        "                    ),\n",
+        "lambda: (_ for _ in ()).throw(PermissionError()),\n",
+    ),
+    "candidate immutable-workspace hostile probe changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint trusts PATH cargo-mutants",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        'TRUSTED_CARGO_MUTANTS = Path("/usr/local/cargo/bin/cargo-mutants")',
+        'TRUSTED_CARGO_MUTANTS = Path("cargo-mutants")',
+    ),
+    "entrypoint authority paths changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint substitutes the cargo-mutants boundary digest",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        '        "cargo-mutants": TRUSTED_CARGO_MUTANTS,\n',
+        '        "cargo-mutants": TRUSTED_CHECKER,\n',
+    ),
+    "trusted execution boundary hash inventory changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint replaces portable capability wrappers with a raw syscall",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "        capget = libc.capget\n",
+        "        capget = libc.syscall\n",
+    ),
+    "setup-only CHOWN capability retirement is architecture-bound",
+)
+assert_boundary_file_rejected(
+    "adversarial checker reuses an unauthenticated cached mutation engine",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        "            authenticated = enterprise_cargo_mutants_executable(root)\n",
+        "            authenticated = cache.executable\n",
+    ),
+    "enterprise cargo-mutants cache authentication changed",
+)
+assert_boundary_file_rejected(
+    "adversarial checker reopens cargo-mutants by pathname",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        '            "executable": f"/proc/self/fd/{descriptor}",\n',
+        '            "executable": os.fspath(authenticated),\n',
+    ),
+    "cargo-mutants descriptor execution changed",
+)
+assert_boundary_file_rejected(
+    "adversarial checker restores line-delimited source discovery",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        '            "--list-files",\n            "--json",\n',
+        '            "--list-files",\n',
+    ),
+    "cargo-mutants JSON source inventory changed",
+)
+assert_boundary_file_rejected(
+    "adversarial checker trusts a stale verifier artifact snapshot",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        "        repeated = {path: path.lstat() for path, _uid, _gid, _mode in authority}\n",
+        "        repeated = snapshots\n",
+    ),
+    "verifier artifact authority authentication changed",
+)
+assert_boundary_file_rejected(
+    "adversarial checker permits enterprise legacy outcome promotion",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        "    if args.promote_outcome and enterprise_security_runner(environment):\n",
+        "    if False:\n",
+    ),
+    "enterprise legacy outcome promotion boundary changed",
+)
+assert_boundary_file_rejected(
+    "adversarial checker rejects unreviewed cargo-mutants auth changes",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        "def enterprise_cargo_mutants_executable(root: Path) -> Path:\n",
+        "def enterprise_cargo_mutants_executable(root: Path) -> Path:\n"
+        "    return TRUSTED_CARGO_MUTANTS\n",
+    ),
+    "function graph commitment changed",
+)
+assert_boundary_file_rejected(
+    "adversarial checker rejects unreviewed artifact authority changes",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        "def verifier_artifact_root(environment: dict[str, str]) -> Path | None:\n",
+        "def verifier_artifact_root(environment: dict[str, str]) -> Path | None:\n"
+        '    return Path("/tmp")\n',
+    ),
+    "function graph commitment changed",
+)
+assert_boundary_file_rejected(
+    "adversarial checker rejects unreviewed byte changes",
+    Path("scripts/check-security-adversarial-evidence.py"),
+    replace_once(
+        "def enterprise_cargo_mutants_executable(root: Path) -> Path:\n",
+        "def enterprise_cargo_mutants_executable(root: Path) -> Path:\n"
+        "    # reviewed source commitment\n",
+    ),
+    "source commitment changed",
+)
+assert_boundary_file_rejected(
+    "security runner restores candidate ownership of the private parent",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once(
+        '"rw,nosuid,nodev,size=2147483648,uid=0,gid=0,mode=0755"',
+        '"rw,nosuid,nodev,size=2147483648,uid=65532,gid=65532,mode=0755"',
+    ),
+    "trusted security container runner contract changed",
+)
+assert_boundary_file_rejected(
+    "security runner omits the cargo-mutants boundary digest",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once('        "cargo-mutants",\n', ""),
+    "runner boundary inventory changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint admits an arbitrary full refresh inventory",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    if campaigns != expected_campaigns or paths != expected_paths:\n",
+        "    if False:\n",
+    ),
+    "trusted pending evidence promotion graph changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint restricts full bootstrap to Linux outcomes",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "        promotable_campaigns = ALL_CAMPAIGNS\n"
+        "        new_outcome_paths = ALL_OUTCOME_PATHS\n",
+        "        promotable_campaigns = LINUX_CAMPAIGNS\n"
+        "        new_outcome_paths = LINUX_OUTCOME_PATHS\n",
+    ),
+    "trusted pending evidence promotion graph changed",
+)
+assert_boundary_file_rejected(
+    "security entrypoint accepts a caller-selected new outcome allowlist",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "    if allowed_paths not in (LINUX_OUTCOME_PATHS, ALL_OUTCOME_PATHS):\n",
+        "    if False:\n",
+    ),
+    "trusted new evidence outcome patch contract changed",
+)
+assert_boundary_file_rejected(
     "security cage gate routes through candidate helper",
     Path("scripts/check-cage-enforcement.sh"),
     replace_once(
@@ -1214,11 +1624,80 @@ assert_rejected(
     ),
     "does not use pinned checker bytes",
 )
+assert_rejected(
+    "committed evidence completion ratchet removed",
+    "enterprise-hardening.yml",
+    replace_once(
+        "      - name: Require committed Linux evidence verification\n",
+        "      - name: Optional committed Linux evidence verification\n",
+    ),
+    "committed Linux evidence step inventory changed",
+)
+assert_rejected(
+    "committed evidence completion ratchet skips bootstrap",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Require committed Linux evidence verification",
+        "if: ${{ always() }}",
+        "if: steps.evidence.outputs.verify == 'true'",
+    ),
+    "can complete without detached verification",
+)
+assert_rejected(
+    "committed evidence completion trusts routing output",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Require committed Linux evidence verification",
+        "VERIFIED: ${{ steps.strict.outputs.verified }}",
+        "VERIFIED: ${{ steps.evidence.outputs.verify }}",
+    ),
+    "can complete without detached verification",
+)
+assert_rejected(
+    "committed evidence strict completion marker removed",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Verify committed Linux evidence descendant",
+        '          echo "verified=true" >> "${GITHUB_OUTPUT}"\n',
+        "",
+    ),
+    "does not use pinned checker bytes",
+)
+assert_rejected(
+    "committed evidence completion test weakened",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Require committed Linux evidence verification",
+        'test "${VERIFIED}" = "true"',
+        "true",
+    ),
+    "can complete without detached verification",
+)
+assert_rejected(
+    "required aggregate accepts an empty committed evidence SHA",
+    "ci.yml",
+    replace_in_named_step(
+        "Require every security dependency",
+        '[[ "${COMMITTED_LINUX_EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]',
+        "true",
+    ),
+    "security aggregate changes its exact fail-closed body",
+)
 
 assert_rejected(
     "controller candidate-context trigger",
     "enterprise-evidence-controller.yml",
     replace_once("  pull_request_target:\n", "  pull_request:\n"),
+    "not base-defined on PR target",
+)
+assert_rejected(
+    "controller path filter skips security-required pull requests",
+    "enterprise-evidence-controller.yml",
+    replace_once(
+        "    types: [opened, synchronize, reopened, labeled, unlabeled]\n",
+        "    types: [opened, synchronize, reopened, labeled, unlabeled]\n"
+        "    paths: ['crates/security/**']\n",
+    ),
     "not base-defined on PR target",
 )
 assert_rejected(
@@ -1379,27 +1858,27 @@ assert_rejected(
     "capture accepts a rerun before controller intent authentication",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Authenticate controller dispatch and capture definition",
         'test "${CAPTURE_RUN_ATTEMPT}" = "1"',
         "true",
     ),
-    "does not revalidate controller, run, merge, source, and freshness bindings",
+    "does not authenticate controller, run, intent, and definition bindings",
 )
 assert_rejected(
     "capture skips controller intent archive digest verification",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Authenticate controller dispatch and capture definition",
         'test "$(sha256sum "${intent_partial}" | cut -d\' \' -f1)" = "${intent_artifact_digest#sha256:}"',
         "true",
     ),
-    "does not revalidate controller, run, merge, source, and freshness bindings",
+    "does not authenticate controller, run, intent, and definition bindings",
 )
 assert_rejected(
     "capture permits multiple controller intent archive members",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Authenticate controller dispatch and capture definition",
         "if len(infos) != 1:",
         "if False:",
     ),
@@ -1409,11 +1888,21 @@ assert_rejected(
     "capture accepts a mismatched controller dispatch nonce",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Revalidate controller source and merge authorization",
+        "Authenticate controller dispatch and capture definition",
         'test "$(jq -r \'.dispatch_nonce\' <<< "${intent}")" = "${INPUT_CONTROLLER_DISPATCH_NONCE}"',
         "true",
     ),
-    "does not revalidate controller, run, merge, source, and freshness bindings",
+    "does not authenticate controller, run, intent, and definition bindings",
+)
+assert_rejected(
+    "capture exceeds GitHub run expression limit",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Revalidate controller source and merge authorization",
+        "          set -euo pipefail\n",
+        "          set -euo pipefail\n          # " + ("x" * 21_000) + "\n",
+    ),
+    "exceeds the GitHub run expression limit",
 )
 assert_rejected(
     "capture gains write permission",
@@ -1485,6 +1974,16 @@ for label, old, new in (
         "contents/.github/workflows/enterprise-linux-capture.yml?ref=",
         "contents/.github/workflows/enterprise-hardening.yml?ref=",
     ),
+):
+    assert_rejected(
+        label,
+        "enterprise-linux-capture.yml",
+        replace_in_named_step(
+            "Authenticate controller dispatch and capture definition", old, new
+        ),
+        "does not authenticate controller, run, intent, and definition bindings",
+    )
+for label, old, new in (
     (
         "capture merge tree unbound",
         '.tree.sha\' <<< "${merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"',
@@ -1506,6 +2005,36 @@ for label, old, new in (
         "does not revalidate controller, run, merge, source, and freshness bindings",
     )
 assert_rejected(
+    "capture omits terminal label digest revalidation",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Revalidate controller source and merge authorization",
+        'test "${stable_labels_digest}" = "${INPUT_LABELS_DIGEST}"',
+        "true",
+    ),
+    "does not revalidate controller, run, merge, source, and freshness bindings",
+)
+assert_rejected(
+    "capture omits terminal label-derived mode revalidation",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Revalidate controller source and merge authorization",
+        'test "${stable_mode}" = "${INPUT_MODE}"',
+        "true",
+    ),
+    "does not revalidate controller, run, merge, source, and freshness bindings",
+)
+assert_rejected(
+    "capture exports stale first-read label mode",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Revalidate controller source and merge authorization",
+        'echo "mode=${stable_mode}"',
+        'echo "mode=${live_mode}"',
+    ),
+    "does not revalidate controller, run, merge, source, and freshness bindings",
+)
+assert_rejected(
     "capture trusted input binding removed",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
@@ -1513,7 +2042,7 @@ assert_rejected(
         "          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}\n",
         "",
     ),
-    "trusted input bindings changed",
+    "trusted authorization bindings changed",
 )
 assert_rejected(
     "capture interpolates raw dispatch input into trusted shell",
@@ -2090,6 +2619,13 @@ for label, step, old, new, error in (
         "Validate canonical fixed-schema capture data",
         'boundary["seccomp_profile_sha256"]',
         'boundary["unbound_seccomp_profile_sha256"]',
+        "weakens fixed-schema validation",
+    ),
+    (
+        "cargo-mutants trusted digest removed",
+        "Validate canonical fixed-schema capture data",
+        '              "cargo-mutants",',
+        '              "candidate-mutants",',
         "weakens fixed-schema validation",
     ),
     (
@@ -4068,12 +4604,198 @@ assert_rejected(
     "omits its negative mutation ratchet",
 )
 assert_rejected(
+    "required CI temporal self-test removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Workspace structural gates",
+        "          bash ./scripts/tests/check-temporal-security.test.sh\n",
+        "",
+    ),
+    "omits the temporal gate self-test",
+)
+assert_rejected(
+    "required CI temporal behavior gate removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        '/bin/bash -p "${temporal_runner}"',
+        "true",
+    ),
+    "required CI test and Loom evidence changes mandatory step body",
+)
+assert_rejected(
+    "enterprise temporal behavior gate removed",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        '/bin/bash -p "${temporal_runner}"',
+        "true",
+    ),
+    "active-defense security evidence changes mandatory step body",
+)
+assert_rejected(
+    "required CI temporal outer privileged shell removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        "/bin/bash --noprofile --norc -p -e {0}",
+        "/bin/bash --noprofile --norc -e {0}",
+    ),
+    "required CI test and Loom evidence changes mandatory step shape",
+)
+assert_rejected(
+    "enterprise temporal outer privileged shell removed",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        "/bin/bash --noprofile --norc -p -e {0}",
+        "/bin/bash --noprofile --norc -e {0}",
+    ),
+    "active-defense security evidence changes mandatory step shape",
+)
+assert_rejected(
+    "required CI temporal self-test privileged invocation removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        '/bin/bash -p "${temporal_self_test}"',
+        '/bin/bash "${temporal_self_test}"',
+    ),
+    "required CI test and Loom evidence changes mandatory step body",
+)
+assert_rejected(
+    "required CI temporal runner privileged invocation removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        '/bin/bash -p "${temporal_runner}"',
+        '/bin/bash "${temporal_runner}"',
+    ),
+    "required CI test and Loom evidence changes mandatory step body",
+)
+assert_rejected(
+    "required CI temporal post-self-test digest removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        "          printf '%s  %s\\n' "
+        "'58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "
+        '"${temporal_runner}" | /usr/bin/sha256sum --check --strict\n'
+        '          /bin/bash -p "${temporal_runner}"',
+        '          /bin/bash -p "${temporal_runner}"',
+    ),
+    "required CI test and Loom evidence changes mandatory step body",
+)
+assert_rejected(
+    "required CI temporal runner digest changed",
+    "ci.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554",
+        "0" * 64,
+    ),
+    "required CI test and Loom evidence changes mandatory step body",
+)
+assert_rejected(
+    "required CI temporal self-test digest changed",
+    "ci.yml",
+    replace_in_named_step(
+        "Temporal security gate",
+        "af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06",
+        "1" * 64,
+    ),
+    "required CI test and Loom evidence changes mandatory step body",
+)
+assert_rejected(
+    "prior CI step exports BASH_ENV through GITHUB_ENV",
+    "ci.yml",
+    replace_once(
+        "      - name: Temporal security gate\n",
+        "      - name: Poison temporal shell startup\n"
+        "        run: |\n"
+        "          printf '%s\\n' 'BASH_ENV=./scripts/exit-zero.sh' >> \"${GITHUB_ENV}\"\n"
+        "\n"
+        "      - name: Temporal security gate\n",
+    ),
+    "CI writes dangerous shell startup state: BASH_ENV",
+)
+assert_boundary_file_rejected(
+    "temporal gate source changed",
+    Path("scripts/check-temporal-security.sh"),
+    replace_once("/bin/bash -p", "/bin/bash"),
+    "temporal security gate digest ratchet changed",
+)
+assert_boundary_file_rejected(
+    "temporal self-test source changed",
+    Path("scripts/tests/check-temporal-security.test.sh"),
+    replace_once("set -euo pipefail", "set -eu"),
+    "temporal security self-test digest ratchet changed",
+)
+assert_rejected(
+    "required CI focused protocol behavior removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Protocol-primitives focused gate",
+        "./scripts/check-protocol-primitives-focused.sh --all",
+        "true",
+    ),
+    "required CI test and Loom evidence changes mandatory step body",
+)
+assert_rejected(
+    "enterprise focused protocol behavior removed",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Protocol primitive focused gate",
+        "./scripts/check-protocol-primitives-focused.sh --all",
+        "true",
+    ),
+    "active-defense security evidence changes mandatory step body",
+)
+assert_rejected(
     "threat gate removed",
     "threat-model-coverage.yml",
     replace_once(
         "        run: bash scripts/check-threat-coverage.sh\n", "        run: true\n"
     ),
     "omits exact gate command",
+)
+assert_rejected(
+    "threat cargo-mutants install removed",
+    "threat-model-coverage.yml",
+    replace_once(
+        "      - name: Install and authenticate cargo-mutants\n",
+        "      - name: Unauthenticated mutation engine\n",
+    ),
+    "threat-model coverage step inventory changed",
+)
+assert_rejected(
+    "threat cargo-mutants version changed",
+    "threat-model-coverage.yml",
+    replace_in_named_step(
+        "Install and authenticate cargo-mutants",
+        "cargo install cargo-mutants --locked --version 25.3.1",
+        "cargo install cargo-mutants --locked --version 25.3.0",
+    ),
+    "cargo-mutants installation changed",
+)
+assert_rejected(
+    "threat cargo-mutants authentication removed",
+    "threat-model-coverage.yml",
+    replace_in_named_step(
+        "Install and authenticate cargo-mutants",
+        '          test "$("${cargo_mutants}" mutants --version)" = "cargo-mutants 25.3.1"\n',
+        "",
+    ),
+    "cargo-mutants installation changed",
+)
+assert_rejected(
+    "threat cargo-mutants install reordered after production gate",
+    "threat-model-coverage.yml",
+    swap_named_steps(
+        "Install and authenticate cargo-mutants",
+        "Run threat-model mutants gate (per-row evidence)",
+    ),
+    "threat-model coverage step inventory changed",
 )
 assert_rejected(
     "admin audit head SHA used",

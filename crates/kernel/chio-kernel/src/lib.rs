@@ -42,6 +42,7 @@ pub mod memory_provenance;
 pub mod observability;
 pub mod operator_report;
 pub mod otel;
+pub mod partition_escrow;
 pub mod payment;
 pub mod post_invocation;
 #[allow(deprecated)]

@@ -1,3 +1,7 @@
+use chio_test_support::prelude::*;
+
+use crate::kernel::ordinary_admission::BudgetTerminalDecisionExpectation;
+
 #[derive(Default)]
 struct InCratePaymentJournalStore {
     inner: InMemoryBudgetStore,
@@ -47,6 +51,32 @@ impl crate::budget_store::BudgetStore for InCratePaymentJournalStore {
             cost_units,
             max_cost_per_invocation,
             max_total_cost_units,
+        )
+    }
+
+    fn try_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        crate::budget_store::BudgetStore::try_charge_cost_with_ids_and_authority(
+            &self.inner,
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+            authority,
         )
     }
 
@@ -116,6 +146,20 @@ impl crate::budget_store::BudgetStore for InCratePaymentJournalStore {
     > {
         self.inner
             .list_mutation_events(limit, capability_id, grant_index)
+    }
+
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<
+        Option<crate::budget_store::BudgetMutationRecord>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        Ok(self
+            .inner
+            .list_mutation_events(usize::MAX, None, None)?
+            .into_iter()
+            .find(|record| record.event_id == event_id))
     }
 
     fn record_payment_journal(
@@ -672,6 +716,627 @@ impl AdmissionPaymentCleanupFixture {
             .expect("payment cleanup row lookup")
             .expect("payment cleanup row")
     }
+}
+
+#[derive(Clone)]
+struct ForgedTerminalBudgetStore {
+    decision: crate::budget_store::BudgetHoldMutationDecision,
+    mutation_event: Option<crate::budget_store::BudgetMutationRecord>,
+}
+
+impl ForgedTerminalBudgetStore {
+    fn new(decision: crate::budget_store::BudgetHoldMutationDecision) -> Self {
+        Self {
+            decision,
+            mutation_event: None,
+        }
+    }
+
+    fn with_mutation_event(
+        decision: crate::budget_store::BudgetHoldMutationDecision,
+        mutation_event: crate::budget_store::BudgetMutationRecord,
+    ) -> Self {
+        Self {
+            decision,
+            mutation_event: Some(mutation_event),
+        }
+    }
+
+    fn unused<T>() -> Result<T, crate::budget_store::BudgetStoreError> {
+        Err(crate::budget_store::BudgetStoreError::Invariant(
+            "unused forged terminal store operation".to_string(),
+        ))
+    }
+}
+
+impl crate::budget_store::BudgetStore for ForgedTerminalBudgetStore {
+    fn authority_profile(&self) -> crate::budget_store::BudgetStoreProfile {
+        crate::budget_store::BudgetStoreProfile::SingleNodeDurable
+    }
+
+    fn try_increment(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _max_invocations: Option<u32>,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        Self::unused()
+    }
+
+    fn try_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _max_invocations: Option<u32>,
+        _cost_units: u64,
+        _max_cost_per_invocation: Option<u64>,
+        _max_total_cost_units: Option<u64>,
+    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
+        Self::unused()
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        Self::unused()
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        Self::unused()
+    }
+
+    fn settle_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _exposed_cost_units: u64,
+        _realized_cost_units: u64,
+    ) -> Result<(), crate::budget_store::BudgetStoreError> {
+        Self::unused()
+    }
+
+    fn list_usages(
+        &self,
+        _limit: usize,
+        _capability_id: Option<&str>,
+    ) -> Result<Vec<crate::budget_store::BudgetUsageRecord>, crate::budget_store::BudgetStoreError>
+    {
+        Ok(Vec::new())
+    }
+
+    fn get_usage(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+    ) -> Result<
+        Option<crate::budget_store::BudgetUsageRecord>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        Ok(None)
+    }
+
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<
+        Option<crate::budget_store::BudgetMutationRecord>,
+        crate::budget_store::BudgetStoreError,
+    > {
+        Ok(self
+            .mutation_event
+            .as_ref()
+            .filter(|event| event.event_id == event_id)
+            .cloned())
+    }
+
+    fn reverse_budget_hold(
+        &self,
+        _request: crate::budget_store::BudgetReverseHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetReverseHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        Ok(self.decision.clone())
+    }
+
+    fn release_budget_hold(
+        &self,
+        _request: crate::budget_store::BudgetReleaseHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetReleaseHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        Ok(self.decision.clone())
+    }
+
+    fn reconcile_budget_hold(
+        &self,
+        _request: crate::budget_store::BudgetReconcileHoldRequest,
+    ) -> Result<
+        crate::budget_store::BudgetReconcileHoldDecision,
+        crate::budget_store::BudgetStoreError,
+    > {
+        Ok(self.decision.clone())
+    }
+}
+
+fn terminal_validation_charge(kernel: &ChioKernel) -> BudgetChargeResult {
+    BudgetChargeResult {
+        grant_index: 0,
+        cost_charged: 5,
+        currency: "USD".to_string(),
+        budget_total: 100,
+        new_committed_cost_units: 5,
+        budget_hold_id: "hold-terminal-validation".to_string(),
+        authorize_metadata: BudgetCommitMetadata {
+            authority: Some(kernel.local_budget_event_authority()),
+            guarantee_level: crate::budget_store::BudgetGuaranteeLevel::SingleNodeAtomic,
+            budget_profile: crate::budget_store::BudgetAuthorityProfile::AuthoritativeHoldEvent,
+            metering_profile:
+                crate::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+            budget_commit_index: Some(41),
+            event_id: Some("hold-terminal-validation:authorize".to_string()),
+            partition_escrow_evidence: None,
+        },
+        admission_operation: None,
+    }
+}
+
+fn terminal_validation_decision(
+    charge: &BudgetChargeResult,
+    event_id: &str,
+    realized_spend_units: u64,
+    invocation_state: crate::budget_store::BudgetInvocationReservationState,
+    monetary_state: crate::budget_store::BudgetMonetaryHoldState,
+) -> crate::budget_store::BudgetHoldMutationDecision {
+    crate::budget_store::BudgetHoldMutationDecision {
+        hold_id: Some(charge.budget_hold_id.clone()),
+        exposure_units: charge.cost_charged,
+        realized_spend_units,
+        committed_cost_units_after: realized_spend_units,
+        invocation_count_after: 1,
+        invocation_counts_after: Vec::new(),
+        invocation_state,
+        monetary_state,
+        revocation_set: None,
+        metadata: BudgetCommitMetadata {
+            authority: charge.authorize_metadata.authority.clone(),
+            guarantee_level: charge.authorize_metadata.guarantee_level,
+            budget_profile: charge.authorize_metadata.budget_profile,
+            metering_profile: charge.authorize_metadata.metering_profile,
+            budget_commit_index: Some(42),
+            event_id: Some(event_id.to_string()),
+            partition_escrow_evidence: None,
+        },
+    }
+}
+
+fn terminal_validation_event(
+    charge: &BudgetChargeResult,
+    decision: &crate::budget_store::BudgetHoldMutationDecision,
+    kind: crate::budget_store::BudgetMutationKind,
+) -> crate::budget_store::BudgetMutationRecord {
+    let event_seq = decision
+        .metadata
+        .budget_commit_index
+        .expect("terminal validation commit index");
+    crate::budget_store::BudgetMutationRecord {
+        event_id: decision
+            .metadata
+            .event_id
+            .clone()
+            .expect("terminal validation event id"),
+        hold_id: decision.hold_id.clone(),
+        admission_operation: charge.admission_operation.clone(),
+        capability_id: "cap-terminal-validation".to_string(),
+        grant_index: u32::try_from(charge.grant_index).expect("terminal validation grant index"),
+        kind,
+        allowed: None,
+        recorded_at: 1,
+        event_seq,
+        usage_seq: Some(event_seq),
+        exposure_units: decision.exposure_units,
+        realized_spend_units: decision.realized_spend_units,
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        invocation_count_after: decision.invocation_count_after,
+        invocation_counts_after: decision.invocation_counts_after.clone(),
+        invocation_state: decision.invocation_state,
+        monetary_state: decision.monetary_state,
+        revocation_set: decision.revocation_set.clone(),
+        total_cost_exposed_after: 0,
+        total_cost_realized_spend_after: decision.committed_cost_units_after,
+        authority: decision.metadata.authority.clone(),
+    }
+}
+
+#[test]
+fn terminal_budget_helpers_reject_forged_store_decisions_before_projection() {
+    let mut reverse_kernel = make_kernel(make_config());
+    let reverse_charge = terminal_validation_charge(&reverse_kernel);
+    let mut wrong_hold = terminal_validation_decision(
+        &reverse_charge,
+        "hold-terminal-validation:reverse",
+        0,
+        crate::budget_store::BudgetInvocationReservationState::Reversed,
+        crate::budget_store::BudgetMonetaryHoldState::Reversed,
+    );
+    wrong_hold.hold_id = Some("hold-attacker-selected".to_string());
+    let forged_reverse_projection = wrong_hold.clone();
+    reverse_kernel
+        .set_budget_store_handle(std::sync::Arc::new(ForgedTerminalBudgetStore::new(
+            wrong_hold,
+        )))
+        .expect("forged reverse store");
+    assert!(matches!(
+        reverse_kernel.reverse_budget_charge("cap-terminal-validation", &reverse_charge),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("terminal decision does not match")
+    ));
+    assert!(matches!(
+        reverse_kernel.budget_execution_receipt_metadata(
+            &reverse_charge,
+            Some(("reversed", &forged_reverse_projection)),
+            None,
+        ),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("terminal decision does not match")
+    ));
+
+    let mut release_kernel = make_kernel(make_config());
+    let release_charge = terminal_validation_charge(&release_kernel);
+    let mut wrong_exposure = terminal_validation_decision(
+        &release_charge,
+        "hold-terminal-validation:release",
+        0,
+        crate::budget_store::BudgetInvocationReservationState::Absent,
+        crate::budget_store::BudgetMonetaryHoldState::Released,
+    );
+    wrong_exposure.exposure_units = release_charge.cost_charged + 1;
+    release_kernel
+        .set_budget_store_handle(std::sync::Arc::new(ForgedTerminalBudgetStore::new(
+            wrong_exposure,
+        )))
+        .expect("forged release store");
+    assert!(matches!(
+        release_kernel.release_budget_charge("cap-terminal-validation", &release_charge),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("terminal decision does not match")
+    ));
+
+    let mut reconcile_kernel = make_kernel(make_config());
+    let reconcile_charge = terminal_validation_charge(&reconcile_kernel);
+    let mut stale_commit = terminal_validation_decision(
+        &reconcile_charge,
+        "hold-terminal-validation:reconcile",
+        3,
+        crate::budget_store::BudgetInvocationReservationState::Absent,
+        crate::budget_store::BudgetMonetaryHoldState::Reconciled,
+    );
+    stale_commit.metadata.budget_commit_index = Some(41);
+    reconcile_kernel
+        .set_budget_store_handle(std::sync::Arc::new(ForgedTerminalBudgetStore::new(
+            stale_commit,
+        )))
+        .expect("forged reconcile store");
+    assert!(matches!(
+        reconcile_kernel.reconcile_budget_charge(
+            "cap-terminal-validation",
+            &reconcile_charge,
+            3,
+        ),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("commit index did not advance")
+    ));
+}
+
+#[test]
+fn terminal_budget_helper_rejects_committed_cost_not_bound_to_durable_event() {
+    let mut kernel = make_kernel(make_config());
+    let charge = terminal_validation_charge(&kernel);
+    let committed = terminal_validation_decision(
+        &charge,
+        "hold-terminal-validation:reconcile",
+        3,
+        crate::budget_store::BudgetInvocationReservationState::Absent,
+        crate::budget_store::BudgetMonetaryHoldState::Reconciled,
+    );
+    let mutation_event = terminal_validation_event(
+        &charge,
+        &committed,
+        crate::budget_store::BudgetMutationKind::ReconcileSpend,
+    );
+    let mut forged = committed;
+    forged.committed_cost_units_after = 999;
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(
+            ForgedTerminalBudgetStore::with_mutation_event(forged, mutation_event),
+        ))
+        .expect("forged committed-cost store");
+
+    assert!(matches!(
+        kernel.reconcile_budget_charge("cap-terminal-validation", &charge, 3),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("durable budget mutation event does not match")
+    ));
+}
+
+#[test]
+fn terminal_budget_helper_rejects_decision_state_not_bound_to_durable_event() {
+    let mut kernel = make_kernel(make_config());
+    let charge = terminal_validation_charge(&kernel);
+    let decision = terminal_validation_decision(
+        &charge,
+        "hold-terminal-validation:reconcile",
+        3,
+        crate::budget_store::BudgetInvocationReservationState::Absent,
+        crate::budget_store::BudgetMonetaryHoldState::Reconciled,
+    );
+    let mut mutation_event = terminal_validation_event(
+        &charge,
+        &decision,
+        crate::budget_store::BudgetMutationKind::ReconcileSpend,
+    );
+    mutation_event.monetary_state = crate::budget_store::BudgetMonetaryHoldState::Released;
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(
+            ForgedTerminalBudgetStore::with_mutation_event(decision, mutation_event),
+        ))
+        .expect("forged terminal-state store");
+
+    assert!(matches!(
+        kernel.reconcile_budget_charge("cap-terminal-validation", &charge, 3),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("durable budget mutation event does not match")
+    ));
+}
+
+#[test]
+fn operation_owned_reverse_validation_rejects_a_forged_terminal_disposition() {
+    let kernel = make_kernel(make_config());
+    let mut charge = terminal_validation_charge(&kernel);
+    charge.admission_operation = Some(
+        crate::budget_store::BudgetAdmissionOperationBinding::new(
+            "operation-terminal-validation".to_string(),
+            "ab".repeat(32),
+        )
+        .expect("operation-owned terminal binding"),
+    );
+    let mut forged = terminal_validation_decision(
+        &charge,
+        "hold-terminal-validation:reverse",
+        0,
+        crate::budget_store::BudgetInvocationReservationState::Reversed,
+        crate::budget_store::BudgetMonetaryHoldState::Reversed,
+    );
+    forged.monetary_state = crate::budget_store::BudgetMonetaryHoldState::Released;
+    let store = ForgedTerminalBudgetStore::new(forged.clone());
+
+    assert!(matches!(
+        kernel.validate_budget_terminal_decision_for_store(
+            &store,
+            &forged,
+            BudgetTerminalDecisionExpectation {
+                authorization_metadata: &charge.authorize_metadata,
+                expected_event_id: "hold-terminal-validation:reverse",
+                expected_authority: charge.authorize_metadata.authority.as_ref(),
+                expected_capability_id: Some("cap-terminal-validation"),
+                expected_grant_index: charge.grant_index,
+                expected_hold_id: &charge.budget_hold_id,
+                expected_admission_operation: charge.admission_operation.as_ref(),
+                expected_mutation_kind:
+                    crate::budget_store::BudgetMutationKind::ReverseInvocations,
+                expected_exposure_units: charge.cost_charged,
+                expected_realized_spend_units: 0,
+                expected_invocation_state:
+                    crate::budget_store::BudgetInvocationReservationState::Reversed,
+                expected_monetary_state:
+                    crate::budget_store::BudgetMonetaryHoldState::Reversed,
+                stage: "operation-owned reverse",
+            },
+        ),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("terminal decision does not match")
+    ));
+}
+
+#[test]
+fn single_node_cleanup_denial_requires_the_durable_decision_index() {
+    let kernel = make_kernel(make_config());
+    let store = InCratePaymentJournalStore::new();
+    let authority = crate::budget_store::BudgetEventAuthority {
+        authority_id: "budget:cleanup-test".to_string(),
+        lease_id: "budget:cleanup-test#1".to_string(),
+        lease_epoch: 1,
+    };
+    let event_id = "budget-cleanup-denial-event";
+    let request = crate::budget_store::BudgetAuthorizeHoldRequest::legacy(
+        "cap-budget-cleanup-denial".to_string(),
+        0,
+        Some(1),
+        2,
+        Some(1),
+        Some(10),
+        Some("hold-budget-cleanup-denial".to_string()),
+        Some(event_id.to_string()),
+        Some(authority.clone()),
+    );
+    let decision = crate::budget_store::BudgetStore::authorize_budget_hold(
+        &store,
+        request.clone(),
+    )
+    .test_expect("default single-node denial");
+    let frozen_decision = decision.clone();
+    let denied = match decision {
+        crate::budget_store::BudgetAuthorizeHoldDecision::Denied(denied) => Some(denied),
+        crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(_) => None,
+    }
+    .test_expect("the default single-node store must deny the over-limit request");
+    assert!(denied
+        .metadata
+        .budget_commit_index
+        .is_some_and(|commit_index| commit_index > 0));
+
+    assert!(crate::budget_store::BudgetStore::try_increment(
+        &store,
+        "cap-budget-cleanup-denial",
+        0,
+        Some(1),
+    )
+    .test_expect("later live budget use"));
+    assert_eq!(
+        crate::budget_store::BudgetStore::authorize_budget_hold(&store, request.clone())
+            .test_expect("exact default authorization replay"),
+        frozen_decision,
+        "hard-guarantee replay must return the frozen event snapshot, not later live usage"
+    );
+
+    let mut changed_request = request;
+    changed_request.requested_exposure_units = 3;
+    assert!(matches!(
+        crate::budget_store::BudgetStore::authorize_budget_hold(&store, changed_request),
+        Err(crate::budget_store::BudgetStoreError::Conflict(_))
+    ));
+
+    kernel
+        .validate_budget_cleanup_denial(super::admission_cleanup::BudgetCleanupDenialValidation {
+            store: &store,
+            denied: &denied,
+            expected_hold_id: Some("hold-budget-cleanup-denial"),
+            expected_exposure: 2,
+            expected_event_id: event_id,
+            expected_authority: Some(&authority),
+            expected_revocation_set: None,
+        })
+        .test_expect("single-node denial with a durable decision index");
+
+    let mut missing_commit_index = denied.clone();
+    missing_commit_index.metadata.budget_commit_index = None;
+    assert!(matches!(
+        kernel.validate_budget_cleanup_denial(
+            super::admission_cleanup::BudgetCleanupDenialValidation {
+                store: &store,
+                denied: &missing_commit_index,
+                expected_hold_id: Some("hold-budget-cleanup-denial"),
+                expected_exposure: 2,
+                expected_event_id: event_id,
+                expected_authority: Some(&authority),
+                expected_revocation_set: None,
+            },
+        ),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("exact hard-budget authority evidence")
+    ));
+
+    let mut zero_commit_index = denied;
+    zero_commit_index.metadata.budget_commit_index = Some(0);
+    assert!(matches!(
+        kernel.validate_budget_cleanup_denial(
+            super::admission_cleanup::BudgetCleanupDenialValidation {
+                store: &store,
+                denied: &zero_commit_index,
+                expected_hold_id: Some("hold-budget-cleanup-denial"),
+                expected_exposure: 2,
+                expected_event_id: event_id,
+                expected_authority: Some(&authority),
+                expected_revocation_set: None,
+            },
+        ),
+        Err(KernelError::GuardDenied(message))
+            if message.contains("exact hard-budget authority evidence")
+    ));
+}
+
+#[test]
+fn post_dispatch_drop_omits_forged_budget_authority_when_partition_lineage_is_invalid() {
+    let kernel = make_kernel(make_config());
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant(
+            "srv-invalid-partition-drop",
+            "destructive_update",
+        )]),
+        300,
+    );
+    let request = make_request_with_arguments(
+        "req-invalid-partition-drop",
+        &cap,
+        "destructive_update",
+        "srv-invalid-partition-drop",
+        serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
+    );
+    authorize_fabricated_drop_hold(&kernel, &cap.id).expect("fabricated drop hold must authorize");
+
+    let mut charge = make_fabricated_drop_charge();
+    charge.authorize_metadata.guarantee_level =
+        crate::budget_store::BudgetGuaranteeLevel::PartitionEscrowed;
+    assert!(charge
+        .authorize_metadata
+        .partition_escrow_evidence
+        .is_none());
+    let forged_metadata = serde_json::json!({
+        "budget_authority": {
+            "guarantee_level": "forged-guarantee",
+            "forged_marker": "must-not-survive"
+        },
+        "route": {
+            "bridge": "partition-lineage-drop-test"
+        }
+    });
+    assert!(matches!(
+        kernel.post_dispatch_cleanup_receipt_metadata(
+            Some(forged_metadata.clone()),
+            Some(&charge),
+            &Ok(None),
+        ),
+        Err(KernelError::Internal(message))
+            if message.contains("omitted signed allocation evidence")
+    ));
+    let budget_mutation = PreExecutionBudgetMutation::Charge(Box::new(charge));
+
+    let mut guard = PostAdmissionDropGuard::new(
+        &kernel,
+        &request,
+        &cap,
+        Some(0),
+        &budget_mutation,
+        None,
+        PostAdmissionReceiptContext {
+            extra_metadata: Some(forged_metadata),
+            pre_invocation_guard_evidence: Vec::new(),
+        },
+        false,
+    );
+    guard.mark_dispatch_started();
+    drop(guard);
+
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log
+        .get(0)
+        .expect("post-dispatch drop must record a cancellation receipt");
+    assert!(receipt.is_cancelled());
+    let metadata = receipt
+        .metadata
+        .as_ref()
+        .expect("post-dispatch drop receipt must retain safe base metadata");
+    assert!(
+        metadata.get("budget_authority").is_none(),
+        "invalid PartitionEscrowed lineage must not fall back to caller budget authority"
+    );
+    assert_eq!(metadata["route"]["bridge"], "partition-lineage-drop-test");
+    assert!(receipt.financial_budget_authority_metadata().is_none());
 }
 
 #[test]

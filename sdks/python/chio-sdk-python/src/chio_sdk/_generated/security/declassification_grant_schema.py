@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: e7734a10ce3d0e21e8497fad86bfb2a97e79c44ce827e678a869c592687f8837
+# Schema sha256: 0a3a1765a96b67781f41c28a0d27ad221b6ab37620da7ca89acc92357927dee9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, RootModel
 
 
 class Algorithm(Enum):
@@ -43,8 +43,65 @@ class FlowIdentifier(RootModel[str]):
     ]
 
 
+def _validate_target_label_owner_identifier(value: str) -> str:
+    try:
+        return FlowIdentifier.model_validate(value).root
+    except ValueError as error:
+        raise ValueError(
+            "target label owner key must be a valid flow identifier"
+        ) from error
+
+
+def _require_unique_target_label_flow_identifiers(
+    values: list[FlowIdentifier],
+) -> list[FlowIdentifier]:
+    seen: set[str] = set()
+    for value in values:
+        if value.root in seen:
+            raise ValueError("target label flow identifiers must be unique")
+        seen.add(value.root)
+    return values
+
+
+_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA = FlowIdentifier.model_json_schema()
+_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA.pop("title", None)
+if set(_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA) != {
+    "type",
+    "minLength",
+    "maxLength",
+    "pattern",
+}:
+    raise RuntimeError("unexpected FlowIdentifier JSON schema shape")
+
+_TargetLabelOwnerIdentifier = Annotated[
+    str,
+    AfterValidator(_validate_target_label_owner_identifier),
+]
+_TargetLabelCompartments = Annotated[
+    list[FlowIdentifier],
+    Field(max_length=64, json_schema_extra={"uniqueItems": True}),
+    AfterValidator(_require_unique_target_label_flow_identifiers),
+]
+_TargetLabelOwnerReaders = Annotated[
+    list[FlowIdentifier],
+    Field(max_length=256, json_schema_extra={"uniqueItems": True}),
+    AfterValidator(_require_unique_target_label_flow_identifiers),
+]
+
+
 class TargetLabel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    compartments: _TargetLabelCompartments
     kind: Literal["known"]
+    owners: Annotated[
+        dict[_TargetLabelOwnerIdentifier, _TargetLabelOwnerReaders],
+        Field(
+            max_length=64,
+            json_schema_extra={
+                "propertyNames": dict(_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA),
+            },
+        ),
+    ]
 
 
 class Body(BaseModel):

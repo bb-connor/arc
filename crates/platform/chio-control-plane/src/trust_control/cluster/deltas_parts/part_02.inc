@@ -67,46 +67,49 @@ pub(crate) fn budget_mutation_record_from_view(
             event.kind
         ))
     })?;
-    let invocation_state = match kind {
-        BudgetMutationKind::IncrementInvocation | BudgetMutationKind::CaptureInvocations => {
-            if event.allowed == Some(false) {
-                BudgetInvocationReservationState::Denied
-            } else {
-                BudgetInvocationReservationState::Captured
-            }
+    let invocation_state = match event.invocation_state {
+        BudgetInvocationReservationStateView::Absent => BudgetInvocationReservationState::Absent,
+        BudgetInvocationReservationStateView::Authorized => {
+            BudgetInvocationReservationState::Authorized
         }
-        BudgetMutationKind::ReserveInvocations => {
-            if event.allowed == Some(false) {
-                BudgetInvocationReservationState::Denied
-            } else {
-                BudgetInvocationReservationState::Authorized
-            }
+        BudgetInvocationReservationStateView::Captured => {
+            BudgetInvocationReservationState::Captured
         }
-        BudgetMutationKind::ReverseInvocations => BudgetInvocationReservationState::Reversed,
-        BudgetMutationKind::AuthorizeExposure
-        | BudgetMutationKind::CaptureExposure
-        | BudgetMutationKind::ReverseExposure
-        | BudgetMutationKind::ReleaseExposure
-        | BudgetMutationKind::ReconcileSpend
-        | BudgetMutationKind::ExpireHold => BudgetInvocationReservationState::Absent,
+        BudgetInvocationReservationStateView::Reversed => {
+            BudgetInvocationReservationState::Reversed
+        }
+        BudgetInvocationReservationStateView::Denied => BudgetInvocationReservationState::Denied,
     };
-    let monetary_state = match kind {
-        BudgetMutationKind::AuthorizeExposure | BudgetMutationKind::ReserveInvocations
-            if event.allowed != Some(false) && event.exposure_units > 0 =>
-        {
-            BudgetMonetaryHoldState::Exposed
-        }
-        BudgetMutationKind::CaptureExposure => BudgetMonetaryHoldState::Captured,
-        BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
-        BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
-        BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,
-        BudgetMutationKind::ExpireHold => BudgetMonetaryHoldState::Released,
-        BudgetMutationKind::IncrementInvocation
-        | BudgetMutationKind::ReserveInvocations
-        | BudgetMutationKind::CaptureInvocations
-        | BudgetMutationKind::ReverseInvocations
-        | BudgetMutationKind::AuthorizeExposure => BudgetMonetaryHoldState::None,
+    let monetary_state = match event.monetary_state {
+        BudgetMonetaryHoldStateView::None => BudgetMonetaryHoldState::None,
+        BudgetMonetaryHoldStateView::Exposed => BudgetMonetaryHoldState::Exposed,
+        BudgetMonetaryHoldStateView::Released => BudgetMonetaryHoldState::Released,
+        BudgetMonetaryHoldStateView::Reconciled => BudgetMonetaryHoldState::Reconciled,
+        BudgetMonetaryHoldStateView::Captured => BudgetMonetaryHoldState::Captured,
+        BudgetMonetaryHoldStateView::Reversed => BudgetMonetaryHoldState::Reversed,
     };
+    let invocation_counts_after = event
+        .invocation_counts_after
+        .iter()
+        .map(|usage| {
+            let usage = BudgetInvocationQuotaUsage {
+                quota: service_runtime::budget::invocation_quota_from_view(&usage.quota)
+                    .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+                reserved_invocations_after: usage.reserved_invocations_after,
+                captured_invocations_after: usage.captured_invocations_after,
+            };
+            usage
+                .validate()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            Ok(usage)
+        })
+        .collect::<Result<Vec<_>, CliError>>()?;
+    let revocation_set = event
+        .revocation_set
+        .as_ref()
+        .map(service_runtime::budget::canonical_revocation_set_from_view)
+        .transpose()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
 
     Ok(BudgetMutationRecord {
         event_id: event.event_id.clone(),
@@ -125,10 +128,10 @@ pub(crate) fn budget_mutation_record_from_view(
         max_cost_per_invocation: event.max_cost_per_invocation,
         max_total_cost_units: event.max_total_cost_units,
         invocation_count_after: event.invocation_count_after,
-        invocation_counts_after: Vec::new(),
+        invocation_counts_after,
         invocation_state,
         monetary_state,
-        revocation_set: None,
+        revocation_set,
         total_cost_exposed_after: event.total_cost_exposed_after,
         total_cost_realized_spend_after: event.total_cost_realized_spend_after,
         authority: event
@@ -324,6 +327,10 @@ mod deltas_tests {
             max_cost_per_invocation: None,
             max_total_cost_units: None,
             invocation_count_after: 1,
+            invocation_counts_after: Vec::new(),
+            invocation_state: BudgetInvocationReservationStateView::Absent,
+            monetary_state: BudgetMonetaryHoldStateView::Exposed,
+            revocation_set: None,
             total_cost_exposed_after: 1,
             total_cost_realized_spend_after: 0,
             authority: Some(BudgetMutationAuthorityView {

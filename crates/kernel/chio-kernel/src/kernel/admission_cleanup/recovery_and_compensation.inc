@@ -440,6 +440,7 @@ impl ChioKernel {
         };
         (|| {
             let authorization = snapshot.authorization_request()?;
+            let authorization_artifact_digests = snapshot.authorization_artifact_digests();
             let expected_hold = authorization.hold_id.clone();
             let expected_authorize_event = authorization.event_id.clone().ok_or_else(|| {
                 KernelError::Internal(
@@ -457,12 +458,38 @@ impl ChioKernel {
             } else {
                 BudgetMonetaryHoldState::None
             };
-            let decision = store
-                .authorize_budget_hold(authorization.clone())
-                .or_else(|_| store.authorize_budget_hold(authorization))?;
+            let decision = match store.replay_budget_authorization(authorization.clone()) {
+                Ok(decision) => decision,
+                Err(BudgetStoreError::MissingCommittedReplay(_)) => {
+                    // The cleanup journal can be durable before the budget
+                    // authorization. Absence proves there is no committed
+                    // effect to reverse. Never recreate one from stale source
+                    // evidence merely to compensate it.
+                    return Ok(());
+                }
+                Err(_) => match store.replay_budget_authorization(authorization.clone()) {
+                    Ok(decision) => decision,
+                    Err(BudgetStoreError::MissingCommittedReplay(_)) => return Ok(()),
+                    Err(error) => return Err(error.into()),
+                },
+            };
+            let authorization_validation = self
+                .validate_budget_authorization_decision_for_store(
+                    store,
+                    &authorization,
+                    &decision,
+                    &authorization_artifact_digests,
+                    "cleanup authorization replay",
+                );
             let authorized = match decision {
                 BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,
                 BudgetAuthorizeHoldDecision::Denied(denied) => {
+                    if authorization_validation.is_err() {
+                        return Err(KernelError::GuardDenied(
+                            "budget authorization denial lacks exact hard-budget authority evidence"
+                                .to_string(),
+                        ));
+                    }
                     self.validate_budget_cleanup_denial(BudgetCleanupDenialValidation {
                         store,
                         denied: &denied,
@@ -478,6 +505,7 @@ impl ChioKernel {
                     return Ok(());
                 }
             };
+            authorization_validation?;
             self.validate_hard_budget_commit_metadata_for_store(
                 store,
                 &authorized.metadata,
@@ -539,7 +567,7 @@ impl ChioKernel {
         })()
     }
 
-    fn validate_budget_cleanup_denial(
+    pub(super) fn validate_budget_cleanup_denial(
         &self,
         validation: BudgetCleanupDenialValidation<'_>,
     ) -> Result<(), KernelError> {
@@ -578,48 +606,14 @@ impl ChioKernel {
         expected_event_id: &str,
         expected_authority: Option<&crate::budget_store::BudgetEventAuthority>,
     ) -> Result<(), KernelError> {
-        let authority_is_valid = match metadata.guarantee_level {
-            BudgetGuaranteeLevel::SingleNodeAtomic => {
-                metadata.authority.as_ref() == expected_authority
-            }
-            BudgetGuaranteeLevel::HaLinearizable => {
-                metadata.authority.as_ref().is_some_and(|authority| {
-                    !authority.authority_id.is_empty()
-                        && !authority.lease_id.is_empty()
-                        && authority.lease_epoch > 0
-                })
-            }
-            BudgetGuaranteeLevel::PartitionEscrowed | BudgetGuaranteeLevel::AdvisoryPosthoc => {
-                false
-            }
-        };
-        let commit_index_is_valid = match metadata.guarantee_level {
-            BudgetGuaranteeLevel::SingleNodeAtomic => metadata.budget_commit_index.is_none(),
-            BudgetGuaranteeLevel::HaLinearizable => metadata
-                .budget_commit_index
-                .is_some_and(|commit_index| commit_index > 0),
-            BudgetGuaranteeLevel::PartitionEscrowed | BudgetGuaranteeLevel::AdvisoryPosthoc => {
-                false
-            }
-        };
-        if metadata.guarantee_level != store.budget_guarantee_level()
-            || metadata.budget_profile != store.budget_authority_profile()
-            || metadata.metering_profile != store.budget_metering_profile()
-            || !metadata.guarantee_level.supports_hard_invocation_limit(
-                store.authority_profile(),
-                self.dispatch_worker_count,
-            )
-            || metadata.event_id.as_deref() != Some(expected_event_id)
-            || metadata.authority.is_none()
-            || !authority_is_valid
-            || !commit_index_is_valid
-        {
-            return Err(KernelError::GuardDenied(
-                "cleanup authorization denial omitted exact hard-budget authority evidence"
-                    .to_string(),
-            ));
-        }
-        Ok(())
+        self.validate_hard_budget_commit_metadata_for_store(
+            store,
+            metadata,
+            expected_event_id,
+            expected_authority,
+            None,
+            "cleanup authorization denial",
+        )
     }
 
     fn execute_payment_cleanup(

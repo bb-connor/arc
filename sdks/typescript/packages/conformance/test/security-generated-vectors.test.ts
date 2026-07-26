@@ -8,7 +8,7 @@ import Ajv2020, {
 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
-import { canonicalJsonString } from "../src/canonical.js";
+import { canonicalJsonBytes, canonicalJsonString } from "../src/canonical.js";
 import type {
   Agent_ToolCallRequest,
   Capability_AggregateBudgetRootBinding,
@@ -18,6 +18,7 @@ import type {
   Capability_AggregateInvocationBudget,
   Capability_GovernedApprovalToken,
   Capability_GovernedApprovalTokenBody,
+  Capability_GovernedTransactionIntent,
   Capability_ThresholdApprovalProposal,
   Capability_ThresholdApprovalProposalBody,
   Capability_VerifiedApprovalSet,
@@ -74,6 +75,17 @@ function readJson(path: string): unknown {
   return JSON.parse(fs.readFileSync(path, "utf8")) as unknown;
 }
 
+function readFixtureBytesWithoutTerminalLf(path: string): Buffer {
+  const bytes = fs.readFileSync(path);
+  return bytes.at(-1) === 0x0a ? bytes.subarray(0, -1) : bytes;
+}
+
+function expectCanonicalTypedBytes(value: unknown, path: string): void {
+  expect(Buffer.from(canonicalJsonBytes(value))).toEqual(
+    readFixtureBytesWithoutTerminalLf(path),
+  );
+}
+
 function decode<T>(value: unknown, validate: ValidateFunction): T {
   if (!validate(value)) {
     throw new Error(JSON.stringify(validate.errors));
@@ -126,9 +138,10 @@ function assertGeneratedRoundTrip<T>(
   if (validate === undefined) {
     throw new Error(`missing exact schema ${schemaId}`);
   }
-  const source = readJson(`${vectorRoot}/${fileName}`);
+  const path = `${vectorRoot}/${fileName}`;
+  const source = readJson(path);
   const decoded = decode<T>(source, validate);
-  expect(canonicalJsonString(decoded)).toBe(canonicalJsonString(source));
+  expectCanonicalTypedBytes(decoded, path);
   expect(() => decode<T>({ ...(source as object), unknown: true }, validate)).toThrow();
 }
 
@@ -187,9 +200,12 @@ function assertWireRoundTrip<T>(
   relativePath: string,
   sourceOverride?: unknown,
 ): T {
-  const source = sourceOverride ?? readJson(`${protocolVectorRoot}/${relativePath}`);
+  const path = `${protocolVectorRoot}/${relativePath}`;
+  const source = sourceOverride ?? readJson(path);
   const decoded = decode<T>(source, validate);
-  expect(canonicalJsonString(decoded)).toBe(canonicalJsonString(source));
+  if (sourceOverride === undefined) {
+    expectCanonicalTypedBytes(decoded, path);
+  }
   expect(() => decode<T>({ ...(source as object), unknown: true }, validate)).toThrow();
   return decoded;
 }
@@ -263,8 +279,15 @@ function assertProtocolWireRoundTrip(
         relativePath,
         sourceOverride,
       );
+    case "governed_active_response_intent":
+      return assertWireRoundTrip<Capability_GovernedTransactionIntent.ChioGovernedTransactionIntent>(
+        validate,
+        relativePath,
+        sourceOverride,
+      );
     case "tool_call_request_singular_approval":
     case "tool_call_request_list_approval":
+    case "tool_call_request_full_security":
       return assertWireRoundTrip<Agent_ToolCallRequest.ChioAgentMessageToolCallRequest>(
         validate,
         relativePath,
@@ -393,6 +416,11 @@ describe("generated active-defense security types", () => {
     );
     assertGeneratedRoundTrip<Security_ResponseCompletionReceiptBodyV1.ChioResponseCompletionReceiptBodyV1>(
       ajv,
+      "response-completion-receipt-body-failed-before-effect-v1.json",
+      "https://chio.world/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json",
+    );
+    assertGeneratedRoundTrip<Security_ResponseCompletionReceiptBodyV1.ChioResponseCompletionReceiptBodyV1>(
+      ajv,
       "response-completion-receipt-body-failed-v1.json",
       "https://chio.world/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json",
     );
@@ -510,9 +538,9 @@ describe("generated protocol security types", () => {
     const index = readJson(`${protocolVectorRoot}/index.json`) as {
       positive: Array<{ file: string; id: string; schema_id: string }>;
     };
-    expect(index.positive).toHaveLength(18);
-    expect(new Set(index.positive.map((entry) => entry.id)).size).toBe(18);
-    expect(new Set(index.positive.map((entry) => entry.file)).size).toBe(18);
+    expect(index.positive).toHaveLength(26);
+    expect(new Set(index.positive.map((entry) => entry.id)).size).toBe(26);
+    expect(new Set(index.positive.map((entry) => entry.file)).size).toBe(26);
     for (const entry of index.positive) {
       const relativeSchema = entry.schema_id.slice(wireSchemaBase.length);
       const schemaId = registerWireSchema(ajv, relativeSchema, registered);
@@ -520,7 +548,21 @@ describe("generated protocol security types", () => {
       if (validate === undefined) {
         throw new Error(`missing protocol schema ${entry.schema_id}`);
       }
-      assertProtocolWireRoundTrip(entry.id, validate, entry.file);
+      const decoded = assertProtocolWireRoundTrip(entry.id, validate, entry.file);
+      if (entry.id === "governed_active_response_intent") {
+        const intent =
+          decoded as Capability_GovernedTransactionIntent.ChioGovernedTransactionIntent;
+        expect(intent.kind).toBe("active_response_plan");
+      } else if (entry.id === "tool_call_request_full_security") {
+        const request = decoded as Agent_ToolCallRequest.ChioAgentMessageToolCallRequest;
+        expect(request.capability_token.aggregate_invocation_budget).toBeDefined();
+        expect(request.supplemental_authorization).toBeDefined();
+        expect(request.governed_intent?.kind).toBe("tool_invocation");
+        expect(request.approval_tokens).toHaveLength(2);
+        expect(request).not.toHaveProperty("approval_token");
+        expect(request.threshold_approval_proposal).toBeDefined();
+        expect(request.declassification_grant).toBeDefined();
+      }
     }
   });
 
@@ -572,8 +614,8 @@ describe("generated protocol security types", () => {
         mutation: { hex?: string; op: string; path?: string; value?: unknown };
       }>;
     };
-    expect(corpus.cases).toHaveLength(20);
-    expect(new Set(corpus.cases.map((entry) => entry.id)).size).toBe(20);
+    expect(corpus.cases).toHaveLength(43);
+    expect(new Set(corpus.cases.map((entry) => entry.id)).size).toBe(43);
     let structuralRejections = 1;
     let semanticRejections = 0;
     for (const entry of corpus.cases) {
@@ -626,8 +668,8 @@ describe("generated protocol security types", () => {
         structuralRejections += 1;
       }
     }
-    expect(structuralRejections).toBe(8);
-    expect(semanticRejections).toBe(13);
-    expect(structuralRejections + semanticRejections).toBe(21);
+    expect(structuralRejections).toBe(16);
+    expect(semanticRejections).toBe(28);
+    expect(structuralRejections + semanticRejections).toBe(44);
   });
 });

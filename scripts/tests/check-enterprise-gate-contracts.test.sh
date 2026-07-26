@@ -79,4 +79,24 @@ if ! grep -Fq './scripts/check-enterprise-cross-mechanism.sh' \
   echo "enterprise workflow omits the composed mechanism gate" >&2
   exit 1
 fi
+
+if ! grep -Fq 'run: ./scripts/check-protocol-primitives-focused.sh --all' \
+  .github/workflows/enterprise-hardening.yml; then
+  echo "enterprise workflow omits the protocol-primitives focused gate" >&2
+  exit 1
+fi
+
+for local_gate in scripts/ci-pr-tier.sh scripts/ci-workspace.sh; do
+  if ! grep -Fq 'bash scripts/tests/check-protocol-primitives-focused.test.sh' \
+    "${local_gate}"; then
+    echo "local CI mirror omits the protocol-primitives focused self-test: ${local_gate}" >&2
+    exit 1
+  fi
+  if ! grep -Fq './scripts/check-protocol-primitives-focused.sh --all' \
+    "${local_gate}"; then
+    echo "local CI mirror omits the protocol-primitives focused gate: ${local_gate}" >&2
+    exit 1
+  fi
+done
+
 echo "enterprise gate static contracts passed"

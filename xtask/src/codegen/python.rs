@@ -140,7 +140,194 @@ fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
             .join("security")
             .join("detector_health_receipt_body_v1_schema.py"),
     )?;
+    harden_python_admission_capture_metadata(
+        &root_dir
+            .join("trust_control")
+            .join("admission_capture_metadata_schema.py"),
+    )?;
+    harden_python_declassification_grant(
+        &root_dir
+            .join("security")
+            .join("declassification_grant_schema.py"),
+    )?;
     Ok(())
+}
+
+const GENERATED_ADMISSION_CAPTURE_PYDANTIC_IMPORT: &str =
+    "from pydantic import BaseModel, ConfigDict, Field, RootModel\n";
+const HARDENED_ADMISSION_CAPTURE_PYDANTIC_IMPORT: &str =
+    "from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator\n";
+const GENERATED_ADMISSION_CAPTURE_GUARANTEE_LEVEL: &str = concat!(
+    "class GuaranteeLevel(Enum):\n",
+    "    single_node_atomic = \"single_node_atomic\"\n",
+    "    partition_escrowed = \"partition_escrowed\"\n",
+    "    ha_linearizable = \"ha_linearizable\"\n",
+);
+const GENERATED_ADMISSION_CAPTURE_LEADER_EPOCH_FIELD: &str =
+    "    leaderEpoch: Annotated[int | None, Field(ge=1)] = None\n";
+const GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD: &str = concat!(
+    "    partitionEscrowEvidence: (\n",
+    "        budget_invocation_admission_evidence_schema.PartitionEscrowEvidence | None\n",
+    "    ) = None\n",
+);
+const HARDENED_ADMISSION_CAPTURE_GUARANTEE_VALIDATOR: &str = concat!(
+    "    @model_validator(mode=\"after\")\n",
+    "    def _validate_guarantee_evidence(\n",
+    "        self,\n",
+    "    ) -> \"ChioAuthoritativeAdmissionCaptureReceiptProjection\":\n",
+    "        leader_epoch_present = \"leaderEpoch\" in self.model_fields_set\n",
+    "        partition_escrow_evidence_present = (\n",
+    "            \"partitionEscrowEvidence\" in self.model_fields_set\n",
+    "        )\n",
+    "        if self.guaranteeLevel is GuaranteeLevel.single_node_atomic:\n",
+    "            if leader_epoch_present or partition_escrow_evidence_present:\n",
+    "                raise ValueError(\n",
+    "                    \"single_node_atomic forbids leaderEpoch and \"\n",
+    "                    \"partitionEscrowEvidence\"\n",
+    "                )\n",
+    "        elif self.guaranteeLevel is GuaranteeLevel.partition_escrowed:\n",
+    "            if leader_epoch_present:\n",
+    "                raise ValueError(\"partition_escrowed forbids leaderEpoch\")\n",
+    "            if (\n",
+    "                not partition_escrow_evidence_present\n",
+    "                or self.partitionEscrowEvidence is None\n",
+    "            ):\n",
+    "                raise ValueError(\n",
+    "                    \"partition_escrowed requires partitionEscrowEvidence\"\n",
+    "                )\n",
+    "        elif self.guaranteeLevel is GuaranteeLevel.ha_linearizable:\n",
+    "            if partition_escrow_evidence_present:\n",
+    "                raise ValueError(\n",
+    "                    \"ha_linearizable forbids partitionEscrowEvidence\"\n",
+    "                )\n",
+    "            if not leader_epoch_present or self.leaderEpoch is None:\n",
+    "                raise ValueError(\"ha_linearizable requires leaderEpoch\")\n",
+    "        else:\n",
+    "            raise ValueError(\"unsupported admission capture guarantee level\")\n",
+    "        return self",
+);
+
+/// Restore the guarantee-dependent evidence matrix dropped when
+/// datamodel-code-generator flattens the schema's conditional `allOf` clauses.
+fn harden_python_admission_capture_metadata(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    require_python_codegen_snippet(path, &body, GENERATED_ADMISSION_CAPTURE_GUARANTEE_LEVEL)?;
+    require_python_codegen_snippet(path, &body, GENERATED_ADMISSION_CAPTURE_LEADER_EPOCH_FIELD)?;
+    require_python_codegen_snippet(
+        path,
+        &body,
+        GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD,
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        GENERATED_ADMISSION_CAPTURE_PYDANTIC_IMPORT,
+        HARDENED_ADMISSION_CAPTURE_PYDANTIC_IMPORT,
+    )?;
+    insert_python_class_member(
+        path,
+        &mut body,
+        "ChioAuthoritativeAdmissionCaptureReceiptProjection",
+        HARDENED_ADMISSION_CAPTURE_GUARANTEE_VALIDATOR,
+    )?;
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
+}
+
+const GENERATED_DECLASSIFICATION_PYDANTIC_IMPORT: &str =
+    "from pydantic import BaseModel, ConfigDict, Field, RootModel\n";
+const HARDENED_DECLASSIFICATION_PYDANTIC_IMPORT: &str =
+    "from pydantic import AfterValidator, BaseModel, ConfigDict, Field, RootModel\n";
+const GENERATED_DECLASSIFICATION_TARGET_LABEL: &str = concat!(
+    "class TargetLabel(BaseModel):\n",
+    "    kind: Literal[\"known\"]\n",
+    "\n",
+    "\n",
+    "class Body(BaseModel):",
+);
+const HARDENED_DECLASSIFICATION_TARGET_LABEL: &str = concat!(
+    "def _validate_target_label_owner_identifier(value: str) -> str:\n",
+    "    try:\n",
+    "        return FlowIdentifier.model_validate(value).root\n",
+    "    except ValueError as error:\n",
+    "        raise ValueError(\n",
+    "            \"target label owner key must be a valid flow identifier\"\n",
+    "        ) from error\n",
+    "\n",
+    "\n",
+    "def _require_unique_target_label_flow_identifiers(\n",
+    "    values: list[FlowIdentifier],\n",
+    ") -> list[FlowIdentifier]:\n",
+    "    seen: set[str] = set()\n",
+    "    for value in values:\n",
+    "        if value.root in seen:\n",
+    "            raise ValueError(\"target label flow identifiers must be unique\")\n",
+    "        seen.add(value.root)\n",
+    "    return values\n",
+    "\n",
+    "\n",
+    "_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA = FlowIdentifier.model_json_schema()\n",
+    "_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA.pop(\"title\", None)\n",
+    "if set(_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA) != {\n",
+    "    \"type\",\n",
+    "    \"minLength\",\n",
+    "    \"maxLength\",\n",
+    "    \"pattern\",\n",
+    "}:\n",
+    "    raise RuntimeError(\"unexpected FlowIdentifier JSON schema shape\")\n",
+    "\n",
+    "_TargetLabelOwnerIdentifier = Annotated[\n",
+    "    str,\n",
+    "    AfterValidator(_validate_target_label_owner_identifier),\n",
+    "]\n",
+    "_TargetLabelCompartments = Annotated[\n",
+    "    list[FlowIdentifier],\n",
+    "    Field(max_length=64, json_schema_extra={\"uniqueItems\": True}),\n",
+    "    AfterValidator(_require_unique_target_label_flow_identifiers),\n",
+    "]\n",
+    "_TargetLabelOwnerReaders = Annotated[\n",
+    "    list[FlowIdentifier],\n",
+    "    Field(max_length=256, json_schema_extra={\"uniqueItems\": True}),\n",
+    "    AfterValidator(_require_unique_target_label_flow_identifiers),\n",
+    "]\n",
+    "\n",
+    "\n",
+    "class TargetLabel(BaseModel):\n",
+    "    model_config = ConfigDict(extra=\"forbid\")\n",
+    "    compartments: _TargetLabelCompartments\n",
+    "    kind: Literal[\"known\"]\n",
+    "    owners: Annotated[\n",
+    "        dict[_TargetLabelOwnerIdentifier, _TargetLabelOwnerReaders],\n",
+    "        Field(\n",
+    "            max_length=64,\n",
+    "            json_schema_extra={\n",
+    "                \"propertyNames\": dict(_TARGET_LABEL_FLOW_IDENTIFIER_SCHEMA),\n",
+    "            },\n",
+    "        ),\n",
+    "    ]\n",
+    "\n",
+    "\n",
+    "class Body(BaseModel):",
+);
+
+/// Restore the inherited known information-label fields and constraints dropped
+/// by datamodel-code-generator when it flattens the target label's `allOf`.
+fn harden_python_declassification_grant(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        GENERATED_DECLASSIFICATION_PYDANTIC_IMPORT,
+        HARDENED_DECLASSIFICATION_PYDANTIC_IMPORT,
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        GENERATED_DECLASSIFICATION_TARGET_LABEL,
+        HARDENED_DECLASSIFICATION_TARGET_LABEL,
+    )?;
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
 }
 
 fn harden_python_detector_health(path: &Path) -> Result<(), XtaskError> {
@@ -290,13 +477,23 @@ fn replace_python_codegen_snippet(
     needle: &str,
     replacement: &str,
 ) -> Result<(), XtaskError> {
-    if !body.contains(needle) {
+    if body.match_indices(needle).count() != 1 {
         return Err(XtaskError::ToolFailed(format!(
-            "codegen python hardening pattern missing in {}",
+            "codegen python hardening pattern is not unique in {}",
             display_path(path)
         )));
     }
     *body = body.replacen(needle, replacement, 1);
+    Ok(())
+}
+
+fn require_python_codegen_snippet(path: &Path, body: &str, needle: &str) -> Result<(), XtaskError> {
+    if body.match_indices(needle).count() != 1 {
+        return Err(XtaskError::ToolFailed(format!(
+            "codegen python hardening prerequisite is not unique in {}",
+            display_path(path)
+        )));
+    }
     Ok(())
 }
 
@@ -1369,6 +1566,173 @@ mod tests {
 
         let result = python_module_inventory(&schemas, &[hyphenated, underscored]);
         assert!(result.is_err(), "accepted colliding Python module paths");
+    }
+
+    #[test]
+    fn admission_capture_hardener_restores_guarantee_evidence_matrix() {
+        let temp = TempDir::new("chio-codegen-python-admission-capture").require("temp dir");
+        let path = temp.path().join("admission_capture_metadata_schema.py");
+        let generated = [
+            GENERATED_ADMISSION_CAPTURE_PYDANTIC_IMPORT,
+            "\n",
+            GENERATED_ADMISSION_CAPTURE_GUARANTEE_LEVEL,
+            "\n",
+            "class ChioAuthoritativeAdmissionCaptureReceiptProjection(BaseModel):\n",
+            "    model_config = ConfigDict(\n        extra=\"forbid\",\n    )\n",
+            GENERATED_ADMISSION_CAPTURE_LEADER_EPOCH_FIELD,
+            GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD,
+        ]
+        .concat();
+        fs::write(&path, &generated).require("write generated fixture");
+
+        harden_python_admission_capture_metadata(&path).require("harden admission capture");
+
+        let hardened = [
+            HARDENED_ADMISSION_CAPTURE_PYDANTIC_IMPORT,
+            "\n",
+            GENERATED_ADMISSION_CAPTURE_GUARANTEE_LEVEL,
+            "\n",
+            "class ChioAuthoritativeAdmissionCaptureReceiptProjection(BaseModel):\n",
+            "    model_config = ConfigDict(\n        extra=\"forbid\",\n    )\n",
+            GENERATED_ADMISSION_CAPTURE_LEADER_EPOCH_FIELD,
+            GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD,
+            "\n",
+            HARDENED_ADMISSION_CAPTURE_GUARANTEE_VALIDATOR,
+            "\n",
+        ]
+        .concat();
+        assert_eq!(
+            fs::read_to_string(&path).require("read hardened fixture"),
+            hardened
+        );
+        assert!(
+            harden_python_admission_capture_metadata(&path).is_err(),
+            "hardener must reject already-hardened generator output"
+        );
+        assert_eq!(
+            fs::read_to_string(&path).require("read rejected hardened fixture"),
+            hardened,
+            "failed repeat hardening must leave the file byte-identical"
+        );
+
+        let missing_field_path = temp.path().join("missing_partition_evidence_schema.py");
+        let missing_field = generated.replace(
+            GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD,
+            "",
+        );
+        fs::write(&missing_field_path, &missing_field).require("write missing-field fixture");
+        assert!(
+            harden_python_admission_capture_metadata(&missing_field_path).is_err(),
+            "hardener accepted generated output without partition escrow evidence"
+        );
+        assert_eq!(
+            fs::read_to_string(&missing_field_path).require("read rejected missing-field fixture"),
+            missing_field,
+            "failed hardening must not partially rewrite the generated file"
+        );
+
+        let duplicate_field_path = temp.path().join("duplicate_partition_evidence_schema.py");
+        let duplicated_partition_field = [
+            GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD,
+            GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD,
+        ]
+        .concat();
+        let duplicate_field = generated.replace(
+            GENERATED_ADMISSION_CAPTURE_PARTITION_ESCROW_EVIDENCE_FIELD,
+            &duplicated_partition_field,
+        );
+        fs::write(&duplicate_field_path, &duplicate_field).require("write duplicate-field fixture");
+        assert!(
+            harden_python_admission_capture_metadata(&duplicate_field_path).is_err(),
+            "hardener accepted duplicate partition escrow evidence fields"
+        );
+        assert_eq!(
+            fs::read_to_string(&duplicate_field_path)
+                .require("read rejected duplicate-field fixture"),
+            duplicate_field,
+            "ambiguous generated output must remain byte-identical"
+        );
+    }
+
+    #[test]
+    fn declassification_grant_hardener_restores_known_label_fields() {
+        let temp = TempDir::new("chio-codegen-python-declassification-label").require("temp dir");
+        let path = temp.path().join("declassification_grant_schema.py");
+        let generated = format!(
+            "{GENERATED_DECLASSIFICATION_PYDANTIC_IMPORT}\n\
+             {GENERATED_DECLASSIFICATION_TARGET_LABEL}\n"
+        );
+        fs::write(&path, generated).require("write generated fixture");
+
+        harden_python_declassification_grant(&path).require("harden target label");
+
+        assert_eq!(
+            fs::read_to_string(&path).require("read hardened fixture"),
+            format!(
+                "{HARDENED_DECLASSIFICATION_PYDANTIC_IMPORT}\n\
+                 {HARDENED_DECLASSIFICATION_TARGET_LABEL}\n"
+            )
+        );
+        assert!(
+            harden_python_declassification_grant(&path).is_err(),
+            "hardener must reject already-hardened or drifted generator output"
+        );
+
+        let drifted_path = temp.path().join("drifted_declassification_grant_schema.py");
+        let drifted = format!(
+            "{GENERATED_DECLASSIFICATION_PYDANTIC_IMPORT}\n\
+             class TargetLabel(BaseModel):\n\
+             \x20   kind: Literal[\"known\"]\n\
+             \x20   owners: dict[str, list[FlowIdentifier]]\n\
+             \n\
+             \n\
+             class Body(BaseModel):\n"
+        );
+        fs::write(&drifted_path, &drifted).require("write drifted fixture");
+        assert!(
+            harden_python_declassification_grant(&drifted_path).is_err(),
+            "hardener accepted a prefix-compatible target label drift"
+        );
+        assert_eq!(
+            fs::read_to_string(&drifted_path).require("read rejected drift fixture"),
+            drifted,
+            "failed hardening must not partially rewrite the generated file"
+        );
+
+        let extended_import_path = temp.path().join("extended_import_schema.py");
+        let extended_import = format!(
+            "from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator\n\n\
+             {GENERATED_DECLASSIFICATION_TARGET_LABEL}\n"
+        );
+        fs::write(&extended_import_path, &extended_import).require("write extended import fixture");
+        assert!(
+            harden_python_declassification_grant(&extended_import_path).is_err(),
+            "hardener accepted an extended generated import"
+        );
+        assert_eq!(
+            fs::read_to_string(&extended_import_path).require("read rejected import fixture"),
+            extended_import,
+            "failed import hardening must leave the generated file byte-identical"
+        );
+
+        let duplicate_class_path = temp.path().join("duplicate_target_label_schema.py");
+        let duplicate_class = format!(
+            "{GENERATED_DECLASSIFICATION_PYDANTIC_IMPORT}\n\
+             {GENERATED_DECLASSIFICATION_TARGET_LABEL}\n\n\
+             {GENERATED_DECLASSIFICATION_TARGET_LABEL}\n"
+        );
+        fs::write(&duplicate_class_path, &duplicate_class)
+            .require("write duplicate target label fixture");
+        assert!(
+            harden_python_declassification_grant(&duplicate_class_path).is_err(),
+            "hardener accepted duplicate generated target labels"
+        );
+        assert_eq!(
+            fs::read_to_string(&duplicate_class_path)
+                .require("read rejected duplicate target label fixture"),
+            duplicate_class,
+            "failed class hardening must leave the generated file byte-identical"
+        );
     }
 
     #[test]

@@ -1248,6 +1248,13 @@ impl BudgetStore for DurableThresholdBudgetStore {
         self.inner.get_usage(capability_id, grant_index)
     }
 
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetMutationRecord>, BudgetStoreError> {
+        self.inner.get_mutation_event_by_id(event_id)
+    }
+
     fn authorize_budget_hold(
         &self,
         mut request: crate::budget_store::BudgetAuthorizeHoldRequest,
@@ -1256,6 +1263,33 @@ impl BudgetStore for DurableThresholdBudgetStore {
             request.authority = Some(Self::remote_authority());
         }
         let mut decision = self.inner.authorize_budget_hold(request)?;
+        match &mut decision {
+            crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                self.normalize_commit_metadata(&mut authorized.metadata);
+                if self.forge_authorize_authority {
+                    authorized.metadata.authority =
+                        Some(crate::budget_store::BudgetEventAuthority {
+                            authority_id: "forged-returned-authority".to_string(),
+                            lease_id: "forged-returned-lease".to_string(),
+                            lease_epoch: 99,
+                        });
+                }
+            }
+            crate::budget_store::BudgetAuthorizeHoldDecision::Denied(denied) => {
+                self.normalize_commit_metadata(&mut denied.metadata);
+            }
+        }
+        Ok(decision)
+    }
+
+    fn replay_budget_authorization(
+        &self,
+        mut request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if self.profile == crate::budget_store::BudgetStoreProfile::SharedLinearizable {
+            request.authority = Some(Self::remote_authority());
+        }
+        let mut decision = self.inner.replay_budget_authorization(request)?;
         match &mut decision {
             crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(authorized) => {
                 self.normalize_commit_metadata(&mut authorized.metadata);
@@ -1528,17 +1562,4 @@ fn aggregate_limited_capability(
         },
     );
     CapabilityToken::sign(body, &kernel.config.keypair).expect("sign aggregate-limited capability")
-}
-
-fn assert_budget_exhausted_or_denied(result: Result<ToolCallResponse, KernelError>, label: &str) {
-    match result {
-        Err(KernelError::BudgetExhausted(_)) => {}
-        Ok(response) => assert_eq!(
-            response.verdict,
-            Verdict::Deny,
-            "{label} unexpectedly dispatched: {:?}",
-            response.reason
-        ),
-        Err(error) => panic!("{label} failed for an unexpected reason: {error}"),
-    }
 }

@@ -22,6 +22,24 @@ pub const MAX_NONCE_BYTES: usize = 128;
 pub const MAX_IDENTIFIER_BYTES: usize = 512;
 pub const MAX_TIMEOUT_MS: u64 = 120_000;
 pub const MAX_PATH_AND_QUERY_BYTES: usize = 16_384;
+const BROKER_EXECUTE_DIAGNOSTIC_PREFIX: &str = "chio.broker.";
+
+pub(crate) fn is_well_formed_broker_execute_diagnostic_code(code: &str) -> bool {
+    let Some(suffix) = code.strip_prefix(BROKER_EXECUTE_DIAGNOSTIC_PREFIX) else {
+        return false;
+    };
+    let bytes = suffix.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 64
+        && bytes.first().is_some_and(u8::is_ascii_lowercase)
+        && bytes
+            .last()
+            .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
+        && !bytes.windows(2).any(|pair| pair == b"__")
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

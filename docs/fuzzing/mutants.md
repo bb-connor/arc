@@ -25,29 +25,30 @@ cargo install cargo-mutants --version '~25' --locked
 
 ## Configuration layout
 
-cargo-mutants 25.x reads its configuration exclusively from the
-workspace-root `.cargo/mutants.toml`. Per-crate `crates/<name>/mutants.toml`
-files are NOT auto-discovered, and even when loaded explicitly via
+cargo-mutants 25.x reads the workspace-root `.cargo/mutants.toml` by default.
+Per-crate `crates/<group>/<name>/mutants.toml` files are NOT auto-discovered,
+and when loaded explicitly via
 `--config` their globs are matched relative to the source-tree root rather
-than the per-crate root. All per-crate scoping is therefore consolidated
-into the single workspace-root file with workspace-rooted globs (e.g.
+than the per-crate root. The nightly job uses the consolidated root config;
+the dormant PR job maps each package to its exact grouped per-crate config.
+All globs are workspace-rooted (e.g.
 `crates/kernel/chio-kernel-core/src/evaluate.rs`).
 
-| Path                                         | Role                                                  |
-|----------------------------------------------|-------------------------------------------------------|
-| `.cargo/mutants.toml`                        | Single source of truth: timeouts, examined trust-boundary modules per crate, workspace-wide skip list |
+| Path | Role |
+|------|------|
+| `.cargo/mutants.toml` | Default and nightly config: timeouts, examined trust-boundary modules per crate, workspace-wide skip list |
+| `crates/<group>/<name>/mutants.toml` | Focused package config loaded explicitly by the dormant PR matrix |
 
 A second discovery rule constrains the layout: cargo-mutants walks `mod`
-declarations and does NOT expand `include!` macros. Two crates in this
-workspace use `include!`:
+declarations and does NOT expand `include!` macros. Relevant examples include:
 
 - `chio-credentials/src/lib.rs` `include!`s 13 files. Only `trust_tier`
-  and the `cfg`-gated `fuzz` are real `mod`s. Globs are written against
-  `lib.rs` (which carries all of the included source for discovery
-  purposes) plus `trust_tier.rs`.
+  and the `cfg`-gated `fuzz` are real `mod`s. The focused globs cover only
+  functions written directly in `lib.rs` and `trust_tier.rs`; the included
+  implementation files are not discoverable.
 - `chio-policy/src/evaluate.rs` `include!`s `evaluate/{context,engine,
-  matchers,outcomes,tests}.rs`. The glob targets `evaluate.rs` itself,
-  not the sub-files.
+  matchers,outcomes,tests}.rs`. The glob targets literal functions in
+  `evaluate.rs`, not the included sub-files.
 
 Workspace-level knobs of note (in `.cargo/mutants.toml`):
 
@@ -82,15 +83,15 @@ fuzz lane).
 
 #### `chio-policy`
 
-Examined: the HushSpec evaluator state machine (`evaluate.rs` +
-`evaluate/{engine,matchers,outcomes,context}.rs`), the compiler bridge
-(`compiler.rs`), conditional activation (`conditions.rs`), regex-based
+Examined: functions written directly in the HushSpec evaluator umbrella
+(`evaluate.rs`), the compiler module tree (`compiler/*.rs`), conditional
+activation (`conditions.rs`), regex-based
 detectors (`detection.rs`, `regex_safety.rs`), `extends`-chain
 plumbing (`merge.rs`, `resolve.rs`), schema validation (`validate.rs`),
 and decision-receipt construction (`receipt.rs`).
 
-Excluded: `models.rs` (pure data), `version.rs` (constant), embedded
-YAML rulesets (`rulesets/**`).
+Excluded: the evaluator's `include!` fragments, `models.rs` (pure data),
+`version.rs` (constant), and embedded YAML rulesets (`rulesets/**`).
 
 #### `chio-guards`
 
@@ -111,15 +112,11 @@ integration testing, not mutation).
 
 #### `chio-credentials`
 
-Examined: `lib.rs` (which `include!`s the trust-boundary set: portable
-JWT VC verify, SD-JWT VC verify, portable reputation credential verify,
-the OID4VCI issuance flow, the OID4VP presentation flow + verifier,
-presentation construction / verify, presentation challenge binding,
-cross-issuer trust packs, the issuer / trust-anchor registry, OID4VCI /
-OID4VP discovery, artifact normalization, passport verifier glue, and
-credential-side policy intersection) plus the real-`mod` `trust_tier.rs`.
+Examined: functions written directly in `lib.rs` plus the real-`mod`
+`trust_tier.rs`.
 
-Excluded: `fuzz.rs` (libFuzzer entry points covered by the
+Excluded: the 13 `include!` implementation files, which cargo-mutants does
+not expand, plus `fuzz.rs` (libFuzzer entry points covered by the
 trust-boundary fuzz lane).
 
 ## Local-developer workflow
@@ -130,8 +127,8 @@ cargo install cargo-mutants --version '~25' --locked
 
 # Run only the mutants generated against changed files in your branch.
 # `--in-diff` takes a unified-diff text file path, NOT a git ref, so we
-# capture the diff first. This is the same invocation the mutants-pr CI
-# job uses.
+# capture the diff first. This is the invocation shape encoded by the
+# currently dormant mutants-pr CI job.
 git diff origin/main...HEAD > /tmp/diff.patch
 cargo mutants --in-diff /tmp/diff.patch
 
@@ -148,9 +145,10 @@ tests poison the report and surface as false TIMEOUT verdicts.
 Workflow: `.github/workflows/mutants.yml`.
 Two jobs:
 
-- `mutants-pr` -- triggered on PR. Runs
-  `cargo mutants --in-diff "$GIT_DIFF" --no-shuffle --jobs 4` against
-  the PR diff and posts a comment via `scripts/mutants-comment.sh`.
+- `mutants-pr` -- defined as a PR-only job, but currently inert because the
+  workflow has no `pull_request` trigger. If that trigger is restored, it runs
+  `cargo mutants --in-diff "$GIT_DIFF" --no-shuffle --jobs 4` against the PR
+  diff and posts a comment via `scripts/mutants-comment.sh`.
   The workflow sets `CHIO_MUTANTS_GATE=blocking`; the actual pass/fail
   posture still comes from `scripts/mutants-gate.sh` and
   `releases.toml::[mutants]`. Empty `cycle_end_tag` or a recorded
@@ -162,8 +160,9 @@ Two jobs:
   workflow artifact, and reports against the per-crate
   `target_catch_ratio_percent` threshold via `scripts/mutants-gate.sh`.
 
-Both jobs run `scripts/check-mutants-rationale.sh` before spending
-mutation budget. That check fails closed if an `exclude_globs` entry in
+Each job is configured to run `scripts/check-mutants-rationale.sh` before
+spending mutation budget; the dormant PR job does not currently execute.
+That check fails closed if an `exclude_globs` entry in
 the workspace or per-crate `mutants.toml` files lacks a nearby
 `rationale:` comment.
 
@@ -208,8 +207,9 @@ without manual edits. `.github/workflows/release-binaries.yml` runs a
 After merge, `scripts/mutants-gate.sh` reads the non-empty
 `cycle_end_tag` and the recorded evidence streak, then switches the
 `mutants-pr` gate from "exit 0 below target" (advisory) to "exit 1
-below target" (blocking). PR comments emitted by `mutants-pr` switch
-from advisory to blocking mode once gate metadata activates blocking.
+below target" (blocking) once the workflow's PR trigger is restored. PR
+comments emitted by `mutants-pr` then switch from advisory to blocking mode
+once gate metadata activates blocking.
 
 If the workflow re-runs against an older tag (workflow_dispatch, repush,
 etc.) the empty-string regex guard makes the write a no-op, so a single

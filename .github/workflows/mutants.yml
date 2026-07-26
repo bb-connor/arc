@@ -1,8 +1,10 @@
 # mutants.yml - cargo-mutants required lane.
 #
 # Two jobs:
-#   mutants-pr      - pull_request trigger; runs `cargo mutants --in-diff`
-#                     against the PR base ref, six crates in parallel,
+#   mutants-pr      - PR-only job, currently dormant because this workflow has
+#                     no pull_request trigger; when activated, runs
+#                     `cargo mutants --in-diff` against the PR base ref,
+#                     six crates in parallel,
 #                     posts a Markdown summary via scripts/mutants-comment.sh,
 #                     and consults scripts/mutants-gate.sh for advisory-vs-blocking
 #                     posture (driven by releases.toml cycle_end_tag).
@@ -81,13 +83,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package:
-          - chio-kernel-core
-          - chio-policy
-          - chio-guards
-          - chio-credentials
-          - chio-attest-verify
-          - chio-anchor
+        include:
+          - package: chio-kernel-core
+            config: crates/kernel/chio-kernel-core/mutants.toml
+          - package: chio-policy
+            config: crates/guards/chio-policy/mutants.toml
+          - package: chio-guards
+            config: crates/guards/chio-guards/mutants.toml
+          - package: chio-credentials
+            config: crates/trust/chio-credentials/mutants.toml
+          - package: chio-attest-verify
+            config: crates/trust/chio-attest-verify/mutants.toml
+          - package: chio-anchor
+            config: crates/economy/chio-anchor/mutants.toml
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -181,7 +189,7 @@ jobs:
           # before any scoped mutants run.
           mutants_exit=0
           cargo mutants \
-            --config "crates/${{ matrix.package }}/mutants.toml" \
+            --config "${{ matrix.config }}" \
             --package "${{ matrix.package }}" \
             --test-workspace false \
             --in-diff "${{ steps.diff.outputs.diff_file }}" \
@@ -361,10 +369,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p mutants-out/${{ matrix.package }}
-          # Full sweep, no --in-diff. examine_globs from .cargo/mutants.toml
-          # plus per-crate mutants.toml narrow scope to trust-boundary
-          # modules. --timeout 600 caps any single mutant at 10 minutes;
-          # the workspace timeout_multiplier = 3.0 still applies.
+          # Full sweep, no --in-diff. examine_globs from the workspace-root
+          # .cargo/mutants.toml narrow scope to trust-boundary modules;
+          # cargo-mutants does not also merge each package's mutants.toml.
+          # --timeout 600 caps any single mutant at 10 minutes; the workspace
+          # timeout_multiplier = 3.0 still applies.
           cargo mutants \
             --package "${{ matrix.package }}" \
             --no-shuffle \

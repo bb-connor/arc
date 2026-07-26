@@ -435,6 +435,7 @@ fn composite_request(
         )
         .unwrap(),
         authorization_artifact_digests: Vec::new(),
+        partition_escrow_evidence: None,
     }
 }
 

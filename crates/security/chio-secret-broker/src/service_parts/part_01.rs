@@ -36,6 +36,8 @@ use crate::generic_https::{
 };
 use crate::migration::BrokerMigrationEnforcer;
 use crate::proof::{proof_digest, verify_request_proof};
+#[cfg(unix)]
+use crate::protocol::is_well_formed_broker_execute_diagnostic_code;
 use crate::protocol::{
     BrokerExecuteFailure, BrokerExecuteRequest, BrokerExecuteResponse, BrokerExecutionEvidence,
     BROKER_EVIDENCE_SCHEMA, MAX_WIRE_BYTES,
@@ -55,8 +57,7 @@ use crate::registration::{
 };
 use crate::revocation::{
     validate_parent_liveness, validate_revocation_snapshot, BrokerRevocationRequest,
-    BrokerRevocations, CanonicalBrokerRevocationSet, CapabilityLiveness,
-    CapabilityLivenessRequest,
+    BrokerRevocations, CanonicalBrokerRevocationSet, CapabilityLiveness, CapabilityLivenessRequest,
 };
 use crate::sqlite::ProductionSqliteAttemptStore;
 use crate::store::{

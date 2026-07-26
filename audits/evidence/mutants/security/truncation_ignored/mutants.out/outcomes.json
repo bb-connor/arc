@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.408051125,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.439332125,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib",
+            "blast::tests::corruption_truncation_lag_and_missing_completeness_are_never_exact",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-quarantine",
+          "file": "crates/security/chio-quarantine/src/blast.rs",
+          "function": {
+            "function_name": "resolve_snapshot",
+            "return_type": "-> Result<ExactResolution, BlastRadiusIncompleteReason>",
+            "span": {
+              "start": {
+                "line": 289,
+                "column": 1
+              },
+              "end": {
+                "line": 419,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 296,
+              "column": 33
+            },
+            "end": {
+              "line": 296,
+              "column": 35
+            }
+          },
+          "replacement": "&&",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-quarantine__src__blast.rs_line_296_col_33.log",
+      "diff_path": "diff/crates__security__chio-quarantine__src__blast.rs_line_296_col_33.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 2.150744833,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.951032625,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib",
+            "blast::tests::corruption_truncation_lag_and_missing_completeness_are_never_exact",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

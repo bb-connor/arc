@@ -65,17 +65,19 @@ impl BudgetStore for InMemoryBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?.try_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
+        self.lock_inner()?
+            .try_charge_cost_with_ids_and_authority(
+                capability_id,
+                grant_index,
+                max_invocations,
+                cost_units,
+                max_cost_per_invocation,
+                max_total_cost_units,
+                hold_id,
+                event_id,
+                authority,
+            )
+            .map(|outcome| outcome.allowed)
     }
 
     fn reverse_charge_cost(
@@ -256,10 +258,34 @@ impl BudgetStore for InMemoryBudgetStore {
             .list_mutation_events(limit, capability_id, grant_index)
     }
 
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<BudgetMutationRecord>, BudgetStoreError> {
+        let inner = self.lock_inner()?;
+        let mut matches = inner
+            .events
+            .iter()
+            .filter(|record| record.event_id == event_id);
+        let result = matches.next().cloned();
+        if matches.next().is_some() {
+            return Err(BudgetStoreError::Invariant(format!(
+                "in-memory budget event_id `{event_id}` is not unique"
+            )));
+        }
+        Ok(result)
+    }
+
     fn authorize_budget_hold(
         &self,
         mut request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if request.requires_existing_authorization_replay() {
+            return Err(BudgetStoreError::Invariant(
+                "snapshot-derived authorization requires the committed replay operation"
+                    .to_string(),
+            ));
+        }
         if request.payment_journal.is_some() {
             // The in-memory store cannot journal the money path durably, and
             // a silently dropped journal row would leave a rail movement
@@ -284,7 +310,8 @@ impl BudgetStore for InMemoryBudgetStore {
             } else {
                 BudgetMonetaryHoldState::None
             };
-            let allowed = self.try_charge_cost_with_ids_and_authority(
+            let mut inner = self.lock_inner()?;
+            let outcome = inner.try_charge_cost_with_ids_and_authority(
                 &request.capability_id,
                 request.grant_index,
                 request.max_invocations,
@@ -295,21 +322,18 @@ impl BudgetStore for InMemoryBudgetStore {
                 request.event_id.as_deref(),
                 request.authority.as_ref(),
             )?;
-            let usage = self.get_usage(&request.capability_id, request.grant_index)?;
-            let committed_cost_units_after = usage
-                .as_ref()
-                .map(BudgetUsageRecord::committed_cost_units)
-                .transpose()?
-                .unwrap_or(0);
-            let invocation_count_after =
-                usage.as_ref().map_or(0, |usage| usage.invocation_count);
+            let LegacyAuthorizationMutationOutcome {
+                allowed,
+                committed_cost_units_after,
+                record,
+            } = outcome;
+            let invocation_count_after = record.invocation_count_after;
+            drop(inner);
             let metadata = budget_commit_metadata(
                 self,
-                request.authority,
-                allowed
-                    .then(|| usage.as_ref().map(|usage| usage.seq))
-                    .flatten(),
-                request.event_id,
+                record.authority.clone(),
+                Some(record.event_seq),
+                Some(record.event_id.clone()),
             );
             return if allowed {
                 Ok(BudgetAuthorizeHoldDecision::Authorized(
@@ -356,6 +380,19 @@ impl BudgetStore for InMemoryBudgetStore {
             request.install_verified_invocation_admission(admission)?;
         }
         inner.authorize_composite_budget_hold(request)
+    }
+
+    fn replay_budget_authorization(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if !request.requires_existing_authorization_replay() {
+            return Err(BudgetStoreError::Invariant(
+                "committed replay requires a snapshot-derived authorization request".to_string(),
+            ));
+        }
+        self.lock_inner()?
+            .replay_composite_budget_authorization(request)
     }
 
     fn reverse_budget_hold(
@@ -602,4 +639,90 @@ fn unix_now() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod invocation_quota_mutation_tests {
+    use super::*;
+
+    fn assert_compatibility_shape_rejected(
+        quotas: &[BudgetInvocationQuota],
+        primary_key: &BudgetQuotaKey,
+    ) {
+        let mut inner = InMemoryBudgetStoreInner::default();
+        assert!(matches!(
+            inner.compare_and_mutate_invocation_quotas(
+                quotas,
+                primary_key,
+                0,
+                InvocationQuotaMutationMode::CaptureCompatibility,
+                InvocationQuotaMutationAction::Attempt,
+                || Ok(false),
+            ),
+            Err(BudgetStoreError::Invariant(message))
+                if message.contains("exactly one primary grant quota")
+        ));
+        assert!(inner.invocation_quotas.is_empty());
+    }
+
+    #[test]
+    fn compatibility_mutation_rejects_multiple_quotas_before_staging() {
+        let primary_key = BudgetQuotaKey {
+            profile: BudgetQuotaProfile::GrantInvocation,
+            owner_id: "cap-primary".to_string(),
+            grant_index: Some(0),
+        };
+        let secondary_key = BudgetQuotaKey {
+            profile: BudgetQuotaProfile::GrantInvocation,
+            owner_id: "cap-secondary".to_string(),
+            grant_index: Some(0),
+        };
+        let quotas = vec![
+            BudgetInvocationQuota {
+                key: primary_key.clone(),
+                max_invocations: 1,
+            },
+            BudgetInvocationQuota {
+                key: secondary_key,
+                max_invocations: 1,
+            },
+        ];
+
+        assert_compatibility_shape_rejected(&quotas, &primary_key);
+    }
+
+    #[test]
+    fn compatibility_mutation_rejects_a_mismatched_primary_before_staging() {
+        let quota_key = BudgetQuotaKey {
+            profile: BudgetQuotaProfile::GrantInvocation,
+            owner_id: "cap-quota".to_string(),
+            grant_index: Some(0),
+        };
+        let primary_key = BudgetQuotaKey {
+            profile: BudgetQuotaProfile::GrantInvocation,
+            owner_id: "cap-primary".to_string(),
+            grant_index: Some(0),
+        };
+        let quota = BudgetInvocationQuota {
+            key: quota_key,
+            max_invocations: 1,
+        };
+
+        assert_compatibility_shape_rejected(std::slice::from_ref(&quota), &primary_key);
+    }
+
+    #[test]
+    fn compatibility_mutation_rejects_a_non_grant_primary_before_staging() {
+        let primary_key = BudgetQuotaKey {
+            profile: BudgetQuotaProfile::AggregateCapabilityInvocation,
+            owner_id: "cap-aggregate".to_string(),
+            grant_index: None,
+        };
+        let quota = BudgetInvocationQuota {
+            key: primary_key.clone(),
+            max_invocations: 1,
+        };
+
+        assert_compatibility_shape_rejected(std::slice::from_ref(&quota), &primary_key);
+    }
 }

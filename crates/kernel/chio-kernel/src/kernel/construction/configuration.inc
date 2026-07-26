@@ -164,14 +164,81 @@ impl ChioKernel {
         &mut self,
         budget_store: Arc<dyn BudgetStore>,
     ) -> Result<(), KernelError> {
+        self.require_no_atomic_security_runtime_publication()?;
         if Arc::ptr_eq(&self.budget_store, &budget_store) {
             return Ok(());
+        }
+        self.require_threshold_deactivated_for_authority_change()?;
+        self.require_protocol_budget_admission_deactivated_for_authority_change()?;
+        if self.partition_escrow_registry.is_some() {
+            return Err(KernelError::Internal(
+                "partition escrow permanently binds the installed budget store".to_string(),
+            ));
+        }
+        self.prepare_current_admission_authority_replacement()?;
+        self.budget_store = budget_store;
+        Ok(())
+    }
+
+    pub fn install_partition_escrow_registry(
+        &mut self,
+        registry: Arc<crate::partition_escrow::PartitionEscrowRegistry>,
+    ) -> Result<(), KernelError> {
+        if self
+            .partition_escrow_registry
+            .as_ref()
+            .is_some_and(|installed| Arc::ptr_eq(installed, &registry))
+        {
+            return Ok(());
+        }
+        if self.partition_escrow_registry.is_some() {
+            return Err(KernelError::Internal(
+                "partition escrow registry replacement is not supported".to_string(),
+            ));
         }
         self.require_no_atomic_security_runtime_publication()?;
         self.require_threshold_deactivated_for_authority_change()?;
         self.require_protocol_budget_admission_deactivated_for_authority_change()?;
-        self.prepare_current_admission_authority_replacement()?;
-        self.budget_store = budget_store;
+        if self.admission_capture_authority.is_none() {
+            return Err(KernelError::Internal(
+                "partition escrow registry requires an exact admission capture authority"
+                    .to_string(),
+            ));
+        }
+        if !matches!(
+            self.budget_store.budget_guarantee_level(),
+            crate::budget_store::BudgetGuaranteeLevel::PartitionEscrowed
+        ) {
+            return Err(KernelError::Internal(
+                "partition escrow registry requires a partition-escrowed budget store"
+                    .to_string(),
+            ));
+        }
+        let store_binding = self
+            .budget_store
+            .partition_escrow_store_binding()?
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "partition-escrowed budget store omitted its durable counter binding"
+                        .to_string(),
+                )
+            })?;
+        let expected = registry.durable_store();
+        if store_binding.store_identity_digest() != expected.store_identity_digest()
+            || store_binding.counter_namespace_digest() != expected.counter_namespace_digest()
+            || store_binding.fencing_token() != expected.fencing_token()
+        {
+            return Err(KernelError::Internal(
+                "partition escrow registry does not match the installed durable counter binding"
+                .to_string(),
+            ));
+        }
+        Self::validate_hard_budget_store_profile(
+            self.budget_store.as_ref(),
+            self.dispatch_worker_count,
+            Some(registry.as_ref()),
+        )?;
+        self.partition_escrow_registry = Some(registry);
         Ok(())
     }
 
@@ -226,11 +293,14 @@ impl ChioKernel {
                 }
             }
         }
-        if self.aggregate_invocation_admission_enabled || self.supplemental_broker_admission_enabled
+        if self.aggregate_invocation_admission_enabled
+            || self.supplemental_broker_admission_enabled
+            || self.partition_escrow_registry.is_some()
         {
             Self::validate_hard_budget_store_profile(
                 self.budget_store.as_ref(),
                 dispatch_worker_count,
+                self.partition_escrow_registry.as_deref(),
             )?;
             let store = self.admission_operation_store.as_ref().ok_or_else(|| {
                 KernelError::Internal(
@@ -257,6 +327,7 @@ impl ChioKernel {
         &mut self,
         store: Arc<dyn crate::admission_operation::AdmissionOperationStore>,
     ) -> Result<(), KernelError> {
+        self.require_no_atomic_security_runtime_publication()?;
         if self
             .admission_operation_store
             .as_ref()
@@ -264,7 +335,6 @@ impl ChioKernel {
         {
             return Ok(());
         }
-        self.require_no_atomic_security_runtime_publication()?;
         self.require_threshold_deactivated_for_authority_change()?;
         self.require_protocol_budget_admission_deactivated_for_authority_change()?;
         Self::validate_admission_operation_store_profile(
@@ -303,6 +373,7 @@ impl ChioKernel {
         &mut self,
         store: Arc<dyn crate::approval::ApprovalStore>,
     ) -> Result<(), KernelError> {
+        self.require_no_atomic_security_runtime_publication()?;
         if self
             .approval_store
             .as_ref()
@@ -310,7 +381,6 @@ impl ChioKernel {
         {
             return Ok(());
         }
-        self.require_no_atomic_security_runtime_publication()?;
         self.require_threshold_deactivated_for_authority_change()?;
         Self::validate_approval_store_profile(
             store.authority_profile(),
@@ -429,6 +499,12 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         self.require_no_atomic_security_runtime_publication()?;
         self.require_supplemental_broker_admission_deactivated()?;
+        if self.partition_escrow_registry.is_some() {
+            return Err(KernelError::Internal(
+                "partition escrow permanently binds the installed admission capture authority"
+                    .to_string(),
+            ));
+        }
         if self.admission_capture_authority.is_some() {
             self.prepare_current_admission_authority_replacement()?;
         }
@@ -493,6 +569,14 @@ impl ChioKernel {
     }
 
     pub(super) fn validate_protocol_budget_admission_profiles(&self) -> Result<(), KernelError> {
+        if self.partition_escrow_registry.is_some()
+            && self.admission_capture_authority.is_none()
+        {
+            return Err(KernelError::Internal(
+                "partition escrow admission requires an exact admission capture authority"
+                    .to_string(),
+            ));
+        }
         if self.payment_adapter.as_ref().is_some_and(|adapter| {
             !adapter.supports_operation_authorization_recovery()
                 || !adapter.supports_operation_payment_mutations()
@@ -525,6 +609,7 @@ impl ChioKernel {
         Self::validate_hard_budget_store_profile(
             self.budget_store.as_ref(),
             self.dispatch_worker_count,
+            self.partition_escrow_registry.as_deref(),
         )?;
         Ok(())
     }
@@ -532,9 +617,50 @@ impl ChioKernel {
     pub(super) fn validate_hard_budget_store_profile(
         store: &dyn BudgetStore,
         dispatch_worker_count: usize,
+        partition_escrow_registry: Option<&crate::partition_escrow::PartitionEscrowRegistry>,
     ) -> Result<(), KernelError> {
         let profile = store.authority_profile();
         let guarantee = store.budget_guarantee_level();
+        if guarantee == crate::budget_store::BudgetGuaranteeLevel::PartitionEscrowed {
+            let registry = partition_escrow_registry.ok_or_else(|| {
+                KernelError::Internal(
+                    "partition-escrowed budget enforcement requires a sealed signed allocation registry"
+                        .to_string(),
+                )
+            })?;
+            if profile != crate::budget_store::BudgetStoreProfile::SharedLinearizable
+                || dispatch_worker_count == 0
+            {
+                return Err(KernelError::Internal(
+                    "partition-escrowed production enforcement requires a shared linearizable fenced authority"
+                        .to_string(),
+                ));
+            }
+            let binding = store.partition_escrow_store_binding()?.ok_or_else(|| {
+                KernelError::Internal(
+                    "partition-escrowed budget authority omitted its sealed counter binding"
+                        .to_string(),
+                )
+            })?;
+            let expected = registry.durable_store();
+            if binding.store_identity_digest() != expected.store_identity_digest()
+                || binding.counter_namespace_digest() != expected.counter_namespace_digest()
+                || binding.fencing_token() != expected.fencing_token()
+            {
+                return Err(KernelError::Internal(
+                    "partition-escrowed budget authority diverged from its signed registry binding"
+                        .to_string(),
+                ));
+            }
+            return Ok(());
+        }
+        if partition_escrow_registry.is_some() || store.partition_escrow_store_binding()?.is_some()
+        {
+            return Err(KernelError::Internal(
+                "partition escrow registry and store binding must be installed together"
+                    .to_string(),
+            ));
+        }
         if guarantee.supports_hard_invocation_limit(profile, dispatch_worker_count) {
             return Ok(());
         }
@@ -558,7 +684,9 @@ impl ChioKernel {
     fn require_protocol_budget_admission_deactivated_for_authority_change(
         &self,
     ) -> Result<(), KernelError> {
-        if self.aggregate_invocation_admission_enabled || self.supplemental_broker_admission_enabled
+        if self.aggregate_invocation_admission_enabled
+            || self.supplemental_broker_admission_enabled
+            || self.partition_escrow_registry.is_some()
         {
             return Err(KernelError::Internal(
                 "aggregate and supplemental admission must be deactivated before authority replacement"

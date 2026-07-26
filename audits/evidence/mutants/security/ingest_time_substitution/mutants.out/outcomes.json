@@ -1,0 +1,115 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.596466083,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.406283833,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib",
+            "correlation::mutation_tests::event_time_window_rejects_reverse_and_expired_sequences",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-quarantine",
+          "file": "crates/security/chio-quarantine/src/correlation.rs",
+          "function": {
+            "function_name": "event_time_is_ordered_and_within",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 1315,
+                "column": 1
+              },
+              "end": {
+                "line": 1323,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 1320,
+              "column": 5
+            },
+            "end": {
+              "line": 1322,
+              "column": 53
+            }
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-quarantine__src__correlation.rs_line_1320_col_5.log",
+      "diff_path": "diff/crates__security__chio-quarantine__src__correlation.rs_line_1320_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 2.1463272079999998,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.933696584,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-quarantine@0.1.0",
+            "--lib",
+            "correlation::mutation_tests::event_time_window_rejects_reverse_and_expired_sequences",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

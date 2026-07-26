@@ -199,8 +199,27 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 "failed to release dropped post-admission monetary invocation"
             );
         }
-        self.kernel
-            .post_dispatch_cleanup_receipt_metadata(base, charge, &cleanup)
+        match self
+            .kernel
+            .post_dispatch_cleanup_receipt_metadata(base.clone(), charge, &cleanup)
+        {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                warn!(
+                    request_id = %self.request.request_id,
+                    reason = %redacted!(&error),
+                    "dropped invocation receipt omitted invalid budget authority lineage"
+                );
+                match base {
+                    Some(serde_json::Value::Object(mut metadata)) => {
+                        metadata.remove("budget_authority");
+                        metadata.remove("budget_denial_authority");
+                        Some(serde_json::Value::Object(metadata))
+                    }
+                    _ => None,
+                }
+            }
+        }
     }
 
     /// Fully unwind a future dropped BEFORE tool-server dispatch. No side
@@ -284,7 +303,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
         if matches!(
             self.budget_mutation,
             PreExecutionBudgetMutation::Invocation { .. }
-                | PreExecutionBudgetMutation::InvocationReservation(_)
         ) {
             if let Err(error) = self
                 .kernel

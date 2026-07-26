@@ -2150,13 +2150,27 @@ PROTOCOL_VECTOR_MODEL_TYPES = (
     ("governed_token_bob", "CapabilityGovernedApprovalToken"),
     ("tool_call_request_singular_approval", "AgentToolCallRequest"),
     ("tool_call_request_list_approval", "AgentToolCallRequest"),
+    ("governed_active_response_intent", "CapabilityGovernedTransactionIntent1"),
+    ("tool_call_request_full_security", "AgentToolCallRequest"),
     ("verified_approval_set", "CapabilityVerifiedApprovalSet"),
     ("admission_request_binding", "TrustControlAdmissionRequestBinding"),
     ("budget_admission_evidence", "TrustControlBudgetInvocationAdmissionEvidence"),
     ("admission_capture_metadata", "TrustControlAdmissionCaptureMetadata"),
+    ("partition_escrow_quota_commitment", "TrustControlPartitionEscrowQuotaCommitment"),
+    ("partition_escrow_allocation_set", "TrustControlPartitionEscrowAllocationSet"),
+    ("partition_escrow_admission_evidence", "TrustControlPartitionEscrowAdmissionEvidence"),
+    ("partition_escrow_receipt_metadata", "TrustControlPartitionEscrowReceiptMetadata"),
+    (
+        "budget_admission_evidence_partition_escrow",
+        "TrustControlBudgetInvocationAdmissionEvidence",
+    ),
+    (
+        "admission_capture_metadata_partition_escrow",
+        "TrustControlAdmissionCaptureMetadata",
+    ),
 )
-if len(PROTOCOL_VECTOR_MODEL_TYPES) != 18:
-    raise SystemExit("regen-types.sh: protocol Go model inventory must contain 18 entries")
+if len(PROTOCOL_VECTOR_MODEL_TYPES) != 26:
+    raise SystemExit("regen-types.sh: protocol Go model inventory must contain 26 entries")
 mapped_protocol_ids = [identifier for identifier, _ in PROTOCOL_VECTOR_MODEL_TYPES]
 if len(set(mapped_protocol_ids)) != len(mapped_protocol_ids):
     raise SystemExit("regen-types.sh: protocol Go model inventory contains duplicate IDs")
@@ -2236,6 +2250,153 @@ for identifier, model_type in PROTOCOL_VECTOR_MODEL_TYPES:
                 "regen-types.sh: strict protocol union decoder is missing for "
                 f"{identifier} ({model_type})"
             )
+
+
+admission_capture_type = "TrustControlAdmissionCaptureMetadata"
+admission_capture_block = generated_struct_block(admission_capture_type)
+admission_capture_field_patterns = (
+    r'^\tGuaranteeLevel\s+TrustControlAdmissionCaptureMetadataGuaranteeLevel\s+`json:"guaranteeLevel"`$',
+    r'^\tLeaderEpoch\s+\*int64\s+`json:"leaderEpoch,omitempty"`$',
+    r'^\tPartitionEscrowEvidence\s+\*TrustControlBudgetInvocationAdmissionEvidencePartitionEscrowEvidence\s+`json:"partitionEscrowEvidence,omitempty"`$',
+)
+for field_pattern in admission_capture_field_patterns:
+    if len(re.findall(field_pattern, admission_capture_block, flags=re.MULTILINE)) != 1:
+        raise SystemExit(
+            "regen-types.sh: admission capture guarantee field contract changed: "
+            f"{field_pattern}"
+        )
+admission_capture_guarantee_constants = (
+    "TrustControlAdmissionCaptureMetadataGuaranteeLevelSingleNodeAtomic",
+    "TrustControlAdmissionCaptureMetadataGuaranteeLevelPartitionEscrowed",
+    "TrustControlAdmissionCaptureMetadataGuaranteeLevelHaLinearizable",
+)
+for guarantee_constant in admission_capture_guarantee_constants:
+    declaration_pattern = (
+        rf"^\t{re.escape(guarantee_constant)}\s+"
+        r"TrustControlAdmissionCaptureMetadataGuaranteeLevel = "
+    )
+    if len(re.findall(declaration_pattern, text, flags=re.MULTILINE)) != 1:
+        raise SystemExit(
+            "regen-types.sh: admission capture guarantee constant is not unique: "
+            f"{guarantee_constant}"
+        )
+
+admission_capture_marshal_signature = (
+    f"func (t {admission_capture_type}) MarshalJSON() ([]byte, error) {{"
+)
+admission_capture_unmarshal_signature = (
+    f"func (t *{admission_capture_type}) UnmarshalJSON(b []byte) error {{"
+)
+if (
+    admission_capture_marshal_signature in text
+    or admission_capture_unmarshal_signature in text
+):
+    raise SystemExit(
+        "regen-types.sh: admission capture JSON codec ownership changed"
+    )
+
+admission_capture_methods = r'''
+
+func validateTrustControlAdmissionCaptureMetadata(
+	value *TrustControlAdmissionCaptureMetadata,
+	leaderEpochPresent bool,
+	partitionEscrowEvidencePresent bool,
+) error {
+	if value == nil {
+		return fmt.Errorf("admission capture metadata is nil")
+	}
+	switch value.GuaranteeLevel {
+	case TrustControlAdmissionCaptureMetadataGuaranteeLevelSingleNodeAtomic:
+		if leaderEpochPresent || partitionEscrowEvidencePresent {
+			return fmt.Errorf(
+				"single_node_atomic admission capture forbids leaderEpoch and partitionEscrowEvidence",
+			)
+		}
+	case TrustControlAdmissionCaptureMetadataGuaranteeLevelPartitionEscrowed:
+		if leaderEpochPresent {
+			return fmt.Errorf("partition_escrowed admission capture forbids leaderEpoch")
+		}
+		if !partitionEscrowEvidencePresent || value.PartitionEscrowEvidence == nil {
+			return fmt.Errorf(
+				"partition_escrowed admission capture requires partitionEscrowEvidence",
+			)
+		}
+	case TrustControlAdmissionCaptureMetadataGuaranteeLevelHaLinearizable:
+		if !leaderEpochPresent || value.LeaderEpoch == nil {
+			return fmt.Errorf("ha_linearizable admission capture requires leaderEpoch")
+		}
+		if partitionEscrowEvidencePresent {
+			return fmt.Errorf(
+				"ha_linearizable admission capture forbids partitionEscrowEvidence",
+			)
+		}
+	default:
+		return fmt.Errorf(
+			"unsupported admission capture guaranteeLevel %q",
+			value.GuaranteeLevel,
+		)
+	}
+	return nil
+}
+
+func (t TrustControlAdmissionCaptureMetadata) MarshalJSON() ([]byte, error) {
+	if err := validateTrustControlAdmissionCaptureMetadata(
+		&t,
+		t.LeaderEpoch != nil,
+		t.PartitionEscrowEvidence != nil,
+	); err != nil {
+		return nil, err
+	}
+	type admissionCaptureMetadataAlias TrustControlAdmissionCaptureMetadata
+	return json.Marshal(admissionCaptureMetadataAlias(t))
+}
+
+func (t *TrustControlAdmissionCaptureMetadata) UnmarshalJSON(b []byte) error {
+	if t == nil {
+		return fmt.Errorf(
+			"cannot decode TrustControlAdmissionCaptureMetadata into a nil receiver",
+		)
+	}
+	if !json.Valid(b) {
+		return fmt.Errorf("invalid TrustControlAdmissionCaptureMetadata JSON")
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(b, &fields); err != nil || fields == nil {
+		return fmt.Errorf("TrustControlAdmissionCaptureMetadata must be a JSON object")
+	}
+	_, leaderEpochPresent := fields["leaderEpoch"]
+	_, partitionEscrowEvidencePresent := fields["partitionEscrowEvidence"]
+	type admissionCaptureMetadataAlias TrustControlAdmissionCaptureMetadata
+	var decoded admissionCaptureMetadataAlias
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&decoded); err != nil {
+		return fmt.Errorf("invalid TrustControlAdmissionCaptureMetadata: %w", err)
+	}
+	candidate := TrustControlAdmissionCaptureMetadata(decoded)
+	if err := validateTrustControlAdmissionCaptureMetadata(
+		&candidate,
+		leaderEpochPresent,
+		partitionEscrowEvidencePresent,
+	); err != nil {
+		return err
+	}
+	*t = candidate
+	return nil
+}
+'''
+replace_once(
+    admission_capture_block,
+    admission_capture_block + admission_capture_methods,
+)
+if (
+    text.count(admission_capture_marshal_signature) != 1
+    or text.count(admission_capture_unmarshal_signature) != 1
+    or text.count("func validateTrustControlAdmissionCaptureMetadata(") != 1
+):
+    raise SystemExit(
+        "regen-types.sh: admission capture guarantee codec is not unique"
+    )
 
 
 replace_once(

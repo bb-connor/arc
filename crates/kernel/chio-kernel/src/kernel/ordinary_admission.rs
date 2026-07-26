@@ -5,10 +5,11 @@ use serde::Serialize;
 
 use super::*;
 use crate::admission_capture_authority::{
-    project_invocation_quota_transitions, validate_invocation_capture_monetary_snapshot,
-    AdmissionCaptureAuthorityProjection, AdmissionCaptureDecision, AdmissionCaptureError,
-    AdmissionCaptureInvocationQuotaProjection, AdmissionCaptureRequest,
-    AdmissionCaptureRequestInput, CombinedAdmissionCaptureReceiptProjection,
+    project_invocation_quota_transitions, project_partition_escrow_commit_evidence,
+    validate_invocation_capture_monetary_snapshot, AdmissionCaptureAuthorityProjection,
+    AdmissionCaptureDecision, AdmissionCaptureError, AdmissionCaptureInvocationQuotaProjection,
+    AdmissionCaptureRequest, AdmissionCaptureRequestInput,
+    CombinedAdmissionCaptureReceiptProjection, PartitionEscrowCommitReceiptProjection,
 };
 use crate::admission_operation::{
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
@@ -19,8 +20,9 @@ use crate::admission_operation::{
 use crate::budget_store::{
     derive_verified_invocation_admission, AuthorizedBudgetHold, BudgetAdmissionOperationBinding,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
-    BudgetCommitMetadata, BudgetGuaranteeLevel, BudgetInvocationReservationState,
-    BudgetReverseHoldRequest,
+    BudgetCommitMetadata, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
+    BudgetInvocationReservationState, BudgetMonetaryHoldState, BudgetMutationKind, BudgetQuotaKey,
+    BudgetReverseHoldRequest, PartitionEscrowCommitEvidence,
 };
 use crate::supplemental_quota::{
     OpaqueSignedSupplementalQuota, SupplementalAdmissionAuthorization,
@@ -32,6 +34,42 @@ const ORDINARY_COORDINATOR_LEASE_EPOCH: u64 = 1;
 const ORDINARY_REQUEST_FINGERPRINT_SCHEMA: &str = "chio.ordinary-request-fingerprint.v1";
 const ORDINARY_REQUEST_FINGERPRINT_DOMAIN: &[u8] = b"chio.ordinary-request-fingerprint.v1\0";
 const MAX_ORDINARY_DESTINATION_IDENTIFIER_BYTES: usize = 512;
+
+pub(super) fn admission_authorization_artifact_digests(
+    evidence: crate::budget_store::BudgetInvocationAdmissionEvidence<'_>,
+) -> Result<Vec<String>, KernelError> {
+    let mut digests = Vec::with_capacity(2);
+    if let Some(digest) = evidence.supplemental_artifact_digest() {
+        digests.push(digest.to_string());
+    }
+    if let Some(escrow) = evidence.partition_escrow_evidence() {
+        digests.push(escrow.digest().map_err(|error| {
+            KernelError::Internal(format!(
+                "partition escrow authorization digest failed: {error}"
+            ))
+        })?);
+    }
+    digests.sort();
+    digests.dedup();
+    Ok(digests)
+}
+
+pub(super) fn authorization_partition_escrow_commit_evidence(
+    request: &BudgetAuthorizeHoldRequest,
+    stage: &str,
+) -> Result<Option<PartitionEscrowCommitEvidence>, KernelError> {
+    request
+        .invocation_admission_evidence()
+        .ok_or_else(|| {
+            KernelError::GuardDenied(format!(
+                "{stage} authorization request omitted verified admission evidence"
+            ))
+        })?
+        .partition_escrow_evidence()
+        .map(PartitionEscrowCommitEvidence::from_admission_evidence)
+        .transpose()
+        .map_err(KernelError::from)
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -152,6 +190,8 @@ pub(super) struct BudgetInvocationCaptureReceiptProjection {
     invocation_quotas: Vec<AdmissionCaptureInvocationQuotaProjection>,
     budget_commit_index: u64,
     guarantee_level: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    partition_escrow_evidence: Option<PartitionEscrowCommitReceiptProjection>,
     authority: AdmissionCaptureAuthorityProjection,
     invocation_state: String,
     monetary_state: String,
@@ -209,6 +249,8 @@ impl BudgetInvocationCaptureReceiptProjection {
                 "budget capture projection requires fenced authority evidence".to_string(),
             )
         })?;
+        let partition_escrow_evidence =
+            project_partition_escrow_commit_evidence(&authorized.metadata, &captured.metadata)?;
         Ok(Self {
             operation_id: operation_id.to_string(),
             hold_id: hold_id.to_string(),
@@ -219,11 +261,36 @@ impl BudgetInvocationCaptureReceiptProjection {
             )?,
             budget_commit_index,
             guarantee_level: captured.metadata.guarantee_level.as_str().to_string(),
+            partition_escrow_evidence,
             authority: AdmissionCaptureAuthorityProjection::from_budget_authority(authority)?,
             invocation_state: captured.invocation_state.as_str().to_string(),
             monetary_state: captured.monetary_state.as_str().to_string(),
         })
     }
+}
+
+pub(super) fn validate_capture_denial_partition_escrow_evidence(
+    authorized: &AuthorizedBudgetHold,
+    denial: &crate::admission_capture_authority::AdmissionCaptureDenial,
+    stage: &str,
+) -> Result<(), KernelError> {
+    let denial_commit = denial.metadata().budget_commit();
+    if denial_commit.authority != authorized.metadata.authority
+        || denial_commit.guarantee_level != authorized.metadata.guarantee_level
+        || denial_commit.budget_profile != authorized.metadata.budget_profile
+        || denial_commit.metering_profile != authorized.metadata.metering_profile
+    {
+        return Err(KernelError::BudgetCaptureRecoveryRequired(format!(
+            "{stage} budget authority did not match authorization"
+        )));
+    }
+    project_partition_escrow_commit_evidence(&authorized.metadata, denial_commit)
+        .map(|_| ())
+        .map_err(|error| {
+            KernelError::BudgetCaptureRecoveryRequired(format!(
+                "{stage} partition escrow evidence did not match authorization: {error}"
+            ))
+        })
 }
 
 pub(crate) struct OrdinaryAdmissionMutation {
@@ -244,6 +311,22 @@ pub(crate) struct OrdinaryAdmissionMutation {
     pub(super) authorization_artifact_digests: Vec<String>,
     pub(super) supplemental: bool,
     pub(super) charge: Option<BudgetChargeResult>,
+}
+
+pub(super) struct BudgetTerminalDecisionExpectation<'a> {
+    pub(super) authorization_metadata: &'a BudgetCommitMetadata,
+    pub(super) expected_event_id: &'a str,
+    pub(super) expected_authority: Option<&'a crate::budget_store::BudgetEventAuthority>,
+    pub(super) expected_capability_id: Option<&'a str>,
+    pub(super) expected_grant_index: usize,
+    pub(super) expected_hold_id: &'a str,
+    pub(super) expected_admission_operation: Option<&'a BudgetAdmissionOperationBinding>,
+    pub(super) expected_mutation_kind: BudgetMutationKind,
+    pub(super) expected_exposure_units: u64,
+    pub(super) expected_realized_spend_units: u64,
+    pub(super) expected_invocation_state: BudgetInvocationReservationState,
+    pub(super) expected_monetary_state: BudgetMonetaryHoldState,
+    pub(super) stage: &'a str,
 }
 
 impl OrdinaryAdmissionMutation {
@@ -277,25 +360,6 @@ impl ChioKernel {
         now: u64,
     ) -> Result<PreExecutionBudgetMutation, KernelError> {
         self.validate_protocol_admission_runtime(cap, request)?;
-        let negotiation = self
-            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
-            .map_err(KernelError::GuardDenied)?;
-        let trusted = self
-            .trusted_issuer_keys_for(cap, now)
-            .map_err(KernelError::GuardDenied)?;
-        let missing_root = |_root_id: &str| Err(AggregateFamilyRootResolutionError::Missing);
-        let resolver: &dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver =
-            match self.aggregate_family_root_resolver.as_deref() {
-                Some(resolver) => resolver,
-                None => &missing_root,
-            };
-        let aggregate = verify_aggregate_invocation_authority(cap, &trusted, &trusted, resolver)
-            .map_err(|error| {
-                KernelError::GuardDenied(format!(
-                    "aggregate invocation authority verification failed: {error}"
-                ))
-            })?;
-
         let capability_digest = crate::threshold_approval::authorization_capability_hash(cap)
             .map_err(|error| KernelError::GuardDenied(error.to_string()))?;
         let arguments_digest =
@@ -376,6 +440,69 @@ impl ChioKernel {
             caller_receipt_metadata,
             &self.config.policy_hash,
         )?;
+        let prepared = AdmissionOperation::prepared(PreparedAdmissionOperation {
+            kind: AdmissionOperationKind::ToolDispatch,
+            coordinator_authority_id: format!("kernel:{}", self.public_key().to_hex()),
+            request_id: request.request_id.clone(),
+            capability_id: cap.id.clone(),
+            authorization_capability_hash: capability_digest.clone(),
+            request_binding_hash: request_binding_hash.clone(),
+            policy_hash: self.config.policy_hash.clone(),
+            broker_attempt_id: supplemental_plan
+                .as_ref()
+                .map(|plan| plan.attempt_id().to_string()),
+            budget_hold_id: Some(hold_id.clone()),
+            approval_set_hash: None,
+            execution_nonce_id: request
+                .execution_nonce
+                .as_ref()
+                .map(|nonce| nonce.nonce_id().to_string()),
+            coordinator_lease_epoch: ORDINARY_COORDINATOR_LEASE_EPOCH,
+        })?;
+        let budget_operation = BudgetAdmissionOperationBinding::new(
+            prepared.operation_id().to_string(),
+            prepared.request_binding_hash().to_string(),
+        )?;
+        let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is unavailable".to_string())
+        })?;
+        let (mut operation, preexisting_operation) =
+            match operation_store.create_prepared(prepared)? {
+                AdmissionOperationCreateOutcome::Created(operation) => (operation, false),
+                AdmissionOperationCreateOutcome::Existing(operation) => (operation, true),
+            };
+        if preexisting_operation {
+            return self.replay_existing_ordinary_protocol_admission(
+                operation_store.as_ref(),
+                operation,
+                cap,
+                grant_index,
+                grant,
+                &hold_id,
+                &authorize_event_id,
+                &reverse_event_id,
+                &capture_event_id,
+                &request_binding_hash,
+            );
+        }
+        let negotiation = self
+            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
+            .map_err(KernelError::GuardDenied)?;
+        let trusted = self
+            .trusted_issuer_keys_for(cap, now)
+            .map_err(KernelError::GuardDenied)?;
+        let missing_root = |_root_id: &str| Err(AggregateFamilyRootResolutionError::Missing);
+        let resolver: &dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver =
+            match self.aggregate_family_root_resolver.as_deref() {
+                Some(resolver) => resolver,
+                None => &missing_root,
+            };
+        let aggregate = verify_aggregate_invocation_authority(cap, &trusted, &trusted, resolver)
+            .map_err(|error| {
+                KernelError::GuardDenied(format!(
+                    "aggregate invocation authority verification failed: {error}"
+                ))
+            })?;
         let supplemental = match supplemental_artifact.as_ref() {
             Some(artifact) => Some(
                 self.verify_supplemental_quota(
@@ -415,7 +542,24 @@ impl ChioKernel {
             supplemental.as_ref(),
             &verified_ancestor_ids,
         )?;
-        let authority = self.local_budget_event_authority();
+        let invocation_admission = match self.partition_escrow_registry.as_ref() {
+            Some(registry) => registry
+                .install_verified_admission(
+                    cap,
+                    grant_index,
+                    aggregate.as_ref(),
+                    supplemental.as_ref(),
+                    invocation_admission,
+                    now,
+                )
+                .map_err(|error| {
+                    KernelError::GuardDenied(format!(
+                        "partition escrow admission verification failed: {error}"
+                    ))
+                })?,
+            None => invocation_admission,
+        };
+        let authority = self.budget_event_authority();
         let cost_units = grant
             .max_cost_per_invocation
             .as_ref()
@@ -438,29 +582,6 @@ impl ChioKernel {
         );
         authorization.install_verified_invocation_admission(invocation_admission)?;
 
-        let prepared = AdmissionOperation::prepared(PreparedAdmissionOperation {
-            kind: AdmissionOperationKind::ToolDispatch,
-            coordinator_authority_id: format!("kernel:{}", self.public_key().to_hex()),
-            request_id: request.request_id.clone(),
-            capability_id: cap.id.clone(),
-            authorization_capability_hash: capability_digest,
-            request_binding_hash: request_binding_hash.clone(),
-            policy_hash: self.config.policy_hash.clone(),
-            broker_attempt_id: supplemental_plan
-                .as_ref()
-                .map(|plan| plan.attempt_id().to_string()),
-            budget_hold_id: Some(hold_id.clone()),
-            approval_set_hash: None,
-            execution_nonce_id: request
-                .execution_nonce
-                .as_ref()
-                .map(|nonce| nonce.nonce_id().to_string()),
-            coordinator_lease_epoch: ORDINARY_COORDINATOR_LEASE_EPOCH,
-        })?;
-        let budget_operation = BudgetAdmissionOperationBinding::new(
-            prepared.operation_id().to_string(),
-            prepared.request_binding_hash().to_string(),
-        )?;
         authorization.admission_operation = Some(budget_operation.clone());
         if self.payment_journal_active()
             && (!caller_reservation || Self::is_governed_mustprepay_request(request))
@@ -501,14 +622,6 @@ impl ChioKernel {
                 });
             }
         }
-        let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
-            KernelError::Internal("durable admission operation store is unavailable".to_string())
-        })?;
-        let (mut operation, preexisting_operation) =
-            match operation_store.create_prepared(prepared)? {
-                AdmissionOperationCreateOutcome::Created(operation) => (operation, false),
-                AdmissionOperationCreateOutcome::Existing(operation) => (operation, true),
-            };
         self.journal_budget_cleanup(
             &operation,
             &authorization,
@@ -617,11 +730,23 @@ impl ChioKernel {
         let supplemental_negotiated_features_digest = admission_evidence
             .supplemental_negotiated_features_digest()
             .map(str::to_string);
+        let authorization_artifact_digests =
+            admission_authorization_artifact_digests(admission_evidence)?;
+        let trusted_partition_escrow_evidence =
+            authorization_partition_escrow_commit_evidence(&authorization, "authorization")?;
         let decision = match self.with_budget_store(|store| {
-            store
+            let decision = store
                 .authorize_budget_hold(authorization.clone())
-                .or_else(|_| store.authorize_budget_hold(authorization))
-                .map_err(KernelError::from)
+                .or_else(|_| store.authorize_budget_hold(authorization.clone()))
+                .map_err(KernelError::from)?;
+            let validation = self.validate_budget_authorization_decision_for_store(
+                store,
+                &authorization,
+                &decision,
+                &authorization_artifact_digests,
+                "authorization",
+            );
+            Ok((decision, validation))
         }) {
             Ok(decision) => decision,
             Err(error)
@@ -644,7 +769,8 @@ impl ChioKernel {
             }
             Err(error) => return Err(error),
         };
-        let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
+        let (decision, authorization_validation) = decision;
+        let BudgetAuthorizeHoldDecision::Authorized(mut authorized) = decision else {
             if self
                 .claim_pre_dispatch_compensation(
                     operation.operation_id(),
@@ -656,8 +782,15 @@ impl ChioKernel {
                     let _ = registrar.release_admission(operation.operation_id());
                 }
             }
+            if authorization_validation.is_err() {
+                return Err(KernelError::GuardDenied(
+                    "budget authorization denial lacks exact hard-budget authority evidence"
+                        .to_string(),
+                ));
+            }
             return Err(KernelError::BudgetExhausted(cap.id.clone()));
         };
+        authorized.metadata.partition_escrow_evidence = trusted_partition_escrow_evidence;
         let charge = self.ordinary_budget_charge(
             grant_index,
             grant,
@@ -681,7 +814,6 @@ impl ChioKernel {
                 )?;
             }
         }
-        let authorization_artifact_digests = supplemental_digest.into_iter().collect();
         let mutation = OrdinaryAdmissionMutation {
             preexisting_operation,
             operation_id: operation.operation_id().to_string(),
@@ -701,13 +833,7 @@ impl ChioKernel {
             supplemental: supplemental_plan.is_some(),
             charge,
         };
-        if let Err(error) = self.validate_hard_budget_commit_metadata(
-            &mutation.authorized.metadata,
-            &authorize_event_id,
-            Some(&authority),
-            None,
-            "authorization",
-        ) {
+        if let Err(error) = authorization_validation {
             // Choose cleanup authority from the trusted store topology, never
             // from metadata the authority just returned. A single-node store
             // must reverse with the request authority even when the returned
@@ -724,6 +850,169 @@ impl ChioKernel {
             )?;
             return Err(error);
         }
+        if matches!(
+            operation.state(),
+            AdmissionOperationState::Prepared | AdmissionOperationState::BrokerAttemptRegistered
+        ) {
+            let _ = self.ordinary_admission_transition(
+                &operation,
+                AdmissionOperationState::BudgetAuthorized,
+                AdmissionDispatchState::NotStarted,
+                None,
+            )?;
+        }
+        Ok(PreExecutionBudgetMutation::Admission(Box::new(mutation)))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn replay_existing_ordinary_protocol_admission(
+        &self,
+        operation_store: &dyn crate::admission_operation::AdmissionOperationStore,
+        mut operation: AdmissionOperation,
+        cap: &CapabilityToken,
+        expected_grant_index: usize,
+        grant: &ToolGrant,
+        expected_hold_id: &str,
+        expected_authorize_event_id: &str,
+        expected_reverse_event_id: &str,
+        expected_capture_event_id: &str,
+        expected_request_binding_hash: &str,
+    ) -> Result<PreExecutionBudgetMutation, KernelError> {
+        if matches!(
+            operation.state(),
+            AdmissionOperationState::CompensationPending
+                | AdmissionOperationState::CompensatedBeforeDispatch
+        ) {
+            if !self.recover_compensated_admission_operation(operation.operation_id())? {
+                return Err(KernelError::Internal(format!(
+                    "ordinary admission operation {} has cleanup owned by another worker",
+                    operation.operation_id()
+                )));
+            }
+            operation = operation_store
+                .load(operation.operation_id())?
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "ordinary admission disappeared after compensation recovery".to_string(),
+                    )
+                })?;
+        }
+        if !matches!(
+            operation.state(),
+            AdmissionOperationState::Prepared
+                | AdmissionOperationState::BrokerAttemptRegistered
+                | AdmissionOperationState::BudgetAuthorized
+                | AdmissionOperationState::ReadyToDispatch
+                | AdmissionOperationState::CapturePending
+        ) {
+            return Err(KernelError::GuardDenied(format!(
+                "admission operation {} cannot replay authorization from {}",
+                operation.operation_id(),
+                operation.state().as_str()
+            )));
+        }
+        let snapshot = self.load_recovery_budget_snapshot(operation_store, &operation)?;
+        if snapshot.hold_id() != expected_hold_id
+            || snapshot.reverse_event_id() != expected_reverse_event_id
+            || snapshot.capture_event_id() != expected_capture_event_id
+            || snapshot.request_binding_hash() != expected_request_binding_hash
+        {
+            return Err(KernelError::GuardDenied(
+                "existing admission changed its frozen budget participant binding".to_string(),
+            ));
+        }
+        let authorization = snapshot.authorization_request()?;
+        let expected_admission_operation = BudgetAdmissionOperationBinding::new(
+            operation.operation_id().to_string(),
+            operation.request_binding_hash().to_string(),
+        )?;
+        if authorization.capability_id != cap.id
+            || authorization.grant_index != expected_grant_index
+            || authorization.event_id.as_deref() != Some(expected_authorize_event_id)
+            || authorization.hold_id.as_deref() != Some(expected_hold_id)
+            || authorization.admission_operation.as_ref() != Some(&expected_admission_operation)
+        {
+            return Err(KernelError::GuardDenied(
+                "existing admission changed its frozen budget authorization".to_string(),
+            ));
+        }
+        let admission_evidence =
+            authorization
+                .invocation_admission_evidence()
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "existing budget authorization omitted frozen admission evidence"
+                            .to_string(),
+                    )
+                })?;
+        let aggregate_root_capability_id = admission_evidence
+            .aggregate_root_capability_id()
+            .map(str::to_string);
+        let aggregate_binding_digest = admission_evidence
+            .aggregate_binding_digest()
+            .map(str::to_string);
+        let supplemental_verifier_id = admission_evidence
+            .supplemental_verifier_id()
+            .map(str::to_string);
+        let supplemental_request_binding_hash = admission_evidence
+            .supplemental_request_binding_hash()
+            .map(str::to_string);
+        let supplemental_negotiated_features_digest = admission_evidence
+            .supplemental_negotiated_features_digest()
+            .map(str::to_string);
+        let supplemental = admission_evidence.supplemental_artifact_digest().is_some();
+        let authorization_artifact_digests = snapshot.authorization_artifact_digests();
+        let decision = self.with_budget_store(|store| {
+            let decision = store
+                .replay_budget_authorization(authorization.clone())
+                .map_err(KernelError::from)?;
+            let validation = self.validate_budget_authorization_decision_for_store(
+                store,
+                &authorization,
+                &decision,
+                &authorization_artifact_digests,
+                "authorization replay",
+            );
+            Ok((decision, validation))
+        })?;
+        let (decision, authorization_validation) = decision;
+        let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
+            if authorization_validation.is_err() {
+                return Err(KernelError::GuardDenied(
+                    "budget authorization denial lacks exact hard-budget authority evidence"
+                        .to_string(),
+                ));
+            }
+            return Err(KernelError::BudgetExhausted(cap.id.clone()));
+        };
+        let admission_operation = expected_admission_operation;
+        let charge = self.ordinary_budget_charge(
+            authorization.grant_index,
+            grant,
+            expected_hold_id,
+            &authorized,
+            admission_operation.clone(),
+        );
+        let mutation = OrdinaryAdmissionMutation {
+            preexisting_operation: true,
+            operation_id: operation.operation_id().to_string(),
+            admission_operation,
+            grant_index: authorization.grant_index,
+            hold_id: expected_hold_id.to_string(),
+            reverse_event_id: expected_reverse_event_id.to_string(),
+            capture_event_id: expected_capture_event_id.to_string(),
+            request_binding_hash: expected_request_binding_hash.to_string(),
+            aggregate_root_capability_id,
+            aggregate_binding_digest,
+            supplemental_verifier_id,
+            supplemental_request_binding_hash,
+            supplemental_negotiated_features_digest,
+            authorized,
+            authorization_artifact_digests,
+            supplemental,
+            charge,
+        };
+        authorization_validation?;
         if matches!(
             operation.state(),
             AdmissionOperationState::Prepared | AdmissionOperationState::BrokerAttemptRegistered
@@ -941,807 +1230,9 @@ impl ChioKernel {
         domain_separated.extend_from_slice(&canonical);
         Ok(sha256_hex(&domain_separated))
     }
-
-    pub(super) fn ordinary_budget_charge(
-        &self,
-        grant_index: usize,
-        grant: &ToolGrant,
-        hold_id: &str,
-        authorized: &AuthorizedBudgetHold,
-        admission_operation: BudgetAdmissionOperationBinding,
-    ) -> Option<BudgetChargeResult> {
-        let (cost_charged, currency) = self.ordinary_payment_charge_terms(grant)?;
-        Some(BudgetChargeResult {
-            grant_index,
-            cost_charged,
-            currency,
-            budget_total: grant
-                .max_total_cost
-                .as_ref()
-                .map_or(u64::MAX, |amount| amount.units),
-            new_committed_cost_units: authorized.committed_cost_units_after,
-            budget_hold_id: hold_id.to_string(),
-            authorize_metadata: authorized.metadata.clone(),
-            admission_operation: Some(admission_operation),
-        })
-    }
-
-    pub(super) fn ordinary_payment_charge_terms(&self, grant: &ToolGrant) -> Option<(u64, String)> {
-        let has_monetary =
-            grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
-        has_monetary.then(|| {
-            (
-                grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .map_or(0, |amount| amount.units),
-                grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .map(|amount| amount.currency.clone())
-                    .or_else(|| {
-                        grant
-                            .max_total_cost
-                            .as_ref()
-                            .map(|amount| amount.currency.clone())
-                    })
-                    .unwrap_or_else(|| "USD".to_string()),
-            )
-        })
-    }
-
-    pub(super) fn commit_ordinary_protocol_dispatch(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-    ) -> Result<serde_json::Value, KernelError> {
-        match self.commit_protocol_capture(
-            cap,
-            mutation,
-            OrdinaryProtocolCaptureMode::InlineDispatch,
-        )? {
-            OrdinaryProtocolCaptureOutcome::DispatchMetadata(metadata) => Ok(metadata),
-            OrdinaryProtocolCaptureOutcome::CallerReservation(_) => Err(KernelError::Internal(
-                "ordinary dispatch returned a caller reservation capture".to_string(),
-            )),
-        }
-    }
-
-    pub(super) fn commit_threshold_protocol_dispatch(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-    ) -> Result<serde_json::Value, KernelError> {
-        match self.commit_protocol_capture(
-            cap,
-            mutation,
-            OrdinaryProtocolCaptureMode::ThresholdDispatch,
-        )? {
-            OrdinaryProtocolCaptureOutcome::DispatchMetadata(metadata) => Ok(metadata),
-            OrdinaryProtocolCaptureOutcome::CallerReservation(_) => Err(KernelError::Internal(
-                "threshold dispatch returned a caller reservation capture".to_string(),
-            )),
-        }
-    }
-
-    /// Capture an operation-owned composite admission for a caller-mediated
-    /// execution. The caller must keep the exact hold stamped and the signed
-    /// execution nonce private until this returns: `CallerReserved` is the
-    /// durable handoff boundary after which startup recovery may not compensate
-    /// the captured invocation reservations.
-    pub(super) fn commit_ordinary_protocol_caller_reservation(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-    ) -> Result<CallerReservationCaptureOutcome, KernelError> {
-        match self.commit_protocol_capture(
-            cap,
-            mutation,
-            OrdinaryProtocolCaptureMode::CallerReservationOrdinary,
-        )? {
-            OrdinaryProtocolCaptureOutcome::CallerReservation(capture) => Ok(capture),
-            OrdinaryProtocolCaptureOutcome::DispatchMetadata(_) => Err(KernelError::Internal(
-                "ordinary caller reservation returned dispatch metadata".to_string(),
-            )),
-        }
-    }
-
-    pub(super) fn commit_threshold_protocol_caller_reservation(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-    ) -> Result<CallerReservationCaptureOutcome, KernelError> {
-        match self.commit_protocol_capture(
-            cap,
-            mutation,
-            OrdinaryProtocolCaptureMode::CallerReservationThreshold,
-        )? {
-            OrdinaryProtocolCaptureOutcome::CallerReservation(capture) => Ok(capture),
-            OrdinaryProtocolCaptureOutcome::DispatchMetadata(_) => Err(KernelError::Internal(
-                "threshold caller reservation returned dispatch metadata".to_string(),
-            )),
-        }
-    }
-
-    fn commit_protocol_capture(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-        mode: OrdinaryProtocolCaptureMode,
-    ) -> Result<OrdinaryProtocolCaptureOutcome, KernelError> {
-        let mut operation = self.load_ordinary_admission(mutation.operation_id())?;
-        if operation.state() == AdmissionOperationState::BudgetAuthorized {
-            operation = self.ordinary_admission_transition(
-                &operation,
-                AdmissionOperationState::ReadyToDispatch,
-                AdmissionDispatchState::NotStarted,
-                None,
-            )?;
-        }
-        if operation.state() == AdmissionOperationState::ReadyToDispatch {
-            if mutation.supplemental && mode.prepares_supplemental_dispatch() {
-                let registrar =
-                    self.supplemental_admission_registrar
-                        .as_ref()
-                        .ok_or_else(|| {
-                            KernelError::Internal(
-                                "supplemental admission registrar disappeared before dispatch"
-                                    .to_string(),
-                            )
-                        })?;
-                if let Err(error) = registrar.prepare_dispatch(operation.operation_id()) {
-                    self.reverse_ordinary_protocol_admission(cap, mutation)?;
-                    return Err(KernelError::GuardDenied(error.to_string()));
-                }
-            }
-            operation = self.ordinary_admission_transition(
-                &operation,
-                mode.pending_state(),
-                AdmissionDispatchState::NotStarted,
-                None,
-            )?;
-        }
-        if operation.state() != mode.pending_state() {
-            return Err(KernelError::GuardDenied(format!(
-                "admission operation {} cannot capture from {}",
-                operation.operation_id(),
-                operation.state().as_str()
-            )));
-        }
-        if matches!(
-            mode,
-            OrdinaryProtocolCaptureMode::CallerReservationOrdinary
-                | OrdinaryProtocolCaptureMode::CallerReservationThreshold
-        ) && operation.approval_set_hash().is_some()
-        {
-            if let Err(error) = self.commit_threshold_approval(operation.operation_id()) {
-                self.reverse_ordinary_protocol_admission_from_capture_pending(
-                    cap,
-                    mutation,
-                    &error.to_string(),
-                )?;
-                return Err(error);
-            }
-            self.discharge_admission_cleanup_action(
-                &operation,
-                crate::admission_operation::AdmissionCleanupActionKind::Approval,
-            )?;
-        }
-        if mode.commits_presented_replay_reservations() {
-            let replay_commit = self
-                .commit_admission_execution_nonce(&operation)
-                .and_then(|()| {
-                    if operation.execution_nonce_id().is_some() {
-                        self.discharge_admission_cleanup_action(
-                            &operation,
-                            crate::admission_operation::AdmissionCleanupActionKind::ExecutionNonce,
-                        )?;
-                    }
-                    Ok(())
-                });
-            if let Err(error) = replay_commit {
-                self.reverse_ordinary_protocol_admission_from_capture_pending(
-                    cap,
-                    mutation,
-                    &error.to_string(),
-                )?;
-                return Err(error);
-            }
-        }
-        let capture_request = BudgetCaptureInvocationRequest {
-            capability_id: cap.id.clone(),
-            grant_index: mutation.grant_index,
-            hold_id: Some(mutation.hold_id.clone()),
-            event_id: Some(mutation.capture_event_id.clone()),
-            authority: mutation.authorized.metadata.authority.clone(),
-            admission_operation: Some(BudgetAdmissionOperationBinding::new(
-                mutation.operation_id.clone(),
-                mutation.request_binding_hash.clone(),
-            )?),
-        };
-        let capture_metadata = if mutation.supplemental {
-            let revocation_set = mutation.authorized.revocation_set.clone().ok_or_else(|| {
-                KernelError::Internal("supplemental hold omitted its revocation set".to_string())
-            })?;
-            let request = AdmissionCaptureRequest::new(AdmissionCaptureRequestInput {
-                operation_id: operation.operation_id().to_string(),
-                budget: capture_request,
-                revocation_set: revocation_set.clone(),
-                bound_revocation_set_digest: revocation_set.digest().to_string(),
-                authorization_artifact_digests: mutation.authorization_artifact_digests.clone(),
-                aggregate_root_capability_id: mutation.aggregate_root_capability_id.clone(),
-                aggregate_root_binding_digest: mutation.aggregate_binding_digest.clone(),
-                last_observed_revocation_index: None,
-            })?;
-            let authority = self.admission_capture_authority.as_ref().ok_or_else(|| {
-                KernelError::Internal("admission capture authority is unavailable".to_string())
-            })?;
-            let decision = authority
-                .query_admission_capture(&request)
-                .and_then(|existing| match existing {
-                    Some(decision) => Ok(decision),
-                    None => authority.capture_admission(request.clone()),
-                })
-                .map_err(|error| KernelError::BudgetCaptureRecoveryRequired(error.to_string()))?;
-            match decision {
-                AdmissionCaptureDecision::Captured { budget, metadata } => {
-                    if budget.invocation_state != BudgetInvocationReservationState::Captured {
-                        return Err(KernelError::BudgetCaptureRecoveryRequired(
-                            "combined authority did not capture invocation reservations"
-                                .to_string(),
-                        ));
-                    }
-                    if let Err(error) = self.validate_hard_budget_commit_metadata(
-                        &budget.metadata,
-                        &mutation.capture_event_id,
-                        mutation.authorized.metadata.authority.as_ref(),
-                        mutation.authorized.metadata.budget_commit_index,
-                        "combined capture",
-                    ) {
-                        // Captured reservations cannot be reversed truthfully.
-                        // Leave the durable operation in its capture-pending
-                        // state so an exact retry can re-query and validate
-                        // without a second effect.
-                        return Err(KernelError::BudgetCaptureRecoveryRequired(
-                            error.to_string(),
-                        ));
-                    }
-                    if metadata.checked_revocation_set_digest() != revocation_set.digest()
-                        || metadata.aggregate_root_capability_id()
-                            != mutation.aggregate_root_capability_id.as_deref()
-                        || metadata.aggregate_root_binding_digest()
-                            != mutation.aggregate_binding_digest.as_deref()
-                    {
-                        return Err(KernelError::BudgetCaptureRecoveryRequired(
-                            "combined capture metadata does not match the verified admission evidence"
-                                .to_string(),
-                        ));
-                    }
-                    let projection = CombinedAdmissionCaptureReceiptProjection::from_capture(
-                        &request,
-                        &mutation.authorized,
-                        &budget,
-                        &metadata,
-                    )?;
-                    serde_json::to_value(projection).map_err(|error| {
-                        KernelError::Internal(format!(
-                            "authoritative admission capture projection serialization failed: {error}"
-                        ))
-                    })?
-                }
-                AdmissionCaptureDecision::Denied(denial) => {
-                    self.reverse_ordinary_protocol_admission_from_capture_pending(
-                        cap,
-                        mutation,
-                        "capture authority definitively denied admission",
-                    )?;
-                    return Err(KernelError::CapabilityRevoked(
-                        denial.revoked_ids().join(","),
-                    ));
-                }
-            }
-        } else {
-            let captured = self
-                .with_budget_store(|store| {
-                    store
-                        .capture_invocation_reservations(capture_request.clone())
-                        .or_else(|_| store.capture_invocation_reservations(capture_request))
-                        .map_err(KernelError::from)
-                })
-                .map_err(|error| KernelError::BudgetCaptureRecoveryRequired(error.to_string()))?;
-            if captured.invocation_state != BudgetInvocationReservationState::Captured {
-                return Err(KernelError::BudgetCaptureRecoveryRequired(
-                    "budget authority did not capture invocation reservations".to_string(),
-                ));
-            }
-            if let Err(error) = self.validate_hard_budget_commit_metadata(
-                &captured.metadata,
-                &mutation.capture_event_id,
-                mutation.authorized.metadata.authority.as_ref(),
-                mutation.authorized.metadata.budget_commit_index,
-                "capture",
-            ) {
-                // Captured reservations cannot be reversed truthfully. Keep
-                // the mode-specific pending state for idempotent authority
-                // recovery.
-                return Err(KernelError::BudgetCaptureRecoveryRequired(
-                    error.to_string(),
-                ));
-            }
-            let projection = BudgetInvocationCaptureReceiptProjection::from_capture(
-                operation.operation_id(),
-                &mutation.authorized,
-                &captured,
-            )?;
-            serde_json::to_value(projection).map_err(|error| {
-                KernelError::Internal(format!(
-                    "budget invocation capture projection serialization failed: {error}"
-                ))
-            })?
-        };
-        match mode {
-            OrdinaryProtocolCaptureMode::InlineDispatch => {
-                operation = self.commit_tool_dispatch_once(&operation)?.ok_or_else(|| {
-                    KernelError::GovernedTransactionDenied(format!(
-                        "{} admission operation {} was committed by another coordinator",
-                        mode.label(),
-                        operation.operation_id()
-                    ))
-                })?;
-            }
-            OrdinaryProtocolCaptureMode::ThresholdDispatch => {}
-            OrdinaryProtocolCaptureMode::CallerReservationOrdinary
-            | OrdinaryProtocolCaptureMode::CallerReservationThreshold => {
-                let reserved = operation.transition_checked(
-                    AdmissionOperationState::CallerReserved,
-                    AdmissionDispatchState::Committed,
-                    operation.coordinator_lease_epoch(),
-                    None,
-                )?;
-                return Ok(OrdinaryProtocolCaptureOutcome::CallerReservation(
-                    CallerReservationCaptureOutcome {
-                        current: operation,
-                        reserved,
-                        capture_metadata,
-                    },
-                ));
-            }
-        }
-        Ok(OrdinaryProtocolCaptureOutcome::DispatchMetadata(
-            self.ordinary_admission_receipt_metadata(mutation, &operation, capture_metadata),
-        ))
-    }
-
-    pub(super) fn bind_threshold_dispatch_receipt_operation(
-        &self,
-        mutation: &OrdinaryAdmissionMutation,
-        operation: &AdmissionOperation,
-        capture_receipt: &serde_json::Value,
-    ) -> Result<serde_json::Value, KernelError> {
-        let capture = capture_receipt
-            .pointer("/protocol_admission/invocation_capture")
-            .cloned()
-            .ok_or_else(|| {
-                KernelError::Internal(
-                    "threshold capture receipt omitted invocation metadata".to_string(),
-                )
-            })?;
-        Ok(self.ordinary_admission_receipt_metadata(mutation, operation, capture))
-    }
-
-    pub(crate) fn reverse_ordinary_protocol_admission(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, KernelError> {
-        self.reverse_ordinary_protocol_admission_inner(cap, mutation, None, None)
-    }
-
-    pub(super) fn reverse_ordinary_protocol_admission_with_authority(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-        cleanup_authority: Option<&crate::budget_store::BudgetEventAuthority>,
-    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, KernelError> {
-        self.reverse_ordinary_protocol_admission_inner(cap, mutation, cleanup_authority, None)
-    }
-
-    pub(super) fn reverse_ordinary_protocol_admission_from_capture_pending(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-        reason: &str,
-    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, KernelError> {
-        self.reverse_ordinary_protocol_admission_inner(cap, mutation, None, Some(reason))
-    }
-
-    fn reverse_ordinary_protocol_admission_inner(
-        &self,
-        cap: &CapabilityToken,
-        mutation: &OrdinaryAdmissionMutation,
-        cleanup_authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        capture_pending_compensation_reason: Option<&str>,
-    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, KernelError> {
-        let claim = if let Some(reason) = capture_pending_compensation_reason {
-            self.claim_capture_pending_compensation(mutation.operation_id(), reason)
-        } else {
-            self.claim_pre_dispatch_compensation(
-                mutation.operation_id(),
-                "pre-dispatch admission reversed",
-            )
-        }?;
-        let operation = claim.ok_or_else(|| {
-            KernelError::GovernedTransactionDenied(format!(
-                "admission operation {} cannot reverse after capture began or dispatch committed",
-                mutation.operation_id()
-            ))
-        })?;
-        let reversed = self.with_budget_store(|store| {
-            let request = BudgetReverseHoldRequest {
-                capability_id: cap.id.clone(),
-                grant_index: mutation.grant_index,
-                reversed_exposure_units: mutation
-                    .charge_result()
-                    .map_or(0, |charge| charge.cost_charged),
-                hold_id: Some(mutation.hold_id.clone()),
-                event_id: Some(mutation.reverse_event_id.clone()),
-                authority: cleanup_authority
-                    .cloned()
-                    .or_else(|| mutation.authorized.metadata.authority.clone()),
-                admission_operation: Some(BudgetAdmissionOperationBinding::new(
-                    mutation.operation_id.clone(),
-                    mutation.request_binding_hash.clone(),
-                )?),
-            };
-            store
-                .reverse_budget_hold(request.clone())
-                .or_else(|_| store.reverse_budget_hold(request))
-                .map_err(KernelError::from)
-        })?;
-        if operation.approval_set_hash().is_some() {
-            self.cancel_threshold_approval_if_reserved(operation.operation_id())?;
-        }
-        if operation.execution_nonce_id().is_some() {
-            self.cancel_admission_nonce_if_reserved(operation.operation_id())?;
-        }
-        if mutation.supplemental {
-            if let Some(registrar) = self.supplemental_admission_registrar.as_ref() {
-                registrar
-                    .release_admission(mutation.operation_id())
-                    .map_err(|error| KernelError::Internal(error.to_string()))?;
-            }
-        }
-        Ok(reversed)
-    }
-
-    pub(super) fn ordinary_admission_receipt_metadata(
-        &self,
-        mutation: &OrdinaryAdmissionMutation,
-        operation: &AdmissionOperation,
-        capture: serde_json::Value,
-    ) -> serde_json::Value {
-        let quotas: Vec<serde_json::Value> = mutation
-            .authorized
-            .invocation_counts_after
-            .iter()
-            .map(|usage| {
-                serde_json::json!({
-                    "profile": usage.quota.key().profile().as_str(),
-                    "owner_id": usage.quota.key().owner_id(),
-                    "grant_index": usage.quota.key().grant_index(),
-                    "max_invocations": usage.quota.max_invocations(),
-                    "reserved_invocations_after": usage.reserved_invocations_after,
-                    "captured_invocations_after": usage.captured_invocations_after,
-                })
-            })
-            .collect();
-        serde_json::json!({
-            "protocol_admission": {
-                "hold_id": mutation.hold_id,
-                "request_binding_hash": mutation.request_binding_hash,
-                "guarantee_level": mutation.authorized.metadata.guarantee_level.as_str(),
-                "authority_profile": mutation.authorized.metadata.budget_profile.as_str(),
-                "metering_profile": mutation.authorized.metadata.metering_profile.as_str(),
-                "aggregate_family_preservation": mutation
-                    .aggregate_binding_digest
-                    .as_ref()
-                    .zip(mutation.aggregate_root_capability_id.as_ref())
-                    .map(|(root_binding_digest, root_capability_id)| serde_json::json!({
-                        "root_capability_id": root_capability_id,
-                        "root_binding_digest": root_binding_digest,
-                    })),
-                "supplemental_verifier_id": mutation.supplemental_verifier_id,
-                "supplemental_request_binding_hash": mutation
-                    .supplemental_request_binding_hash,
-                "supplemental_negotiated_features_digest": mutation
-                    .supplemental_negotiated_features_digest,
-                "authorize": {
-                    "event_id": mutation.authorized.metadata.event_id,
-                    "budget_commit_index": mutation.authorized.metadata.budget_commit_index,
-                    "invocation_state": mutation.authorized.invocation_state.as_str(),
-                    "monetary_state": mutation.authorized.monetary_state.as_str(),
-                    "invocation_quotas": quotas,
-                    "revocation_set_digest": mutation
-                        .authorized
-                        .revocation_set
-                        .as_ref()
-                        .map(crate::supplemental_quota::CanonicalRevocationSet::digest),
-                    "authorization_artifact_digests": mutation.authorization_artifact_digests,
-                },
-                "invocation_capture": capture,
-                "admission_operation": {
-                    "operation_id": operation.operation_id(),
-                    "state": operation.state().as_str(),
-                    "dispatch_state": operation.dispatch_state().as_str(),
-                    "version": operation.version(),
-                }
-            }
-        })
-    }
-
-    pub(super) fn ordinary_admission_operation_metadata(
-        &self,
-        operation: &AdmissionOperation,
-    ) -> serde_json::Value {
-        serde_json::json!({
-            "protocol_admission": {
-                "admission_operation": {
-                    "operation_id": operation.operation_id(),
-                    "state": operation.state().as_str(),
-                    "dispatch_state": operation.dispatch_state().as_str(),
-                    "version": operation.version(),
-                    "last_error": operation.last_error(),
-                }
-            }
-        })
-    }
-
-    pub(super) fn validate_hard_budget_commit_metadata(
-        &self,
-        metadata: &BudgetCommitMetadata,
-        expected_event_id: &str,
-        expected_authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        prior_commit_index: Option<u64>,
-        stage: &str,
-    ) -> Result<(), KernelError> {
-        self.with_budget_store(|store| {
-            self.validate_hard_budget_commit_metadata_for_store(
-                store,
-                metadata,
-                expected_event_id,
-                expected_authority,
-                prior_commit_index,
-                stage,
-            )
-        })
-    }
-
-    pub(super) fn validate_hard_budget_commit_metadata_for_store(
-        &self,
-        store: &dyn crate::budget_store::BudgetStore,
-        metadata: &BudgetCommitMetadata,
-        expected_event_id: &str,
-        expected_authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        prior_commit_index: Option<u64>,
-        stage: &str,
-    ) -> Result<(), KernelError> {
-        let store_profile = store.authority_profile();
-        let configured_guarantee = store.budget_guarantee_level();
-        let configured_authority_profile = store.budget_authority_profile();
-        let configured_metering_profile = store.budget_metering_profile();
-        let authority_is_valid = match metadata.guarantee_level {
-            BudgetGuaranteeLevel::SingleNodeAtomic => {
-                metadata.authority.as_ref() == expected_authority
-            }
-            BudgetGuaranteeLevel::HaLinearizable => {
-                metadata.authority.as_ref().is_some_and(|authority| {
-                    !authority.authority_id.is_empty()
-                        && !authority.lease_id.is_empty()
-                        && authority.lease_epoch > 0
-                        && (prior_commit_index.is_none()
-                            || metadata.authority.as_ref() == expected_authority)
-                })
-            }
-            BudgetGuaranteeLevel::PartitionEscrowed | BudgetGuaranteeLevel::AdvisoryPosthoc => {
-                false
-            }
-        };
-        if metadata.guarantee_level != configured_guarantee
-            || metadata.budget_profile != configured_authority_profile
-            || metadata.metering_profile != configured_metering_profile
-            || !metadata
-                .guarantee_level
-                .supports_hard_invocation_limit(store_profile, self.dispatch_worker_count)
-            || metadata.event_id.as_deref() != Some(expected_event_id)
-            || !authority_is_valid
-        {
-            return Err(KernelError::GuardDenied(format!(
-                "{stage} budget commit metadata cannot enforce the configured hard invocation limit"
-            )));
-        }
-        if metadata.authority.is_none()
-            || metadata
-                .budget_commit_index
-                .is_none_or(|commit_index| commit_index == 0)
-        {
-            return Err(KernelError::GuardDenied(format!(
-                "{stage} hard budget commit omitted fenced authority evidence"
-            )));
-        }
-        if let (Some(previous), Some(current)) = (prior_commit_index, metadata.budget_commit_index)
-        {
-            if current <= previous {
-                return Err(KernelError::GuardDenied(format!(
-                    "{stage} budget commit index did not advance"
-                )));
-            }
-        } else if prior_commit_index.is_some() {
-            return Err(KernelError::GuardDenied(format!(
-                "{stage} hard budget commit omitted its monotonic commit index"
-            )));
-        }
-        Ok(())
-    }
-
-    pub(super) fn load_ordinary_admission(
-        &self,
-        operation_id: &str,
-    ) -> Result<AdmissionOperation, KernelError> {
-        self.admission_operation_store
-            .as_ref()
-            .ok_or_else(|| {
-                KernelError::Internal("admission operation store is unavailable".to_string())
-            })?
-            .load(operation_id)?
-            .ok_or_else(|| {
-                KernelError::Internal(format!("admission operation {operation_id} disappeared"))
-            })
-    }
-
-    fn ordinary_admission_transition(
-        &self,
-        operation: &AdmissionOperation,
-        next_state: AdmissionOperationState,
-        next_dispatch_state: AdmissionDispatchState,
-        last_error: Option<String>,
-    ) -> Result<AdmissionOperation, KernelError> {
-        if next_state.is_terminal() {
-            return Err(KernelError::Internal(
-                "terminal ordinary admission transitions require an atomic signed receipt outbox"
-                    .to_string(),
-            ));
-        }
-        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
-            KernelError::Internal("admission operation store is unavailable".to_string())
-        })?;
-        match store.compare_and_swap(AdmissionOperationCompareAndSwap {
-            operation_id: operation.operation_id(),
-            expected_version: operation.version(),
-            coordinator_lease_epoch: operation.coordinator_lease_epoch(),
-            next_state,
-            next_dispatch_state,
-            next_coordinator_lease_epoch: ORDINARY_COORDINATOR_LEASE_EPOCH
-                .max(operation.coordinator_lease_epoch()),
-            last_error,
-        }) {
-            Ok(AdmissionOperationCasOutcome::Applied(next)) => Ok(next),
-            Ok(AdmissionOperationCasOutcome::Conflict(current))
-                if current.state() == next_state =>
-            {
-                Ok(current)
-            }
-            Ok(AdmissionOperationCasOutcome::Conflict(current)) => {
-                Err(KernelError::Internal(format!(
-                    "admission transition conflicted at {}",
-                    current.state().as_str()
-                )))
-            }
-            Ok(AdmissionOperationCasOutcome::Missing) => Err(KernelError::Internal(
-                "admission operation disappeared during transition".to_string(),
-            )),
-            Err(error) => match store.load(operation.operation_id()) {
-                Ok(Some(current)) if current.state() == next_state => Ok(current),
-                _ => Err(KernelError::Internal(format!(
-                    "admission transition acknowledgement is uncertain: {error}"
-                ))),
-            },
-        }
-    }
-
-    /// Win or recover the durable compensation branch before mutating any
-    /// participant. The dispatch CAS and this CAS share the same operation
-    /// version, so exactly one terminal direction can become authoritative.
-    /// A durable compensated record is safe to resume because every downstream
-    /// release is operation-bound and idempotent.
-    pub(super) fn claim_pre_dispatch_compensation(
-        &self,
-        operation_id: &str,
-        reason: &str,
-    ) -> Result<Option<AdmissionOperation>, KernelError> {
-        self.claim_pre_dispatch_compensation_inner(operation_id, reason, false)
-    }
-
-    fn claim_capture_pending_compensation(
-        &self,
-        operation_id: &str,
-        reason: &str,
-    ) -> Result<Option<AdmissionOperation>, KernelError> {
-        self.claim_pre_dispatch_compensation_inner(operation_id, reason, true)
-    }
-
-    fn claim_pre_dispatch_compensation_inner(
-        &self,
-        operation_id: &str,
-        reason: &str,
-        capture_cannot_have_committed: bool,
-    ) -> Result<Option<AdmissionOperation>, KernelError> {
-        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
-            KernelError::Internal("admission operation store is unavailable".to_string())
-        })?;
-        let current = store.load(operation_id)?.ok_or_else(|| {
-            KernelError::Internal(format!("admission operation {operation_id} disappeared"))
-        })?;
-        if matches!(
-            current.state(),
-            AdmissionOperationState::CompensationPending
-                | AdmissionOperationState::CompensatedBeforeDispatch
-        ) {
-            if !self.recover_compensated_admission_operation(current.operation_id())? {
-                return Err(KernelError::Internal(format!(
-                    "admission operation {} has cleanup owned by another recovery worker",
-                    current.operation_id()
-                )));
-            }
-            let terminal = store.load(current.operation_id())?.ok_or_else(|| {
-                KernelError::Internal(
-                    "admission operation disappeared after compensation recovery".to_string(),
-                )
-            })?;
-            return Ok(Some(terminal));
-        }
-        // Both capture-pending states are uncertainty boundaries. A capture
-        // may already be committed while its acknowledgement is in flight, so
-        // generic cleanup cannot claim either one. Only a caller that has not
-        // entered the capture authority yet, or an exact authority-returned
-        // Denied decision, may cross this boundary into compensation.
-        if matches!(
-            current.state(),
-            AdmissionOperationState::CapturePending
-                | AdmissionOperationState::CallerReservationCapturePending
-        ) && !capture_cannot_have_committed
-        {
-            return Ok(None);
-        }
-        if current.dispatch_state() != AdmissionDispatchState::NotStarted
-            || matches!(
-                current.state(),
-                AdmissionOperationState::DispatchCommitted
-                    | AdmissionOperationState::CallerReserved
-                    | AdmissionOperationState::Completed
-                    | AdmissionOperationState::OutcomeUnknownAfterDispatch
-            )
-        {
-            return Ok(None);
-        }
-        let current = self.stage_compensation_pending_with_terminal_receipt(
-            store.as_ref(),
-            &current,
-            reason,
-        )?;
-        if !self.recover_compensated_admission_operation(current.operation_id())? {
-            return Err(KernelError::Internal(format!(
-                "admission operation {} has cleanup owned by another recovery worker",
-                current.operation_id()
-            )));
-        }
-        let terminal = store.load(current.operation_id())?.ok_or_else(|| {
-            KernelError::Internal(
-                "admission operation disappeared after compensation terminalization".to_string(),
-            )
-        })?;
-        Ok(Some(terminal))
-    }
 }
+
+include!("ordinary_admission_tail.inc");
 
 impl From<AdmissionOperationError> for KernelError {
     fn from(error: AdmissionOperationError) -> Self {

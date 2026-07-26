@@ -57,7 +57,9 @@
           "replacement": "false"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/sandbox_env_leak/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/sandbox_env_leak/mutants.out/outcomes.json",
+          "sha256": "888532f3f41a8586005b1331a33331f1aa92f37b30fd4d2ef9d794d5582a8a72",
+          "inputs_sha256": "ff6606dc7325f3af13cd47dbc0f52d5f9ade6513efaf5ce2a4b92afc02b8c467"
         }
       }
     ]

@@ -429,16 +429,30 @@ pub(crate) fn load_revocation_store_ids(
 /// authorized and captured before the reserve-for-caller path mints a nonce.
 /// When `None` the kernel carries no adapter, so the governed prepayment gate
 /// denies `MustPrepay` fail-closed: only a configured adapter enables it.
+pub(crate) struct MediationKernelInputs<'a> {
+    pub(crate) signer: &'a Keypair,
+    pub(crate) budget_store: Arc<dyn BudgetStore>,
+    pub(crate) receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>>,
+    pub(crate) revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
+    pub(crate) trusted_capability_issuers: &'a [PublicKey],
+    pub(crate) tool_servers: Vec<Box<dyn ToolServerConnection>>,
+    pub(crate) payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    pub(crate) admission_authorities: Option<MediationAdmissionAuthorities>,
+}
+
 pub(crate) fn build_mediation_kernel(
-    signer: &Keypair,
-    budget_store: Arc<dyn BudgetStore>,
-    receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>>,
-    revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
-    trusted_capability_issuers: &[PublicKey],
-    tool_servers: Vec<Box<dyn ToolServerConnection>>,
-    payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
-    admission_authorities: Option<MediationAdmissionAuthorities>,
+    inputs: MediationKernelInputs<'_>,
 ) -> Result<ChioKernel, ProtectError> {
+    let MediationKernelInputs {
+        signer,
+        budget_store,
+        receipt_store,
+        revocation_store,
+        trusted_capability_issuers,
+        tool_servers,
+        payment_adapter,
+        admission_authorities,
+    } = inputs;
     let mut ca_public_keys = vec![signer.public_key()];
     for issuer in trusted_capability_issuers {
         if !ca_public_keys.contains(issuer) {
@@ -1139,16 +1153,16 @@ mod tests {
         trusted_capability_issuers: &[PublicKey],
     ) -> Arc<ChioKernel> {
         Arc::new(
-            build_mediation_kernel(
+            build_mediation_kernel(MediationKernelInputs {
                 signer,
-                budget,
-                None,
-                None,
+                budget_store: budget,
+                receipt_store: None,
+                revocation_store: None,
                 trusted_capability_issuers,
-                Vec::new(),
-                None,
-                None,
-            )
+                tool_servers: Vec::new(),
+                payment_adapter: None,
+                admission_authorities: None,
+            })
             .test_unwrap(),
         )
     }
@@ -1379,16 +1393,16 @@ mod tests {
         // makes the nonce minted on `/v1/evaluate` the one settled on
         // `/v1/reconcile`.
         let mediation_kernel = Mutex::new(
-            build_mediation_kernel(
-                &signer,
-                Arc::clone(&budget),
-                Some(kernel_receipt_store),
-                revocation_store.clone(),
-                &trusted_capability_issuers,
-                Vec::new(),
+            build_mediation_kernel(MediationKernelInputs {
+                signer: &signer,
+                budget_store: Arc::clone(&budget),
+                receipt_store: Some(kernel_receipt_store),
+                revocation_store: revocation_store.clone(),
+                trusted_capability_issuers: &trusted_capability_issuers,
+                tool_servers: Vec::new(),
                 payment_adapter,
                 admission_authorities,
-            )
+            })
             .test_unwrap(),
         );
         let approval_admin = match threshold_config {

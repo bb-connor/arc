@@ -133,8 +133,8 @@ jobs:
       ENTERPRISE_SECURITY_DEFINITION_SHA: ${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Revalidate controller source and merge authorization
-        id: authorize
+      - name: Authenticate controller dispatch and capture definition
+        id: authenticate
         env:
           CAPTURE_ACTOR: ${{ github.actor }}
           CAPTURE_RUN_ATTEMPT: ${{ github.run_attempt }}
@@ -469,6 +469,77 @@ jobs:
           })"
           test "${running_capture_blob_sha}" = "${capture_blob_sha}"
 
+          {
+            echo "capture_blob_sha=${capture_blob_sha}"
+            echo "capture_issued_at_unix_ms=$((capture_created_epoch * 1000))"
+            echo "capture_workflow_id=${capture_workflow_id}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Revalidate controller source and merge authorization
+        id: authorize
+        env:
+          AUTHENTICATED_CAPTURE_BLOB_SHA: ${{ steps.authenticate.outputs.capture_blob_sha }}
+          AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS: ${{ steps.authenticate.outputs.capture_issued_at_unix_ms }}
+          AUTHENTICATED_CAPTURE_WORKFLOW_ID: ${{ steps.authenticate.outputs.capture_workflow_id }}
+          CAPTURE_ACTOR: ${{ github.actor }}
+          CAPTURE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          CAPTURE_RUN_ID: ${{ github.run_id }}
+          INPUT_AUTHORIZED_SOURCE_SHA: ${{ inputs.authorized_source_sha }}
+          INPUT_BASE_REF: ${{ inputs.base_ref }}
+          INPUT_BASE_REPOSITORY: ${{ inputs.base_repository }}
+          INPUT_BASE_SHA: ${{ inputs.base_sha }}
+          INPUT_CONTROLLER_ACTOR: ${{ inputs.controller_actor }}
+          INPUT_CONTROLLER_BLOB_SHA: ${{ inputs.controller_blob_sha }}
+          INPUT_CONTROLLER_ISSUED_AT_UNIX_MS: ${{ inputs.controller_issued_at_unix_ms }}
+          INPUT_CONTROLLER_RUN_ATTEMPT: ${{ inputs.controller_run_attempt }}
+          INPUT_CONTROLLER_RUN_ID: ${{ inputs.controller_run_id }}
+          INPUT_CONTROLLER_WORKFLOW_ID: ${{ inputs.controller_workflow_id }}
+          INPUT_LABELS_DIGEST: ${{ inputs.labels_digest }}
+          INPUT_MERGE_COMMIT_SHA: ${{ inputs.merge_commit_sha }}
+          INPUT_MERGE_TREE_SHA: ${{ inputs.merge_tree_sha }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          INPUT_SECURITY_DEFINITION_SHA: ${{ inputs.security_definition_sha }}
+          INPUT_SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          shopt -s inherit_errexit
+          umask 077
+
+          commit_pattern='^[0-9a-f]{40}$'
+          digest_pattern='^[0-9a-f]{64}$'
+          [[ "${AUTHENTICATED_CAPTURE_BLOB_SHA}" =~ ${commit_pattern} ]]
+          [[ "${AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS}" =~ ^[1-9][0-9]{12}$ ]]
+          [[ "${AUTHENTICATED_CAPTURE_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${AUTHORIZED_SOURCE_SHA}" =~ ${commit_pattern} ]]
+          [[ "${INPUT_SOURCE_SHA}" =~ ${commit_pattern} ]]
+          [[ "${INPUT_BASE_SHA}" =~ ${commit_pattern} ]]
+          [[ "${INPUT_MERGE_COMMIT_SHA}" =~ ${commit_pattern} ]]
+          [[ "${INPUT_MERGE_TREE_SHA}" =~ ${commit_pattern} ]]
+          [[ "${INPUT_SECURITY_DEFINITION_SHA}" =~ ${commit_pattern} ]]
+          [[ "${INPUT_CONTROLLER_BLOB_SHA}" =~ ${commit_pattern} ]]
+          [[ "${INPUT_LABELS_DIGEST}" =~ ${digest_pattern} ]]
+          [[ "${INPUT_CONTROLLER_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${INPUT_CONTROLLER_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${INPUT_CONTROLLER_ISSUED_AT_UNIX_MS}" =~ ^[1-9][0-9]{12}$ ]]
+          [[ "${INPUT_PR_NUMBER}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${CAPTURE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${CAPTURE_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
+          test "${INPUT_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"
+          test "${INPUT_SECURITY_DEFINITION_SHA}" = "${ENTERPRISE_SECURITY_DEFINITION_SHA}"
+          test "${INPUT_CONTROLLER_RUN_ATTEMPT}" = "1"
+          test "${CAPTURE_RUN_ATTEMPT}" = "1"
+          test "${INPUT_SOURCE_REPOSITORY}" = "${GITHUB_REPOSITORY}"
+          test "${INPUT_BASE_REPOSITORY}" = "${GITHUB_REPOSITORY}"
+          test "${INPUT_BASE_REF}" = "${{ github.event.repository.default_branch }}"
+          test "${INPUT_CONTROLLER_ACTOR}" = "${GITHUB_REPOSITORY_OWNER}"
+          [[ "${INPUT_MODE}" == enforcement || "${INPUT_MODE}" == refresh ]]
+          test "${CAPTURE_ACTOR}" = "github-actions[bot]"
+          capture_blob_sha="${AUTHENTICATED_CAPTURE_BLOB_SHA}"
+          capture_created_epoch="$((AUTHENTICATED_CAPTURE_ISSUED_AT_UNIX_MS / 1000))"
+          capture_workflow_id="${AUTHENTICATED_CAPTURE_WORKFLOW_ID}"
+
           live_pr="$({
             gh api \
               -H "Accept: application/vnd.github+json" \
@@ -582,6 +653,14 @@ jobs:
           test "$(jq -r '.base.repo.full_name' <<< "${stable_pr}")" = "${INPUT_BASE_REPOSITORY}"
           test "$(jq -r '.base.ref' <<< "${stable_pr}")" = "${INPUT_BASE_REF}"
           test "$(jq -r '.base.sha' <<< "${stable_pr}")" = "${INPUT_BASE_SHA}"
+          stable_labels_json="$(jq -cS '[.labels[].name] | sort' <<< "${stable_pr}")"
+          stable_labels_digest="$(printf '%s' "${stable_labels_json}" | sha256sum | cut -d' ' -f1)"
+          test "${stable_labels_digest}" = "${INPUT_LABELS_DIGEST}"
+          stable_mode=enforcement
+          if jq -e '.labels | any(.name == "refresh-linux-evidence")' <<< "${stable_pr}" > /dev/null; then
+            stable_mode=refresh
+          fi
+          test "${stable_mode}" = "${INPUT_MODE}"
           stable_merge_ref="$({
             gh api \
               -H "Accept: application/vnd.github+json" \
@@ -617,10 +696,10 @@ jobs:
             echo "controller_run_attempt=${INPUT_CONTROLLER_RUN_ATTEMPT}"
             echo "controller_run_id=${INPUT_CONTROLLER_RUN_ID}"
             echo "controller_workflow_id=${INPUT_CONTROLLER_WORKFLOW_ID}"
-            echo "labels_digest=${labels_digest}"
+            echo "labels_digest=${stable_labels_digest}"
             echo "merge_commit_sha=${INPUT_MERGE_COMMIT_SHA}"
             echo "merge_tree_sha=${INPUT_MERGE_TREE_SHA}"
-            echo "mode=${live_mode}"
+            echo "mode=${stable_mode}"
             echo "pr_number=${INPUT_PR_NUMBER}"
             echo "security_definition_sha=${INPUT_SECURITY_DEFINITION_SHA}"
             echo "source_repository=${INPUT_SOURCE_REPOSITORY}"

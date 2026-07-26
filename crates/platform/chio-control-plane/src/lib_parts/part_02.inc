@@ -1,3 +1,95 @@
+/// Provisions and immutably pins the first partition-escrow remote authority.
+///
+/// Validation completes before consensus state is mutated. Provisioning binds
+/// the initial HA admission membership, derives that membership digest into the
+/// signed descriptor, and pins the exact descriptor digest in the same durable
+/// admission database before returning it. Replacement after the first pin or
+/// after any allocation evidence is unsupported.
+pub fn provision_partition_escrow_remote_authority(
+    budget_db_path: &Path,
+    revocation_db_path: &Path,
+    input: trust_control::service_runtime::budget::PartitionEscrowRemoteAuthorityProvisioningInput,
+    descriptor_signer: &Keypair,
+    now: u64,
+) -> Result<
+    trust_control::service_runtime::budget::SignedPartitionEscrowRemoteAuthorityDescriptor,
+    CliError,
+> {
+    input.validate_current(now)?;
+    let service_endpoints = input.service_endpoints.clone();
+    let membership_digest =
+        trust_control::cluster::bind_initial_partition_escrow_admission_membership(
+            budget_db_path,
+            revocation_db_path,
+            &service_endpoints,
+        )?;
+    let descriptor =
+        trust_control::service_runtime::budget::SignedPartitionEscrowRemoteAuthorityDescriptor::sign(
+            input.into_descriptor_body(membership_digest.clone()),
+            descriptor_signer,
+        )?;
+    let descriptor_digest = chio_core::crypto::sha256_hex(&descriptor.canonical_bytes()?);
+    trust_control::cluster::persist_initial_partition_escrow_authority_pin(
+        budget_db_path,
+        revocation_db_path,
+        &descriptor_digest,
+        &membership_digest,
+    )?;
+    Ok(descriptor)
+}
+
+/// Computes the admission membership digest for an initial partition-escrow
+/// authority descriptor without mutating consensus state.
+///
+/// The shared budget and revocation paths must resolve to the same existing HA
+/// admission database, its genesis baseline and membership proofs must already
+/// be bound, and no partition-escrow allocation evidence may exist. Online
+/// authority rollover is unsupported after the first allocation is committed.
+pub fn partition_escrow_initial_admission_membership_digest(
+    budget_db_path: &Path,
+    revocation_db_path: &Path,
+    service_endpoints: &[String],
+) -> Result<String, CliError> {
+    trust_control::cluster::provisionable_partition_escrow_admission_membership_digest(
+        budget_db_path,
+        revocation_db_path,
+        service_endpoints,
+    )
+}
+
+pub fn compose_partition_escrow_remote_admission_runtime(
+    mut kernel: ChioKernel,
+    config: PartitionEscrowRemoteAdmissionRuntimeConfig<'_>,
+) -> Result<ChioKernel, CliError> {
+    config
+        .authority
+        .verify_current_now()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let composition =
+        trust_control::service_runtime::budget::build_partition_escrow_remote_authority_composition(
+            config.control_url,
+            config.control_token,
+            config.authority,
+        )?;
+    let operation_store: Arc<dyn chio_kernel::admission_operation::AdmissionOperationStore> =
+        Arc::new(
+            chio_store_sqlite::SqliteAdmissionOperationStore::open(
+                config.admission_operation_db_path,
+            )
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "failed to open durable admission-operation store: {error}"
+                ))
+            })?,
+        );
+    kernel.set_admission_operation_store_handle(operation_store)?;
+    kernel.set_admission_capture_authority(composition.admission_capture_authority)?;
+    kernel.set_budget_store(composition.budget_store)?;
+    kernel.install_partition_escrow_registry(composition.registry)?;
+    kernel.enable_aggregate_invocation_admission()?;
+    Ok(kernel)
+}
+
 pub fn compose_ordinary_admission_runtime(
     mut kernel: ChioKernel,
     config: OrdinaryAdmissionRuntimeConfig<'_>,

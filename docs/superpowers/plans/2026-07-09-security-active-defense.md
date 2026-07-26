@@ -884,6 +884,7 @@ Add overlapping-plan tests in which two restrictions on the same target expire i
 
 - Create `scripts/check-flow-security.sh`
 - Create `scripts/check-deception-security.sh`
+- Create `scripts/check-temporal-security.sh`
 - Create `scripts/check-response-recovery.sh`
 - Add corresponding script self-tests
 - Modify the applicable CI workflow
@@ -892,8 +893,18 @@ Add overlapping-plan tests in which two restrictions on the same target expire i
 
 - `check-flow-security`: lattice properties and registered Apalache models, no-default portable build, strict v2 manifest and adapter vectors, policy-owned clearance, principal/session inheritance, context-generation fence, fail-closed matrix, and declassification replay race.
 - `check-deception-security`: lifecycle safety, watermark trust/expiry, tripwire fake-server invocation count, registry secret scan.
+- `check-temporal-security`: exact full rules and correlation inventories, signed event-time semantics, verifier fail-closed behavior, and durable ingress mutation rejection.
 - `check-response-recovery`: authoritative application-time fenced lineage, orphan-fence expiry/recovery, operator-capability and approval mutation matrix, approval-only admission recovery, full effect crash matrix, overlapping out-of-order TTL removal, stale-worker fencing, and receipt truthfulness.
 - All scripts fail if a required test filter matches zero tests.
+
+**Immutable workflow bootstrap**
+
+The candidate-owned CI invocation is required behavioral evidence, but it is not
+trusted enterprise evidence. Land the reviewed `enterprise-hardening.yml` bytes
+on the default branch first. Then rotate the immutable full-SHA workflow pin and
+the authorized workflow-definition baseline to that exact commit. The rollout
+is not complete until a subsequent candidate run executes the temporal gate
+through the rotated enterprise pin.
 
 ### Task 11.2: Shadow migration
 
@@ -939,6 +950,7 @@ bash scripts/check-security-provenance.sh
 bash scripts/check-security-dependencies.sh
 bash scripts/check-flow-security.sh
 bash scripts/check-deception-security.sh
+bash scripts/check-temporal-security.sh
 bash scripts/check-response-recovery.sh
 make codegen-check
 cargo build --workspace

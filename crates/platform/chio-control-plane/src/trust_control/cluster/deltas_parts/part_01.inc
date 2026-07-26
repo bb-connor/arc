@@ -1558,6 +1558,43 @@ pub(crate) fn budget_mutation_event_view(record: BudgetMutationRecord) -> Budget
         max_cost_per_invocation: record.max_cost_per_invocation,
         max_total_cost_units: record.max_total_cost_units,
         invocation_count_after: record.invocation_count_after,
+        invocation_counts_after: record
+            .invocation_counts_after
+            .into_iter()
+            .map(|usage| BudgetInvocationQuotaUsageView {
+                quota: service_runtime::budget::invocation_quota_view(&usage.quota),
+                reserved_invocations_after: usage.reserved_invocations_after,
+                captured_invocations_after: usage.captured_invocations_after,
+            })
+            .collect(),
+        invocation_state: match record.invocation_state {
+            BudgetInvocationReservationState::Absent => {
+                BudgetInvocationReservationStateView::Absent
+            }
+            BudgetInvocationReservationState::Authorized => {
+                BudgetInvocationReservationStateView::Authorized
+            }
+            BudgetInvocationReservationState::Captured => {
+                BudgetInvocationReservationStateView::Captured
+            }
+            BudgetInvocationReservationState::Reversed => {
+                BudgetInvocationReservationStateView::Reversed
+            }
+            BudgetInvocationReservationState::Denied => {
+                BudgetInvocationReservationStateView::Denied
+            }
+        },
+        monetary_state: match record.monetary_state {
+            BudgetMonetaryHoldState::None => BudgetMonetaryHoldStateView::None,
+            BudgetMonetaryHoldState::Exposed => BudgetMonetaryHoldStateView::Exposed,
+            BudgetMonetaryHoldState::Released => BudgetMonetaryHoldStateView::Released,
+            BudgetMonetaryHoldState::Reconciled => BudgetMonetaryHoldStateView::Reconciled,
+            BudgetMonetaryHoldState::Captured => BudgetMonetaryHoldStateView::Captured,
+            BudgetMonetaryHoldState::Reversed => BudgetMonetaryHoldStateView::Reversed,
+        },
+        revocation_set: record.revocation_set.as_ref().map(|set| {
+            service_runtime::budget::canonical_revocation_set_view(set)
+        }),
         total_cost_exposed_after: record.total_cost_exposed_after,
         total_cost_realized_spend_after: record.total_cost_realized_spend_after,
         authority: record

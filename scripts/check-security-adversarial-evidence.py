@@ -11,13 +11,14 @@ import os
 import platform
 import re
 import secrets
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 import tomllib
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterator
@@ -3291,6 +3292,7 @@ def safe_rust_path(value: Any, label: str) -> str:
         or pure.suffix not in (".rs", ".inc")
         or ".." in pure.parts
         or "." in pure.parts
+        or any(not character.isprintable() for character in value)
     ):
         raise EvidenceError(f"{label}: unsafe Rust path")
     return value
@@ -3315,6 +3317,413 @@ def package_roots(root: Path) -> dict[str, Path]:
     return result
 
 
+PINNED_CARGO_MUTANTS_VERSION = "cargo-mutants 25.3.1"
+TRUSTED_CARGO_MUTANTS = Path("/usr/local/cargo/bin/cargo-mutants")
+TRUSTED_CARGO_MUTANTS_ANCESTORS = (
+    Path("/"),
+    Path("/usr"),
+    Path("/usr/local"),
+    Path("/usr/local/cargo"),
+    Path("/usr/local/cargo/bin"),
+)
+
+
+@dataclass
+class CargoMutantsSourceInventory:
+    executable: Path | None = None
+    version_checked: bool = False
+    verified_identity: tuple[int, int] | None = None
+    packages: dict[str, frozenset[str]] = dataclass_field(default_factory=dict)
+
+
+def cargo_mutants_output(
+    command: list[str],
+    root: Path,
+    label: str,
+    environment: dict[str, str] | None = None,
+    expected_identity: tuple[int, int] | None = None,
+) -> tuple[str, tuple[int, int] | None]:
+    try:
+        with cargo_mutants_subprocess_options(
+            root, command, environment, expected_identity
+        ) as (execution_options, observed_identity):
+            completed = subprocess.run(
+                command,
+                cwd=root,
+                env=environment,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                **execution_options,
+            )
+    except OSError as error:
+        raise EvidenceError(
+            f"{label}: unable to execute cargo-mutants: {error}"
+        ) from error
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise EvidenceError(
+            f"{label}: cargo-mutants failed with status {completed.returncode}: {detail}"
+        )
+    return completed.stdout, observed_identity
+
+
+def require_trusted_cargo_mutants_ancestor(
+    metadata: os.stat_result, path: Path
+) -> None:
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != 0
+        or metadata.st_gid != 0
+        or stat.S_IMODE(metadata.st_mode) != 0o755
+    ):
+        raise EvidenceError(f"{path}: cargo-mutants ancestor is mutable or aliased")
+
+
+def require_trusted_cargo_mutants_file(metadata: os.stat_result, path: Path) -> None:
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_uid != 0
+        or metadata.st_gid != 0
+        or stat.S_IMODE(metadata.st_mode) != 0o555
+    ):
+        raise EvidenceError(f"{path}: cargo-mutants executable is mutable or aliased")
+
+
+def require_host_cargo_mutants_file(metadata: os.stat_result, path: Path) -> None:
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or stat.S_IMODE(metadata.st_mode) & 0o111 == 0
+    ):
+        raise EvidenceError(
+            f"{path}: host cargo-mutants executable is mutable or aliased"
+        )
+
+
+def require_unchanged_cargo_mutants_identity(
+    before: os.stat_result, after: os.stat_result, path: Path
+) -> None:
+    if metadata_identity(before) != metadata_identity(after):
+        raise EvidenceError(f"{path}: cargo-mutants identity changed")
+
+
+def enterprise_security_runner(
+    environment: dict[str, str] | None = None,
+) -> bool:
+    return (os.environ if environment is None else environment).get(
+        "CHIO_ENTERPRISE_SECURITY_RUNNER"
+    ) == "1"
+
+
+def enterprise_cargo_mutants_executable(root: Path) -> Path:
+    """Authenticate the fixed verifier-owned cargo-mutants executable."""
+
+    root = root.resolve()
+    executable = TRUSTED_CARGO_MUTANTS
+    if (
+        not executable.is_absolute()
+        or executable.parent != TRUSTED_CARGO_MUTANTS_ANCESTORS[-1]
+    ):
+        raise EvidenceError("cargo-mutants executable authority is not exact")
+    try:
+        ancestor_snapshots = {
+            path: path.lstat() for path in TRUSTED_CARGO_MUTANTS_ANCESTORS
+        }
+        executable_snapshot = executable.lstat()
+        resolved = executable.resolve(strict=True)
+        executable.relative_to(root)
+    except ValueError:
+        pass
+    except (OSError, RuntimeError) as error:
+        raise EvidenceError(
+            f"{executable}: unable to authenticate cargo-mutants: {error}"
+        ) from error
+    else:
+        raise EvidenceError(
+            f"{executable}: cargo-mutants executable cannot be workspace-owned"
+        )
+    if resolved != executable:
+        raise EvidenceError(f"{executable}: cargo-mutants path is aliased")
+    for path, metadata in ancestor_snapshots.items():
+        require_trusted_cargo_mutants_ancestor(metadata, path)
+    require_trusted_cargo_mutants_file(executable_snapshot, executable)
+    try:
+        repeated_ancestors = {
+            path: path.lstat() for path in TRUSTED_CARGO_MUTANTS_ANCESTORS
+        }
+        repeated_executable = executable.lstat()
+    except OSError as error:
+        raise EvidenceError(
+            f"{executable}: cargo-mutants identity changed: {error}"
+        ) from error
+    for path in TRUSTED_CARGO_MUTANTS_ANCESTORS:
+        require_unchanged_cargo_mutants_identity(
+            ancestor_snapshots[path], repeated_ancestors[path], path
+        )
+    require_unchanged_cargo_mutants_identity(
+        executable_snapshot, repeated_executable, executable
+    )
+    for path, metadata in repeated_ancestors.items():
+        require_trusted_cargo_mutants_ancestor(metadata, path)
+    require_trusted_cargo_mutants_file(repeated_executable, executable)
+    return executable
+
+
+def host_cargo_mutants_executable(root: Path) -> Path:
+    """Resolve a local developer's non-workspace cargo-mutants executable."""
+
+    located = shutil.which("cargo-mutants")
+    if located is None:
+        raise EvidenceError("cargo-mutants executable is absent from PATH")
+    executable = Path(located)
+    if not executable.is_absolute() or os.fspath(executable) != located:
+        raise EvidenceError("host cargo-mutants executable path is not canonical")
+    root = root.resolve()
+    try:
+        snapshot = executable.lstat()
+        resolved = executable.resolve(strict=True)
+        executable.relative_to(root)
+    except ValueError:
+        pass
+    except (OSError, RuntimeError) as error:
+        raise EvidenceError(
+            f"{executable}: unable to authenticate host cargo-mutants: {error}"
+        ) from error
+    else:
+        raise EvidenceError(
+            f"{executable}: cargo-mutants executable cannot be workspace-owned"
+        )
+    if resolved != executable:
+        raise EvidenceError(f"{executable}: cargo-mutants path is aliased")
+    require_host_cargo_mutants_file(snapshot, executable)
+    try:
+        repeated = executable.lstat()
+    except OSError as error:
+        raise EvidenceError(
+            f"{executable}: cargo-mutants identity changed: {error}"
+        ) from error
+    require_unchanged_cargo_mutants_identity(snapshot, repeated, executable)
+    require_host_cargo_mutants_file(repeated, executable)
+    return executable
+
+
+def cargo_mutants_executable(
+    root: Path,
+    cache: CargoMutantsSourceInventory,
+    environment: dict[str, str] | None = None,
+) -> Path:
+    enterprise = enterprise_security_runner(environment)
+    if cache.executable is not None:
+        if enterprise:
+            authenticated = enterprise_cargo_mutants_executable(root)
+            if cache.executable != authenticated:
+                raise EvidenceError(
+                    "enterprise cargo-mutants executable authority is not exact"
+                )
+            cache.executable = authenticated
+        return cache.executable
+    executable = (
+        enterprise_cargo_mutants_executable(root)
+        if enterprise
+        else host_cargo_mutants_executable(root)
+    )
+    cache.executable = executable
+    return executable
+
+
+@contextmanager
+def cargo_mutants_subprocess_options(
+    root: Path,
+    command: list[str],
+    environment: dict[str, str] | None,
+    expected_identity: tuple[int, int] | None = None,
+) -> Iterator[tuple[dict[str, Any], tuple[int, int] | None]]:
+    if len(command) < 2 or command[1] != "mutants":
+        raise EvidenceError("cargo-mutants command lacks its direct binary prefix")
+    executable = Path(command[0])
+    if not executable.is_absolute():
+        raise EvidenceError("cargo-mutants command executable is not absolute")
+    if not enterprise_security_runner(environment):
+        if expected_identity is not None:
+            raise EvidenceError(
+                "host cargo-mutants command received an enterprise identity binding"
+            )
+        yield {}, None
+        return
+    if executable != TRUSTED_CARGO_MUTANTS:
+        raise EvidenceError("enterprise cargo-mutants command authority is not exact")
+
+    authenticated = enterprise_cargo_mutants_executable(root)
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    descriptor: int | None = None
+    opened: os.stat_result | None = None
+    try:
+        descriptor = os.open(authenticated, flags)
+        opened = os.fstat(descriptor)
+        require_trusted_cargo_mutants_file(opened, authenticated)
+        opened_identity = metadata_identity(opened)
+        if expected_identity is not None and opened_identity != expected_identity:
+            raise EvidenceError(
+                f"{authenticated}: cargo-mutants differs from the version-verified inode"
+            )
+        named = authenticated.lstat()
+        require_trusted_cargo_mutants_file(named, authenticated)
+        require_unchanged_cargo_mutants_identity(opened, named, authenticated)
+        enterprise_cargo_mutants_executable(root)
+        yield (
+            {
+                "executable": f"/proc/self/fd/{descriptor}",
+                "pass_fds": (descriptor,),
+            },
+            opened_identity,
+        )
+    except OSError as error:
+        raise EvidenceError(
+            f"{authenticated}: unable to pin cargo-mutants executable: {error}"
+        ) from error
+    finally:
+        if descriptor is not None:
+            try:
+                if opened is not None:
+                    repeated = authenticated.lstat()
+                    require_trusted_cargo_mutants_file(repeated, authenticated)
+                    require_unchanged_cargo_mutants_identity(
+                        opened, repeated, authenticated
+                    )
+                    enterprise_cargo_mutants_executable(root)
+            except OSError as error:
+                raise EvidenceError(
+                    f"{authenticated}: cargo-mutants identity changed: {error}"
+                ) from error
+            finally:
+                os.close(descriptor)
+
+
+def require_cargo_mutants_version(
+    executable: Path,
+    root: Path,
+    environment: dict[str, str] | None = None,
+) -> tuple[int, int] | None:
+    observed_version_output, observed_identity = cargo_mutants_output(
+        [os.fspath(executable), "mutants", "--version"],
+        root,
+        "cargo-mutants version",
+        environment,
+    )
+    observed_version = observed_version_output.strip()
+    if observed_version != PINNED_CARGO_MUTANTS_VERSION:
+        raise EvidenceError(
+            "cargo-mutants version mismatch: "
+            f"expected {PINNED_CARGO_MUTANTS_VERSION}, observed {observed_version}"
+        )
+    if enterprise_security_runner(environment) and observed_identity is None:
+        raise EvidenceError("enterprise cargo-mutants version lacks an inode binding")
+    return observed_identity
+
+
+def cargo_mutants_source_inventory(
+    root: Path,
+    package_dir: Path,
+    package: str,
+    cache: CargoMutantsSourceInventory,
+    environment: dict[str, str] | None = None,
+) -> frozenset[str]:
+    executable = cargo_mutants_executable(root, cache, environment)
+    cached = cache.packages.get(package)
+    if cached is not None:
+        return cached
+    if not cache.version_checked:
+        cache.verified_identity = require_cargo_mutants_version(
+            executable, root, environment
+        )
+        cache.version_checked = True
+    elif enterprise_security_runner(environment) and cache.verified_identity is None:
+        raise EvidenceError(
+            "enterprise cargo-mutants inventory lacks a version-verified inode"
+        )
+
+    package_dir = package_dir.resolve()
+    root = root.resolve()
+    try:
+        package_prefix = PurePosixPath(package_dir.relative_to(root).as_posix())
+    except ValueError as error:
+        raise EvidenceError(
+            f"{package}: Cargo package escaped the repository"
+        ) from error
+    output, _observed_identity = cargo_mutants_output(
+        [
+            os.fspath(executable),
+            "mutants",
+            "--no-config",
+            "-p",
+            package,
+            "--list-files",
+            "--json",
+        ],
+        root,
+        f"{package}: cargo-mutants source inventory",
+        environment,
+        cache.verified_identity,
+    )
+    try:
+        entries = json.loads(output, object_pairs_hook=reject_duplicate_keys)
+    except (json.JSONDecodeError, UnicodeError) as error:
+        raise EvidenceError(
+            f"{package}: cargo-mutants source inventory is invalid JSON: {error}"
+        ) from error
+    if not isinstance(entries, list) or not entries:
+        raise EvidenceError(f"{package}: cargo-mutants source inventory is empty")
+    sources: set[str] = set()
+    for index, entry in enumerate(entries):
+        label = f"{package}: cargo-mutants source {index}"
+        if not isinstance(entry, dict):
+            raise EvidenceError(f"{label}: source inventory entry is not an object")
+        exact_keys(entry, {"path", "package"}, set(), label)
+        if entry["package"] != package:
+            raise EvidenceError(f"{label}: source inventory package binding differs")
+        raw_path = entry["path"]
+        if not isinstance(raw_path, str):
+            raise EvidenceError(f"{label}: source inventory path is not a string")
+        path = canonical_repository_path(raw_path, label)
+        safe_rust_path(path, label)
+        parsed = PurePosixPath(path)
+        if package_prefix != parsed and package_prefix not in parsed.parents:
+            raise EvidenceError(
+                f"{package}: cargo-mutants source escaped its Cargo package: {path}"
+            )
+        if path in sources:
+            raise EvidenceError(f"{label}: duplicate source inventory path")
+        sources.add(path)
+    inventory = frozenset(sources)
+    cache.packages[package] = inventory
+    return inventory
+
+
+def require_mutation_source_discoverable(
+    root: Path,
+    package_dir: Path,
+    package: str,
+    source: str,
+    cache: CargoMutantsSourceInventory,
+    label: str,
+) -> bytes:
+    source_path = lexical_path_below_root(root, root / source, label)
+    source_payload = read_regular_file_below_root(root, source_path, label)
+    inventory = cargo_mutants_source_inventory(root, package_dir, package, cache)
+    if source not in inventory:
+        raise EvidenceError(
+            f"{label}: source is not cargo-mutants-discoverable for package {package}"
+        )
+    return source_payload
+
+
 def require_under_package(
     root: Path, package_dirs: dict[str, Path], package: str, source: str
 ) -> Path:
@@ -3333,11 +3742,23 @@ def require_under_package(
     return resolved
 
 
-def rust_function_exists(path: Path, selector: str, label: str) -> None:
+def rust_function_exists(
+    path: Path,
+    selector: str,
+    label: str,
+    *,
+    source_payload: bytes | None = None,
+) -> None:
     leaf = selector.rsplit("::", 1)[-1]
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", leaf):
         raise EvidenceError(f"{label}: selector does not end in a Rust function name")
-    source = path.read_text(encoding="utf-8")
+    if source_payload is None:
+        source = path.read_text(encoding="utf-8")
+    else:
+        try:
+            source = source_payload.decode("utf-8")
+        except UnicodeError as error:
+            raise EvidenceError(f"{label}: invalid UTF-8 Rust source") from error
     if re.search(rf"\bfn\s+{re.escape(leaf)}\s*(?:<[^{{;()]*>)?\s*\(", source) is None:
         raise EvidenceError(f"{label}: function {leaf} is absent from {path}")
 
@@ -3408,6 +3829,7 @@ def validate_campaign(
     value: Any,
     controls: dict[str, dict[str, Any]],
     case_id: str,
+    source_inventory: CargoMutantsSourceInventory | None = None,
 ) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise EvidenceError(f"{case_id}: mutation campaign is not an object")
@@ -3475,8 +3897,23 @@ def validate_campaign(
             raise EvidenceError(
                 f"{case_id}: a semantic selector must bind exactly one caught mutant"
             )
+    if source_inventory is None:
+        source_inventory = CargoMutantsSourceInventory()
     production_path = require_under_package(root, package_dirs, package, source)
-    rust_function_exists(production_path, selector, f"{case_id}: mutation target")
+    production_payload = require_mutation_source_discoverable(
+        root,
+        package_dirs[package],
+        package,
+        source,
+        source_inventory,
+        f"{case_id}: mutation source",
+    )
+    rust_function_exists(
+        production_path,
+        selector,
+        f"{case_id}: mutation target",
+        source_payload=production_payload,
+    )
     normalized = dict(value)
     normalized["id"] = campaign_id
     normalized["control_id"] = control_id
@@ -3835,6 +4272,7 @@ def validate_case(
     require_complete: bool,
     refresh_campaign: str | None = None,
     outcome_overrides: dict[str, Path] | None = None,
+    source_inventory: CargoMutantsSourceInventory | None = None,
 ) -> LoadedCase:
     body = load_json(path)
     if not isinstance(body, dict):
@@ -3894,11 +4332,20 @@ def validate_case(
         if control["id"] in controls:
             raise EvidenceError(f"{path}: duplicate control id {control['id']}")
         controls[control["id"]] = control
+    if source_inventory is None:
+        source_inventory = CargoMutantsSourceInventory()
     campaigns: dict[str, dict[str, Any]] = {}
     outcome_paths: set[str] = set()
     referenced_controls: set[str] = set()
     for value in campaign_values:
-        campaign = validate_campaign(root, package_dirs, value, controls, case_id)
+        campaign = validate_campaign(
+            root,
+            package_dirs,
+            value,
+            controls,
+            case_id,
+            source_inventory,
+        )
         campaign_id = campaign["id"]
         if campaign_id in campaigns:
             raise EvidenceError(f"{path}: duplicate mutation id {campaign_id}")
@@ -4230,6 +4677,9 @@ def promote_outcome(
     package_dirs: dict[str, Path],
     record: tuple[LoadedCase, dict[str, Any], dict[str, Any]],
     raw_path: str,
+    *,
+    expected_outcome_payload: bytes | None = None,
+    expected_inputs_snapshot: tuple[str, dict[Path, bytes]] | None = None,
 ) -> tuple[Path, str, bool]:
     case, campaign, control = record
     if campaign["outcomes"].get("sha256") is not None:
@@ -4247,18 +4697,7 @@ def promote_outcome(
 
     with refresh_lock(root):
         recover_atomic_replace_journal(root)
-        ensure_parent_directories_below_root(
-            root, destination, f"{destination}: outcome destination"
-        )
-        destination = lexical_path_below_root(
-            root, destination, f"{destination}: outcome destination"
-        )
-        if (
-            read_file_snapshot_below_root(
-                root, destination, str(destination), allow_missing=True
-            )
-            is not None
-        ):
+        if destination.exists() or destination.is_symlink():
             raise EvidenceError(
                 f"{destination}: refusing to overwrite promoted mutation evidence"
             )
@@ -4277,10 +4716,21 @@ def promote_outcome(
             root=root,
             source_payload=source_payload,
         )
+        if expected_outcome_payload is not None and payload != expected_outcome_payload:
+            raise EvidenceError(
+                f"{campaign['id']}: outcome changed after the promotion run"
+            )
         digest = hashlib.sha256(payload).hexdigest()
         inputs_digest, input_guards = campaign_input_snapshot(
             root, package_dirs, campaign, control, case.path
         )
+        if expected_inputs_snapshot is not None and (
+            inputs_digest != expected_inputs_snapshot[0]
+            or input_guards != expected_inputs_snapshot[1]
+        ):
+            raise EvidenceError(
+                f"{campaign['id']}: source or control changed before promotion"
+            )
 
         original_case = read_regular_file_below_root(root, case.path, str(case.path))
         if parse_json_payload(original_case, str(case.path)) != case.body:
@@ -4321,6 +4771,21 @@ def promote_outcome(
             != source_payload
         ):
             raise EvidenceError(f"{source_path}: changed during promotion")
+        ensure_parent_directories_below_root(
+            root, destination, f"{destination}: outcome destination"
+        )
+        destination = lexical_path_below_root(
+            root, destination, f"{destination}: outcome destination"
+        )
+        if (
+            read_file_snapshot_below_root(
+                root, destination, str(destination), allow_missing=True
+            )
+            is not None
+        ):
+            raise EvidenceError(
+                f"{destination}: refusing to overwrite promoted mutation evidence"
+            )
         atomic_replace_many(
             [
                 (destination, payload),
@@ -4394,6 +4859,58 @@ def validate_staged_refresh(
                 )
 
 
+def promote_pending_outcome(
+    root: Path,
+    package_dirs: dict[str, Path],
+    record: tuple[LoadedCase, dict[str, Any], dict[str, Any]],
+    environment: dict[str, str],
+) -> tuple[Path, str, bool]:
+    """Run and promote one pending campaign without reusing external output."""
+
+    case, campaign, control = record
+    if campaign["outcomes"].get("sha256") is not None:
+        raise EvidenceError(f"{campaign['id']}: already has promoted mutation evidence")
+    verifier_root = verifier_artifact_root(environment)
+    inputs_before, input_read_guards = campaign_input_snapshot(
+        root, package_dirs, campaign, control, case.path
+    )
+    with mutation_output_workspace(
+        environment, f"chio-security-evidence-promotion-{campaign['id']}"
+    ) as temporary:
+        output_root = temporary / campaign["id"]
+        outcome_candidate = run_campaign(
+            root, campaign, control, output_root, environment
+        )
+        expected_candidate = output_root / "mutants.out/outcomes.json"
+        if outcome_candidate != expected_candidate:
+            raise EvidenceError(
+                f"{campaign['id']}: campaign returned a noncanonical outcome path"
+            )
+        inputs_after, input_read_guards_after = campaign_input_snapshot(
+            root, package_dirs, campaign, control, case.path
+        )
+        if (
+            inputs_after != inputs_before
+            or input_read_guards_after != input_read_guards
+        ):
+            raise EvidenceError(
+                f"{campaign['id']}: source or control contract changed during promotion"
+            )
+        outcome_payload = read_regular_file_no_follow(
+            outcome_candidate,
+            f"{outcome_candidate}: promotion run outcome",
+            root=verifier_root,
+        )
+        return promote_outcome(
+            root,
+            package_dirs,
+            record,
+            os.fspath(outcome_candidate),
+            expected_outcome_payload=outcome_payload,
+            expected_inputs_snapshot=(inputs_after, input_read_guards_after),
+        )
+
+
 def refresh_outcome(
     root: Path,
     package_dirs: dict[str, Path],
@@ -4439,6 +4956,7 @@ def refresh_outcome(
         inputs_before, input_read_guards = campaign_input_snapshot(
             root, package_dirs, campaign, control, case.path
         )
+        verifier_root = verifier_artifact_root(environment)
         with mutation_output_workspace(
             environment, f"chio-security-evidence-refresh-{campaign['id']}"
         ) as temporary:
@@ -4460,7 +4978,7 @@ def refresh_outcome(
                 campaign,
                 None,
                 root / campaign["source"],
-                root=root,
+                root=verifier_root,
             )
 
             inputs_after, input_read_guards_after = campaign_input_snapshot(
@@ -4589,6 +5107,7 @@ def load_cases(
     )
     if not paths:
         raise EvidenceError(f"{cases_path}: no security adversarial cases")
+    source_inventory = CargoMutantsSourceInventory()
     cases = [
         validate_case(
             root,
@@ -4596,6 +5115,7 @@ def load_cases(
             path,
             require_complete,
             refresh_campaign=refresh_campaign,
+            source_inventory=source_inventory,
         )
         for path in paths
     ]
@@ -4625,7 +5145,13 @@ def load_cases(
     return cases, index
 
 
-def run_checked(command: list[str], root: Path, environment: dict[str, str]) -> str:
+def run_checked(
+    command: list[str],
+    root: Path,
+    environment: dict[str, str],
+    *,
+    execution_options: dict[str, Any] | None = None,
+) -> str:
     rendered = " ".join(command)
     print(f"+ {rendered}", file=sys.stderr)
     completed = subprocess.run(
@@ -4636,6 +5162,7 @@ def run_checked(command: list[str], root: Path, environment: dict[str, str]) -> 
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False,
+        **(execution_options or {}),
     )
     if completed.returncode != 0:
         sys.stderr.write(completed.stdout)
@@ -4646,7 +5173,11 @@ def run_checked(command: list[str], root: Path, environment: dict[str, str]) -> 
 
 
 def run_json_checked(
-    command: list[str], root: Path, environment: dict[str, str]
+    command: list[str],
+    root: Path,
+    environment: dict[str, str],
+    *,
+    execution_options: dict[str, Any] | None = None,
 ) -> Any:
     rendered = " ".join(command)
     print(f"+ {rendered}", file=sys.stderr)
@@ -4658,6 +5189,7 @@ def run_json_checked(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
+        **(execution_options or {}),
     )
     if completed.returncode != 0:
         sys.stderr.write(completed.stderr)
@@ -4699,39 +5231,123 @@ def run_control(
         )
 
 
-def candidate_artifact_root(environment: dict[str, str]) -> Path | None:
-    enterprise = environment.get("CHIO_ENTERPRISE_SECURITY_RUNNER") == "1"
-    raw = environment.get("CHIO_SECURITY_CANDIDATE_ARTIFACTS")
-    if not enterprise:
-        if raw is not None:
-            raise EvidenceError(
-                "candidate artifact authority is only valid in the enterprise boundary"
-            )
-        return None
-    if raw != "/target/artifacts":
-        raise EvidenceError("enterprise candidate artifact authority is not exact")
-    root = Path(raw)
-    metadata = root.lstat()
+ENTERPRISE_STATE_ROOT = Path("/baseline/candidate-state")
+ENTERPRISE_VERIFIER_UID = 65533
+ENTERPRISE_VERIFIER_GID = 65533
+ENTERPRISE_BASELINE_MODE = 0o555
+
+
+def require_directory_authority(
+    metadata: os.stat_result,
+    path: Path,
+    *,
+    uid: int,
+    gid: int,
+    mode: int,
+) -> None:
     if (
         not stat.S_ISDIR(metadata.st_mode)
         or stat.S_ISLNK(metadata.st_mode)
-        or metadata.st_uid != 65532
-        or metadata.st_gid != 65532
-        or stat.S_IMODE(metadata.st_mode) != 0o755
+        or metadata.st_uid != uid
+        or metadata.st_gid != gid
+        or stat.S_IMODE(metadata.st_mode) != mode
     ):
-        raise EvidenceError("enterprise candidate artifact root is not isolated")
-    return root
+        raise EvidenceError(f"{path}: directory authority is mutable or aliased")
+
+
+def verifier_artifact_root(environment: dict[str, str]) -> Path | None:
+    enterprise = environment.get("CHIO_ENTERPRISE_SECURITY_RUNNER") == "1"
+    legacy = environment.get("CHIO_SECURITY_CANDIDATE_ARTIFACTS")
+    raw = environment.get("CHIO_SECURITY_VERIFIER_ARTIFACTS")
+    if legacy is not None:
+        raise EvidenceError("candidate artifact authority is forbidden")
+    if not enterprise:
+        if raw is not None:
+            raise EvidenceError(
+                "verifier artifact authority is only valid in the enterprise boundary"
+            )
+        return None
+    if raw is None:
+        raise EvidenceError("enterprise verifier artifact authority is absent")
+    artifact_root = Path(raw)
+    if not artifact_root.is_absolute() or os.fspath(artifact_root) != raw:
+        raise EvidenceError("enterprise verifier artifact authority is not canonical")
+    try:
+        relative = artifact_root.relative_to(ENTERPRISE_STATE_ROOT)
+    except ValueError as error:
+        raise EvidenceError(
+            "enterprise verifier artifact authority escaped its state root"
+        ) from error
+    if (
+        len(relative.parts) != 3
+        or len(relative.parts[0]) != 64
+        or any(character not in "0123456789abcdef" for character in relative.parts[0])
+        or relative.parts[1:] != ("verifier", "artifacts")
+    ):
+        raise EvidenceError("enterprise verifier artifact authority is not exact")
+    gate_root = ENTERPRISE_STATE_ROOT / relative.parts[0]
+    verifier_root = gate_root / "verifier"
+    authority = (
+        (Path("/baseline"), 0, 0, ENTERPRISE_BASELINE_MODE),
+        (ENTERPRISE_STATE_ROOT, 0, 0, 0o711),
+        (gate_root, 0, 0, 0o711),
+        (verifier_root, 0, ENTERPRISE_VERIFIER_GID, 0o770),
+        (
+            artifact_root,
+            ENTERPRISE_VERIFIER_UID,
+            ENTERPRISE_VERIFIER_GID,
+            0o700,
+        ),
+    )
+    try:
+        snapshots = {path: path.lstat() for path, _uid, _gid, _mode in authority}
+        resolved = artifact_root.resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise EvidenceError(
+            f"{artifact_root}: verifier artifact authority is unavailable: {error}"
+        ) from error
+    if resolved != artifact_root:
+        raise EvidenceError(f"{artifact_root}: verifier artifact authority is aliased")
+    for path, uid, gid, mode in authority:
+        require_directory_authority(snapshots[path], path, uid=uid, gid=gid, mode=mode)
+    if any(
+        metadata.st_dev != snapshots[artifact_root].st_dev
+        for metadata in snapshots.values()
+    ):
+        raise EvidenceError(
+            f"{artifact_root}: verifier artifact authority crossed filesystems"
+        )
+    try:
+        repeated = {path: path.lstat() for path, _uid, _gid, _mode in authority}
+    except OSError as error:
+        raise EvidenceError(
+            f"{artifact_root}: verifier artifact authority changed: {error}"
+        ) from error
+    for path, uid, gid, mode in authority:
+        if metadata_identity(snapshots[path]) != metadata_identity(repeated[path]):
+            raise EvidenceError(
+                f"{artifact_root}: verifier artifact authority changed at {path}"
+            )
+        require_directory_authority(repeated[path], path, uid=uid, gid=gid, mode=mode)
+    if any(
+        metadata.st_dev != repeated[artifact_root].st_dev
+        for metadata in repeated.values()
+    ):
+        raise EvidenceError(
+            f"{artifact_root}: verifier artifact authority crossed filesystems"
+        )
+    return artifact_root
 
 
 @contextmanager
 def mutation_output_workspace(
     environment: dict[str, str], prefix: str
 ) -> Iterator[Path]:
-    candidate_root = candidate_artifact_root(environment)
-    if candidate_root is not None:
-        output = candidate_root / f"{prefix}-{secrets.token_hex(16)}"
+    verifier_root = verifier_artifact_root(environment)
+    if verifier_root is not None:
+        output = verifier_root / f"{prefix}-{secrets.token_hex(16)}"
         if output.exists() or output.is_symlink():
-            raise EvidenceError(f"{output}: candidate output identity already exists")
+            raise EvidenceError(f"{output}: verifier output identity already exists")
         yield output
         return
     with tempfile.TemporaryDirectory(prefix=f"{prefix}-") as raw:
@@ -4740,20 +5356,29 @@ def mutation_output_workspace(
 
 def validate_mutation_output_root(
     output_root: Path, environment: dict[str, str]
-) -> None:
-    candidate_root = candidate_artifact_root(environment)
-    if candidate_root is None:
-        return
+) -> Path | None:
+    verifier_root = verifier_artifact_root(environment)
+    if verifier_root is None:
+        return None
     if not output_root.is_absolute():
         raise EvidenceError("enterprise mutation output must be absolute")
     try:
-        output_root.relative_to(candidate_root)
+        output_root.relative_to(verifier_root)
     except ValueError as error:
         raise EvidenceError(
-            "enterprise mutation output escapes candidate artifacts"
+            "enterprise mutation output escapes verifier artifacts"
         ) from error
-    if output_root == candidate_root:
-        raise EvidenceError("enterprise mutation output cannot alias its authority root")
+    if output_root == verifier_root:
+        raise EvidenceError(
+            "enterprise mutation output cannot alias its authority root"
+        )
+    lexical_path_below_root(
+        verifier_root,
+        output_root,
+        f"{output_root}: enterprise mutation output",
+        allow_missing_parents=True,
+    )
+    return verifier_root
 
 
 def run_campaign(
@@ -4763,7 +5388,13 @@ def run_campaign(
     output_root: Path,
     environment: dict[str, str],
 ) -> Path:
-    validate_mutation_output_root(output_root, environment)
+    output_authority = validate_mutation_output_root(output_root, environment)
+    cargo_mutants = cargo_mutants_executable(
+        root, CargoMutantsSourceInventory(), environment
+    )
+    verified_cargo_mutants_identity = require_cargo_mutants_version(
+        cargo_mutants, root, environment
+    )
     if output_root.exists():
         raise EvidenceError(
             f"{output_root}: refusing to overwrite existing mutation output"
@@ -4782,7 +5413,7 @@ def run_campaign(
             f"{campaign['id']}: campaign lacks a semantic mutant selector"
         )
     list_command = [
-        "cargo",
+        os.fspath(cargo_mutants),
         "mutants",
         "--no-config",
         "--package",
@@ -4797,19 +5428,30 @@ def run_campaign(
         list_command.extend(["--error", selector["error"]])
     if control["features"]:
         list_command.extend(["--features", ",".join(control["features"])])
-    selected = select_native_mutant(
-        run_json_checked(list_command, root, environment),
-        campaign,
-        captured_source_lines,
-        source_path,
-    )
+    with cargo_mutants_subprocess_options(
+        root,
+        list_command,
+        environment,
+        verified_cargo_mutants_identity,
+    ) as (execution_options, _preflight_identity):
+        selected = select_native_mutant(
+            run_json_checked(
+                list_command,
+                root,
+                environment,
+                execution_options=execution_options,
+            ),
+            campaign,
+            captured_source_lines,
+            source_path,
+        )
     require_statically_viable_mutant(selected, campaign)
     mutation_name = native_mutant_list_name(selected, campaign)
 
     run_control(root, control, environment)
     output_path = output_root / "mutants.out"
     command = [
-        "cargo",
+        os.fspath(cargo_mutants),
         "mutants",
         "--no-config",
         "--package",
@@ -4845,7 +5487,18 @@ def run_campaign(
             command.append(f"--cargo-arg=--test={control['target']}")
     command.extend(["--", control["test_name"], "--", "--exact"])
     try:
-        run_checked(command, root, environment)
+        with cargo_mutants_subprocess_options(
+            root,
+            command,
+            environment,
+            verified_cargo_mutants_identity,
+        ) as (execution_options, _campaign_identity):
+            run_checked(
+                command,
+                root,
+                environment,
+                execution_options=execution_options,
+            )
         outcomes_path = output_path / "outcomes.json"
         validate_outcomes(
             outcomes_path,
@@ -4853,7 +5506,7 @@ def run_campaign(
             None,
             source_path,
             selected,
-            root=root,
+            root=output_authority,
             source_payload=source_payload,
         )
         return outcomes_path
@@ -4925,6 +5578,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path)
     action.add_argument("--verify-outcome", nargs=2, metavar=("MUTATION_ID", "PATH"))
     action.add_argument("--promote-outcome", nargs=2, metavar=("MUTATION_ID", "PATH"))
+    action.add_argument("--promote-pending-outcome", metavar="MUTATION_ID")
     action.add_argument("--refresh-outcome", metavar="MUTATION_ID")
     action.add_argument("--list-pending", action="store_true")
     return parser.parse_args()
@@ -4932,6 +5586,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    environment = os.environ.copy()
+    environment["CARGO_INCREMENTAL"] = "0"
+    environment["CARGO_BUILD_JOBS"] = "1"
+    if args.promote_outcome and enterprise_security_runner(environment):
+        raise EvidenceError(
+            "legacy --promote-outcome is forbidden in the enterprise boundary"
+        )
     root = (args.root or Path(__file__).resolve().parents[1]).resolve()
     reject_in_root_transaction_state(root)
     if trusted_transaction_exists(root):
@@ -4984,9 +5645,22 @@ def main() -> int:
         print(f"sha256: {digest}")
         print(f"case: {'complete' if complete else 'pending additional campaigns'}")
         return 0
-    environment = os.environ.copy()
-    environment["CARGO_INCREMENTAL"] = "0"
-    environment["CARGO_BUILD_JOBS"] = "1"
+    if args.promote_pending_outcome:
+        record = index.get(args.promote_pending_outcome)
+        if record is None:
+            raise EvidenceError(f"unknown mutation id: {args.promote_pending_outcome}")
+        destination, digest, complete = promote_pending_outcome(
+            root, package_dirs, record, environment
+        )
+        load_cases(root, cases_path, False, args.fixture)
+        print(
+            "ran and promoted caught-only mutation outcome: "
+            f"{args.promote_pending_outcome}"
+        )
+        print(f"outcomes: {destination.relative_to(root)}")
+        print(f"sha256: {digest}")
+        print(f"case: {'complete' if complete else 'pending additional campaigns'}")
+        return 0
     if args.refresh_outcome:
         record = index.get(args.refresh_outcome)
         if record is None:
@@ -5010,12 +5684,11 @@ def main() -> int:
         record = index.get(args.campaign)
         if record is None:
             raise EvidenceError(f"unknown mutation id: {args.campaign}")
-        candidate_root = candidate_artifact_root(environment)
+        verifier_root = verifier_artifact_root(environment)
         output = args.output or (
-            candidate_root / f"chio-security-mutants-{args.campaign}"
-            if candidate_root is not None
-            else Path(tempfile.gettempdir())
-            / f"chio-security-mutants-{args.campaign}"
+            verifier_root / f"chio-security-mutants-{args.campaign}"
+            if verifier_root is not None
+            else Path(tempfile.gettempdir()) / f"chio-security-mutants-{args.campaign}"
         )
         outcome = run_campaign(
             root, record[1], record[2], output.resolve(), environment

@@ -125,14 +125,15 @@ struct RecoveredCaptureValidation<'a> {
     expected_monetary_state: BudgetMonetaryHoldState,
 }
 
-struct BudgetCleanupDenialValidation<'a> {
-    store: &'a dyn BudgetStore,
-    denied: &'a DeniedBudgetHold,
-    expected_hold_id: Option<&'a str>,
-    expected_exposure: u64,
-    expected_event_id: &'a str,
-    expected_authority: Option<&'a crate::budget_store::BudgetEventAuthority>,
-    expected_revocation_set: Option<&'a crate::supplemental_quota::CanonicalRevocationSet>,
+pub(super) struct BudgetCleanupDenialValidation<'a> {
+    pub(super) store: &'a dyn BudgetStore,
+    pub(super) denied: &'a DeniedBudgetHold,
+    pub(super) expected_hold_id: Option<&'a str>,
+    pub(super) expected_exposure: u64,
+    pub(super) expected_event_id: &'a str,
+    pub(super) expected_authority: Option<&'a crate::budget_store::BudgetEventAuthority>,
+    pub(super) expected_revocation_set:
+        Option<&'a crate::supplemental_quota::CanonicalRevocationSet>,
 }
 
 pub(super) struct CallerReservedAdmissionTerms {
@@ -512,8 +513,16 @@ impl ChioKernel {
         })?;
         let action = AdmissionCleanupAction::pending(operation, kind, payload)?;
         match store.create_cleanup_action(action.clone()) {
+            Ok(AdmissionCleanupActionCreateOutcome::Created(created)) if created == action => {
+                Ok(())
+            }
+            Ok(AdmissionCleanupActionCreateOutcome::Existing(existing)) if existing == action => {
+                Ok(())
+            }
             Ok(AdmissionCleanupActionCreateOutcome::Created(_))
-            | Ok(AdmissionCleanupActionCreateOutcome::Existing(_)) => Ok(()),
+            | Ok(AdmissionCleanupActionCreateOutcome::Existing(_)) => Err(KernelError::Internal(
+                "cleanup action persistence changed its immutable participant payload".to_string(),
+            )),
             Err(error) => {
                 let recovered = store
                     .load_cleanup_actions(operation.operation_id())
@@ -523,7 +532,7 @@ impl ChioKernel {
                             .into_iter()
                             .find(|existing| existing.action_id() == action.action_id())
                     });
-                if recovered.is_some() {
+                if recovered.as_ref() == Some(&action) {
                     Ok(())
                 } else {
                     Err(KernelError::Internal(format!(
@@ -1439,6 +1448,7 @@ impl ChioKernel {
             Err(poisoned) => poisoned.into_inner(),
         };
         let authorization_request = snapshot.authorization_request()?;
+        let authorization_artifact_digests = snapshot.authorization_artifact_digests();
         let expected_hold = authorization_request.hold_id.clone();
         let expected_authorize_event = authorization_request.event_id.clone().ok_or_else(|| {
             KernelError::Internal(
@@ -1457,11 +1467,24 @@ impl ChioKernel {
             BudgetMonetaryHoldState::None
         };
         let authorization = budget_store
-            .authorize_budget_hold(authorization_request.clone())
-            .or_else(|_| budget_store.authorize_budget_hold(authorization_request))?;
+            .replay_budget_authorization(authorization_request.clone())
+            .or_else(|_| budget_store.replay_budget_authorization(authorization_request.clone()))?;
+        let authorization_validation = self.validate_budget_authorization_decision_for_store(
+            budget_store,
+            &authorization_request,
+            &authorization,
+            &authorization_artifact_digests,
+            "recovery authorization replay",
+        );
         let authorized = match authorization {
             BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,
             BudgetAuthorizeHoldDecision::Denied(denied) => {
+                if authorization_validation.is_err() {
+                    return Err(KernelError::GuardDenied(
+                        "budget authorization denial lacks exact hard-budget authority evidence"
+                            .to_string(),
+                    ));
+                }
                 self.validate_budget_cleanup_denial(BudgetCleanupDenialValidation {
                     store: budget_store,
                     denied: &denied,
@@ -1481,6 +1504,7 @@ impl ChioKernel {
                 );
             }
         };
+        authorization_validation?;
         self.validate_recovered_authorization(RecoveredAuthorizationValidation {
             budget_store,
             authorized: &authorized,
@@ -1536,7 +1560,12 @@ impl ChioKernel {
             };
             match decision {
                 AdmissionCaptureDecision::Captured { budget, .. } => *budget,
-                AdmissionCaptureDecision::Denied(_) => {
+                AdmissionCaptureDecision::Denied(denial) => {
+                    super::ordinary_admission::validate_capture_denial_partition_escrow_evidence(
+                        &authorized,
+                        &denial,
+                        "combined capture recovery denial",
+                    )?;
                     drop(_guard);
                     return self.compensate_recovery_capture_denial(
                         operation_store,
@@ -1689,6 +1718,8 @@ impl ChioKernel {
             || captured.invocation_state != BudgetInvocationReservationState::Captured
             || captured.monetary_state != expected_monetary_state
             || captured.revocation_set.as_ref() != expected_revocation_set
+            || captured.metadata.partition_escrow_evidence
+                != authorized.metadata.partition_escrow_evidence
         {
             return Err(KernelError::Internal(
                 "recovered invocation capture changed the immutable participant effect".to_string(),

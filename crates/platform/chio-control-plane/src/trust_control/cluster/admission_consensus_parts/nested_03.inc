@@ -416,6 +416,7 @@
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: Some(database_path.to_path_buf()),
+            partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -458,6 +459,7 @@
         max_invocations: u32,
     ) -> CompositeBudgetAuthorizeRequest {
         CompositeBudgetAuthorizeRequest {
+            existing_only: false,
             operation_id: format!("operation-{event_id}"),
             request_binding_hash: "44".repeat(32),
             capability_id: capability_id.to_string(),
@@ -484,9 +486,453 @@
                     verifier_id: "consensus-test-verifier".to_string(),
                     request_binding_hash: "bb".repeat(32),
                     negotiated_features_digest: "cc".repeat(32),
+                    issuer: chio_core::crypto::Keypair::from_seed(&[82; 32]).public_key(),
+                    not_before: 90,
+                    expires_at: 300,
+                    request_constraint_digest: "dd".repeat(32),
+                    broker_capability_id: "consensus-broker-capability".to_string(),
+                    claim_binding_digest: "ee".repeat(32),
+                    verified_at: 100,
                 }),
+                partition_escrow_evidence: None,
             },
         }
+    }
+
+    struct ExpiringPartitionEscrowFixture {
+        authority:
+            Arc<super::super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority>,
+        evidence: PartitionEscrowCommitEvidence,
+    }
+
+    fn expiring_partition_escrow_fixture(
+        capability_id: &str,
+        revocation_set_digest: &str,
+    ) -> ExpiringPartitionEscrowFixture {
+        use chio_core_types::partition_escrow::{
+            verify_partition_escrow_allocation_set, verify_partition_escrow_quota_commitment,
+            PartitionEscrowAllocation, PartitionEscrowAllocationPlan,
+            PartitionEscrowAllocationPlanBinding, PartitionEscrowAllocationSetBody,
+            PartitionEscrowAllocationVerificationContext, PartitionEscrowQuota,
+            PartitionEscrowQuotaCommitmentBody, PartitionEscrowQuotaSourceBinding,
+            SignedPartitionEscrowAllocationSet, SignedPartitionEscrowQuotaCommitment,
+        };
+        use chio_kernel::partition_escrow::{
+            partition_escrow_counter_namespace_digest, PartitionEscrowAdmissionEvidence,
+            PartitionEscrowRegistry, PartitionEscrowRegistryEntryInput,
+            PartitionEscrowRegistryInput, PARTITION_ESCROW_ADMISSION_EVIDENCE_SCHEMA,
+        };
+        use super::super::super::service_runtime::budget::{
+            PartitionEscrowRemoteAuthorityDescriptorBody,
+            SignedPartitionEscrowRemoteAuthorityDescriptor,
+            PARTITION_ESCROW_REMOTE_AUTHORITY_DESCRIPTOR_SCHEMA,
+        };
+
+        const VERIFIED_AT: u64 = 150;
+        const SOURCE_EXPIRES_AT: u64 = 200;
+        let authority_id = "71".repeat(32);
+        let signer = Keypair::from_seed(&[71; 32]);
+        let quota = PartitionEscrowQuota::new(
+            "chio.grant-invocation.v1",
+            capability_id,
+            Some(0),
+            5,
+        )
+        .expect("partition escrow quota");
+        let allocations = vec![
+            PartitionEscrowAllocation::new("partition-a", &authority_id, 2)
+                .expect("local partition allocation"),
+            PartitionEscrowAllocation::new("partition-b", "authority-b", 3)
+                .expect("remote partition allocation"),
+        ];
+        let source_artifact_digest = "aa".repeat(32);
+        let source_trust = json!({
+            "kind": "grantCapability",
+            "capability_id": capability_id,
+            "grant_index": 0,
+            "revocation_set_digest": revocation_set_digest,
+        });
+        let source_trust_binding = json!({
+            "schema": "chio.partition-escrow-source-trust-binding.v1",
+            "profile": quota.profile(),
+            "quotaKeyDigest": quota.key_digest().expect("quota key digest"),
+            "quotaDescriptorDigest": quota
+                .descriptor_digest()
+                .expect("quota descriptor digest"),
+            "underlyingSourceArtifactDigest": source_artifact_digest.clone(),
+            "sourceSigner": signer.public_key(),
+            "sourceNotBefore": 90,
+            "sourceExpiresAt": SOURCE_EXPIRES_AT,
+            "profileTrust": source_trust.clone(),
+        });
+        let mut source_trust_preimage =
+            b"chio.partition-escrow-source-trust-binding.v1\0".to_vec();
+        source_trust_preimage.extend_from_slice(
+            &canonical_json_bytes(&source_trust_binding).expect("source trust binding"),
+        );
+        let source_trust_binding_digest = sha256_hex(&source_trust_preimage);
+        let plan = PartitionEscrowAllocationPlan::new(
+            PartitionEscrowAllocationPlanBinding::new(
+                "production",
+                "root-expiring-replay",
+                1,
+                quota.clone(),
+                SOURCE_EXPIRES_AT,
+                100,
+                SOURCE_EXPIRES_AT,
+            )
+            .expect("partition escrow allocation plan binding"),
+            allocations.clone(),
+        )
+        .expect("partition escrow allocation plan");
+        let quota_commitment = SignedPartitionEscrowQuotaCommitment::sign(
+            PartitionEscrowQuotaCommitmentBody::new(
+                &plan,
+                PartitionEscrowQuotaSourceBinding::new(
+                    source_artifact_digest.clone(),
+                    source_trust_binding_digest.clone(),
+                    90,
+                    SOURCE_EXPIRES_AT,
+                )
+                .expect("partition escrow source binding"),
+            )
+            .expect("partition escrow commitment body"),
+            &signer,
+        )
+        .expect("signed partition escrow commitment");
+        let certificate = verify_partition_escrow_quota_commitment(
+            &quota_commitment,
+            VERIFIED_AT,
+        )
+        .expect("verified partition escrow commitment");
+        let allocation_set = SignedPartitionEscrowAllocationSet::sign(
+            PartitionEscrowAllocationSetBody::new(
+                &certificate,
+                100,
+                SOURCE_EXPIRES_AT,
+                allocations,
+            )
+            .expect("partition escrow allocation set body"),
+            &signer,
+        )
+        .expect("signed partition escrow allocation set");
+        let allocation_context = PartitionEscrowAllocationVerificationContext::new(
+            "partition-a",
+            &authority_id,
+            &certificate,
+        )
+        .expect("partition escrow allocation context");
+        let verified_allocation = verify_partition_escrow_allocation_set(
+            &allocation_set,
+            &allocation_context,
+            VERIFIED_AT,
+            None,
+        )
+        .expect("verified partition escrow allocation set");
+        let counter_namespace_digest =
+            partition_escrow_counter_namespace_digest("partition-a", &authority_id)
+                .expect("partition escrow counter namespace");
+        let registry_input = PartitionEscrowRegistryInput {
+            authority_domain: "production".to_string(),
+            partition_id: "partition-a".to_string(),
+            authority_id: authority_id.clone(),
+            resolver_id: "static-partition-escrow-registry".to_string(),
+            resolver_implementation_id: "chio-kernel-static-partition-escrow".to_string(),
+            resolver_implementation_version: 1,
+            store_identity_digest: authority_id.clone(),
+            counter_namespace_digest: counter_namespace_digest.clone(),
+            fencing_token: 1,
+            entries: vec![PartitionEscrowRegistryEntryInput {
+                quota_commitment: quota_commitment.clone(),
+                allocation_set: allocation_set.clone(),
+            }],
+        };
+        let registry =
+            PartitionEscrowRegistry::new(registry_input.clone()).expect("partition escrow registry");
+        let runtime = registry.runtime_evidence();
+        let durable = registry.durable_store();
+        let evidence_value = json!({
+            "schema": PARTITION_ESCROW_ADMISSION_EVIDENCE_SCHEMA,
+            "verifiedAt": VERIFIED_AT,
+            "resolver": {
+                "resolverId": runtime.resolver_id(),
+                "implementationId": runtime.implementation_id(),
+                "implementationVersion": runtime.implementation_version(),
+                "configurationDigest": runtime.configuration_digest(),
+            },
+            "durableStore": {
+                "storeIdentityDigest": durable.store_identity_digest(),
+                "counterNamespaceDigest": durable.counter_namespace_digest(),
+                "fencingToken": durable.fencing_token(),
+            },
+            "authorityDomain": "production",
+            "partitionId": "partition-a",
+            "authorityId": authority_id,
+            "quotas": [{
+                "globalQuota": quota,
+                "localAllocatedInvocations": verified_allocation.local_allocated_invocations(),
+                "quotaKeyDigest": certificate.quota().key_digest().expect("evidence quota key digest"),
+                "quotaDescriptorDigest": certificate
+                    .quota()
+                    .descriptor_digest()
+                    .expect("evidence quota descriptor digest"),
+                "quotaCertificateBindingDigest": certificate
+                    .binding_digest()
+                    .expect("evidence certificate binding digest"),
+                "quotaCommitmentDigest": certificate.commitment_digest(),
+                "underlyingSourceArtifactDigest": certificate
+                    .underlying_source_artifact_digest(),
+                "sourceTrustBindingDigest": source_trust_binding_digest,
+                "sourceNotBefore": certificate.source_not_before(),
+                "sourceExpiresAt": certificate.source_expires_at(),
+                "sourceSigner": certificate.certificate_signer(),
+                "sourceTrust": source_trust,
+                "allocationPlanDigest": certificate.allocation_plan_digest(),
+                "allocationRootId": certificate.allocation_root_id(),
+                "allocationEpoch": certificate.allocation_epoch(),
+                "allocationSetDigest": verified_allocation.allocation_set_digest(),
+                "totalAllocatedInvocations": verified_allocation.total_allocated_invocations(),
+                "quotaCommitment": quota_commitment,
+                "allocationSet": allocation_set,
+            }],
+        });
+        let evidence_canonical =
+            canonical_json_bytes(&evidence_value).expect("partition escrow evidence canonical JSON");
+        let evidence = PartitionEscrowAdmissionEvidence::from_canonical_json_bytes(
+            &evidence_canonical,
+        )
+        .expect("partition escrow admission evidence");
+        registry
+            .verify_persisted_admission(&evidence)
+            .expect("persisted partition escrow admission evidence");
+        let evidence = PartitionEscrowCommitEvidence::from_admission_evidence(&evidence)
+            .expect("partition escrow commit evidence");
+
+        let descriptor_signer = Keypair::from_seed(&[72; 32]);
+        let node_signer = Keypair::from_seed(&[73; 32]);
+        let descriptor = SignedPartitionEscrowRemoteAuthorityDescriptor::sign(
+            PartitionEscrowRemoteAuthorityDescriptorBody {
+                schema: PARTITION_ESCROW_REMOTE_AUTHORITY_DESCRIPTOR_SCHEMA.to_string(),
+                issued_at: 50,
+                expires_at: 1_000,
+                service_endpoints: vec!["https://node-a".to_string()],
+                cluster_members: vec![ClusterMemberIdentity {
+                    node_url: "https://node-a".to_string(),
+                    public_key: node_signer.public_key(),
+                }],
+                admission_membership_digest: single_member().digest().to_string(),
+                registry: registry_input,
+            },
+            &descriptor_signer,
+        )
+        .expect("signed partition escrow descriptor");
+        let descriptor_canonical = descriptor
+            .canonical_bytes()
+            .expect("partition escrow descriptor canonical JSON");
+        let authority = super::super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority::from_canonical_descriptor(
+            &descriptor_canonical,
+            &descriptor_signer.public_key(),
+            VERIFIED_AT,
+        )
+        .expect("sealed partition escrow authority");
+        authority
+            .validate_persisted_commit_evidence(&evidence)
+            .expect("sealed persisted partition escrow evidence");
+
+        ExpiringPartitionEscrowFixture {
+            authority: Arc::new(authority),
+            evidence,
+        }
+    }
+
+    #[test]
+    fn expired_partition_escrow_source_does_not_block_follower_apply_or_restart_replay() {
+        const AUTHORIZATION_TIME: u64 = 150;
+        const REPLAY_TIME: u64 = 201;
+        let database_path = path("partition-escrow-expired-replay");
+        let capability_id = "capability-partition-escrow-expired-replay";
+        let revocations = revocation_set(capability_id);
+        let fixture =
+            expiring_partition_escrow_fixture(capability_id, &revocations.digest);
+        fixture
+            .authority
+            .validate_fresh_authorization_evidence(&fixture.evidence, AUTHORIZATION_TIME)
+            .expect("fresh partition escrow authorization evidence");
+        fixture
+            .authority
+            .validate_fresh_authorization_evidence(&fixture.evidence, REPLAY_TIME)
+            .expect_err("partition escrow source must be expired at replay time");
+
+        let mut request = composite_request(
+            capability_id,
+            "hold-partition-escrow-expired-replay",
+            "authorize-partition-escrow-expired-replay",
+            2,
+        );
+        request.admission_evidence.revocation_set = revocations;
+        request.admission_evidence.supplemental_binding = None;
+        request.admission_evidence.partition_escrow_evidence =
+            Some(BudgetPartitionEscrowEvidenceView {
+                canonical_json: fixture.evidence.canonical_json().to_string(),
+                digest: fixture.evidence.evidence_digest().to_string(),
+            });
+        let authority_view = BudgetMutationAuthorityView {
+            authority_id: "https://node-a".to_string(),
+            lease_id: "https://node-a#admission-term-1".to_string(),
+            lease_epoch: 1,
+        };
+        let fresh_proposal =
+            super::super::super::budget_handlers::sqlite_fresh_composite_authorize_input(
+                &request,
+                budget_authority_from_view(&authority_view).expect("fresh budget authority"),
+                Some(fixture.authority.as_ref()),
+            );
+        assert!(
+            fresh_proposal.is_err(),
+            "wall-clock freshness must reject the expired proposal"
+        );
+        super::super::super::budget_handlers::sqlite_composite_authorize_input(
+            &request,
+            budget_authority_from_view(&authority_view).expect("persisted budget authority"),
+            Some(fixture.authority.as_ref()),
+        )
+        .expect("persisted authorization parsing must not consult the wall clock");
+
+        let mut config = test_config(&database_path);
+        config.partition_escrow_authority = Some(Arc::clone(&fixture.authority));
+        drop(open_capture_authority(&config).expect("partition escrow capture authority"));
+        let store = AdmissionConsensusStore::open(&database_path).expect("consensus store");
+        let membership = single_member();
+        store
+            .bind_membership(&membership)
+            .expect("bind partition escrow membership");
+        persist_initial_partition_escrow_authority_pin(
+            &database_path,
+            &database_path,
+            fixture.authority.descriptor_digest(),
+            fixture.authority.admission_membership_digest(),
+        )
+        .expect("persist partition escrow authority pin");
+        let election = AdmissionElection {
+            term: 1,
+            candidate_id: "https://node-a".to_string(),
+            last_log_index: 0,
+            last_log_term: 0,
+            commit_index: 0,
+        };
+        let command = ConsensusCompositeAuthorizeCommand {
+            request: request.clone(),
+            authority: authority_view,
+        };
+        let command_value = serde_json::to_value(command).expect("committed command value");
+        let entry = AdmissionConsensusStore::build_entry(
+            &election,
+            &request.event_id,
+            AdmissionCommandKind::CompositeAuthorize,
+            &command_value,
+        )
+        .expect("committed partition escrow entry");
+        let appended = store
+            .append_entries(
+                &membership,
+                &AdmissionAppendEntriesRequest {
+                    protocol_version: ADMISSION_CONSENSUS_PROTOCOL_VERSION.to_string(),
+                    membership_digest: membership.digest().to_string(),
+                    term: election.term,
+                    leader_id: election.candidate_id.clone(),
+                    previous_log_index: 0,
+                    previous_log_term: 0,
+                    entry: Some(entry.clone()),
+                    leader_commit: 0,
+                    commit_proof: None,
+                },
+                |transaction, entry, proof| {
+                    apply_admission_log_entry(&config, transaction, entry, proof)
+                },
+            )
+            .expect("follower append");
+        assert!(appended.accepted);
+        assert_eq!(appended.applied_index, 0);
+        let proof = AdmissionCommitProof {
+            protocol_version: ADMISSION_CONSENSUS_PROTOCOL_VERSION.to_string(),
+            membership_digest: membership.digest().to_string(),
+            index: entry.index,
+            leader_epoch: entry.leader_epoch,
+            current_term_commit_index: entry.index,
+            leader_id: election.candidate_id.clone(),
+            quorum_size: 1,
+            witness_urls: vec![election.candidate_id.clone()],
+        };
+        let committed = store
+            .append_entries(
+                &membership,
+                &AdmissionAppendEntriesRequest {
+                    protocol_version: ADMISSION_CONSENSUS_PROTOCOL_VERSION.to_string(),
+                    membership_digest: membership.digest().to_string(),
+                    term: election.term,
+                    leader_id: election.candidate_id,
+                    previous_log_index: entry.index,
+                    previous_log_term: entry.leader_epoch,
+                    entry: None,
+                    leader_commit: entry.index,
+                    commit_proof: Some(proof),
+                },
+                |transaction, entry, proof| {
+                    apply_admission_log_entry(&config, transaction, entry, proof)
+                },
+            )
+            .expect("expired-source follower commit apply");
+        assert!(committed.accepted);
+        assert_eq!(committed.applied_index, entry.index);
+        let original = store
+            .result_for_operation(&request.event_id)
+            .expect("partition escrow result lookup")
+            .expect("partition escrow result");
+        let response: CompositeBudgetAuthorizeResponse =
+            serde_json::from_str(&original.response_json).expect("partition escrow response");
+        assert!(response.allowed);
+        let metadata = response
+            .budget_authority
+            .expect("partition escrow budget authority");
+        assert_eq!(metadata.guarantee_level, "partition_escrowed");
+        assert_eq!(
+            metadata
+                .partition_escrow_evidence
+                .expect("partition escrow response evidence")
+                .digest,
+            fixture.evidence.evidence_digest()
+        );
+        drop(store);
+
+        let connection = Connection::open(&database_path).expect("replay database");
+        connection
+            .execute("DELETE FROM admission_consensus_results", [])
+            .expect("delete partition escrow result");
+        connection
+            .execute(
+                r#"
+                UPDATE admission_consensus_meta
+                SET last_applied = 0, applied_state_digest = ?1
+                WHERE singleton = 1
+                "#,
+                params![initial_applied_state_digest()],
+            )
+            .expect("rewind partition escrow projection");
+        drop(connection);
+        let reopened =
+            AdmissionConsensusStore::open(&database_path).expect("reopen consensus store");
+        reopened
+            .apply_committed(&mut |transaction, entry, proof| {
+                apply_admission_log_entry(&config, transaction, entry, proof)
+            })
+            .expect("expired-source restart replay");
+        let replayed = reopened
+            .result_for_operation(&request.event_id)
+            .expect("replayed partition escrow result lookup")
+            .expect("replayed partition escrow result");
+        assert_eq!(replayed.response_json, original.response_json);
+
+        let _ = std::fs::remove_file(database_path);
     }
 
     fn commit_state_machine_command<T: Serialize>(

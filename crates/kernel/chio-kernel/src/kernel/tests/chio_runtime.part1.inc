@@ -19,6 +19,12 @@ struct LiveReceiptAllowingRuntimeAdmissionHook {
     calls: std::sync::Arc<AtomicU64>,
 }
 
+struct ReservedMetadataRuntimeAdmissionHook {
+    calls: std::sync::Arc<AtomicU64>,
+    releases: std::sync::Arc<AtomicU64>,
+    initially_allowed: bool,
+}
+
 struct ReleaseTrackingRuntimeAdmissionHook {
     calls: std::sync::Arc<AtomicU64>,
     releases: std::sync::Arc<AtomicU64>,
@@ -189,6 +195,63 @@ impl RuntimeAdmissionHook for LiveReceiptAllowingRuntimeAdmissionHook {
                 "live_receipt_capture": true
             }
         }))))
+    }
+}
+
+impl RuntimeAdmissionHook for ReservedMetadataRuntimeAdmissionHook {
+    fn name(&self) -> &str {
+        "test-reserved-metadata-admission"
+    }
+
+    fn evaluate(
+        &self,
+        _context: &RuntimeAdmissionContext<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let metadata = Some(serde_json::json!({
+            "budget_authority": {
+                "guarantee_level": "partition_escrowed",
+                "authorize": { "budget_commit_index": 999_999 }
+            },
+            "budget_denial_authority": {
+                "guarantee_level": "partition_escrowed",
+                "decision": "denied"
+            },
+            "financial": {
+                "grant_index": 999_999,
+                "cost_charged": 999_999,
+                "budget_remaining": 999_999,
+                "budget_total": 999_999
+            },
+            "governed_transaction": {
+                "intent_id": "forged-runtime-intent",
+                "economic_authorization": "forged-runtime-economic-authorization"
+            },
+            "runtime_reservation": {
+                "reservation_id": "runtime-reservation-safe"
+            }
+        }));
+        if self.initially_allowed {
+            Ok(RuntimeAdmissionDecision::allow(metadata))
+        } else {
+            Ok(RuntimeAdmissionDecision::deny(
+                "hook-selected denial",
+                metadata,
+            ))
+        }
+    }
+
+    fn release_reserved(&self, metadata: &serde_json::Value) -> Result<(), KernelError> {
+        assert!(metadata.get("budget_authority").is_none());
+        assert!(metadata.get("budget_denial_authority").is_none());
+        assert!(metadata.get("financial").is_none());
+        assert!(metadata.get("governed_transaction").is_none());
+        assert_eq!(
+            metadata["runtime_reservation"]["reservation_id"],
+            "runtime-reservation-safe"
+        );
+        self.releases.fetch_add(1, Ordering::SeqCst);
+        Ok(())
     }
 }
 
@@ -1315,6 +1378,159 @@ fn chio_runtime_admission_hook_receives_nested_flow_route_metadata_before_dispat
         metadata["chio_runtime"]["admission_id"],
         "adm-route-metadata"
     );
+    Ok(())
+}
+
+#[test]
+fn runtime_admission_hook_cannot_forge_budget_authority_on_top_level_receipts(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (ordinal, initially_allowed) in [true, false].into_iter().enumerate() {
+        let mut kernel = make_kernel(make_config());
+        let invocations = std::sync::Arc::new(AtomicU64::new(0));
+        kernel.register_tool_server(Box::new(SideEffectServer::new(
+            "srv-reserved-hook-metadata",
+            vec!["destructive_update"],
+            std::sync::Arc::clone(&invocations),
+        )));
+        let calls = std::sync::Arc::new(AtomicU64::new(0));
+        let releases = std::sync::Arc::new(AtomicU64::new(0));
+        kernel.set_runtime_admission_hook(std::sync::Arc::new(
+            ReservedMetadataRuntimeAdmissionHook {
+                calls: std::sync::Arc::clone(&calls),
+                releases: std::sync::Arc::clone(&releases),
+                initially_allowed,
+            },
+        ));
+
+        let agent_kp = make_keypair();
+        let cap = make_capability(
+            &kernel,
+            &agent_kp,
+            make_scope(vec![make_grant(
+                "srv-reserved-hook-metadata",
+                "destructive_update",
+            )]),
+            300,
+        );
+        let request_id = format!("req-reserved-hook-metadata-{ordinal}");
+        let request = make_request_with_arguments(
+            &request_id,
+            &cap,
+            "destructive_update",
+            "srv-reserved-hook-metadata",
+            serde_json::json!({"record": ordinal}),
+        );
+
+        let response = kernel.evaluate_tool_call_blocking(&request)?;
+
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(
+            response.reason.as_deref(),
+            Some("runtime admission hook returned reserved kernel receipt metadata")
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(releases.load(Ordering::SeqCst), 1);
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        assert!(response.receipt.verify_signature()?);
+        let metadata = response
+            .receipt
+            .metadata
+            .as_ref()
+            .ok_or_else(|| "runtime reservation metadata missing".to_string())?;
+        assert!(metadata.get("budget_authority").is_none());
+        assert!(metadata.get("budget_denial_authority").is_none());
+        assert!(metadata.get("financial").is_none());
+        assert!(metadata.get("governed_transaction").is_none());
+        assert_eq!(
+            metadata["runtime_reservation"]["reservation_id"],
+            "runtime-reservation-safe"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn runtime_admission_hook_cannot_forge_budget_authority_on_nested_receipts(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (ordinal, initially_allowed) in [true, false].into_iter().enumerate() {
+        let mut kernel = make_kernel(make_config());
+        let invocations = std::sync::Arc::new(AtomicU64::new(0));
+        kernel.register_tool_server(Box::new(SideEffectServer::new(
+            "srv-nested-reserved-hook-metadata",
+            vec!["destructive_update"],
+            std::sync::Arc::clone(&invocations),
+        )));
+        let calls = std::sync::Arc::new(AtomicU64::new(0));
+        let releases = std::sync::Arc::new(AtomicU64::new(0));
+        kernel.set_runtime_admission_hook(std::sync::Arc::new(
+            ReservedMetadataRuntimeAdmissionHook {
+                calls: std::sync::Arc::clone(&calls),
+                releases: std::sync::Arc::clone(&releases),
+                initially_allowed,
+            },
+        ));
+
+        let agent_kp = make_keypair();
+        let cap = make_capability(
+            &kernel,
+            &agent_kp,
+            make_scope(vec![make_grant(
+                "srv-nested-reserved-hook-metadata",
+                "destructive_update",
+            )]),
+            300,
+        );
+        let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+        kernel.activate_session(&session_id)?;
+        let request_id = format!("req-nested-reserved-hook-metadata-{ordinal}");
+        let context =
+            make_operation_context(&session_id, &request_id, &agent_kp.public_key().to_hex());
+        let operation = ToolCallOperation {
+            capability: cap,
+            server_id: "srv-nested-reserved-hook-metadata".to_string(),
+            tool_name: "destructive_update".to_string(),
+            arguments: serde_json::json!({"record": ordinal}),
+            governed_intent: None,
+            supplemental_authorization: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            execution_nonce: None,
+            model_metadata: None,
+            extra_metadata: None,
+            declassification_grant: None,
+        };
+        let mut client = NoopNestedFlowClient;
+
+        let response = kernel.evaluate_tool_call_operation_with_nested_flow_client(
+            &context,
+            &operation,
+            &mut client,
+        )?;
+
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(
+            response.reason.as_deref(),
+            Some("runtime admission hook returned reserved kernel receipt metadata")
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(releases.load(Ordering::SeqCst), 1);
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        assert!(response.receipt.verify_signature()?);
+        let metadata = response
+            .receipt
+            .metadata
+            .as_ref()
+            .ok_or_else(|| "runtime reservation metadata missing".to_string())?;
+        assert!(metadata.get("budget_authority").is_none());
+        assert!(metadata.get("budget_denial_authority").is_none());
+        assert!(metadata.get("financial").is_none());
+        assert!(metadata.get("governed_transaction").is_none());
+        assert_eq!(
+            metadata["runtime_reservation"]["reservation_id"],
+            "runtime-reservation-safe"
+        );
+    }
     Ok(())
 }
 

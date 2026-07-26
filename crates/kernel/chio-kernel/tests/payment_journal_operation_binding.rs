@@ -256,6 +256,7 @@ fn operation_owned_composite_input(
         )
         .expect("valid revocation set"),
         authorization_artifact_digests: Vec::new(),
+        partition_escrow_evidence: None,
     }
 }
 

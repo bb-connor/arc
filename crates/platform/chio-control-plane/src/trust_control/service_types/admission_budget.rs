@@ -1,5 +1,16 @@
 use super::*;
 
+pub(crate) const COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_PROTOCOL_VERSION: &str =
+    "chio.committed-composite-authorization-query.v1";
+pub(crate) const COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_SERVICE: &str = "chio.trust-control";
+pub(crate) const COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_NAMESPACE: &str =
+    "chio.admission-consensus.composite-authorize";
+pub(crate) const COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_ENVELOPE_SCHEMA: &str =
+    "chio.committed-composite-authorization-query-envelope.v1";
+pub(crate) const COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_MAX_TTL_SECS: u64 = 30;
+const COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_SIGNATURE_DOMAIN: &[u8] =
+    b"chio.committed-composite-authorization-query-envelope.v1\0";
+
 /// Closed wire vocabulary for structured invocation quota ownership.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum BudgetQuotaProfileView {
@@ -81,6 +92,20 @@ pub(crate) struct BudgetSupplementalQuotaBindingView {
     pub(crate) verifier_id: String,
     pub(crate) request_binding_hash: String,
     pub(crate) negotiated_features_digest: String,
+    pub(crate) issuer: chio_core::crypto::PublicKey,
+    pub(crate) not_before: u64,
+    pub(crate) expires_at: u64,
+    pub(crate) request_constraint_digest: String,
+    pub(crate) broker_capability_id: String,
+    pub(crate) claim_binding_digest: String,
+    pub(crate) verified_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct BudgetPartitionEscrowEvidenceView {
+    pub(crate) canonical_json: String,
+    pub(crate) digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,6 +119,8 @@ pub(crate) struct BudgetInvocationAdmissionEvidenceView {
     pub(crate) aggregate_binding_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) supplemental_binding: Option<BudgetSupplementalQuotaBindingView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) partition_escrow_evidence: Option<BudgetPartitionEscrowEvidenceView>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,6 +147,8 @@ pub(crate) enum BudgetMonetaryHoldStateView {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CompositeBudgetAuthorizeRequest {
+    #[serde(default)]
+    pub(crate) existing_only: bool,
     pub(crate) operation_id: String,
     pub(crate) request_binding_hash: String,
     pub(crate) capability_id: String,
@@ -158,6 +187,163 @@ pub(crate) struct CompositeBudgetAuthorizeResponse {
     pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) budget_commit: Option<BudgetWriteCommitView>,
+}
+
+/// One replica's authenticated, read-only view of a committed composite
+/// authorization or of its absence at a current-term read barrier.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CommittedCompositeAuthorizationQueryView {
+    pub(crate) service_namespace: String,
+    pub(crate) request_digest: String,
+    pub(crate) operation_id: String,
+    pub(crate) request_binding_hash: String,
+    pub(crate) hold_id: String,
+    pub(crate) event_id: String,
+    pub(crate) scoped_operation_id: String,
+    pub(crate) current_term: u64,
+    pub(crate) leader_id: String,
+    pub(crate) last_log_index: u64,
+    pub(crate) last_log_term: u64,
+    pub(crate) commit_index: u64,
+    pub(crate) last_applied: u64,
+    pub(crate) applied_state_digest: String,
+    pub(crate) read_barrier: AdmissionCommitProof,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) entry: Option<AdmissionLogEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) result_commit_proof: Option<AdmissionCommitProof>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) result_commit_target: Option<AdmissionLogEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) result: Option<AdmissionConsensusResult>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) authorization: Option<CompositeBudgetAuthorizeResponse>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) rejection: Option<CommittedCompositeAuthorizationRejectionView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CommittedCompositeAuthorizationRejectionView {
+    pub(crate) status_code: u16,
+    pub(crate) code: String,
+    pub(crate) message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CommittedCompositeAuthorizationRejectionEnvelopeView {
+    pub(crate) admission_consensus_rejection: CommittedCompositeAuthorizationRejectionView,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CommittedCompositeAuthorizationReplicaQueryRequest {
+    pub(crate) request_nonce: String,
+    pub(crate) request: CompositeBudgetAuthorizeRequest,
+}
+
+/// Node-bound body returned only on the authenticated cluster endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CommittedCompositeAuthorizationReplicaQueryResponseBody {
+    pub(crate) protocol_version: String,
+    pub(crate) consensus_protocol_version: String,
+    pub(crate) service: String,
+    pub(crate) membership_digest: String,
+    pub(crate) node_id: String,
+    pub(crate) request_nonce: String,
+    pub(crate) issued_at: u64,
+    pub(crate) expires_at: u64,
+    pub(crate) query: CommittedCompositeAuthorizationQueryView,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CommittedCompositeAuthorizationReplicaQueryResponse {
+    pub(crate) schema: String,
+    pub(crate) body: CommittedCompositeAuthorizationReplicaQueryResponseBody,
+    pub(crate) signer_public_key: PublicKey,
+    pub(crate) algorithm: chio_core::SigningAlgorithm,
+    pub(crate) signature: chio_core::Signature,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommittedCompositeAuthorizationReplicaQuerySigningPayload<'a> {
+    schema: &'a str,
+    body: &'a CommittedCompositeAuthorizationReplicaQueryResponseBody,
+    signer_public_key: &'a PublicKey,
+    algorithm: chio_core::SigningAlgorithm,
+}
+
+impl CommittedCompositeAuthorizationReplicaQueryResponse {
+    pub(crate) fn sign(
+        body: CommittedCompositeAuthorizationReplicaQueryResponseBody,
+        keypair: &Keypair,
+    ) -> Result<Self, String> {
+        let signer_public_key = keypair.public_key();
+        let algorithm = signer_public_key.algorithm();
+        let signing_bytes = committed_composite_authorization_query_signing_bytes(
+            &body,
+            &signer_public_key,
+            algorithm,
+        )?;
+        Ok(Self {
+            schema: COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_ENVELOPE_SCHEMA.to_string(),
+            body,
+            signer_public_key,
+            algorithm,
+            signature: keypair.sign(&signing_bytes),
+        })
+    }
+
+    pub(crate) fn verify_signature(&self, expected_signer: &PublicKey) -> Result<(), String> {
+        if self.schema != COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_ENVELOPE_SCHEMA
+            || &self.signer_public_key != expected_signer
+            || self.algorithm != self.signer_public_key.algorithm()
+            || self.algorithm != self.signature.algorithm()
+        {
+            return Err(
+                "committed composite authorization query signer envelope mismatch".to_string(),
+            );
+        }
+        let signing_bytes = committed_composite_authorization_query_signing_bytes(
+            &self.body,
+            &self.signer_public_key,
+            self.algorithm,
+        )?;
+        if !self
+            .signer_public_key
+            .verify(&signing_bytes, &self.signature)
+        {
+            return Err(
+                "committed composite authorization query response signature is invalid".to_string(),
+            );
+        }
+        Ok(())
+    }
+}
+
+fn committed_composite_authorization_query_signing_bytes(
+    body: &CommittedCompositeAuthorizationReplicaQueryResponseBody,
+    signer_public_key: &PublicKey,
+    algorithm: chio_core::SigningAlgorithm,
+) -> Result<Vec<u8>, String> {
+    let payload = CommittedCompositeAuthorizationReplicaQuerySigningPayload {
+        schema: COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_ENVELOPE_SCHEMA,
+        body,
+        signer_public_key,
+        algorithm,
+    };
+    let canonical = canonical_json_bytes(&payload).map_err(|error| error.to_string())?;
+    let mut bytes = Vec::with_capacity(
+        COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_SIGNATURE_DOMAIN.len() + canonical.len(),
+    );
+    bytes.extend_from_slice(COMMITTED_COMPOSITE_AUTHORIZATION_QUERY_SIGNATURE_DOMAIN);
+    bytes.extend_from_slice(&canonical);
+    Ok(bytes)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -259,7 +445,7 @@ pub(crate) enum BudgetGuaranteeLevelView {
     AdvisoryPosthoc,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct AdmissionCaptureMetadataView {
     pub(crate) operation_id: String,
@@ -276,8 +462,11 @@ pub(crate) struct AdmissionCaptureMetadataView {
     pub(crate) budget_commit_index: Option<u64>,
     pub(crate) revocation_commit_index: u64,
     pub(crate) authority_commit_index: u64,
-    pub(crate) leader_epoch: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) leader_epoch: Option<u64>,
     pub(crate) guarantee_level: BudgetGuaranteeLevelView,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) partition_escrow_evidence: Option<BudgetPartitionEscrowEvidenceView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) authority: Option<BudgetMutationAuthorityView>,
     pub(crate) invocation_state: BudgetInvocationReservationStateView,
@@ -398,7 +587,15 @@ mod tests {
                 verifier_id: "broker-capability-verifier-v1".to_string(),
                 request_binding_hash: "66".repeat(32),
                 negotiated_features_digest: "77".repeat(32),
+                issuer: chio_core::crypto::Keypair::from_seed(&[81; 32]).public_key(),
+                not_before: 90,
+                expires_at: 300,
+                request_constraint_digest: "88".repeat(32),
+                broker_capability_id: "broker-capability-1".to_string(),
+                claim_binding_digest: "99".repeat(32),
+                verified_at: 100,
             }),
+            partition_escrow_evidence: None,
         }
     }
 
@@ -421,6 +618,7 @@ mod tests {
             lease_ttl_ms: 750,
             guarantee_level: "ha_linearizable".to_string(),
             budget_commit_index: Some(42),
+            partition_escrow_evidence: None,
         }
     }
 
@@ -504,6 +702,7 @@ mod tests {
     #[test]
     fn composite_authorize_contract_round_trips_without_caller_authority() {
         let request = CompositeBudgetAuthorizeRequest {
+            existing_only: false,
             operation_id: "operation-42".to_string(),
             request_binding_hash: "44".repeat(32),
             capability_id: "cap-leaf".to_string(),
@@ -655,8 +854,9 @@ mod tests {
             budget_commit_index: Some(42),
             revocation_commit_index: 42,
             authority_commit_index: 42,
-            leader_epoch: 7,
+            leader_epoch: Some(7),
             guarantee_level: BudgetGuaranteeLevelView::HaLinearizable,
+            partition_escrow_evidence: None,
             authority: Some(mutation_authority()),
             invocation_state: BudgetInvocationReservationStateView::Captured,
             monetary_state: BudgetMonetaryHoldStateView::Exposed,
@@ -764,8 +964,9 @@ mod tests {
                 budget_commit_index: None,
                 revocation_commit_index: 43,
                 authority_commit_index: 43,
-                leader_epoch: 7,
+                leader_epoch: Some(7),
                 guarantee_level: BudgetGuaranteeLevelView::HaLinearizable,
+                partition_escrow_evidence: None,
                 authority: Some(mutation_authority()),
                 invocation_state: BudgetInvocationReservationStateView::Authorized,
                 monetary_state: BudgetMonetaryHoldStateView::Exposed,
@@ -783,6 +984,10 @@ mod tests {
     fn dedicated_admission_paths_are_stable() {
         assert_eq!(BUDGET_AUTHORIZE_HOLD_PATH, "/v1/budgets/authorize-hold");
         assert_eq!(
+            BUDGET_AUTHORIZE_HOLD_QUERY_PATH,
+            "/v1/budgets/authorize-hold/query"
+        );
+        assert_eq!(
             BUDGET_CAPTURE_INVOCATIONS_PATH,
             "/v1/budgets/capture-invocations"
         );
@@ -795,6 +1000,10 @@ mod tests {
         assert_eq!(
             INTERNAL_ADMISSION_CAPTURE_QUERY_PATH,
             "/v1/internal/admission-consensus/capture-query"
+        );
+        assert_eq!(
+            INTERNAL_COMPOSITE_AUTHORIZE_QUERY_PATH,
+            "/v1/internal/admission-consensus/composite-authorize-query"
         );
         assert_eq!(
             INTERNAL_INVOCATION_CAPTURE_QUERY_PATH,

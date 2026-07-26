@@ -1,5 +1,7 @@
 use super::store::{
     BudgetAdmissionOperationParts, BudgetHoldCreateInput, BudgetMutationEventInput,
+    SqliteInvocationQuotaMutationAction, SqliteInvocationQuotaMutationContext,
+    SqliteInvocationQuotaMutationMode, SqliteLegacyProjectionMutation, SqliteLegacyProjectionState,
 };
 use super::*;
 
@@ -25,11 +27,14 @@ struct StoredCompositeAuthorization {
     aggregate_root_capability_id: Option<String>,
     aggregate_root_binding_digest: Option<String>,
     authorization_artifact_digests: Vec<String>,
+    partition_escrow_evidence: Option<PartitionEscrowCommitEvidence>,
 }
 
 #[derive(Debug)]
 struct StagedQuota {
     quota: BudgetInvocationQuota,
+    before_reserved: u32,
+    before_captured: u32,
     reserved: u32,
     captured: u32,
     exists: bool,
@@ -144,6 +149,7 @@ impl StoredCompositeAuthorization {
                     .collect(),
                 revocation_set: self.revocation_set.clone(),
                 authorization_artifact_digests: self.authorization_artifact_digests.clone(),
+                partition_escrow_evidence: self.partition_escrow_evidence.clone(),
             },
             aggregate_family_evidence: match (
                 self.aggregate_root_capability_id.as_ref(),
@@ -171,13 +177,31 @@ impl StoredCompositeAuthorization {
         request: &SqliteCompositeAuthorizeInput,
         aggregate_family_evidence: Option<&SqliteAggregateFamilyEvidence>,
     ) -> bool {
+        let financial_input_matches = self.requested_exposure_units
+            == request.requested_exposure_units
+            && self.max_cost_per_invocation == request.max_cost_per_invocation
+            && self.max_total_cost_units == request.max_total_cost_units;
+        let normalized_denial_matches = !self.allowed
+            && self.invocation_state == BudgetInvocationReservationState::Denied
+            && self.requested_exposure_units
+                == if request.requested_exposure_units > i64::MAX as u64 {
+                    0
+                } else {
+                    request.requested_exposure_units
+                }
+            && self.max_cost_per_invocation
+                == request
+                    .max_cost_per_invocation
+                    .filter(|value| *value <= i64::MAX as u64)
+            && self.max_total_cost_units
+                == request
+                    .max_total_cost_units
+                    .filter(|value| *value <= i64::MAX as u64);
         self.hold_id == request.hold_id
             && self.event_id == request.event_id
             && self.capability_id == request.capability_id
             && self.grant_index == request.grant_index
-            && self.requested_exposure_units == request.requested_exposure_units
-            && self.max_cost_per_invocation == request.max_cost_per_invocation
-            && self.max_total_cost_units == request.max_total_cost_units
+            && (financial_input_matches || normalized_denial_matches)
             && self.authority == request.authority
             && self.revocation_set == request.revocation_set
             && self.aggregate_root_capability_id.as_deref()
@@ -185,6 +209,7 @@ impl StoredCompositeAuthorization {
             && self.aggregate_root_binding_digest.as_deref()
                 == aggregate_family_evidence.map(|evidence| evidence.root_binding_digest.as_str())
             && self.authorization_artifact_digests == request.authorization_artifact_digests
+            && self.partition_escrow_evidence == request.partition_escrow_evidence
             && self
                 .invocation_counts_after
                 .iter()
@@ -195,8 +220,9 @@ impl StoredCompositeAuthorization {
     fn into_decision(self) -> BudgetAuthorizeHoldDecision {
         let metadata = composite_metadata(
             self.authority,
-            self.allowed.then_some(self.event_seq),
+            Some(self.event_seq),
             self.event_id,
+            self.partition_escrow_evidence,
         );
         if self.allowed {
             BudgetAuthorizeHoldDecision::Authorized(AuthorizedBudgetHold {
@@ -638,6 +664,8 @@ impl SqliteBudgetStore {
             }
             staged.push(StagedQuota {
                 quota: quota.clone(),
+                before_reserved: reserved,
+                before_captured: captured,
                 reserved: reserved - 1,
                 captured: captured.checked_add(1).ok_or_else(|| {
                     BudgetStoreError::Overflow(
@@ -680,24 +708,26 @@ impl SqliteBudgetStore {
         let event_seq = allocate_budget_replication_seq(transaction)?;
         let now = unix_now();
         persist_quota_rows(transaction, &staged, event_seq, now)?;
-        let updated_projection = transaction.execute(
-            r#"
-            UPDATE capability_grant_budgets
-            SET updated_at = ?3, seq = ?4
-            WHERE capability_id = ?1 AND grant_index = ?2
-            "#,
-            params![
-                request.capability_id,
-                request.grant_index as i64,
-                now,
-                sqlite_integer_from_u64(event_seq, "composite projection sequence")?,
-            ],
+        SqliteBudgetStore::compare_and_persist_legacy_projection(
+            transaction,
+            SqliteLegacyProjectionMutation {
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                expected: legacy_usage.3.map(|seq| SqliteLegacyProjectionState {
+                    invocation_count: legacy_usage.0,
+                    total_cost_exposed: legacy_usage.1,
+                    total_cost_realized_spend: legacy_usage.2,
+                    seq,
+                }),
+                after: SqliteLegacyProjectionState {
+                    invocation_count: legacy_usage.0,
+                    total_cost_exposed: legacy_usage.1,
+                    total_cost_realized_spend: legacy_usage.2,
+                    seq: event_seq,
+                },
+                updated_at: now,
+            },
         )?;
-        if updated_projection != 1 {
-            return Err(BudgetStoreError::Invariant(
-                "missing composite budget usage row".to_string(),
-            ));
-        }
         let updated_hold = transaction.execute(
             r#"
             UPDATE budget_composite_holds
@@ -777,6 +807,7 @@ impl SqliteBudgetStore {
                 request.authority.clone(),
                 Some(event_seq),
                 event_id.to_string(),
+                load_partition_escrow_authorization_evidence(transaction, hold_id)?,
             ),
         })
     }
@@ -930,6 +961,8 @@ impl SqliteBudgetStore {
             }
             staged.push(StagedQuota {
                 quota: quota.clone(),
+                before_reserved: reserved,
+                before_captured: captured,
                 reserved: reserved - 1,
                 captured,
                 exists: true,
@@ -976,27 +1009,26 @@ impl SqliteBudgetStore {
         let event_seq = allocate_budget_replication_seq(transaction)?;
         let now = unix_now();
         persist_quota_rows(transaction, &staged, event_seq, now)?;
-        let updated_projection = transaction.execute(
-            r#"
-            UPDATE capability_grant_budgets
-            SET invocation_count = ?3, total_cost_exposed = ?4,
-                updated_at = ?5, seq = ?6
-            WHERE capability_id = ?1 AND grant_index = ?2
-            "#,
-            params![
-                request.capability_id,
-                request.grant_index as i64,
-                i64::from(primary_count_after),
-                sqlite_integer_from_u64(exposed_after, "composite exposed total")?,
-                now,
-                sqlite_integer_from_u64(event_seq, "composite projection sequence")?,
-            ],
+        SqliteBudgetStore::compare_and_persist_legacy_projection(
+            transaction,
+            SqliteLegacyProjectionMutation {
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                expected: legacy_usage.3.map(|seq| SqliteLegacyProjectionState {
+                    invocation_count: legacy_usage.0,
+                    total_cost_exposed: legacy_usage.1,
+                    total_cost_realized_spend: legacy_usage.2,
+                    seq,
+                }),
+                after: SqliteLegacyProjectionState {
+                    invocation_count: primary_count_after,
+                    total_cost_exposed: exposed_after,
+                    total_cost_realized_spend: legacy_usage.2,
+                    seq: event_seq,
+                },
+                updated_at: now,
+            },
         )?;
-        if updated_projection != 1 {
-            return Err(BudgetStoreError::Invariant(
-                "missing composite budget usage row".to_string(),
-            ));
-        }
         let updated_hold = transaction.execute(
             r#"
             UPDATE budget_composite_holds
@@ -1060,7 +1092,7 @@ impl SqliteBudgetStore {
             admission_operation,
         )?;
         Ok(BudgetHoldMutationDecision {
-            hold_id: request.hold_id,
+            hold_id: request.hold_id.clone(),
             exposure_units: request.reversed_exposure_units,
             realized_spend_units: 0,
             committed_cost_units_after: checked_committed_cost_units(
@@ -1072,7 +1104,12 @@ impl SqliteBudgetStore {
             invocation_state: BudgetInvocationReservationState::Reversed,
             monetary_state,
             revocation_set: Some(current_hold.revocation_set),
-            metadata: composite_metadata(request.authority, Some(event_seq), event_id.to_string()),
+            metadata: composite_metadata(
+                request.authority,
+                Some(event_seq),
+                event_id.to_string(),
+                load_partition_escrow_authorization_evidence(transaction, hold_id)?,
+            ),
         })
     }
 
@@ -1330,7 +1367,7 @@ impl SqliteBudgetStore {
             admission_operation,
         )?;
         Ok(BudgetHoldMutationDecision {
-            hold_id: request.hold_id,
+            hold_id: request.hold_id.clone(),
             exposure_units: request.exposed_cost_units,
             realized_spend_units: request.realized_spend_units,
             committed_cost_units_after: checked_committed_cost_units(
@@ -1342,7 +1379,12 @@ impl SqliteBudgetStore {
             invocation_state: current_hold.invocation_state,
             monetary_state: next_monetary_state,
             revocation_set: Some(current_hold.revocation_set),
-            metadata: composite_metadata(request.authority, Some(event_seq), event_id.to_string()),
+            metadata: composite_metadata(
+                request.authority,
+                Some(event_seq),
+                event_id.to_string(),
+                load_partition_escrow_authorization_evidence(transaction, hold_id)?,
+            ),
         })
     }
 
@@ -1572,7 +1614,7 @@ impl SqliteBudgetStore {
             admission_operation,
         )?;
         Ok(BudgetHoldMutationDecision {
-            hold_id: request.hold_id,
+            hold_id: request.hold_id.clone(),
             exposure_units: request.released_exposure_units,
             realized_spend_units: 0,
             committed_cost_units_after: checked_committed_cost_units(
@@ -1584,7 +1626,12 @@ impl SqliteBudgetStore {
             invocation_state: current_hold.invocation_state,
             monetary_state: next_monetary_state,
             revocation_set: Some(current_hold.revocation_set),
-            metadata: composite_metadata(request.authority, Some(event_seq), event_id.to_string()),
+            metadata: composite_metadata(
+                request.authority,
+                Some(event_seq),
+                event_id.to_string(),
+                load_partition_escrow_authorization_evidence(transaction, hold_id)?,
+            ),
         })
     }
 }

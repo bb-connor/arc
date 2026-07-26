@@ -56,6 +56,20 @@ jobs:
       - name: Run threat-model coverage gate (file-existence)
         run: bash scripts/check-threat-coverage.sh
 
+      - name: Install and authenticate cargo-mutants
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install cargo-mutants --locked --version 25.3.1
+          cargo_mutants="$(command -v cargo-mutants)"
+          test -n "${cargo_mutants}"
+          test "$(realpath "${cargo_mutants}")" = "${cargo_mutants}"
+          test -f "${cargo_mutants}"
+          test ! -L "${cargo_mutants}"
+          test -x "${cargo_mutants}"
+          test "$(stat -c '%h' "${cargo_mutants}")" = "1"
+          test "$("${cargo_mutants}" mutants --version)" = "cargo-mutants 25.3.1"
+
       - name: Run threat-model mutants gate (per-row evidence)
         run: bash scripts/check-threat-coverage-mutants.sh
 

@@ -4,6 +4,7 @@ use chio_core::capability::aggregate_budget::{
 use serde::{Deserialize, Serialize};
 
 use crate::supplemental_quota::{CanonicalRevocationSet, VerifiedSupplementalQuota};
+use crate::partition_escrow::{PartitionEscrowAdmission, PartitionEscrowAdmissionEvidence};
 use chio_log_redact::redacted;
 
 #[derive(Debug, thiserror::Error)]
@@ -19,6 +20,9 @@ pub enum BudgetStoreError {
 
     #[error("budget state conflict: {0}")]
     Conflict(String),
+
+    #[error("committed budget authorization replay is absent: {0}")]
+    MissingCommittedReplay(String),
 
     #[error("budget state invariant violated: {0}")]
     Invariant(String),
@@ -224,6 +228,13 @@ struct SupplementalQuotaBinding {
     verifier_id: String,
     request_binding_hash: String,
     negotiated_features_digest: String,
+    issuer: chio_core::crypto::PublicKey,
+    not_before: u64,
+    expires_at: u64,
+    request_constraint_digest: String,
+    broker_capability_id: String,
+    claim_binding_digest: String,
+    verified_at: u64,
 }
 
 /// Read-only projection of invocation admission evidence derived by the kernel.
@@ -279,6 +290,59 @@ impl<'a> BudgetInvocationAdmissionEvidence<'a> {
             .as_ref()
             .map(|binding| binding.negotiated_features_digest.as_str())
     }
+
+    pub fn supplemental_issuer(self) -> Option<&'a chio_core::crypto::PublicKey> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| &binding.issuer)
+    }
+
+    pub fn supplemental_not_before(self) -> Option<u64> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.not_before)
+    }
+
+    pub fn supplemental_expires_at(self) -> Option<u64> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.expires_at)
+    }
+
+    pub fn supplemental_request_constraint_digest(self) -> Option<&'a str> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.request_constraint_digest.as_str())
+    }
+
+    pub fn supplemental_broker_capability_id(self) -> Option<&'a str> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.broker_capability_id.as_str())
+    }
+
+    pub fn supplemental_claim_binding_digest(self) -> Option<&'a str> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.claim_binding_digest.as_str())
+    }
+
+    pub fn supplemental_verified_at(self) -> Option<u64> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.verified_at)
+    }
+
+    pub fn partition_escrow_evidence(self) -> Option<&'a PartitionEscrowAdmissionEvidence> {
+        self.admission.partition_escrow_evidence.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -288,6 +352,7 @@ pub(crate) struct VerifiedInvocationAdmission {
     aggregate_root_capability_id: Option<String>,
     aggregate_binding_digest: Option<String>,
     supplemental_binding: Option<SupplementalQuotaBinding>,
+    partition_escrow_evidence: Option<PartitionEscrowAdmissionEvidence>,
 }
 
 impl VerifiedInvocationAdmission {
@@ -306,12 +371,42 @@ impl VerifiedInvocationAdmission {
         )
     }
 
-    fn quotas(&self) -> &[BudgetInvocationQuota] {
+    pub(crate) fn quotas(&self) -> &[BudgetInvocationQuota] {
         &self.quotas
     }
 
-    fn revocation_set(&self) -> &CanonicalRevocationSet {
+    pub(crate) fn revocation_set(&self) -> &CanonicalRevocationSet {
         &self.revocation_set
+    }
+
+    pub(crate) fn evidence(&self) -> BudgetInvocationAdmissionEvidence<'_> {
+        BudgetInvocationAdmissionEvidence { admission: self }
+    }
+
+    pub(crate) fn install_partition_escrow(
+        mut self,
+        escrow: &PartitionEscrowAdmission,
+    ) -> Result<Self, BudgetStoreError> {
+        if self.partition_escrow_evidence.is_some()
+            || self.quotas.len() != escrow.quotas().len()
+            || self
+                .quotas
+                .iter()
+                .zip(escrow.quotas())
+                .any(|(global, local)| global != local.global_quota())
+        {
+            return Err(BudgetStoreError::Invariant(
+                "partition escrow admission changed the verified global quota projection"
+                    .to_string(),
+            ));
+        }
+        self.quotas = escrow
+            .quotas()
+            .iter()
+            .map(|quota| quota.local_quota().clone())
+            .collect();
+        self.partition_escrow_evidence = Some(escrow.evidence().clone());
+        Ok(self)
     }
 }
 
@@ -360,6 +455,13 @@ pub(crate) fn derive_verified_invocation_admission(
                 verifier_id: supplemental.verifier_id().to_string(),
                 request_binding_hash: supplemental.request_binding_hash().to_string(),
                 negotiated_features_digest: supplemental.negotiated_features_digest().to_string(),
+                issuer: supplemental.issuer().clone(),
+                not_before: supplemental.not_before(),
+                expires_at: supplemental.expires_at(),
+                request_constraint_digest: supplemental.request_constraint_digest().to_string(),
+                broker_capability_id: supplemental.broker_capability_id().to_string(),
+                claim_binding_digest: supplemental.claim_binding_digest().to_string(),
+                verified_at: supplemental.verified_at(),
             }),
         )
     } else {
@@ -389,6 +491,7 @@ pub(crate) fn derive_verified_invocation_admission(
         aggregate_root_capability_id,
         aggregate_binding_digest,
         supplemental_binding,
+        partition_escrow_evidence: None,
     })
 }
 
@@ -746,6 +849,179 @@ pub enum BudgetStoreProfile {
     SharedLinearizable,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartitionEscrowStoreBinding {
+    store_identity_digest: String,
+    counter_namespace_digest: String,
+    fencing_token: u64,
+}
+
+pub const MAX_PARTITION_ESCROW_ADMISSION_EVIDENCE_BYTES: usize = 1_048_576;
+
+/// Exact signed allocation evidence cross-bound into a budget store commit.
+///
+/// Construction reparses the strict canonical envelope and recomputes its
+/// domain-separated digest. A commit can therefore carry this value only when
+/// the full evidence bytes, rather than a caller-provided label, survived the
+/// authorization boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartitionEscrowCommitEvidence {
+    canonical_json: String,
+    evidence_digest: String,
+}
+
+impl PartitionEscrowCommitEvidence {
+    pub fn from_admission_evidence(
+        evidence: &PartitionEscrowAdmissionEvidence,
+    ) -> Result<Self, BudgetStoreError> {
+        let canonical = evidence.canonical_bytes().map_err(|error| {
+            BudgetStoreError::Invariant(format!(
+                "partition escrow admission evidence canonicalization failed: {error}"
+            ))
+        })?;
+        let canonical_json = String::from_utf8(canonical).map_err(|error| {
+            BudgetStoreError::Invariant(format!(
+                "partition escrow admission evidence is not UTF-8 JSON: {error}"
+            ))
+        })?;
+        let evidence_digest = evidence.digest().map_err(|error| {
+            BudgetStoreError::Invariant(format!(
+                "partition escrow admission evidence digest failed: {error}"
+            ))
+        })?;
+        Self::from_canonical_json(canonical_json, evidence_digest)
+    }
+
+    pub fn from_canonical_json(
+        canonical_json: String,
+        evidence_digest: String,
+    ) -> Result<Self, BudgetStoreError> {
+        if canonical_json.is_empty()
+            || canonical_json.len() > MAX_PARTITION_ESCROW_ADMISSION_EVIDENCE_BYTES
+        {
+            return Err(BudgetStoreError::Invariant(
+                "partition escrow admission evidence is empty or exceeds its byte limit"
+                    .to_string(),
+            ));
+        }
+        if evidence_digest.len() != 64
+            || !evidence_digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        {
+            return Err(BudgetStoreError::Invariant(
+                "partition escrow admission evidence digest must be lowercase SHA-256 hex"
+                    .to_string(),
+            ));
+        }
+        let evidence = PartitionEscrowAdmissionEvidence::from_canonical_json_bytes(
+            canonical_json.as_bytes(),
+        )
+        .map_err(|error| {
+            BudgetStoreError::Invariant(format!(
+                "partition escrow admission evidence envelope is invalid: {error}"
+            ))
+        })?;
+        let actual_digest = evidence.digest().map_err(|error| {
+            BudgetStoreError::Invariant(format!(
+                "partition escrow admission evidence digest failed: {error}"
+            ))
+        })?;
+        if actual_digest != evidence_digest {
+            return Err(BudgetStoreError::Conflict(
+                "partition escrow admission evidence digest does not match its canonical envelope"
+                    .to_string(),
+            ));
+        }
+        Ok(Self {
+            canonical_json,
+            evidence_digest,
+        })
+    }
+
+    pub fn canonical_json(&self) -> &str {
+        &self.canonical_json
+    }
+
+    pub fn evidence_digest(&self) -> &str {
+        &self.evidence_digest
+    }
+
+    pub fn evidence(&self) -> Result<PartitionEscrowAdmissionEvidence, BudgetStoreError> {
+        PartitionEscrowAdmissionEvidence::from_canonical_json_bytes(self.canonical_json.as_bytes())
+            .map_err(|error| {
+                BudgetStoreError::Invariant(format!(
+                    "partition escrow commit evidence envelope is invalid: {error}"
+                ))
+            })
+    }
+
+    pub fn validate_store_binding(
+        &self,
+        binding: &PartitionEscrowStoreBinding,
+    ) -> Result<(), BudgetStoreError> {
+        let evidence = self.evidence()?;
+        let durable = evidence.durable_store();
+        if durable.store_identity_digest() != binding.store_identity_digest()
+            || durable.counter_namespace_digest() != binding.counter_namespace_digest()
+            || durable.fencing_token() != binding.fencing_token()
+        {
+            return Err(BudgetStoreError::Conflict(
+                "partition escrow evidence does not match the durable store binding".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl PartitionEscrowStoreBinding {
+    pub fn new(
+        store_identity_digest: String,
+        counter_namespace_digest: String,
+        fencing_token: u64,
+    ) -> Result<Self, BudgetStoreError> {
+        for (label, digest) in [
+            ("partition escrow store identity", &store_identity_digest),
+            (
+                "partition escrow counter namespace",
+                &counter_namespace_digest,
+            ),
+        ] {
+            if digest.len() != 64
+                || !digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+            {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "{label} digest must be lowercase SHA-256 hex"
+                )));
+            }
+        }
+        if fencing_token == 0 {
+            return Err(BudgetStoreError::Invariant(
+                "partition escrow fencing token must be nonzero".to_string(),
+            ));
+        }
+        Ok(Self {
+            store_identity_digest,
+            counter_namespace_digest,
+            fencing_token,
+        })
+    }
+
+    pub fn store_identity_digest(&self) -> &str {
+        &self.store_identity_digest
+    }
+
+    pub fn counter_namespace_digest(&self) -> &str {
+        &self.counter_namespace_digest
+    }
+
+    pub const fn fencing_token(&self) -> u64 {
+        self.fencing_token
+    }
+}
+
 impl BudgetStoreProfile {
     #[must_use]
     pub fn supports_dispatch_workers(self, dispatch_worker_count: usize) -> bool {
@@ -825,6 +1101,7 @@ pub struct BudgetCommitMetadata {
     pub metering_profile: BudgetMeteringProfile,
     pub budget_commit_index: Option<u64>,
     pub event_id: Option<String>,
+    pub partition_escrow_evidence: Option<PartitionEscrowCommitEvidence>,
 }
 
 impl BudgetCommitMetadata {
@@ -851,7 +1128,14 @@ pub fn budget_commit_metadata<T: BudgetStore + ?Sized>(
         metering_profile: store.budget_metering_profile(),
         budget_commit_index,
         event_id,
+        partition_escrow_evidence: None,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BudgetAuthorizationPolicy {
+    FreshOrReplay,
+    ExistingOnly,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -886,6 +1170,7 @@ pub struct BudgetAuthorizeHoldRequest {
     pub authority: Option<BudgetEventAuthority>,
     pub admission_operation: Option<BudgetAdmissionOperationBinding>,
     invocation_admission: Option<VerifiedInvocationAdmission>,
+    pub(crate) authorization_policy: BudgetAuthorizationPolicy,
     /// Optional payment-journal row committed in the SAME transaction as
     /// the hold write, so the money path's recoverable record is durable
     /// before the rail is touched. `None` for non-monetary calls and for
@@ -949,6 +1234,8 @@ pub struct BudgetAuthorizationCleanupSnapshot {
     aggregate_root_capability_id: Option<String>,
     aggregate_binding_digest: Option<String>,
     supplemental_binding: Option<BudgetCleanupSupplementalBinding>,
+    partition_escrow_evidence_canonical_json: Option<Vec<u8>>,
+    partition_escrow_evidence_digest: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -967,6 +1254,13 @@ struct BudgetCleanupSupplementalBinding {
     verifier_id: String,
     request_binding_hash: String,
     negotiated_features_digest: String,
+    issuer: chio_core::crypto::PublicKey,
+    not_before: u64,
+    expires_at: u64,
+    request_constraint_digest: String,
+    broker_capability_id: String,
+    claim_binding_digest: String,
+    verified_at: u64,
 }
 
 impl BudgetAuthorizationCleanupSnapshot {
@@ -1021,7 +1315,53 @@ impl BudgetAuthorizationCleanupSnapshot {
                     verifier_id: binding.verifier_id.clone(),
                     request_binding_hash: binding.request_binding_hash.clone(),
                     negotiated_features_digest: binding.negotiated_features_digest.clone(),
+                    issuer: binding.issuer.clone(),
+                    not_before: binding.not_before,
+                    expires_at: binding.expires_at,
+                    request_constraint_digest: binding.request_constraint_digest.clone(),
+                    broker_capability_id: binding.broker_capability_id.clone(),
+                    claim_binding_digest: binding.claim_binding_digest.clone(),
+                    verified_at: binding.verified_at,
                 });
+        let partition_escrow_evidence = match (
+            self.partition_escrow_evidence_canonical_json.as_deref(),
+            self.partition_escrow_evidence_digest.as_deref(),
+        ) {
+            (Some(canonical), Some(expected_digest)) => {
+                let evidence = PartitionEscrowAdmissionEvidence::from_canonical_json_bytes(canonical)
+                    .map_err(|error| {
+                        BudgetStoreError::Invariant(format!(
+                            "cleanup partition escrow evidence is invalid: {error}"
+                        ))
+                    })?;
+                let digest = evidence.digest().map_err(|error| {
+                    BudgetStoreError::Invariant(format!(
+                        "cleanup partition escrow evidence digest failed: {error}"
+                    ))
+                })?;
+                if digest != expected_digest
+                    || evidence.quotas().len() != quotas.len()
+                    || evidence.quotas().iter().zip(&quotas).any(|(escrow, local)| {
+                        escrow.global_quota().profile() != local.key().profile().as_str()
+                            || escrow.global_quota().owner_id() != local.key().owner_id()
+                            || escrow.global_quota().grant_index() != local.key().grant_index()
+                            || escrow.local_allocated_invocations() != local.max_invocations()
+                    })
+                {
+                    return Err(BudgetStoreError::Invariant(
+                        "cleanup partition escrow evidence changed its digest or local quota projection"
+                            .to_string(),
+                    ));
+                }
+                Some(evidence)
+            }
+            (None, None) => None,
+            _ => {
+                return Err(BudgetStoreError::Invariant(
+                    "cleanup partition escrow evidence is incomplete".to_string(),
+                ));
+            }
+        };
         let admission_operation = BudgetAdmissionOperationBinding::new(
             self.operation_id.clone(),
             self.request_binding_hash.clone(),
@@ -1043,7 +1383,9 @@ impl BudgetAuthorizationCleanupSnapshot {
                 aggregate_root_capability_id: self.aggregate_root_capability_id.clone(),
                 aggregate_binding_digest: self.aggregate_binding_digest.clone(),
                 supplemental_binding,
+                partition_escrow_evidence,
             }),
+            authorization_policy: BudgetAuthorizationPolicy::ExistingOnly,
             payment_journal: None,
         })
     }
@@ -1104,14 +1446,20 @@ impl BudgetAuthorizationCleanupSnapshot {
     }
 
     pub fn requires_combined_capture(&self) -> bool {
-        self.supplemental_binding.is_some()
+        self.supplemental_binding.is_some() || self.partition_escrow_evidence_digest.is_some()
     }
 
     pub fn authorization_artifact_digests(&self) -> Vec<String> {
-        self.supplemental_binding
-            .iter()
-            .map(|binding| binding.artifact_digest.clone())
-            .collect()
+        let mut digests = Vec::with_capacity(2);
+        if let Some(binding) = self.supplemental_binding.as_ref() {
+            digests.push(binding.artifact_digest.clone());
+        }
+        if let Some(digest) = self.partition_escrow_evidence_digest.as_ref() {
+            digests.push(digest.clone());
+        }
+        digests.sort();
+        digests.dedup();
+        digests
     }
 
     pub fn aggregate_root_capability_id(&self) -> Option<&str> {
@@ -1145,6 +1493,10 @@ impl BudgetAuthorizationCleanupSnapshot {
     pub fn capture_event_id(&self) -> &str {
         &self.capture_event_id
     }
+
+    pub fn reverse_event_id(&self) -> &str {
+        &self.reverse_event_id
+    }
 }
 
 impl BudgetAuthorizeHoldRequest {
@@ -1172,6 +1524,7 @@ impl BudgetAuthorizeHoldRequest {
             authority,
             admission_operation: None,
             invocation_admission: None,
+            authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
             payment_journal: None,
         }
     }
@@ -1192,6 +1545,11 @@ impl BudgetAuthorizeHoldRequest {
         self.invocation_admission
             .as_ref()
             .map(|admission| BudgetInvocationAdmissionEvidence { admission })
+    }
+
+    #[must_use]
+    pub fn requires_existing_authorization_replay(&self) -> bool {
+        self.authorization_policy == BudgetAuthorizationPolicy::ExistingOnly
     }
 
     pub(crate) fn install_verified_invocation_admission(
@@ -1251,8 +1609,31 @@ impl BudgetAuthorizeHoldRequest {
                 verifier_id: binding.verifier_id.clone(),
                 request_binding_hash: binding.request_binding_hash.clone(),
                 negotiated_features_digest: binding.negotiated_features_digest.clone(),
+                issuer: binding.issuer.clone(),
+                not_before: binding.not_before,
+                expires_at: binding.expires_at,
+                request_constraint_digest: binding.request_constraint_digest.clone(),
+                broker_capability_id: binding.broker_capability_id.clone(),
+                claim_binding_digest: binding.claim_binding_digest.clone(),
+                verified_at: binding.verified_at,
             }
         });
+        let (partition_escrow_evidence_canonical_json, partition_escrow_evidence_digest) =
+            match admission.partition_escrow_evidence.as_ref() {
+                Some(evidence) => (
+                    Some(evidence.canonical_bytes().map_err(|error| {
+                        BudgetStoreError::Invariant(format!(
+                            "partition escrow cleanup evidence encoding failed: {error}"
+                        ))
+                    })?),
+                    Some(evidence.digest().map_err(|error| {
+                        BudgetStoreError::Invariant(format!(
+                            "partition escrow cleanup evidence digest failed: {error}"
+                        ))
+                    })?),
+                ),
+                None => (None, None),
+            };
         Ok(BudgetAuthorizationCleanupSnapshot {
             capability_id: self.capability_id.clone(),
             grant_index,
@@ -1273,6 +1654,8 @@ impl BudgetAuthorizeHoldRequest {
             aggregate_root_capability_id: admission.aggregate_root_capability_id.clone(),
             aggregate_binding_digest: admission.aggregate_binding_digest.clone(),
             supplemental_binding,
+            partition_escrow_evidence_canonical_json,
+            partition_escrow_evidence_digest,
         })
     }
 }
@@ -1469,4 +1852,8 @@ pub struct BudgetHoldSnapshot {
     /// than the nonce subject. `None` for holds never marked reserved.
     pub reserved_root_budget_holder: Option<String>,
     pub authority: Option<BudgetEventAuthority>,
+    /// Exact authorization commit lineage retained with the hold. Recovery and
+    /// reconcile-by-nonce must project this snapshot instead of reconstructing
+    /// guarantee, fencing, or signed allocation evidence from current config.
+    pub authorization_metadata: BudgetCommitMetadata,
 }

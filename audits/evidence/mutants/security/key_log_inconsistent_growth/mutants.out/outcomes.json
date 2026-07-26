@@ -1,0 +1,111 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 53.0664685,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-core-types@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 10.418112542,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-core-types@0.1.0",
+            "omitted_envelope_and_stale_consistency_proof_do_not_advance_witness_pin",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-core-types",
+          "file": "crates/core/chio-core-types/src/merkle.rs",
+          "function": {
+            "function_name": "MerkleConsistencyProof::verify",
+            "return_type": "-> Result<()>",
+            "span": {
+              "start": {
+                "line": 285,
+                "column": 5
+              },
+              "end": {
+                "line": 356,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 290,
+              "column": 9
+            },
+            "end": {
+              "line": 355,
+              "column": 10
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__chio-core-types__src__merkle.rs_line_290_col_9.log",
+      "diff_path": "diff/crates__core__chio-core-types__src__merkle.rs_line_290_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 14.778953208,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-keyring@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 6.6159567500000005,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-keyring@0.1.0",
+            "omitted_envelope_and_stale_consistency_proof_do_not_advance_witness_pin",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

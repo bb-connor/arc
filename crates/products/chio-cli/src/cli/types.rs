@@ -104,6 +104,21 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) admission_operation_db: Option<PathBuf>,
 
+    /// Canonical signed v1 descriptor for one immutable partition-escrow authority.
+    /// Live descriptor replacement is unsupported; stop and drain the deployment
+    /// before provisioning a different authority generation.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub(crate) partition_escrow_authority_descriptor: Option<PathBuf>,
+
+    /// Independently pinned signer of the partition-escrow authority descriptor.
+    #[arg(
+        long,
+        global = true,
+        env = "CHIO_PARTITION_ESCROW_AUTHORITY_SIGNER_PUBLIC_KEY",
+        value_parser = parse_partition_escrow_authority_signer_public_key
+    )]
+    pub(crate) partition_escrow_authority_signer_public_key: Option<chio_core::PublicKey>,
+
     /// SQLite database path for durable threshold approval replay state.
     #[arg(long, global = true)]
     pub(crate) approval_db: Option<PathBuf>,
@@ -175,6 +190,13 @@ pub(crate) struct Cli {
 fn parse_control_authority_public_key(value: &str) -> Result<chio_core::PublicKey, String> {
     chio_core::PublicKey::from_hex(value)
         .map_err(|error| format!("invalid control-authority public key: {error}"))
+}
+
+fn parse_partition_escrow_authority_signer_public_key(
+    value: &str,
+) -> Result<chio_core::PublicKey, String> {
+    chio_core::PublicKey::from_hex(value)
+        .map_err(|error| format!("invalid partition-escrow authority signer public key: {error}"))
 }
 
 fn parse_threshold_proposal_authority_public_key(

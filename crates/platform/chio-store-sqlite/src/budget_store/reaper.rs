@@ -1,3 +1,7 @@
+use super::store::{
+    SqliteInvocationQuotaMutationAction, SqliteInvocationQuotaMutationContext,
+    SqliteInvocationQuotaMutationMode, SqliteLegacyProjectionMutation, SqliteLegacyProjectionState,
+};
 use super::*;
 
 use std::collections::HashMap;
@@ -122,9 +126,9 @@ impl SqliteBudgetStore {
                     "caller reservation recovery grant index exceeds SQLite INTEGER".to_string(),
                 )
             })?;
-            let current: Option<(u32, u64, u64)> = transaction
+            let current: Option<(u32, u64, u64, u64)> = transaction
                 .query_row(
-                    "SELECT invocation_count, total_cost_exposed, total_cost_realized_spend \
+                    "SELECT invocation_count, total_cost_exposed, total_cost_realized_spend, seq \
                      FROM capability_grant_budgets \
                      WHERE capability_id = ?1 AND grant_index = ?2",
                     params![capability_id, grant_index_sql],
@@ -133,11 +137,17 @@ impl SqliteBudgetStore {
                             budget_u32_from_row(row, 0, "invocation_count")?,
                             budget_u64_from_row(row, 1, "total_cost_exposed")?,
                             budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
+                            budget_u64_from_row(row, 3, "legacy projection sequence")?,
                         ))
                     },
                 )
                 .optional()?;
-            let Some((invocation_count, total_cost_exposed, total_cost_realized_spend)) = current
+            let Some((
+                invocation_count,
+                total_cost_exposed,
+                total_cost_realized_spend,
+                projection_seq,
+            )) = current
             else {
                 return Err(BudgetStoreError::Invariant(format!(
                     "caller reservation hold `{hold_id}` lost its grant usage during recovery"
@@ -154,45 +164,77 @@ impl SqliteBudgetStore {
                         "caller reservation hold `{hold_id}` exceeds its grant exposure during recovery"
                     ))
                 })?;
-            let invocation_count_after = if *invocation_count_debited {
-                invocation_count - 1
-            } else {
-                invocation_count
-            };
             let compatibility_maximum = if *invocation_count_debited {
-                SqliteBudgetStore::stage_compatibility_invocation_reverse(
-                    &transaction,
-                    capability_id,
-                    *grant_index,
-                    invocation_count,
-                )?
+                Some(
+                    SqliteBudgetStore::compatibility_invocation_quota_maximum(
+                        &transaction,
+                        capability_id,
+                        *grant_index,
+                    )?
+                    .ok_or_else(|| {
+                        BudgetStoreError::Invariant(format!(
+                            "caller reservation hold `{hold_id}` lost its invocation quota during recovery"
+                        ))
+                    })?,
+                )
             } else {
                 None
             };
             let event_seq = allocate_budget_replication_seq(&transaction)?;
             let now = unix_now();
-            let usage_changed = transaction.execute(
-                "UPDATE capability_grant_budgets \
-                 SET total_cost_exposed = ?1, invocation_count = ?2, \
-                     updated_at = ?3, seq = ?4 \
-                 WHERE capability_id = ?5 AND grant_index = ?6",
-                params![
-                    sqlite_integer_from_u64(
-                        total_cost_exposed_after,
-                        "caller reservation recovered exposure",
-                    )?,
-                    i64::from(invocation_count_after),
-                    now,
-                    sqlite_integer_from_u64(event_seq, "caller reservation recovery sequence")?,
+            let invocation_count_after = if let Some(maximum) = compatibility_maximum {
+                let compatibility_quota = BudgetInvocationQuota::from_persisted_parts(
+                    BudgetQuotaKey::grant(capability_id, *grant_index)?,
+                    maximum,
+                )?;
+                SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+                    &transaction,
+                    std::slice::from_ref(&compatibility_quota),
+                    compatibility_quota.key(),
+                    invocation_count,
+                    SqliteInvocationQuotaMutationContext {
+                        mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                        action: SqliteInvocationQuotaMutationAction::Replay,
+                        event_seq: projection_seq,
+                        updated_at: now,
+                    },
+                )?;
+                SqliteBudgetStore::compare_and_mutate_invocation_quotas(
+                    &transaction,
+                    std::slice::from_ref(&compatibility_quota),
+                    compatibility_quota.key(),
+                    invocation_count,
+                    SqliteInvocationQuotaMutationContext {
+                        mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                        action: SqliteInvocationQuotaMutationAction::Reverse,
+                        event_seq,
+                        updated_at: now,
+                    },
+                )?
+                .primary_count_after
+            } else {
+                invocation_count
+            };
+            SqliteBudgetStore::compare_and_persist_legacy_projection(
+                &transaction,
+                SqliteLegacyProjectionMutation {
                     capability_id,
-                    grant_index_sql,
-                ],
+                    grant_index: *grant_index,
+                    expected: Some(SqliteLegacyProjectionState {
+                        invocation_count,
+                        total_cost_exposed,
+                        total_cost_realized_spend,
+                        seq: projection_seq,
+                    }),
+                    after: SqliteLegacyProjectionState {
+                        invocation_count: invocation_count_after,
+                        total_cost_exposed: total_cost_exposed_after,
+                        total_cost_realized_spend,
+                        seq: event_seq,
+                    },
+                    updated_at: now,
+                },
             )?;
-            if usage_changed != 1 {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "caller reservation hold `{hold_id}` lost its grant usage during recovery"
-                )));
-            }
             let hold_changed = transaction.execute(
                 "UPDATE budget_authorization_holds \
                  SET disposition = 'reversed', remaining_exposure_units = 0, updated_at = ?1 \
@@ -208,16 +250,6 @@ impl SqliteBudgetStore {
                 return Err(BudgetStoreError::Conflict(format!(
                     "caller reservation hold `{hold_id}` changed during startup recovery"
                 )));
-            }
-            if let Some(maximum) = compatibility_maximum {
-                SqliteBudgetStore::persist_compatibility_invocation_capture(
-                    &transaction,
-                    capability_id,
-                    *grant_index,
-                    Some(maximum),
-                    invocation_count_after,
-                    event_seq,
-                )?;
             }
             let recovery_event_id = format!(
                 "{hold_id}{CALLER_NO_PAYMENT_RESERVATION_RECOVERY_EVENT_SUFFIX}{authorize_event_seq}"
@@ -934,15 +966,28 @@ impl SqliteBudgetStore {
         hold_id: &str,
     ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
         let connection = self.connection()?;
+        let partition_escrow_evidence =
+            super::composite::load_partition_escrow_authorization_evidence(&connection, hold_id)?;
         connection
             .query_row(
-                "SELECT hold_id, capability_id, grant_index, authorized_exposure_units, \
-                 remaining_exposure_units, disposition, reserved_until, \
-                 authority_id, lease_id, lease_epoch, reserved_currency, \
-                 reserved_payment_reference, reserved_budget_total, \
-                 reserved_delegation_depth, reserved_root_budget_holder \
-                 FROM budget_authorization_holds WHERE hold_id = ?1",
-                params![hold_id],
+                "SELECT hold.hold_id, hold.capability_id, hold.grant_index, \
+                 hold.authorized_exposure_units, hold.remaining_exposure_units, \
+                 hold.disposition, hold.reserved_until, hold.authority_id, \
+                 hold.lease_id, hold.lease_epoch, hold.reserved_currency, \
+                 hold.reserved_payment_reference, hold.reserved_budget_total, \
+                 hold.reserved_delegation_depth, hold.reserved_root_budget_holder, \
+                 authorization.event_id, authorization.event_seq \
+                 FROM budget_authorization_holds AS hold \
+                 LEFT JOIN budget_mutation_events AS authorization \
+                   ON authorization.hold_id = hold.hold_id \
+                  AND authorization.allowed = 1 \
+                  AND authorization.kind IN (?2, ?3) \
+                 WHERE hold.hold_id = ?1",
+                params![
+                    hold_id,
+                    BudgetMutationKind::AuthorizeExposure.as_str(),
+                    BudgetMutationKind::ReserveInvocations.as_str(),
+                ],
                 |row| {
                     let disposition = row.get::<_, String>(5)?;
                     let disposition = HoldDisposition::parse(&disposition)
@@ -966,6 +1011,11 @@ impl SqliteBudgetStore {
                         })?;
                     let authority =
                         sqlite_budget_event_authority(row.get(7)?, row.get(8)?, row.get(9)?)?;
+                    let authorization_event_id = row
+                        .get::<_, Option<String>>(15)?
+                        .unwrap_or_else(|| format!("{hold_id}:authorize"));
+                    let authorization_commit_index =
+                        optional_budget_u64_from_row(row, 16, "authorization event_seq")?;
                     Ok(BudgetHoldSnapshot {
                         hold_id: row.get::<_, String>(0)?,
                         capability_id: row.get::<_, String>(1)?,
@@ -995,7 +1045,17 @@ impl SqliteBudgetStore {
                             "reserved_delegation_depth",
                         )?,
                         reserved_root_budget_holder: row.get::<_, Option<String>>(14)?,
-                        authority,
+                        authority: authority.clone(),
+                        authorization_metadata: BudgetCommitMetadata {
+                            authority,
+                            guarantee_level: BudgetGuaranteeLevel::SingleNodeAtomic,
+                            budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
+                            metering_profile:
+                                BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+                            budget_commit_index: authorization_commit_index,
+                            event_id: Some(authorization_event_id),
+                            partition_escrow_evidence: partition_escrow_evidence.clone(),
+                        },
                     })
                 },
             )

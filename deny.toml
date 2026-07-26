@@ -51,8 +51,9 @@ ignore = [
     # last-checked = 2026-05-02; atty is the same dudect-bencher -> clap 2 test harness transitive.
     # Production CLI paths use the clap 4 stack.
     "RUSTSEC-2024-0375",
-    # last-checked = 2026-05-02; proc-macro-error is a compile-time transitive of sigstore 0.13 through
-    # json-syntax/locspan-derive. No runtime code is shipped from this crate.
+    # last-checked = 2026-07-25; proc-macro-error 0.4.12 is retained only by
+    # iroh-blobs -> bao-tree -> genawaiter code generation. It is not linked
+    # into Chio runtime binaries and has no safe upgrade within that graph.
     "RUSTSEC-2024-0370",
     # last-checked = 2026-06-08; proc-macro-error2 is unmaintained (RUSTSEC-2026-0173). It is a compile-time
     # transitive through alloy-sol-macro and sigstore/oci-spec codegen. No runtime code is shipped from this crate.
@@ -354,13 +355,6 @@ name = "regress"
 version = "=0.11.1"
 
 [[bans.skip]]
-# Reviewed pinned-nono graph split: Chio's sigstore/json-syntax path requires
-# ryu-js 0.2.2; nono's sigstore-verify path requires 1.0.3. Exact lockfile guard:
-# scripts/cargo-deny-duplicate-baseline.txt.
-name = "ryu-js"
-version = "=1.0.3"
-
-[[bans.skip]]
 name = "spin"
 
 [[bans.skip]]
@@ -393,14 +387,6 @@ version = "=0.6.1"
 
 [[bans.skip]]
 name = "wasm-streams"
-
-[[bans.skip]]
-# last-checked = 2026-07-10. Legacy proc-macro-error remains in transitive
-# codegen paths while proc-macro-error 1.x is pulled by newer stacks.
-name = "proc-macro-error"
-
-[[bans.skip]]
-name = "proc-macro-error-attr"
 
 [[bans.skip]]
 # last-checked = 2026-05-03. `syn` 1.x is a known proc-macro
@@ -475,9 +461,6 @@ name = "wit-parser"
 name = "x509-parser"
 
 [[bans.skip]]
-name = "ahash"
-
-[[bans.skip]]
 name = "axum"
 
 [[bans.skip]]
@@ -509,6 +492,29 @@ name = "crypto-bigint"
 
 [[bans.skip]]
 name = "crypto-common"
+
+[[bans.skip]]
+# last-checked = 2026-07-25. sigstore 0.14 removes the unmaintained smallstr
+# path but its PKCS#8 compatibility stack and tough 0.22 use adjacent RustCrypto
+# generations. Exact lockfile guard: scripts/cargo-deny-duplicate-baseline.txt.
+name = "cipher"
+version = "=0.5.2"
+
+[[bans.skip]]
+name = "inout"
+version = "=0.2.2"
+
+[[bans.skip]]
+name = "pbkdf2"
+version = "=0.13.0"
+
+[[bans.skip]]
+name = "salsa20"
+version = "=0.11.0"
+
+[[bans.skip]]
+name = "scrypt"
+version = "=0.12.0"
 
 [[bans.skip]]
 name = "darling"

@@ -8,6 +8,10 @@ include!(concat!(
 ));
 include!(concat!(
     env!("CARGO_MANIFEST_DIR"),
+    "/src/trust_control/cluster/admission_consensus_parts/part_02_mutation_event_query.inc"
+));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
     "/src/trust_control/cluster/admission_consensus_parts/part_03.inc"
 ));
 include!(concat!(

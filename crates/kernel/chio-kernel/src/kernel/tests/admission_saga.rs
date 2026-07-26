@@ -416,6 +416,13 @@ impl BudgetStore for DurableRecoveryBudgetStore {
         self.inner.get_usage(capability_id, grant_index)
     }
 
+    fn get_mutation_event_by_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetMutationRecord>, BudgetStoreError> {
+        self.inner.get_mutation_event_by_id(event_id)
+    }
+
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,

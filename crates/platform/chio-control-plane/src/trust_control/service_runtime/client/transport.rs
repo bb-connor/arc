@@ -99,6 +99,40 @@ impl TrustControlClient {
         )
     }
 
+    pub(crate) fn post_json_to_endpoint<B: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        endpoint: &str,
+        path: &str,
+        body: &B,
+    ) -> Result<T, CliError> {
+        if !self.endpoints.iter().any(|candidate| candidate == endpoint) {
+            return Err(CliError::cli_other_error(
+                "fixed trust control endpoint is outside the configured endpoint set".to_string(),
+            ));
+        }
+        let json = serde_json::to_value(body).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to serialize trust control request: {error}"
+            ))
+        })?;
+        let url = format!("{endpoint}{path}");
+        let response = self
+            .http
+            .post(&url)
+            .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token))
+            .send_json(json)
+            .map_err(|error| match error {
+                ureq::Error::Status(status, response) => CliError::cli_other_error(format!(
+                    "trust control endpoint `{endpoint}` failed with {status}: {}",
+                    response.into_string().unwrap_or_default()
+                )),
+                ureq::Error::Transport(error) => CliError::cli_other_error(format!(
+                    "trust control endpoint `{endpoint}` transport failed: {error}"
+                )),
+            })?;
+        read_capped_json(response.into_reader(), MAX_PEER_RESPONSE_BYTES)
+    }
+
     pub(crate) fn post_internal_json<B: Serialize, T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,

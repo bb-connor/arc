@@ -27,9 +27,172 @@ fn supplemental_quota_verification_requires_an_installed_kernel_verifier() {
     ));
 }
 
+fn install_bounded_budget_authorities(kernel: &mut ChioKernel, prefix: &str) {
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-operations"
+        )))
+        .expect("install bounded admission operation store");
+    kernel
+        .set_budget_store_handle(durable_atomic_test_budget_store(&format!(
+            "{prefix}-budget"
+        )))
+        .expect("install bounded budget store");
+}
+
+fn install_bounded_admission_operation_store(kernel: &mut ChioKernel, prefix: &str) {
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{prefix}-operations"
+        )))
+        .expect("install bounded admission operation store");
+}
+
+struct OperationDecliningPaymentAdapter {
+    validation: crate::payment::SimPaymentAdapter,
+}
+
+impl OperationDecliningPaymentAdapter {
+    fn new() -> Self {
+        Self {
+            validation: crate::payment::SimPaymentAdapter::new(),
+        }
+    }
+}
+
+impl PaymentAdapter for OperationDecliningPaymentAdapter {
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        true
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        true
+    }
+
+    fn authorize(
+        &self,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        PaymentAdapter::authorize(&DecliningPaymentAdapter, request)
+    }
+
+    fn capture(
+        &self,
+        authorization_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        PaymentAdapter::capture(
+            &DecliningPaymentAdapter,
+            authorization_id,
+            amount_units,
+            currency,
+            reference,
+        )
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        PaymentAdapter::release(&DecliningPaymentAdapter, authorization_id, reference)
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        PaymentAdapter::refund(
+            &DecliningPaymentAdapter,
+            transaction_id,
+            amount_units,
+            currency,
+            reference,
+        )
+    }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        let _ = self
+            .validation
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)?;
+        if request.operation_id.as_deref() != Some(operation_id)
+            || request.request_binding_hash.as_deref() != Some(request_binding_hash)
+        {
+            return Err(PaymentError::RailError(
+                "declining payment request does not match its admission operation".to_string(),
+            ));
+        }
+        Err(PaymentError::InsufficientFunds)
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        self.validation
+            .lookup_authorization_for_operation(operation_id, request_binding_hash)
+    }
+
+    fn capture_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.validation.capture_for_operation(request)
+    }
+
+    fn release_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.validation.release_for_operation(
+            operation_id,
+            request_binding_hash,
+            authorization_id,
+            reference,
+        )
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.validation.refund_for_operation(request)
+    }
+
+    fn settlement_state_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        self.validation.settlement_state_for_operation(
+            operation_id,
+            request_binding_hash,
+            reference,
+            authorization_id,
+        )
+    }
+}
+
 #[test]
 fn budget_exhaustion() {
     let mut kernel = make_kernel(make_config());
+    install_bounded_budget_authorities(&mut kernel, "budget-exhaustion");
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
     let agent_kp = make_keypair();
@@ -52,7 +215,12 @@ fn budget_exhaustion() {
     for i in 0..2 {
         let req = make_request(&format!("req-{i}"), &cap, "read_file", "srv-a");
         let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
-        assert_eq!(resp.verdict, Verdict::Allow, "call {i} should succeed");
+        assert_eq!(
+            resp.verdict,
+            Verdict::Allow,
+            "call {i} should succeed: {:?}",
+            resp.reason
+        );
     }
 
     // Third call is denied.
@@ -67,6 +235,7 @@ fn budget_exhaustion() {
 fn single_invocation_budget_dispatches_once() {
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     let mut kernel = make_kernel(make_config());
+    install_bounded_budget_authorities(&mut kernel, "single-invocation-budget");
     kernel.register_tool_server(Box::new(SideEffectServer::new(
         "srv-a",
         vec!["read_file"],
@@ -166,6 +335,7 @@ fn aggregate_invocation_enforcement_disabled_denies_before_hosted_dispatch() {
 #[test]
 fn budgets_are_tracked_per_matching_grant() {
     let mut kernel = make_kernel(make_config());
+    install_bounded_budget_authorities(&mut kernel, "per-matching-grant-budget");
     kernel.register_tool_server(Box::new(EchoServer::new(
         "srv-a",
         vec!["read_file", "write_file"],
@@ -255,6 +425,7 @@ fn pre_dispatch_guard_denial_does_not_mutate_invocation_budget() {
 
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     let mut kernel = make_kernel(make_config());
+    install_bounded_budget_authorities(&mut kernel, "pre-dispatch-guard-budget");
     kernel.add_guard(Box::new(DenyOnce {
         denied: AtomicBool::new(false),
     }));
@@ -323,6 +494,7 @@ fn monetary_denial_exceeds_per_invocation_cap() {
     //
     // Test: accumulated 500 + max_cost_per_invocation=100 exceeds max_total_cost=500 -> deny.
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-total-exhaustion");
     let agent_kp = Keypair::generate();
     let server = MonetaryCostServer::no_cost("cost-srv");
     kernel.register_tool_server(Box::new(server));
@@ -374,9 +546,39 @@ fn monetary_denial_exceeds_per_invocation_cap() {
     );
 }
 
-#[test]
-fn monetary_denial_receipt_contains_financial_metadata() {
+pub(super) fn assert_opaque_budget_authorization_denial(response: &ToolCallResponse) {
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("invocation budget authorization denied")
+    );
+    assert!(
+        response
+            .receipt
+            .verify_signature()
+            .expect("budget denial signature")
+    );
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("budget denial attribution metadata");
+    for forbidden_key in [
+        "financial",
+        "budget_authority",
+        "budget_denial_authority",
+    ] {
+        assert!(
+            metadata.get(forbidden_key).is_none(),
+            "budget authorization denial disclosed `{forbidden_key}`"
+        );
+    }
+}
+
+#[tokio::test]
+async fn monetary_budget_authorization_denial_omits_financial_dimensions() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-denial-receipt");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
 
@@ -405,33 +607,101 @@ fn monetary_denial_receipt_contains_financial_metadata() {
     };
 
     // First invocation uses up the entire budget (100 of 100).
-    let _allow = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    let _allow = kernel
+        .evaluate_tool_call_with_metadata(&request, None)
+        .await
+        .unwrap();
 
     // Second invocation should be denied.
     let deny_req = ToolCallRequest {
         request_id: "req-2".to_string(),
         ..request
     };
-    let resp = kernel.evaluate_tool_call_blocking(&deny_req).unwrap();
-    assert_eq!(resp.verdict, Verdict::Deny);
-
-    // Receipt must contain financial metadata.
-    let metadata = resp
-        .receipt
-        .metadata
-        .as_ref()
-        .expect("should have metadata");
-    let financial = metadata
-        .get("financial")
-        .expect("should have 'financial' key");
-    assert_eq!(financial["settlement_status"], "not_applicable");
-    assert!(financial["attempted_cost"].as_u64().is_some());
-    assert_eq!(financial["currency"], "USD");
+    let resp = kernel
+        .evaluate_tool_call_with_unchecked_receipt_metadata_for_test(
+            &deny_req,
+            Some(serde_json::json!({
+                "financial": {
+                    "budget_remaining": 413_729,
+                    "budget_total": 937_000,
+                    "attempted_cost": 17,
+                    "currency": "SECRET"
+                },
+                "governed_transaction": {
+                    "economic_authorization": "FORGED-ECONOMIC-AUTHORIZATION"
+                }
+            })),
+        )
+        .await
+        .unwrap();
+    assert_opaque_budget_authorization_denial(&resp);
+    let metadata = resp.receipt.metadata.as_ref().unwrap();
+    assert!(metadata.get("governed_transaction").is_none());
     let attribution = metadata
         .get("attribution")
         .expect("should have 'attribution' key");
     assert_eq!(attribution["grant_index"].as_u64(), Some(0));
     assert!(attribution["subject_key"].as_str().is_some());
+}
+
+#[test]
+fn nested_monetary_budget_authorization_denial_omits_financial_dimensions() {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "nested-monetary-denial-receipt");
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let session_id = kernel
+        .open_session("nested-budget-parent".to_string(), Vec::new())
+        .unwrap();
+    kernel.activate_session(&session_id).unwrap();
+    let parent_context = make_operation_context(
+        &session_id,
+        "req-nested-budget-parent",
+        "nested-budget-parent",
+    );
+    kernel
+        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
+        .unwrap();
+    let mut client = MockNestedFlowClient {
+        roots: Vec::new(),
+        sampled_message: CreateMessageResult {
+            role: "assistant".to_string(),
+            content: serde_json::json!({ "type": "text", "text": "unused" }),
+            model: "unused".to_string(),
+            stop_reason: None,
+        },
+        elicited_content: make_elicited_content(),
+        cancel_parent_on_create_message: false,
+        cancel_child_on_create_message: false,
+        completed_elicitation_ids: Vec::new(),
+        resource_updates: Vec::new(),
+        resources_list_changed_count: 0,
+    };
+
+    let allowed = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &make_request("req-nested-budget-1", &cap, "compute", "cost-srv"),
+            &mut client,
+            None,
+        )
+        .unwrap();
+    assert_eq!(allowed.verdict, Verdict::Allow);
+
+    let denied = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &make_request("req-nested-budget-2", &cap, "compute", "cost-srv"),
+            &mut client,
+            None,
+        )
+        .unwrap();
+    assert_opaque_budget_authorization_denial(&denied);
 }
 
 #[test]
@@ -459,6 +729,7 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
     }
 
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-guard-denial");
     kernel.add_guard(Box::new(DenyOnceGuard {
         denied: Arc::new(Mutex::new(false)),
     }));
@@ -538,7 +809,10 @@ fn kernel_accepts_optional_payment_adapter_installation() {
 fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocation() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter)).expect("install payment adapter");
+    install_bounded_budget_authorities(&mut kernel, "monetary-payment-denial");
+    kernel
+        .set_payment_adapter(Box::new(OperationDecliningPaymentAdapter::new()))
+        .expect("install payment adapter");
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "cost-srv".to_string(),
         invocations: invocations.clone(),
@@ -591,9 +865,12 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
 }
 
 #[test]
-fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
+fn monetary_operation_payment_sets_reference_on_allow_receipt() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(PrepaidSettledPaymentAdapter)).expect("install payment adapter");
+    install_bounded_budget_authorities(&mut kernel, "monetary-operation-payment-allow");
+    kernel
+        .set_payment_adapter(Box::new(TrackingPaymentAdapter::new()))
+        .expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
 
     let agent_kp = Keypair::generate();
@@ -630,7 +907,10 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
         .as_ref()
         .and_then(|metadata| metadata.get("financial"))
         .expect("allow receipt should carry financial metadata");
-    assert_eq!(financial["payment_reference"], "x402_txn_paid");
+    let payment_reference = financial["payment_reference"]
+        .as_str()
+        .expect("operation payment reference");
+    assert!(payment_reference.starts_with("sim-"));
     assert_eq!(financial["settlement_status"], "settled");
     assert_eq!(financial["cost_charged"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(900));
@@ -641,6 +921,7 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
 #[test]
 fn monetary_allow_receipt_contains_financial_metadata() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-allow-receipt");
     let agent_kp = Keypair::generate();
     // Server reports actual cost of 75 cents (< max 100).
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
@@ -699,6 +980,7 @@ fn monetary_allow_receipt_contains_financial_metadata() {
 #[test]
 fn monetary_allow_records_budget_hold_and_append_only_events() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-event-log");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -733,22 +1015,29 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
 
     let hold_id = format!("budget-hold:{request_id}:{}:0", cap.id);
     let authorize_event_id = format!("{hold_id}:authorize");
+    let capture_event_id = format!("{hold_id}:capture-invocations");
     let reconcile_event_id = format!("{hold_id}:reconcile");
     let events = kernel
         .budget_store
         .list_mutation_events(10, Some(&cap.id), Some(0))
         .unwrap();
 
-    assert_eq!(events.len(), 2);
+    assert_eq!(events.len(), 3);
     assert_eq!(events[0].event_id, authorize_event_id);
     assert_eq!(events[0].hold_id.as_deref(), Some(hold_id.as_str()));
     assert_eq!(events[0].allowed, Some(true));
     assert_eq!(events[0].exposure_units, 100);
-    assert_eq!(events[1].event_id, reconcile_event_id);
+    assert_eq!(events[1].event_id, capture_event_id);
     assert_eq!(events[1].hold_id.as_deref(), Some(hold_id.as_str()));
-    assert_eq!(events[1].realized_spend_units, 75);
-    assert_eq!(events[1].total_cost_exposed_after, 0);
-    assert_eq!(events[1].total_cost_realized_spend_after, 75);
+    assert_eq!(
+        events[1].kind,
+        crate::budget_store::BudgetMutationKind::CaptureInvocations
+    );
+    assert_eq!(events[2].event_id, reconcile_event_id);
+    assert_eq!(events[2].hold_id.as_deref(), Some(hold_id.as_str()));
+    assert_eq!(events[2].realized_spend_units, 75);
+    assert_eq!(events[2].total_cost_exposed_after, 0);
+    assert_eq!(events[2].total_cost_realized_spend_after, 75);
 }
 
 #[test]
@@ -1027,7 +1316,9 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
 fn payment_authorization_denial_releases_delegated_sibling_budget() {
     let fixture = make_sibling_sum_monetary_fixture("delegated-payment-deny-budget");
     let mut kernel = fixture.kernel;
-    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(OperationDecliningPaymentAdapter::new()))
+        .expect("install payment adapter");
 
     let denied_response = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
@@ -1056,7 +1347,7 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
         .is_some_and(|reason| reason.contains("payment authorization failed")));
 
     kernel
-        .set_payment_adapter(Box::new(DeterministicPaymentAdapter))
+        .set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()))
         .expect("install payment adapter");
     let allowed_sibling = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
@@ -1092,7 +1383,9 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
 fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
     let fixture = make_sibling_sum_monetary_fixture("nested-delegated-payment-deny-budget");
     let mut kernel = fixture.kernel;
-    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter)).expect("install payment adapter");
+    kernel
+        .set_payment_adapter(Box::new(OperationDecliningPaymentAdapter::new()))
+        .expect("install payment adapter");
     let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new()).unwrap();
     kernel.activate_session(&session_id).unwrap();
     let parent_context = make_operation_context(
@@ -1151,7 +1444,7 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
         .is_some_and(|reason| reason.contains("payment authorization failed")));
 
     kernel
-        .set_payment_adapter(Box::new(DeterministicPaymentAdapter))
+        .set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()))
         .expect("install payment adapter");
     let allowed_sibling = kernel
         .evaluate_tool_call_with_nested_flow_client(
@@ -1191,7 +1484,11 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
 #[test]
 fn hosted_named_remote_without_fresh_peer_fails_before_dispatch() {
     let fixture = make_sibling_sum_monetary_fixture("missing-remote-peer");
-    let kernel = fixture.kernel;
+    let mut kernel = fixture.kernel;
+    kernel.clear_admission_operation_store();
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(InMemoryBudgetStore::new()))
+        .expect("restore storeless pre-admission fixture");
 
     let response = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
@@ -1232,7 +1529,11 @@ fn hosted_named_remote_without_fresh_peer_fails_before_dispatch() {
 #[test]
 fn portable_subject_denial_does_not_consume_sibling_budget() {
     let fixture = make_sibling_sum_monetary_fixture("portable-subject-deny-budget");
-    let kernel = fixture.kernel;
+    let mut kernel = fixture.kernel;
+    kernel.clear_admission_operation_store();
+    kernel
+        .set_budget_store_handle(std::sync::Arc::new(InMemoryBudgetStore::new()))
+        .expect("restore storeless portable fixture");
     let clock = chio_kernel_core::FixedClock::new(current_unix_timestamp());
     let guards: [&dyn chio_kernel_core::Guard; 0] = [];
 
@@ -1264,6 +1565,7 @@ fn portable_subject_denial_does_not_consume_sibling_budget() {
 #[test]
 fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_charge() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-reported-overrun");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 150, "USD")));
 
@@ -1310,6 +1612,7 @@ fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_cha
 #[test]
 fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-unreported-cost");
     let agent_kp = Keypair::generate();
     // Server does NOT report cost (returns None).
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
@@ -1357,6 +1660,7 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
 fn monetary_dispatch_failure_keeps_invocation_consumed() {
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-dispatch-failure");
     kernel.register_tool_server(Box::new(FailingAfterSideEffectServer::new(
         "cost-srv",
         vec!["compute"],
@@ -1402,14 +1706,16 @@ fn monetary_dispatch_failure_keeps_invocation_consumed() {
 }
 
 #[test]
-fn unmeasured_cost_server_reverses_hold_and_signs_provisional_receipt() {
+fn unmeasured_cost_server_releases_exposure_and_signs_provisional_receipt() {
     // A tool server that does not measure realized cost (a pre-execution
     // authorization gate that dispatches a pass-through while the real tool
     // runs elsewhere) must not yield a settled, reconciled authoritative spend.
-    // The kernel reverses the pre-execution hold and signs a provisional,
+    // The kernel releases the pre-execution monetary exposure while retaining
+    // the captured invocation, then signs a provisional,
     // unreconciled receipt: settlement is pending, the terminal disposition is
-    // "reversed", and no committed cost is moved.
+    // "released", and no committed cost is moved.
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "unmeasured-cost-release");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(UnmeasuredCostServer {
         id: "gate-srv".to_string(),
@@ -1457,18 +1763,20 @@ fn unmeasured_cost_server_reverses_hold_and_signs_provisional_receipt() {
     let budget_authority = metadata
         .get("budget_authority")
         .expect("should have 'budget_authority' key");
-    assert_eq!(budget_authority["terminal"]["disposition"], "reversed");
+    assert_eq!(budget_authority["terminal"]["disposition"], "released");
     assert_ne!(budget_authority["terminal"]["disposition"], "reconciled");
 
-    // The hold is reversed, so no committed cost is moved.
+    // Monetary exposure is released, so no committed cost is moved. The
+    // dispatched invocation remains consumed.
     let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
 
 #[test]
 fn unmeasured_cost_provisional_allow_emits_no_execution_nonce() {
-    // The provisional unmeasured-cost allow path reverses the pre-execution
-    // budget hold and does not execute the target tool at the kernel. On a
+    // The provisional unmeasured-cost allow path releases the pre-execution
+    // monetary exposure and does not execute the target tool at the kernel. On a
     // nonce-enabled kernel it must emit no execution nonce: there is no reserved
     // hold to reconcile and nothing to authorize downstream. A minted nonce here
     // would carry no reserved hold, so a gate deployment could execute against a
@@ -1476,6 +1784,7 @@ fn unmeasured_cost_provisional_allow_emits_no_execution_nonce() {
     // leaving the spend unreconcilable. The measured-cost allow path on the same
     // kernel must still mint a nonce, guarding against over-suppression.
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "unmeasured-cost-provisional");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(UnmeasuredCostServer {
         id: "gate-srv".to_string(),
@@ -1560,6 +1869,7 @@ fn unmeasured_cost_provisional_allow_emits_no_execution_nonce() {
 #[test]
 fn monetary_tool_server_error_releases_precharged_budget() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_bounded_budget_authorities(&mut kernel, "monetary-tool-server-error");
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(FailingMonetaryServer {
         id: "cost-srv".to_string(),

@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "rotation_unwitnessed_signing_detected",
   "threat_id": "kernel_impersonation",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -32,7 +32,9 @@
           "replacement": ">"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/rotation_unwitnessed_signing/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/rotation_unwitnessed_signing/mutants.out/outcomes.json",
+          "sha256": "94d34f2c5df1d4fd9ba0779b03698d1d45fa281408dc334b575643ccbb8b5379",
+          "inputs_sha256": "e49b97313025c351e28a787101ccf85099f1b1ee91673ec3aed0ae082701a5c7"
         }
       }
     ]

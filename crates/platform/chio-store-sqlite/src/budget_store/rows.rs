@@ -105,9 +105,9 @@ pub(super) fn mutation_record_from_row(
             }
         }
         BudgetMutationKind::ReverseInvocations => BudgetInvocationReservationState::Reversed,
+        BudgetMutationKind::ReverseExposure => BudgetInvocationReservationState::Reversed,
         BudgetMutationKind::AuthorizeExposure
         | BudgetMutationKind::CaptureExposure
-        | BudgetMutationKind::ReverseExposure
         | BudgetMutationKind::ReleaseExposure
         | BudgetMutationKind::ReconcileSpend
         | BudgetMutationKind::ExpireHold => BudgetInvocationReservationState::Absent,
@@ -119,6 +119,7 @@ pub(super) fn mutation_record_from_row(
             BudgetMonetaryHoldState::Exposed
         }
         BudgetMutationKind::CaptureExposure => BudgetMonetaryHoldState::Captured,
+        BudgetMutationKind::ReverseExposure if exposure_units == 0 => BudgetMonetaryHoldState::None,
         BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
         BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
         BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,

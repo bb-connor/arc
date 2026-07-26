@@ -5,14 +5,292 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf16"
+	"unicode/utf8"
 )
+
+const securityJCSMaxSafeInteger int64 = 9007199254740991
+
+func stripSecurityFixtureLF(raw []byte) []byte {
+	if len(raw) != 0 && raw[len(raw)-1] == '\n' {
+		return raw[:len(raw)-1]
+	}
+	return raw
+}
+
+func canonicalizeSecurityJSON(raw []byte) ([]byte, error) {
+	if !utf8.Valid(raw) {
+		return nil, fmt.Errorf("canonical JSON contains invalid UTF-8")
+	}
+	if err := validateSecurityJCSUnicode(raw); err != nil {
+		return nil, err
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return nil, fmt.Errorf("decode canonical JSON input: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return nil, fmt.Errorf("canonical JSON input contains multiple values")
+		}
+		return nil, fmt.Errorf("decode canonical JSON trailing input: %w", err)
+	}
+
+	var canonical bytes.Buffer
+	if err := writeSecurityJCSValue(&canonical, value); err != nil {
+		return nil, err
+	}
+	return canonical.Bytes(), nil
+}
+
+func validateSecurityJCSUnicode(raw []byte) error {
+	inString := false
+	for index := 0; index < len(raw); index++ {
+		current := raw[index]
+		if !inString {
+			if current == '"' {
+				inString = true
+			}
+			continue
+		}
+		switch current {
+		case '"':
+			inString = false
+		case '\\':
+			index++
+			if index >= len(raw) {
+				return fmt.Errorf("canonical JSON string has an incomplete escape")
+			}
+			escape := raw[index]
+			if escape != 'u' {
+				if !strings.ContainsRune(`"\\/bfnrt`, rune(escape)) {
+					return fmt.Errorf("canonical JSON string has invalid escape \\%c", escape)
+				}
+				continue
+			}
+			unit, err := parseSecurityJCSUTF16Unit(raw, index+1)
+			if err != nil {
+				return err
+			}
+			index += 4
+			switch {
+			case unit >= 0xd800 && unit <= 0xdbff:
+				if index+6 >= len(raw) || raw[index+1] != '\\' || raw[index+2] != 'u' {
+					return fmt.Errorf("canonical JSON string has an unpaired high surrogate")
+				}
+				low, err := parseSecurityJCSUTF16Unit(raw, index+3)
+				if err != nil {
+					return err
+				}
+				if low < 0xdc00 || low > 0xdfff {
+					return fmt.Errorf("canonical JSON string has an unpaired high surrogate")
+				}
+				index += 6
+			case unit >= 0xdc00 && unit <= 0xdfff:
+				return fmt.Errorf("canonical JSON string has an unpaired low surrogate")
+			}
+		default:
+			if current < 0x20 {
+				return fmt.Errorf("canonical JSON string has an unescaped control character")
+			}
+		}
+	}
+	return nil
+}
+
+func parseSecurityJCSUTF16Unit(raw []byte, start int) (uint16, error) {
+	if start+4 > len(raw) {
+		return 0, fmt.Errorf("canonical JSON string has an incomplete Unicode escape")
+	}
+	var unit uint16
+	for _, digit := range raw[start : start+4] {
+		unit <<= 4
+		switch {
+		case digit >= '0' && digit <= '9':
+			unit |= uint16(digit - '0')
+		case digit >= 'a' && digit <= 'f':
+			unit |= uint16(digit-'a') + 10
+		case digit >= 'A' && digit <= 'F':
+			unit |= uint16(digit-'A') + 10
+		default:
+			return 0, fmt.Errorf("canonical JSON string has an invalid Unicode escape")
+		}
+	}
+	return unit, nil
+}
+
+func writeSecurityJCSValue(output *bytes.Buffer, value any) error {
+	switch typed := value.(type) {
+	case nil:
+		output.WriteString("null")
+	case bool:
+		if typed {
+			output.WriteString("true")
+		} else {
+			output.WriteString("false")
+		}
+	case string:
+		if err := writeSecurityJCSString(output, typed); err != nil {
+			return err
+		}
+	case json.Number:
+		rendered, err := canonicalizeSecurityJCSInteger(typed)
+		if err != nil {
+			return err
+		}
+		output.WriteString(rendered)
+	case []any:
+		output.WriteByte('[')
+		for index, item := range typed {
+			if index != 0 {
+				output.WriteByte(',')
+			}
+			if err := writeSecurityJCSValue(output, item); err != nil {
+				return err
+			}
+		}
+		output.WriteByte(']')
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			if !utf8.ValidString(key) {
+				return fmt.Errorf("canonical JSON object key contains invalid UTF-8")
+			}
+			keys = append(keys, key)
+		}
+		sort.Slice(keys, func(left, right int) bool {
+			return compareSecurityJCSUTF16(keys[left], keys[right]) < 0
+		})
+		output.WriteByte('{')
+		for index, key := range keys {
+			if index != 0 {
+				output.WriteByte(',')
+			}
+			if err := writeSecurityJCSString(output, key); err != nil {
+				return err
+			}
+			output.WriteByte(':')
+			if err := writeSecurityJCSValue(output, typed[key]); err != nil {
+				return err
+			}
+		}
+		output.WriteByte('}')
+	default:
+		return fmt.Errorf("canonical JSON does not support %T", value)
+	}
+	return nil
+}
+
+func canonicalizeSecurityJCSInteger(number json.Number) (string, error) {
+	raw := number.String()
+	if strings.ContainsAny(raw, ".eE") {
+		return "", fmt.Errorf("bounded canonical JSON rejects non-integral number %q", raw)
+	}
+	parsed, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("bounded canonical JSON rejects invalid integer %q", raw)
+	}
+	if parsed < -securityJCSMaxSafeInteger || parsed > securityJCSMaxSafeInteger {
+		return "", fmt.Errorf("bounded canonical JSON rejects unsafe integer %q", raw)
+	}
+	return strconv.FormatInt(parsed, 10), nil
+}
+
+func writeSecurityJCSString(output *bytes.Buffer, value string) error {
+	if !utf8.ValidString(value) {
+		return fmt.Errorf("canonical JSON string contains invalid UTF-8")
+	}
+	const hexadecimal = "0123456789abcdef"
+	output.WriteByte('"')
+	for _, current := range value {
+		switch current {
+		case '"':
+			output.WriteString(`\"`)
+		case '\\':
+			output.WriteString(`\\`)
+		case '\b':
+			output.WriteString(`\b`)
+		case '\t':
+			output.WriteString(`\t`)
+		case '\n':
+			output.WriteString(`\n`)
+		case '\f':
+			output.WriteString(`\f`)
+		case '\r':
+			output.WriteString(`\r`)
+		default:
+			if current < 0x20 {
+				output.WriteString(`\u00`)
+				output.WriteByte(hexadecimal[byte(current)>>4])
+				output.WriteByte(hexadecimal[byte(current)&0x0f])
+			} else {
+				output.WriteRune(current)
+			}
+		}
+	}
+	output.WriteByte('"')
+	return nil
+}
+
+func compareSecurityJCSUTF16(left, right string) int {
+	leftUnits := utf16.Encode([]rune(left))
+	rightUnits := utf16.Encode([]rune(right))
+	limit := len(leftUnits)
+	if len(rightUnits) < limit {
+		limit = len(rightUnits)
+	}
+	for index := 0; index < limit; index++ {
+		if leftUnits[index] < rightUnits[index] {
+			return -1
+		}
+		if leftUnits[index] > rightUnits[index] {
+			return 1
+		}
+	}
+	if len(leftUnits) < len(rightUnits) {
+		return -1
+	}
+	if len(leftUnits) > len(rightUnits) {
+		return 1
+	}
+	return 0
+}
+
+func assertSecurityCanonicalReencoding(
+	t *testing.T,
+	relativePath string,
+	raw []byte,
+	reencoded []byte,
+) {
+	t.Helper()
+	payload := stripSecurityFixtureLF(raw)
+	fixtureCanonical, err := canonicalizeSecurityJSON(payload)
+	if err != nil {
+		t.Fatalf("canonicalize fixture %s: %v", relativePath, err)
+	}
+	if !bytes.Equal(fixtureCanonical, payload) {
+		t.Fatalf("security vector %s is not exact RFC 8785 JSON", relativePath)
+	}
+	typedCanonical, err := canonicalizeSecurityJSON(reencoded)
+	if err != nil {
+		t.Fatalf("canonicalize generated Go encoding %s: %v", relativePath, err)
+	}
+	if !bytes.Equal(typedCanonical, payload) {
+		t.Fatalf("generated Go type changed exact RFC 8785 bytes for %s", relativePath)
+	}
+}
 
 func assertSecurityGeneratedRoundTrip[T any](t *testing.T, relativePath string) {
 	t.Helper()
@@ -35,24 +313,14 @@ func assertSecurityGeneratedRoundTrip[T any](t *testing.T, relativePath string) 
 	if err != nil {
 		t.Fatalf("generated Go type failed to encode %s: %v", relativePath, err)
 	}
-	var sourceValue any
-	var reencodedValue any
+	assertSecurityCanonicalReencoding(t, relativePath, raw, reencoded)
+
+	var sourceValue map[string]any
 	if err := json.Unmarshal(raw, &sourceValue); err != nil {
 		t.Fatalf("decode source %s: %v", relativePath, err)
 	}
-	if err := json.Unmarshal(reencoded, &reencodedValue); err != nil {
-		t.Fatalf("decode re-encoded %s: %v", relativePath, err)
-	}
-	if !reflect.DeepEqual(sourceValue, reencodedValue) {
-		t.Fatalf("generated Go type changed %s during re-encoding", relativePath)
-	}
-
-	object, ok := sourceValue.(map[string]any)
-	if !ok {
-		t.Fatalf("security vector %s is not an object", relativePath)
-	}
-	object["unknown"] = true
-	unknown, err := json.Marshal(object)
+	sourceValue["unknown"] = true
+	unknown, err := json.Marshal(sourceValue)
 	if err != nil {
 		t.Fatalf("encode unknown-field mutation for %s: %v", relativePath, err)
 	}
@@ -140,6 +408,10 @@ func TestGeneratedActiveDefenseTypesDecodeReencodeAndReject(t *testing.T) {
 	assertSecurityGeneratedRoundTrip[SecurityResponseCompletionReceiptBodyV1](
 		t,
 		"active-defense/positive/response-completion-receipt-body-v1.json",
+	)
+	assertSecurityGeneratedRoundTrip[SecurityResponseCompletionReceiptBodyV1](
+		t,
+		"active-defense/positive/response-completion-receipt-body-failed-before-effect-v1.json",
 	)
 	assertSecurityGeneratedRoundTrip[SecurityResponseCompletionReceiptBodyV1](
 		t,
@@ -754,8 +1026,8 @@ func TestGeneratedProtocolTypesPreserveApprovalAndAggregateBudgetFields(t *testi
 	if err := json.Unmarshal(indexRaw, &index); err != nil {
 		t.Fatalf("decode protocol vector index: %v", err)
 	}
-	if len(index.Positive) != 18 {
-		t.Fatalf("positive protocol inventory has %d entries, want 18", len(index.Positive))
+	if len(index.Positive) != 26 {
+		t.Fatalf("positive protocol inventory has %d entries, want 26", len(index.Positive))
 	}
 	identifiers := make(map[string]struct{}, len(index.Positive))
 	files := make(map[string]struct{}, len(index.Positive))
@@ -794,7 +1066,9 @@ func protocolGeneratedTarget(identifier string) (any, error) {
 		return &CapabilityGovernedApprovalTokenBody{}, nil
 	case "governed_token_alice", "governed_token_bob":
 		return &CapabilityGovernedApprovalToken{}, nil
-	case "tool_call_request_singular_approval", "tool_call_request_list_approval":
+	case "governed_active_response_intent":
+		return &CapabilityGovernedTransactionIntent1{}, nil
+	case "tool_call_request_singular_approval", "tool_call_request_list_approval", "tool_call_request_full_security":
 		return &AgentToolCallRequest{}, nil
 	case "verified_approval_set":
 		return &CapabilityVerifiedApprovalSet{}, nil
@@ -833,23 +1107,15 @@ func assertProtocolGeneratedRoundTrip(
 	if err != nil {
 		t.Fatalf("generated Go type failed to encode protocol positive %s: %v", identifier, err)
 	}
-	var sourceValue any
-	var reencodedValue any
+	assertSecurityCanonicalReencoding(t, relativePath, raw, reencoded)
+	assertProtocolSecurityFields(t, identifier, target)
+
+	var sourceValue map[string]any
 	if err := json.Unmarshal(raw, &sourceValue); err != nil {
 		t.Fatalf("decode protocol source %s: %v", identifier, err)
 	}
-	if err := json.Unmarshal(reencoded, &reencodedValue); err != nil {
-		t.Fatalf("decode protocol re-encoding %s: %v", identifier, err)
-	}
-	if !reflect.DeepEqual(sourceValue, reencodedValue) {
-		t.Fatalf("generated Go type changed protocol positive %s", identifier)
-	}
-	object, ok := sourceValue.(map[string]any)
-	if !ok {
-		t.Fatalf("protocol positive %s is not an object", identifier)
-	}
-	object["unknown"] = true
-	unknown, err := json.Marshal(object)
+	sourceValue["unknown"] = true
+	unknown, err := json.Marshal(sourceValue)
 	if err != nil {
 		t.Fatalf("encode unknown-field protocol mutation %s: %v", identifier, err)
 	}
@@ -861,6 +1127,81 @@ func assertProtocolGeneratedRoundTrip(
 	strict.DisallowUnknownFields()
 	if err := strict.Decode(rejected); err == nil {
 		t.Fatalf("generated Go type accepted unknown protocol field for %s", identifier)
+	}
+}
+
+func assertProtocolSecurityFields(t *testing.T, identifier string, target any) {
+	t.Helper()
+	switch identifier {
+	case "governed_active_response_intent":
+		intent, ok := target.(*CapabilityGovernedTransactionIntent1)
+		if !ok {
+			t.Fatalf("protocol positive %s used the wrong generated Go type", identifier)
+		}
+		if string(intent.Kind) != "active_response_plan" {
+			t.Fatalf("protocol positive %s has governed kind %q", identifier, intent.Kind)
+		}
+	case "tool_call_request_full_security":
+		request, ok := target.(*AgentToolCallRequest)
+		if !ok {
+			t.Fatalf("protocol positive %s used the wrong generated Go type", identifier)
+		}
+		if request.CapabilityToken.AggregateInvocationBudget == nil {
+			t.Fatal("full security request omitted aggregate invocation budget")
+		}
+		if request.SupplementalAuthorization == nil {
+			t.Fatal("full security request omitted supplemental authorization")
+		}
+		if request.GovernedIntent == nil {
+			t.Fatal("full security request omitted governed intent")
+		}
+		governed, err := request.GovernedIntent.AsCapabilityGovernedTransactionIntent0()
+		if err != nil {
+			t.Fatalf("decode full security request governed intent: %v", err)
+		}
+		if string(governed.Kind) != "tool_invocation" {
+			t.Fatalf("full security request governed kind is %q", governed.Kind)
+		}
+		if request.ApprovalTokens == nil || len(*request.ApprovalTokens) != 2 {
+			t.Fatal("full security request must carry exactly two approval tokens")
+		}
+		if request.ApprovalToken != nil {
+			t.Fatal("full security request carried the singular approval form")
+		}
+		if request.ThresholdApprovalProposal == nil {
+			t.Fatal("full security request omitted threshold approval proposal")
+		}
+		if request.DeclassificationGrant == nil {
+			t.Fatal("full security request omitted declassification grant")
+		}
+	}
+}
+
+func TestSecurityJCSUsesUTF16PropertyOrder(t *testing.T) {
+	canonical, err := canonicalizeSecurityJSON([]byte("{\"\ue000\":1,\"\U0001f600\":2}"))
+	if err != nil {
+		t.Fatalf("canonicalize non-BMP property ordering proof: %v", err)
+	}
+	want := []byte("{\"\U0001f600\":2,\"\ue000\":1}")
+	if !bytes.Equal(canonical, want) {
+		t.Fatalf("UTF-16 property order is %q, want %q", canonical, want)
+	}
+}
+
+func TestSecurityJCSRejectsValuesOutsideBoundedCorpus(t *testing.T) {
+	tests := map[string][]byte{
+		"float":          []byte(`{"value":1.5}`),
+		"unsafe integer": []byte(`{"value":9007199254740992}`),
+		"high surrogate": []byte(`{"value":"\ud800"}`),
+		"low surrogate":  []byte(`{"value":"\udc00"}`),
+		"invalid UTF-8":  {'{', '"', 'v', '"', ':', '"', 0xff, '"', '}'},
+	}
+	for name, raw := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := canonicalizeSecurityJSON(raw); err == nil {
+				t.Fatal("bounded canonical JSON accepted an unsupported value")
+			}
+		})
 	}
 }
 
@@ -959,8 +1300,8 @@ func TestProtocolSchemaAndGeneratedTypesCoverExactNegativeCorpus(t *testing.T) {
 	if err := json.Unmarshal(corpusRaw, &corpus); err != nil {
 		t.Fatalf("decode protocol mutation corpus: %v", err)
 	}
-	if len(corpus.Cases) != 20 {
-		t.Fatalf("protocol mutation corpus has %d cases, want 20", len(corpus.Cases))
+	if len(corpus.Cases) != 43 {
+		t.Fatalf("protocol mutation corpus has %d cases, want 43", len(corpus.Cases))
 	}
 	caseIDs := make(map[string]struct{}, len(corpus.Cases))
 	structuralRejections := 1
@@ -1040,15 +1381,15 @@ func TestProtocolSchemaAndGeneratedTypesCoverExactNegativeCorpus(t *testing.T) {
 			structuralRejections++
 		}
 	}
-	if structuralRejections != 8 || semanticRejections != 13 {
+	if structuralRejections != 16 || semanticRejections != 28 {
 		t.Fatalf(
-			"protocol negative partition is structural=%d semantic=%d, want 8 and 13",
+			"protocol negative partition is structural=%d semantic=%d, want 16 and 28",
 			structuralRejections,
 			semanticRejections,
 		)
 	}
-	if structuralRejections+semanticRejections != 21 {
-		t.Fatalf("protocol negative corpus has %d cases, want 21", structuralRejections+semanticRejections)
+	if structuralRejections+semanticRejections != 44 {
+		t.Fatalf("protocol negative corpus has %d cases, want 44", structuralRejections+semanticRejections)
 	}
 }
 
@@ -1085,7 +1426,9 @@ func TestBothApprovalFormsVectorTracksAuthoritativeExclusion(t *testing.T) {
 		t.Fatalf("decode %s: %v", vectorPath, err)
 	}
 
-	if !reflect.DeepEqual(schema.Not.Required, []string{"approval_token", "approval_tokens"}) {
+	if len(schema.Not.Required) != 2 ||
+		schema.Not.Required[0] != "approval_token" ||
+		schema.Not.Required[1] != "approval_tokens" {
 		t.Fatalf("unexpected approval exclusion: %v", schema.Not.Required)
 	}
 	for _, field := range schema.Not.Required {

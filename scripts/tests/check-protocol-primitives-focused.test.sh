@@ -213,9 +213,9 @@ if not all(count > 0 for count, _ in observed_commitments.values()):
     raise SystemExit("focused protocol inventory contains an empty target")
 
 expected_exact_counts = {
-    "control-plane admission consensus": 61,
+    "control-plane admission consensus": 62,
     "protocol primitives tier 1 conformance": 10,
-    "protocol primitives tier 2 conformance": 10,
+    "protocol primitives tier 2 conformance": 11,
     "generated security binding corpus": 10,
 }
 for label, count in expected_exact_counts.items():
@@ -229,10 +229,10 @@ admission_parts = [
     len(TEST_PATTERN.findall(Path(path).read_text(encoding="utf-8")))
     for path in source_contracts["control-plane admission consensus"][1]
 ]
-if admission_parts != [28, 18, 15]:
+if admission_parts != [28, 18, 16]:
     raise SystemExit(
         "control-plane admission consensus source partition changed: "
-        f"expected={[28, 18, 15]!r} observed={admission_parts!r}"
+        f"expected={[28, 18, 16]!r} observed={admission_parts!r}"
     )
 
 def inventory_commitment(names: list[str]) -> tuple[int, str]:
@@ -283,6 +283,7 @@ for lane in baseline model persistence; do
   fi
 done
 
+grep -Fq 'python3 scripts/check-protocol-provenance.py' "${runner}"
 grep -Fq 'python3 scripts/check-protocol-primitives-vectors.py' "${runner}"
 
 echo "protocol-primitives focused gate self-test passed (14 committed inventories)"

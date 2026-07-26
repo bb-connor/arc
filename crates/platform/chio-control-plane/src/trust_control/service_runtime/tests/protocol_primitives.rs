@@ -366,6 +366,7 @@ fn composite_authorize_request(
     admission_evidence: BudgetInvocationAdmissionEvidenceView,
 ) -> CompositeBudgetAuthorizeRequest {
     CompositeBudgetAuthorizeRequest {
+        existing_only: false,
         operation_id: "admission-operation-vector-1".to_string(),
         request_binding_hash: "44".repeat(32),
         capability_id: "aggregate-root-vector-1".to_string(),
@@ -424,6 +425,7 @@ fn budget_authority_view(sequence: u64) -> BudgetAuthorityMetadataView {
         lease_ttl_ms: 750,
         guarantee_level: "ha_linearizable".to_string(),
         budget_commit_index: Some(sequence),
+        partition_escrow_evidence: None,
     }
 }
 

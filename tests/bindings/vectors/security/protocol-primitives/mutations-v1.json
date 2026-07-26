@@ -121,6 +121,144 @@
       "base": "positive/admission-capture-metadata-v1.json",
       "mutation": { "op": "replace", "path": "/leaderEpoch", "value": 0 },
       "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "capture_nonzero_leader_epoch_required" }
+    },
+    {
+      "id": "partition_capture_evidence_omitted",
+      "base": "positive/admission-capture-metadata-partition-escrow-v1.json",
+      "mutation": { "op": "remove", "path": "/partitionEscrowEvidence" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "partition_escrow_capture_evidence_required" }
+    },
+    {
+      "id": "partition_capture_leader_epoch_forbidden",
+      "base": "positive/admission-capture-metadata-partition-escrow-v1.json",
+      "mutation": { "op": "add", "path": "/leaderEpoch", "value": 9 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "partition_escrow_capture_leader_epoch_forbidden" }
+    },
+    {
+      "id": "ha_capture_partition_evidence_forbidden",
+      "base": "positive/admission-capture-metadata-v1.json",
+      "mutation": { "op": "add", "path": "/partitionEscrowEvidence", "value": { "canonicalJson": "{}", "digest": "0000000000000000000000000000000000000000000000000000000000000000" } },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "ha_capture_partition_escrow_evidence_forbidden" }
+    },
+    {
+      "id": "single_node_capture_leader_epoch_forbidden",
+      "base": "positive/admission-capture-metadata-v1.json",
+      "mutation": { "op": "replace", "path": "/guaranteeLevel", "value": "single_node_atomic" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "single_node_capture_leader_epoch_forbidden" }
+    },
+    {
+      "id": "single_node_capture_partition_evidence_forbidden",
+      "base": "positive/admission-capture-metadata-partition-escrow-v1.json",
+      "mutation": { "op": "replace", "path": "/guaranteeLevel", "value": "single_node_atomic" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "single_node_capture_partition_escrow_evidence_forbidden" }
+    },
+    {
+      "id": "partition_wrapper_unknown_field",
+      "base": "positive/budget-invocation-admission-evidence-partition-escrow-v1.json",
+      "mutation": { "op": "add", "path": "/partitionEscrowEvidence/schema", "value": "chio.partition-escrow-admission-evidence.v1" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "partition_escrow_wrapper_is_closed" }
+    },
+    {
+      "id": "partition_admission_zero_fencing",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/durableStore/fencingToken", "value": 0 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "partition_escrow_nonzero_fencing_required" }
+    },
+    {
+      "id": "partition_commitment_wrong_algorithm",
+      "base": "positive/partition-escrow-quota-commitment-v1.json",
+      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "partition_escrow_ed25519_required" }
+    },
+    {
+      "id": "partition_wrapper_digest_rebound",
+      "base": "positive/budget-invocation-admission-evidence-partition-escrow-v1.json",
+      "mutation": { "op": "replace", "path": "/partitionEscrowEvidence/digest", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_evidence_digest_mismatch" }
+    },
+    {
+      "id": "partition_wrapper_noncanonical_json",
+      "base": "positive/budget-invocation-admission-evidence-partition-escrow-v1.json",
+      "mutation": { "op": "replace", "path": "/partitionEscrowEvidence/canonicalJson", "value": " {}" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_noncanonical_evidence" }
+    },
+    {
+      "id": "partition_quota_commitment_signature_tampered",
+      "base": "positive/partition-escrow-quota-commitment-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_quota_commitment_signature_invalid" }
+    },
+    {
+      "id": "partition_allocation_signature_tampered",
+      "base": "positive/partition-escrow-allocation-set-v1.json",
+      "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_allocation_signature_invalid" }
+    },
+    {
+      "id": "partition_admission_expired",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/verifiedAt", "value": 300 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_source_expired" }
+    },
+    {
+      "id": "partition_admission_root_rebound",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/quotas/0/allocationRootId", "value": "partition-allocation-root-rebound" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_allocation_root_mismatch" }
+    },
+    {
+      "id": "partition_admission_epoch_rebound",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/quotas/0/allocationEpoch", "value": 10 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_allocation_epoch_mismatch" }
+    },
+    {
+      "id": "partition_allocation_exceeds_maximum",
+      "base": "positive/partition-escrow-allocation-set-v1.json",
+      "mutation": { "op": "replace", "path": "/body/allocations/1/allocatedInvocations", "value": 4 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_allocation_exceeds_maximum" }
+    },
+    {
+      "id": "partition_budget_local_maximum_rebound",
+      "base": "positive/budget-invocation-admission-evidence-partition-escrow-v1.json",
+      "mutation": { "op": "replace", "path": "/invocationQuotas/0/maxInvocations", "value": 3 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_local_maximum_mismatch" }
+    },
+    {
+      "id": "partition_capture_artifact_digest_rebound",
+      "base": "positive/admission-capture-metadata-partition-escrow-v1.json",
+      "mutation": { "op": "replace", "path": "/authorizationArtifactDigests/0", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_capture_artifact_digest_mismatch" }
+    },
+    {
+      "id": "partition_receipt_summary_fencing_rebound",
+      "base": "positive/partition-escrow-receipt-metadata-v1.json",
+      "mutation": { "op": "replace", "path": "/summary/fencing_token", "value": 10 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_receipt_summary_mismatch" }
+    },
+    {
+      "id": "partition_admission_source_trust_rebound",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/quotas/0/sourceTrustBindingDigest", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_source_trust_binding_mismatch" }
+    },
+    {
+      "id": "partition_admission_quota_descriptor_rebound",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/quotas/0/quotaDescriptorDigest", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_quota_descriptor_mismatch" }
+    },
+    {
+      "id": "partition_admission_total_allocation_rebound",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/quotas/0/totalAllocatedInvocations", "value": 4 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_total_allocation_mismatch" }
+    },
+    {
+      "id": "partition_admission_counter_namespace_rebound",
+      "base": "positive/partition-escrow-admission-evidence-v1.json",
+      "mutation": { "op": "replace", "path": "/durableStore/counterNamespaceDigest", "value": "0000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "partition_escrow_counter_namespace_mismatch" }
     }
   ]
 }

@@ -914,6 +914,26 @@
         ]
     }
 
+    fn real_adapter_budget_and_replay_snapshot(paths: &RealAdapterPaths) -> [u64; 9] {
+        [
+            real_adapter_table_count(
+                &paths.approvals,
+                "chio_hitl_operation_reservations",
+            ),
+            real_adapter_table_count(
+                &paths.approvals,
+                "chio_hitl_operation_reservation_tokens",
+            ),
+            real_adapter_table_count(&paths.approvals, "chio_hitl_consumed_tokens"),
+            real_adapter_table_count(&paths.budgets, "budget_authorization_holds"),
+            real_adapter_table_count(&paths.budgets, "budget_authorization_claims"),
+            real_adapter_table_count(&paths.budgets, "budget_mutation_events"),
+            real_adapter_table_count(&paths.budgets, "budget_invocation_quota_usage"),
+            real_adapter_table_count(&paths.budgets, "budget_composite_authorizations"),
+            real_adapter_table_count(&paths.budgets, "budget_composite_holds"),
+        ]
+    }
+
     #[test]
     fn real_kernel_approval_adapter_prepares_reconstructs_commits_and_cold_resumes_once() {
         let fixture = real_adapter_fixture();
@@ -1221,6 +1241,8 @@
 
         let fixture = real_adapter_fixture();
         let baseline = real_adapter_mutation_snapshot(&fixture.paths);
+        let zero_budget_and_replay = real_adapter_budget_and_replay_snapshot(&fixture.paths);
+        assert_eq!(zero_budget_and_replay, [0; 9]);
         let cases: [(&str, ApprovalMutation); 6] = [
             ("proposal_digest", mutate_real_adapter_proposal_digest),
             ("proposal_deadline", mutate_real_adapter_proposal_deadline),
@@ -1251,6 +1273,11 @@
                 baseline,
                 "{name} substitution mutated a durable authority"
             );
+            assert_eq!(
+                real_adapter_budget_and_replay_snapshot(&fixture.paths),
+                zero_budget_and_replay,
+                "{name} substitution mutated a budget or replay authority"
+            );
         }
         assert_eq!(baseline, [0, 0, 0, 0, 0]);
         assert_eq!(fixture.runtime.effects.executions(), 0);
@@ -1278,7 +1305,10 @@
             .unwrap_or_else(|| panic!("scoped mutation fixture reservation missing"));
         let prepared_native = kernel_prepared.prepared.clone();
         let reserved_baseline = real_adapter_mutation_snapshot(&fixture.paths);
+        let reserved_budget_and_replay =
+            real_adapter_budget_and_replay_snapshot(&fixture.paths);
         assert_eq!(reserved_baseline, [1, 1, 1, 0, 0]);
+        assert_eq!(reserved_budget_and_replay, [1, 1, 0, 0, 0, 0, 0, 0, 0]);
 
         for (name, mutate) in cases {
             let mut substituted = fixture.governed_request.clone();
@@ -1341,6 +1371,11 @@
                 real_adapter_mutation_snapshot(&fixture.paths),
                 reserved_baseline,
                 "scoped {name} substitution mutated a durable authority"
+            );
+            assert_eq!(
+                real_adapter_budget_and_replay_snapshot(&fixture.paths),
+                reserved_budget_and_replay,
+                "scoped {name} substitution mutated a budget or replay authority"
             );
         }
         assert_eq!(

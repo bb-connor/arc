@@ -140,29 +140,29 @@ impl SettleStatusReport {
             .map_err(|err| SettleStatusError::Backend(err.to_string()))?;
         let conn: &Connection = &transaction;
 
-        let pending_total = if table_exists(&conn, "iou_envelope")? {
-            count_pending(&conn)?
+        let pending_total = if table_exists(conn, "iou_envelope")? {
+            count_pending(conn)?
         } else {
             0
         };
         let pending = if pending_total > 0 {
-            list_pending(&conn, limit)?
+            list_pending(conn, limit)?
         } else {
             Vec::new()
         };
-        let retrying_total = if table_exists(&conn, "settle_attempts")? {
-            count_rows(&conn, "settle_attempts", None)?
+        let retrying_total = if table_exists(conn, "settle_attempts")? {
+            count_rows(conn, "settle_attempts", None)?
         } else {
             0
         };
         let retrying = if retrying_total > 0 {
-            list_retrying(&conn, limit)?
+            list_retrying(conn, limit)?
         } else {
             Vec::new()
         };
-        let settled_total = if table_exists(&conn, "settlement_reconciliations")? {
+        let settled_total = if table_exists(conn, "settlement_reconciliations")? {
             count_rows(
-                &conn,
+                conn,
                 "settlement_reconciliations",
                 Some("reconciliation_state = 'reconciled'"),
             )?
@@ -170,17 +170,17 @@ impl SettleStatusReport {
             0
         };
         let settled = if settled_total > 0 {
-            list_settled(&conn, limit)?
+            list_settled(conn, limit)?
         } else {
             Vec::new()
         };
-        let dead_lettered_total = if table_exists(&conn, "settle_dead_letters")? {
-            count_rows(&conn, "settle_dead_letters", None)?
+        let dead_lettered_total = if table_exists(conn, "settle_dead_letters")? {
+            count_rows(conn, "settle_dead_letters", None)?
         } else {
             0
         };
         let dead_lettered = if dead_lettered_total > 0 {
-            list_dead_lettered(&conn, limit)?
+            list_dead_lettered(conn, limit)?
         } else {
             Vec::new()
         };

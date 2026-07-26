@@ -66,6 +66,9 @@ RUN curl --proto '=https' --tlsv1.2 --fail --location \
       --locked \
       --path /tmp/cargo-mutants-25.3.1 \
       --root /usr/local/cargo \
+ && chown 0:0 /usr/local/cargo /usr/local/cargo/bin /usr/local/cargo/bin/cargo-mutants \
+ && chmod 0755 /usr/local/cargo /usr/local/cargo/bin \
+ && chmod 0555 /usr/local/cargo/bin/cargo-mutants \
  && rm -rf /tmp/cargo-mutants-25.3.1 /tmp/cargo-mutants-25.3.1.crate
 
 WORKDIR /opt/authorized-source
@@ -79,7 +82,7 @@ RUN test "$(rustc --version | cut -d' ' -f1-2)" = "rustc 1.93.0" \
  && test "$(cargo mutants --version | awk '{print $2}')" = "25.3.1" \
  && test "$(cargo clippy --version | cut -d' ' -f1)" = "clippy" \
  && test "$(cargo fmt --version | cut -d' ' -f1)" = "rustfmt" \
- && echo '44426ff0f763ae5e8a8f72bf3feb344a7870bf6e8402c2e4b0438a75fbf87032  Cargo.lock' | sha256sum -c - \
+ && echo '5764368b209d95259cddfc171dca702298298a02bc77ef8fbd80ad24f8814a7c  Cargo.lock' | sha256sum -c - \
  && echo '8bc51ecab82415fddd8489604f2424e137d71856e7f65cbdcfaa48850d794b46  rust-toolchain.toml' | sha256sum -c - \
  && cargo fetch --locked \
  && mkdir -p /opt/chio-security/cargo-cache \

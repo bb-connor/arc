@@ -99,12 +99,14 @@ pub(crate) const BUDGETS_PATH: &str = "/v1/budgets";
 pub(crate) const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
 pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
 pub(crate) const BUDGET_AUTHORIZE_HOLD_PATH: &str = "/v1/budgets/authorize-hold";
+pub(crate) const BUDGET_AUTHORIZE_HOLD_QUERY_PATH: &str = "/v1/budgets/authorize-hold/query";
 pub(crate) const BUDGET_CAPTURE_INVOCATIONS_PATH: &str = "/v1/budgets/capture-invocations";
 pub(crate) const BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH: &str =
     "/v1/budgets/capture-invocations/query";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
 pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
 pub(crate) const BUDGET_CAPTURE_EXPOSURE_PATH: &str = "/v1/budgets/capture-exposure";
+pub(crate) const BUDGET_MUTATION_EVENT_QUERY_PATH: &str = "/v1/budgets/mutation-event/query";
 pub(crate) const ADMISSION_CAPTURE_PATH: &str = "/v1/admissions/capture";
 pub(crate) const ADMISSION_CAPTURE_QUERY_PATH: &str = "/v1/admissions/capture/query";
 pub(crate) const AGGREGATE_FAMILY_ROOT_LOOKUP_PATH: &str =
@@ -121,6 +123,8 @@ pub(crate) const INTERNAL_ADMISSION_SNAPSHOT_PATH: &str =
     "/v1/internal/admission-consensus/snapshot";
 pub(crate) const INTERNAL_ADMISSION_CAPTURE_QUERY_PATH: &str =
     "/v1/internal/admission-consensus/capture-query";
+pub(crate) const INTERNAL_COMPOSITE_AUTHORIZE_QUERY_PATH: &str =
+    "/v1/internal/admission-consensus/composite-authorize-query";
 pub(crate) const INTERNAL_INVOCATION_CAPTURE_QUERY_PATH: &str =
     "/v1/internal/admission-consensus/invocation-capture-query";
 pub(crate) const INTERNAL_AUTHORITY_SNAPSHOT_PATH: &str = "/v1/internal/authority/snapshot";

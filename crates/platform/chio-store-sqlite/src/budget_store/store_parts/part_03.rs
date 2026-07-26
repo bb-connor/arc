@@ -1,3 +1,59 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SqliteInvocationQuotaMutationMode {
+    Reserve,
+    CaptureCompatibility,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SqliteInvocationQuotaMutationAction {
+    Attempt { external_denied: bool },
+    Replay,
+    Reverse,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct SqliteInvocationQuotaMutationContext {
+    pub(super) mode: SqliteInvocationQuotaMutationMode,
+    pub(super) action: SqliteInvocationQuotaMutationAction,
+    pub(super) event_seq: u64,
+    pub(super) updated_at: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct SqliteLegacyProjectionState {
+    pub(super) invocation_count: u32,
+    pub(super) total_cost_exposed: u64,
+    pub(super) total_cost_realized_spend: u64,
+    pub(super) seq: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct SqliteLegacyProjectionMutation<'a> {
+    pub(super) capability_id: &'a str,
+    pub(super) grant_index: usize,
+    pub(super) expected: Option<SqliteLegacyProjectionState>,
+    pub(super) after: SqliteLegacyProjectionState,
+    pub(super) updated_at: i64,
+}
+
+#[derive(Debug)]
+pub(super) struct SqliteInvocationQuotaMutationOutcome {
+    pub(super) allowed: bool,
+    pub(super) quota_exhausted: bool,
+    pub(super) invocation_counts_after: Vec<BudgetInvocationQuotaUsage>,
+    pub(super) primary_count_after: u32,
+}
+
+#[derive(Debug)]
+struct SqliteStagedInvocationQuota {
+    quota: BudgetInvocationQuota,
+    before_reserved: u32,
+    before_captured: u32,
+    reserved: u32,
+    captured: u32,
+    exists: bool,
+}
+
 impl SqliteBudgetStore {
     pub(super) fn ensure_open_hold(
         transaction: &rusqlite::Transaction<'_>,
@@ -82,6 +138,7 @@ impl SqliteBudgetStore {
                     max_invocations,
                     invocation_count_after,
                     event_seq,
+                    usage_seq,
                     authority_id,
                     lease_id,
                     lease_epoch
@@ -98,7 +155,8 @@ impl SqliteBudgetStore {
                         optional_budget_u32_from_row(row, 4, "max_invocations")?,
                         budget_u32_from_row(row, 5, "invocation_count_after")?,
                         budget_u64_from_row(row, 6, "event_seq")?,
-                        sqlite_budget_event_authority(row.get(7)?, row.get(8)?, row.get(9)?)?,
+                        optional_budget_u64_from_row(row, 7, "usage_seq")?,
+                        sqlite_budget_event_authority(row.get(8)?, row.get(9)?, row.get(10)?)?,
                     ))
                 },
             )
@@ -111,6 +169,7 @@ impl SqliteBudgetStore {
             existing_max_invocations,
             existing_invocation_count,
             existing_event_seq,
+            existing_usage_seq,
             existing_authority,
         )) = existing
         else {
@@ -126,8 +185,29 @@ impl SqliteBudgetStore {
                 "budget event_id `{event_id}` was reused for a different mutation"
             )));
         }
+        let existing_allowed = existing_allowed.ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "persisted increment event `{event_id}` omits its decision"
+            ))
+        })?;
+        let allowed = match existing_allowed {
+            0 => false,
+            1 => true,
+            other => {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "persisted increment event `{event_id}` has invalid decision `{other}`"
+                )));
+            }
+        };
+        if (allowed && existing_usage_seq != Some(existing_event_seq))
+            || (!allowed && existing_usage_seq.is_some())
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "persisted increment event `{event_id}` has inconsistent usage sequence"
+            )));
+        }
         Ok(Some(SqliteBudgetIncrementOutcome {
-            allowed: existing_allowed.unwrap_or(0) > 0,
+            allowed,
             invocation_count: existing_invocation_count,
             event_seq: existing_event_seq,
         }))
@@ -159,6 +239,26 @@ impl SqliteBudgetStore {
     ) -> Result<bool, BudgetStoreError> {
         let rollback_prefix = format!("{event_id}:rollback:");
         let rollback_prefix_pattern = Self::sqlite_like_prefix_pattern(&rollback_prefix);
+        let candidate_exists = transaction
+            .query_row(
+                r#"
+                SELECT 1
+                FROM budget_mutation_events
+                WHERE event_id LIKE ?1 ESCAPE '\'
+                  AND kind = ?2
+                LIMIT 1
+                "#,
+                params![
+                    rollback_prefix_pattern,
+                    BudgetMutationKind::ReverseExposure.as_str()
+                ],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if !candidate_exists {
+            return Ok(false);
+        }
         let grant_index = i64::try_from(grant_index).map_err(|_| {
             BudgetStoreError::Overflow(
                 "budget rollback grant index exceeds SQLite INTEGER".to_string(),
@@ -172,28 +272,51 @@ impl SqliteBudgetStore {
             .query_row(
                 r#"
                 SELECT 1
-                FROM budget_mutation_events
-                WHERE event_id LIKE ?1 ESCAPE '\'
-                  AND kind = ?2
-                  AND allowed IS NULL
-                  AND hold_id IS ?3
-                  AND capability_id = ?4
-                  AND grant_index = ?5
-                  AND exposure_units = ?6
-                  AND realized_spend_units = 0
-                  AND max_invocations IS NULL
-                  AND max_exposure_per_invocation IS NULL
-                  AND max_total_exposure_units IS NULL
-                  AND authority_id IS ?7
-                  AND lease_id IS ?8
-                  AND lease_epoch IS ?9
-                  AND usage_seq = event_seq
-                  AND event_seq > (
-                      SELECT authorization.event_seq
-                      FROM budget_mutation_events AS authorization
-                      WHERE authorization.event_id = ?10
-                        AND authorization.kind = ?11
-                        AND authorization.allowed = 1
+                FROM budget_mutation_events AS rollback
+                WHERE rollback.event_id LIKE ?1 ESCAPE '\'
+                  AND rollback.kind = ?2
+                  AND rollback.allowed IS NULL
+                  AND rollback.hold_id IS ?3
+                  AND rollback.capability_id = ?4
+                  AND rollback.grant_index = ?5
+                  AND rollback.exposure_units = ?6
+                  AND rollback.realized_spend_units = 0
+                  AND rollback.max_invocations IS NULL
+                  AND rollback.max_exposure_per_invocation IS NULL
+                  AND rollback.max_total_exposure_units IS NULL
+                  AND rollback.authority_id IS ?7
+                  AND rollback.lease_id IS ?8
+                  AND rollback.lease_epoch IS ?9
+                  AND rollback.usage_seq = rollback.event_seq
+                  AND (
+                      rollback.event_seq > (
+                          SELECT authorization.event_seq
+                          FROM budget_mutation_events AS authorization
+                          WHERE authorization.event_id = ?10
+                            AND authorization.kind = ?11
+                            AND authorization.allowed = 1
+                      )
+                      OR (
+                          NOT EXISTS (
+                              SELECT 1
+                              FROM budget_mutation_events AS authorization
+                              WHERE authorization.event_id = ?10
+                          )
+                          AND EXISTS (
+                              SELECT 1
+                              FROM budget_authorization_claims AS claim
+                              WHERE claim.event_id = ?10
+                                AND claim.hold_id IS ?3
+                                AND claim.capability_id = ?4
+                                AND claim.grant_index = ?5
+                                AND claim.requested_exposure_units = ?6
+                                AND claim.authority_id IS ?7
+                                AND claim.lease_id IS ?8
+                                AND claim.lease_epoch IS ?9
+                                AND claim.allowed = 1
+                                AND rollback.recorded_at >= claim.created_at
+                          )
+                      )
                   )
                 LIMIT 1
                 "#,
@@ -628,127 +751,398 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
-    pub(super) fn stage_compatibility_invocation_quota(
+    pub(super) fn compare_and_mutate_invocation_quotas(
         transaction: &rusqlite::Transaction<'_>,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        legacy_invocation_count: u32,
-        legacy_usage_seq: u64,
-    ) -> Result<(), BudgetStoreError> {
-        Self::reject_composite_managed_grant(transaction, capability_id, grant_index)?;
-        let quota_key = BudgetQuotaKey::grant(capability_id, grant_index)?;
-        let grant_index_key = i64::from(quota_key.grant_index().ok_or_else(|| {
-            BudgetStoreError::Invariant(
-                "grant invocation quota is missing its grant index".to_string(),
-            )
-        })?);
-        let immutable_maximum = max_invocations.unwrap_or(u32::MAX);
-        let persisted_quota = transaction
-            .query_row(
-                r#"
-                SELECT max_invocations, reserved_invocations, captured_invocations
-                FROM budget_invocation_quota_usage
-                WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
-                "#,
-                params![
-                    quota_key.profile().as_str(),
-                    quota_key.owner_id(),
-                    grant_index_key
-                ],
-                |row| {
-                    Ok((
-                        budget_u32_from_row(row, 0, "quota max_invocations")?,
-                        budget_u32_from_row(row, 1, "quota reserved_invocations")?,
-                        budget_u32_from_row(row, 2, "quota captured_invocations")?,
-                    ))
-                },
-            )
-            .optional()?;
-        if let Some((stored_maximum, reserved, captured)) = persisted_quota {
-            if stored_maximum != immutable_maximum {
+        quotas: &[BudgetInvocationQuota],
+        primary_key: &BudgetQuotaKey,
+        primary_usage_count: u32,
+        context: SqliteInvocationQuotaMutationContext,
+    ) -> Result<SqliteInvocationQuotaMutationOutcome, BudgetStoreError> {
+        let SqliteInvocationQuotaMutationContext {
+            mode,
+            action,
+            event_seq,
+            updated_at,
+        } = context;
+        if matches!(
+            mode,
+            SqliteInvocationQuotaMutationMode::CaptureCompatibility
+        ) && (quotas.len() != 1 || quotas[0].key() != primary_key)
+        {
+            return Err(BudgetStoreError::Invariant(
+                "compatibility capture requires exactly one primary grant quota".to_string(),
+            ));
+        }
+        let mut staged = Vec::with_capacity(quotas.len());
+        let mut quota_exhausted = false;
+        for quota in quotas {
+            quota.validate()?;
+            let grant_index_key = quota.key().grant_index().map_or(-1_i64, i64::from);
+            let persisted = transaction
+                .query_row(
+                    r#"
+                    SELECT max_invocations, reserved_invocations, captured_invocations
+                    FROM budget_invocation_quota_usage
+                    WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
+                    "#,
+                    params![
+                        quota.key().profile().as_str(),
+                        quota.key().owner_id(),
+                        grant_index_key,
+                    ],
+                    |row| {
+                        Ok((
+                            budget_u32_from_row(row, 0, "quota max_invocations")?,
+                            budget_u32_from_row(row, 1, "quota reserved_invocations")?,
+                            budget_u32_from_row(row, 2, "quota captured_invocations")?,
+                        ))
+                    },
+                )
+                .optional()?;
+            let (reserved, captured, exists) = match persisted {
+                Some((stored_maximum, reserved, captured)) => {
+                    if stored_maximum != quota.max_invocations() {
+                        return Err(BudgetStoreError::Invariant(format!(
+                            "invocation quota `{}` was presented with a different maximum",
+                            quota.key().owner_id()
+                        )));
+                    }
+                    (reserved, captured, true)
+                }
+                None => {
+                    if mode == SqliteInvocationQuotaMutationMode::Reserve
+                        && action == SqliteInvocationQuotaMutationAction::Replay
+                    {
+                        return Err(BudgetStoreError::Invariant(format!(
+                            "composite replay is missing invocation quota authority for `{}`",
+                            quota.key().owner_id()
+                        )));
+                    }
+                    if mode == SqliteInvocationQuotaMutationMode::CaptureCompatibility
+                        && action == SqliteInvocationQuotaMutationAction::Replay
+                    {
+                        let grant_index = quota.key().grant_index().ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "compatibility quota is missing its grant index".to_string(),
+                            )
+                        })?;
+                        Self::reject_composite_managed_grant(
+                            transaction,
+                            quota.key().owner_id(),
+                            usize::try_from(grant_index).map_err(|_| {
+                                BudgetStoreError::Invariant(
+                                    "compatibility quota grant index does not fit usize"
+                                        .to_string(),
+                                )
+                            })?,
+                        )?;
+                    }
+                    if action == SqliteInvocationQuotaMutationAction::Reverse {
+                        return Err(BudgetStoreError::Invariant(format!(
+                            "invocation quota `{}` must be migrated before reversal",
+                            quota.key().owner_id()
+                        )));
+                    }
+                    (
+                        0,
+                        if quota.key() == primary_key {
+                            primary_usage_count
+                        } else {
+                            0
+                        },
+                        false,
+                    )
+                }
+            };
+            let current_count = reserved.checked_add(captured).ok_or_else(|| {
+                BudgetStoreError::Overflow(
+                    "reserved invocations + captured invocations overflowed u32".to_string(),
+                )
+            })?;
+            if current_count > quota.max_invocations() {
                 return Err(BudgetStoreError::Invariant(format!(
-                    "invocation quota `{capability_id}` was presented with a different maximum"
+                    "invocation quota `{}` maximum is below existing usage",
+                    quota.key().owner_id()
                 )));
             }
-            if reserved != 0 || captured != legacy_invocation_count {
+            if matches!(
+                mode,
+                SqliteInvocationQuotaMutationMode::CaptureCompatibility
+            ) && !matches!(action, SqliteInvocationQuotaMutationAction::Replay)
+                && reserved != 0
+            {
                 return Err(BudgetStoreError::Invariant(
-                    "legacy grant usage projection diverged from structured invocation quota"
-                        .to_string(),
+                    "compatibility capture cannot mutate reserved invocation authority".to_string(),
                 ));
+            }
+            quota_exhausted |= current_count == quota.max_invocations();
+            staged.push(SqliteStagedInvocationQuota {
+                quota: quota.clone(),
+                before_reserved: reserved,
+                before_captured: captured,
+                reserved,
+                captured,
+                exists,
+            });
+        }
+        let primary_before = staged
+            .iter()
+            .find(|entry| entry.quota.key() == primary_key)
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant("missing primary quota counter".to_string())
+            })?
+            .reserved
+            .checked_add(
+                staged
+                    .iter()
+                    .find(|entry| entry.quota.key() == primary_key)
+                    .ok_or_else(|| {
+                        BudgetStoreError::Invariant("missing primary quota counter".to_string())
+                    })?
+                    .captured,
+            )
+            .ok_or_else(|| {
+                BudgetStoreError::Overflow("primary invocation count overflowed u32".to_string())
+            })?;
+        if primary_before != primary_usage_count {
+            return Err(BudgetStoreError::Invariant(
+                "grant usage projection diverged from structured invocation quota".to_string(),
+            ));
+        }
+
+        let allowed = match action {
+            SqliteInvocationQuotaMutationAction::Attempt { external_denied } => {
+                let allowed =
+                    Self::invocation_quota_attempt_is_allowed(quota_exhausted, external_denied);
+                if allowed {
+                    for entry in &mut staged {
+                        match mode {
+                            SqliteInvocationQuotaMutationMode::Reserve => {
+                                entry.reserved =
+                                    entry.reserved.checked_add(1).ok_or_else(|| {
+                                        BudgetStoreError::Overflow(
+                                            "reserved invocation count overflowed u32".to_string(),
+                                        )
+                                    })?;
+                            }
+                            SqliteInvocationQuotaMutationMode::CaptureCompatibility => {
+                                entry.captured =
+                                    entry.captured.checked_add(1).ok_or_else(|| {
+                                        BudgetStoreError::Overflow(
+                                            "captured invocation count overflowed u32".to_string(),
+                                        )
+                                    })?;
+                            }
+                        }
+                    }
+                }
+                allowed
+            }
+            SqliteInvocationQuotaMutationAction::Replay => false,
+            SqliteInvocationQuotaMutationAction::Reverse => {
+                if mode != SqliteInvocationQuotaMutationMode::CaptureCompatibility {
+                    return Err(BudgetStoreError::Invariant(
+                        "only compatibility capture authority can be reversed".to_string(),
+                    ));
+                }
+                for entry in &mut staged {
+                    entry.captured = entry.captured.checked_sub(1).ok_or_else(|| {
+                        BudgetStoreError::Invariant(
+                            "compatibility capture has no reversible invocation".to_string(),
+                        )
+                    })?;
+                }
+                true
+            }
+        };
+
+        let event_seq = sqlite_integer_from_u64(event_seq, "invocation quota sequence")?;
+        for entry in &staged {
+            let grant_index_key = entry.quota.key().grant_index().map_or(-1_i64, i64::from);
+            if entry.exists {
+                if !allowed {
+                    continue;
+                }
+                let updated = transaction.execute(
+                    r#"
+                    UPDATE budget_invocation_quota_usage
+                    SET reserved_invocations = ?4,
+                        captured_invocations = ?5,
+                        updated_at = ?6,
+                        seq = ?7
+                    WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
+                      AND max_invocations = ?8
+                      AND reserved_invocations = ?9
+                      AND captured_invocations = ?10
+                    "#,
+                    params![
+                        entry.quota.key().profile().as_str(),
+                        entry.quota.key().owner_id(),
+                        grant_index_key,
+                        i64::from(entry.reserved),
+                        i64::from(entry.captured),
+                        updated_at,
+                        event_seq,
+                        i64::from(entry.quota.max_invocations()),
+                        i64::from(entry.before_reserved),
+                        i64::from(entry.before_captured),
+                    ],
+                )?;
+                if updated != 1 {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "invocation quota `{}` changed during mutation",
+                        entry.quota.key().owner_id()
+                    )));
+                }
+            } else {
+                let inserted = transaction.execute(
+                    r#"
+                    INSERT INTO budget_invocation_quota_usage (
+                        profile, owner_id, grant_index_key, max_invocations,
+                        reserved_invocations, captured_invocations, updated_at, seq
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                    "#,
+                    params![
+                        entry.quota.key().profile().as_str(),
+                        entry.quota.key().owner_id(),
+                        grant_index_key,
+                        i64::from(entry.quota.max_invocations()),
+                        i64::from(entry.reserved),
+                        i64::from(entry.captured),
+                        updated_at,
+                        event_seq,
+                    ],
+                )?;
+                if inserted != 1 {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "invocation quota `{}` was not inserted exactly once",
+                        entry.quota.key().owner_id()
+                    )));
+                }
+            }
+        }
+
+        let invocation_counts_after = staged
+            .iter()
+            .map(|entry| BudgetInvocationQuotaUsage {
+                quota: entry.quota.clone(),
+                reserved_invocations_after: entry.reserved,
+                captured_invocations_after: entry.captured,
+            })
+            .collect::<Vec<_>>();
+        for usage in &invocation_counts_after {
+            usage.validate()?;
+        }
+        let primary_count_after = invocation_counts_after
+            .iter()
+            .find(|usage| usage.quota.key() == primary_key)
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant("missing primary quota snapshot".to_string())
+            })?
+            .invocation_count_after()?;
+        Ok(SqliteInvocationQuotaMutationOutcome {
+            allowed,
+            quota_exhausted,
+            invocation_counts_after,
+            primary_count_after,
+        })
+    }
+
+    pub(super) fn compare_and_persist_legacy_projection(
+        transaction: &rusqlite::Transaction<'_>,
+        mutation: SqliteLegacyProjectionMutation<'_>,
+    ) -> Result<(), BudgetStoreError> {
+        let SqliteLegacyProjectionMutation {
+            capability_id,
+            grant_index,
+            expected,
+            after,
+            updated_at,
+        } = mutation;
+        let after_seq = sqlite_integer_from_u64(after.seq, "legacy projection sequence")?;
+        if let Some(expected) = expected {
+            let updated = transaction.execute(
+                r#"
+                UPDATE capability_grant_budgets
+                SET invocation_count = ?3,
+                    updated_at = ?4,
+                    seq = ?5,
+                    total_cost_exposed = ?6,
+                    total_cost_realized_spend = ?7
+                WHERE capability_id = ?1 AND grant_index = ?2
+                  AND invocation_count = ?8
+                  AND total_cost_exposed = ?9
+                  AND total_cost_realized_spend = ?10
+                  AND seq = ?11
+                "#,
+                params![
+                    capability_id,
+                    grant_index as i64,
+                    i64::from(after.invocation_count),
+                    updated_at,
+                    after_seq,
+                    sqlite_integer_from_u64(
+                        after.total_cost_exposed,
+                        "legacy projection exposed total",
+                    )?,
+                    sqlite_integer_from_u64(
+                        after.total_cost_realized_spend,
+                        "legacy projection realized-spend total",
+                    )?,
+                    i64::from(expected.invocation_count),
+                    sqlite_integer_from_u64(
+                        expected.total_cost_exposed,
+                        "expected legacy projection exposed total",
+                    )?,
+                    sqlite_integer_from_u64(
+                        expected.total_cost_realized_spend,
+                        "expected legacy projection realized-spend total",
+                    )?,
+                    sqlite_integer_from_u64(expected.seq, "expected legacy projection sequence")?,
+                ],
+            )?;
+            if updated != 1 {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "legacy budget projection `{capability_id}` changed during quota mutation"
+                )));
             }
             return Ok(());
         }
-        if legacy_invocation_count > immutable_maximum {
-            return Err(BudgetStoreError::Invariant(format!(
-                "invocation quota `{capability_id}` maximum is below existing usage"
-            )));
-        }
-        transaction.execute(
+        let inserted = transaction.execute(
             r#"
-            INSERT INTO budget_invocation_quota_usage (
-                profile, owner_id, grant_index_key, max_invocations,
-                reserved_invocations, captured_invocations, updated_at, seq
-            ) VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6, ?7)
+            INSERT INTO capability_grant_budgets (
+                capability_id, grant_index, invocation_count, updated_at, seq,
+                total_cost_exposed, total_cost_realized_spend
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             "#,
             params![
-                quota_key.profile().as_str(),
-                quota_key.owner_id(),
-                grant_index_key,
-                i64::from(immutable_maximum),
-                i64::from(legacy_invocation_count),
-                unix_now(),
-                sqlite_integer_from_u64(legacy_usage_seq, "compatibility quota usage sequence")?,
+                capability_id,
+                grant_index as i64,
+                i64::from(after.invocation_count),
+                updated_at,
+                after_seq,
+                sqlite_integer_from_u64(
+                    after.total_cost_exposed,
+                    "legacy projection exposed total",
+                )?,
+                sqlite_integer_from_u64(
+                    after.total_cost_realized_spend,
+                    "legacy projection realized-spend total",
+                )?,
             ],
         )?;
-        Ok(())
-    }
-
-    pub(super) fn persist_compatibility_invocation_capture(
-        transaction: &rusqlite::Transaction<'_>,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        captured_invocations: u32,
-        usage_seq: u64,
-    ) -> Result<(), BudgetStoreError> {
-        let quota_key = BudgetQuotaKey::grant(capability_id, grant_index)?;
-        let grant_index_key = i64::from(quota_key.grant_index().ok_or_else(|| {
-            BudgetStoreError::Invariant(
-                "grant invocation quota is missing its grant index".to_string(),
-            )
-        })?);
-        let immutable_maximum = max_invocations.unwrap_or(u32::MAX);
-        let updated = transaction.execute(
-            r#"
-            UPDATE budget_invocation_quota_usage
-            SET captured_invocations = ?5, updated_at = ?6, seq = ?7
-            WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
-              AND max_invocations = ?4 AND reserved_invocations = 0
-            "#,
-            params![
-                quota_key.profile().as_str(),
-                quota_key.owner_id(),
-                grant_index_key,
-                i64::from(immutable_maximum),
-                i64::from(captured_invocations),
-                unix_now(),
-                sqlite_integer_from_u64(usage_seq, "compatibility quota usage sequence")?,
-            ],
-        )?;
-        if updated != 1 {
+        if inserted != 1 {
             return Err(BudgetStoreError::Invariant(format!(
-                "invocation quota `{capability_id}` disappeared or changed during compatibility mutation"
+                "legacy budget projection `{capability_id}` was not inserted exactly once"
             )));
         }
         Ok(())
     }
 
-    pub(super) fn stage_compatibility_invocation_reverse(
+    pub(super) fn compatibility_invocation_quota_maximum(
         transaction: &rusqlite::Transaction<'_>,
         capability_id: &str,
         grant_index: usize,
-        legacy_invocation_count: u32,
     ) -> Result<Option<u32>, BudgetStoreError> {
         Self::reject_composite_managed_grant(transaction, capability_id, grant_index)?;
         let quota_key = BudgetQuotaKey::grant(capability_id, grant_index)?;
@@ -760,7 +1154,7 @@ impl SqliteBudgetStore {
         let persisted = transaction
             .query_row(
                 r#"
-                SELECT max_invocations, reserved_invocations, captured_invocations
+                SELECT max_invocations
                 FROM budget_invocation_quota_usage
                 WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
                 "#,
@@ -769,24 +1163,32 @@ impl SqliteBudgetStore {
                     quota_key.owner_id(),
                     grant_index_key
                 ],
-                |row| {
-                    Ok((
-                        budget_u32_from_row(row, 0, "quota max_invocations")?,
-                        budget_u32_from_row(row, 1, "quota reserved_invocations")?,
-                        budget_u32_from_row(row, 2, "quota captured_invocations")?,
-                    ))
-                },
+                |row| budget_u32_from_row(row, 0, "quota max_invocations"),
             )
             .optional()?;
-        let Some((maximum, reserved, captured)) = persisted else {
-            return Ok(None);
-        };
-        if reserved != 0 || captured != legacy_invocation_count || captured == 0 {
-            return Err(BudgetStoreError::Invariant(
-                "compatibility quota projection diverged during reversal".to_string(),
-            ));
+        if persisted.is_some() {
+            return Ok(persisted);
         }
-        Ok(Some(maximum))
+        let historical_maximum = transaction
+            .query_row(
+                r#"
+                SELECT max_invocations
+                FROM budget_mutation_events
+                WHERE capability_id = ?1 AND grant_index = ?2
+                  AND kind IN (?3, ?4)
+                ORDER BY event_seq ASC
+                LIMIT 1
+                "#,
+                params![
+                    capability_id,
+                    grant_index as i64,
+                    BudgetMutationKind::IncrementInvocation.as_str(),
+                    BudgetMutationKind::AuthorizeExposure.as_str(),
+                ],
+                |row| optional_budget_u32_from_row(row, 0, "historical max_invocations"),
+            )
+            .optional()?;
+        Ok(Some(historical_maximum.flatten().unwrap_or(u32::MAX)))
     }
 
     pub fn try_increment_with_event_id(
@@ -866,65 +1268,35 @@ impl SqliteBudgetStore {
             )
             .optional()?
             .unwrap_or((0, 0));
-        Self::stage_compatibility_invocation_quota(
+        SqliteBudgetStore::reject_composite_managed_grant(
             transaction,
             capability_id,
             grant_index,
-            max_invocations,
-            legacy_invocation_count,
-            existing_event
-                .as_ref()
-                .map(|outcome| outcome.event_seq.max(legacy_usage_seq))
-                .unwrap_or(legacy_usage_seq),
         )?;
-
         if let Some(outcome) = existing_event {
+            let quota = BudgetInvocationQuota::from_persisted_parts(
+                BudgetQuotaKey::grant(capability_id, grant_index)?,
+                max_invocations.unwrap_or(u32::MAX),
+            )?;
+            Self::compare_and_mutate_invocation_quotas(
+                transaction,
+                std::slice::from_ref(&quota),
+                quota.key(),
+                legacy_invocation_count,
+                SqliteInvocationQuotaMutationContext {
+                    mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                    action: SqliteInvocationQuotaMutationAction::Replay,
+                    event_seq: outcome.event_seq.max(legacy_usage_seq),
+                    updated_at: unix_now(),
+                },
+            )?;
             return Ok(outcome);
         }
 
-        let outcome = Self::increment_legacy_invocation_in_transaction(
-            transaction,
-            capability_id,
-            grant_index,
-            max_invocations,
-            event_id,
-            authority,
-        )?;
-        Self::persist_compatibility_invocation_capture(
-            transaction,
-            capability_id,
-            grant_index,
-            max_invocations,
-            outcome.invocation_count,
-            outcome.event_seq,
-        )?;
-        Ok(outcome)
-    }
-
-    fn increment_legacy_invocation_in_transaction(
-        transaction: &rusqlite::Transaction<'_>,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<SqliteBudgetIncrementOutcome, BudgetStoreError> {
-        if let Some(outcome) = SqliteBudgetStore::existing_increment_outcome(
-            transaction,
-            event_id,
-            capability_id,
-            grant_index,
-            max_invocations,
-            authority,
-        )? {
-            return Ok(outcome);
-        }
-        SqliteBudgetStore::reject_composite_managed_grant(transaction, capability_id, grant_index)?;
-
-        let current: Option<(u32, u64, u64)> = transaction
+        let current: Option<(u32, u64, u64, u64)> = transaction
             .query_row(
                 r#"
-                SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
+                SELECT invocation_count, total_cost_exposed, total_cost_realized_spend, seq
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
@@ -934,72 +1306,65 @@ impl SqliteBudgetStore {
                         budget_u32_from_row(row, 0, "invocation_count")?,
                         budget_u64_from_row(row, 1, "total_cost_exposed")?,
                         budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
+                        budget_u64_from_row(row, 3, "legacy projection sequence")?,
                     ))
                 },
             )
             .optional()?;
-        let (current, total_cost_exposed, total_cost_realized_spend) = current.unwrap_or((0, 0, 0));
-        let updated_at = unix_now();
-
-        if let Some(max) = max_invocations {
-            if current >= max {
-                let event_seq = allocate_budget_replication_seq(transaction)?;
-                SqliteBudgetStore::append_mutation_event(
-                    transaction,
-                    event_id,
-                    None,
-                    authority,
-                    capability_id,
-                    grant_index,
-                    BudgetMutationKind::IncrementInvocation,
-                    Some(false),
-                    event_seq,
-                    None,
-                    0,
-                    0,
-                    max_invocations,
-                    None,
-                    None,
-                    current,
+        let expected_projection = current.map(
+            |(invocation_count, total_cost_exposed, total_cost_realized_spend, seq)| {
+                SqliteLegacyProjectionState {
+                    invocation_count,
                     total_cost_exposed,
                     total_cost_realized_spend,
-                )?;
-                return Ok(SqliteBudgetIncrementOutcome {
-                    allowed: false,
-                    invocation_count: current,
-                    event_seq,
-                });
-            }
+                    seq,
+                }
+            },
+        );
+        let (current, total_cost_exposed, total_cost_realized_spend, _) =
+            current.unwrap_or((0, 0, 0, 0));
+        if max_invocations.is_none() && current == u32::MAX {
+            return Err(BudgetStoreError::Overflow(
+                "unbounded invocation counter exhausted u32".to_string(),
+            ));
         }
-
-        let next_invocation_count = current.checked_add(1).ok_or_else(|| {
-            BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
-        })?;
-        let seq = allocate_budget_replication_seq(transaction)?;
-        transaction.execute(
-            r#"
-            INSERT INTO capability_grant_budgets (
-                capability_id,
-                grant_index,
-                invocation_count,
-                updated_at,
-                seq,
-                total_cost_exposed,
-                total_cost_realized_spend
-            ) VALUES (?1, ?2, ?3, ?4, ?5, 0, 0)
-            ON CONFLICT(capability_id, grant_index) DO UPDATE SET
-                invocation_count = excluded.invocation_count,
-                updated_at = excluded.updated_at,
-                seq = excluded.seq
-            "#,
-            params![
-                capability_id,
-                grant_index as i64,
-                i64::from(next_invocation_count),
-                updated_at,
-                seq as i64,
-            ],
+        let updated_at = unix_now();
+        let event_seq = allocate_budget_replication_seq(transaction)?;
+        let quota = BudgetInvocationQuota::from_persisted_parts(
+            BudgetQuotaKey::grant(capability_id, grant_index)?,
+            max_invocations.unwrap_or(u32::MAX),
         )?;
+        let mutation = Self::compare_and_mutate_invocation_quotas(
+            transaction,
+            std::slice::from_ref(&quota),
+            quota.key(),
+            current,
+            SqliteInvocationQuotaMutationContext {
+                mode: SqliteInvocationQuotaMutationMode::CaptureCompatibility,
+                action: SqliteInvocationQuotaMutationAction::Attempt {
+                    external_denied: false,
+                },
+                event_seq,
+                updated_at,
+            },
+        )?;
+        if mutation.allowed {
+            Self::compare_and_persist_legacy_projection(
+                transaction,
+                SqliteLegacyProjectionMutation {
+                    capability_id,
+                    grant_index,
+                    expected: expected_projection,
+                    after: SqliteLegacyProjectionState {
+                        invocation_count: mutation.primary_count_after,
+                        total_cost_exposed,
+                        total_cost_realized_spend,
+                        seq: event_seq,
+                    },
+                    updated_at,
+                },
+            )?;
+        }
         SqliteBudgetStore::append_mutation_event(
             transaction,
             event_id,
@@ -1008,22 +1373,22 @@ impl SqliteBudgetStore {
             capability_id,
             grant_index,
             BudgetMutationKind::IncrementInvocation,
-            Some(true),
-            seq,
-            Some(seq),
+            Some(mutation.allowed),
+            event_seq,
+            mutation.allowed.then_some(event_seq),
             0,
             0,
             max_invocations,
             None,
             None,
-            next_invocation_count,
+            mutation.primary_count_after,
             total_cost_exposed,
             total_cost_realized_spend,
         )?;
         Ok(SqliteBudgetIncrementOutcome {
-            allowed: true,
-            invocation_count: next_invocation_count,
-            event_seq: seq,
+            allowed: mutation.allowed,
+            invocation_count: mutation.primary_count_after,
+            event_seq,
         })
     }
 }

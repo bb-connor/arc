@@ -34,6 +34,7 @@ pub mod manifest;
 pub mod merkle;
 pub mod message;
 pub mod oracle;
+pub mod partition_escrow;
 pub mod plan;
 #[cfg(feature = "pq")]
 pub mod pq;
@@ -74,6 +75,23 @@ pub use message::{
     MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES, MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES,
 };
 pub use oracle::{OracleConversionEvidence, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA};
+pub use partition_escrow::{
+    verify_partition_escrow_allocation_set, verify_partition_escrow_allocation_set_structure,
+    verify_partition_escrow_quota_commitment, PartitionEscrowAllocation,
+    PartitionEscrowAllocationPlan, PartitionEscrowAllocationPlanBinding,
+    PartitionEscrowAllocationSetBody, PartitionEscrowAllocationVerificationContext,
+    PartitionEscrowQuota, PartitionEscrowQuotaCommitmentBody, PartitionEscrowQuotaSourceBinding,
+    PartitionEscrowValidationError, SignedPartitionEscrowAllocationSet,
+    SignedPartitionEscrowQuotaCommitment, StructurallyVerifiedPartitionEscrowAllocation,
+    VerifiedPartitionEscrowAllocation, VerifiedPartitionEscrowQuotaCertificate,
+    MAX_PARTITION_ESCROW_ALLOCATIONS, MAX_PARTITION_ESCROW_IDENTIFIER_BYTES,
+    PARTITION_ESCROW_ALLOCATION_PLAN_DIGEST_DOMAIN, PARTITION_ESCROW_ALLOCATION_SET_DIGEST_DOMAIN,
+    PARTITION_ESCROW_ALLOCATION_SET_SCHEMA, PARTITION_ESCROW_ALLOCATION_SIGNATURE_DOMAIN,
+    PARTITION_ESCROW_QUOTA_AUTHORITY_BINDING_DOMAIN,
+    PARTITION_ESCROW_QUOTA_COMMITMENT_DIGEST_DOMAIN, PARTITION_ESCROW_QUOTA_COMMITMENT_SCHEMA,
+    PARTITION_ESCROW_QUOTA_COMMITMENT_SIGNATURE_DOMAIN, PARTITION_ESCROW_QUOTA_DESCRIPTOR_DOMAIN,
+    PARTITION_ESCROW_QUOTA_KEY_DOMAIN,
+};
 pub use plan::{
     PlanEvaluationRequest, PlanEvaluationResponse, PlanVerdict, PlannedToolCall, PlannedToolCallId,
     StepVerdict, StepVerdictKind,

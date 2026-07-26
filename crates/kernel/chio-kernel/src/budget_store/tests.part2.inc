@@ -302,13 +302,8 @@
             .unwrap()
             .is_none());
         assert!(matches!(
-            denied_store.reserve_invocation_hold(
-                denied_hold_id,
-                "cap-invocation",
-                0,
-                1_000,
-                &envelope,
-            ),
+            denied_store
+                .reserve_invocation_hold(denied_hold_id, "cap-invocation", 0, 1_000, &envelope,),
             Err(BudgetStoreError::Invariant(_))
         ));
     }
@@ -491,6 +486,7 @@
                 authority: Some(authority.clone()),
                 admission_operation: None,
                 invocation_admission: None,
+                authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
                 payment_journal: None,
             })
             .unwrap();
@@ -545,12 +541,7 @@
         assert_eq!(events[1].realized_spend_units, 75);
     }
 
-    fn authorize_reserved(
-        store: &InMemoryBudgetStore,
-        hold_id: &str,
-        cap: &str,
-        reserved_until: i64,
-    ) {
+    fn authorize_reserved(store: &InMemoryBudgetStore, hold_id: &str, cap: &str, reserved_until: i64) {
         let decision = store
             .authorize_budget_hold(BudgetAuthorizeHoldRequest {
                 capability_id: cap.to_string(),
@@ -564,6 +555,7 @@
                 authority: None,
                 admission_operation: None,
                 invocation_admission: None,
+                authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
                 payment_journal: None,
             })
             .unwrap();
@@ -679,7 +671,7 @@
     }
 
     #[test]
-    fn denied_authorize_hold_reports_guarantee_metadata_without_commit_index() {
+    fn denied_authorize_hold_reports_its_durable_decision_event() {
         let store = InMemoryBudgetStore::new();
         let authority = BudgetEventAuthority {
             authority_id: "kernel:test-authority".to_string(),
@@ -687,23 +679,25 @@
             lease_epoch: 0,
         };
 
-        let decision = store
-            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
-                capability_id: "cap-budget-deny".to_string(),
-                grant_index: 0,
-                max_invocations: Some(1),
-                requested_exposure_units: 150,
-                max_cost_per_invocation: Some(100),
-                max_total_cost_units: Some(1_000),
-                hold_id: Some("hold-budget-deny".to_string()),
-                event_id: Some("hold-budget-deny:authorize".to_string()),
-                authority: Some(authority.clone()),
-                admission_operation: None,
-                invocation_admission: None,
-                payment_journal: None,
-            })
-            .unwrap();
-        let BudgetAuthorizeHoldDecision::Denied(denied) = decision else {
+        let request = BudgetAuthorizeHoldRequest {
+            capability_id: "cap-budget-deny".to_string(),
+            grant_index: 0,
+            max_invocations: Some(1),
+            requested_exposure_units: 150,
+            max_cost_per_invocation: Some(100),
+            max_total_cost_units: Some(1_000),
+            hold_id: Some("hold-budget-deny".to_string()),
+            event_id: Some("hold-budget-deny:authorize".to_string()),
+            authority: Some(authority.clone()),
+            admission_operation: None,
+            invocation_admission: None,
+            authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
+            payment_journal: None,
+        };
+        let first = store
+            .authorize_budget_hold(request.clone())
+            .test_expect("budget denial");
+        let BudgetAuthorizeHoldDecision::Denied(denied) = &first else {
             panic!("budget hold should be denied");
         };
         assert_eq!(denied.committed_cost_units_after, 0);
@@ -712,7 +706,10 @@
             denied.metadata.event_id.as_deref(),
             Some("hold-budget-deny:authorize")
         );
-        assert_eq!(denied.metadata.budget_commit_index, None);
+        let commit_index = denied
+            .metadata
+            .budget_commit_index
+            .test_expect("a durable denial must expose its event sequence");
         assert_eq!(
             denied.metadata.guarantee_level,
             BudgetGuaranteeLevel::SingleNodeAtomic
@@ -721,11 +718,88 @@
 
         let events = store
             .list_mutation_events(10, Some("cap-budget-deny"), Some(0))
-            .unwrap();
+            .test_expect("list budget denial event");
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].allowed, Some(false));
+        assert_eq!(events[0].event_seq, commit_index);
+        assert_eq!(events[0].usage_seq, None);
         assert_eq!(events[0].authority.as_ref(), Some(&authority));
-        assert!(store.get_usage("cap-budget-deny", 0).unwrap().is_none());
+        assert!(store
+            .get_usage("cap-budget-deny", 0)
+            .test_expect("denied budget usage lookup")
+            .is_none());
+        assert!(store
+            .try_increment("cap-budget-deny", 0, Some(1))
+            .test_expect("post-denial increment"));
+        assert_eq!(
+            store
+                .authorize_budget_hold(request)
+                .test_expect("replayed budget denial"),
+            first,
+            "exact replay must return the original denial after later live usage"
+        );
+    }
+
+    #[test]
+    fn exhausted_quota_records_denial_before_irrelevant_cost_overflow() {
+        let store = InMemoryBudgetStore::new();
+        let authority = BudgetEventAuthority {
+            authority_id: "kernel:overflow-denial".to_string(),
+            lease_id: "single-node".to_string(),
+            lease_epoch: 1,
+        };
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-overflow-denial",
+                0,
+                Some(1),
+                u64::MAX,
+                Some(u64::MAX),
+                Some(u64::MAX),
+                Some("hold-overflow-baseline"),
+                Some("event-overflow-baseline"),
+                Some(&authority),
+            )
+            .test_expect("baseline near-limit charge"));
+
+        let denied = store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-overflow-denial",
+                0,
+                Some(1),
+                1,
+                Some(u64::MAX),
+                Some(u64::MAX),
+                Some("hold-overflow-denied"),
+                Some("event-overflow-denied"),
+                Some(&authority),
+            )
+            .test_expect("quota denial before prospective overflow");
+        assert!(!denied);
+
+        let denial_event = store
+            .list_mutation_events(10, Some("cap-overflow-denial"), Some(0))
+            .test_expect("list overflow denial event")
+            .into_iter()
+            .find(|event| event.event_id == "event-overflow-denied")
+            .test_expect("overflow denial event");
+        assert_eq!(denial_event.allowed, Some(false));
+        assert_eq!(denial_event.usage_seq, None);
+        assert!(denial_event.event_seq > 0);
+        assert_eq!(denial_event.total_cost_exposed_after, u64::MAX);
+        assert!(!store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-overflow-denial",
+                0,
+                Some(1),
+                1,
+                Some(u64::MAX),
+                Some(u64::MAX),
+                Some("hold-overflow-denied"),
+                Some("event-overflow-denied"),
+                Some(&authority),
+            )
+            .test_expect("replayed overflow denial"));
     }
 
     #[test]
@@ -747,6 +821,7 @@
                 authority: None,
                 admission_operation: None,
                 invocation_admission: None,
+                authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
                 payment_journal: None,
             })
             .unwrap();
@@ -780,6 +855,7 @@
     struct JournalOrderProbeStore {
         allow: bool,
         journal_write_fails: bool,
+        guarantee_level: BudgetGuaranteeLevel,
         journal: std::sync::Mutex<Vec<crate::payment::PaymentJournalRecord>>,
         reverses: std::sync::Mutex<u32>,
     }
@@ -789,6 +865,17 @@
             Self {
                 allow,
                 journal_write_fails,
+                guarantee_level: BudgetGuaranteeLevel::AdvisoryPosthoc,
+                journal: std::sync::Mutex::new(Vec::new()),
+                reverses: std::sync::Mutex::new(0),
+            }
+        }
+
+        fn single_node_without_event_query(allow: bool) -> Self {
+            Self {
+                allow,
+                journal_write_fails: false,
+                guarantee_level: BudgetGuaranteeLevel::SingleNodeAtomic,
                 journal: std::sync::Mutex::new(Vec::new()),
                 reverses: std::sync::Mutex::new(0),
             }
@@ -804,6 +891,10 @@
     }
 
     impl BudgetStore for JournalOrderProbeStore {
+        fn budget_guarantee_level(&self) -> BudgetGuaranteeLevel {
+            self.guarantee_level
+        }
+
         fn try_increment(
             &self,
             _capability_id: &str,
@@ -897,6 +988,7 @@
             authority: None,
             admission_operation: None,
             invocation_admission: None,
+            authorization_policy: BudgetAuthorizationPolicy::FreshOrReplay,
             payment_journal: Some(crate::payment::PaymentJournalRecord {
                 request_id: "req-journal-order".to_string(),
                 capability_id: "cap-journal-order".to_string(),
@@ -932,6 +1024,18 @@
             0,
             "a budget-denied request must leave no journal row: no rail call will follow"
         );
+    }
+
+    #[test]
+    fn default_atomic_authorize_fails_before_mutation_without_exact_event_lookup() {
+        let store = JournalOrderProbeStore::single_node_without_event_query(true);
+        assert!(matches!(
+            store.authorize_budget_hold(probe_hold_request()),
+            Err(BudgetStoreError::Invariant(message))
+                if message.contains("exact budget mutation event lookup is unavailable")
+        ));
+        assert_eq!(store.journal_rows(), 0);
+        assert_eq!(store.reverse_count(), 0);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "producer": "chio-adversarial-suite",
-  "case_count": 40,
+  "case_count": 62,
   "cases": [
     {
       "id": "anchor-grafted-001",
@@ -49,6 +49,87 @@
       "content_sha256": "b185a7ee490bded0b2fb67d1b4d0e262c08c9207b359d06e21b4eea75c157c5d"
     },
     {
+      "id": "broker-destination-rebinding-001",
+      "class": "broker_destination_rebinding",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_destination_rebinding_detected",
+      "threat_id": "ssrf_via_http_substrate",
+      "path": "cases/broker_destination_rebinding/broker-destination-rebinding-001.json",
+      "content_sha256": "84ed6c68c92dc6eaa3d3a94a81a24296d5ec66e0c7824ee592e72b2eaeee19c3"
+    },
+    {
+      "id": "broker-execution-overspend-001",
+      "class": "broker_execution_overspend",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_execution_overspend_detected",
+      "threat_id": "resource_exhaustion_dos",
+      "path": "cases/broker_execution_overspend/broker-execution-overspend-001.json",
+      "content_sha256": "09e5a1e2a48f3f5203d6e038ae6524bf4d51031be12a4dd96728c360b740403d"
+    },
+    {
+      "id": "broker-orphan-hold-001",
+      "class": "broker_orphan_hold",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_orphan_hold_detected",
+      "threat_id": "resource_exhaustion_dos",
+      "path": "cases/broker_orphan_hold/broker-orphan-hold-001.json",
+      "content_sha256": "e299bb379b7b1ccea5933c1b9a25e0856a2f25ed61238da16697704dce7d764a"
+    },
+    {
+      "id": "broker-parent-double-charge-001",
+      "class": "broker_parent_double_charge",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_parent_double_charge_detected",
+      "threat_id": "resource_exhaustion_dos",
+      "path": "cases/broker_parent_double_charge/broker-parent-double-charge-001.json",
+      "content_sha256": "5ccddce4d2a6b6b112c39612509c01b16a5fd3fdccb1fc323d3e66885eb25d47"
+    },
+    {
+      "id": "broker-proof-replay-001",
+      "class": "broker_proof_replay",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_proof_replay_detected",
+      "threat_id": "native_channel_replay",
+      "path": "cases/broker_proof_replay/broker-proof-replay-001.json",
+      "content_sha256": "501224e9f19c92a06b69b6713a20f0f9eacbb01e0fe574366f6988b4eeeaf8a0"
+    },
+    {
+      "id": "broker-revocation-race-001",
+      "class": "broker_revocation_race",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_revocation_race_detected",
+      "threat_id": "capability_token_theft",
+      "path": "cases/broker_revocation_race/broker-revocation-race-001.json",
+      "content_sha256": "8c784655145b002fa89851c1c2be1442188517ecbd0b6d297f08f4da38b8f1e0"
+    },
+    {
+      "id": "broker-secret-boundary-crossing-001",
+      "class": "broker_secret_boundary_crossing",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_secret_boundary_crossing_detected",
+      "threat_id": "tool_server_escape",
+      "path": "cases/broker_secret_boundary_crossing/broker-secret-boundary-crossing-001.json",
+      "content_sha256": "400b21b685c25729d09ac7006a6ad06ab1a3e549b88b553dec2b8c9560a9def0"
+    },
+    {
+      "id": "broker-unbound-headers-001",
+      "class": "broker_unbound_headers",
+      "expected_verdict": "DENY",
+      "expected_reason": "broker_unbound_headers_detected",
+      "threat_id": "ssrf_via_http_substrate",
+      "path": "cases/broker_unbound_headers/broker-unbound-headers-001.json",
+      "content_sha256": "c12bf953ecf95a3175052b723d63fd3b907dcb1a57bbc1263bbee89339ef16b0"
+    },
+    {
+      "id": "canary-evasion-001",
+      "class": "canary_evasion",
+      "expected_verdict": "DENY",
+      "expected_reason": "canary_evasion_detected",
+      "threat_id": "behavioral_sequence_attack",
+      "path": "cases/canary_evasion/canary-evasion-001.json",
+      "content_sha256": "ab2ce31203b54d09483faabc072c0198f96340776d10446fea90654de1a69dcc"
+    },
+    {
       "id": "clock-rewound-001",
       "class": "clock_rewound",
       "expected_verdict": "DENY",
@@ -94,6 +175,15 @@
       "content_sha256": "b35526db26dd7cefaa0c9f967986d33585c5fa4b390ad29b718770440c3ef0cf"
     },
     {
+      "id": "containment-rollback-001",
+      "class": "containment_rollback",
+      "expected_verdict": "DENY",
+      "expected_reason": "containment_rollback_detected",
+      "threat_id": "resource_exhaustion_dos",
+      "path": "cases/containment_rollback/containment-rollback-001.json",
+      "content_sha256": "d730d89b529e2b2c714903d2abc3e92d566632c586805b49ffade484b7f9eb0c"
+    },
+    {
       "id": "future-dated-001",
       "class": "future_dated",
       "expected_verdict": "DENY",
@@ -137,6 +227,60 @@
       "threat_id": "kernel_impersonation",
       "path": "cases/future_dated/future-dated-005.json",
       "content_sha256": "70dd7a95b2572da007282fe9e77b6d13b04c873b9c86a0c48bada48688ba9eeb"
+    },
+    {
+      "id": "key-log-inconsistent-growth-001",
+      "class": "key_log_inconsistent_growth",
+      "expected_verdict": "DENY",
+      "expected_reason": "key_log_inconsistent_growth_detected",
+      "threat_id": "kernel_impersonation",
+      "path": "cases/key_log_inconsistent_growth/key-log-inconsistent-growth-001.json",
+      "content_sha256": "78b29fc18da97fae3dfff7d3e059461b551e46ff9f94fb8332e0a5eaff375084"
+    },
+    {
+      "id": "key-log-noncontiguous-sync-001",
+      "class": "key_log_noncontiguous_sync",
+      "expected_verdict": "DENY",
+      "expected_reason": "key_log_noncontiguous_sync_detected",
+      "threat_id": "native_channel_replay",
+      "path": "cases/key_log_noncontiguous_sync/key-log-noncontiguous-sync-001.json",
+      "content_sha256": "d49a1543fab9da58854acbce0bb4b6dd3f41adda0784b1451635c78fe1218920"
+    },
+    {
+      "id": "key-log-omission-001",
+      "class": "key_log_omission",
+      "expected_verdict": "DENY",
+      "expected_reason": "key_log_omission_detected",
+      "threat_id": "kernel_impersonation",
+      "path": "cases/key_log_omission/key-log-omission-001.json",
+      "content_sha256": "f06882b9b9561ed8e7c0abd71120b163da0f7c9c98e33145d8ac708999a83000"
+    },
+    {
+      "id": "key-log-split-view-001",
+      "class": "key_log_split_view",
+      "expected_verdict": "DENY",
+      "expected_reason": "key_log_split_view_detected",
+      "threat_id": "kernel_impersonation",
+      "path": "cases/key_log_split_view/key-log-split-view-001.json",
+      "content_sha256": "9a1a48276c30216cdf7c73a81bb2e00c992c26c3f944ce424cce685bd48006d8"
+    },
+    {
+      "id": "label-downgrade-001",
+      "class": "label_downgrade",
+      "expected_verdict": "DENY",
+      "expected_reason": "label_downgrade_detected",
+      "threat_id": "pii_phi_exposure",
+      "path": "cases/label_downgrade/label-downgrade-001.json",
+      "content_sha256": "0fe09a10bba9ab6696502aa431552711acf614d91af0d35b4c098c34f1e3d2eb"
+    },
+    {
+      "id": "old-key-backdating-001",
+      "class": "old_key_backdating",
+      "expected_verdict": "DENY",
+      "expected_reason": "old_key_backdating_detected",
+      "threat_id": "kernel_impersonation",
+      "path": "cases/old_key_backdating/old-key-backdating-001.json",
+      "content_sha256": "f8917ed06fcca2faf319b6be3dcf3ca4ab94d221b55ac1ed02a1eab346b44b48"
     },
     {
       "id": "partial-signature-001",
@@ -274,6 +418,51 @@
       "content_sha256": "4a00cb68a19579f7682c48a2638fc538cd6a681962257281b848ba51122b767d"
     },
     {
+      "id": "rotation-partial-commit-001",
+      "class": "rotation_partial_commit",
+      "expected_verdict": "DENY",
+      "expected_reason": "rotation_partial_commit_detected",
+      "threat_id": "kernel_impersonation",
+      "path": "cases/rotation_partial_commit/rotation-partial-commit-001.json",
+      "content_sha256": "6c24572fb8896431e52644f8d693a357c44a687304f9ac6f5e21338727aa1154"
+    },
+    {
+      "id": "rotation-unwitnessed-signing-001",
+      "class": "rotation_unwitnessed_signing",
+      "expected_verdict": "DENY",
+      "expected_reason": "rotation_unwitnessed_signing_detected",
+      "threat_id": "kernel_impersonation",
+      "path": "cases/rotation_unwitnessed_signing/rotation-unwitnessed-signing-001.json",
+      "content_sha256": "bc5c15c75d6c53ad5b61315e2a0a9acdda0991177961e7992c641f9e4791a57a"
+    },
+    {
+      "id": "sandbox-false-exec-success-001",
+      "class": "sandbox_false_exec_success",
+      "expected_verdict": "DENY",
+      "expected_reason": "sandbox_false_exec_success_detected",
+      "threat_id": "tool_server_escape",
+      "path": "cases/sandbox_false_exec_success/sandbox-false-exec-success-001.json",
+      "content_sha256": "205b55a8364bacf55665d69113a6d1fb6218fc4c8cca27732b3a779dcf794026"
+    },
+    {
+      "id": "sandbox-partial-enforcement-001",
+      "class": "sandbox_partial_enforcement",
+      "expected_verdict": "DENY",
+      "expected_reason": "sandbox_partial_enforcement_detected",
+      "threat_id": "tool_server_escape",
+      "path": "cases/sandbox_partial_enforcement/sandbox-partial-enforcement-001.json",
+      "content_sha256": "1dea88374e5b9ffbe966297735029e3f614c1748ab727850ffba1482b64248f0"
+    },
+    {
+      "id": "sandbox-unsigned-manifest-001",
+      "class": "sandbox_unsigned_manifest",
+      "expected_verdict": "DENY",
+      "expected_reason": "sandbox_unsigned_manifest_detected",
+      "threat_id": "tool_server_escape",
+      "path": "cases/sandbox_unsigned_manifest/sandbox-unsigned-manifest-001.json",
+      "content_sha256": "012392cf2698180c4cc33a9ae88367a94efcae18e8da5faf8f286392e406a392"
+    },
+    {
       "id": "scope-superset-001",
       "class": "scope_superset",
       "expected_verdict": "DENY",
@@ -362,6 +551,15 @@
       "threat_id": "kernel_impersonation",
       "path": "cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-005.json",
       "content_sha256": "bc7de137ed1ba550e8fedfe91b3bfd33105c0afa1d1a6d25f92f3972a4150919"
+    },
+    {
+      "id": "temporal-evasion-001",
+      "class": "temporal_evasion",
+      "expected_verdict": "DENY",
+      "expected_reason": "temporal_evasion_detected",
+      "threat_id": "behavioral_sequence_attack",
+      "path": "cases/temporal_evasion/temporal-evasion-001.json",
+      "content_sha256": "e33ad49f9f92c0293d2533ebdf579f74bebb5b4bf4597956e1a30d6b2f0d99b4"
     }
   ]
 }

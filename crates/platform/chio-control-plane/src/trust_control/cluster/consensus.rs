@@ -292,6 +292,7 @@ pub(crate) fn budget_authority_metadata_view(
         lease_ttl_ms: authority_lease.lease_ttl_ms,
         guarantee_level: guarantee_level.to_string(),
         budget_commit_index,
+        partition_escrow_evidence: None,
     })
 }
 

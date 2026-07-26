@@ -321,6 +321,7 @@ mod tests {
                 realized_spend_units: 75,
                 committed_cost_units_after: 75,
             }),
+            partition_escrow: None,
         };
         let row = SettlementReconciliationRow {
             receipt_id: "rcpt-1".to_string(),
@@ -376,6 +377,7 @@ mod tests {
                 committed_cost_units_after: 150,
             },
             terminal: None,
+            partition_escrow: None,
         };
 
         let metered = MeteredBillingReconciliationRow {

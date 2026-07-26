@@ -57,6 +57,8 @@ pub(crate) fn dispatch_mcp(
     control_token: Option<String>,
     control_authority_public_key: Option<chio_core::PublicKey>,
     control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
+    partition_escrow_authority_descriptor: Option<PathBuf>,
+    partition_escrow_authority_signer: Option<chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     match command {
         McpCommands::Wrap(args) => {
@@ -134,6 +136,8 @@ pub(crate) fn dispatch_mcp(
             control_token.as_deref(),
             control_authority_public_key.as_ref(),
             &control_authority_trusted_public_keys,
+            partition_escrow_authority_descriptor.as_deref(),
+            partition_escrow_authority_signer.as_ref(),
         ),
         McpCommands::ServeHttp {
             policy,

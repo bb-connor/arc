@@ -21,7 +21,7 @@ impl SqliteBudgetStore {
         &self,
         request: SqliteCompositeAuthorizeInput,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
-        self.authorize_composite_hold_with_optional_family_evidence(request, None)
+        self.authorize_composite_hold_with_optional_family_evidence(request, None, false)
     }
 
     pub fn authorize_aggregate_family_composite_hold(
@@ -32,6 +32,7 @@ impl SqliteBudgetStore {
         self.authorize_composite_hold_with_optional_family_evidence(
             request,
             Some(aggregate_family_evidence),
+            false,
         )
     }
 
@@ -39,6 +40,7 @@ impl SqliteBudgetStore {
         &self,
         request: SqliteCompositeAuthorizeInput,
         aggregate_family_evidence: Option<SqliteAggregateFamilyEvidence>,
+        existing_only: bool,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -46,6 +48,7 @@ impl SqliteBudgetStore {
             &transaction,
             request,
             aggregate_family_evidence,
+            existing_only,
         )?;
         transaction.commit()?;
         Ok(decision)
@@ -76,12 +79,30 @@ impl SqliteBudgetStore {
             &transaction,
             request,
             aggregate_family_evidence,
+            false,
         )?;
         if matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)) {
             if let Some(journal) = journal {
                 super::trait_impl::insert_payment_journal_tx(&transaction, journal, true)?;
             }
         }
+        transaction.commit()?;
+        Ok(decision)
+    }
+
+    pub(super) fn replay_composite_hold(
+        &self,
+        request: SqliteCompositeAuthorizeInput,
+        aggregate_family_evidence: Option<SqliteAggregateFamilyEvidence>,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let decision = Self::authorize_composite_hold_in_transaction_with_optional_family_evidence(
+            &transaction,
+            request,
+            aggregate_family_evidence,
+            true,
+        )?;
         transaction.commit()?;
         Ok(decision)
     }
@@ -94,6 +115,7 @@ impl SqliteBudgetStore {
             transaction,
             request,
             None,
+            false,
         )
     }
 
@@ -106,6 +128,32 @@ impl SqliteBudgetStore {
             transaction,
             request,
             Some(aggregate_family_evidence),
+            false,
+        )
+    }
+
+    pub fn replay_composite_hold_in_transaction(
+        transaction: &rusqlite::Transaction<'_>,
+        request: SqliteCompositeAuthorizeInput,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        Self::authorize_composite_hold_in_transaction_with_optional_family_evidence(
+            transaction,
+            request,
+            None,
+            true,
+        )
+    }
+
+    pub fn replay_aggregate_family_composite_hold_in_transaction(
+        transaction: &rusqlite::Transaction<'_>,
+        request: SqliteCompositeAuthorizeInput,
+        aggregate_family_evidence: SqliteAggregateFamilyEvidence,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        Self::authorize_composite_hold_in_transaction_with_optional_family_evidence(
+            transaction,
+            request,
+            Some(aggregate_family_evidence),
+            true,
         )
     }
 
@@ -113,16 +161,17 @@ impl SqliteBudgetStore {
         transaction: &rusqlite::Transaction<'_>,
         request: SqliteCompositeAuthorizeInput,
         aggregate_family_evidence: Option<SqliteAggregateFamilyEvidence>,
+        existing_only: bool,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         with_composite_savepoint(transaction, "chio_authorize_composite_hold", || {
             Self::authorize_composite_hold_in_transaction_unchecked(
                 transaction,
                 request,
                 aggregate_family_evidence,
+                existing_only,
             )
         })
     }
-
 }
 
 fn validate_composite_input(
@@ -250,15 +299,6 @@ fn validate_composite_input(
         })?,
         "composite grant index",
     )?;
-    sqlite_integer_from_u64(request.requested_exposure_units, "composite exposure")?;
-    request
-        .max_cost_per_invocation
-        .map(|value| sqlite_integer_from_u64(value, "composite per-invocation maximum"))
-        .transpose()?;
-    request
-        .max_total_cost_units
-        .map(|value| sqlite_integer_from_u64(value, "composite total maximum"))
-        .transpose()?;
     if request.authorization_artifact_digests.len()
         > MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION
         || request.authorization_artifact_digests.iter().any(|digest| {
@@ -280,6 +320,46 @@ fn validate_composite_input(
         sqlite_integer_from_u64(authority.lease_epoch, "composite lease epoch")?;
     }
     Ok(())
+}
+
+fn validate_partition_escrow_input(
+    _transaction: &rusqlite::Transaction<'_>,
+    request: &SqliteCompositeAuthorizeInput,
+) -> Result<(), BudgetStoreError> {
+    match request.partition_escrow_evidence.as_ref() {
+        Some(commit_evidence) => {
+            if request
+                .authorization_artifact_digests
+                .binary_search_by(|digest| digest.as_str().cmp(commit_evidence.evidence_digest()))
+                .is_err()
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "partition escrow evidence digest is absent from authorization artifacts"
+                        .to_string(),
+                ));
+            }
+            let evidence = commit_evidence.evidence()?;
+            if evidence.quotas().len() != request.invocation_quotas.len()
+                || evidence
+                    .quotas()
+                    .iter()
+                    .zip(&request.invocation_quotas)
+                    .any(|(escrow, local)| {
+                        escrow.global_quota().profile() != local.key().profile().as_str()
+                            || escrow.global_quota().owner_id() != local.key().owner_id()
+                            || escrow.global_quota().grant_index() != local.key().grant_index()
+                            || escrow.local_allocated_invocations() != local.max_invocations()
+                    })
+            {
+                return Err(BudgetStoreError::Conflict(
+                    "partition escrow evidence does not match the local quota projection"
+                        .to_string(),
+                ));
+            }
+            Ok(())
+        }
+        None => Ok(()),
+    }
 }
 
 fn reject_legacy_namespace_collisions(
@@ -319,13 +399,116 @@ fn reject_legacy_namespace_collisions(
             request.event_id
         )));
     }
+    let open_compatibility_hold = transaction
+        .query_row(
+            r#"
+            SELECT hold_id
+            FROM budget_authorization_holds
+            WHERE capability_id = ?1 AND grant_index = ?2
+              AND disposition = 'open'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM budget_composite_holds
+                  WHERE budget_composite_holds.hold_id = budget_authorization_holds.hold_id
+              )
+            ORDER BY created_at, hold_id
+            LIMIT 1
+            "#,
+            params![request.capability_id, request.grant_index as i64],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    if let Some(hold_id) = open_compatibility_hold {
+        return Err(BudgetStoreError::Conflict(format!(
+            "grant `{}` has open compatibility hold `{hold_id}`",
+            request.capability_id
+        )));
+    }
+    Ok(())
+}
+
+fn validate_composite_managed_grant_marker(
+    transaction: &rusqlite::Transaction<'_>,
+    capability_id: &str,
+    grant_index: usize,
+) -> Result<String, BudgetStoreError> {
+    let first_hold_id = transaction
+        .query_row(
+            r#"
+            SELECT first_hold_id
+            FROM budget_composite_managed_grants
+            WHERE capability_id = ?1 AND grant_index = ?2
+            "#,
+            params![capability_id, grant_index as i64],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "grant `{capability_id}` is missing composite managed authority"
+            ))
+        })?;
+    let marker_owner_exists = transaction
+        .query_row(
+            r#"
+            SELECT 1
+            FROM budget_composite_authorizations
+            WHERE hold_id = ?1 AND capability_id = ?2 AND grant_index = ?3
+            "#,
+            params![first_hold_id, capability_id, grant_index as i64],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if !marker_owner_exists {
+        return Err(BudgetStoreError::Invariant(format!(
+            "grant `{capability_id}` composite authority references a missing first hold"
+        )));
+    }
+    Ok(first_hold_id)
+}
+
+fn persist_composite_managed_grant_marker(
+    transaction: &rusqlite::Transaction<'_>,
+    request: &SqliteCompositeAuthorizeInput,
+) -> Result<(), BudgetStoreError> {
+    let inserted = transaction.execute(
+        r#"
+        INSERT INTO budget_composite_managed_grants (
+            capability_id, grant_index, first_hold_id
+        ) VALUES (?1, ?2, ?3)
+        ON CONFLICT(capability_id, grant_index) DO NOTHING
+        "#,
+        params![
+            request.capability_id,
+            request.grant_index as i64,
+            request.hold_id,
+        ],
+    )?;
+    if inserted > 1 {
+        return Err(BudgetStoreError::Invariant(format!(
+            "grant `{}` inserted multiple composite authority markers",
+            request.capability_id
+        )));
+    }
+    let first_hold_id = validate_composite_managed_grant_marker(
+        transaction,
+        &request.capability_id,
+        request.grant_index,
+    )?;
+    if inserted == 1 && first_hold_id != request.hold_id {
+        return Err(BudgetStoreError::Invariant(format!(
+            "grant `{}` composite authority marker was rebound during insertion",
+            request.capability_id
+        )));
+    }
     Ok(())
 }
 
 fn load_legacy_usage(
     transaction: &rusqlite::Transaction<'_>,
     request: &SqliteCompositeAuthorizeInput,
-) -> Result<(u32, u64, u64), BudgetStoreError> {
+) -> Result<(u32, u64, u64, Option<u64>), BudgetStoreError> {
     load_legacy_usage_for_identity(transaction, &request.capability_id, request.grant_index)
 }
 
@@ -333,11 +516,11 @@ fn load_legacy_usage_for_identity(
     transaction: &rusqlite::Transaction<'_>,
     capability_id: &str,
     grant_index: usize,
-) -> Result<(u32, u64, u64), BudgetStoreError> {
+) -> Result<(u32, u64, u64, Option<u64>), BudgetStoreError> {
     Ok(transaction
         .query_row(
             r#"
-            SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
+            SELECT invocation_count, total_cost_exposed, total_cost_realized_spend, seq
             FROM capability_grant_budgets
             WHERE capability_id = ?1 AND grant_index = ?2
             "#,
@@ -347,11 +530,12 @@ fn load_legacy_usage_for_identity(
                     budget_u32_from_row(row, 0, "invocation_count")?,
                     budget_u64_from_row(row, 1, "total_cost_exposed")?,
                     budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
+                    Some(budget_u64_from_row(row, 3, "legacy projection sequence")?),
                 ))
             },
         )
         .optional()?
-        .unwrap_or((0, 0, 0)))
+        .unwrap_or((0, 0, 0, None)))
 }
 
 fn load_live_quota_usages(
@@ -419,7 +603,7 @@ fn persist_quota_rows(
     for entry in staged {
         let (profile, owner_id, grant_index_key) = quota_storage_key(entry.quota.key())?;
         if entry.exists {
-            transaction.execute(
+            let updated = transaction.execute(
                 r#"
                 UPDATE budget_invocation_quota_usage
                 SET reserved_invocations = ?4,
@@ -427,6 +611,9 @@ fn persist_quota_rows(
                     updated_at = ?6,
                     seq = ?7
                 WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
+                  AND max_invocations = ?8
+                  AND reserved_invocations = ?9
+                  AND captured_invocations = ?10
                 "#,
                 params![
                     profile,
@@ -436,10 +623,18 @@ fn persist_quota_rows(
                     i64::from(entry.captured),
                     now,
                     event_seq,
+                    i64::from(entry.quota.max_invocations()),
+                    i64::from(entry.before_reserved),
+                    i64::from(entry.before_captured),
                 ],
             )?;
+            if updated != 1 {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "invocation quota `{owner_id}` changed during composite transition"
+                )));
+            }
         } else {
-            transaction.execute(
+            let inserted = transaction.execute(
                 r#"
                 INSERT INTO budget_invocation_quota_usage (
                     profile, owner_id, grant_index_key, max_invocations,
@@ -457,44 +652,13 @@ fn persist_quota_rows(
                     event_seq,
                 ],
             )?;
+            if inserted != 1 {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "invocation quota `{owner_id}` was not inserted exactly once"
+                )));
+            }
         }
     }
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn upsert_legacy_projection(
-    transaction: &rusqlite::Transaction<'_>,
-    request: &SqliteCompositeAuthorizeInput,
-    invocation_count: u32,
-    total_cost_exposed: u64,
-    total_cost_realized_spend: u64,
-    event_seq: u64,
-    now: i64,
-) -> Result<(), BudgetStoreError> {
-    transaction.execute(
-        r#"
-        INSERT INTO capability_grant_budgets (
-            capability_id, grant_index, invocation_count, updated_at, seq,
-            total_cost_exposed, total_cost_realized_spend
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-        ON CONFLICT(capability_id, grant_index) DO UPDATE SET
-            invocation_count = excluded.invocation_count,
-            updated_at = excluded.updated_at,
-            seq = excluded.seq,
-            total_cost_exposed = excluded.total_cost_exposed,
-            total_cost_realized_spend = excluded.total_cost_realized_spend
-        "#,
-        params![
-            request.capability_id,
-            request.grant_index as i64,
-            i64::from(invocation_count),
-            now,
-            sqlite_integer_from_u64(event_seq, "composite projection sequence")?,
-            sqlite_integer_from_u64(total_cost_exposed, "composite exposed total")?,
-            sqlite_integer_from_u64(total_cost_realized_spend, "composite realized-spend total")?,
-        ],
-    )?;
     Ok(())
 }
 
@@ -608,6 +772,20 @@ fn persist_composite_authorization(
             ) VALUES (?1, ?2, ?3)
             "#,
             params![request.hold_id, position as i64, digest],
+        )?;
+    }
+    if let Some(evidence) = request.partition_escrow_evidence.as_ref() {
+        transaction.execute(
+            r#"
+            INSERT INTO budget_composite_partition_escrow_evidence (
+                hold_id, evidence_digest, canonical_evidence
+            ) VALUES (?1, ?2, ?3)
+            "#,
+            params![
+                request.hold_id,
+                evidence.evidence_digest(),
+                evidence.canonical_json().as_bytes(),
+            ],
         )?;
     }
     transaction.execute(
@@ -781,7 +959,19 @@ fn load_composite_capture_decision(
         invocation_state: state.invocation_state,
         monetary_state: state.monetary_state,
         revocation_set: Some(state.revocation_set),
-        metadata: composite_metadata(record.authority, Some(record.event_seq), record.event_id),
+        metadata: composite_metadata(
+            record.authority,
+            Some(record.event_seq),
+            record.event_id,
+            load_partition_escrow_authorization_evidence(
+                transaction,
+                request.hold_id.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "persisted invocation capture omits hold_id".to_string(),
+                    )
+                })?,
+            )?,
+        ),
     }))
 }
 
@@ -850,7 +1040,12 @@ fn load_composite_transition_decision(
         invocation_state: state.invocation_state,
         monetary_state: state.monetary_state,
         revocation_set: Some(state.revocation_set),
-        metadata: composite_metadata(record.authority, record.usage_seq, record.event_id),
+        metadata: composite_metadata(
+            record.authority,
+            record.usage_seq,
+            record.event_id,
+            load_partition_escrow_authorization_evidence(transaction, hold_id)?,
+        ),
     }))
 }
 
@@ -1086,6 +1281,8 @@ fn load_composite_authorization(
         })?;
     let invocation_counts_after = load_authorization_quota_snapshots(transaction, hold_id)?;
     let authorization_artifact_digests = load_authorization_artifact_digests(transaction, hold_id)?;
+    let partition_escrow_evidence =
+        load_partition_escrow_authorization_evidence(transaction, hold_id)?;
     let authorization = StoredCompositeAuthorization {
         admission_operation: StoredAdmissionOperation::from_columns(
             row.18,
@@ -1111,13 +1308,49 @@ fn load_composite_authorization(
         event_seq: row.17,
         invocation_counts_after,
         authorization_artifact_digests,
+        partition_escrow_evidence,
     };
     let recovered = authorization.authorization_input()?;
     validate_composite_input(
         &recovered.authorization,
         recovered.aggregate_family_evidence.as_ref(),
     )?;
+    validate_partition_escrow_input(transaction, &recovered.authorization)?;
     Ok(Some(authorization))
+}
+
+pub(super) fn load_partition_escrow_authorization_evidence(
+    transaction: &rusqlite::Connection,
+    hold_id: &str,
+) -> Result<Option<PartitionEscrowCommitEvidence>, BudgetStoreError> {
+    let row = transaction
+        .query_row(
+            r#"
+            SELECT evidence_digest, canonical_evidence
+            FROM budget_composite_partition_escrow_evidence
+            WHERE hold_id = ?1
+            "#,
+            params![hold_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?)),
+        )
+        .optional()?;
+    let Some((evidence_digest, canonical_evidence)) = row else {
+        return Ok(None);
+    };
+    if canonical_evidence.is_empty()
+        || canonical_evidence.len()
+            > chio_kernel::budget_store::MAX_PARTITION_ESCROW_ADMISSION_EVIDENCE_BYTES
+    {
+        return Err(BudgetStoreError::Invariant(
+            "persisted partition escrow evidence is empty or oversized".to_string(),
+        ));
+    }
+    let canonical_json = String::from_utf8(canonical_evidence).map_err(|error| {
+        BudgetStoreError::Invariant(format!(
+            "persisted partition escrow evidence is not UTF-8 JSON: {error}"
+        ))
+    })?;
+    PartitionEscrowCommitEvidence::from_canonical_json(canonical_json, evidence_digest).map(Some)
 }
 
 fn load_authorization_artifact_digests(
@@ -1317,6 +1550,7 @@ fn composite_metadata(
     authority: Option<BudgetEventAuthority>,
     budget_commit_index: Option<u64>,
     event_id: String,
+    partition_escrow_evidence: Option<PartitionEscrowCommitEvidence>,
 ) -> BudgetCommitMetadata {
     BudgetCommitMetadata {
         authority,
@@ -1325,5 +1559,6 @@ fn composite_metadata(
         metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
         budget_commit_index,
         event_id: Some(event_id),
+        partition_escrow_evidence,
     }
 }

@@ -553,6 +553,8 @@ pub struct ChioKernel {
     pub(super) guards: Arc<Vec<Arc<dyn Guard>>>,
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
+    pub(super) partition_escrow_registry:
+        Option<Arc<crate::partition_escrow::PartitionEscrowRegistry>>,
     pub(super) budget_store_lock: Mutex<()>,
     pub(super) admission_operation_store:
         Option<Arc<dyn crate::admission_operation::AdmissionOperationStore>>,
@@ -568,8 +570,7 @@ pub struct ChioKernel {
         Option<Arc<dyn crate::admission_capture_authority::AdmissionCaptureAuthority>>,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
     /// Fallible source snapshotted before a capability authority can sign.
-    pub(super) capability_authority_clock:
-        Arc<dyn crate::authority::CapabilityAuthorityClock>,
+    pub(super) capability_authority_clock: Arc<dyn crate::authority::CapabilityAuthorityClock>,
     pub(super) authority_signing_backend: Arc<dyn chio_core::crypto::SigningBackend>,
     pub(super) authority_signing_used: Arc<AtomicBool>,
     pub(super) authority_backend_topology_locked: bool,

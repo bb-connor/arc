@@ -24,9 +24,6 @@ pub use execution_identity::{
     validate_cage_execution_identity_binding, ExecutionIdentity, MAX_SUPPLEMENTARY_GIDS,
 };
 
-include!("lib_parts/part_01.rs");
-include!("lib_parts/part_02.rs");
-
 fn is_credential_or_injection_name(name: &str) -> bool {
     let normalized = name.to_ascii_uppercase();
     let name = normalized.as_str();
@@ -86,3 +83,6 @@ fn is_credential_or_injection_name(name: &str) -> bool {
         .iter()
         .any(|marker| name.contains(marker))
 }
+
+include!("lib_parts/part_01.rs");
+include!("lib_parts/part_02.rs");

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/trust-control/partition-escrow-receipt-metadata.schema.json",
+  "title": "Chio partition-escrow financial receipt metadata",
+  "description": "Receipt-side partition authority proof carrying the exact canonical admission-evidence JSON, its domain-separated digest, and an indexable authority summary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["canonical_json", "evidence_digest", "summary"],
+  "properties": {
+    "canonical_json": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576,
+      "contentMediaType": "application/json",
+      "contentSchema": {
+        "$ref": "partition-escrow-admission-evidence.schema.json"
+      },
+      "description": "The exact RFC 8785 canonical JSON serialization of a partition-escrow admission evidence object. Runtime validation applies the one MiB bound to UTF-8 bytes."
+    },
+    "evidence_digest": { "$ref": "#/$defs/digest" },
+    "summary": { "$ref": "#/$defs/summary" }
+  },
+  "$comment": "Runtime validation recomputes evidence_digest from canonical_json and requires every summary field to equal the corresponding admission-evidence field.",
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolver_id",
+        "resolver_implementation_id",
+        "resolver_implementation_version",
+        "resolver_configuration_digest",
+        "store_identity_digest",
+        "counter_namespace_digest",
+        "fencing_token",
+        "partition_id",
+        "authority_id"
+      ],
+      "properties": {
+        "resolver_id": { "$ref": "#/$defs/identifier" },
+        "resolver_implementation_id": { "$ref": "#/$defs/identifier" },
+        "resolver_implementation_version": { "$ref": "#/$defs/positiveUint32" },
+        "resolver_configuration_digest": { "$ref": "#/$defs/digest" },
+        "store_identity_digest": { "$ref": "#/$defs/digest" },
+        "counter_namespace_digest": { "$ref": "#/$defs/digest" },
+        "fencing_token": { "$ref": "#/$defs/positiveSafeInteger" },
+        "partition_id": { "$ref": "#/$defs/identifier" },
+        "authority_id": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000]+$",
+      "description": "A non-empty identifier whose UTF-8 representation is limited to 512 bytes by runtime validation."
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "positiveUint32": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "positiveSafeInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    }
+  }
+}

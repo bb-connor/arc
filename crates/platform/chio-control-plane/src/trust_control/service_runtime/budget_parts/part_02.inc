@@ -86,29 +86,31 @@ fn validate_remote_composite_evidence(
     authority: Option<&BudgetAuthorityMetadataView>,
     commit: Option<&BudgetWriteCommitView>,
     requested_authority: Option<&BudgetEventAuthority>,
+    sealed_authority: Option<&SealedPartitionEscrowRemoteAuthority>,
+    expected_partition_escrow_evidence: Option<&PartitionEscrowCommitEvidence>,
+    validation: RemoteEscrowEvidenceValidation,
 ) -> Result<ValidatedRemoteBudgetEvidence, BudgetStoreError> {
-    if authority.is_none_or(|authority| authority.guarantee_level != "ha_linearizable")
-        || commit.is_none()
-    {
-        return Err(BudgetStoreError::Invariant(
-            "remote composite budget response is not HA-linearizable".to_string(),
-        ));
-    }
-    let evidence = validate_remote_budget_evidence(authority, commit, requested_authority)?;
-    if evidence.guarantee_level != BudgetGuaranteeLevel::HaLinearizable
-        || evidence.authority.is_none()
-        || evidence.commit_index.is_none()
-    {
-        return Err(BudgetStoreError::Invariant(
-            "remote composite budget response is not HA-linearizable".to_string(),
-        ));
-    }
-    Ok(evidence)
+    validate_remote_budget_evidence_for_authority(
+        authority,
+        commit,
+        requested_authority,
+        sealed_authority,
+        expected_partition_escrow_evidence,
+        validation,
+    )
 }
 
 pub(crate) fn validate_composite_authorize_response(
     request: &CompositeBudgetAuthorizeRequest,
     response: CompositeBudgetAuthorizeResponse,
+) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+    validate_composite_authorize_response_for_authority(request, response, None)
+}
+
+pub(crate) fn validate_composite_authorize_response_for_authority(
+    request: &CompositeBudgetAuthorizeRequest,
+    response: CompositeBudgetAuthorizeResponse,
+    sealed_authority: Option<&SealedPartitionEscrowRemoteAuthority>,
 ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
     if response.capability_id != request.capability_id
         || response.operation_id != request.operation_id
@@ -152,10 +154,23 @@ pub(crate) fn validate_composite_authorize_response(
             "remote composite authorization revocation set omits the leaf capability".to_string(),
         ));
     }
+    let expected_partition_escrow_evidence = request
+        .admission_evidence
+        .partition_escrow_evidence
+        .as_ref()
+        .map(partition_escrow_commit_evidence_from_view)
+        .transpose()?;
     let evidence = validate_remote_composite_evidence(
         response.budget_authority.as_ref(),
         response.budget_commit.as_ref(),
         None,
+        sealed_authority,
+        expected_partition_escrow_evidence.as_ref(),
+        if request.existing_only {
+            RemoteEscrowEvidenceValidation::PersistedMutation
+        } else {
+            RemoteEscrowEvidenceValidation::FreshAuthorization
+        },
     )?;
     let invocation_state = invocation_state_from_view(response.invocation_state);
     let monetary_state = monetary_state_from_view(response.monetary_state);
@@ -198,6 +213,7 @@ pub(crate) fn validate_composite_authorize_response(
         metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
         budget_commit_index: evidence.commit_index,
         event_id: Some(response.event_id),
+        partition_escrow_evidence: evidence.partition_escrow_evidence,
     };
     if response.allowed {
         Ok(BudgetAuthorizeHoldDecision::Authorized(
@@ -232,12 +248,33 @@ pub(crate) fn validate_composite_authorize_response(
     }
 }
 
+#[cfg(test)]
 pub(crate) fn validate_invocation_capture_response(
     request: &BudgetCaptureInvocationRequest,
     expected_quotas: &[BudgetInvocationQuota],
     expected_revocation_set: &CanonicalRevocationSet,
     expected_monetary_state: BudgetMonetaryHoldState,
     response: CaptureInvocationReservationsResponse,
+) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+    validate_invocation_capture_response_for_authority(
+        request,
+        expected_quotas,
+        expected_revocation_set,
+        expected_monetary_state,
+        response,
+        None,
+        None,
+    )
+}
+
+pub(crate) fn validate_invocation_capture_response_for_authority(
+    request: &BudgetCaptureInvocationRequest,
+    expected_quotas: &[BudgetInvocationQuota],
+    expected_revocation_set: &CanonicalRevocationSet,
+    expected_monetary_state: BudgetMonetaryHoldState,
+    response: CaptureInvocationReservationsResponse,
+    sealed_authority: Option<&SealedPartitionEscrowRemoteAuthority>,
+    expected_partition_escrow_evidence: Option<&PartitionEscrowCommitEvidence>,
 ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
     let hold_id = request.hold_id.as_deref().ok_or_else(|| {
         BudgetStoreError::Invariant("remote invocation capture requires hold_id".to_string())
@@ -293,6 +330,9 @@ pub(crate) fn validate_invocation_capture_response(
         response.budget_authority.as_ref(),
         response.budget_commit.as_ref(),
         request.authority.as_ref(),
+        sealed_authority,
+        expected_partition_escrow_evidence,
+        RemoteEscrowEvidenceValidation::PersistedMutation,
     )?;
     Ok(BudgetHoldMutationDecision {
         hold_id: Some(response.hold_id),
@@ -311,6 +351,7 @@ pub(crate) fn validate_invocation_capture_response(
             metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: evidence.commit_index,
             event_id: Some(response.event_id),
+            partition_escrow_evidence: evidence.partition_escrow_evidence,
         },
     })
 }
@@ -318,6 +359,15 @@ pub(crate) fn validate_invocation_capture_response(
 pub(crate) fn validate_remote_admission_capture_response(
     request: &AdmissionCaptureRequest,
     response: CombinedAdmissionCaptureResponse,
+) -> Result<AdmissionCaptureDecision, AdmissionCaptureError> {
+    validate_remote_admission_capture_response_for_authority(request, response, None, None)
+}
+
+pub(crate) fn validate_remote_admission_capture_response_for_authority(
+    request: &AdmissionCaptureRequest,
+    response: CombinedAdmissionCaptureResponse,
+    sealed_authority: Option<&SealedPartitionEscrowRemoteAuthority>,
+    expected_partition_escrow_evidence: Option<&PartitionEscrowCommitEvidence>,
 ) -> Result<AdmissionCaptureDecision, AdmissionCaptureError> {
     let budget_request = request.budget();
     let hold_id = budget_request.hold_id.as_deref().ok_or_else(|| {
@@ -351,8 +401,6 @@ pub(crate) fn validate_remote_admission_capture_response(
             != request.aggregate_root_capability_id()
         || response.metadata.aggregate_root_binding_digest.as_deref()
             != request.aggregate_root_binding_digest()
-        || response.metadata.guarantee_level != BudgetGuaranteeLevelView::HaLinearizable
-        || response.metadata.leader_epoch == 0
         || response.metadata.authority_commit_index == 0
     {
         return Err(AdmissionCaptureError::InvalidRequest(
@@ -360,6 +408,13 @@ pub(crate) fn validate_remote_admission_capture_response(
                 .to_string(),
         ));
     }
+    let (guarantee_level, leader_epoch, partition_escrow_evidence) =
+        validate_remote_admission_capture_guarantee(
+            &response.metadata,
+            request.authorization_artifact_digests(),
+            sealed_authority,
+            expected_partition_escrow_evidence,
+        )?;
     let revocation_set = canonical_revocation_set_from_view(&response.revocation_set)?;
     if &revocation_set != request.revocation_set() {
         return Err(AdmissionCaptureError::InvalidRequest(
@@ -399,13 +454,23 @@ pub(crate) fn validate_remote_admission_capture_response(
                 ));
             }
             let monetary_state = monetary_state_from_view(budget_response.monetary_state);
-            let budget = validate_invocation_capture_response(
+            let budget = validate_invocation_capture_response_for_authority(
                 budget_request,
                 &quotas,
                 request.revocation_set(),
                 monetary_state,
                 budget_response,
+                sealed_authority,
+                expected_partition_escrow_evidence,
             )?;
+            if budget.metadata.guarantee_level != guarantee_level
+                || budget.metadata.partition_escrow_evidence != partition_escrow_evidence
+            {
+                return Err(AdmissionCaptureError::InvalidRequest(
+                    "remote admission capture budget evidence changed its guarantee or escrow proof"
+                        .to_string(),
+                ));
+            }
             validate_remote_capture_projection(&response.metadata, &budget)?;
             if response.metadata.budget_commit_index != budget.metadata.budget_commit_index {
                 return Err(AdmissionCaptureError::InvalidRequest(
@@ -420,7 +485,7 @@ pub(crate) fn validate_remote_admission_capture_response(
                 budget_commit: budget.metadata.clone(),
                 revocation_commit_index: response.metadata.revocation_commit_index,
                 authority_commit_index: response.metadata.authority_commit_index,
-                leader_epoch: Some(response.metadata.leader_epoch),
+                leader_epoch,
             })?;
             Ok(AdmissionCaptureDecision::Captured {
                 budget: Box::new(budget),
@@ -441,11 +506,12 @@ pub(crate) fn validate_remote_admission_capture_response(
             }
             let budget_commit = BudgetCommitMetadata {
                 authority: Some(requested_authority.clone()),
-                guarantee_level: BudgetGuaranteeLevel::HaLinearizable,
+                guarantee_level,
                 budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
                 metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
                 budget_commit_index: response.metadata.budget_commit_index,
                 event_id: Some(event_id.to_string()),
+                partition_escrow_evidence,
             };
             let metadata = AdmissionCaptureMetadata::new(AdmissionCaptureMetadataInput {
                 operation_id: request.operation_id().to_string(),
@@ -455,7 +521,7 @@ pub(crate) fn validate_remote_admission_capture_response(
                 budget_commit,
                 revocation_commit_index: response.metadata.revocation_commit_index,
                 authority_commit_index: response.metadata.authority_commit_index,
-                leader_epoch: Some(response.metadata.leader_epoch),
+                leader_epoch,
             })?;
             Ok(AdmissionCaptureDecision::Denied(
                 AdmissionCaptureDenial::revoked(response.revoked_capability_ids, metadata)?,
@@ -463,6 +529,76 @@ pub(crate) fn validate_remote_admission_capture_response(
         }
         _ => Err(AdmissionCaptureError::InvalidRequest(
             "remote admission capture outcome contradicts its budget body".to_string(),
+        )),
+    }
+}
+
+fn validate_remote_admission_capture_guarantee(
+    metadata: &AdmissionCaptureMetadataView,
+    authorization_artifact_digests: &[String],
+    sealed_authority: Option<&SealedPartitionEscrowRemoteAuthority>,
+    expected_partition_escrow_evidence: Option<&PartitionEscrowCommitEvidence>,
+) -> Result<
+    (
+        BudgetGuaranteeLevel,
+        Option<u64>,
+        Option<PartitionEscrowCommitEvidence>,
+    ),
+    AdmissionCaptureError,
+> {
+    match (sealed_authority, expected_partition_escrow_evidence) {
+        (None, None) => match (
+            metadata.guarantee_level,
+            metadata.leader_epoch,
+            metadata.partition_escrow_evidence.as_ref(),
+        ) {
+            (BudgetGuaranteeLevelView::HaLinearizable, Some(epoch), None) if epoch > 0 => {
+                Ok((BudgetGuaranteeLevel::HaLinearizable, Some(epoch), None))
+            }
+            _ => Err(AdmissionCaptureError::InvalidRequest(
+                "ordinary remote admission capture requires an HA-linearizable guarantee and rejects partition escrow evidence"
+                    .to_string(),
+            )),
+        },
+        (Some(authority), Some(expected)) => match (
+            metadata.guarantee_level,
+            metadata.leader_epoch,
+            metadata.partition_escrow_evidence.as_ref(),
+        ) {
+            (BudgetGuaranteeLevelView::PartitionEscrowed, None, Some(evidence)) => {
+                if !authorization_artifact_digests
+                    .iter()
+                    .any(|digest| digest == &evidence.digest)
+                {
+                    return Err(AdmissionCaptureError::InvalidRequest(
+                        "partition-escrowed admission capture proof is absent from authorization artifacts"
+                            .to_string(),
+                    ));
+                }
+                let evidence = partition_escrow_commit_evidence_from_view(evidence)
+                    .map_err(AdmissionCaptureError::BudgetStore)?;
+                if &evidence != expected {
+                    return Err(AdmissionCaptureError::InvalidRequest(
+                        "partition-escrowed admission capture changed the exact authorization proof"
+                            .to_string(),
+                    ));
+                }
+                authority
+                    .validate_persisted_commit_evidence(&evidence)
+                    .map_err(AdmissionCaptureError::BudgetStore)?;
+                Ok((BudgetGuaranteeLevel::PartitionEscrowed, None, Some(evidence)))
+            }
+            _ => Err(AdmissionCaptureError::InvalidRequest(
+                "sealed remote admission capture requires a partition-escrowed guarantee and the exact authorization proof"
+                    .to_string(),
+            )),
+        },
+        (None, Some(_)) => Err(AdmissionCaptureError::InvalidRequest(
+            "ordinary remote admission capture cannot accept partition escrow evidence"
+                .to_string(),
+        )),
+        (Some(_), None) => Err(AdmissionCaptureError::InvalidRequest(
+            "sealed remote admission capture requires the exact authorization proof".to_string(),
         )),
     }
 }
@@ -526,11 +662,27 @@ fn validate_remote_capture_projection(
     Ok(())
 }
 
+fn partition_escrow_commit_evidence_from_view(
+    evidence: &BudgetPartitionEscrowEvidenceView,
+) -> Result<PartitionEscrowCommitEvidence, BudgetStoreError> {
+    PartitionEscrowCommitEvidence::from_canonical_json(
+        evidence.canonical_json.clone(),
+        evidence.digest.clone(),
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RemoteEscrowEvidenceValidation {
+    FreshAuthorization,
+    PersistedMutation,
+}
+
 #[derive(Debug, Clone)]
-struct ValidatedRemoteBudgetEvidence {
+pub(crate) struct ValidatedRemoteBudgetEvidence {
     authority: Option<BudgetEventAuthority>,
     guarantee_level: BudgetGuaranteeLevel,
     commit_index: Option<u64>,
+    partition_escrow_evidence: Option<PartitionEscrowCommitEvidence>,
 }
 
 fn required_remote_transition_snapshot(
@@ -584,6 +736,159 @@ fn validate_remote_budget_evidence(
     commit: Option<&BudgetWriteCommitView>,
     requested_terminal_authority: Option<&BudgetEventAuthority>,
 ) -> Result<ValidatedRemoteBudgetEvidence, BudgetStoreError> {
+    validate_remote_budget_evidence_for_authority(
+        authority,
+        commit,
+        requested_terminal_authority,
+        None,
+        None,
+        RemoteEscrowEvidenceValidation::PersistedMutation,
+    )
+}
+
+pub(crate) fn validate_remote_budget_evidence_for_authority(
+    authority: Option<&BudgetAuthorityMetadataView>,
+    commit: Option<&BudgetWriteCommitView>,
+    requested_terminal_authority: Option<&BudgetEventAuthority>,
+    sealed_authority: Option<&SealedPartitionEscrowRemoteAuthority>,
+    expected_partition_escrow_evidence: Option<&PartitionEscrowCommitEvidence>,
+    validation: RemoteEscrowEvidenceValidation,
+) -> Result<ValidatedRemoteBudgetEvidence, BudgetStoreError> {
+    if sealed_authority.is_none()
+        && expected_partition_escrow_evidence.is_none()
+        && authority.is_some_and(|metadata| metadata.guarantee_level != "ha_linearizable")
+    {
+        return Err(BudgetStoreError::Invariant(
+            "ordinary remote budget response requires an HA-linearizable quorum commit and rejects partition escrow evidence"
+                .to_string(),
+        ));
+    }
+    let evidence = parse_remote_budget_evidence(authority, commit, requested_terminal_authority)?;
+    if evidence.authority.is_none() || evidence.commit_index.is_none() || commit.is_none() {
+        return Err(BudgetStoreError::Invariant(
+            "remote authoritative budget response omitted authority or quorum commit evidence"
+                .to_string(),
+        ));
+    }
+
+    match (sealed_authority, expected_partition_escrow_evidence) {
+        (None, None) => {
+            if authority.map(|metadata| metadata.guarantee_level.as_str())
+                != Some("ha_linearizable")
+                || evidence.guarantee_level != BudgetGuaranteeLevel::HaLinearizable
+                || evidence.partition_escrow_evidence.is_some()
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "ordinary remote budget response requires an HA-linearizable quorum commit and rejects partition escrow evidence"
+                        .to_string(),
+                ));
+            }
+        }
+        (Some(authority_config), Some(expected)) => {
+            if evidence.guarantee_level != BudgetGuaranteeLevel::PartitionEscrowed {
+                return Err(BudgetStoreError::Invariant(
+                    "sealed remote budget response requires a partition-escrowed quorum commit"
+                        .to_string(),
+                ));
+            }
+            let actual = evidence.partition_escrow_evidence.as_ref().ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "sealed remote budget response omitted partition escrow evidence".to_string(),
+                )
+            })?;
+            if actual != expected {
+                return Err(BudgetStoreError::Conflict(
+                    "sealed remote budget response changed the exact authorization proof"
+                        .to_string(),
+                ));
+            }
+            validate_sealed_remote_budget_commit_membership(
+                authority_config,
+                authority,
+                commit.ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "sealed remote budget response omitted its quorum commit".to_string(),
+                    )
+                })?,
+            )?;
+            match validation {
+                RemoteEscrowEvidenceValidation::FreshAuthorization => {
+                    authority_config.validate_fresh_authorization_evidence_now(actual)?
+                }
+                RemoteEscrowEvidenceValidation::PersistedMutation => {
+                    authority_config.validate_persisted_commit_evidence(actual)?
+                }
+            }
+        }
+        (None, Some(_)) => {
+            return Err(BudgetStoreError::Invariant(
+                "ordinary remote budget validation cannot accept partition escrow evidence"
+                    .to_string(),
+            ));
+        }
+        (Some(_), None) => {
+            return Err(BudgetStoreError::Invariant(
+                "sealed remote budget validation requires the exact expected authorization proof"
+                    .to_string(),
+            ));
+        }
+    }
+
+    Ok(evidence)
+}
+
+fn validate_sealed_remote_budget_commit_membership(
+    sealed_authority: &SealedPartitionEscrowRemoteAuthority,
+    authority: Option<&BudgetAuthorityMetadataView>,
+    commit: &BudgetWriteCommitView,
+) -> Result<(), BudgetStoreError> {
+    let authority = authority.ok_or_else(|| {
+        BudgetStoreError::Invariant(
+            "sealed remote budget response omitted its authority metadata".to_string(),
+        )
+    })?;
+    let endpoints = sealed_authority.service_endpoints();
+    if endpoints
+        .binary_search_by(|candidate| candidate.as_bytes().cmp(authority.leader_url.as_bytes()))
+        .is_err()
+    {
+        return Err(BudgetStoreError::Invariant(
+            "sealed remote budget response leader is outside pinned membership".to_string(),
+        ));
+    }
+    let expected_quorum = endpoints
+        .len()
+        .checked_div(2)
+        .and_then(|half| half.checked_add(1))
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "sealed remote budget membership quorum overflowed".to_string(),
+            )
+        })?;
+    if commit.quorum_size != expected_quorum
+        || commit.committed_nodes > endpoints.len()
+        || commit.witness_urls.iter().any(|witness| {
+            endpoints
+                .binary_search_by(|candidate| candidate.as_bytes().cmp(witness.as_bytes()))
+                .is_err()
+        })
+    {
+        return Err(BudgetStoreError::Invariant(
+            "sealed remote budget quorum is not bound to pinned membership".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn parse_remote_budget_evidence(
+    authority: Option<&BudgetAuthorityMetadataView>,
+    commit: Option<&BudgetWriteCommitView>,
+    requested_terminal_authority: Option<&BudgetEventAuthority>,
+) -> Result<ValidatedRemoteBudgetEvidence, BudgetStoreError> {
+    let partition_escrow_evidence = authority
+        .and_then(|authority| authority.partition_escrow_evidence.as_ref())
+        .map(partition_escrow_commit_evidence_from_view)
+        .transpose()?;
     let metadata_authority = authority
         .map(|authority| {
             if authority.budget_term != authority.lease_epoch {
@@ -694,7 +999,7 @@ fn validate_remote_budget_evidence(
         Some("ha_quorum_commit") | Some("ha_linearizable") if commit.is_some() => {
             BudgetGuaranteeLevel::HaLinearizable
         }
-        Some("partition_escrowed") if commit.is_none() => BudgetGuaranteeLevel::PartitionEscrowed,
+        Some("partition_escrowed") if commit.is_some() => BudgetGuaranteeLevel::PartitionEscrowed,
         Some("ha_leader_visible") | Some("advisory_posthoc") if commit.is_none() => {
             BudgetGuaranteeLevel::AdvisoryPosthoc
         }
@@ -703,9 +1008,12 @@ fn validate_remote_budget_evidence(
                 "remote HA budget authority omitted its quorum commit".to_string(),
             ));
         }
-        Some(
-            "single_node_atomic" | "partition_escrowed" | "ha_leader_visible" | "advisory_posthoc",
-        ) => {
+        Some("partition_escrowed") => {
+            return Err(BudgetStoreError::Invariant(
+                "remote authoritative budget response omitted its quorum commit".to_string(),
+            ));
+        }
+        Some("single_node_atomic" | "ha_leader_visible" | "advisory_posthoc") => {
             return Err(BudgetStoreError::Invariant(
                 "remote budget guarantee contradicts the supplied quorum commit".to_string(),
             ));
@@ -718,6 +1026,22 @@ fn validate_remote_budget_evidence(
         None if commit.is_some() => BudgetGuaranteeLevel::HaLinearizable,
         None => BudgetGuaranteeLevel::SingleNodeAtomic,
     };
+
+    match (guarantee_level, partition_escrow_evidence.as_ref()) {
+        (BudgetGuaranteeLevel::PartitionEscrowed, Some(_)) => {}
+        (BudgetGuaranteeLevel::PartitionEscrowed, None) => {
+            return Err(BudgetStoreError::Invariant(
+                "partition-escrowed remote budget response omitted its proof".to_string(),
+            ));
+        }
+        (_, Some(_)) => {
+            return Err(BudgetStoreError::Invariant(
+                "non-partition remote budget response supplied partition escrow evidence"
+                    .to_string(),
+            ));
+        }
+        (_, None) => {}
+    }
 
     let response_authority = metadata_authority.or(commit_authority);
     let commit_index = commit
@@ -736,5 +1060,6 @@ fn validate_remote_budget_evidence(
         authority: response_authority,
         guarantee_level,
         commit_index,
+        partition_escrow_evidence,
     })
 }

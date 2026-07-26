@@ -48,7 +48,7 @@ impl ChioKernel {
         )?;
         let payload = parse_handoff_payload(&final_action)?;
         if i64::try_from(now).unwrap_or(i64::MAX) >= payload.expires_at
-            || !self.caller_reservation_handoff_hold_is_live(&current, &payload)?
+            || !self.caller_reservation_handoff_hold_is_live(&current, &intent, &payload)?
         {
             return Ok(CallerReservationReplayProbe::Conflict);
         }
@@ -379,7 +379,7 @@ impl ChioKernel {
             false,
         )?;
         self.require_caller_reservation_response_still_live(operation, initial_payload.expires_at)?;
-        if !self.caller_reservation_handoff_hold_is_live(operation, &initial_payload)? {
+        if !self.caller_reservation_handoff_hold_is_live(operation, &intent, &initial_payload)? {
             return Err(KernelError::GuardDenied(
                 "caller reservation exact handoff is no longer live".to_string(),
             ));
@@ -542,7 +542,7 @@ impl ChioKernel {
                 self.validate_caller_reservation_handoff_publication(&intent, &response.receipt)?;
             }
         }
-        if !self.caller_reservation_handoff_hold_is_live(operation, &payload)? {
+        if !self.caller_reservation_handoff_hold_is_live(operation, &intent, &payload)? {
             return Err(KernelError::GuardDenied(
                 "caller reservation closed during exact handoff delivery".to_string(),
             ));
@@ -828,6 +828,15 @@ impl ChioKernel {
         store: &dyn crate::admission_operation::AdmissionOperationStore,
         operation: &AdmissionOperation,
     ) -> Result<(), KernelError> {
+        self.validated_caller_reserved_handoff_receipt_with_store(store, operation)
+            .map(|_| ())
+    }
+
+    pub(super) fn validated_caller_reserved_handoff_receipt_with_store(
+        &self,
+        store: &dyn crate::admission_operation::AdmissionOperationStore,
+        operation: &AdmissionOperation,
+    ) -> Result<ChioReceipt, KernelError> {
         let intent_action = exact_handoff_action(
             store,
             operation.operation_id(),
@@ -841,8 +850,8 @@ impl ChioKernel {
             AdmissionCleanupActionKind::CallerReservationHandoff,
         )?;
         let payload = parse_handoff_payload(&handoff_action)?;
-        self.response_from_handoff_payload(operation, &intent_action, &intent, &payload, 0, false)?;
-        Ok(())
+        self.response_from_handoff_payload(operation, &intent_action, &intent, &payload, 0, false)
+            .map(|response| response.receipt)
     }
 
     /// Recover publication of an already committed caller-reservation handoff
@@ -893,6 +902,7 @@ impl ChioKernel {
     fn caller_reservation_handoff_hold_is_live(
         &self,
         operation: &AdmissionOperation,
+        intent: &SignedCallerReservationHandoffIntent,
         payload: &CallerReservationHandoffPayload,
     ) -> Result<bool, KernelError> {
         let (hold, journal) = self.with_budget_store(|store| {
@@ -904,12 +914,18 @@ impl ChioKernel {
         let Some(hold) = hold else {
             return Ok(false);
         };
+        let authorized = intent.body.authorization.to_authorized()?;
         if !hold.disposition.is_open() {
             return Ok(false);
         }
         if hold.hold_id != payload.hold_id
             || hold.capability_id != payload.capability_id
             || hold.grant_index != payload.matched_grant_index
+            || authorized.hold_id.as_deref() != Some(hold.hold_id.as_str())
+            || authorized.authorized_exposure_units != hold.authorized_exposure_units
+            || hold.remaining_exposure_units != authorized.authorized_exposure_units
+            || hold.authority != authorized.metadata.authority
+            || hold.authorization_metadata != authorized.metadata
             || hold.reserved_until != Some(payload.expires_at)
             || hold.reserved_payment_reference != payload.payment.reserved_payment_reference
             || operation.budget_hold_id() != Some(payload.hold_id.as_str())

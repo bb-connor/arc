@@ -851,20 +851,20 @@ impl ChioKernel {
         base: Option<serde_json::Value>,
         charge: Option<&BudgetChargeResult>,
         cleanup: &Result<Option<BudgetReleaseHoldDecision>, PostDispatchCleanupFailure>,
-    ) -> Option<serde_json::Value> {
-        match (charge, cleanup) {
+    ) -> Result<Option<serde_json::Value>, KernelError> {
+        Ok(match (charge, cleanup) {
             (Some(charge), Ok(Some(released))) => self.merge_budget_receipt_metadata(
                 base,
-                self.budget_execution_receipt_metadata(charge, Some(("released", released)), None),
+                self.budget_execution_receipt_metadata(charge, Some(("released", released)), None)?,
             ),
             (Some(charge), Ok(None)) => self.merge_budget_receipt_metadata(
                 base,
-                self.budget_execution_receipt_metadata(charge, None, None),
+                self.budget_execution_receipt_metadata(charge, None, None)?,
             ),
             (Some(charge), Err(failure)) => {
                 let authorized = self.merge_budget_receipt_metadata(
                     base,
-                    self.budget_execution_receipt_metadata(charge, None, None),
+                    self.budget_execution_receipt_metadata(charge, None, None)?,
                 );
                 merge_metadata_objects(
                     authorized,
@@ -896,7 +896,7 @@ impl ChioKernel {
                 })),
             ),
             _ => base,
-        }
+        })
     }
 
     pub(crate) fn record_observed_capability_snapshot(
@@ -1398,6 +1398,13 @@ impl ChioKernel {
                 })),
             ),
         };
+        if reserved_receipt_metadata_key(decision.metadata.as_ref()).is_some() {
+            strip_reserved_receipt_metadata(&mut decision.metadata);
+            decision.allowed = false;
+            decision.reason = Some(
+                "runtime admission hook returned reserved kernel receipt metadata".to_string(),
+            );
+        }
         if let Some(operation) = admission_operation {
             decision.metadata = merge_metadata_objects(
                 decision.metadata,

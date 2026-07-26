@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "key_log_noncontiguous_sync_detected",
   "threat_id": "native_channel_replay",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -30,7 +30,9 @@
           "replacement": "true"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/key_log_noncontiguous_sync/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/key_log_noncontiguous_sync/mutants.out/outcomes.json",
+          "sha256": "850b00dd6a00f5d90ee4188bc9757a0fb1225b3e3b18b35df223893e24a9c712",
+          "inputs_sha256": "5316230c242c715f62be2d0e4eae43f3d8b1b65c2017231546486bb5b4418606"
         }
       }
     ]

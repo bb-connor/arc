@@ -1,7 +1,7 @@
 use super::super::super::*;
 use super::super::budget::{
     admission_capture_request_from_view, build_remote_admission_capture_authority,
-    build_remote_budget_store,
+    build_remote_budget_store, canonical_revocation_set_from_view, invocation_quota_from_view,
 };
 use super::super::budget::{
     validate_composite_authorize_response, validate_invocation_capture_response,
@@ -13,19 +13,20 @@ use super::super::errors::{
 use super::super::issuance::ensure_signed_by_trusted_authority;
 use super::support::{
     assert_json_post, ScriptedResponse, ScriptedResponseServer, StaticResponseServer,
+    TEST_SERVER_ENDPOINT_MARKER,
 };
 use chio_test_support::prelude::*;
 
 fn budget_authority_json(seq: u64) -> serde_json::Value {
     serde_json::json!({
-        "authorityId": "budget-primary",
-        "leaderUrl": "http://leader-a",
+        "authorityId": TEST_SERVER_ENDPOINT_MARKER,
+        "leaderUrl": TEST_SERVER_ENDPOINT_MARKER,
         "budgetTerm": 7,
-        "leaseId": "lease-7",
+        "leaseId": format!("{TEST_SERVER_ENDPOINT_MARKER}#term-7"),
         "leaseEpoch": 7,
         "leaseExpiresAt": 5000,
         "leaseTtlMs": 750,
-        "guaranteeLevel": "ha_quorum_commit",
+        "guaranteeLevel": "ha_linearizable",
         "budgetCommitIndex": seq
     })
 }
@@ -35,12 +36,12 @@ fn budget_commit_json(seq: u64) -> serde_json::Value {
         "budgetSeq": seq,
         "commitIndex": seq,
         "quorumCommitted": true,
-        "quorumSize": 2,
-        "committedNodes": 2,
-        "witnessUrls": ["http://leader-a", "http://follower-b"],
-        "authorityId": "budget-primary",
+        "quorumSize": 1,
+        "committedNodes": 1,
+        "witnessUrls": [TEST_SERVER_ENDPOINT_MARKER],
+        "authorityId": TEST_SERVER_ENDPOINT_MARKER,
         "budgetTerm": 7,
-        "leaseId": "lease-7",
+        "leaseId": format!("{TEST_SERVER_ENDPOINT_MARKER}#term-7"),
         "leaseEpoch": 7
     })
 }
@@ -56,6 +57,7 @@ fn budget_authority_view(seq: u64, guarantee_level: &str) -> BudgetAuthorityMeta
         lease_ttl_ms: 750,
         guarantee_level: guarantee_level.to_string(),
         budget_commit_index: Some(seq),
+        partition_escrow_evidence: None,
     }
 }
 
@@ -124,11 +126,13 @@ fn composite_admission_evidence_view() -> BudgetInvocationAdmissionEvidenceView 
         aggregate_root_capability_id: Some("cap-root".to_string()),
         aggregate_binding_digest: Some("44".repeat(32)),
         supplemental_binding: None,
+        partition_escrow_evidence: None,
     }
 }
 
 fn composite_authorize_request_view() -> CompositeBudgetAuthorizeRequest {
     CompositeBudgetAuthorizeRequest {
+        existing_only: false,
         operation_id: "operation-budget".to_string(),
         request_binding_hash: "44".repeat(32),
         capability_id: "cap-budget".to_string(),
@@ -218,6 +222,37 @@ fn invocation_capture_response_view() -> CaptureInvocationReservationsResponse {
     }
 }
 
+fn invocation_capture_response_view_for_endpoint(
+    endpoint: &str,
+) -> CaptureInvocationReservationsResponse {
+    let mut response = invocation_capture_response_view();
+    response.budget_authority = Some(BudgetAuthorityMetadataView {
+        authority_id: endpoint.to_string(),
+        leader_url: endpoint.to_string(),
+        budget_term: 7,
+        lease_id: format!("{endpoint}#admission-term-7"),
+        lease_epoch: 7,
+        lease_expires_at: 5_000,
+        lease_ttl_ms: 750,
+        guarantee_level: "ha_linearizable".to_string(),
+        budget_commit_index: Some(42),
+        partition_escrow_evidence: None,
+    });
+    response.budget_commit = Some(BudgetWriteCommitView {
+        budget_seq: 42,
+        commit_index: 42,
+        quorum_committed: true,
+        quorum_size: 1,
+        committed_nodes: 1,
+        witness_urls: vec![endpoint.to_string()],
+        authority_id: endpoint.to_string(),
+        budget_term: 7,
+        lease_id: format!("{endpoint}#admission-term-7"),
+        lease_epoch: 7,
+    });
+    response
+}
+
 fn combined_admission_capture_request_view() -> CombinedAdmissionCaptureRequest {
     let evidence = composite_admission_evidence_view();
     CombinedAdmissionCaptureRequest {
@@ -244,9 +279,17 @@ fn combined_admission_capture_request_view() -> CombinedAdmissionCaptureRequest 
 fn combined_admission_capture_response(
     outcome: AdmissionCaptureOutcomeView,
 ) -> CombinedAdmissionCaptureResponse {
+    combined_admission_capture_response_for_endpoint(outcome, "budget-primary")
+}
+
+fn combined_admission_capture_response_for_endpoint(
+    outcome: AdmissionCaptureOutcomeView,
+    endpoint: &str,
+) -> CombinedAdmissionCaptureResponse {
     let request = combined_admission_capture_request_view();
     let captured = outcome == AdmissionCaptureOutcomeView::Captured;
-    let invocation_quotas = composite_admission_evidence_view()
+    let invocation_quotas: Vec<AdmissionCaptureInvocationQuotaView> =
+        composite_admission_evidence_view()
         .invocation_quotas
         .into_iter()
         .map(|quota| {
@@ -274,7 +317,7 @@ fn combined_admission_capture_response(
         hold_id: request.hold_id.clone(),
         event_id: request.event_id.clone(),
         outcome,
-        budget: captured.then(invocation_capture_response_view),
+        budget: captured.then(|| invocation_capture_response_view_for_endpoint(endpoint)),
         revocation_set: request.revocation_set.clone(),
         revoked_capability_ids: if captured {
             Vec::new()
@@ -286,16 +329,21 @@ fn combined_admission_capture_response(
             hold_id: request.hold_id,
             event_id: request.event_id,
             checked_revocation_set_digest: request.bound_revocation_set_digest,
-            invocation_quotas,
+            invocation_quotas: invocation_quotas.clone(),
             authorization_artifact_digests: request.authorization_artifact_digests,
             aggregate_root_capability_id: request.aggregate_root_capability_id,
             aggregate_root_binding_digest: request.aggregate_root_binding_digest,
-            budget_commit_index: captured.then_some(42),
+            budget_commit_index: Some(42),
             revocation_commit_index: 43,
             authority_commit_index: 44,
-            leader_epoch: 7,
+            leader_epoch: Some(7),
             guarantee_level: BudgetGuaranteeLevelView::HaLinearizable,
-            authority: request.budget_authority,
+            partition_escrow_evidence: None,
+            authority: Some(BudgetMutationAuthorityView {
+                authority_id: endpoint.to_string(),
+                lease_id: format!("{endpoint}#admission-term-7"),
+                lease_epoch: 7,
+            }),
             invocation_state: if captured {
                 BudgetInvocationReservationStateView::Captured
             } else {
@@ -316,17 +364,58 @@ fn admission_capture_point_response(
     }
 }
 
-fn budget_leader_visible_authority_json() -> serde_json::Value {
-    serde_json::json!({
-        "authorityId": "budget-primary",
-        "leaderUrl": "http://leader-a",
-        "budgetTerm": 7,
-        "leaseId": "lease-7",
-        "leaseEpoch": 7,
-        "leaseExpiresAt": 5000,
-        "leaseTtlMs": 750,
-        "guaranteeLevel": "ha_leader_visible"
-    })
+fn seeded_remote_admission_capture_authority(
+    endpoint: &str,
+) -> RemoteAdmissionCaptureAuthority {
+    let evidence = composite_admission_evidence_view();
+    let invocation_quotas = evidence
+        .invocation_quotas
+        .iter()
+        .map(invocation_quota_from_view)
+        .collect::<Result<Vec<_>, _>>()
+        .test_expect("native capture quotas");
+    let revocation_set = canonical_revocation_set_from_view(&evidence.revocation_set)
+        .test_expect("native capture revocation set");
+    let admission_operation =
+        BudgetAdmissionOperationBinding::new("operation-budget".to_string(), "44".repeat(32))
+            .test_expect("capture admission operation");
+    let authority = BudgetEventAuthority {
+        authority_id: endpoint.to_string(),
+        lease_id: format!("{endpoint}#admission-term-7"),
+        lease_epoch: 7,
+    };
+    let hold = RemoteCompositeHoldEvidence {
+        authorization_event_id: "hold-budget:authorize".to_string(),
+        last_event_id: "hold-budget:authorize".to_string(),
+        last_event_seq: 41,
+        admission_operation,
+        capability_id: "cap-budget".to_string(),
+        grant_index: 2,
+        invocation_quotas: invocation_quotas.clone(),
+        invocation_counts_after: invocation_quotas
+            .into_iter()
+            .map(|quota| BudgetInvocationQuotaUsage {
+                quota,
+                reserved_invocations_after: 1,
+                captured_invocations_after: 0,
+            })
+            .collect(),
+        invocation_state: BudgetInvocationReservationState::Authorized,
+        revocation_set,
+        authorized_exposure_units: 120,
+        remaining_exposure_units: 120,
+        monetary_state: BudgetMonetaryHoldState::Exposed,
+        authority,
+        partition_escrow_evidence: None,
+    };
+    RemoteAdmissionCaptureAuthority {
+        client: build_client(endpoint, "secret").test_expect("build capture client"),
+        partition_escrow_authority: None,
+        composite_holds: Arc::new(Mutex::new(HashMap::from([(
+            "hold-budget".to_string(),
+            hold,
+        )]))),
+    }
 }
 
 fn later_authorize_response(
@@ -352,7 +441,7 @@ fn scripted_transition_server(
     transition_response: String,
     later_response: String,
 ) -> ScriptedResponseServer {
-    ScriptedResponseServer::spawn(vec![
+    ScriptedResponseServer::spawn_with_mutation_absence(vec![
         ScriptedResponse {
             status: 200,
             body: transition_response.clone(),
@@ -474,6 +563,50 @@ fn composite_budget_client_does_not_fallback_when_dedicated_route_is_missing() {
     let requests = server.requests();
     assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].target, BUDGET_AUTHORIZE_HOLD_PATH);
+}
+
+#[test]
+fn committed_composite_replay_uses_only_the_read_only_query_route() {
+    let body = serde_json::to_string(&composite_authorize_response_view())
+        .test_expect("serialize composite authorization response");
+    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+    let client = build_client(&server.url, "secret").test_expect("build client");
+    let mut request = composite_authorize_request_view();
+    request.existing_only = true;
+
+    client
+        .query_committed_composite_budget_authorization(&request)
+        .test_expect("query committed composite authorization");
+
+    let requests = server.requests();
+    assert_eq!(requests.len(), 1);
+    assert_json_post(
+        &requests[0],
+        BUDGET_AUTHORIZE_HOLD_QUERY_PATH,
+        &[
+            "\"existingOnly\":true",
+            "\"eventId\":\"hold-budget:authorize\"",
+            "\"admissionEvidence\"",
+        ],
+    );
+    assert!(!requests[0].body.contains("budgetAuthority"));
+}
+
+#[test]
+fn missing_committed_replay_query_never_falls_back_to_fresh_authorization() {
+    let server = StaticResponseServer::spawn(404, "missing", "text/plain", 1);
+    let client = build_client(&server.url, "secret").test_expect("build client");
+    let mut request = composite_authorize_request_view();
+    request.existing_only = true;
+
+    let error = client
+        .query_committed_composite_budget_authorization(&request)
+        .test_expect_err("missing committed replay query must fail closed");
+
+    assert!(error.to_string().contains("404"));
+    let requests = server.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].target, BUDGET_AUTHORIZE_HOLD_QUERY_PATH);
 }
 
 #[test]
@@ -677,14 +810,18 @@ fn remote_budget_invocation_capture_point_query_restores_the_exact_capture() {
     let body = serde_json::to_string(&CaptureInvocationPointQueryResponse {
         operation_id: "operation-budget".to_string(),
         request_binding_hash: "44".repeat(32),
-        capture: Some(invocation_capture_response_view()),
+        capture: Some(invocation_capture_response_view_for_endpoint(
+            TEST_SERVER_ENDPOINT_MARKER,
+        )),
     })
     .test_expect("serialize invocation capture point response");
-    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+    let server =
+        StaticResponseServer::spawn_with_mutation_absence(200, &body, "application/json", 1);
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret").test_expect("build client"),
+        partition_escrow_authority: None,
         cached_usage: Mutex::new(HashMap::new()),
-        composite_holds: Mutex::new(HashMap::new()),
+        composite_holds: Arc::new(Mutex::new(HashMap::new())),
     };
     let evidence = composite_admission_evidence_view();
     let invocation_quotas = evidence
@@ -724,22 +861,36 @@ fn remote_budget_invocation_capture_point_query_restores_the_exact_capture() {
         BudgetAdmissionOperationBinding::new("operation-budget".to_string(), "44".repeat(32))
             .test_unwrap();
     let authority = BudgetEventAuthority {
-        authority_id: "budget-primary".to_string(),
-        lease_id: "lease-7".to_string(),
+        authority_id: server.url.clone(),
+        lease_id: format!("{}#admission-term-7", server.url),
         lease_epoch: 7,
     };
     store.composite_holds.lock().test_unwrap().insert(
         "hold-budget".to_string(),
         RemoteCompositeHoldEvidence {
+            authorization_event_id: "hold-budget:authorize".to_string(),
+            last_event_id: "hold-budget:authorize".to_string(),
+            last_event_seq: 41,
             admission_operation: admission_operation.clone(),
             capability_id: "cap-budget".to_string(),
             grant_index: 2,
-            invocation_quotas,
-            invocation_counts_after: Vec::new(),
+            invocation_quotas: invocation_quotas.clone(),
+            invocation_counts_after: invocation_quotas
+                .iter()
+                .cloned()
+                .map(|quota| BudgetInvocationQuotaUsage {
+                    quota,
+                    reserved_invocations_after: 1,
+                    captured_invocations_after: 0,
+                })
+                .collect(),
+            invocation_state: BudgetInvocationReservationState::Authorized,
             revocation_set,
             authorized_exposure_units: 120,
+            remaining_exposure_units: 120,
             monetary_state: BudgetMonetaryHoldState::Exposed,
             authority: authority.clone(),
+            partition_escrow_evidence: None,
         },
     );
     let request = BudgetCaptureInvocationRequest {
@@ -759,7 +910,7 @@ fn remote_budget_invocation_capture_point_query_restores_the_exact_capture() {
         BudgetInvocationReservationState::Captured
     );
     let requests = server.requests();
-    assert_eq!(requests.len(), 1);
+    assert_eq!(requests.len(), 2);
     assert_json_post(
         &requests[0],
         BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH,
@@ -769,11 +920,12 @@ fn remote_budget_invocation_capture_point_query_restores_the_exact_capture() {
             "\"eventId\":\"hold-budget:capture-invocations\"",
         ],
     );
+    assert_eq!(requests[1].target, BUDGET_MUTATION_EVENT_QUERY_PATH);
 }
 
 #[test]
 fn remote_admission_capture_point_query_recovers_miss_captured_and_denied() {
-    let responses = [
+    let responses: Vec<ScriptedResponse> = [
         admission_capture_point_response(None),
         admission_capture_point_response(Some(combined_admission_capture_response(
             AdmissionCaptureOutcomeView::Captured,
@@ -789,10 +941,25 @@ fn remote_admission_capture_point_query_recovers_miss_captured_and_denied() {
         content_type: "application/json",
     })
     .collect();
-    let server = ScriptedResponseServer::spawn(responses);
-    let authority = build_remote_admission_capture_authority(&server.url, "secret")
-        .test_expect("build remote capture authority");
-    let request = admission_capture_request_from_view(&combined_admission_capture_request_view())
+    let responses = responses
+        .into_iter()
+        .map(|mut response| {
+            response.body = response
+                .body
+                .replace("budget-primary", TEST_SERVER_ENDPOINT_MARKER)
+                .replace("lease-7", &format!("{TEST_SERVER_ENDPOINT_MARKER}#admission-term-7"));
+            response
+        })
+        .collect();
+    let server = ScriptedResponseServer::spawn_with_mutation_absence(responses);
+    let authority = seeded_remote_admission_capture_authority(&server.url);
+    let mut request_view = combined_admission_capture_request_view();
+    request_view.budget_authority = Some(BudgetMutationAuthorityView {
+        authority_id: server.url.clone(),
+        lease_id: format!("{}#admission-term-7", server.url),
+        lease_epoch: 7,
+    });
+    let request = admission_capture_request_from_view(&request_view)
         .test_expect("native admission capture request");
 
     assert!(authority
@@ -813,8 +980,11 @@ fn remote_admission_capture_point_query_recovers_miss_captured_and_denied() {
     ));
 
     let requests = server.requests();
-    assert_eq!(requests.len(), 3);
-    for captured in requests {
+    assert_eq!(requests.len(), 4);
+    for captured in requests
+        .into_iter()
+        .filter(|request| request.target == ADMISSION_CAPTURE_QUERY_PATH)
+    {
         assert_json_post(
             &captured,
             ADMISSION_CAPTURE_QUERY_PATH,
@@ -883,11 +1053,13 @@ fn remote_admission_capture_point_query_rejects_rebinding_and_malformed_bodies()
 
 #[test]
 fn remote_budget_store_authority_apis_include_budget_event_identity() {
-    let server = StaticResponseServer::spawn(200, "{}", "application/json", 5);
+    let server =
+        StaticResponseServer::spawn_with_mutation_absence(200, "{}", "application/json", 5);
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret").test_expect("build client"),
+        partition_escrow_authority: None,
         cached_usage: Mutex::new(HashMap::new()),
-        composite_holds: Mutex::new(HashMap::new()),
+        composite_holds: Arc::new(Mutex::new(HashMap::new())),
     };
     let capture_authority = BudgetEventAuthority {
         authority_id: "budget-primary".to_string(),
@@ -943,6 +1115,10 @@ fn remote_budget_store_authority_apis_include_budget_event_identity() {
     });
 
     let requests = server.requests();
+    let requests = requests
+        .into_iter()
+        .filter(|request| request.target != BUDGET_MUTATION_EVENT_QUERY_PATH)
+        .collect::<Vec<_>>();
     assert_eq!(requests.len(), 5);
     assert_json_post(
         &requests[0],
@@ -1050,7 +1226,7 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
             "leaseEpoch": 7,
             "leaseExpiresAt": 5000,
             "leaseTtlMs": 750,
-            "guaranteeLevel": "ha_quorum_commit",
+            "guaranteeLevel": "ha_linearizable",
             "budgetCommitIndex": 41
         },
         "budgetCommit": {
@@ -1070,8 +1246,9 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret").test_expect("build client"),
+        partition_escrow_authority: None,
         cached_usage: Mutex::new(HashMap::new()),
-        composite_holds: Mutex::new(HashMap::new()),
+        composite_holds: Arc::new(Mutex::new(HashMap::new())),
     };
 
     let decision = store
@@ -1126,7 +1303,9 @@ fn remote_budget_grant_only_authorize_has_no_monetary_state() {
         "allowed": true,
         "invocationCount": 1,
         "totalExposureCharged": 0,
-        "totalRealizedSpend": 0
+        "totalRealizedSpend": 0,
+        "budgetAuthority": budget_authority_json(41),
+        "budgetCommit": budget_commit_json(41)
     })
     .to_string();
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
@@ -1154,10 +1333,10 @@ fn remote_budget_grant_only_authorize_has_no_monetary_state() {
         authorized.invocation_state,
         BudgetInvocationReservationState::Absent
     );
-    assert_eq!(authorized.metadata.authority, None);
+    assert!(authorized.metadata.authority.is_some());
     assert_eq!(
         authorized.metadata.guarantee_level,
-        BudgetGuaranteeLevel::SingleNodeAtomic
+        BudgetGuaranteeLevel::HaLinearizable
     );
 }
 
@@ -1240,15 +1419,17 @@ fn remote_budget_denied_authorize_retry_returns_frozen_decision_and_invalidates_
         "invocationCount": 1,
         "totalExposureCharged": 80,
         "totalRealizedSpend": 0,
-        "budgetAuthority": budget_leader_visible_authority_json()
+        "budgetAuthority": budget_authority_json(42),
+        "budgetCommit": budget_commit_json(42)
     })
     .to_string();
     let server =
         scripted_transition_server(denied_response, later_authorize_response(43, 2, 90, 0));
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret").test_expect("build client"),
+        partition_escrow_authority: None,
         cached_usage: Mutex::new(HashMap::new()),
-        composite_holds: Mutex::new(HashMap::new()),
+        composite_holds: Arc::new(Mutex::new(HashMap::new())),
     };
     let request = BudgetAuthorizeHoldRequest::legacy(
         "cap-budget".to_string(),
@@ -1318,32 +1499,12 @@ fn remote_budget_capture_uses_distinct_truthful_terminal_state() {
         "releasedExposureUnits": 45,
         "totalExposureCharged": 0,
         "totalRealizedSpend": 75,
-        "budgetAuthority": {
-            "authorityId": "http://leader-a",
-            "leaderUrl": "http://leader-a",
-            "budgetTerm": 7,
-            "leaseId": "http://leader-a#term-7",
-            "leaseEpoch": 7,
-            "leaseExpiresAt": 5000,
-            "leaseTtlMs": 750,
-            "guaranteeLevel": "ha_quorum_commit",
-            "budgetCommitIndex": 42
-        },
-        "budgetCommit": {
-            "budgetSeq": 42,
-            "commitIndex": 42,
-            "quorumCommitted": true,
-            "quorumSize": 2,
-            "committedNodes": 2,
-            "witnessUrls": ["http://leader-a", "http://follower-b"],
-            "authorityId": "http://leader-a",
-            "budgetTerm": 7,
-            "leaseId": "http://leader-a#term-7",
-            "leaseEpoch": 7
-        }
+        "budgetAuthority": budget_authority_json(42),
+        "budgetCommit": budget_commit_json(42)
     })
     .to_string();
-    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+    let server =
+        StaticResponseServer::spawn_with_mutation_absence(200, &body, "application/json", 1);
     let store =
         build_remote_budget_store(&server.url, "secret").test_expect("build remote budget store");
 
@@ -1364,15 +1525,17 @@ fn remote_budget_capture_uses_distinct_truthful_terminal_state() {
     assert_eq!(captured.committed_cost_units_after, 75);
     assert_eq!(captured.metadata.budget_commit_index, Some(42));
     let requests = server.requests();
-    assert_eq!(requests.len(), 1);
+    assert_eq!(requests.len(), 3);
+    assert_eq!(requests[0].target, BUDGET_MUTATION_EVENT_QUERY_PATH);
     assert_json_post(
-        &requests[0],
+        &requests[1],
         BUDGET_CAPTURE_EXPOSURE_PATH,
         &[
             "\"holdId\":\"hold-budget\"",
             "\"eventId\":\"hold-budget:capture\"",
         ],
     );
+    assert_eq!(requests[2].target, BUDGET_MUTATION_EVENT_QUERY_PATH);
 }
 
 #[test]
@@ -1384,29 +1547,8 @@ fn remote_budget_capture_retry_returns_frozen_decision_without_regressing_cache(
         "releasedExposureUnits": 45,
         "totalExposureCharged": 0,
         "totalRealizedSpend": 75,
-        "budgetAuthority": {
-            "authorityId": "budget-primary",
-            "leaderUrl": "http://leader-a",
-            "budgetTerm": 7,
-            "leaseId": "lease-7",
-            "leaseEpoch": 7,
-            "leaseExpiresAt": 5000,
-            "leaseTtlMs": 750,
-            "guaranteeLevel": "ha_quorum_commit",
-            "budgetCommitIndex": 42
-        },
-        "budgetCommit": {
-            "budgetSeq": 42,
-            "commitIndex": 42,
-            "quorumCommitted": true,
-            "quorumSize": 2,
-            "committedNodes": 2,
-            "witnessUrls": ["http://leader-a", "http://follower-b"],
-            "authorityId": "budget-primary",
-            "budgetTerm": 7,
-            "leaseId": "lease-7",
-            "leaseEpoch": 7
-        }
+        "budgetAuthority": budget_authority_json(42),
+        "budgetCommit": budget_commit_json(42)
     })
     .to_string();
     let later_authorize_response = serde_json::json!({
@@ -1416,32 +1558,11 @@ fn remote_budget_capture_retry_returns_frozen_decision_without_regressing_cache(
         "invocationCount": 2,
         "totalExposureCharged": 10,
         "totalRealizedSpend": 75,
-        "budgetAuthority": {
-            "authorityId": "budget-primary",
-            "leaderUrl": "http://leader-a",
-            "budgetTerm": 7,
-            "leaseId": "lease-7",
-            "leaseEpoch": 7,
-            "leaseExpiresAt": 5000,
-            "leaseTtlMs": 750,
-            "guaranteeLevel": "ha_quorum_commit",
-            "budgetCommitIndex": 43
-        },
-        "budgetCommit": {
-            "budgetSeq": 43,
-            "commitIndex": 43,
-            "quorumCommitted": true,
-            "quorumSize": 2,
-            "committedNodes": 2,
-            "witnessUrls": ["http://leader-a", "http://follower-b"],
-            "authorityId": "budget-primary",
-            "budgetTerm": 7,
-            "leaseId": "lease-7",
-            "leaseEpoch": 7
-        }
+        "budgetAuthority": budget_authority_json(43),
+        "budgetCommit": budget_commit_json(43)
     })
     .to_string();
-    let server = ScriptedResponseServer::spawn(vec![
+    let server = ScriptedResponseServer::spawn_with_mutation_absence(vec![
         ScriptedResponse {
             status: 200,
             body: capture_response.clone(),
@@ -1461,8 +1582,8 @@ fn remote_budget_capture_retry_returns_frozen_decision_without_regressing_cache(
     let store =
         build_remote_budget_store(&server.url, "secret").test_expect("build remote budget store");
     let authority = BudgetEventAuthority {
-        authority_id: "budget-primary".to_string(),
-        lease_id: "lease-7".to_string(),
+        authority_id: server.url.clone(),
+        lease_id: format!("{}#term-7", server.url),
         lease_epoch: 7,
     };
     let request = BudgetCaptureHoldRequest {

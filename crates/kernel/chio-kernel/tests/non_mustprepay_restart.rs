@@ -362,6 +362,7 @@ fn operation_owned_authorization(
             &[],
         )?,
         authorization_artifact_digests: Vec::new(),
+        partition_escrow_evidence: None,
     })
 }
 

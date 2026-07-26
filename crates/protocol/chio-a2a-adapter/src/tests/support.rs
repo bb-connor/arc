@@ -1512,7 +1512,7 @@ fn test_capability(
                     tool_name: "research".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: vec![],
-                    max_invocations: Some(5),
+                    max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
                     dpop_required: None,

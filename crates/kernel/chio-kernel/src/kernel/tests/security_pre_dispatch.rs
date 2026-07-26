@@ -466,6 +466,11 @@ fn security_dispatch_capture_failure_fixture(
 ) -> (ChioKernel, ToolCallRequest, std::sync::Arc<AtomicUsize>) {
     let mut kernel = make_kernel(make_monetary_config());
     kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
+            "{request_id}-operations"
+        )))
+        .expect("install security capture admission operation store");
+    kernel
         .set_budget_store_handle(std::sync::Arc::new(FailingReleaseBudgetStore::new()))
         .unwrap();
     let invocations = std::sync::Arc::new(AtomicUsize::new(0));
@@ -1680,6 +1685,10 @@ async fn security_dispatch_outcome_persistence_failure_preserves_primary_when_te
 async fn security_dispatch_outcome_persistence_failure_releases_ordinary_payment_and_budget() {
     let payment = TrackingPaymentAdapter::new();
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(
+        &mut kernel,
+        "security-outcome-ordinary-monetary-cleanup",
+    );
     kernel
         .set_payment_adapter(Box::new(payment.clone()))
         .expect("install payment adapter");
@@ -1790,6 +1799,10 @@ async fn security_dispatch_outcome_persistence_failure_retains_runtime_and_deleg
 #[tokio::test]
 async fn security_dispatch_outcome_persistence_failure_aggregates_monetary_cleanup_failure() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_fixture_budget_admission_authorities(
+        &mut kernel,
+        "security-outcome-monetary-cleanup-failure",
+    );
     kernel
         .set_payment_adapter(Box::new(FailingReleasePaymentAdapter))
         .expect("install payment adapter");

@@ -36,6 +36,7 @@ impl crate::supplemental_quota::SupplementalQuotaVerifier
             destination: context.destination.clone(),
             arguments_digest: context.arguments_digest.clone(),
             request_binding_hash: context.request_binding_hash.clone(),
+            not_before: context.now,
             expires_at: context.now.saturating_add(300),
             broker_capability_id: broker_capability_id.clone(),
             issuer: self.issuer.clone(),
@@ -46,6 +47,217 @@ impl crate::supplemental_quota::SupplementalQuotaVerifier
             negotiated_features_digest,
             profile: crate::budget_store::BudgetQuotaProfile::SupplementalBrokerExecution,
         })
+    }
+}
+
+#[derive(Clone)]
+struct SingleUseThresholdSupplementalVerifier {
+    issuer: PublicKey,
+    calls: std::sync::Arc<AtomicU64>,
+}
+
+impl SingleUseThresholdSupplementalVerifier {
+    fn new() -> Self {
+        Self {
+            issuer: Keypair::generate().public_key(),
+            calls: std::sync::Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    fn calls(&self) -> u64 {
+        self.calls.load(Ordering::SeqCst)
+    }
+}
+
+impl crate::supplemental_quota::SupplementalQuotaVerifier
+    for SingleUseThresholdSupplementalVerifier
+{
+    fn verifier_id(&self) -> &str {
+        "single-use-frozen-retry-verifier"
+    }
+
+    fn verify(
+        &self,
+        artifact: &crate::supplemental_quota::OpaqueSignedSupplementalQuota,
+        context: &crate::supplemental_quota::SupplementalQuotaVerificationContext,
+    ) -> Result<
+        crate::supplemental_quota::VerifiedSupplementalQuotaClaimBody,
+        crate::supplemental_quota::SupplementalQuotaError,
+    > {
+        if self.calls.fetch_add(1, Ordering::SeqCst) != 0 {
+            return Err(crate::supplemental_quota::SupplementalQuotaError::VerifierUnavailable);
+        }
+        crate::supplemental_quota::SupplementalQuotaVerifier::verify(
+            &BoundThresholdSupplementalVerifier {
+                issuer: self.issuer.clone(),
+            },
+            artifact,
+            context,
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum FrozenRetrySnapshotTamper {
+    Payload,
+    SourceTrust,
+}
+
+struct FrozenRetryOperationStore {
+    inner: std::sync::Arc<RecordingThresholdOperationStore>,
+    hide_next_load: AtomicBool,
+    snapshot_tamper: std::sync::atomic::AtomicU8,
+}
+
+impl FrozenRetryOperationStore {
+    fn with_budget_authorized_ack_loss() -> Self {
+        Self {
+            inner: std::sync::Arc::new(RecordingThresholdOperationStore::with_ack_loss(
+                AdmissionOperationState::BudgetAuthorized,
+            )),
+            hide_next_load: AtomicBool::new(false),
+            snapshot_tamper: std::sync::atomic::AtomicU8::new(0),
+        }
+    }
+
+    fn set_snapshot_tamper(&self, tamper: FrozenRetrySnapshotTamper) {
+        let value = match tamper {
+            FrozenRetrySnapshotTamper::Payload => 1,
+            FrozenRetrySnapshotTamper::SourceTrust => 2,
+        };
+        self.snapshot_tamper.store(value, Ordering::SeqCst);
+    }
+
+    fn original_budget_snapshot(&self) -> (String, String) {
+        let operations = self
+            .inner
+            .list_unresolved(Some(AdmissionOperationKind::ToolDispatch), 16)
+            .expect("frozen retry operation inventory");
+        assert_eq!(operations.len(), 1, "one frozen retry operation");
+        let operation_id = operations[0].operation_id().to_string();
+        let actions = self
+            .inner
+            .load_cleanup_actions(&operation_id)
+            .expect("frozen retry cleanup inventory");
+        let action = actions
+            .iter()
+            .find(|action| action.kind() == AdmissionCleanupActionKind::Budget)
+            .expect("frozen retry budget snapshot");
+        (operation_id, action.payload_json().to_string())
+    }
+
+    fn tamper_budget_snapshot(
+        &self,
+        action: AdmissionCleanupAction,
+    ) -> Result<AdmissionCleanupAction, AdmissionOperationError> {
+        if action.kind() != AdmissionCleanupActionKind::Budget {
+            return Ok(action);
+        }
+        let mut payload: serde_json::Value =
+            serde_json::from_str(action.payload_json()).map_err(|error| {
+                AdmissionOperationError::Invalid(format!(
+                    "frozen retry budget snapshot is not JSON: {error}"
+                ))
+            })?;
+        match self.snapshot_tamper.load(Ordering::SeqCst) {
+            0 => return Ok(action),
+            1 => {
+                let exposure = payload
+                    .pointer_mut("/authorization/requestedExposureUnits")
+                    .ok_or_else(|| {
+                        AdmissionOperationError::Invalid(
+                            "frozen retry snapshot omitted requested exposure".to_string(),
+                        )
+                    })?;
+                let current = exposure.as_u64().ok_or_else(|| {
+                    AdmissionOperationError::Invalid(
+                        "frozen retry requested exposure is not an unsigned integer".to_string(),
+                    )
+                })?;
+                *exposure = serde_json::json!(current.saturating_add(1));
+            }
+            2 => {
+                let verifier_id = payload
+                    .pointer_mut("/authorization/supplementalBinding/verifierId")
+                    .ok_or_else(|| {
+                        AdmissionOperationError::Invalid(
+                            "frozen retry snapshot omitted supplemental source trust".to_string(),
+                        )
+                    })?;
+                *verifier_id = serde_json::json!("forged-frozen-retry-verifier");
+            }
+            _ => {
+                return Err(AdmissionOperationError::Invalid(
+                    "invalid frozen retry snapshot tamper mode".to_string(),
+                ));
+            }
+        }
+        let operation = self.inner.load(action.operation_id())?.ok_or_else(|| {
+            AdmissionOperationError::Invalid(
+                "frozen retry operation disappeared during snapshot fault injection".to_string(),
+            )
+        })?;
+        AdmissionCleanupAction::pending(&operation, AdmissionCleanupActionKind::Budget, &payload)
+    }
+}
+
+impl AdmissionOperationStore for FrozenRetryOperationStore {
+    fn authority_profile(&self) -> AdmissionOperationStoreProfile {
+        self.inner.authority_profile()
+    }
+
+    fn cleanup_journal_delegate(&self) -> Option<&dyn AdmissionOperationStore> {
+        Some(self.inner.as_ref())
+    }
+
+    fn create_prepared(
+        &self,
+        operation: AdmissionOperation,
+    ) -> Result<AdmissionOperationCreateOutcome, AdmissionOperationError> {
+        self.inner.create_prepared(operation)
+    }
+
+    fn load(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<AdmissionOperation>, AdmissionOperationError> {
+        if self.hide_next_load.swap(false, Ordering::SeqCst) {
+            return Err(AdmissionOperationError::Unavailable(
+                "injected post-commit admission read outage".to_string(),
+            ));
+        }
+        self.inner.load(operation_id)
+    }
+
+    fn count_unresolved_by_authority(
+        &self,
+        kind: AdmissionOperationKind,
+        coordinator_authority_id: &str,
+    ) -> Result<u64, AdmissionOperationError> {
+        self.inner
+            .count_unresolved_by_authority(kind, coordinator_authority_id)
+    }
+
+    fn compare_and_swap(
+        &self,
+        request: AdmissionOperationCompareAndSwap<'_>,
+    ) -> Result<AdmissionOperationCasOutcome, AdmissionOperationError> {
+        let outcome = self.inner.compare_and_swap(request);
+        if outcome.is_err() {
+            self.hide_next_load.store(true, Ordering::SeqCst);
+        }
+        outcome
+    }
+
+    fn load_cleanup_actions(
+        &self,
+        operation_id: &str,
+    ) -> Result<Vec<AdmissionCleanupAction>, AdmissionOperationError> {
+        self.inner
+            .load_cleanup_actions(operation_id)?
+            .into_iter()
+            .map(|action| self.tamper_budget_snapshot(action))
+            .collect()
     }
 }
 
@@ -1004,4 +1216,385 @@ fn ordinary_noncomposite_non_mustprepay_reservation_survives_kernel_reconstructi
         "kernel reconstruction moved rail funds"
     );
     drop(reconstructed);
+}
+
+struct FrozenRetryHarness {
+    operations: std::sync::Arc<FrozenRetryOperationStore>,
+    verifier: SingleUseThresholdSupplementalVerifier,
+}
+
+fn install_frozen_retry_authorities(
+    kernel: &mut ChioKernel,
+    threshold: bool,
+) -> FrozenRetryHarness {
+    let operations =
+        std::sync::Arc::new(FrozenRetryOperationStore::with_budget_authorized_ack_loss());
+    let budget = std::sync::Arc::new(DurableThresholdBudgetStore::new());
+    let verifier = SingleUseThresholdSupplementalVerifier::new();
+    kernel
+        .set_admission_operation_store_handle(operations.clone())
+        .expect("frozen retry operation store");
+    kernel
+        .set_budget_store_handle(budget.clone())
+        .expect("frozen retry budget store");
+    if threshold {
+        kernel
+            .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
+            .expect("frozen retry approval store");
+    }
+    kernel
+        .set_supplemental_quota_verifier(std::sync::Arc::new(verifier.clone()))
+        .expect("frozen retry supplemental verifier");
+    kernel
+        .set_supplemental_admission_registrar(std::sync::Arc::new(
+            RecordingThresholdSupplementalRegistrar::default(),
+        ))
+        .expect("frozen retry supplemental registrar");
+    kernel
+        .set_admission_capture_authority(std::sync::Arc::new(
+            InCrateThresholdCaptureAuthority::new(budget),
+        ))
+        .expect("frozen retry capture authority");
+    kernel
+        .enable_supplemental_broker_admission()
+        .expect("frozen retry supplemental activation");
+    FrozenRetryHarness {
+        operations,
+        verifier,
+    }
+}
+
+fn install_frozen_retry_supplemental_request(request: &mut ToolCallRequest, request_id: &str) {
+    request.request_id = request_id.to_string();
+    request.supplemental_authorization = Some(
+        chio_core::OpaqueSupplementalAuthorization::new(
+            format!("broker:{request_id}"),
+            format!("signed:{request_id}").into_bytes(),
+        )
+        .expect("frozen retry supplemental authorization"),
+    );
+}
+
+fn assert_existing_only_frozen_snapshot(payload_json: &str) {
+    let payload: serde_json::Value =
+        serde_json::from_str(payload_json).expect("frozen retry budget cleanup payload");
+    let snapshot: crate::budget_store::BudgetAuthorizationCleanupSnapshot = serde_json::from_value(
+        payload
+            .get("authorization")
+            .cloned()
+            .expect("frozen retry authorization snapshot"),
+    )
+    .expect("frozen retry budget snapshot");
+    let authorization = snapshot
+        .authorization_request()
+        .expect("snapshot-derived authorization");
+    assert!(
+        authorization.requires_existing_authorization_replay(),
+        "a persisted recovery snapshot must only authorize read-only committed replay"
+    );
+    assert_eq!(
+        authorization
+            .invocation_admission_evidence()
+            .and_then(|evidence| evidence.supplemental_verifier_id()),
+        Some("single-use-frozen-retry-verifier"),
+        "the frozen authorization must retain its verified source authority"
+    );
+}
+
+fn assert_retry_error_is_frozen_mismatch(error: &KernelError) {
+    assert!(
+        matches!(
+            error,
+            KernelError::BudgetStore(BudgetStoreError::Conflict(_))
+                | KernelError::BudgetStore(BudgetStoreError::Invariant(_))
+                | KernelError::GovernedTransactionDenied(_)
+                | KernelError::GuardDenied(_)
+        ),
+        "frozen retry mismatch returned an unexpected error: {error}"
+    );
+}
+
+fn run_ordinary_frozen_retry_mismatch(tamper: FrozenRetrySnapshotTamper) {
+    let (mut kernel, capability, grant, _intent, mut request, now) = threshold_test_fixture();
+    install_frozen_retry_supplemental_request(
+        &mut request,
+        match tamper {
+            FrozenRetrySnapshotTamper::Payload => "ordinary-frozen-payload-mismatch",
+            FrozenRetrySnapshotTamper::SourceTrust => "ordinary-frozen-source-trust-mismatch",
+        },
+    );
+    let harness = install_frozen_retry_authorities(&mut kernel, false);
+
+    let first_error = kernel
+        .coordinate_ordinary_protocol_admission(
+            &request,
+            &capability,
+            0,
+            &grant,
+            false,
+            None,
+            now,
+        )
+        .err()
+        .expect("the first admission must lose its committed transition acknowledgement");
+    assert!(first_error.to_string().contains("transition"));
+    let (operation_id, original_snapshot) = harness.operations.original_budget_snapshot();
+    assert_existing_only_frozen_snapshot(&original_snapshot);
+    harness.operations.set_snapshot_tamper(tamper);
+
+    let retry_error = kernel
+        .coordinate_ordinary_protocol_admission(
+            &request,
+            &capability,
+            0,
+            &grant,
+            false,
+            None,
+            now,
+        )
+        .err()
+        .expect("a changed frozen authorization must fail closed");
+    assert_retry_error_is_frozen_mismatch(&retry_error);
+    assert_eq!(harness.verifier.calls(), 1, "retry re-resolved its source");
+    assert_eq!(
+        harness
+            .operations
+            .inner
+            .load(&operation_id)
+            .expect("ordinary mismatch operation lookup")
+            .expect("ordinary mismatch operation")
+            .state(),
+        AdmissionOperationState::BudgetAuthorized,
+        "a mismatched replay must not advance the operation"
+    );
+    assert_eq!(
+        harness.operations.original_budget_snapshot().1,
+        original_snapshot,
+        "fault injection must not mutate the authoritative journal row"
+    );
+}
+
+fn run_threshold_frozen_retry_mismatch(tamper: FrozenRetrySnapshotTamper) {
+    let (mut kernel, capability, grant, intent, mut request, now) = threshold_test_fixture();
+    install_frozen_retry_supplemental_request(
+        &mut request,
+        match tamper {
+            FrozenRetrySnapshotTamper::Payload => "threshold-frozen-payload-mismatch",
+            FrozenRetrySnapshotTamper::SourceTrust => "threshold-frozen-source-trust-mismatch",
+        },
+    );
+    install_valid_threshold_artifacts(&mut kernel, &capability, &intent, &mut request, now);
+    let harness = install_frozen_retry_authorities(&mut kernel, true);
+    let verified = kernel
+        .validate_governed_transaction(&request, &capability, &grant, None, now)
+        .expect("threshold governed validation")
+        .expect("threshold governed admission")
+        .verified_governed_approval
+        .expect("verified threshold approval");
+    let (prepared, protocol) = prepare_threshold_fingerprint_operation(
+        &kernel,
+        &request,
+        &capability,
+        &verified,
+        None,
+        now,
+    );
+
+    let first_error = kernel
+        .reserve_threshold_tool_admission(
+            crate::kernel::admission_coordinator::ThresholdToolAdmissionContext {
+                request: &request,
+                cap: &capability,
+                grant_index: 0,
+                grant: &grant,
+                now,
+                payment_mode: crate::kernel::admission_coordinator::ThresholdPaymentMode::Dispatch,
+            },
+            prepared,
+            protocol,
+            None,
+        )
+        .err()
+        .expect("the first threshold admission must lose its transition acknowledgement");
+    assert!(first_error.to_string().contains("transition"));
+    let (operation_id, original_snapshot) = harness.operations.original_budget_snapshot();
+    assert_existing_only_frozen_snapshot(&original_snapshot);
+    harness.operations.set_snapshot_tamper(tamper);
+    let (prepared, protocol) = prepare_threshold_fingerprint_operation(
+        &kernel,
+        &request,
+        &capability,
+        &verified,
+        None,
+        now,
+    );
+
+    let retry_error = kernel
+        .reserve_threshold_tool_admission(
+            crate::kernel::admission_coordinator::ThresholdToolAdmissionContext {
+                request: &request,
+                cap: &capability,
+                grant_index: 0,
+                grant: &grant,
+                now,
+                payment_mode: crate::kernel::admission_coordinator::ThresholdPaymentMode::Dispatch,
+            },
+            prepared,
+            protocol,
+            None,
+        )
+        .err()
+        .expect("a changed threshold frozen authorization must fail closed");
+    assert_retry_error_is_frozen_mismatch(&retry_error);
+    assert_eq!(harness.verifier.calls(), 1, "retry re-resolved its source");
+    assert_eq!(
+        harness
+            .operations
+            .inner
+            .load(&operation_id)
+            .expect("threshold mismatch operation lookup")
+            .expect("threshold mismatch operation")
+            .state(),
+        AdmissionOperationState::BudgetAuthorized,
+        "a mismatched threshold replay must not advance the operation"
+    );
+    assert_eq!(
+        harness.operations.original_budget_snapshot().1,
+        original_snapshot,
+        "fault injection must not mutate the authoritative journal row"
+    );
+}
+
+#[test]
+fn ordinary_retry_uses_exact_frozen_snapshot_when_source_is_unavailable() {
+    let (mut kernel, capability, grant, _intent, mut request, now) = threshold_test_fixture();
+    install_frozen_retry_supplemental_request(&mut request, "ordinary-frozen-source-outage");
+    let harness = install_frozen_retry_authorities(&mut kernel, false);
+
+    let first_error = kernel
+        .coordinate_ordinary_protocol_admission(
+            &request,
+            &capability,
+            0,
+            &grant,
+            false,
+            None,
+            now,
+        )
+        .err()
+        .expect("the first admission must leave a committed retry point");
+    assert!(first_error.to_string().contains("transition"));
+    let (_, before) = harness.operations.original_budget_snapshot();
+    assert_existing_only_frozen_snapshot(&before);
+
+    let retry = kernel
+        .coordinate_ordinary_protocol_admission(
+            &request,
+            &capability,
+            0,
+            &grant,
+            false,
+            None,
+            now,
+        )
+        .expect("ordinary retry must use committed read-only replay");
+    assert!(retry
+        .ordinary_admission()
+        .expect("ordinary retry admission")
+        .preexisting_operation());
+    assert_eq!(harness.verifier.calls(), 1, "retry re-resolved its source");
+    assert_eq!(
+        harness.operations.original_budget_snapshot().1,
+        before,
+        "ordinary retry changed its frozen authorization snapshot"
+    );
+}
+
+#[test]
+fn threshold_retry_uses_exact_frozen_snapshot_when_source_is_unavailable() {
+    let (mut kernel, capability, grant, intent, mut request, now) = threshold_test_fixture();
+    install_frozen_retry_supplemental_request(&mut request, "threshold-frozen-source-outage");
+    install_valid_threshold_artifacts(&mut kernel, &capability, &intent, &mut request, now);
+    let harness = install_frozen_retry_authorities(&mut kernel, true);
+    let verified = kernel
+        .validate_governed_transaction(&request, &capability, &grant, None, now)
+        .expect("threshold governed validation")
+        .expect("threshold governed admission")
+        .verified_governed_approval
+        .expect("verified threshold approval");
+    let (prepared, protocol) = prepare_threshold_fingerprint_operation(
+        &kernel,
+        &request,
+        &capability,
+        &verified,
+        None,
+        now,
+    );
+
+    let first_error = kernel
+        .reserve_threshold_tool_admission(
+            crate::kernel::admission_coordinator::ThresholdToolAdmissionContext {
+                request: &request,
+                cap: &capability,
+                grant_index: 0,
+                grant: &grant,
+                now,
+                payment_mode: crate::kernel::admission_coordinator::ThresholdPaymentMode::Dispatch,
+            },
+            prepared,
+            protocol,
+            None,
+        )
+        .err()
+        .expect("the first threshold admission must leave a committed retry point");
+    assert!(first_error.to_string().contains("transition"));
+    let (_, before) = harness.operations.original_budget_snapshot();
+    assert_existing_only_frozen_snapshot(&before);
+    let (prepared, protocol) = prepare_threshold_fingerprint_operation(
+        &kernel,
+        &request,
+        &capability,
+        &verified,
+        None,
+        now,
+    );
+
+    let (permit, retry) = kernel
+        .reserve_threshold_tool_admission(
+            crate::kernel::admission_coordinator::ThresholdToolAdmissionContext {
+                request: &request,
+                cap: &capability,
+                grant_index: 0,
+                grant: &grant,
+                now,
+                payment_mode: crate::kernel::admission_coordinator::ThresholdPaymentMode::Dispatch,
+            },
+            prepared,
+            protocol,
+            None,
+        )
+        .expect("threshold retry must use committed read-only replay");
+    assert!(permit.preexisting_operation());
+    assert!(retry
+        .ordinary_admission()
+        .expect("threshold retry admission")
+        .preexisting_operation());
+    assert_eq!(harness.verifier.calls(), 1, "retry re-resolved its source");
+    assert_eq!(
+        harness.operations.original_budget_snapshot().1,
+        before,
+        "threshold retry changed its frozen authorization snapshot"
+    );
+}
+
+#[test]
+fn ordinary_retry_rejects_frozen_payload_and_source_trust_mismatches() {
+    run_ordinary_frozen_retry_mismatch(FrozenRetrySnapshotTamper::Payload);
+    run_ordinary_frozen_retry_mismatch(FrozenRetrySnapshotTamper::SourceTrust);
+}
+
+#[test]
+fn threshold_retry_rejects_frozen_payload_and_source_trust_mismatches() {
+    run_threshold_frozen_retry_mismatch(FrozenRetrySnapshotTamper::Payload);
+    run_threshold_frozen_retry_mismatch(FrozenRetrySnapshotTamper::SourceTrust);
 }

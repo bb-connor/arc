@@ -485,6 +485,11 @@ fn a_failed_pre_dispatch_cleanup_clears_the_journaled_intent(
         std::sync::Arc::clone(&stream_attempts),
     )));
     kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(
+            "intent-cleanup-abort-operations",
+        ))
+        .expect("install durable admission operation store");
+    kernel
         .set_budget_store_handle(std::sync::Arc::new(ReverseFailingBudgetStore::new()))
         .expect("install budget store");
 
@@ -542,6 +547,11 @@ fn nested_flow_failed_pre_dispatch_cleanup_clears_the_journaled_intent(
         vec!["destructive_update"],
         std::sync::Arc::clone(&stream_attempts),
     )));
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(
+            "nested-intent-cleanup-abort-operations",
+        ))
+        .expect("install durable admission operation store");
     kernel
         .set_budget_store_handle(std::sync::Arc::new(ReverseFailingBudgetStore::new()))
         .expect("install budget store");
@@ -621,6 +631,11 @@ fn a_second_cleanup_fault_receipt_persists_after_the_first_consumes_the_intent(
         vec!["destructive_update"],
         std::sync::Arc::clone(&stream_attempts),
     )));
+    kernel
+        .set_admission_operation_store_handle(durable_test_admission_operation_store(
+            "intent-second-cleanup-fault-operations",
+        ))
+        .expect("install durable admission operation store");
     kernel
         .set_budget_store_handle(std::sync::Arc::new(ReverseFailingBudgetStore::new()))
         .expect("install budget store");

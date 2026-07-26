@@ -19,6 +19,7 @@ use crate::budget_store::{
     BudgetGuaranteeLevel, BudgetHoldDispositionView, BudgetInvocationQuota,
     BudgetInvocationQuotaUsage, BudgetInvocationReservationState, BudgetMeteringProfile,
     BudgetMonetaryHoldState, BudgetQuotaKey, BudgetQuotaProfile, BudgetStore,
+    PartitionEscrowCommitEvidence,
 };
 use crate::execution_nonce::{is_supported_execution_nonce_schema, SignedExecutionNonce};
 use crate::payment::{PaymentJournalRecord, PaymentJournalState};
@@ -180,6 +181,15 @@ struct CallerReservationAuthorizationProjection {
     metering_profile: String,
     budget_commit_index: Option<u64>,
     event_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    partition_escrow_evidence: Option<CallerReservationPartitionEscrowProjection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CallerReservationPartitionEscrowProjection {
+    canonical_json: String,
+    evidence_digest: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,6 +229,23 @@ impl CallerReservationAuthorizationProjection {
                 captured_invocations_after: usage.captured_invocations_after,
             })
             .collect();
+        let partition_escrow_evidence =
+            authorized
+                .metadata
+                .partition_escrow_evidence
+                .as_ref()
+                .map(|evidence| CallerReservationPartitionEscrowProjection {
+                    canonical_json: evidence.canonical_json().to_string(),
+                    evidence_digest: evidence.evidence_digest().to_string(),
+                });
+        if (authorized.metadata.guarantee_level == BudgetGuaranteeLevel::PartitionEscrowed)
+            != partition_escrow_evidence.is_some()
+        {
+            return Err(KernelError::Internal(
+                "caller reservation authorization has inconsistent partition escrow evidence"
+                    .to_string(),
+            ));
+        }
         Ok(Self {
             hold_id,
             authorized_exposure_units: authorized.authorized_exposure_units,
@@ -239,6 +266,7 @@ impl CallerReservationAuthorizationProjection {
             metering_profile: authorized.metadata.metering_profile.as_str().to_string(),
             budget_commit_index: authorized.metadata.budget_commit_index,
             event_id: authorized.metadata.event_id.clone(),
+            partition_escrow_evidence,
         })
     }
 
@@ -286,6 +314,23 @@ impl CallerReservationAuthorizationProjection {
                 ))
             }
         };
+        let partition_escrow_evidence = self
+            .partition_escrow_evidence
+            .as_ref()
+            .map(|evidence| {
+                PartitionEscrowCommitEvidence::from_canonical_json(
+                    evidence.canonical_json.clone(),
+                    evidence.evidence_digest.clone(),
+                )
+            })
+            .transpose()?;
+        if (guarantee_level == BudgetGuaranteeLevel::PartitionEscrowed)
+            != partition_escrow_evidence.is_some()
+        {
+            return Err(KernelError::Internal(
+                "caller reservation handoff has inconsistent partition escrow evidence".to_string(),
+            ));
+        }
         if self.budget_profile != BudgetAuthorityProfile::AuthoritativeHoldEvent.as_str()
             || self.metering_profile
                 != BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual.as_str()
@@ -321,6 +366,7 @@ impl CallerReservationAuthorizationProjection {
                 metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
                 budget_commit_index: self.budget_commit_index,
                 event_id: self.event_id.clone(),
+                partition_escrow_evidence,
             },
         })
     }
@@ -952,7 +998,7 @@ impl ChioKernel {
                     let _ = self.reap_expired_reserved_budget_holds(now)?;
                     return Ok(CallerReservationReplayProbe::Conflict);
                 }
-                if !self.caller_reservation_handoff_hold_is_live(operation, &payload)? {
+                if !self.caller_reservation_handoff_hold_is_live(operation, &intent, &payload)? {
                     return Ok(CallerReservationReplayProbe::Conflict);
                 }
                 let response = match self.finalize_caller_reservation_handoff_delivery(
@@ -1014,6 +1060,13 @@ impl ChioKernel {
         let snapshot = self.load_recovery_budget_snapshot(operation_store, operation)?;
         let authorization_request = snapshot.authorization_request()?;
         let authorized = intent.body.authorization.to_authorized()?;
+        self.validate_budget_authorization_decision_for_store(
+            budget_store,
+            &authorization_request,
+            &crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(authorized.clone()),
+            &snapshot.authorization_artifact_digests(),
+            "caller reservation recovery authorization snapshot",
+        )?;
         let expected_authorize_event =
             authorization_request.event_id.as_deref().ok_or_else(|| {
                 KernelError::Internal(
@@ -1100,7 +1153,15 @@ impl ChioKernel {
                         })?,
                     ))
                 }
-                Some(AdmissionCaptureDecision::Denied(_)) | None => None,
+                Some(AdmissionCaptureDecision::Denied(denial)) => {
+                    super::ordinary_admission::validate_capture_denial_partition_escrow_evidence(
+                        &authorized,
+                        &denial,
+                        "caller reservation recovery capture denial",
+                    )?;
+                    None
+                }
+                None => None,
             }
         } else {
             budget_store
@@ -1430,6 +1491,12 @@ fn validate_final_handoff_payload(
         receipt.decision.as_ref(),
         Some(Decision::Incomplete { reason }) if reason == &body.incomplete_reason
     );
+    let receipt_signing_nonce_matches = receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("chio_receipt_signing_nonce"))
+        .and_then(serde_json::Value::as_str)
+        == Some(body.receipt_id.as_str());
     let now = i64::try_from(now).unwrap_or(i64::MAX);
     if payload.schema != CALLER_RESERVATION_HANDOFF_SCHEMA
         || intent_action.kind() != AdmissionCleanupActionKind::CallerReservationHandoffIntent
@@ -1472,7 +1539,7 @@ fn validate_final_handoff_payload(
         || (require_unexpired && now >= payload.expires_at)
         || payload.execution_nonce.reserved_hold_id() != Some(payload.hold_id.as_str())
         || payload.execution_nonce.reserving_request_id() != Some(payload.request_id.as_str())
-        || receipt.id != body.receipt_id
+        || !receipt_signing_nonce_matches
         || receipt.timestamp != body.timestamp
         || receipt.capability_id != body.capability_id
         || receipt.tool_server != body.tool_server
@@ -1578,6 +1645,12 @@ fn validate_final_handoff_payload(
         ),
         Some(serde_json::json!({
             "receipt_context": { "request_id": &body.request_id }
+        })),
+    );
+    let expected_metadata = merge_metadata_objects(
+        expected_metadata,
+        Some(serde_json::json!({
+            "chio_receipt_signing_nonce": &body.receipt_id,
         })),
     );
     if receipt.metadata != expected_metadata {

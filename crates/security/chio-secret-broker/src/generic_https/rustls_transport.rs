@@ -42,7 +42,7 @@ impl RustlsPinnedHttpsTransport {
     }
 
     #[cfg(test)]
-    fn with_tls_config(tls_config: Arc<ClientConfig>) -> Self {
+    pub(crate) fn with_tls_config(tls_config: Arc<ClientConfig>) -> Self {
         Self { tls_config }
     }
 }

@@ -116,6 +116,31 @@ impl TrustedSqliteDirectory {
         Ok(opened)
     }
 
+    /// Retain an existing database through a read-only descriptor.
+    pub fn open_existing_database_read_only(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<Arc<DurableSqliteFile>, DurableSqliteError> {
+        let path = self.normalize_sibling_path(path.as_ref())?;
+        self.validate()?;
+        #[cfg(unix)]
+        let file = open_database_file_at_read_only(&self.parent, &path)?;
+        #[cfg(not(unix))]
+        let file = {
+            return Err(DurableSqliteError::Conflict(
+                "descriptor-bound read-only SQLite authorities are unsupported on this platform"
+                    .to_string(),
+            ));
+        };
+        let opened = Arc::new(DurableSqliteFile {
+            file,
+            directory: self.clone(),
+            path,
+        });
+        opened.validate()?;
+        Ok(opened)
+    }
+
     fn normalize_sibling_path(&self, path: &Path) -> Result<PathBuf, DurableSqliteError> {
         reject_volatile_database_path(path)?;
         let file_name = path.file_name().ok_or_else(|| {
@@ -223,6 +248,33 @@ impl DurableSqliteFile {
         Ok(connection)
     }
 
+    /// Open an exact read-only SQLite connection without creating a WAL shared-memory file.
+    pub fn open_read_only_connection(&self) -> Result<Connection, DurableSqliteError> {
+        self.validate()?;
+        #[cfg(unix)]
+        let wal_identity = self.required_existing_sidecar_identity("-wal")?;
+        #[cfg(not(unix))]
+        {
+            return Err(DurableSqliteError::Conflict(
+                "exact read-only WAL connections are unsupported on this platform".to_string(),
+            ));
+        }
+        let uri = read_only_sqlite_uri(&self.path)?;
+        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW
+            | OpenFlags::SQLITE_OPEN_URI;
+        let connection = Connection::open_with_flags(uri, flags)?;
+        self.validate_live_connection(&connection)?;
+        #[cfg(unix)]
+        if self.required_existing_sidecar_identity("-wal")? != wal_identity {
+            return Err(DurableSqliteError::Conflict(
+                "SQLite WAL identity changed during exact read-only open".to_string(),
+            ));
+        }
+        Ok(connection)
+    }
+
     /// Revalidate the main file, SQLite sidecars, and the live main-file handle.
     pub fn validate_live_connection(
         &self,
@@ -255,6 +307,43 @@ impl DurableSqliteFile {
         })?;
         validate_existing_sqlite_sidecars_at(&self.directory.parent, file_name)
     }
+
+    #[cfg(unix)]
+    fn required_existing_sidecar_identity(
+        &self,
+        suffix: &str,
+    ) -> Result<SqliteSidecarIdentity, DurableSqliteError> {
+        let file_name = self.path.file_name().ok_or_else(|| {
+            DurableSqliteError::Conflict("database path has no file name".to_string())
+        })?;
+        let mut sidecar_name = file_name.to_os_string();
+        sidecar_name.push(suffix);
+        let metadata = rustix::fs::statat(
+            &self.directory.parent,
+            &sidecar_name,
+            rustix::fs::AtFlags::SYMLINK_NOFOLLOW,
+        )
+        .map_err(|error| {
+            DurableSqliteError::Conflict(format!(
+                "required SQLite {suffix} sidecar is unavailable: {error}"
+            ))
+        })?;
+        if validate_sqlite_sidecar_snapshot(&metadata, suffix)?
+            != SqliteSidecarSnapshotState::Linked
+        {
+            return Err(DurableSqliteError::Conflict(format!(
+                "required SQLite {suffix} sidecar is not linked"
+            )));
+        }
+        Ok(SqliteSidecarIdentity {
+            device: u64::try_from(metadata.st_dev).map_err(|_| {
+                DurableSqliteError::Conflict(
+                    "required SQLite sidecar has an invalid device identifier".to_string(),
+                )
+            })?,
+            inode: metadata.st_ino,
+        })
+    }
 }
 
 fn reject_volatile_database_path(path: &Path) -> Result<(), DurableSqliteError> {
@@ -280,6 +369,28 @@ fn reject_volatile_database_path(path: &Path) -> Result<(), DurableSqliteError> 
         ));
     }
     Ok(())
+}
+
+fn read_only_sqlite_uri(path: &Path) -> Result<String, DurableSqliteError> {
+    let path = path.to_str().ok_or_else(|| {
+        DurableSqliteError::Conflict(
+            "database path is not valid UTF-8 for an exact read-only SQLite URI".to_string(),
+        )
+    })?;
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut uri = String::with_capacity(path.len().saturating_add(32));
+    uri.push_str("file:");
+    for byte in path.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'_' | b'.' | b'~') {
+            uri.push(char::from(byte));
+        } else {
+            uri.push('%');
+            uri.push(char::from(HEX[usize::from(byte >> 4)]));
+            uri.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        }
+    }
+    uri.push_str("?mode=ro&readonly_shm=1");
+    Ok(uri)
 }
 
 #[cfg(unix)]
@@ -380,6 +491,21 @@ fn open_database_file_at(
 }
 
 #[cfg(unix)]
+fn open_database_file_at_read_only(parent: &File, path: &Path) -> Result<File, DurableSqliteError> {
+    let file_name = path.file_name().ok_or_else(|| {
+        DurableSqliteError::Conflict("database path has no file name".to_string())
+    })?;
+    rustix::fs::openat(
+        parent,
+        file_name,
+        rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    )
+    .map(File::from)
+    .map_err(|error| DurableSqliteError::Io(error.into()))
+}
+
+#[cfg(unix)]
 /// Validate sidecar authority without opening the sidecar inode. Closing any
 /// descriptor for a POSIX-locked SQLite sidecar can release locks held by other
 /// SQLite connections in this process. The retained private directory blocks
@@ -413,6 +539,13 @@ fn validate_existing_sqlite_sidecar_at(
 enum SqliteSidecarSnapshotState {
     Linked,
     Unlinked,
+}
+
+#[cfg(unix)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SqliteSidecarIdentity {
+    device: u64,
+    inode: u64,
 }
 
 #[cfg(unix)]

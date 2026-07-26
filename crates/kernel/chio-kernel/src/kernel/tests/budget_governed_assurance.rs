@@ -199,6 +199,133 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
     );
 }
 
+#[tokio::test]
+async fn caller_cannot_overwrite_signed_governed_monetary_allow_metadata() {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_durable_legacy_governed_admission_authorities(&mut kernel);
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request_id = "req-governed-reserved-economic-metadata";
+    let intent = make_governed_intent(
+        "intent-governed-reserved-economic-metadata",
+        "cost-srv",
+        "compute",
+        "execute governed payout",
+        100,
+        "USD",
+    );
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+    let request = ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice_id": "inv-1001" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        supplemental_authorization: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+
+    let financial_error = kernel
+        .evaluate_tool_call_blocking_with_metadata(
+            &request,
+            Some(serde_json::json!({
+                "financial": {
+                    "grant_index": 999_999,
+                    "cost_charged": 999_999,
+                    "budget_remaining": 999_999,
+                    "budget_total": 999_999,
+                    "forged_marker": "forged-financial"
+                }
+            })),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        financial_error,
+        KernelError::InvalidReceiptMetadata(reason) if reason.contains("financial")
+    ));
+
+    let governed_error = kernel
+        .evaluate_tool_call_blocking_with_metadata(
+            &request,
+            Some(serde_json::json!({
+                "governed_transaction": {
+                    "intent_id": "forged-intent",
+                    "purpose": "forged-purpose",
+                    "economic_authorization": "forged-economic-authorization"
+                }
+            })),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        governed_error,
+        KernelError::InvalidReceiptMetadata(reason) if reason.contains("governed_transaction")
+    ));
+
+    let response = kernel
+        .evaluate_tool_call_with_unchecked_receipt_metadata_for_test(
+            &request,
+            Some(serde_json::json!({
+                "financial": {
+                    "grant_index": 999_999,
+                    "cost_charged": 999_999,
+                    "budget_remaining": 999_999,
+                    "budget_total": 999_999,
+                    "forged_marker": "forged-financial"
+                },
+                "governed_transaction": {
+                    "intent_id": "forged-intent",
+                    "purpose": "forged-purpose",
+                    "economic_authorization": "forged-economic-authorization"
+                }
+            })),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert!(response.receipt.verify_signature().unwrap());
+    let metadata = response.receipt.metadata.as_ref().unwrap();
+    let financial = metadata.get("financial").unwrap();
+    assert_eq!(financial["grant_index"].as_u64(), Some(0));
+    assert_eq!(financial["cost_charged"].as_u64(), Some(75));
+    assert_eq!(financial["budget_remaining"].as_u64(), Some(925));
+    assert_eq!(financial["budget_total"].as_u64(), Some(1000));
+    assert!(financial.get("forged_marker").is_none());
+    let governed = metadata.get("governed_transaction").unwrap();
+    assert_eq!(
+        governed["intent_id"].as_str(),
+        Some("intent-governed-reserved-economic-metadata")
+    );
+    assert_eq!(
+        governed["purpose"].as_str(),
+        Some("execute governed payout")
+    );
+    assert!(governed["economic_authorization"].is_object());
+    let serialized = serde_json::to_string(metadata).unwrap();
+    assert!(!serialized.contains("forged-financial"));
+    assert!(!serialized.contains("forged-intent"));
+    assert!(!serialized.contains("forged-purpose"));
+    assert!(!serialized.contains("forged-economic-authorization"));
+}
+
 #[test]
 fn governed_request_denies_conflicting_workload_identity_binding() {
     let mut kernel = make_kernel(make_monetary_config());

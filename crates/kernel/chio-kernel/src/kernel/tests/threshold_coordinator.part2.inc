@@ -40,10 +40,27 @@ async fn top_level_threshold_enforces_aggregate_composite_quota() {
         .await
         .expect("first threshold aggregate response");
     assert_eq!(first.verdict, Verdict::Allow);
-    assert_budget_exhausted_or_denied(
-        kernel.evaluate_tool_call(&second_request).await,
-        "second top-level threshold aggregate request",
-    );
+    let denied = kernel
+        .evaluate_tool_call_with_unchecked_receipt_metadata_for_test(
+            &second_request,
+            Some(serde_json::json!({
+                "financial": {
+                    "budget_remaining": 413_729,
+                    "budget_total": 937_000,
+                    "attempted_cost": 17,
+                    "currency": "SECRET"
+                },
+                "governed_transaction": {
+                    "economic_authorization": "FORGED-ECONOMIC-AUTHORIZATION"
+                }
+            })),
+        )
+        .await
+        .expect("second top-level threshold aggregate denial response");
+    assert_opaque_budget_authorization_denial(&denied);
+    assert!(!serde_json::to_string(&denied.receipt.metadata)
+        .expect("threshold denial metadata")
+        .contains("FORGED-ECONOMIC-AUTHORIZATION"));
     assert_eq!(
         invocations.load(Ordering::SeqCst),
         1,
@@ -130,17 +147,16 @@ async fn nested_threshold_enforces_aggregate_composite_quota() {
     kernel
         .begin_session_request(&second_context, OperationKind::ToolCall, true)
         .expect("second session request");
-    assert_budget_exhausted_or_denied(
-        kernel
-            .evaluate_tool_call_with_nested_flow_client_async(
-                &second_context,
-                &second_request,
-                &mut client,
-                None,
-            )
-            .await,
-        "second nested threshold aggregate request",
-    );
+    let denied = kernel
+        .evaluate_tool_call_with_nested_flow_client_async(
+            &second_context,
+            &second_request,
+            &mut client,
+            None,
+        )
+        .await
+        .expect("second nested threshold aggregate denial response");
+    assert_opaque_budget_authorization_denial(&denied);
     assert_eq!(
         invocations.load(Ordering::SeqCst),
         1,
@@ -1502,7 +1518,7 @@ async fn single_node_invalid_returned_authority_reverses_with_trusted_request_au
     assert!(response
         .reason
         .as_deref()
-        .is_some_and(|reason| reason.contains("configured hard invocation limit")));
+        .is_some_and(|reason| reason.contains("configured hard budget ceiling")));
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_eq!(
         operations.states().last(),
