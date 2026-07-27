@@ -1705,6 +1705,8 @@ impl LiveAggregateFamilyFixture {
                 attenuations: Vec::new(),
                 timestamp: now.saturating_sub(5),
                 scope_hash: Some(root_scope_hash.clone()),
+                aggregate_budget: None,
+                cumulative_approval: None,
                 aggregate_family_preservation: Some(self.verified_root.preservation_evidence()),
             },
             &self.root_subject,

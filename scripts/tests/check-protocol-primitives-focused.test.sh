@@ -135,7 +135,8 @@ if observed_filtering != expected_filtering:
 source_contracts = {
     "kernel budget characterization": (
         "kernel::tests::budget::",
-        sorted(glob.glob("crates/kernel/chio-kernel/src/kernel/tests/budget.part*.inc")),
+        sorted(glob.glob("crates/kernel/chio-kernel/src/kernel/tests/budget.part*.inc"))
+        + ["crates/kernel/chio-kernel/src/kernel/tests/budget_part2_tail.inc"],
     ),
     "kernel approval characterization": (
         "kernel::tests::approval_flow::",
@@ -147,7 +148,11 @@ source_contracts = {
     ),
     "SQLite budget characterization": (
         "budget_store::tests::",
-        sorted(glob.glob("crates/platform/chio-store-sqlite/src/budget_store/tests_parts/*.rs")),
+        sorted(glob.glob("crates/platform/chio-store-sqlite/src/budget_store/tests_parts/*.rs"))
+        + [
+            "crates/platform/chio-store-sqlite/src/budget_store/"
+            "tests_parts/part_01_tail.inc"
+        ],
     ),
     "aggregate root model": (
         "capability::aggregate_budget::tests::",
@@ -171,7 +176,11 @@ source_contracts = {
     ),
     "SQLite composite budget persistence": (
         "budget_store::tests::",
-        sorted(glob.glob("crates/platform/chio-store-sqlite/src/budget_store/tests_parts/*.rs")),
+        sorted(glob.glob("crates/platform/chio-store-sqlite/src/budget_store/tests_parts/*.rs"))
+        + [
+            "crates/platform/chio-store-sqlite/src/budget_store/"
+            "tests_parts/part_01_tail.inc"
+        ],
     ),
     "control-plane budget composition": (
         "trust_control::service_runtime::tests::budget::",
@@ -193,7 +202,10 @@ source_contracts = {
     ),
     "protocol primitives tier 2 conformance": (
         "",
-        ["crates/tooling/chio-conformance/tests/protocol_primitives_t2.rs"],
+        [
+            "crates/tooling/chio-conformance/tests/protocol_primitives_t2.rs",
+            "crates/tooling/chio-conformance/tests/protocol_primitives_t2_tail.inc",
+        ],
     ),
 }
 observed_commitments = {

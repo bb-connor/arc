@@ -180,7 +180,7 @@ fn partition_escrow_reconcile_receipt_passes_authoritative_consumers(
     kernel.set_receipt_store(Box::new(receipt_store))?;
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
     let nonce_config = ExecutionNonceConfig {
-        nonce_ttl_secs: 30,
+        nonce_ttl_secs: 60,
         nonce_store_capacity: 1_024,
         require_nonce: true,
     };

@@ -11,6 +11,7 @@ fi
 
 export CARGO_INCREMENTAL=0
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
+export RUST_TEST_THREADS="${RUST_TEST_THREADS:-1}"
 
 run_committed_inventory() {
   local label="$1"

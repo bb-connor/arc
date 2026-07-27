@@ -210,6 +210,8 @@ impl AggregateFamilyFixture {
                 attenuations: Vec::new(),
                 timestamp: 1_100,
                 scope_hash: Some(scope_hash(&self.root_token.scope).unwrap()),
+                aggregate_budget: None,
+                cumulative_approval: None,
                 aggregate_family_preservation: Some(self.verified_root.preservation_evidence()),
             },
             &self.root_subject,

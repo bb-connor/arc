@@ -125,7 +125,8 @@ pub(crate) fn materialize_remote_edge_security(
     let security_dir = artifacts_dir.join("security");
     fs::create_dir_all(&security_dir)?;
     let security_dir = fs::canonicalize(security_dir)?;
-    let python_executable = resolve_python_executable(&options.python_binary)?;
+    let source_python_executable = resolve_python_executable(&options.python_binary)?;
+    let python_executable = stage_private_executable(&source_python_executable, &security_dir)?;
     let upstream_server_script = fs::canonicalize(&options.upstream_server_script)?;
     let working_directory = fs::canonicalize(&options.repo_root)?;
     let chio_executable = fs::canonicalize(chio_executable)?;
@@ -456,6 +457,46 @@ fn path_text(path: &Path, label: &str) -> Result<String, RunnerError> {
         .ok_or_else(|| security_error(format!("{label} path is not UTF-8")))
 }
 
+fn stage_private_executable(source: &Path, destination_dir: &Path) -> Result<PathBuf, RunnerError> {
+    let file_name = source
+        .file_name()
+        .ok_or_else(|| security_error("Python executable has no file name"))?;
+    let destination = destination_dir.join(file_name);
+    let bytes = fs::read(source)?;
+    let mut options = OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o700);
+    }
+    let mut file = options.open(&destination)?;
+    file.write_all(&bytes)?;
+    file.sync_all()?;
+    drop(file);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o500))?;
+        let metadata = fs::symlink_metadata(&destination)?;
+        if !metadata.file_type().is_file()
+            || metadata.file_type().is_symlink()
+            || metadata.permissions().mode() & 0o077 != 0
+            || metadata.permissions().mode() & 0o100 == 0
+            || metadata.len()
+                != u64::try_from(bytes.len()).map_err(|_| {
+                    security_error("Python executable length exceeds the platform limit")
+                })?
+        {
+            return Err(security_error(
+                "staged Python executable is not an owner-only executable",
+            ));
+        }
+    }
+    Ok(destination)
+}
+
 fn write_private_file(path: &Path, bytes: &[u8]) -> Result<(), RunnerError> {
     let mut options = OpenOptions::new();
     options.create(true).truncate(true).write(true);
@@ -472,4 +513,32 @@ fn write_private_file(path: &Path, bytes: &[u8]) -> Result<(), RunnerError> {
 
 fn security_error(message: impl Into<String>) -> RunnerError {
     RunnerError::SecurityMaterial(message.into())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    use super::stage_private_executable;
+
+    #[test]
+    fn staged_executable_is_byte_stable_and_owner_only() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let source = directory.path().join("python-fixture");
+        fs::write(&source, b"fixture executable")?;
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o777))?;
+        let destination_dir = directory.path().join("private");
+        fs::create_dir(&destination_dir)?;
+
+        let staged = stage_private_executable(&source, &destination_dir)?;
+
+        assert_eq!(fs::read(&staged)?, b"fixture executable");
+        assert_ne!(staged, source);
+        assert_eq!(
+            fs::symlink_metadata(&staged)?.permissions().mode() & 0o777,
+            0o500
+        );
+        Ok(())
+    }
 }
