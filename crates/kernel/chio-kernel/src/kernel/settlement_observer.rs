@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use chio_core::crypto::PublicKey;
 use chio_core::receipt::{body::ChioReceipt, economics::ChannelReceiptMetadataV1};
+use chio_log_redact::redacted;
 use chio_settle::{
     SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementHook,
     SettlementHookError, SettlementIdempotencyKey, SettlementObservation, SettlementOutcome,
@@ -472,7 +473,7 @@ impl SettlementObserverRecoveryHandle {
                     Ok(Ok(true)) => continue,
                     Ok(Ok(false)) => {}
                     Ok(Err(error)) => tracing::warn!(
-                        reason = %chio_log_redact::redacted!(&error),
+                        reason = %redacted!(&error),
                         "settlement-observer recovery remains pending"
                     ),
                     Err(_) => tracing::warn!("settlement-observer recovery panicked"),

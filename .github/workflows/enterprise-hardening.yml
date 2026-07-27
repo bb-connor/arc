@@ -320,7 +320,7 @@ jobs:
         run: |
           bash scripts/tests/check-flow-security.test.sh
           bash scripts/tests/check-deception-security.test.sh
-          bash scripts/tests/check-temporal-security.test.sh
+          /bin/bash -p scripts/tests/check-temporal-security.test.sh
           bash scripts/tests/check-response-recovery.test.sh
           bash scripts/tests/check-active-defense-conformance.test.sh
           bash scripts/tests/check-protocol-primitives-concurrency.test.sh

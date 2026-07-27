@@ -95,6 +95,8 @@ fn make_delegated_capability(
             timestamp: ISSUED_AT,
             scope_hash: None,
             aggregate_family_preservation: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
         },
         issuer,
     )

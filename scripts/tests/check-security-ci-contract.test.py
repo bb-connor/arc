@@ -4667,7 +4667,7 @@ assert_rejected(
     "ci.yml",
     replace_in_named_step(
         "Workspace structural gates",
-        "          bash ./scripts/tests/check-temporal-security.test.sh\n",
+        "          /bin/bash -p ./scripts/tests/check-temporal-security.test.sh\n",
         "",
     ),
     "omits the temporal gate self-test",

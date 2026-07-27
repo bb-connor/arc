@@ -375,6 +375,8 @@ mod linux_uds {
 
     use chio_secret_broker::service::{read_bounded_frame, write_bounded_frame};
 
+    use crate::security::event_consumer::AttestedFindingResponsePolicyPlanner;
+
     use super::super::transport::connect_unix_stream_before;
     use super::*;
 

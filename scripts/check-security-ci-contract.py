@@ -4983,7 +4983,7 @@ def validate(root: Path) -> None:
     require_run_markers(
         portable,
         "Gate contract self-tests",
-        ("bash scripts/tests/check-temporal-security.test.sh",),
+        ("/bin/bash -p scripts/tests/check-temporal-security.test.sh",),
         "enterprise portable contracts omit the temporal gate self-test",
     )
     portable_evidence_steps = (
@@ -7691,7 +7691,7 @@ def validate(root: Path) -> None:
     require_run_markers(
         check_job,
         "Workspace structural gates",
-        ("bash ./scripts/tests/check-temporal-security.test.sh",),
+        ("/bin/bash -p ./scripts/tests/check-temporal-security.test.sh",),
         "required CI omits the temporal gate self-test",
     )
     mapping = named_step(check_job, "Formal traceability gate")

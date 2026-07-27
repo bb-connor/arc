@@ -255,6 +255,7 @@ fn with_guard_context(
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: Some(0),
+        security_context: None,
     };
     f(&ctx);
 }

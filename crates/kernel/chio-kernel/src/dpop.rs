@@ -36,6 +36,7 @@ use chio_core::crypto::{
     sha256_hex, sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature,
     SigningBackend,
 };
+use chio_log_redact::redacted;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -239,7 +240,7 @@ impl DpopNonceStore {
                 .reserve_until(&replay_id, nonce_expires_at)
                 .map_err(|error| {
                     error!(
-                        error = %error,
+                        error = %redacted!(&error),
                         "authoritative DPoP nonce store unavailable; denying proof fail-closed"
                     );
                     KernelError::DpopVerificationFailed(

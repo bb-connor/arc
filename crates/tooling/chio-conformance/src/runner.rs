@@ -292,25 +292,22 @@ fn ensure_chio_executable(
     cargo_binary: &OsString,
 ) -> Result<PathBuf, RunnerError> {
     let candidates = chio_executable_candidates(repo_root);
-    for candidate in &candidates {
-        if candidate.exists() {
-            return Ok(candidate.clone());
-        }
-    }
     let status = Command::new(cargo_binary)
         .current_dir(repo_root)
         .arg("build")
         .arg("-q")
         .arg("-p")
         .arg("chio-cli")
+        .arg("--bin")
+        .arg("chio")
         .status()
         .map_err(|source| RunnerError::Spawn {
-            command: "cargo build -q -p chio-cli".to_string(),
+            command: "cargo build -q -p chio-cli --bin chio".to_string(),
             source,
         })?;
     if !status.success() {
         return Err(RunnerError::ProcessFailed {
-            command: "cargo build -q -p chio-cli".to_string(),
+            command: "cargo build -q -p chio-cli --bin chio".to_string(),
             status: status.code().unwrap_or(1),
             log_path: "<stderr>".to_string(),
         });
@@ -326,7 +323,7 @@ fn ensure_chio_executable(
         .collect::<Vec<_>>()
         .join(", ");
     Err(RunnerError::ProcessFailed {
-        command: "cargo build -q -p chio-cli".to_string(),
+        command: "cargo build -q -p chio-cli --bin chio".to_string(),
         status: 1,
         log_path: format!("<stderr>; checked {checked}"),
     })
