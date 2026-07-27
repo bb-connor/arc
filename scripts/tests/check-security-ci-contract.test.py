@@ -4673,6 +4673,16 @@ assert_rejected(
     "omits the temporal gate self-test",
 )
 assert_rejected(
+    "enterprise portable ripgrep prerequisite removed",
+    "enterprise-hardening.yml",
+    replace_in_named_step(
+        "Install native prerequisites",
+        "protobuf-compiler ripgrep",
+        "protobuf-compiler",
+    ),
+    "enterprise portable contracts do not install exact native prerequisites",
+)
+assert_rejected(
     "required CI temporal behavior gate removed",
     "ci.yml",
     replace_in_named_step(

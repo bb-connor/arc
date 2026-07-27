@@ -12,6 +12,9 @@ use crate::{
     generate_markdown_report, load_results_from_dir, load_scenarios_from_dir, CompatibilityReport,
 };
 
+const SERVER_STARTUP_ATTEMPTS: usize = 900;
+const SERVER_STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeerTarget {
     Js,
@@ -648,7 +651,7 @@ fn wait_for_server(
     listen: SocketAddr,
     log_path: &Path,
 ) -> Result<(), RunnerError> {
-    for _ in 0..100 {
+    for _ in 0..SERVER_STARTUP_ATTEMPTS {
         if let Some(status) = child.try_wait()? {
             return Err(RunnerError::ProcessFailed {
                 command: "chio mcp serve-http".to_string(),
@@ -657,10 +660,10 @@ fn wait_for_server(
             });
         }
         if TcpStream::connect(listen).is_ok() {
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(SERVER_STARTUP_POLL_INTERVAL);
             return Ok(());
         }
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(SERVER_STARTUP_POLL_INTERVAL);
     }
     Err(RunnerError::ServerStartupTimeout { listen })
 }

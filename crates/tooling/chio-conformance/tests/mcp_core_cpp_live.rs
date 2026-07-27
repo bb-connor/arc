@@ -15,7 +15,17 @@ fn mcp_core_harness_runs_against_live_cpp_peer() {
     }
 
     let options = common::cpp_options("mcp_core", ConformanceAuthMode::StaticBearer);
-    let summary = run_conformance_harness(&options).expect("run conformance harness");
+    let summary = run_conformance_harness(&options).unwrap_or_else(|error| {
+        let server_log_path = options
+            .results_dir
+            .join("artifacts/logs/chio-mcp-serve-http.log");
+        let server_log = std::fs::read_to_string(&server_log_path)
+            .unwrap_or_else(|read_error| format!("<unavailable: {read_error}>"));
+        panic!(
+            "run conformance harness: {error}\nserver log {}:\n{server_log}",
+            server_log_path.display()
+        );
+    });
     let report = std::fs::read_to_string(&summary.report_output).expect("read report");
     let cpp_results = std::fs::read_to_string(summary.results_dir.join("cpp-remote-http.json"))
         .expect("cpp results");

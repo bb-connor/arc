@@ -4,11 +4,11 @@ use chio_core_types::{
     receipt::security::validate_response_snapshot_lifecycle, sha256,
 };
 use chio_security_types::ports::{
-    BlastRadiusResult, BoundedVec, CanonicalBody, CreateOutcome, Digest32, EffectId, ErrorCode,
-    IssuanceFreezeSpec, LeaseOwnerId, OpaqueReceiptRef, PortError, RecordId, RecordIdSet,
-    ResponseCasRequest, ResponseDispatchApproval, ResponseDispatchAuthorization,
-    ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode, ResponseDispatchCommitRequest,
-    ResponseDispatchKey, ResponseDispatchLease, ResponsePlanRecord,
+    response_affected_set_hash, BlastRadiusResult, BoundedVec, CanonicalBody, CreateOutcome,
+    Digest32, EffectId, ErrorCode, IssuanceFreezeSpec, LeaseOwnerId, OpaqueReceiptRef, PortError,
+    RecordId, RecordIdSet, ResponseCasRequest, ResponseDispatchApproval,
+    ResponseDispatchAuthorization, ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode,
+    ResponseDispatchCommitRequest, ResponseDispatchKey, ResponseDispatchLease, ResponsePlanRecord,
     ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseStore, ScheduledWork,
     RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
 };
@@ -28,7 +28,6 @@ use thiserror::Error;
 
 use crate::native_receipts::response_receipt_for_mutation;
 
-const AFFECTED_SET_HASH_DOMAIN: &[u8] = b"chio.response-affected-set.v1\0";
 const EFFECT_ID_DOMAIN: &[u8] = b"chio.response-effect.v1\0";
 const REQUEST_ID_DOMAIN: &[u8] = b"chio.response-request.v1\0";
 const TRANSITION_ID_DOMAIN: &[u8] = b"chio.response-transition.v1\0";
@@ -610,13 +609,8 @@ pub fn build_response_plan(input: ResponsePlanInput) -> Result<ResponsePlan, Sta
         .ok_or(StateMachineError::InvalidPlan)?;
     let affected_ids =
         RecordIdSet::new(input.affected_ids).map_err(|_| StateMachineError::InvalidPlan)?;
-    let affected_set_hash = domain_hash(
-        AFFECTED_SET_HASH_DOMAIN,
-        &AffectedSetCommitment {
-            tenant_id: input.tenant_id.as_str(),
-            affected_ids: affected_ids.as_slice(),
-        },
-    )?;
+    let affected_set_hash = response_affected_set_hash(&input.tenant_id, &affected_ids)
+        .map_err(|_| StateMachineError::InvalidPlan)?;
     let mut effects = Vec::with_capacity(input.effects.len());
     for (index, spec) in input.effects.into_iter().enumerate() {
         validate_effect_contribution(&spec.canonical_contribution, &spec.contribution_hash)?;
@@ -899,13 +893,8 @@ fn encode_response_record_with_mode(
 fn validate_plan(plan: &ResponsePlan) -> Result<(), StateMachineError> {
     plan.validate_shape()?;
     if plan.affected_set_hash
-        != domain_hash(
-            AFFECTED_SET_HASH_DOMAIN,
-            &AffectedSetCommitment {
-                tenant_id: plan.tenant_id.as_str(),
-                affected_ids: plan.affected_ids.as_slice(),
-            },
-        )?
+        != response_affected_set_hash(&plan.tenant_id, &plan.affected_ids)
+            .map_err(|_| StateMachineError::InvalidPlan)?
     {
         return Err(StateMachineError::InvalidPlan);
     }
@@ -1728,12 +1717,6 @@ fn require_generation(
     } else {
         Err(StateMachineError::StaleGeneration)
     }
-}
-
-#[derive(Serialize)]
-struct AffectedSetCommitment<'a> {
-    tenant_id: &'a str,
-    affected_ids: &'a [RecordId],
 }
 
 #[derive(Serialize)]

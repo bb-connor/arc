@@ -4968,6 +4968,15 @@ def validate(root: Path) -> None:
     ):
         if "if" in job(enterprise, identifier):
             raise ContractError(f"required enterprise job is conditional: {identifier}")
+    portable_prerequisites = named_step(portable, "Install native prerequisites")
+    if portable_prerequisites != {
+        "name": "Install native prerequisites",
+        "uses": "./.github/actions/apt-install",
+        "with": {"packages": "protobuf-compiler ripgrep"},
+    }:
+        raise ContractError(
+            "enterprise portable contracts do not install exact native prerequisites"
+        )
     enterprise_validators = named_step(portable, "Install Python validators")
     if enterprise_validators.get("run") != EXPECTED_ENTERPRISE_PYTHON_VALIDATORS_RUN:
         raise ContractError(
