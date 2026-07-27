@@ -74,7 +74,7 @@ EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
     "bdd31e29868ad10bcc18af97eb431958851824634d977eeaffaa95a995109d33"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "f1a37575a5b8dafe1d416413e46be76883cb97373ca14d3a708cdaa3b791456c"
+    "0ddbd2622510f6059a79e46d560a6a1e5e43ee5cc468f159a4f542f0b56be953"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "51cfd01140812db5df3310271c0cc12e123d41ddea2e13e9f82b23cfaec18cde"
@@ -83,7 +83,7 @@ EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
     "f35c9e95544a7d22a037a287a0d63696b1b85b1691312aab908b4b4c46944b18"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "80caeb391bc7d7cbf92e5c30cea9847c8af026ee1179289c7b030ad083229648"
+    "add5fd34c4f34aa3bda5ff897246097246b81aa96569d18c903f38621e7913a1"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554"
@@ -2103,6 +2103,13 @@ def ast_function_map(tree: ast.Module) -> dict[str, ast.FunctionDef]:
     }
 
 
+def stable_ast_dump(node: ast.AST) -> str:
+    try:
+        return ast.dump(node, include_attributes=False, show_empty=True)
+    except TypeError:
+        return ast.dump(node, include_attributes=False)
+
+
 def ast_parent_map(root: ast.AST) -> dict[ast.AST, ast.AST]:
     return {
         child: parent
@@ -3852,7 +3859,7 @@ except BaseException as primary_error:
     ):
         raise ContractError("candidate command client control flow changed")
     function_graph_payload = {
-        name: ast.dump(function, include_attributes=False)
+        name: stable_ast_dump(function)
         for name, function in sorted(functions.items())
     }
     function_graph_digest = hashlib.sha256(
@@ -4096,7 +4103,7 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
     ):
         raise ContractError("enterprise legacy outcome promotion boundary changed")
     function_graph_payload = {
-        name: ast.dump(function, include_attributes=False)
+        name: stable_ast_dump(function)
         for name, function in sorted(functions.items())
     }
     function_graph_digest = hashlib.sha256(

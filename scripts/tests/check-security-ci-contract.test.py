@@ -29,6 +29,20 @@ sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 
 
+stable_dump_fixture = ast.parse("def fixture(value=None):\n    return value\n").body[0]
+stable_dump = CHECKER.stable_ast_dump(stable_dump_fixture)
+for empty_field in (
+    "posonlyargs=[]",
+    "kwonlyargs=[]",
+    "kw_defaults=[]",
+    "decorator_list=[]",
+):
+    if empty_field not in stable_dump:
+        raise AssertionError(
+            f"stable AST dump omitted committed empty field: {empty_field}"
+        )
+
+
 def assert_live_call_count(label: str, body: str, expected: int) -> None:
     tree = ast.parse(body)
     function = tree.body[0]
