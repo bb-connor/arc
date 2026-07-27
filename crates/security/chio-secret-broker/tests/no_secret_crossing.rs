@@ -139,6 +139,7 @@ mod linux_process {
         AuthenticatedIpcRequest, IpcOperation, IpcResponse,
     };
     use chio_secret_broker::{BrokerError, Result};
+    use chio_test_support::prelude::*;
     use rustix::fs::{fcntl_add_seals, memfd_create, MemfdFlags, SealFlags};
     use rustix::io::{fcntl_setfd, FdFlags};
 
@@ -274,7 +275,10 @@ mod linux_process {
             .arg(master_seed.as_raw_fd().to_string())
             .arg("--signing-key-fd")
             .arg(signing_seed.as_raw_fd().to_string())
-            .env("CHIO_TEST_CANARY", String::from_utf8_lossy(canary).as_ref())
+            .env(
+                "CHIO_TEST_CANARY",
+                String::from_utf8_lossy(canary).into_owned(),
+            )
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
