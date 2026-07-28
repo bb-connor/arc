@@ -262,7 +262,7 @@
       "expected_reason": "key_log_split_view_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/key_log_split_view/key-log-split-view-001.json",
-      "content_sha256": "9a1a48276c30216cdf7c73a81bb2e00c992c26c3f944ce424cce685bd48006d8"
+      "content_sha256": "f21bdf0beba5d4ad10fa2f98b10e888f12e400bdebcb8f64d6a2930d0dd5a03b"
     },
     {
       "id": "label-downgrade-001",
