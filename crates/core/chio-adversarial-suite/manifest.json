@@ -73,7 +73,7 @@
       "expected_reason": "broker_orphan_hold_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/broker_orphan_hold/broker-orphan-hold-001.json",
-      "content_sha256": "e299bb379b7b1ccea5933c1b9a25e0856a2f25ed61238da16697704dce7d764a"
+      "content_sha256": "256f6ea73312a6b7eb4020bce4e57a352af86fccf689ec3c2ce501431d6be811"
     },
     {
       "id": "broker-parent-double-charge-001",
