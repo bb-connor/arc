@@ -91,7 +91,7 @@
       "expected_reason": "broker_proof_replay_detected",
       "threat_id": "native_channel_replay",
       "path": "cases/broker_proof_replay/broker-proof-replay-001.json",
-      "content_sha256": "501224e9f19c92a06b69b6713a20f0f9eacbb01e0fe574366f6988b4eeeaf8a0"
+      "content_sha256": "200f79d9ca1223744541d4098ab271f91db6efb76f0a82e1b7a36318219134e5"
     },
     {
       "id": "broker-revocation-race-001",
