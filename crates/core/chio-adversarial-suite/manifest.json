@@ -127,7 +127,7 @@
       "expected_reason": "canary_evasion_detected",
       "threat_id": "behavioral_sequence_attack",
       "path": "cases/canary_evasion/canary-evasion-001.json",
-      "content_sha256": "ab2ce31203b54d09483faabc072c0198f96340776d10446fea90654de1a69dcc"
+      "content_sha256": "5ca2c61311f0ca676e8b002a3fe7251065ccdfc2bd31d458028985d7d5db3350"
     },
     {
       "id": "clock-rewound-001",
