@@ -244,7 +244,7 @@
       "expected_reason": "key_log_noncontiguous_sync_detected",
       "threat_id": "native_channel_replay",
       "path": "cases/key_log_noncontiguous_sync/key-log-noncontiguous-sync-001.json",
-      "content_sha256": "d49a1543fab9da58854acbce0bb4b6dd3f41adda0784b1451635c78fe1218920"
+      "content_sha256": "1efcfa745a15139e6eb6e5dd182b49a518ac258582948ae3dbd3ebebc944c425"
     },
     {
       "id": "key-log-omission-001",
