@@ -936,7 +936,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `6deb5a075f1810560e8e1861fb9fd8807987a0a37976269dea5de460149d97b6`
+- Input digest: `0bf00627f55cacb66caad9a26306030b7d9373ab6b6777ce82adb3e230fc3e21`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1166,7 +1166,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `06e18ce8f287a40a393684e23ddfae5a3a545d1302edd264f52e240d8d14d3c2`
 - `fuzz/target-map.toml`: `2c36579e3496db8fe0916df69bdc760bcb520c45bc11c73cc10b159acb8d3009`
-- `git-worktree://rust-files`: `a6b967be775a591c75345c76f71db79c9854a739b0f79f93c00c41fa660020ef`
+- `git-worktree://rust-files`: `4ea59db594114c21a1e434a63bc2d7f698ca75b71db89d157d8b351840ae738a`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `8bc51ecab82415fddd8489604f2424e137d71856e7f65cbdcfaa48850d794b46`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
@@ -1177,4 +1177,15 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `scripts/proof-mutants.sh`: `b6a8709ff3d15e8e58521ed60efda0e344733a81b1902dc314928cdedec479a7`
 - `scripts/spec-mutants.py`: `ca80a1a94c5731933f3bab3258bd0f4bbfa61f754bb8de82e73950ae1d417cb0`
 - `tools/install-apalache.sh`: `3f50745f56521685d30d18669bddb64a4bff060b40c121b30cdbf61fe26f4cc5`
-- `xtask/src/proof_coverage.rs`: `079f86fec97e8061e21fbcf5b8fe29d8c9cfe60c45a9ca872af73becf6d5ee4e`
+- `xtask/src/proof_coverage.rs`: `69d95683f00355935be2fc7340bca155b98313a03cb8ef1759337420582033c6`
+- `xtask/src/proof_coverage/build.rs`: `d3c143795929b424c1eb71008378801d9c3ea3e9717de287223e1a04eb148054`
+- `xtask/src/proof_coverage/common.rs`: `19da9d7c01cfc80fbafe2acf83706c866fb15f960583e66f251c0d6e15621553`
+- `xtask/src/proof_coverage/evidence.rs`: `ec8751942935652675bb1f1d28521a9608ee03971d561675b6af56a6e33bb7f8`
+- `xtask/src/proof_coverage/mapping.rs`: `b3fe4efaf7b5780169ba1109946fbdf476eefb41a2ba90fc8cc566bfbc0af268`
+- `xtask/src/proof_coverage/mutation_inputs.rs`: `72d9da42443b427139d7f5e5e8ea5ed8eb5539eb47dd050da870fede40dad2cf`
+- `xtask/src/proof_coverage/mutation_reports.rs`: `92dc5724bd98f97ffca22e8db0d0df61ef02ad504df654b308ab18af8cab412b`
+- `xtask/src/proof_coverage/refinement.rs`: `c61d6c88c88e357e34394c0b93e5fc1c8f19e7a425c25f61942bd71c8f097b05`
+- `xtask/src/proof_coverage/render.rs`: `000adc02c61e9f5d7a9ae9bf1d04f4d7873ad1cfc28bc69d6894e7c62fa5305f`
+- `xtask/src/proof_coverage/tests/aeneas.rs`: `9f3d115d348aabc61bc09e4b0babd4236fcd73d4668f7d6f2689e91fafeeafb8`
+- `xtask/src/proof_coverage/tests/mod.rs`: `610f6b650755ecf9478824003d061de22884d8ced18084aef70a45381b1ab853`
+- `xtask/src/proof_coverage/tests/mutation.rs`: `ded4477041bff9ed81da3ba346e96f48b0a8728d2f4d6bf5211cb4d535c113f3`
