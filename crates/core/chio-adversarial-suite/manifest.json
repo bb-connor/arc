@@ -118,7 +118,7 @@
       "expected_reason": "broker_unbound_headers_detected",
       "threat_id": "ssrf_via_http_substrate",
       "path": "cases/broker_unbound_headers/broker-unbound-headers-001.json",
-      "content_sha256": "c12bf953ecf95a3175052b723d63fd3b907dcb1a57bbc1263bbee89339ef16b0"
+      "content_sha256": "a33d1fd27a46ba2af87dd10ea97a3355ad268be2a58a966a04a402efd3cdfc20"
     },
     {
       "id": "canary-evasion-001",
