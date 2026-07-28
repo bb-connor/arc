@@ -253,7 +253,7 @@
       "expected_reason": "key_log_omission_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/key_log_omission/key-log-omission-001.json",
-      "content_sha256": "f06882b9b9561ed8e7c0abd71120b163da0f7c9c98e33145d8ac708999a83000"
+      "content_sha256": "a5222312f18fbb8504c0eb9a3145a2f0f53182483216954bddcaf48680d32b7a"
     },
     {
       "id": "key-log-split-view-001",
