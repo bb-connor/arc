@@ -1,4 +1,4 @@
-# ADR-0016: Singular Approval Compatibility Removal
+# ADR-0018: Singular Approval Compatibility Removal
 
 - Status: Accepted
 - Decision date: 2026-07-14
