@@ -109,7 +109,7 @@
       "expected_reason": "broker_secret_boundary_crossing_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/broker_secret_boundary_crossing/broker-secret-boundary-crossing-001.json",
-      "content_sha256": "400b21b685c25729d09ac7006a6ad06ab1a3e549b88b553dec2b8c9560a9def0"
+      "content_sha256": "8c1181cbc9ad8e271416595f252f40dad735dbe9319bc525fb6beb9a85e5c992"
     },
     {
       "id": "broker-unbound-headers-001",
