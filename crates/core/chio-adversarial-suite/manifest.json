@@ -235,7 +235,7 @@
       "expected_reason": "key_log_inconsistent_growth_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/key_log_inconsistent_growth/key-log-inconsistent-growth-001.json",
-      "content_sha256": "78b29fc18da97fae3dfff7d3e059461b551e46ff9f94fb8332e0a5eaff375084"
+      "content_sha256": "1d77175fc9289c65a53351d8f73d0e05ac4f51a5e02a5a5a3cb18153fd69f882"
     },
     {
       "id": "key-log-noncontiguous-sync-001",
