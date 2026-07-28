@@ -167,6 +167,16 @@ impl RetryPolicy {
     }
 }
 
+/// Convert a retry backoff to the smallest whole-second delay that does not
+/// schedule the retry earlier than the policy requested.
+#[must_use]
+pub fn ceil_retry_delay_seconds(backoff: Duration) -> u64 {
+    backoff
+        .as_secs()
+        .saturating_add(u64::from(backoff.subsec_nanos() != 0))
+        .max(1)
+}
+
 /// Decision returned by [`classify_attempt`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RetryDecision {
@@ -695,5 +705,12 @@ mod tests {
             policy.backoff_for(u32::MAX),
             Duration::from_millis(policy.initial_backoff_ms)
         );
+    }
+
+    #[test]
+    fn retry_delay_rounds_fractional_seconds_up() {
+        assert_eq!(ceil_retry_delay_seconds(Duration::from_millis(250)), 1);
+        assert_eq!(ceil_retry_delay_seconds(Duration::from_millis(1_000)), 1);
+        assert_eq!(ceil_retry_delay_seconds(Duration::from_millis(1_999)), 2);
     }
 }

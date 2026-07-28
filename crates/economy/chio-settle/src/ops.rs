@@ -391,6 +391,10 @@ impl OpsSettlementHook {
 }
 
 impl crate::SettlementHook for OpsSettlementHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
     fn observe(
         &self,
         observation: &crate::SettlementObservation,
@@ -440,9 +444,12 @@ pub struct SettlementRuntime<H> {
 }
 
 impl<H: crate::SettlementHook> SettlementRuntime<H> {
-    #[must_use]
-    pub fn new(hook: H, policy: crate::RetryPolicy) -> Self {
-        Self { hook, policy }
+    pub fn new(
+        hook: H,
+        policy: crate::RetryPolicy,
+    ) -> Result<Self, crate::RetryPolicyError> {
+        policy.validate()?;
+        Ok(Self { hook, policy })
     }
 
     #[must_use]
@@ -456,6 +463,14 @@ impl<H: crate::SettlementHook> SettlementRuntime<H> {
             row_version: u64::from(prior_attempts).saturating_add(1),
         };
         let routing = match self.hook.observe(observation, &idempotency_key) {
+            Ok(outcome) if outcome.validate().is_err() => {
+                crate::SettlementRoutingInput::Permanent {
+                    reason: crate::SettlementFailureReason::from_detail(
+                        crate::SettlementFailureCode::InvalidObservation,
+                        "settlement hook returned an invalid outcome",
+                    ),
+                }
+            }
             Ok(crate::SettlementOutcome::Accepted { transcript_id, .. }) => {
                 return SettlementDriveStep::Settle { transcript_id };
             }
@@ -510,15 +525,75 @@ mod tests {
         classify_settlement_lane, ensure_settlement_completion_flow_binding,
         ensure_settlement_operation_allowed, SettlementControlState, SettlementEmergencyControls,
         SettlementEmergencyMode, SettlementIndexerCursor, SettlementIndexerCursorInput,
-        SettlementIndexerStatus, SettlementOperationKind, SettlementRuntimeReport,
-        SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
+        SettlementIndexerStatus, SettlementOperationKind, SettlementRuntime,
+        SettlementRuntimeReport, SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
     };
     use crate::{
-        settlement_completion_flow_row_id, SettlementFinalityStatus,
+        settlement_completion_flow_row_id, RetryPolicy, RetryPolicyError, SettlementDriveStep,
+        SettlementFailureCode, SettlementFinalityStatus, SettlementHook, SettlementHookError,
+        SettlementIdempotencyKey, SettlementObservation, SettlementOutcome,
         SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX,
     };
 
     use chio_test_support::prelude::*;
+
+    struct InvalidOutcomeHook;
+
+    impl SettlementHook for InvalidOutcomeHook {
+        fn supports_receipt_id_idempotency(&self) -> bool {
+            true
+        }
+
+        fn observe(
+            &self,
+            _observation: &SettlementObservation,
+            _idempotency_key: &SettlementIdempotencyKey,
+        ) -> Result<SettlementOutcome, SettlementHookError> {
+            Ok(SettlementOutcome::accepted("\n"))
+        }
+    }
+
+    fn observation() -> SettlementObservation {
+        SettlementObservation::new(
+            "receipt-1",
+            1,
+            "server",
+            "tool",
+            "capability",
+            chio_core::capability::scope::MonetaryAmount {
+                currency: "USD".to_string(),
+                units: 1,
+            },
+            "content",
+            "policy",
+        )
+    }
+
+    #[test]
+    fn runtime_construction_rejects_an_invalid_retry_policy() {
+        let error = SettlementRuntime::new(
+            InvalidOutcomeHook,
+            RetryPolicy {
+                initial_backoff_ms: 0,
+                ..RetryPolicy::default()
+            },
+        )
+        .test_expect_err("invalid retry policy must fail at construction");
+
+        assert_eq!(error, RetryPolicyError::InitialBackoffZero);
+    }
+
+    #[test]
+    fn runtime_dead_letters_an_invalid_hook_outcome() {
+        let runtime = SettlementRuntime::new(InvalidOutcomeHook, RetryPolicy::default())
+            .test_expect("valid runtime");
+
+        assert!(matches!(
+            runtime.drive(&observation(), 0),
+            SettlementDriveStep::DeadLetter { reason }
+                if reason.code() == SettlementFailureCode::InvalidObservation
+        ));
+    }
 
     #[test]
     fn indexer_cursor_classifies_lagging() {

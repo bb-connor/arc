@@ -364,6 +364,17 @@ pub enum SettlementOutcome {
     },
 }
 
+/// Validation failure for a settlement hook outcome.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementOutcomeValidationError {
+    /// The outcome schema is not understood by this build.
+    #[error("unsupported settlement outcome schema")]
+    UnsupportedSchema,
+    /// An accepted outcome carried an unusable transcript identifier.
+    #[error("invalid settlement transcript identifier")]
+    InvalidTranscriptId,
+}
+
 impl SettlementOutcome {
     /// Return whether this outcome uses the schema understood by this build.
     #[must_use]
@@ -375,6 +386,23 @@ impl SettlementOutcome {
             | Self::Permanent { schema, .. } => schema,
         };
         schema == SETTLEMENT_OUTCOME_SCHEMA
+    }
+
+    /// Validate the complete outcome before it reaches retry or settlement
+    /// routing. Accepted outcomes require a bounded, printable transcript id.
+    pub fn validate(&self) -> Result<(), SettlementOutcomeValidationError> {
+        if !self.has_supported_schema() {
+            return Err(SettlementOutcomeValidationError::UnsupportedSchema);
+        }
+        if let Self::Accepted { transcript_id, .. } = self {
+            if transcript_id.trim().is_empty()
+                || transcript_id.len() > 512
+                || transcript_id.chars().any(char::is_control)
+            {
+                return Err(SettlementOutcomeValidationError::InvalidTranscriptId);
+            }
+        }
+        Ok(())
     }
 
     /// Construct an `Accepted` outcome with the canonical schema tag.
@@ -559,7 +587,7 @@ pub trait SettlementHook: Send + Sync {
     /// compatibility signal remains available to older embedders and must not
     /// be used to bypass the key.
     fn supports_receipt_id_idempotency(&self) -> bool {
-        true
+        false
     }
 
     /// Observe a finalized receipt and route it through the settlement
@@ -609,6 +637,18 @@ mod tests {
     #[test]
     fn outcome_schema_is_stable() {
         assert_eq!(SETTLEMENT_OUTCOME_SCHEMA, "chio.settle.outcome.v1");
+    }
+
+    #[test]
+    fn outcome_validation_rejects_invalid_accepted_transcript_ids() {
+        assert_eq!(
+            SettlementOutcome::accepted(" \n").validate(),
+            Err(SettlementOutcomeValidationError::InvalidTranscriptId)
+        );
+        assert_eq!(
+            SettlementOutcome::accepted("x".repeat(513)).validate(),
+            Err(SettlementOutcomeValidationError::InvalidTranscriptId)
+        );
     }
 
     #[test]
@@ -732,6 +772,10 @@ mod tests {
             }
         }
         let hook: std::sync::Arc<dyn SettlementHook> = std::sync::Arc::new(NoopHook);
+        assert!(
+            !hook.supports_receipt_id_idempotency(),
+            "idempotency must require an explicit implementation claim"
+        );
         let observation = SettlementObservation::new(
             "rcpt-1",
             42,

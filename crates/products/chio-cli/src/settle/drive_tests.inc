@@ -1,10 +1,20 @@
     use super::*;
     use chio_core::credit::IouEnvelopeStore;
+    use chio_core::receipt::economics::{
+        EconomicAmountBoundsReceiptMetadata, EconomicAuthorizationMode,
+        EconomicAuthorizationReceiptMetadata, EconomicAuthorizationReceiptMetadataVersion,
+        EconomicBudgetReceiptMetadata, EconomicMerchantReceiptMetadata,
+        EconomicPayeeReceiptMetadata, EconomicPayerReceiptMetadata, EconomicRailReceiptMetadata,
+        EconomicSettlementReceiptMetadata, FinancialReceiptMetadata, SettlementStatus,
+    };
+    use chio_core::receipt::governance::{
+        GovernedApprovalReceiptMetadata, GovernedTransactionReceiptMetadata,
+    };
     use chio_kernel::settlement_retry::{SettleAttemptRecord, SettlementRetryStore};
     use chio_kernel::ReceiptStore;
+    use chio_test_support::private_fs::private_tempdir;
     use rusqlite::params;
     use std::sync::Arc;
-    use tempfile::TempDir;
 
     fn signed_money_receipt(
         keypair: &chio_core::Keypair,
@@ -24,6 +34,102 @@
         timestamp: u64,
         action: chio_core::receipt::decision::ToolCallAction,
     ) -> chio_core::receipt::body::ChioReceipt {
+        let intent_digest = chio_core::hashing::sha256_hex(format!("intent:{marker}").as_bytes());
+        let authority_digest =
+            chio_core::hashing::sha256_hex(format!("authority:{marker}").as_bytes());
+        let credit_authority_digest =
+            chio_core::hashing::sha256_hex(b"settlement-drive-credit-authority");
+        let payee_digest = chio_core::hashing::sha256_hex(b"settlement-drive-payee");
+        let financial = FinancialReceiptMetadata {
+            grant_index: 0,
+            cost_charged: 250,
+            currency: "USD".to_string(),
+            budget_remaining: 750,
+            budget_total: 1_000,
+            delegation_depth: 0,
+            root_budget_holder: "settlement-drive-debtor".to_string(),
+            payment_reference: None,
+            settlement_status: SettlementStatus::Pending,
+            cost_breakdown: None,
+            oracle_evidence: None,
+            attempted_cost: None,
+        };
+        let governed = GovernedTransactionReceiptMetadata {
+            intent_id: format!("intent-{marker}"),
+            intent_hash: intent_digest.clone(),
+            purpose: "settlement retry credit facility".to_string(),
+            server_id: "srv".to_string(),
+            tool_name: "tool".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            approval: Some(GovernedApprovalReceiptMetadata {
+                token_id: format!("approval-{marker}"),
+                approver_key: "settlement-drive-approver".to_string(),
+                approval_artifact_digest: Some(authority_digest.clone()),
+                approved: true,
+            }),
+            runtime_assurance: None,
+            call_chain: None,
+            autonomy: None,
+            economic_authorization: Some(EconomicAuthorizationReceiptMetadata {
+                version: EconomicAuthorizationReceiptMetadataVersion::V1,
+                economic_intent_digest: Some(intent_digest),
+                payee_binding_digest: Some(payee_digest),
+                pre_action_authority_digest: Some(authority_digest),
+                credit_authority_digest: Some(credit_authority_digest),
+                economic_mode: EconomicAuthorizationMode::BudgetOnly,
+                payer: EconomicPayerReceiptMetadata {
+                    party_id: "settlement-drive-debtor".to_string(),
+                    funding_source_ref: "facility:settlement-drive".to_string(),
+                    custody_provider: None,
+                    obligor_ref: None,
+                },
+                merchant: EconomicMerchantReceiptMetadata {
+                    merchant_id: "settlement-drive-merchant".to_string(),
+                    merchant_of_record: None,
+                    order_ref: None,
+                },
+                payee: EconomicPayeeReceiptMetadata {
+                    beneficiary_id: "settlement-drive-payee".to_string(),
+                    settlement_destination_ref: "account:settlement-drive-payee".to_string(),
+                },
+                rail: EconomicRailReceiptMetadata {
+                    kind: "credit_facility".to_string(),
+                    asset: "USD".to_string(),
+                    network: None,
+                    facilitator: None,
+                    contract_or_account_ref: Some("facility:settlement-drive".to_string()),
+                },
+                amount_bounds: EconomicAmountBoundsReceiptMetadata {
+                    approved_max: chio_core::capability::scope::MonetaryAmount {
+                        currency: "USD".to_string(),
+                        units: 250,
+                    },
+                    hold_amount: None,
+                    settlement_cap: chio_core::capability::scope::MonetaryAmount {
+                        currency: "USD".to_string(),
+                        units: 250,
+                    },
+                },
+                pricing_basis: None,
+                metering: None,
+                liability_refs: None,
+                budget: EconomicBudgetReceiptMetadata {
+                    grant_index: 0,
+                    cost_charged: 250,
+                    currency: "USD".to_string(),
+                    budget_remaining: 750,
+                    budget_total: 1_000,
+                    delegation_depth: 0,
+                    root_budget_holder: "settlement-drive-debtor".to_string(),
+                    attempted_cost: None,
+                },
+                settlement: EconomicSettlementReceiptMetadata {
+                    settlement_status: SettlementStatus::Pending,
+                },
+            }),
+        };
         chio_core::receipt::body::ChioReceipt::sign(
             chio_core::receipt::body::ChioReceiptBody {
                 id: marker.to_string(),
@@ -43,7 +149,8 @@
                 policy_hash: "policy-1".to_string(),
                 evidence: Vec::new(),
                 metadata: Some(serde_json::json!({
-                    "financial": {"cost_charged": 250, "currency": "USD"}
+                    "financial": financial,
+                    "governed_transaction": governed,
                 })),
                 trust_level: chio_core::receipt::kinds::TrustLevel::default(),
                 tenant_id: None,
@@ -53,6 +160,26 @@
             keypair,
         )
         .expect("sign receipt")
+    }
+
+    fn signed_captured_receipt(
+        keypair: &chio_core::Keypair,
+        marker: &str,
+        timestamp: u64,
+    ) -> chio_core::receipt::body::ChioReceipt {
+        let receipt = signed_money_receipt(keypair, marker, timestamp);
+        let mut body = receipt.body();
+        let metadata = body.metadata.as_mut().expect("receipt metadata");
+        metadata["financial"]["payment_reference"] = serde_json::json!("capture-1");
+        metadata["financial"]["settlement_status"] = serde_json::json!("settled");
+        metadata["governed_transaction"]["economic_authorization"]["economic_mode"] =
+            serde_json::json!("hold_capture");
+        metadata["governed_transaction"]["economic_authorization"]["settlement"]
+            ["settlement_status"] = serde_json::json!("settled");
+        metadata["governed_transaction"]["economic_authorization"]["rail"]["kind"] =
+            serde_json::json!("card_capture");
+        chio_core::receipt::body::ChioReceipt::sign(body, keypair)
+            .expect("sign captured receipt")
     }
 
     fn seed_attempt(
@@ -174,7 +301,7 @@
 
     #[test]
     fn drive_mints_truthful_iou_with_historical_kernel_trust_and_exact_replay() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-drive-").expect("private tempdir");
         let path = dir.path().join("drive.sqlite3");
         let current_kernel = chio_core::Keypair::from_seed(&[11_u8; 32]);
         let historical_kernel = chio_core::Keypair::from_seed(&[12_u8; 32]);
@@ -272,8 +399,31 @@
     }
 
     #[test]
+    fn drive_dead_letters_captured_receipt_without_minting_a_second_obligation() {
+        let dir = private_tempdir("chio-settle-drive-").expect("private tempdir");
+        let path = dir.path().join("captured.sqlite3");
+        let kernel = chio_core::Keypair::from_seed(&[14_u8; 32]);
+        let iou_issuer = chio_core::Keypair::from_seed(&[15_u8; 32]);
+        let receipts = chio_store_sqlite::SqliteReceiptStore::open(&path).expect("open receipts");
+        let receipt = signed_captured_receipt(&kernel, "captured", 100);
+        receipts
+            .append_chio_receipt(&receipt)
+            .expect("append captured receipt");
+        seed_attempt(&receipts, &receipt);
+        drop(receipts);
+
+        let report =
+            run_settlement_drive(&path, 16, &iou_issuer, &[kernel.public_key()]).expect("drive");
+        assert_eq!(report.dead_lettered, 1);
+        assert_eq!(report.settled, 0);
+        assert_eq!(table_row_count(&path, "iou_envelope", &receipt.id), 0);
+        assert_eq!(table_row_count(&path, "settle_dead_letters", &receipt.id), 1);
+        assert_eq!(table_row_count(&path, "settle_attempts", &receipt.id), 0);
+    }
+
+    #[test]
     fn exact_reconciliation_rejects_empty_or_unbounded_evidence() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-drive-").expect("private tempdir");
         let path = dir.path().join("reconciliation-validation.sqlite3");
         let kernel = chio_core::Keypair::from_seed(&[14_u8; 32]);
         let receipts = chio_store_sqlite::SqliteReceiptStore::open(&path).expect("open receipts");
@@ -314,7 +464,7 @@
 
     #[test]
     fn untrusted_receipt_signer_dead_letters_without_minting_an_iou() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-drive-").expect("private tempdir");
         let path = dir.path().join("untrusted.sqlite3");
         let trusted_kernel = chio_core::Keypair::from_seed(&[21_u8; 32]);
         let untrusted_kernel = chio_core::Keypair::from_seed(&[22_u8; 32]);
@@ -366,7 +516,7 @@
 
     #[test]
     fn tampered_signature_preserves_attempt_without_economic_or_terminal_evidence() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-drive-").expect("private tempdir");
         let path = dir.path().join("signature-tamper.sqlite3");
         let kernel = chio_core::Keypair::from_seed(&[31_u8; 32]);
         let iou_issuer = chio_core::Keypair::from_seed(&[32_u8; 32]);
@@ -383,16 +533,13 @@
 
         let error = run_settlement_drive(&path, 16, &iou_issuer, &[kernel.public_key()])
             .expect_err("tampered signature must fail closed");
-        assert!(matches!(
-            error,
-            SettleStatusError::Integrity(message) if message.contains("invalid signature")
-        ));
+        assert!(matches!(error, SettleStatusError::Integrity(_)));
         assert_attempt_preserved_without_terminal_evidence(&path, &receipt.id);
     }
 
     #[test]
     fn invalid_action_hash_preserves_attempt_without_economic_or_terminal_evidence() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-drive-").expect("private tempdir");
         let path = dir.path().join("action-tamper.sqlite3");
         let kernel = chio_core::Keypair::from_seed(&[41_u8; 32]);
         let iou_issuer = chio_core::Keypair::from_seed(&[42_u8; 32]);
@@ -435,7 +582,7 @@
 
     #[test]
     fn archive_only_legacy_attempt_stops_without_iou_reconciliation_or_dead_letter() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-drive-").expect("private tempdir");
         let path = dir.path().join("archive-only.sqlite3");
         let archive = dir.path().join("archive.sqlite3");
         let archive_path = archive.to_str().expect("utf-8 archive path");

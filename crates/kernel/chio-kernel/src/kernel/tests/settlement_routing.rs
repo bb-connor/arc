@@ -408,6 +408,20 @@ impl chio_settle::SettlementHook for RetryableSettlementHook {
     }
 }
 
+struct NonIdempotentSettlementHook;
+
+impl chio_settle::SettlementHook for NonIdempotentSettlementHook {
+    fn observe(
+        &self,
+        _observation: &chio_settle::SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+    ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
+        Ok(chio_settle::SettlementOutcome::accepted(
+            "non-idempotent-observer",
+        ))
+    }
+}
+
 struct FailingSettlementHook;
 
 impl chio_settle::SettlementHook for FailingSettlementHook {
@@ -746,6 +760,26 @@ fn observer_install_without_a_retry_store_is_rejected() {
         .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
         .expect("observer install succeeds once the retry store is present");
     assert!(kernel.settlement_observer().is_some());
+}
+
+#[test]
+fn observer_install_rejects_a_hook_without_explicit_idempotency_support() {
+    let mut kernel = make_kernel(make_monetary_config());
+    install_empty_durable_settlement_stores(&mut kernel, 0x42);
+
+    let error = kernel
+        .set_settlement_observer(std::sync::Arc::new(NonIdempotentSettlementHook))
+        .expect_err("a hook without an explicit idempotency contract must be rejected");
+
+    assert!(matches!(
+        error,
+        KernelBuildError::SettlementHookNotIdempotent
+    ));
+    assert!(kernel.settlement_observer().is_none());
+    assert!(
+        kernel.settlement_observer_recovery.is_none(),
+        "rejected installation must not start recovery"
+    );
 }
 
 #[test]

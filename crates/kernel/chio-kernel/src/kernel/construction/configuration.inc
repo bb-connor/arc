@@ -760,6 +760,9 @@ impl ChioKernel {
         if self.settlement_observer.is_some() {
             return Err(KernelBuildError::SettlementObserverAlreadyInstalled);
         }
+        if !hook.supports_receipt_id_idempotency() {
+            return Err(KernelBuildError::SettlementHookNotIdempotent);
+        }
         if self.settlement_retry_store.is_none() {
             return Err(KernelBuildError::MissingSettlementRetryStore);
         }
@@ -1127,7 +1130,8 @@ impl ChioKernel {
                     receipt_id: receipt.id.clone(),
                     finalized_at: receipt.timestamp,
                     attempts: attempt,
-                    next_visible_at: now.saturating_add(backoff.as_secs().max(1)),
+                    next_visible_at: now
+                        .saturating_add(chio_settle::ceil_retry_delay_seconds(backoff)),
                     last_reason: Some(reason.code().as_str().to_string()),
                 })
             }

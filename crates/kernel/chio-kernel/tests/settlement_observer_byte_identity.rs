@@ -58,6 +58,10 @@ impl RecordingHook {
 }
 
 impl SettlementHook for RecordingHook {
+    fn supports_receipt_id_idempotency(&self) -> bool {
+        true
+    }
+
     fn observe(
         &self,
         observation: &SettlementObservation,

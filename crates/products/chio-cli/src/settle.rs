@@ -1479,7 +1479,10 @@ pub fn run_settlement_drive_with_iou_trust(
     let runtime = chio_settle::SettlementRuntime::new(
         chio_settle::OpsSettlementHook::new(),
         chio_settle::RetryPolicy::default(),
-    );
+    )
+    .map_err(|error| {
+        SettleStatusError::Integrity(format!("invalid settlement retry policy: {error}"))
+    })?;
 
     let mut report = SettleDriveReport::default();
     for _ in 0..batch {
@@ -1559,6 +1562,19 @@ pub fn run_settlement_drive_with_iou_trust(
             continue;
         }
 
+        if let Err(error) = chio_core::credit::validate_credit_facility_election(&receipt) {
+            dead_letter_attempt(
+                &retry_store,
+                &lease,
+                chio_settle::SettlementFailureReason::from_detail(
+                    chio_settle::SettlementFailureCode::InvalidObservation,
+                    format!("receipt is not eligible for credit settlement: {error}"),
+                ),
+            )?;
+            report.dead_lettered += 1;
+            continue;
+        }
+
         let envelope = credit_account.evaluate(&receipt).map_err(|error| {
             SettleStatusError::Integrity(format!(
                 "receipt {} failed deterministic IOU evaluation: {error}",
@@ -1623,7 +1639,7 @@ pub fn run_settlement_drive_with_iou_trust(
                     finalized_at: attempt.finalized_at,
                     attempts,
                     next_visible_at: now_unix_secs
-                        .saturating_add(backoff.as_secs().max(1)),
+                        .saturating_add(chio_settle::ceil_retry_delay_seconds(backoff)),
                     last_reason: Some(reason.code().as_str().to_string()),
                 };
                 let rescheduled = retry_store

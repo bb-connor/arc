@@ -59,8 +59,8 @@ pub use evm::{
 pub use hook::{
     SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
     SettlementFailureReason, SettlementHook, SettlementHookError, SettlementIdempotencyKey,
-    SettlementObservation, SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
-    SETTLEMENT_OUTCOME_SCHEMA,
+    SettlementObservation, SettlementOutcome, SettlementOutcomeValidationError,
+    SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA, SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
     inspect_finality, inspect_finality_for_receipt, observe_bond, project_escrow_execution_receipt,
@@ -94,7 +94,8 @@ pub use payments::{
     DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
-    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, RetryPolicyError,
+    ceil_retry_delay_seconds, classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy,
+    RetryPolicyError,
     DEAD_LETTER_MAX_ATTEMPTS, DEAD_LETTER_PIPELINE_ERROR_DIGEST_PREFIX,
     DEAD_LETTER_PIPELINE_ERROR_MAX_BYTES, DEAD_LETTER_REASON_DIGEST_PREFIX,
     DEAD_LETTER_REASON_MAX_BYTES, DEAD_LETTER_RECEIPT_ID_MAX_BYTES, DEFAULT_BACKOFF_CAP_MS,

@@ -133,21 +133,12 @@ fn permanent(code: SettlementFailureCode, detail: impl AsRef<[u8]>) -> Settlemen
 pub(super) fn validate_and_sanitize_settlement_outcome(
     outcome: &SettlementOutcome,
 ) -> Result<SettlementRoutingInput, SettlementRetryError> {
-    if !outcome.has_supported_schema() {
-        return Err(SettlementRetryError::Backend(
-            "settlement hook returned an unsupported outcome schema".to_string(),
-        ));
-    }
+    outcome.validate().map_err(|error| {
+        SettlementRetryError::Backend(format!("settlement hook returned an {error}"))
+    })?;
     match outcome {
         SettlementOutcome::Accepted { transcript_id, .. } => {
-            if transcript_id.trim().is_empty()
-                || transcript_id.len() > 512
-                || transcript_id.chars().any(char::is_control)
-            {
-                return Err(SettlementRetryError::Backend(
-                    "settlement hook returned an invalid transcript identifier".to_string(),
-                ));
-            }
+            let _ = transcript_id;
             Ok(SettlementRoutingInput::Accepted)
         }
         SettlementOutcome::Skipped { reason, .. } => {
@@ -424,7 +415,8 @@ pub(super) fn route_staged_status(
                     receipt_id: receipt.id.clone(),
                     finalized_at: receipt.timestamp,
                     attempts: attempt,
-                    next_visible_at: now.saturating_add(backoff.as_secs().max(1)),
+                    next_visible_at: now
+                        .saturating_add(chio_settle::ceil_retry_delay_seconds(backoff)),
                     last_reason: Some(reason.code().as_str().to_string()),
                 })
                 .map(|_| ())
