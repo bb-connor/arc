@@ -74,8 +74,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json",
-          "sha256": "8908bff5092eef5e17ca86222a5dfe3043b756acd561f1aaf081257e26f0a7a7",
-          "inputs_sha256": "a40dc37b33d946e4e608299cc1ba002246f8d4c7dabfe60ebef5054c51adc826"
+          "sha256": "e4a767db86fb9abe68ca12bebb5059dfefe00623ee4b2164c68dd783a4992a8e",
+          "inputs_sha256": "73f81ccd925c27061c9be8c23703a73f25a6d3779f12c821a35ef50ddadb6de5"
         }
       },
       {

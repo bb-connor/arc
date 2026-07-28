@@ -8,7 +8,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 0.432418959,
+          "duration": 0.380587834,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -21,7 +21,7 @@
         },
         {
           "phase": "Test",
-          "duration": 0.48872375,
+          "duration": 0.443559917,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -46,22 +46,22 @@
             "return_type": "-> Result<[u8; 32], StateMachineError>",
             "span": {
               "start": {
-                "line": 1763,
+                "line": 1746,
                 "column": 1
               },
               "end": {
-                "line": 1769,
+                "line": 1752,
                 "column": 2
               }
             }
           },
           "span": {
             "start": {
-              "line": 1764,
+              "line": 1747,
               "column": 5
             },
             "end": {
-              "line": 1768,
+              "line": 1751,
               "column": 27
             }
           },
@@ -70,12 +70,12 @@
         }
       },
       "summary": "CaughtMutant",
-      "log_path": "log/crates__security__chio-quarantine__src__state_machine.rs_line_1764_col_5.log",
-      "diff_path": "diff/crates__security__chio-quarantine__src__state_machine.rs_line_1764_col_5.diff",
+      "log_path": "log/crates__security__chio-quarantine__src__state_machine.rs_line_1747_col_5.log",
+      "diff_path": "diff/crates__security__chio-quarantine__src__state_machine.rs_line_1747_col_5.diff",
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 4.292976708,
+          "duration": 2.793977625,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -88,7 +88,7 @@
         },
         {
           "phase": "Test",
-          "duration": 1.185898375,
+          "duration": 1.08797275,
           "process_status": {
             "Failure": 101
           },
