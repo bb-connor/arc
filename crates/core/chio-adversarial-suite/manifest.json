@@ -181,7 +181,7 @@
       "expected_reason": "containment_rollback_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/containment_rollback/containment-rollback-001.json",
-      "content_sha256": "1c636fb23a1cffce5acc344fc5973765d22b1282b86b27727d97cfe312fbbb34"
+      "content_sha256": "5b1f87d0683319842ff923303499a2a67344af721209d29203cef3c62f8a4993"
     },
     {
       "id": "future-dated-001",
