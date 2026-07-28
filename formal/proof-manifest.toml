@@ -437,19 +437,21 @@ rust_symbols = [
   "MerkleTree::from_leaves",
   "MerkleTree::root",
   "MerkleTree::inclusion_proof",
+  "MerkleTree::inclusion_proof_at_size",
   "MerkleProof",
   "MerkleProof::compute_root",
   "MerkleProof::compute_root_from_hash",
   "MerkleProof::verify",
 ]
-normalized_sha256 = "e6b3e89a5516c905c3407f78531d0dea49049c1560919d8b2322acf2fa9ce5c2"
+normalized_sha256 = "370f946bfcf01392548bf5d58f2855c595a9dc615f76e77e561db6bc239b1ac1"
 symbol_sha256 = [
   { symbol = "leaf_hash", sha256 = "b4db61a20d6638c532d285fb7fe05a601b8a3f2faee5226533463f8ae9374a3d" },
   { symbol = "node_hash", sha256 = "ca2f58af6ea3f6b26e2e5eb787854029d6b965ee4cb1c616f5937bd57ff5f34d" },
   { symbol = "MerkleTree", sha256 = "5c33a91e34394dea1498d2325ab81d2eb0cab31f9105d13038c35b76d2e4a67f" },
   { symbol = "MerkleTree::from_leaves", sha256 = "fdb3f21e5120fe91e5b6fe925b4896eab7b77e82eafa4f8a0744fdbeb3d699f2" },
   { symbol = "MerkleTree::root", sha256 = "1a3ee23e8a58937e0afb3fb119df09c159104892e31d113b0e51175ae70139eb" },
-  { symbol = "MerkleTree::inclusion_proof", sha256 = "8aad4f8ca03ef5bede44d85bbcac3b116fe3d37b97abb3684239a0714a19fb5a" },
+  { symbol = "MerkleTree::inclusion_proof", sha256 = "fd6d6b861b9d4245cddb3c3e06037619d974869b2c1545dba09a53d688f7b105" },
+  { symbol = "MerkleTree::inclusion_proof_at_size", sha256 = "064354f4b7fd27ff734dd96a724698ce8db015caeae6601e3607c4a1d56715f4" },
   { symbol = "MerkleProof", sha256 = "73a372d92e97db2d3428dfbc7d44d33eae42ac1fb09ca1ac160dec8fb050f40e" },
   { symbol = "MerkleProof::compute_root", sha256 = "2b90481b412b567a651cb3357aa70f5e11debd9da4a995b48632b57f2a791974" },
   { symbol = "MerkleProof::compute_root_from_hash", sha256 = "7c9beb4b748a2874444bd54e5a6317cb42a36f9e24f0d88efba19d4a7c81ce8a" },
@@ -459,7 +461,7 @@ symbol_sha256 = [
 [[mirror]]
 model_file = "formal/lean4/Chio/Chio/Core/Receipt.lean"
 model_kind = "lean"
-relationship = "transliteration"
+relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/checkpoint.rs"
 rust_symbols = [
   "KernelCheckpointBody",
@@ -467,18 +469,22 @@ rust_symbols = [
   "ReceiptInclusionProof",
   "ReceiptInclusionProof::verify",
   "build_checkpoint",
+  "build_checkpoint_with_previous",
+  "build_checkpoint_with_chain_frontier",
   "build_inclusion_proof",
   "verify_checkpoint_signature",
 ]
-normalized_sha256 = "91702cc4b52462ef7e1e54d00908a9aee9148cf9ef07bc429952c0e83d98f63c"
+normalized_sha256 = "a5d090a8d82edc68f4f6cd8aa1c18f59442cba705ae28c8901fda8232b128947"
 symbol_sha256 = [
-  { symbol = "KernelCheckpointBody", sha256 = "3e27f4d35baeb86e7b41f812c2dec03ecdbc3cc78e7170e5d5bfcccc971a6ed3" },
-  { symbol = "KernelCheckpoint", sha256 = "bbce7f6b51b09d48efedae5abef0fda71ddd7986f8d7964302df97e77651bdad" },
+  { symbol = "KernelCheckpointBody", sha256 = "cd1d6b91e592859a881b7f07fd18a5f07814dd7536a2d8702b534f19596f147c" },
+  { symbol = "KernelCheckpoint", sha256 = "6199079e137de72df31dc0edc14bb54337e2cda2177d2dc78eee38d6c33d07b4" },
   { symbol = "ReceiptInclusionProof", sha256 = "6fb42fed267ef9b1f4b27c67ca0ce9b5436b22bd78c4eb525f154996e2c617b4" },
   { symbol = "ReceiptInclusionProof::verify", sha256 = "e2d3affb6bf892f08beac5d9056ce8807e1c43101a7f62808b4e0eab517b3fbc" },
-  { symbol = "build_checkpoint", sha256 = "3c59d00982618b4c839f59d05e35c1e7c4844ecc0be4601f51edb9cf84af380c" },
+  { symbol = "build_checkpoint", sha256 = "43f68cff56db2effbf22622b756c4c14160b55a7f9a5229b914feb28c2c66e3e" },
+  { symbol = "build_checkpoint_with_previous", sha256 = "4545c912df6485e124bde61382354395acdc71a0644152ba02d6fb60c221ff8b" },
+  { symbol = "build_checkpoint_with_chain_frontier", sha256 = "d1e7395c86c9de6980b08bdef3f6ecb7a8f89af2212bc60efef69798317f2df2" },
   { symbol = "build_inclusion_proof", sha256 = "39fb10be9c0cf8f290ac73e3fd18cf4cc4952c96a20aeb761ce6a34a622ca194" },
-  { symbol = "verify_checkpoint_signature", sha256 = "f332b4e55397bbefdb2db3758735207583d9df7e55a5f8a406f68b37fab65c28" },
+  { symbol = "verify_checkpoint_signature", sha256 = "6b267b752805d62a2588930fd62f6bf72cadbd5c560ae9d2adc6ae12bea4d07d" },
 ]
 
 # TLA records are abstraction anchors. Their hashes force model review when the

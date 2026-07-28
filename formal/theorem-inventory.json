@@ -418,15 +418,15 @@
       "notes": "The checked fold reaches the declared symbolic root for every leaf index at every tree size from one through eight. Hashing remains under ASSUME-SHA256."
     },
     {
-      "id": "proof.checkpoint_same_sequence_root_unique",
-      "leanName": "Chio.Proofs.checkpoint_same_sequence_root_unique",
+      "id": "proof.checkpoint_same_lookup_root_unique",
+      "leanName": "Chio.Proofs.checkpoint_same_lookup_root_unique",
       "file": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P4"],
-      "notes": "For one Nat lookup key in the functional CheckpointStore model, two successful lookups produce the same checkpoint value and therefore the same Merkle root. The model does not bind the key to either embedded checkpointSeq; it proves no append-only or prefix relation, predecessor continuity, signature property, durable or concurrent storage behavior, or production CheckpointConsistencyProof construction or verification."
+      "notes": "For one Nat lookup key and one fixed functional CheckpointStore value, two successful lookups produce the same checkpoint value and therefore the same Merkle root. This is a same-snapshot functional lookup fact only. The model does not bind the key to either embedded checkpointSeq; it proves no uniqueness across writes or readers, equivocation prevention, schema or range validation, chain-root semantics, receipt-to-root refinement, append-only or prefix relation, predecessor continuity, signature property, durable or concurrent storage behavior, or production CheckpointConsistencyProof construction or verification."
     },
     {
       "id": "proof.receipt_sign_then_verify",

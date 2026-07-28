@@ -1,7 +1,7 @@
 /-
   Proofs for the bounded receipt lane:
   - Merkle inclusion soundness
-  - same-key checkpoint root uniqueness
+  - same-lookup checkpoint root uniqueness
   - receipt immutability
 -/
 
@@ -105,9 +105,13 @@ theorem indexed_inclusion_accepts_matching_membership_proof
   exact membership_proof_verifies tree receipt path h
 
 /-- Two checkpoint values returned by the same lookup in the functional
-    `CheckpointStore` model have the same Merkle root. The lookup key is not
-    connected to either value's embedded `checkpointSeq`. -/
-theorem checkpoint_same_sequence_root_unique
+    `CheckpointStore` model have the same Merkle root for one fixed store
+    value. The lookup key is not connected to either value's embedded
+    `checkpointSeq`, and the theorem does not relate different store snapshots,
+    writes, readers, or equivocation checks. It also does not model production
+    schema or range validation, chain-root semantics, or receipt-to-root
+    refinement. -/
+theorem checkpoint_same_lookup_root_unique
     (store : CheckpointStore) (lookupKey : Nat)
     (cp₁ cp₂ : KernelCheckpoint)
     (h₁ : store lookupKey = some cp₁)

@@ -102,13 +102,16 @@ Lean cross-references (informational; the script does not enforce these):
   current Lean theorem proves strict receipt timestamp ordering. The Rust
   storage paths cited by those rows are abstraction anchors and do not prove
   the modeled timestamp relation.
-- P4 theorem `Chio.Proofs.checkpoint_same_sequence_root_unique` (inventory id
-  `proof.checkpoint_same_sequence_root_unique`) proves only that the same
-  functional `CheckpointStore` lookup cannot return checkpoints with different
-  Merkle roots. It does not bind the lookup key to
-  `KernelCheckpoint.checkpointSeq`, establish append-only or prefix continuity,
-  verify signatures, cover durable or concurrent storage behavior, or prove
-  production `CheckpointConsistencyProof` construction or verification.
+- P4 theorem `Chio.Proofs.checkpoint_same_lookup_root_unique` (inventory id
+  `proof.checkpoint_same_lookup_root_unique`) proves only that the same lookup
+  from one fixed functional `CheckpointStore` value cannot return checkpoints
+  with different Merkle roots. This is a same-snapshot fact only. It does not
+  bind the lookup key to `KernelCheckpoint.checkpointSeq`, establish uniqueness
+  across writes or readers, prevent equivocation, validate schemas or ranges,
+  model chain-root semantics, refine receipt storage to the checkpoint root,
+  establish append-only or prefix continuity, verify signatures, cover durable
+  or concurrent storage behavior, or prove production
+  `CheckpointConsistencyProof` construction or verification.
 - `AttenuationPreserving` corresponds to the attenuation lemmas in
   `formal/lean4/Chio/Chio/Proofs/Monotonicity.lean` (theorem ids
   `proof.scope_subset_of_grants_subset`,
