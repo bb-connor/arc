@@ -110,8 +110,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json",
-          "sha256": "2af189520e4c71e54566c2ed1b35f714f576d032bc07d838b8ae3f99f98f0ef5",
-          "inputs_sha256": "660f220401b474fb753399246b4fe6f08fcdf2cd8a6a2dec548c98e93c19614f"
+          "sha256": "abe4b2a2f7f86dfa3d2a95249308970f0777fa66665c0de7921e45d0e5908377",
+          "inputs_sha256": "924144ad100aa447a172fede060739016be95c49a3e0425abe067e071a65fc0d"
         }
       }
     ]
