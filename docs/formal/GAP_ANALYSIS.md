@@ -169,7 +169,7 @@ Evidence (details and exact fixes in [HYGIENE_PASS.md](HYGIENE_PASS.md)):
   `proved`.
 - The original `proof-manifest.toml` synchronized mirrors by symbol name only.
   This is now mechanically closed for seven Lean models and seven TLA+
-  models: 57 mirror entries hash 171 parser-resolved Rust symbol references,
+  models: 57 mirror entries hash 166 parser-resolved Rust symbol references,
   with per-symbol diagnostics in required PR CI. The repaired TLA+ records are
   labeled abstraction anchors so their hashes require review without claiming
   that the Rust code establishes a modeled property.

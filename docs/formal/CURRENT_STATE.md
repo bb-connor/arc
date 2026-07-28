@@ -24,9 +24,9 @@ aspirational; remaining boundaries are catalogued separately in
   811.737 seconds at length 5, 1.991 seconds at length 3, and 429.525 seconds
   at length 24. The legacy unbounded eventuality run reached its 3,602-second
   timeout without an invariant or tool error and is not counted as a proof.
-- Mirror validation covers 57 registered mirrors over 171 bindings, including
+- Mirror validation covers 57 registered mirrors over 166 bindings, including
   seven Lean module hashes and seven TLA+ module hashes. The proof manifest
-  contains 35 root imports, 14 gates, 12 model modules, 43 Rust symbols, and 15
+  contains 35 root imports, 14 gates, 12 model modules, 44 Rust symbols, and 15
   shell-bound checks.
 - Lean contains 149 catalogued declarations, one cryptographic axiom, thirteen
   registered assumptions, and no placeholders.
@@ -333,12 +333,12 @@ differential-test joins, theorem status, and model-only Kani scope remain
 explicit there.
 
 - `formal/proof-manifest.toml` (schema `chio.proof-manifest.v1`) is the hub:
-  `root_modules` (35 Lean files), `gate_commands` (15 commands), 12
-  `covered_rust_modules`, 41 `covered_rust_symbols`, 14 `shell_entrypoints`,
+  `root_modules` (35 Lean files), `gate_commands` (14 commands), 12
+  `covered_rust_modules`, 44 `covered_rust_symbols`, 15 `shell_entrypoints`,
   the P1-P10 `property_matrix` with per-property evidence-lane tags,
   `rust_refinement_lanes`, `allowed_axioms` (exactly one),
-  `excluded_surfaces`, and `discharged_assumptions`. Forty-six `[[mirror]]`
-  entries bind 118 parser-resolved Rust symbol references to seven Lean models
+  `excluded_surfaces`, and `discharged_assumptions`. Fifty-seven `[[mirror]]`
+  entries bind 166 parser-resolved Rust symbol references to seven Lean models
   and seven TLA+ models with ordered rollup and per-symbol hashes. Lean entries
   are labeled as transliterations or abstraction anchors; TLA+ entries are
   abstraction anchors. `cargo xtask check formal-mirrors` enforces those hashes

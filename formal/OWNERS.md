@@ -40,9 +40,9 @@ The formal owners (primary and backup) are jointly on the hook for:
   and Rust verification metadata checks before merging affected changes.
 - **Mirror hash review:** own the `cargo xtask check formal-mirrors` registry.
   A blessed hash change attests only that the named model was reviewed. For a
-  Lean transliteration, compare the Rust token change with the Lean semantics.
-  For a TLA+ abstraction anchor, compare it with the model boundary and its
-  assumptions without treating the hash as proof that Rust enforces the
+  transliteration, compare the Rust token change with the Lean semantics. For
+  a Lean or TLA+ abstraction anchor, compare it with the model boundary and
+  its assumptions without treating the hash as proof that Rust enforces the
   property. Run `cargo xtask check formal-mirrors --bless` only after that
   review, and commit the manifest diff with the affected source.
 - **Nightly liveness lane:** own the nightly job that runs the long-form

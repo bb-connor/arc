@@ -13,11 +13,12 @@
 ## Summary
 
 `cargo xtask check formal-mirrors` now fails when a Rust item registered as a
-manual Lean transliteration or a TLA+ abstraction anchor changes without a
-deliberate manifest bless. The required PR job runs the gate beside the
-existing crate-path check and needs no Lean, Charon, Kani, or Why3 toolchain.
+manual Lean transliteration or a Lean or TLA+ abstraction anchor changes
+without a deliberate manifest bless. The required PR job runs the gate beside
+the existing crate-path check and needs no Lean, Charon, Kani, or Why3
+toolchain.
 
-The proof manifest contains 57 `[[mirror]]` entries covering 171 Rust symbol
+The proof manifest contains 57 `[[mirror]]` entries covering 166 Rust symbol
 references across seven Lean models and seven TLA+ models. Every entry
 records an ordered rollup and a digest for each symbol. The per-symbol digests
 let a failure name the exact changed item; the rollup binds symbol order and
@@ -25,8 +26,8 @@ the complete entry.
 
 This is review evidence, not an equivalence proof. A successful bless means a
 reviewer must compare the named Rust item with the named model relationship.
-TLA+ hashes explicitly do not claim that Rust enforces the modeled property.
-Nightly proof lanes remain the semantic backstop.
+Abstraction-anchor hashes explicitly do not claim that Rust enforces the
+modeled property. Nightly proof lanes remain the semantic backstop.
 
 ## Decisions
 
@@ -63,8 +64,9 @@ Nightly proof lanes remain the semantic backstop.
   checkpoints. `ChioReceipt::verify_signature` lives in `receipt/body.rs`, not
   the kernel-core signing wrapper named in the earlier example.
 - Generalize the schema to `model_file`, `model_kind`, and `relationship`.
-  Lean entries require `lean` plus `transliteration`; TLA+ entries require
-  `tla` plus `abstraction_anchor`. Invalid combinations fail closed.
+  Lean entries require `lean` plus `transliteration` or `abstraction_anchor`;
+  TLA+ entries require `tla` plus `abstraction_anchor`. Invalid combinations
+  fail closed.
 - Repair TLA+ code mappings before hashing them. `ReceiptBeforeAllow` now maps
   persistence and response construction, `KernelTransitionCancelSafe` maps
   the drop guard, states that snapshot equality is by construction rather than
@@ -133,12 +135,12 @@ the manifest.
 | Protocol | `kernel-core/evaluate.rs` | `finish_verified_evaluation` |
 | Receipt | `kernel-core/receipts.rs` | `sign_receipt` |
 | Receipt | `receipt/body.rs` | receipt body, receipt, signature verification |
-| Receipt | `merkle.rs` | 10 tree and inclusion-proof items |
-| Receipt | `checkpoint.rs` | 7 checkpoint and inclusion-proof items |
+| Receipt | `merkle.rs` | 15 tree and inclusion-proof items |
+| Receipt | `checkpoint.rs` | 9 checkpoint and inclusion-proof items |
 | MerkleWalk | `merkle_steps.rs` | scalar step decision and transition |
 | MerkleWalk | `kernel-core/formal_aeneas.rs` | extraction-safe scalar step mirror |
 
-The TLA+ inventory adds 24 entries and 44 symbol references:
+The TLA+ inventory adds 38 entries and 95 symbol references:
 
 | TLA+ model | Rust surfaces |
 | --- | --- |
@@ -190,7 +192,7 @@ formal-mirrors: MIRROR DRIFT in crates/kernel/chio-kernel-core/src/formal_core.r
    formatting-preserving blesses with `toml_edit`.
 2. The xtask CLI and dispatcher expose `check formal-mirrors [--bless]` with a
    dedicated fail-closed error category.
-3. `formal/proof-manifest.toml` contains 57 entries and 171 symbol
+3. `formal/proof-manifest.toml` contains 57 entries and 166 symbol
    digests. The seven Lean mirror headers and seven TLA+ Code mapping blocks use
    corrected repository paths.
 4. The required CI job runs the checker next to `check crate-paths`.
@@ -226,7 +228,8 @@ formal-mirrors: MIRROR DRIFT in crates/kernel/chio-kernel-core/src/formal_core.r
 - [x] `formal/OWNERS.md` documents the bless-review obligation.
 - [x] A missing or renamed item fails with `symbol not found`.
 - [x] The schema supports `model_file` and `model_kind`, and validates the
-  relationship between Lean transliterations and TLA+ abstraction anchors.
+  relationships among Lean transliterations, Lean abstraction anchors, and
+  TLA+ abstraction anchors.
 - [x] `RevocationPropagation.tla` and all five `formal/apalache/` modules have
   manifest-backed Code mapping blocks with exact Rust items.
 - [x] TLA+ drift diagnostics state that matching hashes do not claim Rust
@@ -247,8 +250,8 @@ formal-mirrors: MIRROR DRIFT in crates/kernel/chio-kernel-core/src/formal_core.r
 - Authors may bless without reviewing. The gate is symbol-granular, ignores
   doc-only edits, and makes every hash diff a formal-owner review obligation.
 - Hashes prove review, not correctness. Diagnostics and documentation state
-  that limit; TLA+ entries are labeled abstraction anchors and semantic proof
-  lanes remain authoritative.
+  that limit; abstraction-anchor entries are labeled explicitly and semantic
+  proof lanes remain authoritative.
 - Macro-generated, nested-module, associated-item, or const-only seams may not
   resolve. The checker fails rather than guessing. Such surfaces require an
   explicit resolver extension before registration.

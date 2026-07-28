@@ -428,30 +428,38 @@ symbol_sha256 = [
 [[mirror]]
 model_file = "formal/lean4/Chio/Chio/Core/Receipt.lean"
 model_kind = "lean"
-relationship = "transliteration"
+relationship = "abstraction_anchor"
 rust_source = "crates/core/chio-core-types/src/merkle.rs"
 rust_symbols = [
   "leaf_hash",
   "node_hash",
   "MerkleTree",
   "MerkleTree::from_leaves",
+  "MerkleTree::leaf_count",
   "MerkleTree::root",
   "MerkleTree::inclusion_proof",
   "MerkleTree::inclusion_proof_at_size",
+  "MerkleTree::inclusion_subproof",
+  "MerkleTree::range_hash",
+  "largest_power_of_two_less_than",
   "MerkleProof",
   "MerkleProof::compute_root",
   "MerkleProof::compute_root_from_hash",
   "MerkleProof::verify",
 ]
-normalized_sha256 = "370f946bfcf01392548bf5d58f2855c595a9dc615f76e77e561db6bc239b1ac1"
+normalized_sha256 = "8f728138025c37f90d815a13d6dffc8e0c0d9c6e0fae849b28fdcdabba275a49"
 symbol_sha256 = [
   { symbol = "leaf_hash", sha256 = "b4db61a20d6638c532d285fb7fe05a601b8a3f2faee5226533463f8ae9374a3d" },
   { symbol = "node_hash", sha256 = "ca2f58af6ea3f6b26e2e5eb787854029d6b965ee4cb1c616f5937bd57ff5f34d" },
   { symbol = "MerkleTree", sha256 = "5c33a91e34394dea1498d2325ab81d2eb0cab31f9105d13038c35b76d2e4a67f" },
   { symbol = "MerkleTree::from_leaves", sha256 = "fdb3f21e5120fe91e5b6fe925b4896eab7b77e82eafa4f8a0744fdbeb3d699f2" },
+  { symbol = "MerkleTree::leaf_count", sha256 = "f670d939a69e9a1fafe3f1cdcee29e64bb3397fa6a83acd32c923ca0754f3591" },
   { symbol = "MerkleTree::root", sha256 = "1a3ee23e8a58937e0afb3fb119df09c159104892e31d113b0e51175ae70139eb" },
   { symbol = "MerkleTree::inclusion_proof", sha256 = "fd6d6b861b9d4245cddb3c3e06037619d974869b2c1545dba09a53d688f7b105" },
   { symbol = "MerkleTree::inclusion_proof_at_size", sha256 = "064354f4b7fd27ff734dd96a724698ce8db015caeae6601e3607c4a1d56715f4" },
+  { symbol = "MerkleTree::inclusion_subproof", sha256 = "1ebc431d0b76ebb551d0658956746686dae57343b8f47c6ce0f7bc2262f76f2c" },
+  { symbol = "MerkleTree::range_hash", sha256 = "ec3e7cb8980db02f26c7d61b74a58df17313d59bdcf721d5ecf2c9ff46d3b6ec" },
+  { symbol = "largest_power_of_two_less_than", sha256 = "091b9a04e78c17f35b15d3749f4fd830b8d1d4dda85066ee0872eca7bdd71cf9" },
   { symbol = "MerkleProof", sha256 = "73a372d92e97db2d3428dfbc7d44d33eae42ac1fb09ca1ac160dec8fb050f40e" },
   { symbol = "MerkleProof::compute_root", sha256 = "2b90481b412b567a651cb3357aa70f5e11debd9da4a995b48632b57f2a791974" },
   { symbol = "MerkleProof::compute_root_from_hash", sha256 = "7c9beb4b748a2874444bd54e5a6317cb42a36f9e24f0d88efba19d4a7c81ce8a" },
