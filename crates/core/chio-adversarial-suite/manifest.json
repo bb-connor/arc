@@ -100,7 +100,7 @@
       "expected_reason": "broker_revocation_race_detected",
       "threat_id": "capability_token_theft",
       "path": "cases/broker_revocation_race/broker-revocation-race-001.json",
-      "content_sha256": "8c784655145b002fa89851c1c2be1442188517ecbd0b6d297f08f4da38b8f1e0"
+      "content_sha256": "2c9d819628527c92cc21084fb7b7cb22050f1c1c8ce725aeaccaad8a73018d77"
     },
     {
       "id": "broker-secret-boundary-crossing-001",
