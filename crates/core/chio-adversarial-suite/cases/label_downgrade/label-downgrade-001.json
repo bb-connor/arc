@@ -71,8 +71,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/missing_clearance_allow/mutants.out/outcomes.json",
-          "sha256": "0476c5ca95a970fae1cf2f104dcf214a4d035d2a8435d8326215ce4fc5d9b039",
-          "inputs_sha256": "a75822e7c31c876f90429e4791cf21da65f91b6d30e7a9aa197887f53c0042e3"
+          "sha256": "eb452bcc8a15cfc23d323fa0c713b9f56773e45dbe5553b815790c2dd5798b2c",
+          "inputs_sha256": "60c3c1015ea1e43811907db54898ea64391fbac38d6da8b2b54c777a4dd424b3"
         }
       },
       {
