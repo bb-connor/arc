@@ -29,11 +29,15 @@ use chio_core_types::capability::{
         validate_capability_delegation_chain, validate_delegation_chain_with_trust_root, ScopeHash,
     },
     crypto_floor::{CapabilityCryptoFloor, CapabilityFloorVerifyError},
-    features::CapabilityNegotiation,
+    cumulative_approval::verify_cumulative_approval_constraints,
+    features::{
+        CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET,
+    },
     scope::ChioScope,
     token::CapabilityToken,
 };
 use chio_core_types::crypto::PublicKey;
+use chio_core_types::error::Error as CoreError;
 
 use crate::budget_split::{BudgetRegistry, BudgetSplitError, NoopBudgetRegistry};
 use crate::clock::Clock;
@@ -149,7 +153,8 @@ pub fn verify_capability_with_floor(
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let peer = CapabilityNegotiation::v1_default();
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer)?;
+    let verified =
+        verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer, None)?;
     admit_delegated_budget(token, budgets)?;
     Ok(verified)
 }
@@ -160,6 +165,7 @@ fn verify_capability_base(
     clock: &dyn Clock,
     crypto_floor: CapabilityCryptoFloor,
     peer: &CapabilityNegotiation,
+    direct_root: Option<&CapabilityToken>,
 ) -> Result<VerifiedCapability, CapabilityError> {
     // Issuer trust check. The full kernel also trusts its own public key
     // and the set returned by the capability authority; callers must
@@ -183,7 +189,7 @@ fn verify_capability_base(
         }
     }
 
-    verify_negotiated_capability_semantics(token, peer)?;
+    verify_negotiated_capability_semantics(token, trusted_issuers, peer, direct_root)?;
 
     // Time-bound check.
     let now = clock.now_unix_secs();
@@ -206,7 +212,9 @@ fn verify_capability_base(
 
 fn verify_negotiated_capability_semantics(
     token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
     peer: &CapabilityNegotiation,
+    direct_root: Option<&CapabilityToken>,
 ) -> Result<(), CapabilityError> {
     peer.validate().map_err(|error| {
         CapabilityError::AttenuationViolation(format!(
@@ -214,15 +222,47 @@ fn verify_negotiated_capability_semantics(
         ))
     })?;
 
-    if token.aggregate_invocation_budget.is_none() {
-        return Ok(());
-    }
-    if !peer.supports(chio_core_types::capability::features::AGGREGATE_INVOCATION_BUDGET) {
+    if token_uses_aggregate_budget(token) && !peer.supports(AGGREGATE_INVOCATION_BUDGET) {
         return Err(CapabilityError::AttenuationViolation(
             "aggregate invocation budget is not negotiated".to_string(),
         ));
     }
+
+    if token.scope.has_cumulative_approval() {
+        if !peer.supports(CUMULATIVE_APPROVAL_BUDGET) {
+            return Err(CapabilityError::AttenuationViolation(
+                "cumulative_approval_budget was not negotiated".to_string(),
+            ));
+        }
+        verify_cumulative_approval_constraints(token, trusted_issuers, direct_root)
+            .map(|_| ())
+            .map_err(map_optional_feature_error)?;
+    }
     Ok(())
+}
+
+fn token_uses_aggregate_budget(token: &CapabilityToken) -> bool {
+    token.aggregate_invocation_budget.is_some()
+        || token
+            .delegation_chain
+            .iter()
+            .any(|link| link.aggregate_budget.is_some())
+        || token
+            .attenuation_proof
+            .as_ref()
+            .is_some_and(|proof| proof.normalized_subset_proof.aggregate_budget.is_some())
+}
+
+fn map_optional_feature_error(error: CoreError) -> CapabilityError {
+    match error {
+        CoreError::SignatureVerificationFailed | CoreError::InvalidSignature(_) => {
+            CapabilityError::InvalidSignature
+        }
+        CoreError::AttenuationViolation { reason }
+        | CoreError::DelegationChainBroken { reason }
+        | CoreError::ScopeMismatch { reason } => CapabilityError::AttenuationViolation(reason),
+        other => CapabilityError::Internal(other.to_string()),
+    }
 }
 
 pub(crate) fn admit_delegated_budget(
@@ -272,7 +312,8 @@ pub fn verify_capability_with_negotiated_floor(
     peer: &CapabilityNegotiation,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let mut budgets = NoopBudgetRegistry;
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, peer)?;
+    let verified =
+        verify_capability_base(token, trusted_issuers, clock, crypto_floor, peer, None)?;
     admit_delegated_budget(token, &mut budgets)?;
     Ok(verified)
 }
@@ -321,6 +362,13 @@ pub trait TrustRootResolver {
     fn trust_root_scope_hash(&self, issuer: &PublicKey) -> Option<ScopeHash>;
 }
 
+/// Negotiated optional-feature profile and authenticated family-root evidence.
+#[derive(Debug, Clone, Copy)]
+pub struct CapabilityFeatureContext<'a> {
+    pub peer: &'a CapabilityNegotiation,
+    pub direct_root: Option<&'a CapabilityToken>,
+}
+
 impl<F> TrustRootResolver for F
 where
     F: Fn(&PublicKey) -> Option<ScopeHash>,
@@ -352,7 +400,8 @@ pub fn verify_capability_with_floor_and_trust_root(
     trust_root_scope_hash: &ScopeHash,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let peer = CapabilityNegotiation::v1_default();
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer)?;
+    let verified =
+        verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer, None)?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_trust_root(token, trust_root_scope_hash)?;
 
@@ -372,7 +421,8 @@ pub fn verify_capability_with_floor_and_resolver(
     trust_root: &dyn TrustRootResolver,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let peer = CapabilityNegotiation::v1_default();
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer)?;
+    let verified =
+        verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer, None)?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_resolver(token, trust_root)?;
 
@@ -389,7 +439,43 @@ pub fn verify_capability_full(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, peer)?;
+    verify_capability_full_with_root(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        CapabilityFeatureContext {
+            peer,
+            direct_root: None,
+        },
+        trust_root,
+        budgets,
+    )
+}
+
+/// Full verifier entry point with authenticated optional-family root evidence
+/// for delegated tokens.
+pub fn verify_capability_full_with_root(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+    clock: &dyn Clock,
+    crypto_floor: CapabilityCryptoFloor,
+    features: CapabilityFeatureContext<'_>,
+    trust_root: &dyn TrustRootResolver,
+    budgets: &mut dyn BudgetRegistry,
+) -> Result<VerifiedCapability, CapabilityError> {
+    let CapabilityFeatureContext { peer, direct_root } = features;
+    if let Some(root) = direct_root {
+        verify_capability_base(root, trusted_issuers, clock, crypto_floor, peer, None)?;
+    }
+    let verified = verify_capability_base(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        peer,
+        direct_root,
+    )?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_negotiation(token, peer, trust_root)?;
     admit_delegated_budget(token, budgets)?;
@@ -472,7 +558,7 @@ mod tests {
             DelegationLinkBody,
         },
         features,
-        scope::ChioScope,
+        scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
         token::{CapabilityTokenAttenuationBody, CapabilityTokenBody},
     };
     use chio_core_types::crypto::Keypair;
@@ -537,6 +623,74 @@ mod tests {
                 "aggregate invocation budget is not negotiated".to_string()
             )
         );
+    }
+
+    #[test]
+    fn cumulative_approval_requires_negotiation_on_portable_verifiers() {
+        let issuer = Keypair::generate();
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-cumulative-portable".to_string(),
+                issuer: issuer.public_key(),
+                subject: Keypair::generate().public_key(),
+                scope: ChioScope {
+                    grants: vec![ToolGrant {
+                        server_id: "server".to_string(),
+                        tool_name: "tool".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![Constraint::RequireCumulativeApprovalAbove {
+                            threshold: MonetaryAmount {
+                                units: 100,
+                                currency: "USD".to_string(),
+                            },
+                            approval_budget_id: "budget-1".to_string(),
+                            approval_budget_epoch: 7,
+                            cumulative_approval_root_binding: None,
+                        }],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    ..ChioScope::default()
+                },
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            &issuer,
+        )
+        .expect("sign direct cumulative capability");
+        let clock = crate::FixedClock::new(150);
+
+        let portable_error = verify_capability(&token, &[issuer.public_key()], &clock)
+            .expect_err("portable verifier must reject unnegotiated cumulative approval");
+        assert_eq!(
+            portable_error,
+            CapabilityError::AttenuationViolation(
+                "cumulative_approval_budget was not negotiated".to_string()
+            )
+        );
+
+        let mut peer = CapabilityNegotiation::v1_default();
+        peer.features.insert(
+            chio_core_types::capability::features::CUMULATIVE_APPROVAL_BUDGET.to_string(),
+            true,
+        );
+        let trust_roots = |_issuer: &PublicKey| None;
+        let mut budgets = NoopBudgetRegistry;
+        let verified = verify_capability_full(
+            &token,
+            &[issuer.public_key()],
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            &peer,
+            &trust_roots,
+            &mut budgets,
+        )
+        .expect("negotiated direct cumulative approval must verify");
+        assert_eq!(verified.id, token.id);
     }
 
     #[test]

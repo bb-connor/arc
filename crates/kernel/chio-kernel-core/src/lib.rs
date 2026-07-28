@@ -80,10 +80,10 @@ pub use budget_split::{
     MAX_BUDGET_SHARE_BPS,
 };
 pub use capability_verify::{
-    verify_capability, verify_capability_full, verify_capability_with_floor,
-    verify_capability_with_floor_and_resolver, verify_capability_with_floor_and_trust_root,
-    verify_capability_with_negotiated_floor, CapabilityError, TrustRootResolver,
-    VerifiedCapability,
+    verify_capability, verify_capability_full, verify_capability_full_with_root,
+    verify_capability_with_floor, verify_capability_with_floor_and_resolver,
+    verify_capability_with_floor_and_trust_root, verify_capability_with_negotiated_floor,
+    CapabilityError, CapabilityFeatureContext, TrustRootResolver, VerifiedCapability,
 };
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{

@@ -24,6 +24,9 @@ pub const DELEGATION_CHAIN_BINDING: &str = "delegation_chain_binding";
 /// durable composite quota authority is installed by the rollout composition.
 pub const AGGREGATE_INVOCATION_BUDGET: &str = "aggregate_invocation_budget";
 
+/// Peers can verify and enforce cumulative approval budgets.
+pub const CUMULATIVE_APPROVAL_BUDGET: &str = "cumulative_approval_budget";
+
 /// Peers can verify and atomically enforce an installed broker supplemental quota.
 ///
 /// The feature remains opt-in because silently ignoring the supplemental

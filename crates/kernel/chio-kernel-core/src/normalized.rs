@@ -634,6 +634,7 @@ fn unsupported_constraint_name(constraint: &Constraint) -> &'static str {
         Constraint::MaxArgsSize(_) => "max_args_size",
         Constraint::GovernedIntentRequired => "governed_intent_required",
         Constraint::RequireApprovalAbove { .. } => "require_approval_above",
+        Constraint::RequireCumulativeApprovalAbove { .. } => "require_cumulative_approval_above",
         Constraint::SellerExact(_) => "seller_exact",
         Constraint::MinimumRuntimeAssurance(_) => "minimum_runtime_assurance",
         Constraint::MinimumAutonomyTier(_) => "minimum_autonomy_tier",

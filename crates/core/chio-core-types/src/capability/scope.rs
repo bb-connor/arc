@@ -1,8 +1,12 @@
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::{Error, Result};
+
+use super::cumulative_approval::CumulativeApprovalRootBinding;
 use super::governance::{GovernedAutonomyTier, ProvenanceEvidenceClass};
 use super::runtime_attestation::RuntimeAssuranceTier;
 
@@ -38,6 +42,17 @@ impl ChioScope {
                 .prompt_grants
                 .iter()
                 .any(|grant| grant.operations.contains(&Operation::Delegate))
+    }
+
+    /// Whether this scope carries negotiated cumulative-approval semantics.
+    #[must_use]
+    pub fn has_cumulative_approval(&self) -> bool {
+        self.grants.iter().any(|grant| {
+            grant
+                .constraints
+                .iter()
+                .any(Constraint::is_cumulative_approval)
+        })
     }
 
     /// Returns true if `self` is a subset of `other` -- that is, every grant
@@ -141,10 +156,20 @@ impl ToolGrant {
 
         // Child must have at least as many constraints (more restrictive).
         // Each parent constraint must appear in the child's constraint list.
-        let constraints_ok = parent
+        let constraints_ok = parent.constraints.iter().all(|parent_constraint| {
+            self.constraints
+                .iter()
+                .any(|child_constraint| parent_constraint.is_preserved_by(child_constraint))
+        }) && self
             .constraints
             .iter()
-            .all(|pc| self.constraints.contains(pc));
+            .filter(|constraint| constraint.is_cumulative_approval())
+            .all(|child_constraint| {
+                parent
+                    .constraints
+                    .iter()
+                    .any(|parent_constraint| parent_constraint.is_preserved_by(child_constraint))
+            });
         if !constraints_ok {
             return false;
         }
@@ -298,7 +323,12 @@ pub enum ModelSafetyTier {
 
 /// A constraint on tool parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(
+    tag = "type",
+    content = "value",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum Constraint {
     /// File path parameter must start with this prefix.
     PathPrefix(String),
@@ -316,6 +346,14 @@ pub enum Constraint {
     GovernedIntentRequired,
     /// Requests at or above this threshold require a valid approval token.
     RequireApprovalAbove { threshold_units: u64 },
+    /// Cumulative authorized spend at or above this threshold requires approval.
+    RequireCumulativeApprovalAbove {
+        threshold: MonetaryAmount,
+        approval_budget_id: String,
+        approval_budget_epoch: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cumulative_approval_root_binding: Option<Box<CumulativeApprovalRootBinding>>,
+    },
     /// Requests must carry commerce approval context for this exact seller.
     SellerExact(String),
     /// Governed requests must carry valid runtime attestation at or above this tier.
@@ -370,6 +408,82 @@ pub enum Constraint {
     /// Patterns are compiled lazily during kernel evaluation so invalid
     /// regexes do not break construction or round-trip serialization.
     MemoryWriteDenyPatterns(Vec<String>),
+}
+
+impl Constraint {
+    #[must_use]
+    pub fn is_cumulative_approval(&self) -> bool {
+        matches!(self, Self::RequireCumulativeApprovalAbove { .. })
+    }
+
+    #[must_use]
+    pub fn cumulative_approval_root_binding(&self) -> Option<&CumulativeApprovalRootBinding> {
+        match self {
+            Self::RequireCumulativeApprovalAbove {
+                cumulative_approval_root_binding,
+                ..
+            } => cumulative_approval_root_binding.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn set_cumulative_approval_root_binding(
+        &mut self,
+        binding: Option<CumulativeApprovalRootBinding>,
+    ) -> Result<()> {
+        match self {
+            Self::RequireCumulativeApprovalAbove {
+                cumulative_approval_root_binding,
+                ..
+            } => {
+                *cumulative_approval_root_binding = binding.map(Box::new);
+                Ok(())
+            }
+            _ => Err(Error::AttenuationViolation {
+                reason: "constraint is not cumulative approval".into(),
+            }),
+        }
+    }
+
+    pub(crate) fn clear_cumulative_approval_root_binding(&mut self) {
+        if let Self::RequireCumulativeApprovalAbove {
+            cumulative_approval_root_binding,
+            ..
+        } = self
+        {
+            *cumulative_approval_root_binding = None;
+        }
+    }
+
+    fn is_preserved_by(&self, child: &Self) -> bool {
+        match (self, child) {
+            (
+                Self::RequireCumulativeApprovalAbove {
+                    threshold: parent_threshold,
+                    approval_budget_id: parent_budget_id,
+                    approval_budget_epoch: parent_budget_epoch,
+                    cumulative_approval_root_binding: parent_binding,
+                },
+                Self::RequireCumulativeApprovalAbove {
+                    threshold: child_threshold,
+                    approval_budget_id: child_budget_id,
+                    approval_budget_epoch: child_budget_epoch,
+                    cumulative_approval_root_binding: child_binding,
+                },
+            ) => {
+                parent_budget_id == child_budget_id
+                    && parent_budget_epoch == child_budget_epoch
+                    && parent_threshold.currency == child_threshold.currency
+                    && child_threshold.units <= parent_threshold.units
+                    && match (parent_binding, child_binding) {
+                        (Some(parent), Some(child)) => parent.canonical_eq(child),
+                        (None, None) => true,
+                        _ => false,
+                    }
+            }
+            _ => self == child,
+        }
+    }
 }
 
 /// Metadata describing the model executing a tool-bearing agent.

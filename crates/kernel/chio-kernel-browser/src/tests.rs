@@ -51,6 +51,8 @@ fn make_delegated_capability(
             attenuations: std::vec![],
             timestamp: ISSUED_AT,
             scope_hash: Some(parent_scope_hash.clone()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         issuer,

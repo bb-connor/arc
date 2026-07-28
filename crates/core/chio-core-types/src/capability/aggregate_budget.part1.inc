@@ -1253,6 +1253,12 @@ fn domain_separated_hash<T: Serialize>(domain: &str, value: &T) -> Result<String
 }
 
 fn validate_direct_root_issuance_body(body: &CapabilityTokenBody) -> Result<()> {
+    if body.scope.has_cumulative_approval() {
+        return Err(Error::AttenuationViolation {
+            reason:
+                "aggregate and cumulative approval family roots cannot be combined".to_string(),
+        });
+    }
     if body.aggregate_invocation_budget.is_some() {
         return Err(Error::AttenuationViolation {
             reason:
