@@ -55,7 +55,7 @@
       "expected_reason": "broker_destination_rebinding_detected",
       "threat_id": "ssrf_via_http_substrate",
       "path": "cases/broker_destination_rebinding/broker-destination-rebinding-001.json",
-      "content_sha256": "726c6b89694f79ed72909b9de6a19389837b0964fa5f6066b74d050e49b5052b"
+      "content_sha256": "76c7b0d1fdcb72b2a34f965a4a93bd027809220d36840357c76b3af0c4a5418a"
     },
     {
       "id": "broker-execution-overspend-001",
@@ -64,7 +64,7 @@
       "expected_reason": "broker_execution_overspend_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/broker_execution_overspend/broker-execution-overspend-001.json",
-      "content_sha256": "09e5a1e2a48f3f5203d6e038ae6524bf4d51031be12a4dd96728c360b740403d"
+      "content_sha256": "a249ee8dddeb046baa2d14a4ccea2c9cf04a72600ebf8f1d5c998506d8ac1a7f"
     },
     {
       "id": "broker-orphan-hold-001",
