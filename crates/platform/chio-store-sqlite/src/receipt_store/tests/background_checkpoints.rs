@@ -393,6 +393,7 @@ fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn
     // build_due_checkpoints.)
     let mut stale_head = VerifiedHead {
         latest_checkpoint: None,
+        chain_frontier: None,
         claim_log_count: max_batch,
         claim_log_max_seq: max_batch,
     };
@@ -451,6 +452,7 @@ fn successful_checkpoint_build_clears_stale_error() -> Result<(), Box<dyn std::e
     // The recovery build succeeds and must clear the stale error.
     let mut head = VerifiedHead {
         latest_checkpoint: None,
+        chain_frontier: None,
         claim_log_count: max_batch,
         claim_log_max_seq: max_batch,
     };
@@ -579,8 +581,17 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
         .ok_or("checkpoint 1 missing")?;
 
     let range_bytes = canonical_receipt_bytes(&bad_store, 4, 6);
-    let mut disconnected_two =
-        build_checkpoint_with_previous(2, 4, 6, &range_bytes, &keypair, Some(&checkpoint_one))?;
+    let mut disconnected_two = build_checkpoint_with_previous(
+        2,
+        4,
+        6,
+        &range_bytes,
+        &keypair,
+        Some(&checkpoint_one),
+        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(
+            &checkpoint_one.body,
+        )?],
+    )?;
     // Break the predecessor linkage while keeping the row individually valid:
     // point at a digest that is NOT cp1's, then re-sign so the body/signature
     // still verify (same mechanics as the clock-skew re-sign fixtures).
@@ -761,8 +772,21 @@ fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::erro
         .load_checkpoint_by_seq(2)?
         .ok_or("checkpoint 2 must exist")?;
     let range_bytes = canonical_receipt_bytes(&store, 5, 6);
-    let checkpoint_three =
-        build_checkpoint_with_previous(3, 5, 6, &range_bytes, &keypair, Some(&checkpoint_two))?;
+    let checkpoint_one = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("checkpoint 1 must exist")?;
+    let checkpoint_three = build_checkpoint_with_previous(
+        3,
+        5,
+        6,
+        &range_bytes,
+        &keypair,
+        Some(&checkpoint_two),
+        &[
+            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_one.body)?,
+            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_two.body)?,
+        ],
+    )?;
 
     // Tamper an EARLIER checkpoint (seq 1) while the LATEST (seq 2) still parses:
     // mutate checkpoint 1's signed batch_end_seq so it no longer matches its
@@ -900,6 +924,91 @@ fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn
     drop(tx);
     drop(connection);
     let _ = fs::remove_file(bad_path);
+    Ok(())
+}
+
+/// The frontier cache-miss scan races independently from the latest-row head
+/// refresh. Model the precise interleaving where the refresh saw an empty
+/// checkpoint chain, a peer then committed checkpoint 1, and the frontier scan
+/// sees that winner. The builder must boundedly verify and adopt the winner,
+/// reuse the one-leaf frontier, and continue with checkpoint 2 rather than
+/// reporting a false head/frontier conflict.
+#[test]
+fn frontier_rebuild_adopts_concurrent_checkpoint_winner() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (temp_dir, path) = temp_db("chio-bg-frontier-race")?;
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = 2;
+    for i in 0..(max_batch * 2) {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-frontier-race-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // This is the loser's cached state immediately after its latest-row
+    // refresh: four claim-log entries are known, but no checkpoint or chain
+    // frontier was visible yet.
+    let connection = store.connection()?;
+    let mut stale_head = seed_verified_head(&connection)?;
+    assert_eq!(stale_head.checkpoint_seq(), 0);
+    assert_eq!(
+        stale_head
+            .chain_frontier
+            .as_ref()
+            .map(CheckpointChainFrontier::leaf_count),
+        Some(0),
+        "startup must retain the verified empty frontier"
+    );
+    // Model a dropped cache between the refresh and frontier rebuild.
+    stale_head.chain_frontier = None;
+    assert!(stale_head.chain_frontier.is_none());
+    drop(connection);
+
+    // The peer wins checkpoint 1 after that refresh and before the loser's
+    // cache-miss frontier scan.
+    store.create_next_receipt_checkpoint(max_batch, &keypair)?;
+    let winner = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("concurrent checkpoint winner missing")?;
+
+    // Enter at the frontier-rebuild stage. It now observes one persisted leaf
+    // while the cached head is still at zero. Adoption must succeed, then the
+    // second owed batch must extend the adopted winner.
+    let mut connection = store.connection()?;
+    let advanced = maybe_build_checkpoint(
+        &mut connection,
+        &mut stale_head,
+        &signer(&keypair, max_batch),
+    )?;
+    assert!(
+        advanced,
+        "winner adoption and catch-up must report progress"
+    );
+    assert_eq!(
+        stale_head.latest_checkpoint.as_ref(),
+        store.load_checkpoint_by_seq(2)?.as_ref(),
+        "the cached head must continue through the second owed checkpoint"
+    );
+    assert_eq!(
+        stale_head
+            .chain_frontier
+            .as_ref()
+            .map(CheckpointChainFrontier::leaf_count),
+        Some(2),
+        "the reused frontier must cover the adopted winner and its successor"
+    );
+    assert_eq!(
+        store.load_checkpoint_by_seq(1)?.as_ref(),
+        Some(&winner),
+        "catch-up must preserve the concurrently committed winner"
+    );
+    verify_checkpoint_chain_integrity(&connection)?;
+
+    drop(connection);
+    drop(store);
+    temp_dir.close()?;
     Ok(())
 }
 

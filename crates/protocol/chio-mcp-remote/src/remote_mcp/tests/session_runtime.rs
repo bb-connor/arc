@@ -51,11 +51,8 @@ fn mcp_rate_limiter_caps_tracked_keys() {
 fn remote_session_factory_holds_one_durable_admission_sidecar() {
     let directory = private_remote_admission_directory("owner");
     let policy_path = directory.join("policy.yaml");
-    std::fs::write(
-        &policy_path,
-        "capabilities:\n  default:\n    tools: []\n",
-    )
-    .expect("write remote admission policy");
+    std::fs::write(&policy_path, "capabilities:\n  default:\n    tools: []\n")
+        .expect("write remote admission policy");
     let session_database = directory.join("sessions.sqlite3");
     let mut config = test_remote_config();
     config.policy_path = policy_path;
@@ -65,8 +62,7 @@ fn remote_session_factory_holds_one_durable_admission_sidecar() {
         RemoteSessionFactory::new(config.clone()).expect("claim remote durable admission owner");
     assert!(factory.durable_admission.is_some());
     assert_ne!(
-        durable_admission_sidecar_path(&session_database)
-            .expect("derive remote admission sidecar"),
+        durable_admission_sidecar_path(&session_database).expect("derive remote admission sidecar"),
         session_database
     );
     assert!(RemoteSessionFactory::new(config.clone()).is_err());
@@ -80,11 +76,8 @@ fn remote_session_factory_holds_one_durable_admission_sidecar() {
 fn remote_session_factory_rejects_admission_sidecar_aliases() {
     let directory = private_remote_admission_directory("alias");
     let policy_path = directory.join("policy.yaml");
-    std::fs::write(
-        &policy_path,
-        "capabilities:\n  default:\n    tools: []\n",
-    )
-    .expect("write remote admission policy");
+    std::fs::write(&policy_path, "capabilities:\n  default:\n    tools: []\n")
+        .expect("write remote admission policy");
     let session_database = directory.join("sessions.sqlite3");
     let admission_database =
         durable_admission_sidecar_path(&session_database).expect("derive admission sidecar");

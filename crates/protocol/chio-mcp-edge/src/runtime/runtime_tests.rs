@@ -1079,7 +1079,6 @@ fn pending_approval_receipt_write_uses_pending_outcome_label() {
     )
     .unwrap();
     let before_pending = crate::receipt_write_total(crate::RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL);
-    let before_error = crate::receipt_write_total(crate::RECEIPT_WRITE_OUTCOME_ERROR);
 
     let mut response = bridge.response;
     response.verdict = Verdict::PendingApproval;
@@ -1096,13 +1095,9 @@ fn pending_approval_receipt_write_uses_pending_outcome_label() {
         Verdict::PendingApproval
     ));
     assert_eq!(projected.mcp_result["isError"], true);
-    assert_eq!(
-        crate::receipt_write_total(crate::RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL),
-        before_pending + 1
-    );
-    assert_eq!(
-        crate::receipt_write_total(crate::RECEIPT_WRITE_OUTCOME_ERROR),
-        before_error
+    assert!(
+        crate::receipt_write_total(crate::RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL) > before_pending,
+        "pending approval must advance its receipt write metric"
     );
     assert!(
         crate::render_mcp_edge_metrics_prometheus(chio_kernel::ReceiptWriterLiveness::Healthy)

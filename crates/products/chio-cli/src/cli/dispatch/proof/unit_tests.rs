@@ -207,10 +207,8 @@ fn proof_collect_consumes_replays_only_after_sealing_succeeds() {
         std::fs::write(&verifier_path, b"not a directory"),
         "block verifier report directory",
     );
-    let sealing_error = collect::seal_collected_proof_bundle(
-        ProofCollectKind::AgentWebEnvelope,
-        &bundle,
-    );
+    let sealing_error =
+        collect::seal_collected_proof_bundle(ProofCollectKind::AgentWebEnvelope, &bundle);
     assert!(
         sealing_error.is_err(),
         "unwritable verifier output must fail sealing"
@@ -225,13 +223,10 @@ fn proof_collect_consumes_replays_only_after_sealing_succeeds() {
         "retry after sealing failure",
     );
 
-    let replay_error = collect::seal_collected_proof_bundle(
-        ProofCollectKind::AgentWebEnvelope,
-        &bundle,
-    );
-    assert!(replay_error.is_err_and(|error| error
-        .to_string()
-        .contains("replayed Standard Webhooks id")));
+    let replay_error =
+        collect::seal_collected_proof_bundle(ProofCollectKind::AgentWebEnvelope, &bundle);
+    assert!(replay_error
+        .is_err_and(|error| error.to_string().contains("replayed Standard Webhooks id")));
     for relative_path in [
         "bundle-signature.dsse.json",
         ".bundle-signature.dsse.json.pending",

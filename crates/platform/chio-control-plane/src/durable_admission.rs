@@ -11,6 +11,10 @@ use chio_store_sqlite::{SqliteAuthorityStore, SqliteBudgetStore, SqliteRevocatio
 
 use crate::{load_or_create_authority_keypair, CliError};
 
+#[cfg(windows)]
+#[path = "durable_admission/windows.rs"]
+mod windows;
+
 #[derive(Clone)]
 pub struct DurableAdmissionRuntime {
     operations: Arc<dyn QualifiedAdmissionProjectionStore>,
@@ -190,27 +194,202 @@ pub(crate) fn durable_admission_lock_root(path: &Path) -> Result<PathBuf, CliErr
     sibling_path(path, ".locks", "durable admission database")
 }
 
-pub(crate) fn create_private_directory(path: &Path) -> Result<(), CliError> {
-    let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
+pub(crate) fn create_private_directory(path: &Path) -> Result<(), std::io::Error> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
+        prepare_private_directory_unix(path, ExistingPrivateDirectory::Harden)?;
     }
-    builder.create(path)?;
+    #[cfg(windows)]
+    {
+        windows::prepare_private_directory(path)?;
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = path;
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "secure private-directory creation is unavailable on this platform",
+        ));
+    }
     Ok(())
 }
 
 #[cfg(test)]
 pub(crate) fn private_tempdir() -> Result<tempfile::TempDir, CliError> {
     let directory = tempfile::tempdir()?;
+    create_private_directory(directory.path())?;
+    Ok(directory)
+}
+
+/// Creates a missing private directory or validates an existing one without
+/// changing its permissions.
+///
+/// On Unix, the path is traversed relative to open directory descriptors so
+/// symlinks cannot redirect validation or creation. A missing target is created
+/// with mode `0700`. An existing target must be owned by the effective user and
+/// must not be group or world writable.
+pub fn ensure_private_directory(path: &Path) -> Result<(), std::io::Error> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
+        prepare_private_directory_unix(path, ExistingPrivateDirectory::Preserve)?;
     }
-    Ok(directory)
+    #[cfg(windows)]
+    {
+        windows::prepare_private_directory(path)?;
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = path;
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "secure private-directory creation is unavailable on this platform",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[derive(Clone, Copy)]
+enum ExistingPrivateDirectory {
+    Harden,
+    Preserve,
+}
+
+#[cfg(unix)]
+fn prepare_private_directory_unix(
+    path: &Path,
+    existing_target: ExistingPrivateDirectory,
+) -> Result<(), std::io::Error> {
+    use nix::errno::Errno;
+    use nix::fcntl::{open, openat, OFlag};
+    use nix::sys::stat::{mkdirat, Mode};
+    use std::ffi::OsStr;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    let components = absolute
+        .components()
+        .filter_map(|component| match component {
+            Component::RootDir | Component::CurDir => None,
+            Component::Normal(name) => Some(Ok(name)),
+            Component::ParentDir | Component::Prefix(_) => Some(Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "private directory path must not contain parent or platform-prefix components",
+            ))),
+        })
+        .collect::<Result<Vec<&OsStr>, std::io::Error>>()?;
+    if components.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "private directory path must name a directory below the filesystem root",
+        ));
+    }
+
+    let flags = OFlag::O_RDONLY | OFlag::O_CLOEXEC | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW;
+    let mut directory = File::from(open(Path::new("/"), flags, Mode::empty())?);
+    let effective_uid = nix::unistd::geteuid().as_raw();
+
+    for (index, component) in components.iter().enumerate() {
+        let parent_metadata = directory.metadata()?;
+        let (child, created) = match openat(&directory, *component, flags, Mode::empty()) {
+            Ok(file) => (File::from(file), false),
+            Err(Errno::ENOENT) => {
+                validate_private_directory_parent(&parent_metadata, None, effective_uid)?;
+                let created = match mkdirat(&directory, *component, Mode::from_bits_truncate(0o700))
+                {
+                    Ok(()) => true,
+                    Err(Errno::EEXIST) => false,
+                    Err(error) => return Err(error.into()),
+                };
+                let child = File::from(openat(&directory, *component, flags, Mode::empty())?);
+                if created {
+                    child.set_permissions(fs::Permissions::from_mode(0o700))?;
+                }
+                (child, created)
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let child_metadata = child.metadata()?;
+        validate_private_directory_parent(
+            &parent_metadata,
+            Some(child_metadata.uid()),
+            effective_uid,
+        )?;
+
+        if index + 1 == components.len() {
+            validate_private_directory_owner(child_metadata.uid(), effective_uid)?;
+            match existing_target {
+                ExistingPrivateDirectory::Harden => {
+                    child.set_permissions(fs::Permissions::from_mode(0o700))?;
+                }
+                ExistingPrivateDirectory::Preserve if created => {}
+                ExistingPrivateDirectory::Preserve => {
+                    validate_private_directory_mode(child_metadata.mode())?;
+                }
+            }
+        }
+        directory = child;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_private_directory_owner(uid: u32, effective_uid: u32) -> Result<(), std::io::Error> {
+    if uid != effective_uid {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "private directory must be owned by the effective user",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_private_directory_mode(mode: u32) -> Result<(), std::io::Error> {
+    if mode & 0o022 != 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "private directory must not be group or world writable",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_private_directory_parent(
+    parent: &fs::Metadata,
+    child_uid: Option<u32>,
+    effective_uid: u32,
+) -> Result<(), std::io::Error> {
+    use std::os::unix::fs::MetadataExt;
+
+    let parent_uid = parent.uid();
+    let parent_mode = parent.mode();
+    if parent_uid != effective_uid && parent_uid != 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "private directory ancestry must be owned by the effective user or root",
+        ));
+    }
+    if parent_mode & 0o022 != 0 {
+        if parent_mode & 0o1000 == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "private directory ancestry must not be group or world writable unless sticky",
+            ));
+        }
+        if child_uid.is_some_and(|uid| uid != effective_uid && uid != 0) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "private directory entry in sticky ancestry must be owned by the effective user or root",
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn write_private_file_atomically(path: &Path, contents: &[u8]) -> Result<(), CliError> {
@@ -520,6 +699,220 @@ mod tests {
         assert!(error
             .to_string()
             .contains("target database must not alias alias database"));
+        Ok(())
+    }
+
+    #[test]
+    fn private_directory_rejects_symlink_without_chmod_target() -> Result<(), CliError> {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let directory = tempfile::tempdir()?;
+        let target = directory.path().join("attacker-selected");
+        let alias = directory.path().join("authority.locks");
+        fs::create_dir(&target)?;
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
+        symlink(&target, &alias)?;
+
+        let Err(error) = create_private_directory(&alias) else {
+            return Err(CliError::cli_other_error(
+                "a symlinked private-directory path was accepted",
+            ));
+        };
+        assert_ne!(error.kind(), std::io::ErrorKind::NotFound);
+        assert_eq!(fs::metadata(&target)?.permissions().mode() & 0o777, 0o755);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_directory_rejects_a_parent_writable_by_other_users() -> Result<(), CliError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir()?;
+        let insecure_parent = directory.path().join("shared");
+        fs::create_dir(&insecure_parent)?;
+        fs::set_permissions(&insecure_parent, fs::Permissions::from_mode(0o777))?;
+
+        let Err(error) = create_private_directory(&insecure_parent.join("authority.locks")) else {
+            return Err(CliError::cli_other_error(
+                "an attacker-writable parent was accepted",
+            ));
+        };
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(error
+            .to_string()
+            .contains("must not be group or world writable unless sticky"));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_directory_rejects_an_attacker_writable_ancestor() -> Result<(), CliError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir()?;
+        let insecure_ancestor = directory.path().join("shared");
+        let secure_parent = insecure_ancestor.join("victim");
+        fs::create_dir(&insecure_ancestor)?;
+        fs::set_permissions(&insecure_ancestor, fs::Permissions::from_mode(0o777))?;
+        fs::create_dir(&secure_parent)?;
+        fs::set_permissions(&secure_parent, fs::Permissions::from_mode(0o700))?;
+
+        let Err(error) = create_private_directory(&secure_parent.join("authority.locks")) else {
+            return Err(CliError::cli_other_error(
+                "an attacker-writable ancestor was accepted",
+            ));
+        };
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(error
+            .to_string()
+            .contains("must not be group or world writable unless sticky"));
+        Ok(())
+    }
+
+    fn private_directory_test_root() -> Result<tempfile::TempDir, CliError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir()?;
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
+        Ok(directory)
+    }
+
+    #[test]
+    fn ensured_private_directory_is_created_with_private_permissions() -> Result<(), CliError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = private_directory_test_root()?;
+        let target = directory.path().join("project");
+
+        ensure_private_directory(&target)?;
+
+        assert_eq!(fs::metadata(&target)?.permissions().mode() & 0o777, 0o700);
+        Ok(())
+    }
+
+    #[test]
+    fn ensured_private_directory_preserves_safe_existing_permissions() -> Result<(), CliError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = private_directory_test_root()?;
+        let target = directory.path().join("project");
+        fs::create_dir(&target)?;
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
+
+        ensure_private_directory(&target)?;
+
+        assert_eq!(fs::metadata(&target)?.permissions().mode() & 0o777, 0o755);
+        Ok(())
+    }
+
+    #[test]
+    fn ensured_private_directory_rejects_and_preserves_writable_target() -> Result<(), CliError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = private_directory_test_root()?;
+        let target = directory.path().join("project");
+        fs::create_dir(&target)?;
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o775))?;
+
+        let Err(error) = ensure_private_directory(&target) else {
+            return Err(CliError::cli_other_error(
+                "a group-writable private directory was accepted",
+            ));
+        };
+
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(error
+            .to_string()
+            .contains("must not be group or world writable"));
+        assert_eq!(fs::metadata(&target)?.permissions().mode() & 0o777, 0o775);
+        Ok(())
+    }
+
+    #[test]
+    fn ensured_private_directory_rejects_final_symlink_with_trailing_slash() -> Result<(), CliError>
+    {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let directory = private_directory_test_root()?;
+        let target = directory.path().join("attacker-selected");
+        let alias = directory.path().join("project");
+        fs::create_dir(&target)?;
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
+        symlink(&target, &alias)?;
+        let trailing_slash = PathBuf::from(format!("{}/", alias.display()));
+
+        let Err(error) = ensure_private_directory(&trailing_slash) else {
+            return Err(CliError::cli_other_error(
+                "a trailing slash made a final symlink safe",
+            ));
+        };
+
+        assert_ne!(error.kind(), std::io::ErrorKind::NotFound);
+        assert_eq!(fs::metadata(&target)?.permissions().mode() & 0o777, 0o755);
+        Ok(())
+    }
+
+    #[test]
+    fn ensured_private_directory_rejects_intermediate_symlink() -> Result<(), CliError> {
+        use std::os::unix::fs::symlink;
+
+        let directory = private_directory_test_root()?;
+        let target_parent = directory.path().join("attacker-selected");
+        let alias_parent = directory.path().join("alias");
+        fs::create_dir(&target_parent)?;
+        fs::create_dir(target_parent.join("project"))?;
+        symlink(&target_parent, &alias_parent)?;
+
+        if ensure_private_directory(&alias_parent.join("project")).is_ok() {
+            return Err(CliError::cli_other_error(
+                "an intermediate symlink was accepted",
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn ensured_private_directory_rejects_unsafe_ancestor() -> Result<(), CliError> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = private_directory_test_root()?;
+        let insecure_ancestor = directory.path().join("shared");
+        let target = insecure_ancestor.join("project");
+        fs::create_dir(&insecure_ancestor)?;
+        fs::set_permissions(&insecure_ancestor, fs::Permissions::from_mode(0o777))?;
+        fs::create_dir(&target)?;
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
+
+        let Err(error) = ensure_private_directory(&target) else {
+            return Err(CliError::cli_other_error(
+                "a nonsticky writable ancestor was accepted",
+            ));
+        };
+
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(error
+            .to_string()
+            .contains("must not be group or world writable unless sticky"));
+        assert_eq!(fs::metadata(&target)?.permissions().mode() & 0o777, 0o755);
+        Ok(())
+    }
+
+    #[test]
+    fn private_directory_owner_must_match_effective_user() -> Result<(), CliError> {
+        let effective_uid = nix::unistd::geteuid().as_raw();
+        let foreign_uid = if effective_uid == 0 { 1 } else { 0 };
+
+        let Err(error) = validate_private_directory_owner(foreign_uid, effective_uid) else {
+            return Err(CliError::cli_other_error(
+                "foreign private-directory ownership was accepted",
+            ));
+        };
+
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(error
+            .to_string()
+            .contains("must be owned by the effective user"));
         Ok(())
     }
 }

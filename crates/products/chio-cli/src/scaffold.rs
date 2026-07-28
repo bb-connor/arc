@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::CliError;
 
@@ -12,7 +12,8 @@ const HELLO_SERVER_TEMPLATE: &str = include_str!("../templates/init/src/bin/hell
 const DEMO_TEMPLATE: &str = include_str!("../templates/init/src/bin/demo.rs.tmpl");
 
 pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
-    ensure_target_dir(path)?;
+    let path = normalize_target_path(path)?;
+    ensure_target_dir(&path)?;
 
     let project_name = path
         .file_name()
@@ -41,7 +42,7 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
     )?;
     write_template(path.join("src/bin/demo.rs"), DEMO_TEMPLATE, &replacements)?;
 
-    let absolute = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let absolute = fs::canonicalize(&path).unwrap_or_else(|_| path.to_path_buf());
     let chio_bin_hint = std::env::current_exe()
         .ok()
         .map(|path| path.display().to_string())
@@ -57,24 +58,88 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn ensure_target_dir(path: &Path) -> Result<(), CliError> {
-    if path.exists() {
-        if !path.is_dir() {
-            return Err(CliError::cli_other_error(format!(
-                "refusing to scaffold into non-directory `{}`",
-                path.display()
-            )));
+fn normalize_target_path(path: &Path) -> Result<PathBuf, CliError> {
+    if path.is_absolute() {
+        if path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
+        {
+            return Err(CliError::cli_other_error(
+                "scaffold target path must not contain parent components after a path segment",
+            ));
         }
-        if path.read_dir()?.next().is_some() {
-            return Err(CliError::cli_other_error(format!(
-                "refusing to scaffold into non-empty directory `{}`",
-                path.display()
-            )));
-        }
-        return Ok(());
+        return Ok(path.components().collect());
     }
 
-    fs::create_dir_all(path)?;
+    let mut leading_parents = 0_usize;
+    let mut relative_tail = PathBuf::new();
+    let mut reached_target = false;
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if reached_target {
+                    return Err(CliError::cli_other_error(
+                        "scaffold target path must not contain parent components after a path segment",
+                    ));
+                }
+                leading_parents += 1;
+            }
+            Component::Normal(name) => {
+                reached_target = true;
+                relative_tail.push(name);
+            }
+            Component::Prefix(_) | Component::RootDir => {
+                return Err(CliError::cli_other_error(
+                    "relative scaffold target path must not contain a platform prefix or root",
+                ));
+            }
+        }
+    }
+
+    if leading_parents == 0 {
+        return Ok(path.components().collect());
+    }
+
+    let mut normalized = std::env::current_dir()?;
+    for _ in 0..leading_parents {
+        normalized.pop();
+    }
+    normalized.push(relative_tail);
+    Ok(normalized)
+}
+
+fn ensure_target_dir(path: &Path) -> Result<(), CliError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() {
+                return Err(CliError::cli_other_error(format!(
+                    "refusing to scaffold into symbolic link `{}`",
+                    path.display()
+                )));
+            }
+            if !metadata.is_dir() {
+                return Err(CliError::cli_other_error(format!(
+                    "refusing to scaffold into non-directory `{}`",
+                    path.display()
+                )));
+            }
+            chio_control_plane::ensure_private_directory(path)?;
+            if path.read_dir()?.next().is_some() {
+                return Err(CliError::cli_other_error(format!(
+                    "refusing to scaffold into non-empty directory `{}`",
+                    path.display()
+                )));
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            chio_control_plane::ensure_private_directory(path)?;
+        }
+        Err(error) => {
+            return Err(error.into());
+        }
+    }
+
     Ok(())
 }
 
@@ -122,7 +187,18 @@ fn render_template(template: &str, replacements: &BTreeMap<&str, String>) -> Str
 
 #[cfg(test)]
 mod tests {
-    use super::sanitize_package_name;
+    use std::path::Path;
+
+    use super::{normalize_target_path, sanitize_package_name};
+    use crate::CliError;
+
+    #[test]
+    fn normalize_target_path_preserves_ordinary_relative_path() -> Result<(), CliError> {
+        let path = Path::new("nested/project");
+
+        assert_eq!(normalize_target_path(path)?, path);
+        Ok(())
+    }
 
     #[test]
     fn sanitize_package_name_normalizes_cli_input() {

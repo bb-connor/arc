@@ -47,7 +47,7 @@
                 {
                     use std::os::unix::fs::PermissionsExt;
                     fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
-                        .expect("restrict session store directory permissions");
+                        .expect("secure private session store directory");
                 }
                 directory
             })
