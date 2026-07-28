@@ -57,8 +57,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json",
-          "sha256": "75859a4914889c6917c31429665bcc842e0cf891b1f02e1bb5a98d8274453691",
-          "inputs_sha256": "fb96fbea5e3d29530f850127125bf042a434efbcd73eb88427b0cff79936e1ad"
+          "sha256": "1a219965b027eadf89fc5d11e38b48ab922d55f1110cda82f214d43b90ed11e5",
+          "inputs_sha256": "612787f5952cc82b60600dc2098ef9205919e60d161fe1fbe9750fd3bebe17b0"
         }
       },
       {
