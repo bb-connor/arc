@@ -54,8 +54,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/reader_subset_direction/mutants.out/outcomes.json",
-          "sha256": "8c0182433392c37c2f0f45d5469e357a9d285056749e42cf64af5b913af61c0e",
-          "inputs_sha256": "42f3399c99bc6648a183fc6764c62fc3354e97e0511c9dc465c2ec3a20f71389"
+          "sha256": "5baf4b4578f6aad6977361e31b4061f1bbf7569236d585ee7acb5aed0fa3d3dc",
+          "inputs_sha256": "f4d25d166b6c85a688648970f2fbdd7c7960f69d9957c48fb39d6754ff57b192"
         }
       },
       {
