@@ -82,7 +82,7 @@
       "expected_reason": "broker_parent_double_charge_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/broker_parent_double_charge/broker-parent-double-charge-001.json",
-      "content_sha256": "5ccddce4d2a6b6b112c39612509c01b16a5fd3fdccb1fc323d3e66885eb25d47"
+      "content_sha256": "28a7a3b5c3cf902d3643bdf42884f4897afd6a78e2d412c1814ea8ab6717a551"
     },
     {
       "id": "broker-proof-replay-001",
