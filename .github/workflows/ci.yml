@@ -419,8 +419,8 @@ jobs:
     uses: ./.github/workflows/threat-model-coverage.yml
 
   enterprise-security-contract:
-    # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=c9ed03b59f5655a5e198bf1e0ea35aafe817393c
-    uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@c9ed03b59f5655a5e198bf1e0ea35aafe817393c
+    # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=e2202455c704597a74b75dacfec3157a97c36254
+    uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@e2202455c704597a74b75dacfec3157a97c36254
     permissions:
       artifact-metadata: write
       attestations: write
