@@ -433,7 +433,7 @@
       "expected_reason": "rotation_unwitnessed_signing_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/rotation_unwitnessed_signing/rotation-unwitnessed-signing-001.json",
-      "content_sha256": "bc5c15c75d6c53ad5b61315e2a0a9acdda0991177961e7992c641f9e4791a57a"
+      "content_sha256": "d98b113c04dbe6f6056302ab12ab6e2e4ce620fd397151205f2342fee0ab83cb"
     },
     {
       "id": "sandbox-false-exec-success-001",
