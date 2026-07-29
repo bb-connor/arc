@@ -88,8 +88,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/ignored_store_error/mutants.out/outcomes.json",
-          "sha256": "3bb9519a4d8d70ab01bd293cba2f3d0601fdea60ae0c2cc89d3028982bab3aaa",
-          "inputs_sha256": "505be61155ad66c0cc7b2908b69b4e1dfd9624bf269c8eca9ec43ba09302925b"
+          "sha256": "11c49b7994dba57675e1b7935aad44f84ed934bed36a093fbfac2a268cd5fb7a",
+          "inputs_sha256": "90f21a43c89b63f3bdf40f24da7c49aa756394c50aa6b5c9e350a324237893f3"
         }
       },
       {
