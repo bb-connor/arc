@@ -8,7 +8,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 3.447635917,
+          "duration": 6.255695,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -20,7 +20,7 @@
         },
         {
           "phase": "Test",
-          "duration": 3.1890015,
+          "duration": 3.560387375,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -44,22 +44,22 @@
             "return_type": "-> Result<(), ManifestError>",
             "span": {
               "start": {
-                "line": 26,
+                "line": 21,
                 "column": 1
               },
               "end": {
-                "line": 42,
+                "line": 37,
                 "column": 2
               }
             }
           },
           "span": {
             "start": {
-              "line": 31,
+              "line": 26,
               "column": 5
             },
             "end": {
-              "line": 41,
+              "line": 36,
               "column": 6
             }
           },
@@ -68,12 +68,12 @@
         }
       },
       "summary": "CaughtMutant",
-      "log_path": "log/crates__platform__chio-manifest__src__lib.rs_line_31_col_5.log",
-      "diff_path": "diff/crates__platform__chio-manifest__src__lib.rs_line_31_col_5.diff",
+      "log_path": "log/crates__platform__chio-manifest__src__lib.rs_line_26_col_5.log",
+      "diff_path": "diff/crates__platform__chio-manifest__src__lib.rs_line_26_col_5.diff",
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 3.840126625,
+          "duration": 4.094356834,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -85,7 +85,7 @@
         },
         {
           "phase": "Test",
-          "duration": 1.211129666,
+          "duration": 1.474331584,
           "process_status": {
             "Failure": 101
           },

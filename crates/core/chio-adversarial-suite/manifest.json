@@ -460,7 +460,7 @@
       "expected_reason": "sandbox_unsigned_manifest_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/sandbox_unsigned_manifest/sandbox-unsigned-manifest-001.json",
-      "content_sha256": "012392cf2698180c4cc33a9ae88367a94efcae18e8da5faf8f286392e406a392"
+      "content_sha256": "28b40a4bfb40e865aa2004df7c97dd1e234cae17816d263df9d3b9a28586df8d"
     },
     {
       "id": "scope-superset-001",
