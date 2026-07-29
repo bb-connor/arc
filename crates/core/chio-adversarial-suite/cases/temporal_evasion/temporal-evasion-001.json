@@ -31,8 +31,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/ingest_time_substitution/mutants.out/outcomes.json",
-          "sha256": "383cd9a4158be7e2d86cc052ca982c46aeb4d7d78490a0bffa34b67ca926de8c",
-          "inputs_sha256": "a72261c84f75199da021bb5c22f8c7c8c387baca4e47ee9ee8c931fe2200627f"
+          "sha256": "f7bbd43080032fd77cff129a5658efac2390ffa3cd7d2376417657be8b52941a",
+          "inputs_sha256": "31d15282ffd62a4219b6d1fbb6149f57e2cdc627024bb762971378d3940ce2e8"
         }
       }
     ]
