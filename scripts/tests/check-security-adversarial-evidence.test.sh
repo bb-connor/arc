@@ -2829,13 +2829,44 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             "survivors": [],
         },
     )
-    _multi_cases, multi_index = checker.load_cases(
-        multi_refresh_root,
-        multi_cases_path,
-        False,
-        True,
-        refresh_campaign="sandbox_fd_leak",
-    )
+    actual_campaign_input_digest = checker.campaign_input_digest
+    refresh_input_digest_campaigns: list[str] = []
+
+    def capture_refresh_input_digest(
+        root: Path,
+        package_dirs: dict[str, Path],
+        campaign: dict[str, object],
+        control: dict[str, object],
+        case_path: Path,
+        *,
+        captured_files: dict[Path, bytes | None] | None = None,
+    ) -> str:
+        refresh_input_digest_campaigns.append(str(campaign["id"]))
+        return actual_campaign_input_digest(
+            root,
+            package_dirs,
+            campaign,
+            control,
+            case_path,
+            captured_files=captured_files,
+        )
+
+    checker.campaign_input_digest = capture_refresh_input_digest
+    try:
+        _multi_cases, multi_index = checker.load_cases(
+            multi_refresh_root,
+            multi_cases_path,
+            False,
+            True,
+            refresh_campaign="sandbox_fd_leak",
+        )
+    finally:
+        checker.campaign_input_digest = actual_campaign_input_digest
+    if refresh_input_digest_campaigns != ["sandbox_fd_leak"]:
+        raise AssertionError(
+            "targeted refresh recomputed an untouched campaign input closure: "
+            f"{refresh_input_digest_campaigns}"
+        )
     untouched_outcome = multi_refresh_root / (
         multi_index["sandbox_env_leak"][1]["outcomes"]["path"]
     )

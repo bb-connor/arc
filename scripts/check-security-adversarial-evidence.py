@@ -4381,15 +4381,29 @@ def validate_case(
             continue
         source_path = root / campaign["source"]
         captured_files: dict[Path, bytes | None] = {source_path: None}
-        expected_inputs_digest = campaign_input_digest(
-            root,
-            package_dirs,
-            campaign,
-            controls[campaign["control_id"]],
-            path,
-            captured_files=captured_files,
-        )
-        stale_inputs = outcomes["inputs_sha256"] != expected_inputs_digest
+        if refresh_campaign is not None and campaign["id"] != refresh_campaign:
+            # Targeted refresh deliberately permits other promoted campaigns to
+            # remain stale until their own genuine rerun. Recomputing the full
+            # conservative repository closure for those untouched campaigns is
+            # both redundant and quadratic across a multi-campaign refresh.
+            # Their stored outcome digest and caught-only shape are still
+            # verified below, while ordinary validation remains fully strict.
+            stale_inputs = True
+            captured_files[source_path] = read_regular_file_no_follow(
+                source_path,
+                campaign["source"],
+                root=root,
+            )
+        else:
+            expected_inputs_digest = campaign_input_digest(
+                root,
+                package_dirs,
+                campaign,
+                controls[campaign["control_id"]],
+                path,
+                captured_files=captured_files,
+            )
+            stale_inputs = outcomes["inputs_sha256"] != expected_inputs_digest
         # Refresh mode may need to repair several independently stale campaigns
         # one at a time. It relaxes only freshness and current semantic binding
         # for stale stored outcomes; their recorded digest and caught-only shape
