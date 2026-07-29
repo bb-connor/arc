@@ -271,7 +271,7 @@
       "expected_reason": "label_downgrade_detected",
       "threat_id": "pii_phi_exposure",
       "path": "cases/label_downgrade/label-downgrade-001.json",
-      "content_sha256": "67e55c47c61605234302516024f419f8eb0c8ae66bb685217f89dbba492b608c"
+      "content_sha256": "04ff0674c6c8d4722dba98963a38cb6870cb3a569c3c9e90c37bf1b00e6eb836"
     },
     {
       "id": "old-key-backdating-001",
