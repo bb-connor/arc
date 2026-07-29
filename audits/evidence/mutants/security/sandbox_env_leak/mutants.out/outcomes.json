@@ -8,7 +8,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 0.748882416,
+          "duration": 0.467450959,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -21,7 +21,7 @@
         },
         {
           "phase": "Test",
-          "duration": 0.473631,
+          "duration": 0.466543041,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -46,22 +46,22 @@
             "return_type": "-> bool",
             "span": {
               "start": {
-                "line": 30,
+                "line": 27,
                 "column": 1
               },
               "end": {
-                "line": 88,
+                "line": 85,
                 "column": 2
               }
             }
           },
           "span": {
             "start": {
-              "line": 31,
+              "line": 28,
               "column": 5
             },
             "end": {
-              "line": 87,
+              "line": 84,
               "column": 45
             }
           },
@@ -70,12 +70,12 @@
         }
       },
       "summary": "CaughtMutant",
-      "log_path": "log/crates__security__chio-cage__src__lib.rs_line_31_col_5.log",
-      "diff_path": "diff/crates__security__chio-cage__src__lib.rs_line_31_col_5.diff",
+      "log_path": "log/crates__security__chio-cage__src__lib.rs_line_28_col_5.log",
+      "diff_path": "diff/crates__security__chio-cage__src__lib.rs_line_28_col_5.diff",
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 1.954828833,
+          "duration": 1.912092333,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -88,7 +88,7 @@
         },
         {
           "phase": "Test",
-          "duration": 1.232851417,
+          "duration": 1.212561292,
           "process_status": {
             "Failure": 101
           },
