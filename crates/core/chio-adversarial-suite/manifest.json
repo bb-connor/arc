@@ -424,7 +424,7 @@
       "expected_reason": "rotation_partial_commit_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/rotation_partial_commit/rotation-partial-commit-001.json",
-      "content_sha256": "6c24572fb8896431e52644f8d693a357c44a687304f9ac6f5e21338727aa1154"
+      "content_sha256": "42fc644975ab77ae26e842068c72668791975f890dba82e09d3ac5a139e972c1"
     },
     {
       "id": "rotation-unwitnessed-signing-001",
