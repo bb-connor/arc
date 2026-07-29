@@ -280,7 +280,7 @@
       "expected_reason": "old_key_backdating_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/old_key_backdating/old-key-backdating-001.json",
-      "content_sha256": "f8917ed06fcca2faf319b6be3dcf3ca4ab94d221b55ac1ed02a1eab346b44b48"
+      "content_sha256": "dc19a3447d0ba829a13831f0e5d24ebb7c9e1781b4436444ed8dc26e8f49c9b7"
     },
     {
       "id": "partial-signature-001",
