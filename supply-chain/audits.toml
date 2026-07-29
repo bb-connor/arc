@@ -481,11 +481,29 @@ criteria = "safe-to-deploy"
 version = "0.4.44"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
 
+[[audits.cmpv2]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.2.0"
+notes = "Reviewed exact RustCrypto CMPv2 DER data-model source and manifest. The crate forbids unsafe code, has no build script or runtime IO, and is used for typed certificate-management messages."
+
+[[audits.cms]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.2.3"
+notes = "Reviewed exact RustCrypto CMS DER, builder, and crypto-composition source. The crate forbids unsafe code and has no build script or runtime IO; bounded collection conversion panics are internal construction failures, not memory-safety violations."
+
 [[audits.coset]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.4.2"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.crmf]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.2.0"
+notes = "Reviewed exact RustCrypto CRMF DER data-model source and manifest. The crate forbids unsafe code, has no build script or runtime IO, and is used for typed certificate-request messages."
 
 [[audits.crossbeam-channel]]
 who = "Chio supply-chain reviewer"
@@ -552,6 +570,18 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "2.2.0"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
+
+[[audits.enumflags2]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.7.12"
+notes = "Reviewed exact enumflags2 bit-representation and conversion source, including unsafe representation operations. Derive-generated masks and RawBitFlags invariants constrain values to valid declared flag discriminants."
+
+[[audits.enumflags2_derive]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.7.12"
+notes = "Reviewed exact enumflags2 proc-macro source. The macro validates enum representation, variant form, and discriminants before generating RawBitFlags implementations and performs no runtime IO."
 
 [[audits.fips204]]
 who = "Chio supply-chain reviewer"
@@ -679,6 +709,12 @@ criteria = "safe-to-deploy"
 version = "1.0.1"
 notes = "Identifier case conversion helper for darling; pure string ops, no IO."
 
+[[audits.ignore]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.4.28"
+notes = "Reviewed exact ripgrep ignore and filesystem traversal source. It has no unsafe code, build script, or network path; filesystem IO is limited to requested traversal and ignore-file parsing."
+
 [[audits.indexmap]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -727,6 +763,12 @@ criteria = "safe-to-deploy"
 version = "0.3.91"
 notes = "Exemption chase-down certification. Reviewed current workspace dependency role and removed the matching audit-this-later exemption row."
 
+[[audits.landlock]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.4.4"
+notes = "Reviewed exact Linux Landlock syscall wrapper, ABI compatibility handling, rule construction, and OwnedFd ownership. Successful descriptors are owned, partial or unavailable enforcement is observable, and callers can require full enforcement."
+
 [[audits.libc]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -762,6 +804,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-run"
 version = "0.8.11"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.nono]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.53.0"
+notes = "Reviewed exact sandbox and trust-library source used by Chio with default features disabled. Its build script reads only embedded schema and writes generated Rust to OUT_DIR; FFI and keystore boundaries were inspected, and 625 exact no-default-feature tests passed."
 
 [[audits.notify]]
 who = "Chio supply-chain reviewer"
@@ -937,6 +985,12 @@ criteria = "safe-to-deploy"
 version = "1.12.3"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
 
+[[audits.regress]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.11.1"
+notes = "Reviewed exact regular-expression parser, bytecode VM, generated Unicode tables, and unchecked indexing invariants. It has no build script, filesystem IO, or network access in deployed code."
+
 [[audits.reqwest]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -985,6 +1039,12 @@ criteria = "safe-to-deploy"
 version = "1.2.0"
 notes = "RAII scope guard helper; trivial defer macro, no IO."
 
+[[audits.seccompiler]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.5.0"
+notes = "Reviewed exact seccomp BPF compiler and installer source. Filter size and condition bounds are validated, no_new_privs and seccomp syscall failures propagate, and thread-synchronization installation errors fail closed."
+
 [[audits.semver]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -1032,6 +1092,48 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.10.9"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
+
+[[audits.sigstore-bundle]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed exact Sigstore bundle parsing and structural-validation source. It has no local unsafe code, build script, or runtime IO and rejects malformed verification-material combinations before cryptographic verification."
+
+[[audits.sigstore-crypto]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed exact Sigstore signature, X.509, checkpoint, and key-parsing source. Cryptographic operations dispatch to reviewed aws-lc-backed primitives; key type and signing-scheme mismatches fail verification."
+
+[[audits.sigstore-merkle]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed exact Sigstore Merkle inclusion and consistency proof source. Bounds, tree-size decomposition, path consumption, and root comparison reject malformed or inconsistent proofs."
+
+[[audits.sigstore-rekor]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed exact Sigstore Rekor client and entry-parsing source. Typed URL construction, HTTP response errors, entry decoding, and log-object validation propagate failures rather than accepting incomplete responses."
+
+[[audits.sigstore-trust-root]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.3"
+notes = "Reviewed exact Sigstore trust-root loading, TUF integration, cache IO, and validity filtering source. Invalid or unavailable trusted material propagates errors and expired trust material is excluded."
+
+[[audits.sigstore-tsa]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed exact RFC 3161 parsing, message-imprint, signature, certificate-chain, and timestamp verification source. Malformed tokens, digest mismatches, untrusted chains, and invalid signing times fail verification."
+
+[[audits.sigstore-types]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed exact Sigstore wire and data-encoding source. It has no unsafe code, build script, or runtime IO and uses typed closed representations for bundle and verification material."
 
 [[audits.smallvec]]
 who = "Chio supply-chain reviewer"
@@ -1200,6 +1302,24 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "1.19.0"
 notes = "Compile-time numeric types; build-time only, no IO."
+
+[[audits.typify]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed exact typify facade crate. It exposes build-time schema-to-Rust generation from typify-impl and typify-macro and adds no runtime IO or unsafe implementation."
+
+[[audits.typify-impl]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed exact typify schema parser and Rust token-generation source. File access is limited to explicitly requested schema inputs; generated identifiers, bounds, and type composition are validated without unsafe code."
+
+[[audits.typify-macro]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed exact typify procedural macro source. It reads only the explicitly named schema path at build time and delegates validated token generation to typify-impl without runtime authority."
 
 [[audits.unicode-ident]]
 who = "Chio supply-chain reviewer"
@@ -1404,6 +1524,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.16.0"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.x509-tsp]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "Reviewed exact RustCrypto RFC 3161 timestamp-protocol DER type source and manifest. It contains no unsafe code, build script, filesystem IO, or network path."
 
 [[audits.zed_extension_api]]
 who = "Chio supply-chain reviewer"

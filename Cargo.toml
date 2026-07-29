@@ -195,7 +195,13 @@ exclude = [
     # Linux-only patched Landlock adapter: compiled transitively through
     # chio-cage on Linux, not as a standalone member on non-Linux hosts.
     "third_party/nono-chio",
+    # Patched transitive Sigstore verifier: compiled through nono and tested
+    # independently from the first-party workspace.
+    "third_party/sigstore-verify-chio",
 ]
+
+[patch.crates-io]
+sigstore-verify = { path = "third_party/sigstore-verify-chio" }
 
 [workspace.package]
 version = "0.1.0"

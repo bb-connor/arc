@@ -12637,8 +12637,6 @@ dependencies = [
 [[package]]
 name = "sigstore-verify"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d751d608afd334fb9d8c037ad9efef69f1954494eff99cd79a0a6fc8af34ccb"
 dependencies = [
  "base64 0.22.1",
  "chrono",
