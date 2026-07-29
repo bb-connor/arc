@@ -442,7 +442,7 @@
       "expected_reason": "sandbox_false_exec_success_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/sandbox_false_exec_success/sandbox-false-exec-success-001.json",
-      "content_sha256": "205b55a8364bacf55665d69113a6d1fb6218fc4c8cca27732b3a779dcf794026"
+      "content_sha256": "fb6a97aed4b3c76e31e9cb30140a0513a6fb9a4eb97f42f322996feab31d2fd1"
     },
     {
       "id": "sandbox-partial-enforcement-001",
