@@ -451,7 +451,7 @@
       "expected_reason": "sandbox_partial_enforcement_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/sandbox_partial_enforcement/sandbox-partial-enforcement-001.json",
-      "content_sha256": "1dea88374e5b9ffbe966297735029e3f614c1748ab727850ffba1482b64248f0"
+      "content_sha256": "420a346f673648406045aba5f3db96e7130a49b4a8ffccebe1956c5391bb2d66"
     },
     {
       "id": "sandbox-unsigned-manifest-001",
