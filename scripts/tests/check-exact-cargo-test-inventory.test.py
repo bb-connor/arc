@@ -58,6 +58,16 @@ test beta ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 """
+INTERLEAVED_RUN = """running 2 tests
+test alpha ... child output
+more child output
+ok
+test beta ...
+child output
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+"""
 
 
 def main() -> int:
@@ -65,6 +75,15 @@ def main() -> int:
     require(
         invoke(LISTING, RUN, digest_mode=True) == 0,
         "verifier rejected the valid committed-inventory fixture",
+    )
+    require(
+        invoke(LISTING, INTERLEAVED_RUN) == 0,
+        "verifier rejected sequential test output interleaved with libtest status",
+    )
+    require(
+        invoke(LISTING, INTERLEAVED_RUN.replace("\nchild output\nok\n", "\nchild output\n"))
+        != 0,
+        "verifier accepted an interleaved test without a completion marker",
     )
     require(
         invoke("alpha: test\ngamma: test\n", RUN, digest_mode=True) != 0,

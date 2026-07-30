@@ -75,11 +75,33 @@ def main() -> int:
             )
 
     run_lines = lines(args.run_output)
-    passed = sorted(
-        match.group(1)
-        for line in run_lines
-        if (match := re.fullmatch(r"test ([A-Za-z0-9_:]+) \.\.\. ok", line))
-    )
+    passed = []
+    pending_test: str | None = None
+    for line in run_lines:
+        if match := re.fullmatch(r"test ([A-Za-z0-9_:]+) \.\.\. ok", line):
+            if pending_test is not None:
+                raise SystemExit(
+                    f"{args.label} started {match.group(1)!r} before "
+                    f"{pending_test!r} completed"
+                )
+            passed.append(match.group(1))
+            continue
+        if match := re.fullmatch(r"test ([A-Za-z0-9_:]+) \.\.\.(?: .*)?", line):
+            if pending_test is not None:
+                raise SystemExit(
+                    f"{args.label} started {match.group(1)!r} before "
+                    f"{pending_test!r} completed"
+                )
+            pending_test = match.group(1)
+            continue
+        if line == "ok" and pending_test is not None:
+            passed.append(pending_test)
+            pending_test = None
+    if pending_test is not None:
+        raise SystemExit(
+            f"{args.label} never observed completion for {pending_test!r}"
+        )
+    passed.sort()
     if passed != listed:
         missing = sorted(set(listed) - set(passed))
         unexpected = sorted(set(passed) - set(listed))

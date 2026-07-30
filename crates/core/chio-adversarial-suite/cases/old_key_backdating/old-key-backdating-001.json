@@ -34,8 +34,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/old_key_backdating/mutants.out/outcomes.json",
-          "sha256": "37e57d0547d55eac098e7a25cd60507c9e6f443becb928b15a3db5cf7ea9d47a",
-          "inputs_sha256": "4bb0eb449dba655a6888422f708504f10f66585e2a9c5dd9a4e017668d3bc17f"
+          "sha256": "4b9aa8798d6e2470f94826f1d568148cf5492ee1105f106d9346b10228d55e56",
+          "inputs_sha256": "bf366c6805e5c337b17dd6a3c021c51c0453e9d4abd34dbe84cf2132b3a66397"
         }
       }
     ]
