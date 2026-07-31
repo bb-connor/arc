@@ -52,6 +52,9 @@ pub(crate) const PUBLIC_SETTLEMENT_FINALITY_REPORT_STATUSES: &[&str] = &[
     "failed",
     "reorged",
     "not_final",
+    // Emitted in place of an affirmative-finality status when finality is
+    // not independently grounded (no independent chain head).
+    "ungrounded",
 ];
 
 #[path = "settlement_proof_types.rs"]
@@ -65,6 +68,27 @@ use settlement_proof_event_validation::{
     validate_identity_registry_operator_snapshot, validate_release_event,
 };
 
+/// Verify a public settlement proof bundle through the recompute lane.
+///
+/// Settlement state is recomputed from the kernel-signed checkpoint anchor
+/// and the chain snapshot, not trusted from any producer-asserted or
+/// witnessed on-chain value: the public witness must agree with the
+/// recomputed `chain_anchor` (root, checkpoint sequence, anchor tx), and the
+/// snapshot registry root must equal the anchored Merkle root. The returned
+/// [`PublicSettlementVerifierReport`] binds settlement and payment claims
+/// ONLY (`claim.public_settlement.*`). A "verified" verdict here means the
+/// payment settled and the settlement evidence recomputes; it does NOT
+/// authorize a tool call. Payment success is not authorization: tool-call
+/// authority comes from the capability/governance lane, never from a
+/// settlement receipt, so this report carries no capability grant and emits
+/// no tool-call authorization claim.
+///
+/// # Errors
+///
+/// Returns [`Web3ContractError`] when the bundle fails header, trust,
+/// verifier-policy, provenance, order-binding, chain-binding, snapshot,
+/// independent-head, finality, dispute, trust-market, or public-witness
+/// validation, or when any carried signature fails to verify.
 pub fn verify_public_settlement_proof(
     bundle: &PublicSettlementProofBundle,
     trust: &PublicSettlementVerifierTrust,
@@ -104,10 +128,23 @@ pub fn verify_public_settlement_proof(
         &mut verified_claims,
         CLAIM_PUBLIC_SETTLEMENT_CHAIN_CONTEXT_VERIFIED,
     );
-    push_claim_once(
-        &mut verified_claims,
-        CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
-    );
+    // Fail-closed finality grounding: finality is asserted ONLY when an
+    // INDEPENDENT chain head is supplied. `validate_finality` checks the
+    // producer-supplied `chain_snapshot.latest_block_number` /
+    // `observed_confirmations`, which are UNSIGNED bundle fields a malicious
+    // producer can fabricate to manufacture confirmation depth. Without
+    // `trust.independent_chain_head` (validated above by
+    // `validate_independent_chain_head`) there is no source the verifier
+    // independently observed, so the finality claim is WITHHELD rather than
+    // emitted from producer-asserted depth. Downstream verifier policy that
+    // requires `finality_verified` then fails closed; nothing here vouches for
+    // finality it cannot independently ground.
+    if trust.independent_chain_head.is_some() {
+        push_claim_once(
+            &mut verified_claims,
+            CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
+        );
+    }
     if let Some(oracle_evidence) = &bundle.settlement_receipt.oracle_evidence {
         verify_oracle_conversion_evidence_signature(oracle_evidence, &trust.trusted_oracle_keys)?;
         push_claim_once(
@@ -161,7 +198,17 @@ pub fn verify_public_settlement_proof(
         },
         public_witness,
         finality_decision: PublicSettlementFinalityDecision {
-            status: finality_report_status(bundle).to_string(),
+            // Fail-closed finality grounding: the `status` field must never
+            // ASSERT grounded finality without an independent chain head. The raw
+            // lifecycle-derived status can read `final`/`closed` from the
+            // producer-supplied settlement state and confirmation depth, so a
+            // consumer keying off the STATUS field (rather than the withheld
+            // `finality_verified` claim) could still accept ungrounded finality.
+            // Downgrade those affirmative-finality statuses to `ungrounded` when no
+            // independent head grounds the depth; the non-final dispute/reversal
+            // outcomes are not finality assertions and pass through unchanged.
+            status: grounded_finality_report_status(bundle, trust.independent_chain_head.is_some())
+                .to_string(),
             required_confirmations: bundle.required_confirmations,
             observed_confirmations: bundle.observed_confirmations,
         },
@@ -1090,7 +1137,7 @@ fn validate_public_settlement_verifier_policy(
     Ok(())
 }
 
-fn public_settlement_chain_is_mainnet(chain_id: &str) -> bool {
+pub(crate) fn public_settlement_chain_is_mainnet(chain_id: &str) -> bool {
     matches!(
         chain_id,
         "eip155:1"
@@ -1102,6 +1149,38 @@ fn public_settlement_chain_is_mainnet(chain_id: &str) -> bool {
             | "eip155:42161"
             | "eip155:43114"
             | "eip155:59144"
+    )
+}
+
+/// Whether `chain_id` is a KNOWN public testnet. This is a positive allow-list,
+/// not the inverse of [`public_settlement_chain_is_mainnet`]: an unknown or
+/// unverified chain is NOT a testnet here, so a testnet-gated path that requires
+/// this predicate fails closed for any chain the protocol cannot positively
+/// confirm is a testnet (the mainnet deny-list alone is partial and would let an
+/// unenumerated mainnet through).
+pub(crate) fn public_settlement_chain_is_testnet(chain_id: &str) -> bool {
+    matches!(
+        chain_id,
+        // Ethereum testnets.
+        "eip155:11155111"   // Sepolia
+            | "eip155:17000"    // Holesky
+            // Base / OP-stack testnets.
+            | "eip155:84532"    // Base Sepolia
+            | "eip155:11155420" // OP Sepolia
+            // Arbitrum testnet.
+            | "eip155:421614"   // Arbitrum Sepolia
+            // Polygon testnet.
+            | "eip155:80002"    // Polygon Amoy
+            // Avalanche testnet.
+            | "eip155:43113"    // Fuji
+            // BNB Smart Chain testnet.
+            | "eip155:97"       // BSC testnet
+            // zkSync Era testnet.
+            | "eip155:300"      // zkSync Sepolia
+            // Linea testnet.
+            | "eip155:59141"    // Linea Sepolia
+            // Scroll testnet.
+            | "eip155:534351" // Scroll Sepolia
     )
 }
 
@@ -1966,6 +2045,38 @@ fn finality_report_status(bundle: &PublicSettlementProofBundle) -> &'static str 
         Web3SettlementLifecycleState::PendingDispatch
         | Web3SettlementLifecycleState::EscrowLocked => "not_final",
     }
+}
+
+/// The status the verifier report emits when a finality status that WOULD assert
+/// grounded finality is not independently grounded (no `independent_chain_head`).
+pub(crate) const FINALITY_STATUS_UNGROUNDED: &str = "ungrounded";
+
+/// The finality statuses that affirmatively assert the settlement is final and
+/// confirmed on chain. These derive from the `Settled` lifecycle state and may be
+/// reported ONLY when an INDEPENDENT chain head grounds the confirmation depth.
+/// The remaining statuses (`partially_settled`, the reversal/dispute
+/// outcomes, and `not_final`) are NOT affirmative-finality assertions, so they are
+/// never downgraded.
+const GROUNDED_FINALITY_STATUSES: &[&str] = &["final", "closed"];
+
+/// The report's finality status, downgraded fail-closed when finality is not
+/// independently grounded.
+///
+/// When `independent_head_present` is false the verifier cannot vouch for the
+/// confirmation depth (it is producer-supplied and unsigned), so any status that
+/// would AFFIRM grounded finality is replaced with [`FINALITY_STATUS_UNGROUNDED`].
+/// This keeps the STATUS field from asserting grounded finality on its own, so a
+/// consumer that keys off the status (rather than the withheld `finality_verified`
+/// claim) can never accept ungrounded finality. Non-final outcomes pass through.
+fn grounded_finality_report_status(
+    bundle: &PublicSettlementProofBundle,
+    independent_head_present: bool,
+) -> &'static str {
+    let status = finality_report_status(bundle);
+    if !independent_head_present && GROUNDED_FINALITY_STATUSES.contains(&status) {
+        return FINALITY_STATUS_UNGROUNDED;
+    }
+    status
 }
 
 fn validate_dispute_snapshot(

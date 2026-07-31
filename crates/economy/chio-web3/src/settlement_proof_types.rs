@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::capability::scope::{Operation, ToolGrant};
 use crate::crypto::PublicKey;
 use crate::identity::SignedWeb3IdentityBinding;
 use crate::settlement::Web3SettlementExecutionReceiptArtifact;
@@ -392,4 +393,161 @@ pub struct PublicSettlementTrustMarketContext {
     pub guarantee_decision_ref: String,
     pub sla_remedy_ref: String,
     pub slash_authority_ref: String,
+}
+
+/// A tool-call authorization decision: the type that occupies the
+/// "may this tool call proceed?" position in the kernel capability lane.
+///
+/// This type is fail-closed BY CONSTRUCTION. It carries a single private flag,
+/// so an authorized state is unrepresentable outside this module:
+///
+/// - [`Default`] and [`ToolCallAuthorization::denied`] both yield DENY.
+/// - The only constructor that can yield an authorized decision is
+///   [`ToolCallAuthorization::from_capability_grant`], which requires an
+///   explicit positive capability grant (a [`ToolGrant`] that targets the tool
+///   and carries the `Invoke` operation).
+/// - There is deliberately NO `From`/`Into`, no `Deserialize`, and no other
+///   constructor that maps a settlement or payment verdict (such as a
+///   [`PublicSettlementVerifierReport`]) into this type. Payment success is
+///   therefore STRUCTURALLY incapable of producing a tool-call grant: it is not
+///   a runtime check that could be forgotten or weakened, it is the absence of
+///   any reachable code path from a settlement verdict to a grant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ToolCallAuthorization {
+    /// Private by design: `false` (DENY) unless minted from a capability grant.
+    granted: bool,
+}
+
+impl ToolCallAuthorization {
+    /// The fail-closed default: the tool call is NOT authorized.
+    #[must_use]
+    pub const fn denied() -> Self {
+        Self { granted: false }
+    }
+
+    /// Mint a tool-call authorization from an explicit positive capability
+    /// grant. This is the ONLY path to an authorized decision.
+    ///
+    /// DENY-BY-DEFAULT POSTURE. This argument-less helper sees ONLY the static
+    /// grant plus the `(server_id, tool_name)` being invoked. It has NO request
+    /// arguments, NO running usage/budget, NO per-call cost, and NO DPoP/sender
+    /// proof. It may therefore authorize ONLY a grant whose EVERY
+    /// authorization-relevant field is FULLY satisfiable from those static inputs.
+    /// Any field that gates authorization but requires runtime, usage, proof, or
+    /// request context to evaluate MUST fail closed (DENY) here and route through
+    /// the lane that holds that context (the kernel capability/budget lane, the
+    /// edge DPoP lane). When a NEW field is added to `ToolGrant`, this helper MUST
+    /// treat it as deny-by-default until it is explicitly proven fully evaluable
+    /// from the static inputs above and added to the positive checks below.
+    ///
+    /// Concretely, the decision is authorized only when the grant targets this
+    /// `server_id`/`tool_name` (honoring `*` wildcards), carries the `Invoke`
+    /// operation, carries NO parameter constraints, carries NO invocation cap
+    /// (`max_invocations` is `None`), carries NO monetary cap
+    /// (`max_cost_per_invocation` and `max_total_cost` are both `None`), and does
+    /// NOT require a DPoP proof (`dpop_required` is `None` or `Some(false)`). Every
+    /// other case fails closed to DENY.
+    ///
+    /// Why each non-identity field is deny-by-default here:
+    ///
+    /// - Parameter CONSTRAINTS (`grant.constraints`) narrow the tool's input space,
+    ///   and the kernel's `constraints_match` evaluates them against the actual
+    ///   request arguments. This helper never sees the request, so a constrained
+    ///   grant could authorize EVERY invocation; only an unconstrained grant is
+    ///   evaluable.
+    /// - INVOCATION cap (`max_invocations`) gates on the grant's running call
+    ///   count, which lives in the kernel budget lane, not here. `Some(0)` permits
+    ///   zero calls outright, and even a positive cap (`Some(n)`) cannot be
+    ///   confirmed unexhausted without the usage count, so ANY `Some(_)` fails
+    ///   closed; only an uncapped grant (`None`, bounded by the budget lane
+    ///   elsewhere) is evaluable.
+    /// - MONETARY caps (`max_cost_per_invocation`, `max_total_cost`) gate on the
+    ///   call's cost and the grant's running spend, neither of which this helper
+    ///   holds. `Some(0)` per-invocation denies every non-zero-cost call and an
+    ///   exhausted total denies further calls, and even a positive cap is
+    ///   unconfirmable, so any `Some(_)` fails closed; only `None`/`None` is
+    ///   evaluable.
+    /// - DPoP (`dpop_required`) requires a valid DPoP proof on every invocation
+    ///   when `Some(true)`, and this helper holds no proof. The ACP/edge lane denies
+    ///   a DPoP-required grant without a proof, so authorizing it here would
+    ///   advertise a capability the edge lane would deny; `Some(true)` fails closed.
+    ///   `None`/`Some(false)` require no proof and are evaluable.
+    ///
+    /// Drift checklist: this helper mirrors, but does not share, the kernel
+    /// capability lane. The complete set of `ToolGrant` fields it evaluates is
+    /// `server_id`, `tool_name`, `operations`, `constraints`, `max_invocations`,
+    /// `max_cost_per_invocation`, `max_total_cost`, and `dpop_required`. If
+    /// `ToolGrant` gains any new gating field, this helper does not see it and
+    /// its positive ("granted") case diverges from real kernel authorization
+    /// until the field is added here deny-by-default. Drift is deny-safe (an
+    /// unknown field can only make the kernel stricter than this mirror), but
+    /// the conformance harness's positive case goes stale.
+    #[must_use]
+    pub fn from_capability_grant(grant: &ToolGrant, server_id: &str, tool_name: &str) -> Self {
+        // Identity + operation: fully evaluable from the static inputs.
+        let server_ok = grant.server_id == "*" || grant.server_id == server_id;
+        let tool_ok = grant.tool_name == "*" || grant.tool_name == tool_name;
+        let can_invoke = grant.operations.contains(&Operation::Invoke);
+
+        // Parameter constraints are checked against the request this helper never
+        // sees: only an unconstrained grant is evaluable here.
+        let unconstrained = grant.constraints.is_empty();
+
+        // Budget caps (invocation count + monetary) gate authorization on running
+        // usage and per-call cost that live in the kernel budget lane, not here. A
+        // capped grant (any `Some`) - even a positive one - is unconfirmable from
+        // static inputs, so authorize ONLY an uncapped grant (every cap `None`).
+        let uncapped = grant.max_invocations.is_none()
+            && grant.max_cost_per_invocation.is_none()
+            && grant.max_total_cost.is_none();
+
+        // A grant that requires a DPoP proof cannot be authorized without one, and
+        // this helper holds no proof. `Some(true)` fails closed; `None`/`Some(false)`
+        // require no proof and are evaluable.
+        let dpop_not_required = grant.dpop_required != Some(true);
+
+        // Deny-by-default: authorize ONLY when every authorization-relevant field
+        // above is fully satisfiable from the static inputs. A new gating field
+        // must be added as a fresh `&&` term here, defaulting to DENY until proven
+        // evaluable.
+        Self {
+            granted: server_ok
+                && tool_ok
+                && can_invoke
+                && unconstrained
+                && uncapped
+                && dpop_not_required,
+        }
+    }
+
+    /// Whether this decision authorizes the tool call. `false` for every
+    /// decision except one minted from a matching capability grant.
+    #[must_use]
+    pub const fn is_authorized(&self) -> bool {
+        self.granted
+    }
+}
+
+impl PublicSettlementVerifierReport {
+    /// The tool-call authorization carried by a settlement verifier report:
+    /// always [`ToolCallAuthorization::denied`].
+    ///
+    /// This is STRUCTURAL, not a runtime check. The body returns the
+    /// fail-closed DENY decision without reading any field of the report, so no
+    /// value of `verdict` (not even `"verified"`, nor a forged `"authorized"`),
+    /// no `verified_claims` entry, and no other field can flip it. A verified
+    /// settlement report proves a payment settled and that the settlement
+    /// evidence recomputes; tool-call authority comes ONLY from the
+    /// capability/governance lane via
+    /// [`ToolCallAuthorization::from_capability_grant`].
+    #[must_use]
+    pub const fn tool_call_authorization(&self) -> ToolCallAuthorization {
+        ToolCallAuthorization::denied()
+    }
+
+    /// Convenience guard: `false` for every settlement report, by construction.
+    #[must_use]
+    pub const fn authorizes_tool_call(&self) -> bool {
+        self.tool_call_authorization().is_authorized()
+    }
 }

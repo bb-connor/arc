@@ -471,6 +471,27 @@ pub fn verify_checkpoint_statement(
     Ok(())
 }
 
+/// Verify an anchor inclusion proof through the recompute lane, the SOLE
+/// proof lane for anchored state.
+///
+/// This is the verifier-side mirror of the on-chain `getRoot` /
+/// `verifyInclusionDetailed` readback: it does NOT trust any
+/// producer-asserted or witnessed value. The committed Merkle root is taken
+/// only from the kernel-signed checkpoint statement (recomputed and
+/// signature-checked here), the receipt leaf is recomputed from the
+/// canonical receipt body, and the audit path is re-walked to that root. A
+/// value that is merely asserted (for example an external EAS/SAS
+/// attestation that states "root R was anchored") is not admissible: it
+/// carries no recomputing audit path and no kernel-signed checkpoint
+/// commitment, so it cannot pass this lane. An attestation is not an
+/// anchoring inclusion proof.
+///
+/// # Errors
+///
+/// Returns [`Web3ContractError`] when the proof fails structural
+/// validation, when the receipt, identity-binding, or checkpoint-statement
+/// signatures do not verify, or when the recomputed receipt leaf does not
+/// reproduce the committed Merkle root via the supplied audit path.
 pub fn verify_anchor_inclusion_proof(
     proof: &AnchorInclusionProof,
 ) -> Result<(), Web3ContractError> {

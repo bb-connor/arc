@@ -21,6 +21,7 @@ pub mod settlement;
 pub mod settlement_proof;
 pub mod trust_profile;
 pub(crate) mod validation;
+pub mod x402_signing;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

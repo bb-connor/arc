@@ -256,6 +256,10 @@ pub(super) fn is_supported_source_protocol(source_protocol: &str) -> bool {
     source_protocol_spec(source_protocol).is_some()
 }
 
+pub(super) fn registered_source_protocol_ids() -> impl Iterator<Item = &'static str> {
+    SOURCE_PROTOCOLS.iter().map(|spec| spec.id)
+}
+
 pub(super) fn external_subject_schema(source_protocol: &str) -> Option<&'static str> {
     source_protocol_spec(source_protocol).map(|spec| spec.external_subject_schema)
 }

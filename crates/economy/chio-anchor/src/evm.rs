@@ -23,6 +23,7 @@ pub use types::{
     EvmAnchorTarget, EvmPublicationGuard, EvmPublicationReceipt, PreparedDelegateRegistration,
     PreparedEvmRootPublication,
 };
+pub use validation::validate_publication_call_data_against_checkpoint;
 pub use verification::verify_inclusion_onchain;
 
 use crate::AnchorError;

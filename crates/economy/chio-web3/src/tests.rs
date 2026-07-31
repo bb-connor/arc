@@ -7,7 +7,7 @@ use crate::anchors::{
     CHIO_LINK_ORACLE_AUTHORITY, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA,
 };
 use crate::canonical::canonical_json_bytes;
-use crate::capability::scope::MonetaryAmount;
+use crate::capability::scope::{MonetaryAmount, Operation, ToolGrant};
 use crate::chain::{
     validate_web3_chain_configuration, Web3ChainConfiguration, Web3ChainContractAddresses,
 };
@@ -47,8 +47,9 @@ use crate::settlement_proof::{
     PublicSettlementDisputeSnapshot, PublicSettlementIdentityRegistryOperatorSnapshot,
     PublicSettlementIndependentChainHead, PublicSettlementOrderBinding,
     PublicSettlementProofBundle, PublicSettlementRuntimeCodehashTrust,
-    PublicSettlementTrustMarketContext, PublicSettlementVerifierTrust, PublicSettlementWitnessMode,
-    PublicSettlementWitnessReport, CHIO_PUBLIC_SETTLEMENT_VERIFIER_REPORT_SCHEMA,
+    PublicSettlementTrustMarketContext, PublicSettlementVerifierReport,
+    PublicSettlementVerifierTrust, PublicSettlementWitnessMode, PublicSettlementWitnessReport,
+    ToolCallAuthorization, CHIO_PUBLIC_SETTLEMENT_VERIFIER_REPORT_SCHEMA,
     CHIO_WEB3_SETTLEMENT_DISPUTE_SCHEMA, CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA,
     CLAIM_PUBLIC_SETTLEMENT_CHAIN_CONTEXT_VERIFIED, CLAIM_PUBLIC_SETTLEMENT_DISPUTE_POSTURE_BOUND,
     CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED, CLAIM_PUBLIC_SETTLEMENT_ORACLE_CONVERSION_BOUND,
@@ -60,6 +61,12 @@ use crate::trust_profile::{
     validate_web3_trust_profile, Web3ChainFinalityRule, Web3DisputePolicy, Web3DisputeWindow,
     Web3FinalityMode, Web3RegulatedRole, Web3RegulatedRoleAssumption, Web3SettlementPath,
     Web3TrustProfile, CHIO_WEB3_TRUST_PROFILE_SCHEMA,
+};
+use crate::x402_signing::{
+    prepare_x402_broadcast_intent, sign_x402_settlement_attestation,
+    verify_x402_settlement_attestation, ValueMovementAuthorization, X402CustodyModel,
+    X402LiveMoneyMovementLeg, CHIO_X402_PREPARE_ONLY_BROADCAST_INTENT_SCHEMA,
+    CHIO_X402_SETTLEMENT_ATTESTATION_SCHEMA,
 };
 use serde_json::json;
 use std::collections::BTreeSet;
@@ -1413,10 +1420,25 @@ fn settlement_receipt_rejects_oracle_grant_currency_mismatch() {
     ));
 }
 
+fn sample_matching_independent_chain_head() -> PublicSettlementIndependentChainHead {
+    // Matches the sample bundle's chain snapshot so finality grounds on an
+    // independent head. Same values the offline-finality fixture pins.
+    PublicSettlementIndependentChainHead {
+        chain_id: "eip155:8453".to_string(),
+        observed_block_number: 12_345_678,
+        observed_block_hash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            .to_string(),
+        latest_block_number: 12_345_701,
+    }
+}
+
 #[test]
 fn public_settlement_proof_emits_verifier_report() {
     let bundle = sample_public_settlement_proof_bundle();
-    let report = verify_sample_public_settlement_proof(&bundle).unwrap();
+    // The finality claim is grounded on an independent chain head.
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.independent_chain_head = Some(sample_matching_independent_chain_head());
+    let report = verify_public_settlement_proof(&bundle, &trust).unwrap();
 
     assert_eq!(report.schema, CHIO_PUBLIC_SETTLEMENT_VERIFIER_REPORT_SCHEMA);
     assert_eq!(report.verdict, "verified");
@@ -1477,6 +1499,317 @@ fn public_settlement_proof_emits_verifier_report() {
     assert!(report
         .verified_claims
         .contains(&CLAIM_PUBLIC_SETTLEMENT_PUBLIC_WITNESS_VERIFIED.to_string()));
+}
+
+/// Fail-closed negative: a fully verified x402
+/// settlement RECEIPT binds settlement and payment claims ONLY. It never
+/// authorizes a tool call. Payment success is not authorization; tool-call
+/// authority belongs to the capability/governance lane, so a "verified"
+/// settlement verdict must not leak any capability grant or tool-call claim.
+#[test]
+fn verified_x402_settlement_receipt_does_not_authorize_tool_call() {
+    // A settlement proof the recompute lane accepts: payment settled and
+    // every settlement claim recomputes from the kernel-signed anchor.
+    let bundle = sample_public_settlement_proof_bundle();
+    let report = verify_sample_public_settlement_proof(&bundle).unwrap();
+    assert_eq!(report.verdict, "verified");
+    assert_eq!(report.recomputed_settlement_state, "settled");
+
+    // Every claim a verified settlement proof can emit lives on the
+    // settlement/payment axis (`claim.public_settlement.*`). None of them
+    // grants capability or tool-call authority.
+    let settlement_claims: BTreeSet<&str> = BTreeSet::from([
+        CLAIM_PUBLIC_SETTLEMENT_ORDER_BINDING_VERIFIED,
+        CLAIM_PUBLIC_SETTLEMENT_CHAIN_CONTEXT_VERIFIED,
+        CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
+        CLAIM_PUBLIC_SETTLEMENT_ORACLE_CONVERSION_BOUND,
+        CLAIM_PUBLIC_SETTLEMENT_DISPUTE_POSTURE_BOUND,
+        CLAIM_PUBLIC_SETTLEMENT_TRUST_MARKET_REFS_BOUND,
+        CLAIM_PUBLIC_SETTLEMENT_PUBLIC_WITNESS_VERIFIED,
+    ]);
+    assert!(!report.verified_claims.is_empty());
+    for claim in &report.verified_claims {
+        assert!(
+            claim.starts_with("claim.public_settlement."),
+            "settlement proof emitted a non-settlement claim: {claim}"
+        );
+        assert!(
+            settlement_claims.contains(claim.as_str()),
+            "settlement proof emitted an unexpected claim: {claim}"
+        );
+        for forbidden in ["tool_call", "capability", "authoriz", "invoke"] {
+            assert!(
+                !claim.contains(forbidden),
+                "settlement claim must not carry tool-call authority: {claim}"
+            );
+        }
+    }
+
+    // The verifier report speaks only to settlement: there is no
+    // authorization verdict and no capability grant to be mistaken for one.
+    assert_ne!(report.verdict, "authorized");
+
+    // Structural inversion: the report cannot occupy an authorization
+    // position. Its tool-call authorization is the fail-closed DENY decision.
+    assert!(!report.authorizes_tool_call());
+    assert_eq!(
+        report.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+}
+
+/// A tool-call authorization is fail-closed BY
+/// CONSTRUCTION. Its `Default` and `denied()` are DENY, and an authorized
+/// state is unrepresentable except via an explicit positive capability grant.
+#[test]
+fn tool_call_authorization_defaults_to_denied() {
+    assert!(!ToolCallAuthorization::default().is_authorized());
+    assert!(!ToolCallAuthorization::denied().is_authorized());
+    assert_eq!(
+        ToolCallAuthorization::default(),
+        ToolCallAuthorization::denied()
+    );
+}
+
+/// The ONLY path to an authorized decision is an explicit positive
+/// capability grant. A matching grant carrying `Invoke` authorizes; every other
+/// case (wrong tool, no `Invoke` operation) fails closed to DENY.
+#[test]
+fn tool_call_authorization_requires_explicit_capability_grant() {
+    let invoke_grant = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A matching grant with Invoke authorizes the tool call.
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&invoke_grant, "srv", "tool_a")
+            .is_authorized()
+    );
+    // Wrong tool fails closed.
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&invoke_grant, "srv", "tool_b")
+            .is_authorized()
+    );
+    // A grant without the Invoke operation fails closed.
+    let read_only = ToolGrant {
+        operations: vec![Operation::ReadResult],
+        ..invoke_grant.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&read_only, "srv", "tool_a").is_authorized()
+    );
+}
+
+/// An INVOCATION cap cannot be
+/// evaluated without the grant's running call count, which lives in the kernel
+/// budget lane, not in this argument-less helper. `max_invocations = Some(0)`
+/// permits zero calls outright, and even a positive cap (`Some(n)`) cannot be
+/// confirmed unexhausted without the usage count, so ANY `Some(_)` fails closed
+/// and must route through the budget lane. Only an uncapped grant (`None`,
+/// bounded elsewhere) is evaluable here.
+#[test]
+fn tool_call_authorization_denies_invocation_capped_grant() {
+    let base = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: Some(0),
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A zero-invocation cap fails closed even though every other axis matches.
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&base, "srv", "tool_a").is_authorized(),
+        "a grant that permits zero invocations must not authorize a tool call"
+    );
+    // A positive cap is still unconfirmable without the running usage count, so it
+    // fails closed and must route through the budget lane.
+    let one_call = ToolGrant {
+        max_invocations: Some(1),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&one_call, "srv", "tool_a").is_authorized(),
+        "an invocation-capped grant must route through the budget lane, not authorize here"
+    );
+    // An uncapped grant (None) stays usable; the budget lane bounds it elsewhere.
+    let uncapped = ToolGrant {
+        max_invocations: None,
+        ..base
+    };
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&uncapped, "srv", "tool_a").is_authorized(),
+        "an uncapped grant authorizes the matching tool call"
+    );
+}
+
+/// A grant that REQUIRES a DPoP proof
+/// (`dpop_required = Some(true)`) cannot be authorized by this argument-less
+/// helper, which holds no proof. The ACP/edge lane denies a DPoP-required grant
+/// without a valid proof, so authorizing it here would advertise a capability the
+/// edge lane would deny: it fails closed. `None`/`Some(false)` require no proof
+/// and stay usable.
+#[test]
+fn tool_call_authorization_denies_dpop_required_grant() {
+    let base = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A grant that requires DPoP fails closed: the proof lives in the edge lane.
+    let dpop_required = ToolGrant {
+        dpop_required: Some(true),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&dpop_required, "srv", "tool_a")
+            .is_authorized(),
+        "a DPoP-required grant must fail closed without a proof, not authorize here"
+    );
+    // Some(false) explicitly does not require a proof and stays usable.
+    let dpop_optional = ToolGrant {
+        dpop_required: Some(false),
+        ..base.clone()
+    };
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&dpop_optional, "srv", "tool_a")
+            .is_authorized(),
+        "a grant that does not require DPoP (Some(false)) authorizes the matching tool call"
+    );
+    // None likewise does not require a proof and stays usable.
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&base, "srv", "tool_a").is_authorized(),
+        "a grant with no DPoP requirement authorizes the matching tool call"
+    );
+}
+
+/// A capability whose MONETARY budget is unusable or
+/// unconfirmable authorizes nothing here. The argument-less helper has no per-call
+/// cost and no running-total usage, so it cannot evaluate a monetary cap: a
+/// `max_cost_per_invocation = Some(0)` cap denies every non-zero-cost call, an
+/// exhausted `max_total_cost` denies further calls, and even a positive cap is
+/// unconfirmable. Like the constraint lane, a monetary-capped grant fails closed
+/// and must route through the kernel budget lane. A grant with no monetary cap
+/// (both `None`) remains usable.
+#[test]
+fn tool_call_authorization_denies_monetary_capped_grant() {
+    let base = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A zero per-invocation cost cap denies every non-zero-cost call: fail closed.
+    let zero_cost = ToolGrant {
+        max_cost_per_invocation: Some(MonetaryAmount {
+            units: 0,
+            currency: "USD".to_string(),
+        }),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&zero_cost, "srv", "tool_a").is_authorized(),
+        "a grant with max_cost_per_invocation Some(0) must not authorize a tool call"
+    );
+    // A positive per-invocation cost cap is still unconfirmable without the call
+    // cost, so it fails closed and must route through the budget lane.
+    let positive_cost = ToolGrant {
+        max_cost_per_invocation: Some(MonetaryAmount {
+            units: 500,
+            currency: "USD".to_string(),
+        }),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&positive_cost, "srv", "tool_a")
+            .is_authorized(),
+        "a monetary-capped grant must route through the budget lane, not authorize here"
+    );
+    // A total-cost cap is likewise unconfirmable without running usage: fail closed.
+    let total_cap = ToolGrant {
+        max_total_cost: Some(MonetaryAmount {
+            units: 1_000,
+            currency: "USD".to_string(),
+        }),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&total_cap, "srv", "tool_a").is_authorized(),
+        "a max_total_cost-capped grant must route through the budget lane, not authorize here"
+    );
+    // A grant with no monetary cap (both None) stays usable.
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&base, "srv", "tool_a").is_authorized(),
+        "a grant with no monetary cap authorizes the matching tool call"
+    );
+}
+
+/// A fully verified settlement report NEVER authorizes a tool call, and
+/// this holds STRUCTURALLY rather than as a runtime string check. Even after
+/// forging a `"authorized"` verdict and injecting capability-shaped claims, the
+/// decision stays DENY, because `authorizes_tool_call` reads no field of the
+/// report. The settlement lane and the capability lane are disjoint: only the
+/// capability lane can mint a grant.
+#[test]
+fn settlement_report_never_authorizes_tool_call_by_construction() {
+    let bundle = sample_public_settlement_proof_bundle();
+    let mut report: PublicSettlementVerifierReport =
+        verify_sample_public_settlement_proof(&bundle).unwrap();
+    assert_eq!(report.verdict, "verified");
+
+    // Baseline: a verified settlement report denies tool-call authority.
+    assert!(!report.authorizes_tool_call());
+    assert_eq!(
+        report.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+
+    // Forge the verdict and inject capability-shaped claims. If authorization
+    // were a runtime check over `verdict`/`verified_claims`, this would flip
+    // it. It does not: the guard is structural, so the decision stays DENY.
+    report.verdict = "authorized".to_string();
+    report.verified_claims = vec![
+        "claim.capability.tool_call_authorized".to_string(),
+        "authorized".to_string(),
+    ];
+    assert!(!report.authorizes_tool_call());
+    assert_eq!(
+        report.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+
+    // The settlement-derived decision is not the GRANT a real capability grant
+    // mints: the two lanes are disjoint and only the capability lane authorizes.
+    let capability_grant = ToolGrant {
+        server_id: "*".to_string(),
+        tool_name: "*".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    let granted = ToolCallAuthorization::from_capability_grant(&capability_grant, "srv", "tool_a");
+    assert!(granted.is_authorized());
+    assert_ne!(report.tool_call_authorization(), granted);
 }
 
 #[test]
@@ -2205,6 +2538,84 @@ fn public_settlement_proof_accepts_matching_independent_head() {
     assert!(verify_public_settlement_proof(&bundle, &trust).is_ok());
 }
 
+/// Fail-closed finality grounding: a bundle whose producer fabricates
+/// the chain-snapshot confirmation depth cannot verify at all WITHOUT an
+/// independent chain head: the verifier hard-denies rather than emitting any
+/// report whose status or claims could be mistaken for grounded finality.
+/// Finality must be grounded on an independent head, never on the unsigned,
+/// producer-supplied `latest_block_number` / `observed_confirmations`. The
+/// status downgrade to `ungrounded` remains a second, structural layer behind
+/// this deny for any future path that builds a report without a grounded head.
+#[test]
+fn public_settlement_proof_denies_without_independent_head() {
+    // Producer inflates the unsigned chain-snapshot depth and observed
+    // confirmations to manufacture a deep, "final"-looking settlement.
+    let bundle = sample_public_settlement_proof_bundle_with_chain_snapshot(|snapshot| {
+        snapshot["chain_snapshot"]["latest_block_number"] = json!(12_345_700);
+    });
+    let mut bundle = bundle;
+    bundle.observed_confirmations = 23;
+    sign_sample_public_settlement_bundle(&mut bundle);
+
+    // No independent chain head: the verifier cannot independently observe the
+    // chain tip, so the whole bundle is denied fail-closed.
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.independent_chain_head = None;
+
+    assert!(matches!(
+        verify_public_settlement_proof(&bundle, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("independent head missing")
+    ));
+
+    // Supplying a matching independent head restores the grounded path: the
+    // finality claim is emitted and the status reads the grounded `final`.
+    trust.independent_chain_head = Some(sample_matching_independent_chain_head());
+    let grounded = sample_public_settlement_proof_bundle();
+    let grounded_report =
+        verify_public_settlement_proof(&grounded, &trust).expect("a head-grounded bundle verifies");
+    assert!(grounded_report
+        .verified_claims
+        .contains(&CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED.to_string()));
+    assert_eq!(
+        grounded_report.finality_decision.status, "final",
+        "a head-grounded Settled bundle reports the grounded final status"
+    );
+}
+
+/// The argument-less tool-call
+/// authorization helper cannot evaluate a grant's parameter constraints against
+/// a request it never sees, so a CONSTRAINED grant must fail closed rather than
+/// authorize every invocation of the tool.
+#[test]
+fn tool_call_authorization_denies_constrained_grant() {
+    use crate::capability::scope::Constraint;
+
+    let mut constrained = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![Constraint::PathPrefix("/safe".to_string())],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+
+    // A grant narrowed to one parameter set cannot authorize via this helper.
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&constrained, "srv", "tool_a")
+            .is_authorized(),
+        "a constrained grant must fail closed in the argument-less helper"
+    );
+
+    // Dropping the constraints restores the (otherwise matching) authorization.
+    constrained.constraints.clear();
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&constrained, "srv", "tool_a").is_authorized()
+    );
+}
+
 #[test]
 fn public_settlement_proof_rejects_chain_snapshot_ahead_of_independent_head() {
     let bundle = sample_public_settlement_proof_bundle_with_chain_snapshot(|bundle| {
@@ -2653,4 +3064,522 @@ fn reference_artifacts_parse_and_validate() {
     validate_web3_settlement_dispatch(&dispatch).unwrap();
     validate_web3_settlement_execution_receipt(&receipt).unwrap();
     validate_web3_qualification_matrix(&matrix).unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// Custody-neutral, prepare-only x402 signing path.
+// ---------------------------------------------------------------------------
+
+/// Base Sepolia testnet chain id used for the prepare-only x402 signing tests.
+const X402_TESTNET_CHAIN_ID: &str = "eip155:84532";
+
+/// Rebuild the sample public settlement proof bundle on a TESTNET chain
+/// (Base Sepolia), rewriting every chain-id-bearing field and re-signing the
+/// two identity bindings so their `chain_scope` covers the testnet chain. The
+/// kernel-signed checkpoint statement and the receipt Merkle root do not carry
+/// a chain id, so they remain valid unchanged.
+fn sample_testnet_public_settlement_proof_bundle() -> PublicSettlementProofBundle {
+    let mut bundle = sample_public_settlement_proof_bundle();
+    bundle.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    bundle.order_binding.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    if let Some(provenance) = bundle.deployment_provenance.as_mut() {
+        provenance.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    }
+    bundle.chain_snapshot.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    bundle.settlement_receipt.dispatch.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    if let Some(anchor_proof) = bundle.settlement_receipt.reconciled_anchor_proof.as_mut() {
+        if let Some(chain_anchor) = anchor_proof.chain_anchor.as_mut() {
+            chain_anchor.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+        }
+        anchor_proof.key_binding_certificate = signed_identity_binding(
+            operator_keypair(),
+            "0x1111111111111111111111111111111111111111",
+            vec![Web3KeyBindingPurpose::Anchor, Web3KeyBindingPurpose::Settle],
+            vec![X402_TESTNET_CHAIN_ID],
+            "0123456789abcdef0123456789abcdef",
+        );
+    }
+    if let Some(witness) = bundle.public_witness.as_mut() {
+        witness.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+        witness.body_hash =
+            public_settlement_witness_body_hash(witness).expect("testnet witness body hashes");
+    }
+    bundle.chain_snapshot.beneficiary_identity_binding = Some(signed_identity_binding(
+        beneficiary_keypair(),
+        "0x2222222222222222222222222222222222222222",
+        vec![Web3KeyBindingPurpose::Settle],
+        vec![X402_TESTNET_CHAIN_ID],
+        "beneficiary-identity-binding-0001",
+    ));
+    sign_sample_public_settlement_bundle(&mut bundle);
+    bundle
+}
+
+/// Verifier trust for the prepare-only x402 signing path: the testnet chain is
+/// allow-listed and mainnet is blocked.
+fn sample_testnet_x402_verifier_trust() -> PublicSettlementVerifierTrust {
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.allowed_chain_ids = vec![X402_TESTNET_CHAIN_ID.to_string()];
+    trust.mainnet_blocked = true;
+    // Ground finality on an independent chain head matching the testnet bundle so
+    // the recompute emits the finality claim the signing path requires.
+    // Without this the report carries no grounded finality and
+    // the kernel must refuse to sign.
+    trust.independent_chain_head = Some(PublicSettlementIndependentChainHead {
+        chain_id: X402_TESTNET_CHAIN_ID.to_string(),
+        observed_block_number: 12_345_678,
+        observed_block_hash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            .to_string(),
+        latest_block_number: 12_345_701,
+    });
+    trust
+}
+
+/// The custody-neutral prepare-only signing path produces a kernel-signed
+/// attestation that explicitly moves NO value on chain. The signed body carries
+/// `value_moved_on_chain = false`, `prepare_only = true`, `testnet_gated = true`,
+/// and the custody-neutral model. The attestation verifies and round-trips
+/// through serde unchanged.
+#[test]
+fn x402_prepare_only_signing_is_value_neutral_and_recompute_bound() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    assert_eq!(
+        attestation.body.schema,
+        CHIO_X402_SETTLEMENT_ATTESTATION_SCHEMA
+    );
+    assert_eq!(attestation.body.chain_id, X402_TESTNET_CHAIN_ID);
+    assert_eq!(
+        attestation.body.custody_model,
+        X402CustodyModel::CustodyNeutral
+    );
+    // Prepare-only and value-neutral: NO value moves on chain.
+    assert!(!attestation.body.value_moved_on_chain);
+    assert!(!attestation.value_moved_on_chain());
+    assert!(attestation.body.prepare_only);
+    assert!(attestation.body.testnet_gated);
+    // Recompute-bound: the attestation binds the recomputed settlement report.
+    let report = verify_public_settlement_proof(&bundle, &trust).unwrap();
+    assert_eq!(
+        attestation.body.recomputed_settlement_state,
+        report.recomputed_settlement_state
+    );
+    assert_eq!(
+        attestation.body.settlement_reference,
+        report.chain_context.settlement_reference
+    );
+    assert_eq!(
+        attestation.body.verifier_report_digest,
+        sha256_hex(&canonical_json_bytes(&report).unwrap())
+    );
+
+    // The signed attestation verifies, and round-trips through serde unchanged.
+    verify_x402_settlement_attestation(&attestation, &trust).unwrap();
+    let encoded = serde_json::to_vec(&attestation).unwrap();
+    let decoded: crate::x402_signing::X402SignedSettlementAttestation =
+        serde_json::from_slice(&encoded).unwrap();
+    assert_eq!(decoded, attestation);
+    verify_x402_settlement_attestation(&decoded, &trust).unwrap();
+}
+
+/// The signing path is custody-neutral. The signed attestation carries NO
+/// value-movement authority and NO tool-call authority; both are fail-closed BY
+/// CONSTRUCTION. The signed body has no authority field
+/// at all, and flipping the value-moved flag is rejected fail-closed on verify.
+#[test]
+fn x402_attestation_carries_no_value_movement_authority_by_construction() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    // Value-movement and tool-call authority are DENY by construction.
+    assert!(!attestation.authorizes_value_movement());
+    assert_eq!(
+        attestation.value_movement_authorization(),
+        ValueMovementAuthorization::denied()
+    );
+    assert!(!attestation.authorizes_tool_call());
+    assert_eq!(
+        attestation.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+
+    // The signed body contains no authority field of any kind: it records only
+    // that the proof recomputes and that no value moved.
+    let body_json = String::from_utf8(canonical_json_bytes(&attestation.body).unwrap()).unwrap();
+    assert!(body_json.contains("\"value_moved_on_chain\":false"));
+    assert!(body_json.contains("\"custody_model\":\"custody_neutral\""));
+    for forbidden in ["authoriz", "grant", "tool_call", "value_movement_authoriz"] {
+        assert!(
+            !body_json.contains(forbidden),
+            "x402 attestation body must carry no authority field, found {forbidden}: {body_json}"
+        );
+    }
+
+    // Fail-closed: an attestation that claims value moved on chain is rejected,
+    // before any signature check, so it can never pass as custody-neutral.
+    let mut tampered = attestation.clone();
+    tampered.body.value_moved_on_chain = true;
+    assert!(matches!(
+        verify_x402_settlement_attestation(&tampered, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("must not move value on chain")
+    ));
+}
+
+/// The x402 attestation VERIFIER must re-run the
+/// signed-body field invariants the signer enforces, not just schema + flags +
+/// chain + key + signature. A trusted-kernel-signed body hand-built with an empty
+/// required identifier (here `bundle_id`) passes the signature check but must be
+/// rejected fail-closed before any consumer (e.g. `prepare_x402_broadcast_intent`)
+/// can emit an intent carrying the empty identifier.
+#[test]
+fn x402_verify_rejects_signed_body_with_empty_required_field() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+    // Sanity: the genuine recompute-built attestation verifies.
+    verify_x402_settlement_attestation(&attestation, &trust).unwrap();
+
+    // Hand-build a body with an empty required identifier and re-sign it with the
+    // SAME trusted kernel key, so the schema, custody/prepare/testnet flags, chain
+    // gate, trusted-key check, and signature all pass: only the re-run body-field
+    // invariants can catch the empty identifier.
+    let mut body = attestation.body.clone();
+    body.bundle_id = String::new();
+    let (signature, _) = kernel.sign_canonical(&body).unwrap();
+    let forged = crate::x402_signing::X402SignedSettlementAttestation { body, signature };
+    assert!(matches!(
+        verify_x402_settlement_attestation(&forged, &trust),
+        Err(Web3ContractError::MissingField(field)) if field.contains("bundle_id")
+    ));
+    // The downstream broadcast-intent path re-verifies, so it is closed too.
+    assert!(
+        prepare_x402_broadcast_intent(&forged, &trust, "x402-intent-1", 1_743_293_950).is_err()
+    );
+}
+
+/// The settlement and anchor tx hashes
+/// bind the attestation to the on-chain settlement/anchoring transactions. The
+/// signer derives both from the recomputed report, but a hand-built body signed by
+/// a trusted kernel key with either blank would otherwise pass verification and let
+/// a consumer accept an attestation not tied to the settlement/anchor tx. Both must
+/// be re-checked non-empty by the verifier, fail-closed.
+#[test]
+fn x402_verify_rejects_signed_body_with_empty_settlement_or_anchor_tx_hash() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+    // Sanity: the genuine recompute-built attestation carries both tx hashes and
+    // verifies.
+    assert!(!attestation.body.settlement_tx_hash.is_empty());
+    assert!(!attestation.body.anchor_tx_hash.is_empty());
+    verify_x402_settlement_attestation(&attestation, &trust).unwrap();
+
+    for field in ["settlement_tx_hash", "anchor_tx_hash"] {
+        // Hand-build a body with the tx hash blanked and re-sign it with the SAME
+        // trusted kernel key, so every other check (schema, flags, chain gate,
+        // trusted key, signature) passes: only the re-run body-field invariants can
+        // catch the empty tx hash.
+        let mut body = attestation.body.clone();
+        match field {
+            "settlement_tx_hash" => body.settlement_tx_hash = String::new(),
+            _ => body.anchor_tx_hash = String::new(),
+        }
+        let (signature, _) = kernel.sign_canonical(&body).unwrap();
+        let forged = crate::x402_signing::X402SignedSettlementAttestation { body, signature };
+        assert!(
+            matches!(
+                verify_x402_settlement_attestation(&forged, &trust),
+                Err(Web3ContractError::MissingField(missing)) if missing.contains(field)
+            ),
+            "verifier must reject an empty {field}"
+        );
+        // The downstream broadcast-intent path re-verifies, so it is closed too.
+        assert!(
+            prepare_x402_broadcast_intent(&forged, &trust, "x402-intent-1", 1_743_293_950).is_err()
+        );
+    }
+}
+
+/// Testnet-gated, fail-closed. A mainnet chain (here Base mainnet) is
+/// rejected by the prepare-only signing path even when the proof itself would
+/// recompute and the chain is allow-listed.
+#[test]
+fn x402_prepare_only_signing_rejects_mainnet_chain() {
+    // The default sample bundle settles on Base MAINNET (eip155:8453).
+    let bundle = sample_public_settlement_proof_bundle();
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.mainnet_blocked = true;
+    trust.allowed_chain_ids = vec!["eip155:8453".to_string()];
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("testnet-gated; mainnet chain rejected")
+    ));
+}
+
+/// The testnet gate does not rely on the partial mainnet
+/// deny-list. An allow-listed chain that the mainnet detector does not enumerate
+/// (here Gnosis mainnet `eip155:100`, which is not a known testnet either) fails
+/// closed instead of being signed for, even on a mainnet-blocked policy.
+#[test]
+fn x402_prepare_only_signing_rejects_unknown_chain_fail_closed() {
+    let mut bundle = sample_testnet_public_settlement_proof_bundle();
+    // A real mainnet the partial deny-list omits; not a known testnet either.
+    bundle.chain_id = "eip155:100".to_string();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    trust.mainnet_blocked = true;
+    trust.allowed_chain_ids = vec!["eip155:100".to_string()];
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("only known testnets are allowed")
+    ));
+}
+
+/// Testnet-gated, fail-closed. A chain that is not on the verifier
+/// allow-list is rejected by the prepare-only signing path.
+#[test]
+fn x402_prepare_only_signing_rejects_non_allowed_chain() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    // Allow a DIFFERENT testnet, not the bundle chain.
+    trust.allowed_chain_ids = vec!["eip155:11155111".to_string()];
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("x402 prepare-only chain id is not allowed")
+    ));
+}
+
+/// Testnet-gated, fail-closed. The path refuses to sign unless the
+/// verifier policy explicitly blocks mainnet.
+#[test]
+fn x402_prepare_only_signing_requires_mainnet_blocked_policy() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    trust.mainnet_blocked = false;
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("requires a mainnet-blocked verifier policy")
+    ));
+}
+
+/// An empty attestation id is rejected fail-closed.
+#[test]
+fn x402_prepare_only_signing_rejects_blank_attestation_id() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "  ", 1_743_293_900),
+        Err(Web3ContractError::MissingField(
+            "x402_settlement_attestation.attestation_id"
+        ))
+    ));
+}
+
+/// The prepare-only x402 signing path is
+/// fail-closed on finality grounding. Without an independent chain head the
+/// inner recompute itself denies, so no report exists to attest and signing
+/// returns the denial; the signing gate additionally requires the grounded
+/// finality claim on any report it does receive. Restoring the head restores
+/// signing, confirming the head (not some unrelated gate) is the control.
+#[test]
+fn x402_prepare_only_signing_requires_grounded_finality_claim() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    // Strip the independent chain head: finality can no longer be grounded.
+    trust.independent_chain_head = None;
+    let kernel = operator_keypair();
+
+    // Signing is DENIED fail-closed: the ungrounded recompute never yields a
+    // report, so no attestation can exist without a grounded head.
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("independent head missing")
+    ));
+
+    // Re-attaching the independent head restores the grounded path and signing
+    // succeeds, confirming the head (not some unrelated gate) is the control.
+    let grounded = sample_testnet_x402_verifier_trust();
+    sign_x402_settlement_attestation(
+        &bundle,
+        &grounded,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .expect("a grounded finality claim permits signing");
+}
+
+/// Verification is fail-closed on the attesting key. An attestation
+/// signed by a key that is not a trusted kernel key is rejected, even though the
+/// underlying settlement proof recomputes.
+#[test]
+fn x402_verify_rejects_untrusted_kernel_key() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    // Sign with a key that is NOT in trusted_anchor_kernel_keys.
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &custodian_keypair(),
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        verify_x402_settlement_attestation(&attestation, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("kernel key is not trusted")
+    ));
+}
+
+/// A tampered signature is rejected fail-closed by the recompute-and-check
+/// signature verification over the canonical body.
+#[test]
+fn x402_verify_rejects_tampered_signature() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let mut attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+    attestation.signature = Signature::from_hex(
+        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    )
+    .unwrap();
+
+    assert!(matches!(
+        verify_x402_settlement_attestation(&attestation, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("signature verification failed")
+    ));
+}
+
+/// The prepare-only broadcast intent moves NO value. It records
+/// `value_moved_on_chain = false`, is prepare-only and testnet-gated, and marks
+/// the live money-movement leg (the external partner/CDP leg) as out of scope
+/// and blocked.
+#[test]
+fn x402_prepare_only_broadcast_intent_moves_no_value() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    let intent = prepare_x402_broadcast_intent(
+        &attestation,
+        &trust,
+        "x402-broadcast-intent-1",
+        1_743_293_950,
+    )
+    .unwrap();
+
+    assert_eq!(
+        intent.schema,
+        CHIO_X402_PREPARE_ONLY_BROADCAST_INTENT_SCHEMA
+    );
+    assert_eq!(intent.chain_id, X402_TESTNET_CHAIN_ID);
+    assert_eq!(intent.attestation_id, attestation.body.attestation_id);
+    assert_eq!(
+        intent.attestation_digest,
+        sha256_hex(&canonical_json_bytes(&attestation).unwrap())
+    );
+    // NO value moves: prepare-only, testnet-gated, live leg out of scope/blocked.
+    assert!(!intent.value_moved_on_chain);
+    assert!(!intent.would_move_value());
+    assert!(intent.prepare_only);
+    assert!(intent.testnet_gated);
+    assert_eq!(
+        intent.live_money_movement_leg,
+        X402LiveMoneyMovementLeg::OutOfScopeBlockedPendingPartner
+    );
+}
+
+/// Building a broadcast intent re-verifies the attestation fail-closed.
+/// A trust context that no longer allows the chain rejects the intent.
+#[test]
+fn x402_prepare_only_broadcast_intent_rejects_unverifiable_attestation() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    let mut hostile_trust = trust.clone();
+    hostile_trust.allowed_chain_ids = vec!["eip155:11155111".to_string()];
+
+    assert!(matches!(
+        prepare_x402_broadcast_intent(&attestation, &hostile_trust, "x402-broadcast-intent-1", 1_743_293_950),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("x402 prepare-only chain id is not allowed")
+    ));
 }

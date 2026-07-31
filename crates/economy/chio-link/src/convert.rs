@@ -5,6 +5,14 @@ const BPS_DENOMINATOR: u128 = 10_000;
 pub fn minor_units_for_currency(currency: &str) -> Result<u64, PriceOracleError> {
     match currency.trim().to_ascii_uppercase().as_str() {
         "USD" | "EUR" | "GBP" => Ok(100),
+        // XCC (the Chio Pass free-tier allotment unit) is deliberately ABSENT.
+        // The Pass free-tier pool detector in chio-kernel classifies a unit as
+        // private-use only when `minor_units_for_currency(currency).is_err()`, so
+        // pinning a minor-unit scale here would re-route genuine XCC grants onto
+        // the normal budget path and let Passes bypass the aggregate
+        // `freetier:global` pool ceiling. XCC must stay unpriced (no money leg);
+        // the off-chain credit netting carries its own canonical rate table and
+        // never consults this function for XCC.
         "JPY" => Ok(1),
         "USDC" | "USDT" => Ok(1_000_000),
         "BTC" => Ok(100_000_000),
@@ -150,6 +158,34 @@ mod tests {
         let converted = convert_supported_units(1_000_000_000_000_000, &sample_rate(), 0)
             .test_unwrap("converted");
         assert_eq!(converted, 300);
+    }
+
+    #[test]
+    fn xcc_stays_unpriced_for_the_pass_pool_gate() {
+        // XCC (the Chio Pass free-tier allotment unit) MUST stay
+        // unpriced. The kernel free-tier pool detector classifies a unit as
+        // private-use only when this lookup fails, so pinning XCC here would
+        // re-route genuine XCC grants onto the normal budget path and bypass the
+        // aggregate pool ceiling. Every spelling must fail closed.
+        for candidate in ["XCC", "xcc", " xcc ", " XCC "] {
+            assert!(
+                matches!(
+                    minor_units_for_currency(candidate),
+                    Err(crate::PriceOracleError::InvalidConfiguration(_))
+                ),
+                "XCC must stay unpriced so the Pass pool gate routes it, got a price for {candidate:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_non_three_letter_credit_code() {
+        // A non-3-letter code such as "CHIOCREDIT" is not pinned and must
+        // fail closed through the catch-all guard rather than resolve.
+        assert!(matches!(
+            minor_units_for_currency("CHIOCREDIT"),
+            Err(crate::PriceOracleError::InvalidConfiguration(_))
+        ));
     }
 }
 

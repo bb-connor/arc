@@ -11,6 +11,10 @@
 //!
 //! - [`hook`] -- credit-evaluator hook and the IOU envelope types.
 //! - [`local_account`] -- in-memory account that signs IOU envelopes.
+//! - [`netting`] -- off-chain single-denomination netting collapse (read-only
+//!   projection; flips no support-boundary flag).
+//! - [`prepaid`] -- escrow-socketed closed-loop prepaid credit view (read-only
+//!   projection; non-transferable; refundable to the original funder only).
 //! - [`risk_reports`] -- loss-lifecycle, backtest, and provider-risk reports.
 //! - [`store_binding`] -- durable-store trait for persisting IOU envelopes.
 
@@ -22,6 +26,8 @@ pub use chio_underwriting as underwriting;
 
 pub mod hook;
 pub mod local_account;
+pub mod netting;
+pub mod prepaid;
 pub mod risk_reports;
 pub mod store_binding;
 
@@ -29,6 +35,18 @@ pub use hook::{
     CreditEvaluatorError, CreditEvaluatorHook, IouEnvelope, IouEnvelopeBody, IOU_ENVELOPE_SCHEMA,
 };
 pub use local_account::LocalCreditAccount;
+pub use netting::{
+    collapse_positions_to_canonical, CanonicalConversionRate, ExposureLedgerNettedSupportBoundary,
+    ExposureLedgerNettedView, ExposureLedgerNettingError, ExposureLedgerNettingRates,
+    SingleDenominationNettingBenefit, CANONICAL_NETTING_CURRENCY,
+    EXPOSURE_LEDGER_NETTED_VIEW_SCHEMA,
+};
+pub use prepaid::{
+    project_closed_loop_prepaid, ClosedLoopPrepaidView, EscrowPrepaidSocket,
+    PrepaidCreditLifecycle, PrepaidCreditSupportBoundary, PrepaidCreditViewError,
+    PrepaidRefundDenied, PrepaidRefundDisposition, PrepaidTransferDenied,
+    PREPAID_CREDIT_CANONICAL_CURRENCY, PREPAID_CREDIT_VIEW_SCHEMA,
+};
 pub use risk_reports::{
     CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
     CreditBacktestWindow, CreditCertificationState, CreditLossLifecycleArtifact,
@@ -263,6 +281,40 @@ pub struct ExposureLedgerCurrencyPosition {
     pub recovered_units: u64,
     pub quoted_premium_units: u64,
     pub active_quoted_premium_units: u64,
+}
+
+impl ExposureLedgerCurrencyPosition {
+    /// Outstanding capital requirement for this single-currency position: the
+    /// worst of the reserved channel, the unsettled channel
+    /// (`pending + failed`), and the net provisional-loss channel
+    /// (`provisional_loss - recovered`). This mirrors the prudential
+    /// bond-outstanding accounting and is the per-currency figure the
+    /// single-denomination netting collapse aggregates and nets.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`netting::ExposureLedgerNettingError::UnsettledExposureOverflow`]
+    /// when the unsettled channel (`pending + failed`) exceeds `u64::MAX`. The
+    /// helper fails closed rather than saturating, because a capped unsettled
+    /// figure understates the outstanding exposure the collapse and capital view
+    /// publish.
+    pub fn outstanding_exposure_units(&self) -> Result<u64, netting::ExposureLedgerNettingError> {
+        let unsettled_units = self
+            .pending_units
+            .checked_add(self.failed_units)
+            .ok_or_else(
+                || netting::ExposureLedgerNettingError::UnsettledExposureOverflow {
+                    currency: self.currency.clone(),
+                },
+            )?;
+        let net_provisional_loss_units = self
+            .provisional_loss_units
+            .saturating_sub(self.recovered_units);
+        Ok(self
+            .reserved_units
+            .max(unsettled_units)
+            .max(net_provisional_loss_units))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -948,12 +1000,21 @@ mod do_not_weaken {
     //! 2. `CreditScorecardSupportBoundary` defaults
     //!    `capital_allocation_supported` to `false` (and likewise does
     //!    not net cross-currency). Scorecards never allocate capital.
-    //! 3. IOUs only arise from a strictly non-zero charged cost. A
+    //! 3. `CapitalBookSupportBoundary` defaults
+    //!    `mixed_currency_netting_supported` to `false`. The capital
+    //!    book never nets across currencies on its own authority.
+    //! 4. IOUs only arise from a strictly non-zero charged cost. A
     //!    zero-cost allow receipt mints no IOU. Flipping any flag to
     //!    `true`, or minting on a zero cost, would weaken the obligation
     //!    surface; do not do it.
+    //!
+    //! The third prudential netting flag is locked directly here, not
+    //! only through the off-chain collapse equality check, so a
+    //! weakened capital-book default is caught without having to run
+    //! the collapse.
     use super::{
-        CreditScorecardSupportBoundary, ExposureLedgerSupportBoundary, LocalCreditAccount,
+        CapitalBookSupportBoundary, CreditScorecardSupportBoundary, ExposureLedgerSupportBoundary,
+        LocalCreditAccount,
     };
     use crate::crypto::{sha256_hex, Ed25519Backend, Keypair};
     use crate::hook::CreditEvaluatorHook;
@@ -982,6 +1043,87 @@ mod do_not_weaken {
         assert!(
             !boundary.cross_currency_netting_supported,
             "cross-currency netting must stay unsupported on the scorecard"
+        );
+    }
+
+    #[test]
+    fn capital_book_boundary_does_not_support_mixed_currency_netting() {
+        // Direct default lock on the third prudential netting flag.
+        // The capital book never nets across currencies on its own authority;
+        // per-currency fail-closed accounting is the prudential safeguard.
+        let boundary = CapitalBookSupportBoundary::default();
+        assert!(
+            !boundary.mixed_currency_netting_supported,
+            "mixed-currency netting must stay unsupported on the capital book"
+        );
+    }
+
+    #[test]
+    fn off_chain_netting_collapse_keeps_all_three_flags_false() {
+        // The off-chain single-denomination collapse realizes the
+        // netting/capital-allocation benefit on a mixed-currency book WITHOUT
+        // flipping any prudential support-boundary flag. The netted view is a
+        // read-only projection; the per-currency books are the safeguard.
+        use super::{
+            collapse_positions_to_canonical, CanonicalConversionRate, CapitalBookSupportBoundary,
+            ExposureLedgerCurrencyPosition, ExposureLedgerNettingRates,
+        };
+        let usd = ExposureLedgerCurrencyPosition {
+            currency: "USD".to_string(),
+            reserved_units: 0,
+            pending_units: 300,
+            governed_max_exposure_units: 0,
+            settled_units: 0,
+            failed_units: 0,
+            provisional_loss_units: 0,
+            recovered_units: 0,
+            quoted_premium_units: 0,
+            active_quoted_premium_units: 0,
+        };
+        let eur = ExposureLedgerCurrencyPosition {
+            currency: "EUR".to_string(),
+            reserved_units: 400,
+            pending_units: 0,
+            governed_max_exposure_units: 0,
+            settled_units: 0,
+            failed_units: 0,
+            provisional_loss_units: 0,
+            recovered_units: 0,
+            quoted_premium_units: 0,
+            active_quoted_premium_units: 0,
+        };
+        let rates = ExposureLedgerNettingRates::new(vec![CanonicalConversionRate {
+            currency: "EUR".to_string(),
+            numerator: 11,
+            denominator: 10,
+        }]);
+
+        let view = collapse_positions_to_canonical(&[usd, eur], &rates)
+            .expect("mixed-currency collapse succeeds");
+
+        // The single-denomination benefit is real: capital is freed.
+        assert!(
+            view.benefit.capital_freed_units > 0,
+            "off-chain collapse must realize a single-denomination netting benefit"
+        );
+        // Yet every prudential netting flag stays false after the collapse.
+        assert!(!view.support_boundary.cross_currency_netting_supported);
+        assert!(!view.support_boundary.capital_allocation_supported);
+        assert!(!view.support_boundary.mixed_currency_netting_supported);
+        assert!(!view.support_boundary.on_chain_instrument_required);
+        assert!(!view.support_boundary.new_contract_required);
+        // The view flags are carried straight off the prudential defaults.
+        assert_eq!(
+            view.support_boundary.cross_currency_netting_supported,
+            ExposureLedgerSupportBoundary::default().cross_currency_netting_supported
+        );
+        assert_eq!(
+            view.support_boundary.capital_allocation_supported,
+            CreditScorecardSupportBoundary::default().capital_allocation_supported
+        );
+        assert_eq!(
+            view.support_boundary.mixed_currency_netting_supported,
+            CapitalBookSupportBoundary::default().mixed_currency_netting_supported
         );
     }
 

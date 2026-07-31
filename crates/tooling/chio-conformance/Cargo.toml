@@ -97,6 +97,9 @@ name = "verdict_matrix_cross_language"
 path = "verdict_matrix/tests/verdict_matrix_cross_language.rs"
 
 [dev-dependencies]
+# EAS/Verax display-only conformance pins its projection register against the
+# production source-protocol manifest.
+chio-agent-web-interop = { workspace = true }
 # verdict-matrix test targets (deployment_shape_smoke, diff_oracle_self_test)
 # compile verdict_matrix/src/diff_oracle.rs, which parses the error registry as YAML.
 serde_yaml = { workspace = true }
@@ -164,6 +167,17 @@ zeroize = { workspace = true }
 # state machine via the chio-anchor crate. tokio drives the async
 # trait surface; tiny_http stages the mock Rekor server.
 chio-anchor = { workspace = true }
+# The recompute-sole-lane conformance test
+# (eas_attestation_not_anchoring_inclusion_proof.rs) drives the chio-web3
+# `verify_anchor_inclusion_proof` readback lane directly to prove an external
+# EAS/SAS attestation is not admissible as an anchoring inclusion proof.
+chio-web3 = { workspace = true }
+# The single-slash-lane conformance harness
+# (slash_routes_only_through_comptroller.rs) drives the comptroller
+# adjudication surface (`validate_risk_report`) directly to prove a slash
+# routes only through the comptroller and that there is no second slash lane.
+chio-risk-comptroller = { workspace = true }
+chio-transaction-passport = { workspace = true }
 async-trait = "0.1"
 # Negative conformance test: anchor_batch_witness_impersonation_rejected.rs
 # forges a Rekor SET
@@ -203,6 +217,18 @@ wat = "1.246"
 # drive validate_signed and verify_tenant_sig deny branches with forged
 # tenant signatures.
 chio-tee-frame = { workspace = true }
+# The single-source capital-book conformance test
+# (capital_book_single_source_gate.rs) stages a real SqliteReceiptStore with
+# adversarial facility/bond/currency configurations and drives the production
+# capital-book builder (chio-control-plane build_signed_capital_book_report,
+# which delegates to build_capital_book_report_from_store) to prove the
+# prudential single-source rule denies fail-closed. chio-credit supplies the
+# off-chain netted-view projection (collapse_positions_to_canonical) used
+# to prove the read-only collapse does not flip the single-source rule. The
+# chio-conformance <- chio-control-plane edge is a dev-dependency-only cycle
+# (chio-control-plane normal-depends on chio-conformance), which Cargo permits.
+chio-control-plane = { workspace = true }
+chio-credit = { workspace = true }
 
 [lints]
 workspace = true
