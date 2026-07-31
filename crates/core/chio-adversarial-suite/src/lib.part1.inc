@@ -47,6 +47,7 @@ pub const ATTACK_CLASSES: &[AttackClass] = &[
     AttackClass::RotationPartialCommit,
     AttackClass::RotationUnwitnessedSigning,
     AttackClass::OldKeyBackdating,
+    AttackClass::AuthorityBindingMutation,
     AttackClass::BrokerSecretBoundaryCrossing,
     AttackClass::BrokerExecutionOverspend,
     AttackClass::BrokerParentDoubleCharge,
@@ -296,6 +297,18 @@ pub const BUNDLED_CASES: &[BundledCase] = &[
     BundledCase {
         path: "cases/old_key_backdating/old-key-backdating-001.json",
         contents: include_str!("../cases/old_key_backdating/old-key-backdating-001.json"),
+    },
+    BundledCase {
+        path: "cases/authority_binding_mutation/aggregate-root-binding-mutations-001.json",
+        contents: include_str!(
+            "../cases/authority_binding_mutation/aggregate-root-binding-mutations-001.json"
+        ),
+    },
+    BundledCase {
+        path: "cases/authority_binding_mutation/threshold-proposal-mutations-001.json",
+        contents: include_str!(
+            "../cases/authority_binding_mutation/threshold-proposal-mutations-001.json"
+        ),
     },
     BundledCase {
         path: "cases/broker_secret_boundary_crossing/broker-secret-boundary-crossing-001.json",
@@ -551,6 +564,7 @@ pub enum AttackClass {
     RotationPartialCommit,
     RotationUnwitnessedSigning,
     OldKeyBackdating,
+    AuthorityBindingMutation,
     BrokerSecretBoundaryCrossing,
     BrokerExecutionOverspend,
     BrokerParentDoubleCharge,
@@ -593,6 +607,7 @@ impl AttackClass {
             Self::RotationPartialCommit => "rotation_partial_commit",
             Self::RotationUnwitnessedSigning => "rotation_unwitnessed_signing",
             Self::OldKeyBackdating => "old_key_backdating",
+            Self::AuthorityBindingMutation => "authority_binding_mutation",
             Self::BrokerSecretBoundaryCrossing => "broker_secret_boundary_crossing",
             Self::BrokerExecutionOverspend => "broker_execution_overspend",
             Self::BrokerParentDoubleCharge => "broker_parent_double_charge",
@@ -626,6 +641,7 @@ impl AttackClass {
                 | Self::RevocationRollback
                 | Self::AnchorGrafted
                 | Self::SigstoreBundlePayloadMismatch
+                | Self::AuthorityBindingMutation
         )
     }
 
@@ -678,7 +694,8 @@ impl AttackClass {
             | Self::ScopeSuperset
             | Self::RevocationRollback
             | Self::AnchorGrafted
-            | Self::SigstoreBundlePayloadMismatch => &[],
+            | Self::SigstoreBundlePayloadMismatch
+            | Self::AuthorityBindingMutation => &[],
         }
     }
 }

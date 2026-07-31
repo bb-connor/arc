@@ -260,6 +260,8 @@ fn child_token_with_chain_ancestor(
             attenuations: Vec::new(),
             timestamp: now,
             scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         &delegator,
@@ -367,6 +369,8 @@ async fn sidecar_validate_capability_checks_issuer_trust_before_walking_chain() 
             attenuations: Vec::new(),
             timestamp: now,
             scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         },
         &delegator,
@@ -444,7 +448,9 @@ async fn sidecar_validate_capability_rejects_untrusted_issuer() {
 
 #[tokio::test]
 async fn sidecar_validate_authentication_gates_control_revocation_queries() {
-    let observed = Arc::new(ObservedRevocationStore::with_revoked(["cap-validate-revoked"]));
+    let observed = Arc::new(ObservedRevocationStore::with_revoked([
+        "cap-validate-revoked",
+    ]));
     let revocation_store: Arc<dyn chio_kernel::RevocationStore> = observed.clone();
     let state = make_test_state_with_revocation_store(
         Vec::new(),

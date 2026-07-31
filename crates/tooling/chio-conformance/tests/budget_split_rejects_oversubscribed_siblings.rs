@@ -110,6 +110,8 @@ fn parent_at_5000_bps_cannot_mint_two_children_at_4000_bps_each() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         };
         let link = DelegationLink::sign(body, &parent_kp).expect("delegation link signs");
@@ -134,6 +136,8 @@ fn parent_at_5000_bps_cannot_mint_two_children_at_4000_bps_each() {
                 attenuations: vec![],
                 timestamp: 100,
                 scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+                aggregate_budget: None,
+                cumulative_approval: None,
                 aggregate_family_preservation: None,
             };
             vec![DelegationLink::sign(body, &parent_kp).expect("link a")]

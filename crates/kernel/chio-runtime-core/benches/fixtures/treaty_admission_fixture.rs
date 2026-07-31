@@ -1,5 +1,5 @@
 use chio_core_types::capability::{
-    governance::GovernedTransactionIntent,
+    governance::{GovernedToolInvocationIntentBody, GovernedTransactionIntent},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -11,7 +11,8 @@ use chio_core_types::receipt::{
     metadata::ActorRef,
 };
 use chio_federation::bilateral_dsse::{
-    sign_chio_bilateral_dsse_envelope, BilateralPredicateExtensions, CapabilityLeaseRef,
+    sign_chio_bilateral_dsse_envelope, BilateralDsseInvocationInput,
+    BilateralDsseLocalSigningInput, BilateralPredicateExtensions, CapabilityLeaseRef,
     GovernanceReceiptRef, HashRecord, PolicyEvaluationSummary, PolicyVerdict, TreatyBindingRef,
 };
 use chio_federation::trust_establishment::{KernelTrustExchange, PeerHandshakeEnvelope};
@@ -160,8 +161,11 @@ impl TreatyPredispatchDenyFixture {
             .governed_intent
             .as_mut()
             .ok_or_else(|| std::io::Error::other("benchmark governed intent is missing"))?;
-        intent.id = format!("intent-bench-treaty-deny-{sequence}");
-        let admission = intent
+        let tool_intent = intent.as_tool_invocation_mut().ok_or_else(|| {
+            std::io::Error::other("benchmark governed intent is not a tool invocation")
+        })?;
+        tool_intent.id = format!("intent-bench-treaty-deny-{sequence}");
+        let admission = tool_intent
             .context
             .as_mut()
             .and_then(|context| context.get_mut("chioAdmission"))
@@ -235,6 +239,7 @@ fn kernel_config() -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -396,52 +401,54 @@ impl TreatyArtifacts {
         }
         let dsse_consistency_model =
             bilateral_dsse_consistency_model(&invocation.consistency_model)?.to_string();
-        let dsse = sign_chio_bilateral_dsse_envelope(
-            &receipt,
-            &signer_a,
-            &signer_b,
-            &invocation.signer_kernel_ids[0],
-            &invocation.signer_kernel_ids[1],
-            "close_account",
-            NOW_UNIX_MS,
-            BilateralPredicateExtensions {
-                capability_lease_ref: Some(CapabilityLeaseRef {
-                    lease_id: "lease-bench-treaty-deny".to_string(),
-                    issuer: invocation.signer_kernel_ids[0].clone(),
-                    expires_at_unix_ms: 1_800_003_600_000,
-                    scope_digest: None,
-                }),
-                policy_evaluation_summary: Some(unanimous_deny_summary()),
-                governance_receipt_ref: Some(GovernanceReceiptRef {
-                    receipt_id: "gov-bench-treaty-deny".to_string(),
-                    kernel_id: invocation.signer_kernel_ids[1].clone(),
-                    digest: HashRecord {
-                        alg: "sha256".to_string(),
-                        value: "6".repeat(64),
-                    },
-                }),
-                consistency_anchor: Some("anchor-bench-treaty-deny".to_string()),
-                consistency_model: Some(dsse_consistency_model.clone()),
-                cross_org_visibility: Some("treaty_only".to_string()),
-                treaty_binding_ref: Some(TreatyBindingRef {
-                    treaty_id: invocation.treaty_id.clone(),
-                    treaty_scope_sha256: scope_sha256.clone(),
-                    ladder_intersection_sha256: intersection_sha256.clone(),
-                    admission_report_sha256: "7".repeat(64),
-                    continuation_sha256: continuation_sha256.clone(),
-                    lineage_bundle_sha256: lineage_sha256.clone(),
-                    action_class_id: ACTION_CLASS_ID.to_string(),
-                    consistency_model: dsse_consistency_model,
-                    request_sha256: invocation.request_sha256.clone(),
-                    outcome_sha256: invocation.outcome_sha256.clone(),
-                    local_receipt_sha256: invocation.local_receipt_sha256.clone(),
-                    remote_receipt_sha256: invocation.remote_receipt_sha256.clone(),
-                    lease_refs: vec!["lease-bench-treaty-deny".to_string()],
-                    governance_refs: vec!["gov-bench-treaty-deny".to_string()],
-                    signer_kernel_ids: invocation.signer_kernel_ids.clone(),
-                }),
+        let dsse = sign_chio_bilateral_dsse_envelope(BilateralDsseLocalSigningInput {
+            invocation: BilateralDsseInvocationInput {
+                receipt: &receipt,
+                org_a_kernel_id: &invocation.signer_kernel_ids[0],
+                org_b_kernel_id: &invocation.signer_kernel_ids[1],
+                tool_name: "close_account",
+                timestamp_unix_ms: NOW_UNIX_MS,
+                extensions: BilateralPredicateExtensions {
+                    capability_lease_ref: Some(CapabilityLeaseRef {
+                        lease_id: "lease-bench-treaty-deny".to_string(),
+                        issuer: invocation.signer_kernel_ids[0].clone(),
+                        expires_at_unix_ms: 1_800_003_600_000,
+                        scope_digest: None,
+                    }),
+                    policy_evaluation_summary: Some(unanimous_deny_summary()),
+                    governance_receipt_ref: Some(GovernanceReceiptRef {
+                        receipt_id: "gov-bench-treaty-deny".to_string(),
+                        kernel_id: invocation.signer_kernel_ids[1].clone(),
+                        digest: HashRecord {
+                            alg: "sha256".to_string(),
+                            value: "6".repeat(64),
+                        },
+                    }),
+                    consistency_anchor: Some("anchor-bench-treaty-deny".to_string()),
+                    consistency_model: Some(dsse_consistency_model.clone()),
+                    cross_org_visibility: Some("treaty_only".to_string()),
+                    treaty_binding_ref: Some(TreatyBindingRef {
+                        treaty_id: invocation.treaty_id.clone(),
+                        treaty_scope_sha256: scope_sha256.clone(),
+                        ladder_intersection_sha256: intersection_sha256.clone(),
+                        admission_report_sha256: "7".repeat(64),
+                        continuation_sha256: continuation_sha256.clone(),
+                        lineage_bundle_sha256: lineage_sha256.clone(),
+                        action_class_id: ACTION_CLASS_ID.to_string(),
+                        consistency_model: dsse_consistency_model,
+                        request_sha256: invocation.request_sha256.clone(),
+                        outcome_sha256: invocation.outcome_sha256.clone(),
+                        local_receipt_sha256: invocation.local_receipt_sha256.clone(),
+                        remote_receipt_sha256: invocation.remote_receipt_sha256.clone(),
+                        lease_refs: vec!["lease-bench-treaty-deny".to_string()],
+                        governance_refs: vec!["gov-bench-treaty-deny".to_string()],
+                        signer_kernel_ids: invocation.signer_kernel_ids.clone(),
+                    }),
+                },
             },
-        )?;
+            org_a_signer: &signer_a,
+            org_b_signer: &signer_b,
+        })?;
         let dsse_sha256 = sha256_hex(&canonical_json_bytes(&dsse)?);
         Ok(Self {
             scope,
@@ -582,18 +589,19 @@ fn treaty_request(
         arguments: args,
         dpop_proof: None,
         execution_nonce: None,
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-bench-treaty-deny".to_string(),
-            server_id: "vendor-ledger".to_string(),
-            tool_name: "close_account".to_string(),
-            purpose: "benchmark receiver-owned treaty denial".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: Some(serde_json::json!({
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-bench-treaty-deny".to_string(),
+                server_id: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                purpose: "benchmark receiver-owned treaty denial".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({
                 "chioAdmission": {
                     "admissionId": "adm-bench-treaty-deny",
                     "bundleSha256": bundle_sha256
@@ -621,14 +629,15 @@ fn treaty_request(
                         "sha256": artifacts.dsse_sha256
                     }
                 }
-            })),
-            body: Default::default(),
-        }),
+                })),
+            },
+        )),
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     })
 }

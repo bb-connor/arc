@@ -2,10 +2,8 @@ use std::io::{self, Read};
 use std::time::Duration;
 
 use super::*;
-use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalTokenBody, ThresholdApprovalProposalBody,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
-};
+use chio_core::capability::governance::{GovernedApprovalDecision, GovernedApprovalTokenBody};
+use chio_core::capability::threshold_approval::ThresholdApprovalProposalBody;
 use chio_core::Keypair;
 
 fn threshold_approval_artifacts() -> (Vec<GovernedApprovalToken>, ThresholdApprovalProposal) {
@@ -14,25 +12,26 @@ fn threshold_approval_artifacts() -> (Vec<GovernedApprovalToken>, ThresholdAppro
     let approver_a = Keypair::generate();
     let approver_b = Keypair::generate();
     let proposal = ThresholdApprovalProposal::sign(
-        ThresholdApprovalProposalBody {
-            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
-            proposal_id: "proposal-mcp-001".to_string(),
-            request_id: "request-mcp-001".to_string(),
-            governed_intent_hash: "a".repeat(64),
-            subject: subject.public_key(),
-            authorizing_capability_digest: "b".repeat(64),
-            policy_hash: "c".repeat(64),
-            threshold: 2,
-            eligible_set_digest: "d".repeat(64),
-            proposal_created_at: 100,
-            proposal_deadline: 200,
-            policy_authority: policy_authority.public_key(),
-        },
+        ThresholdApprovalProposalBody::new(
+            "proposal-mcp-001",
+            "request-mcp-001",
+            "a".repeat(64),
+            subject.public_key(),
+            "b".repeat(64),
+            "c".repeat(64),
+            2,
+            "d".repeat(64),
+            100,
+            100,
+            200,
+            200,
+        )
+        .unwrap_or_else(|error| panic!("proposal body must construct: {error}")),
         &policy_authority,
     )
     .unwrap_or_else(|error| panic!("proposal must sign: {error}"));
     let proposal_hash = proposal
-        .artifact_digest()
+        .proposal_hash()
         .unwrap_or_else(|error| panic!("proposal must hash: {error}"));
     let tokens = [&approver_a, &approver_b]
         .into_iter()
@@ -104,7 +103,8 @@ fn mcp_meta_keeps_supplemental_authorization_opaque() {
     let params = json!({
         "_meta": {
             "chioSupplementalAuthorization": {
-                "signed_extension": "b3BhcXVl"
+                "reference": "opaque-authorization",
+                "artifact": [111, 112, 97, 113, 117, 101]
             }
         }
     });
@@ -114,8 +114,8 @@ fn mcp_meta_keeps_supplemental_authorization_opaque() {
             .unwrap_or_else(|error| panic!("opaque authorization must parse: {error:?}"));
 
     assert_eq!(
-        authorization.map(|value| value.signed_extension),
-        Some("b3BhcXVl".to_string())
+        authorization.map(|value| (value.reference().to_string(), value.artifact().to_vec())),
+        Some(("opaque-authorization".to_string(), b"opaque".to_vec()))
     );
 }
 
@@ -124,7 +124,8 @@ fn mcp_meta_rejects_caller_supplied_supplemental_claim_fields() {
     let params = json!({
         "_meta": {
             "chioSupplementalAuthorization": {
-                "signed_extension": "b3BhcXVl",
+                "reference": "opaque-authorization",
+                "artifact": [111, 112, 97, 113, 117, 101],
                 "max_invocations": 1000
             }
         }

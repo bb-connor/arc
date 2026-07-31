@@ -348,6 +348,101 @@ impl OrdinaryAdmissionMutation {
 }
 
 impl ChioKernel {
+    fn validate_cumulative_approval_ordinary_admission(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        grant_index: usize,
+        grant: &ToolGrant,
+        now: u64,
+    ) -> Result<(), KernelError> {
+        let cumulative_constraint_count = grant
+            .constraints
+            .iter()
+            .filter(|constraint| {
+                matches!(
+                    constraint,
+                    Constraint::RequireCumulativeApprovalAbove { .. }
+                )
+            })
+            .count();
+        if cumulative_constraint_count == 0 {
+            return Ok(());
+        }
+        if cumulative_constraint_count != 1 {
+            return Err(KernelError::GovernedTransactionDenied(
+                "a matching grant must contain exactly one cumulative approval constraint"
+                    .to_string(),
+            ));
+        }
+
+        let peer = self
+            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
+            .map_err(KernelError::GovernedTransactionDenied)?;
+        if !peer.supports(chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET) {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval budgets were not negotiated".to_string(),
+            ));
+        }
+        let direct_root = self
+            .negotiated_capability_root(cap, &peer)
+            .map_err(KernelError::GovernedTransactionDenied)?;
+        let trusted = self
+            .trusted_issuer_keys_for(cap, now)
+            .map_err(KernelError::GovernedTransactionDenied)?;
+        let verified =
+            chio_core::capability::cumulative_approval::verify_cumulative_approval_constraints(
+                cap,
+                &trusted,
+                direct_root.as_ref(),
+            )
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let mut matching_constraints = verified
+            .into_iter()
+            .filter(|constraint| constraint.grant_index == grant_index);
+        let constraint = matching_constraints.next().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval verification omitted the matching grant".to_string(),
+            )
+        })?;
+        if matching_constraints.next().is_some() {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval verification produced an ambiguous grant".to_string(),
+            ));
+        }
+
+        let governed_intent = request.governed_intent.as_ref().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval requires a governed transaction intent".to_string(),
+            )
+        })?;
+        let intent = governed_intent.as_tool_invocation().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval requires a governed tool-invocation intent".to_string(),
+            )
+        })?;
+        if intent.server_id != request.server_id || intent.tool_name != request.tool_name {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval intent target does not match the request".to_string(),
+            ));
+        }
+        let requested_authorized = intent.max_amount.as_ref().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval intent requires a maximum amount".to_string(),
+            )
+        })?;
+        if requested_authorized.currency != constraint.threshold.currency {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval intent currency does not match the capability".to_string(),
+            ));
+        }
+
+        Err(KernelError::GovernedTransactionDenied(
+            "cumulative approval requires a qualified admission authority; the ordinary durable admission participant is unavailable"
+                .to_string(),
+        ))
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(super) fn coordinate_ordinary_protocol_admission(
         &self,
@@ -359,6 +454,13 @@ impl ChioKernel {
         caller_receipt_metadata: Option<&serde_json::Value>,
         now: u64,
     ) -> Result<PreExecutionBudgetMutation, KernelError> {
+        self.validate_cumulative_approval_ordinary_admission(
+            request,
+            cap,
+            grant_index,
+            grant,
+            now,
+        )?;
         self.validate_protocol_admission_runtime(cap, request)?;
         let capability_digest = crate::threshold_approval::authorization_capability_hash(cap)
             .map_err(|error| KernelError::GuardDenied(error.to_string()))?;

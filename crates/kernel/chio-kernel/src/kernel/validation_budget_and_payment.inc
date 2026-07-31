@@ -336,6 +336,12 @@ impl ChioKernel {
                 || has_monetary
                 || grant.max_invocations.is_some()
                 || cap.aggregate_invocation_budget.is_some()
+                || grant.constraints.iter().any(|constraint| {
+                    matches!(
+                        constraint,
+                        Constraint::RequireCumulativeApprovalAbove { .. }
+                    )
+                })
                 || request.supplemental_authorization.is_some()
                 || self.partition_escrow_registry.is_some()
                 || Self::is_governed_mustprepay_request(request)

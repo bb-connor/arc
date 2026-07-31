@@ -286,6 +286,37 @@ pub(in crate::runtime) fn parse_request_threshold_approval_proposal(
     )
 }
 
+pub(in crate::runtime) fn parse_request_approval_artifacts(
+    id: &Value,
+    params: &Value,
+) -> Result<
+    (
+        Option<GovernedApprovalToken>,
+        Vec<GovernedApprovalToken>,
+        Option<ThresholdApprovalProposal>,
+    ),
+    Value,
+> {
+    let singular = parse_request_approval_token(id, params)?;
+    let tokens = parse_request_approval_tokens(id, params)?;
+    let proposal = parse_request_threshold_approval_proposal(id, params)?;
+    if singular.is_some() && (!tokens.is_empty() || proposal.is_some()) {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "singular and threshold approval tokens must not be mixed",
+        ));
+    }
+    if tokens.is_empty() != proposal.is_none() {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "threshold approval tokens and proposal must be supplied together",
+        ));
+    }
+    Ok((singular, tokens, proposal))
+}
+
 pub(in crate::runtime) fn parse_request_extra_metadata(
     id: &Value,
     params: &Value,

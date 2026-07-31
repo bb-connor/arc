@@ -59,6 +59,39 @@ struct SqliteReceiptStore {
         Mutex<Option<(std::sync::Arc<dyn chio_core::crypto::SigningBackend>, u64)>>,
 }
 
+fn capability_snapshot_from_test_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
+    let provenance = match row.get::<_, String>(8)?.as_str() {
+        "signed_token" => CapabilitySnapshotProvenance::SignedToken,
+        "synthetic_anchor" => CapabilitySnapshotProvenance::SyntheticAnchor,
+        _ => CapabilitySnapshotProvenance::LegacyProjection,
+    };
+    let signed_capability = row
+        .get::<_, Option<String>>(9)?
+        .map(|raw| {
+            serde_json::from_str(&raw).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    9,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()?;
+    Ok(CapabilitySnapshot {
+        capability_id: row.get::<_, String>(0)?,
+        subject_key: row.get::<_, String>(1)?,
+        issuer_key: row.get::<_, String>(2)?,
+        issued_at: row.get::<_, i64>(3)?.max(0) as u64,
+        expires_at: row.get::<_, i64>(4)?.max(0) as u64,
+        grants_json: row.get::<_, String>(5)?,
+        delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
+        parent_capability_id: row.get::<_, Option<String>>(7)?,
+        federated_parent_capability_id: None,
+        provenance,
+        signed_capability,
+    })
+}
+
 static UNIQUE_RECEIPT_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl SqliteReceiptStore {
@@ -109,7 +142,9 @@ impl SqliteReceiptStore {
                     expires_at INTEGER NOT NULL,
                     grants_json TEXT NOT NULL,
                     delegation_depth INTEGER NOT NULL DEFAULT 0,
-                    parent_capability_id TEXT
+                    parent_capability_id TEXT,
+                    provenance TEXT NOT NULL DEFAULT 'legacy_projection',
+                    signed_capability_json TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS credit_bonds (
@@ -377,22 +412,6 @@ impl SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
-        fn snapshot_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
-            Ok(CapabilitySnapshot {
-                capability_id: row.get::<_, String>(0)?,
-                subject_key: row.get::<_, String>(1)?,
-                issuer_key: row.get::<_, String>(2)?,
-                issued_at: row.get::<_, i64>(3)?.max(0) as u64,
-                expires_at: row.get::<_, i64>(4)?.max(0) as u64,
-                grants_json: row.get::<_, String>(5)?,
-                delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
-                parent_capability_id: row.get::<_, Option<String>>(7)?,
-                federated_parent_capability_id: None,
-                provenance: CapabilitySnapshotProvenance::LegacyProjection,
-                signed_capability: None,
-            })
-        }
-
         let mut chain = Vec::new();
         let mut current = Some(capability_id.to_string());
 
@@ -409,12 +428,14 @@ impl SqliteReceiptStore {
                             expires_at,
                             grants_json,
                             delegation_depth,
-                            parent_capability_id
+                            parent_capability_id,
+                            provenance,
+                            signed_capability_json
                         FROM capability_lineage
                         WHERE capability_id = ?1
                         "#,
                     params![current_id],
-                    snapshot_from_row,
+                    capability_snapshot_from_test_row,
                 )
                 .optional()?;
             let Some(snapshot) = snapshot else {
@@ -443,26 +464,14 @@ impl SqliteReceiptStore {
                         expires_at,
                         grants_json,
                         delegation_depth,
-                        parent_capability_id
+                        parent_capability_id,
+                        provenance,
+                        signed_capability_json
                     FROM capability_lineage
                     WHERE capability_id = ?1
                 "#,
                 params![capability_id],
-                |row| {
-                    Ok(CapabilitySnapshot {
-                        capability_id: row.get::<_, String>(0)?,
-                        subject_key: row.get::<_, String>(1)?,
-                        issuer_key: row.get::<_, String>(2)?,
-                        issued_at: row.get::<_, i64>(3)?.max(0) as u64,
-                        expires_at: row.get::<_, i64>(4)?.max(0) as u64,
-                        grants_json: row.get::<_, String>(5)?,
-                        delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
-                        parent_capability_id: row.get::<_, Option<String>>(7)?,
-                        federated_parent_capability_id: None,
-                        provenance: CapabilitySnapshotProvenance::LegacyProjection,
-                        signed_capability: None,
-                    })
-                },
+                capability_snapshot_from_test_row,
             )
             .optional()
             .map_err(Into::into)
@@ -1008,8 +1017,10 @@ impl ReceiptStore for SqliteReceiptStore {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                    parent_capability_id,
+                    provenance,
+                    signed_capability_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                 "#,
             params![
                 token.id,
@@ -1020,6 +1031,8 @@ impl ReceiptStore for SqliteReceiptStore {
                 grants_json,
                 delegation_depth as i64,
                 parent_capability_id,
+                "signed_token",
+                serde_json::to_string(token)?,
             ],
         )?;
         Ok(())

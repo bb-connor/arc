@@ -288,6 +288,8 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
@@ -391,6 +393,8 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
@@ -480,6 +484,8 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_budget: None,
+            cumulative_approval: None,
             aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]

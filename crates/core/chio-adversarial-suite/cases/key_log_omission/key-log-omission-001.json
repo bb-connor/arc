@@ -34,8 +34,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/key_log_omission/mutants.out/outcomes.json",
-          "sha256": "39890ad455a3d21938088f3500d0f359977012c93d39706b0b5389279de1433e",
-          "inputs_sha256": "4fbf6dd5eceac997789cb33d81ebbcefd88b1a7e832894bae33af0af6d0ea404"
+          "sha256": "b8bd5b48ac6b31e1885ae563df26e881bfed43d84b4feeadeea82527d5855359",
+          "inputs_sha256": "72a099877bb02cbafe7b7c024b0f0a55f823ccee8fc4a0169384fa22e79a0522"
         }
       }
     ]

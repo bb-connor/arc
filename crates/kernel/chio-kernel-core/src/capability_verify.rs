@@ -30,9 +30,7 @@ use chio_core_types::capability::{
     },
     crypto_floor::{CapabilityCryptoFloor, CapabilityFloorVerifyError},
     cumulative_approval::verify_cumulative_approval_constraints,
-    features::{
-        CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET,
-    },
+    features::{CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET},
     scope::ChioScope,
     token::CapabilityToken,
 };
@@ -153,8 +151,16 @@ pub fn verify_capability_with_floor(
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let peer = CapabilityNegotiation::v1_default();
-    let verified =
-        verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer, None)?;
+    let verified = verify_capability_base(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        &peer,
+        None,
+        false,
+        false,
+    )?;
     admit_delegated_budget(token, budgets)?;
     Ok(verified)
 }
@@ -166,6 +172,8 @@ fn verify_capability_base(
     crypto_floor: CapabilityCryptoFloor,
     peer: &CapabilityNegotiation,
     direct_root: Option<&CapabilityToken>,
+    aggregate_invocation_authority: bool,
+    cumulative_approval_authority: bool,
 ) -> Result<VerifiedCapability, CapabilityError> {
     // Issuer trust check. The full kernel also trusts its own public key
     // and the set returned by the capability authority; callers must
@@ -189,7 +197,14 @@ fn verify_capability_base(
         }
     }
 
-    verify_negotiated_capability_semantics(token, trusted_issuers, peer, direct_root)?;
+    verify_negotiated_capability_semantics(
+        token,
+        trusted_issuers,
+        peer,
+        direct_root,
+        aggregate_invocation_authority,
+        cumulative_approval_authority,
+    )?;
 
     // Time-bound check.
     let now = clock.now_unix_secs();
@@ -215,6 +230,8 @@ fn verify_negotiated_capability_semantics(
     trusted_issuers: &[PublicKey],
     peer: &CapabilityNegotiation,
     direct_root: Option<&CapabilityToken>,
+    aggregate_invocation_authority: bool,
+    cumulative_approval_authority: bool,
 ) -> Result<(), CapabilityError> {
     peer.validate().map_err(|error| {
         CapabilityError::AttenuationViolation(format!(
@@ -227,11 +244,21 @@ fn verify_negotiated_capability_semantics(
             "aggregate invocation budget is not negotiated".to_string(),
         ));
     }
+    if token_uses_aggregate_budget(token) && !aggregate_invocation_authority {
+        return Err(CapabilityError::AttenuationViolation(
+            "aggregate invocation budget enforcement is unavailable".to_string(),
+        ));
+    }
 
     if token.scope.has_cumulative_approval() {
         if !peer.supports(CUMULATIVE_APPROVAL_BUDGET) {
             return Err(CapabilityError::AttenuationViolation(
                 "cumulative_approval_budget was not negotiated".to_string(),
+            ));
+        }
+        if !cumulative_approval_authority {
+            return Err(CapabilityError::AttenuationViolation(
+                "cumulative approval enforcement is unavailable".to_string(),
             ));
         }
         verify_cumulative_approval_constraints(token, trusted_issuers, direct_root)
@@ -312,8 +339,16 @@ pub fn verify_capability_with_negotiated_floor(
     peer: &CapabilityNegotiation,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let mut budgets = NoopBudgetRegistry;
-    let verified =
-        verify_capability_base(token, trusted_issuers, clock, crypto_floor, peer, None)?;
+    let verified = verify_capability_base(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        peer,
+        None,
+        false,
+        false,
+    )?;
     admit_delegated_budget(token, &mut budgets)?;
     Ok(verified)
 }
@@ -367,6 +402,8 @@ pub trait TrustRootResolver {
 pub struct CapabilityFeatureContext<'a> {
     pub peer: &'a CapabilityNegotiation,
     pub direct_root: Option<&'a CapabilityToken>,
+    pub aggregate_invocation_authority: bool,
+    pub cumulative_approval_authority: bool,
 }
 
 impl<F> TrustRootResolver for F
@@ -400,8 +437,16 @@ pub fn verify_capability_with_floor_and_trust_root(
     trust_root_scope_hash: &ScopeHash,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let peer = CapabilityNegotiation::v1_default();
-    let verified =
-        verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer, None)?;
+    let verified = verify_capability_base(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        &peer,
+        None,
+        false,
+        false,
+    )?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_trust_root(token, trust_root_scope_hash)?;
 
@@ -421,8 +466,16 @@ pub fn verify_capability_with_floor_and_resolver(
     trust_root: &dyn TrustRootResolver,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let peer = CapabilityNegotiation::v1_default();
-    let verified =
-        verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer, None)?;
+    let verified = verify_capability_base(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        &peer,
+        None,
+        false,
+        false,
+    )?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_resolver(token, trust_root)?;
 
@@ -447,6 +500,8 @@ pub fn verify_capability_full(
         CapabilityFeatureContext {
             peer,
             direct_root: None,
+            aggregate_invocation_authority: false,
+            cumulative_approval_authority: false,
         },
         trust_root,
         budgets,
@@ -464,9 +519,23 @@ pub fn verify_capability_full_with_root(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    let CapabilityFeatureContext { peer, direct_root } = features;
+    let CapabilityFeatureContext {
+        peer,
+        direct_root,
+        aggregate_invocation_authority,
+        cumulative_approval_authority,
+    } = features;
     if let Some(root) = direct_root {
-        verify_capability_base(root, trusted_issuers, clock, crypto_floor, peer, None)?;
+        verify_capability_base(
+            root,
+            trusted_issuers,
+            clock,
+            crypto_floor,
+            peer,
+            None,
+            aggregate_invocation_authority,
+            cumulative_approval_authority,
+        )?;
     }
     let verified = verify_capability_base(
         token,
@@ -475,6 +544,8 @@ pub fn verify_capability_full_with_root(
         crypto_floor,
         peer,
         direct_root,
+        aggregate_invocation_authority,
+        cumulative_approval_authority,
     )?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_negotiation(token, peer, trust_root)?;
@@ -680,7 +751,7 @@ mod tests {
         );
         let trust_roots = |_issuer: &PublicKey| None;
         let mut budgets = NoopBudgetRegistry;
-        let verified = verify_capability_full(
+        let enforcement_error = verify_capability_full(
             &token,
             &[issuer.public_key()],
             &clock,
@@ -689,12 +760,34 @@ mod tests {
             &trust_roots,
             &mut budgets,
         )
-        .expect("negotiated direct cumulative approval must verify");
+        .expect_err("portable negotiation without a cumulative authority must deny");
+        assert_eq!(
+            enforcement_error,
+            CapabilityError::AttenuationViolation(
+                "cumulative approval enforcement is unavailable".to_string()
+            )
+        );
+
+        let verified = verify_capability_full_with_root(
+            &token,
+            &[issuer.public_key()],
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            CapabilityFeatureContext {
+                peer: &peer,
+                direct_root: None,
+                aggregate_invocation_authority: false,
+                cumulative_approval_authority: true,
+            },
+            &trust_roots,
+            &mut budgets,
+        )
+        .expect("an explicitly supplied cumulative authority must verify direct semantics");
         assert_eq!(verified.id, token.id);
     }
 
     #[test]
-    fn aggregate_invocation_requires_negotiation_and_full_verification_accepts_rollout_profile() {
+    fn aggregate_invocation_requires_negotiation_and_composite_enforcement() {
         let issuer = Keypair::generate();
         let clock = crate::FixedClock::new(150);
         let peer = CapabilityNegotiation::t1_default();
@@ -729,7 +822,7 @@ mod tests {
                 true,
             );
             let mut budgets = NoopBudgetRegistry;
-            let verified = verify_capability_full(
+            let enforcement_error = verify_capability_full(
                 &token,
                 &[issuer.public_key()],
                 &clock,
@@ -738,8 +831,15 @@ mod tests {
                 &trust_roots,
                 &mut budgets,
             )
-            .expect("negotiated full verification must accept the aggregate semantic");
-            assert_eq!(verified.id, token.id);
+            .expect_err(
+                "negotiation without a composite quota authority must deny aggregate budgets",
+            );
+            assert_eq!(
+                enforcement_error,
+                CapabilityError::AttenuationViolation(
+                    "aggregate invocation budget enforcement is unavailable".to_string()
+                )
+            );
         }
 
         let mut tampered = aggregate_budget_token(&issuer, 0);

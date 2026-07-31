@@ -390,9 +390,8 @@ impl ChioMcpEdge {
         let execution_nonce = parse_request_execution_nonce(id, params)?;
         let governed_intent = parse_request_governed_intent(id, params)?;
         let supplemental_authorization = parse_request_supplemental_authorization(id, params)?;
-        let approval_token = parse_request_approval_token(id, params)?;
-        let approval_tokens = parse_request_approval_tokens(id, params)?;
-        let threshold_approval_proposal = parse_request_threshold_approval_proposal(id, params)?;
+        let (approval_token, approval_tokens, threshold_approval_proposal) =
+            parse_request_approval_artifacts(id, params)?;
         let extra_metadata = parse_request_extra_metadata(id, params)?;
 
         let Some(&tool_index) = self.tool_index.get(tool_name) else {

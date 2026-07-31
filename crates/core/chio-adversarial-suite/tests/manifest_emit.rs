@@ -62,13 +62,22 @@ fn manifest_covers_every_attack_class() {
         Ok(manifest) => manifest,
         Err(err) => panic!("Manifest::from_bundled failed: {err}"),
     };
+    let bundled = match bundled_cases() {
+        Ok(cases) => cases,
+        Err(err) => panic!("bundled_cases failed: {err}"),
+    };
 
     let observed: BTreeSet<AttackClass> = manifest.cases.iter().map(|c| c.class).collect();
-    let expected: BTreeSet<AttackClass> = ATTACK_CLASSES.iter().copied().collect();
+    let expected: BTreeSet<AttackClass> = bundled
+        .into_iter()
+        .filter(|case| !case.pending)
+        .map(|case| case.class)
+        .collect();
     assert_eq!(
         observed, expected,
-        "manifest must reference every attack class"
+        "manifest must reference every attack class with non-pending cases"
     );
+    assert!(observed.is_subset(&ATTACK_CLASSES.iter().copied().collect()));
 }
 
 #[test]

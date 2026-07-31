@@ -268,6 +268,8 @@ fn delegated_aggregate_mode_requires_root_and_detects_omission() -> Result<(), C
         CapabilityFeatureContext {
             peer: &aggregate_peer(),
             direct_root: Some(&root),
+            aggregate_invocation_authority: true,
+            cumulative_approval_authority: false,
         },
         &resolver,
         &mut budgets,
@@ -336,6 +338,8 @@ fn delegated_aggregate_budget_accepts_authenticated_root() -> Result<(), Capabil
         CapabilityFeatureContext {
             peer: &aggregate_peer(),
             direct_root: Some(&root),
+            aggregate_invocation_authority: true,
+            cumulative_approval_authority: false,
         },
         &resolver,
         &mut budgets,
@@ -435,7 +439,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
     let child = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-cumulative-child".to_string(),
-            issuer: issuer.public_key(),
+            issuer: root_subject.public_key(),
             subject: delegatee.public_key(),
             scope: child_scope,
             issued_at: 120,
@@ -443,7 +447,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
             delegation_chain: receipt.complete_chain(),
             aggregate_invocation_budget: None,
         },
-        &issuer,
+        &root_subject,
     )
     .map_err(|error| CapabilityError::Internal(error.to_string()))?;
     let clock = crate::FixedClock::new(150);
@@ -453,7 +457,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
 
     let missing_root = verify_capability_full(
         &child,
-        &[issuer.public_key()],
+        &[issuer.public_key(), root_subject.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
         &cumulative_peer(),
@@ -468,12 +472,14 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
 
     let verified = verify_capability_full_with_root(
         &child,
-        &[issuer.public_key()],
+        &[issuer.public_key(), root_subject.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
         CapabilityFeatureContext {
             peer: &cumulative_peer(),
             direct_root: Some(&root),
+            aggregate_invocation_authority: false,
+            cumulative_approval_authority: true,
         },
         &resolver,
         &mut budgets,

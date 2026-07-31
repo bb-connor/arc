@@ -1,6 +1,12 @@
 
 # cargo-vet audits file
 
+[[audits.addr2line]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.25.1"
+notes = "Reviewed exact locked source and resolved feature set. The build disables addr2line loader, so the memory-mapped file loader and its unsafe blocks are not compiled; the enabled DWARF lookup core is no_std-compatible and contains no unsafe code."
+
 [[audits.alloy]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -463,17 +469,401 @@ criteria = "safe-to-deploy"
 version = "1.0.4"
 notes = "Conditional compilation helper macro; trivial code, no IO or unsafe."
 
+[[audits.chio-a2a-adapter]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-a2a-edge]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-acp-edge]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-acp-proxy]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-ag-ui-proxy]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-anchor]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-api-protect]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-appraisal]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-attest-verify]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-autonomy]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-binding-helpers]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-bindings-ffi]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-cli]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-config]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-conformance]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-control-plane]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-core]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-core-types]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-cpp-kernel-ffi]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-credentials]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-credit]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-cross-protocol]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-data-guards]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-did]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-envoy-ext-authz]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-external-guards]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-federation]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-governance]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-guard-sdk]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-guard-sdk-macros]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-guards]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-hosted-mcp]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-http-core]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-http-session]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-kernel]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-kernel-browser]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-kernel-core]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-kernel-mobile]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-link]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-listing]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-manifest]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-market]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-mcp-adapter]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-mcp-edge]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
 [[audits.chio-mcp-remote]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.1.0"
 notes = "First-party extraction of the hosted MCP remote runtime from chio-cli. Reviewed the moved source boundary, dependency set, and public reexports; the change removes source splicing without introducing new external supplier code."
 
+[[audits.chio-metering]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-open-market]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-openai-adapter]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-openapi]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-openapi-mcp-bridge]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-policy]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
 [[audits.chio-provider-adapter-core]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.1.0"
 notes = "First-party provider adapter core. Reviewed that it centralizes SSE parsing, stream verdict helpers, provider identity, and loaded-weights helpers for existing in-tree adapters without adding network IO, unsafe code, or new external supplier code."
+
+[[audits.chio-reputation]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-settle]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-siem]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-spec-codegen]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-spec-validate]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-store-sqlite]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-tower]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-underwriting]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-wall]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-wall-core]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-wasm-guards]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-web3]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-web3-bindings]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
+
+[[audits.chio-workflow]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "First-party Chio crate at the integrated 0.1.0 workspace revision. Reviewed as in-repository source with repository-controlled provenance; its dependency role and trust-boundary changes are covered by the branch security validation and evidence gates."
 
 [[audits.chrono]]
 who = "Chio supply-chain reviewer"
@@ -1380,6 +1770,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.245.1"
 notes = "Exemption chase-down certification. Reviewed current workspace dependency role and removed the matching audit-this-later exemption row."
+
+[[audits.wasmtime-internal-asm-macros]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "36.0.13"
+notes = "Reviewed the complete locked 90-line no_std source and manifest. It exports platform-scoped global_asm wrappers only, has no build script, filesystem, network, or runtime input path, and is consumed solely by the audited Wasmtime runtime."
 
 [[audits.wasmtime-internal-core]]
 who = "Chio supply-chain reviewer"

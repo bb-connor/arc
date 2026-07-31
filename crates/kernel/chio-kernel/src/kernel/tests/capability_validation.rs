@@ -31,6 +31,181 @@ fn kernel_rejects_classical_capability_under_pq_required_floor() {
 }
 
 #[test]
+fn hosted_cumulative_family_requires_matching_signed_root_lineage(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let now = current_unix_timestamp();
+    let issuer = make_keypair();
+    let root_subject = make_keypair();
+    let delegatee = make_keypair();
+    let remote_key = make_keypair();
+    let remote_kernel_id = "kernel.cumulative-origin";
+
+    let cumulative_constraint = |threshold_units,
+                                 root_binding: Option<
+        chio_core::capability::cumulative_approval::CumulativeApprovalRootBinding,
+    >| {
+        Constraint::RequireCumulativeApprovalAbove {
+            threshold: MonetaryAmount {
+                units: threshold_units,
+                currency: "USD".to_string(),
+            },
+            approval_budget_id: "budget-1".to_string(),
+            approval_budget_epoch: 1,
+            cumulative_approval_root_binding: root_binding.map(Box::new),
+        }
+    };
+    let mut root_grant = make_grant("srv-a", "read_file");
+    root_grant.operations.push(Operation::Delegate);
+    root_grant
+        .constraints
+        .push(cumulative_constraint(100, None));
+    let root_body = CapabilityTokenBody {
+        id: "cap-hosted-cumulative-root".to_string(),
+        issuer: issuer.public_key(),
+        subject: root_subject.public_key(),
+        scope: make_scope(vec![root_grant]),
+        issued_at: now.saturating_sub(1),
+        expires_at: now.saturating_add(300),
+        delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
+    };
+    let root = CapabilityToken::sign_cumulative_approval_family_root(root_body.clone(), &issuer)?;
+    let binding = root
+        .scope
+        .grants
+        .first()
+        .and_then(|grant| grant.constraints.first())
+        .and_then(Constraint::cumulative_approval_root_binding)
+        .cloned()
+        .ok_or_else(|| std::io::Error::other("cumulative root binding missing"))?;
+    let mut child_grant = make_grant("srv-a", "read_file");
+    child_grant
+        .constraints
+        .push(cumulative_constraint(80, Some(binding)));
+    let child_scope = make_scope(vec![child_grant]);
+    let receipt = chio_core::capability::attenuation::delegate(
+        &root,
+        &child_scope,
+        &root_subject,
+        &delegatee.public_key(),
+        chio_core_types::ScopeAttenuation::empty(),
+        now,
+        [15_u8; 16],
+    )?;
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-hosted-cumulative-child".to_string(),
+            issuer: root_subject.public_key(),
+            subject: delegatee.public_key(),
+            scope: child_scope,
+            issued_at: now,
+            expires_at: now.saturating_add(200),
+            delegation_chain: receipt.complete_chain(),
+            aggregate_invocation_budget: None,
+        },
+        &root_subject,
+    )?;
+    let mut wrong_root_body = root_body;
+    wrong_root_body.subject = make_keypair().public_key();
+    let wrong_root =
+        CapabilityToken::sign_cumulative_approval_family_root(wrong_root_body, &issuer)?;
+
+    let mut capabilities = chio_core::capability::features::CapabilityNegotiation::v1_default();
+    capabilities.features.insert(
+        chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET.to_string(),
+        true,
+    );
+    let peer = chio_federation::trust_establishment::FederationPeer {
+        kernel_id: remote_kernel_id.to_string(),
+        public_key: remote_key.public_key(),
+        conformance_tier: Default::default(),
+        established_at: now.saturating_sub(1),
+        rotation_due: now.saturating_add(300),
+        capabilities,
+        ladder_manifest_ref: None,
+    };
+    let make_hosted_kernel = || {
+        let mut config = make_config();
+        config.keypair = issuer.clone();
+        config.ca_public_keys = vec![issuer.public_key(), root_subject.public_key()];
+        let mut kernel = make_kernel(config).with_federation_peers(vec![peer.clone()]);
+        kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+        kernel.set_federation_cosigner(std::sync::Arc::new(
+            chio_federation::bilateral::InProcessCoSigner::new(
+                remote_kernel_id,
+                remote_key.clone(),
+                issuer.public_key(),
+            ),
+        ));
+        kernel
+    };
+
+    let valid_path = unique_receipt_db_path("chio-hosted-cumulative-valid-root");
+    let valid_store = SqliteReceiptStore::open(&valid_path)?;
+    valid_store.record_capability_snapshot(&root, None)?;
+    drop(valid_store);
+    let mut valid_kernel = make_hosted_kernel();
+    valid_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&valid_path)?))?;
+    valid_kernel.verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)?;
+    let mut valid_request =
+        make_request("req-hosted-cumulative-valid", &child, "read_file", "srv-a");
+    valid_request.federated_origin_kernel_id = Some(remote_kernel_id.to_string());
+    valid_request.governed_intent = Some(make_governed_intent(
+        "intent-hosted-cumulative-valid",
+        "srv-a",
+        "read_file",
+        "exercise cumulative approval admission",
+        80,
+        "USD",
+    ));
+    let matching_grants = crate::request_matching::resolve_required_matching_grants(
+        &child,
+        &valid_request.tool_name,
+        &valid_request.server_id,
+        &valid_request.arguments,
+        valid_request.model_metadata.as_ref(),
+    )?;
+    let valid_error = valid_kernel
+        .check_and_increment_budget(&valid_request, &child, &matching_grants, false, None)
+        .err()
+        .ok_or_else(|| {
+            std::io::Error::other("unavailable cumulative participant admitted ordinary request")
+        })?;
+    assert!(
+        valid_error.to_string().contains("qualified admission"),
+        "{valid_error}"
+    );
+
+    let missing_path = unique_receipt_db_path("chio-hosted-cumulative-missing-root");
+    let mut missing_kernel = make_hosted_kernel();
+    missing_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&missing_path)?))?;
+    let missing_error = missing_kernel
+        .verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
+        .expect_err("missing cumulative root lineage must fail closed");
+    assert!(missing_error.contains("missing signed capability root snapshot"));
+
+    let mismatch_path = unique_receipt_db_path("chio-hosted-cumulative-mismatched-root");
+    let mismatch_store = SqliteReceiptStore::open(&mismatch_path)?;
+    mismatch_store.record_capability_snapshot(&root, None)?;
+    mismatch_store.connection()?.execute(
+        "UPDATE capability_lineage SET signed_capability_json = ?1 WHERE capability_id = ?2",
+        params![serde_json::to_string(&wrong_root)?, root.id],
+    )?;
+    drop(mismatch_store);
+    let mut mismatch_kernel = make_hosted_kernel();
+    mismatch_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&mismatch_path)?))?;
+    let mismatch_error = mismatch_kernel
+        .verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
+        .expect_err("mismatched cumulative root lineage must fail closed");
+    assert!(mismatch_error.contains("does not originate from the authenticated root"));
+
+    for cleanup_path in [valid_path, missing_path, mismatch_path] {
+        let _ = std::fs::remove_file(cleanup_path);
+    }
+    Ok(())
+}
+
+#[test]
 fn production_evaluate_rejects_direct_attenuated_without_trust_root_resolver() {
     let issuer = make_keypair();
     let subject = make_keypair();

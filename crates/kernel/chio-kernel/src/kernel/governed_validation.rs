@@ -9,6 +9,11 @@ use chio_appraisal::VerifiedRuntimeAttestationRecord;
 
 use super::*;
 
+#[path = "governed_validation/verified_outcome.rs"]
+mod verified_outcome;
+
+use verified_outcome::validate_verified_outcome_request;
+
 impl ChioKernel {
     fn governed_requirements(
         grant: &ToolGrant,
@@ -358,6 +363,7 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
+        validate_verified_outcome_request(metered)?;
         if let Some(intent_amount) = intent.max_amount.as_ref() {
             if intent_amount.currency != quote.quoted_cost.currency {
                 return Err(KernelError::GovernedTransactionDenied(
@@ -1429,7 +1435,7 @@ mod mustprepay_gate_tests {
     use super::*;
     use chio_core::capability::governance::{
         GovernedToolInvocationIntentBody, MeteredBillingContext, MeteredBillingQuote,
-        MeteredSettlementMode,
+        MeteredSettlementMode, VerifiedOutcomeRequestV1, VERIFIED_OUTCOME_REQUEST_SCHEMA,
     };
     use chio_core::capability::scope::MonetaryAmount;
 
@@ -1522,5 +1528,36 @@ mod mustprepay_gate_tests {
         }
         ChioKernel::validate_metered_billing_context(&intent, None, true, 1_500)
             .expect("an open-ended quote issued in the past must be accepted");
+    }
+
+    #[test]
+    fn inactive_verified_outcome_billing_is_rejected_by_metered_admission() {
+        let mut intent = must_prepay_intent();
+        let Some(metered) = intent.metered_billing.as_mut() else {
+            panic!("metered test intent is missing its billing context");
+        };
+        metered.settlement_mode = MeteredSettlementMode::HoldCapture;
+        metered.quote.billing_unit = "verified_outcome".to_string();
+        metered.quote.quoted_units = 1;
+        metered.max_billed_units = Some(1);
+        metered.verified_outcome = Some(VerifiedOutcomeRequestV1 {
+            schema: VERIFIED_OUTCOME_REQUEST_SCHEMA.to_string(),
+            listing_id: "listing-1".to_string(),
+            listing_digest: "1".repeat(64),
+            provider_binding_digest: "2".repeat(64),
+            pricing_id: "3".repeat(64),
+            pricing_digest: "4".repeat(64),
+            predicate_id: "5".repeat(64),
+            predicate_digest: "6".repeat(64),
+            sla_digest: Some("7".repeat(64)),
+            receiver_binding_digest: "8".repeat(64),
+        });
+
+        let error = ChioKernel::validate_metered_billing_context(&intent, None, true, 1_500)
+            .expect_err("inactive verified outcome pricing must deny before payment admission");
+        assert!(
+            error.to_string().contains("pricing is not activated"),
+            "unexpected verified outcome denial: {error}"
+        );
     }
 }

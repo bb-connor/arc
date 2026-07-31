@@ -732,18 +732,67 @@ impl ChioKernel {
         let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = chio_kernel_core::NoopBudgetRegistry;
+        let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
 
-        chio_kernel_core::verify_capability_full(
+        chio_kernel_core::verify_capability_full_with_root(
             cap,
             &trusted,
             &clock,
             capability_crypto_floor(self.capability_crypto_floor),
-            &peer_profile,
+            chio_kernel_core::CapabilityFeatureContext {
+                peer: &peer_profile,
+                direct_root: direct_root.as_ref(),
+                aggregate_invocation_authority: true,
+                cumulative_approval_authority: true,
+            },
             &trust_resolver,
             &mut budgets,
         )
         .map(|_| ())
         .map_err(|error| chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason())
+    }
+
+    /// Resolve signed family-root evidence retained by the receipt store.
+    ///
+    /// Delegated aggregate and cumulative capabilities are not admitted from
+    /// an identifier-only lineage. The root token itself is required so the
+    /// family verifier can authenticate its signature, scope, and binding.
+    /// Older snapshots without signed token retention fail closed.
+    pub(crate) fn negotiated_capability_root(
+        &self,
+        cap: &CapabilityToken,
+        peer: &chio_core::capability::features::CapabilityNegotiation,
+    ) -> Result<Option<CapabilityToken>, String> {
+        let aggregate_root_required = cap.aggregate_invocation_budget.is_some()
+            && peer.supports(chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET);
+        let cumulative_root_required = cap.scope.has_cumulative_approval()
+            && peer.supports(chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET);
+        if (!aggregate_root_required && !cumulative_root_required)
+            || cap.delegation_chain.is_empty()
+        {
+            return Ok(None);
+        }
+
+        let root_id = cap
+            .delegation_chain
+            .first()
+            .map(|link| link.capability_id.as_str())
+            .ok_or_else(|| "delegated capability has no root delegation link".to_string())?;
+        let snapshot = self
+            .with_receipt_store(|store| Ok(store.get_capability_snapshot(root_id)?))
+            .map_err(|error| format!("failed to resolve signed capability root: {error}"))?
+            .flatten()
+            .ok_or_else(|| format!("missing signed capability root snapshot for {root_id}"))?;
+        let signed_root = snapshot.signed_capability.ok_or_else(|| {
+            format!("capability root snapshot {root_id} has no signed token evidence")
+        })?;
+        if signed_root.id != root_id {
+            return Err(format!(
+                "signed capability root {} does not match requested root {root_id}",
+                signed_root.id
+            ));
+        }
+        Ok(Some(signed_root))
     }
 
     /// The hosted `evaluate_tool_call_*` paths route the full chain

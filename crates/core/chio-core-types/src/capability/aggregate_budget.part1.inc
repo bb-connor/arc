@@ -1145,6 +1145,10 @@ fn validate_family_preservation(
     token: &CapabilityToken,
     root: &VerifiedAggregateFamilyRoot,
 ) -> Result<()> {
+    let expected_marker = AggregateBudgetDelegationMarker {
+        root_binding_digest: root.root_binding_digest().to_string(),
+        max_invocations: root.max_invocations(),
+    };
     if let Some(proof) = token.attenuation_proof.as_ref() {
         let evidence = proof
             .aggregate_family_preservation
@@ -1154,6 +1158,12 @@ fn validate_family_preservation(
                     .to_string(),
             })?;
         evidence.validate_against_verified_root(root)?;
+        if proof.normalized_subset_proof.aggregate_budget.as_ref() != Some(&expected_marker) {
+            return Err(Error::AttenuationViolation {
+                reason: "aggregate family attenuation witness changed or omitted the authenticated root binding marker"
+                    .to_string(),
+            });
+        }
     }
     for link in &token.delegation_chain {
         let evidence = link
@@ -1164,6 +1174,12 @@ fn validate_family_preservation(
                     .to_string(),
             })?;
         evidence.validate_against_verified_root(root)?;
+        if link.aggregate_budget.as_ref() != Some(&expected_marker) {
+            return Err(Error::AttenuationViolation {
+                reason: "aggregate family delegation link changed or omitted the authenticated root binding marker"
+                    .to_string(),
+            });
+        }
     }
     Ok(())
 }

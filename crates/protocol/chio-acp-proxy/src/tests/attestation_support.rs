@@ -4,18 +4,20 @@ use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_core::capability::{scope::{ChioScope, Constraint, Operation, ToolGrant}, token::{CapabilityToken, CapabilityTokenBody}};
+use chio_core::capability::{
+    scope::{ChioScope, Constraint, Operation, ToolGrant},
+    token::{CapabilityToken, CapabilityTokenBody},
+};
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
-    lineage::ChildRequestReceipt, body::ChioReceipt, body::ChioReceiptBody, decision::Decision, metadata::GuardEvidence, decision::ToolCallAction,
+    body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
+    lineage::ChildRequestReceipt, metadata::GuardEvidence,
 };
-use chio_kernel::receipt_store::{
-    ReceiptCheckpointCreateReport, ReceiptStore, ReceiptStoreError,
-};
+use chio_kernel::receipt_store::{ReceiptCheckpointCreateReport, ReceiptStore, ReceiptStoreError};
 use chio_kernel::{
     ChioKernel, ExecutionNonceConfig, InMemoryExecutionNonceStore, KernelConfig,
-    DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_manifest::{
     sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration,
@@ -86,6 +88,7 @@ fn test_kernel_config(issuer: &Keypair) -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -141,10 +144,7 @@ fn test_authority_manifest_registry(server_id: &str) -> Arc<VerifiedManifestRegi
     )
 }
 
-fn test_kernel_capability_checker(
-    kernel: ChioKernel,
-    server_id: &str,
-) -> KernelCapabilityChecker {
+fn test_kernel_capability_checker(kernel: ChioKernel, server_id: &str) -> KernelCapabilityChecker {
     KernelCapabilityChecker::new(
         kernel,
         server_id,
@@ -271,12 +271,13 @@ fn make_authorization_receipt_with_semantics(
         "authorization_parameter_hash": authorization_parameter_hash,
         "operation_payload": operation_payload,
     }))
-        .expect("hash receipt parameters");
-    let decision = if semantics.receipt_kind == chio_core::receipt::kinds::ReceiptKind::MediatedDecision {
-        Some(decision)
-    } else {
-        None
-    };
+    .expect("hash receipt parameters");
+    let decision =
+        if semantics.receipt_kind == chio_core::receipt::kinds::ReceiptKind::MediatedDecision {
+            Some(decision)
+        } else {
+            None
+        };
     ChioReceipt::sign(
         ChioReceiptBody {
             id: "ignored-auth-id".to_string(),
@@ -437,10 +438,8 @@ fn test_authorization_operation_payload() -> serde_json::Value {
 }
 
 fn test_authorization_parameter_hash() -> String {
-    let bytes = chio_core::canonical::canonical_json_bytes(
-        &test_authorization_operation_payload(),
-    )
-    .expect("test authorization payload should canonicalize");
+    let bytes = chio_core::canonical::canonical_json_bytes(&test_authorization_operation_payload())
+        .expect("test authorization payload should canonicalize");
     chio_core::sha256_hex(&bytes)
 }
 
@@ -556,8 +555,7 @@ impl ReceiptStore for MockReceiptStore {
         }
         if !self.supports_checkpoints {
             return Err(ReceiptStoreError::Conflict(
-                "receipt checkpoint creation is not supported by this receipt store"
-                    .to_string(),
+                "receipt checkpoint creation is not supported by this receipt store".to_string(),
             ));
         }
         let mut state = self.state.lock().expect("mock store lock should hold");
@@ -582,9 +580,8 @@ impl ReceiptStore for MockReceiptStore {
                 latest_checkpointed_entry_seq: latest_committed_entry_seq,
             });
         }
-        let batch_end_seq = latest_committed_entry_seq.min(
-            next_start.saturating_add(max_batch.saturating_sub(1)),
-        );
+        let batch_end_seq =
+            latest_committed_entry_seq.min(next_start.saturating_add(max_batch.saturating_sub(1)));
         let report = ReceiptCheckpointCreateReport {
             created: true,
             checkpoint_seq: Some(state.checkpoints.len() as u64 + 1),
