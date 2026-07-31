@@ -109,6 +109,17 @@ pub struct BidRequest {
 }
 
 impl BidRequest {
+    /// Validate the structural invariants of a bid request before signing
+    /// or settlement.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BiddingError::InvalidRequest`] when the schema is not
+    /// [`BID_REQUEST_SCHEMA`], when `agent_id`, `listing_id`, or the price
+    /// currency is empty or surrounded by whitespace, or when
+    /// `max_price_per_call.units` is zero. Returns
+    /// [`BiddingError::WindowOutOfBounds`] when `window_seconds` is zero, and
+    /// propagates any error from [`RequestedScope::validate`].
     pub fn validate(&self) -> Result<(), BiddingError> {
         if self.schema != BID_REQUEST_SCHEMA {
             return Err(invalid_request(format!(
@@ -148,6 +159,14 @@ pub struct RequestedScope {
 }
 
 impl RequestedScope {
+    /// Validate that the requested scope fields are non-empty and free of
+    /// surrounding whitespace.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BiddingError::InvalidRequest`] when `server_id`,
+    /// `tool_name`, or `capability_scope_prefix` is empty or padded with
+    /// surrounding whitespace.
     pub fn validate(&self) -> Result<(), BiddingError> {
         validate_required_field(&self.server_id, "requested_scope.server_id")?;
         validate_required_field(&self.tool_name, "requested_scope.tool_name")?;
@@ -257,6 +276,16 @@ pub struct VerifiedReservationReceipt {
 }
 
 impl VerifiedReservationReceipt {
+    /// Verify a signed reservation receipt against the expected settlement
+    /// reservation authority and lift it into a market-accepted witness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BiddingError::ReservationReceiptInvalid`] when the receipt
+    /// body fails its structural checks, when the signer key does not match
+    /// `expected_reservation_authority`, or when the signature does not
+    /// verify. Structural validation may also surface
+    /// [`BiddingError::InvalidRequest`] for empty receipt fields.
     pub fn from_signed(
         receipt: &SignedReservationReceipt,
         expected_reservation_authority: &PublicKey,
@@ -305,6 +334,34 @@ pub struct BidMintContext<'a> {
 /// Execute the bid/ask flow: validate the request, apply fail-closed checks
 /// against the resolved listing, mint a capability token, and return a
 /// signed ask response.
+///
+/// # Errors
+///
+/// Returns a [`BiddingError`] when:
+///
+/// - the bid request fails [`BidRequest::validate`], the token cannot be
+///   signed, or a canonical digest cannot be produced
+///   ([`BiddingError::InvalidRequest`]);
+/// - the bid signature does not verify
+///   ([`BiddingError::BidSignatureInvalid`]);
+/// - the listing or pricing-hint signature does not verify
+///   ([`BiddingError::ListingSignatureInvalid`],
+///   [`BiddingError::PricingSignatureInvalid`]);
+/// - the bid, pricing hint, or namespace does not match the resolved
+///   listing ([`BiddingError::ListingMismatch`]);
+/// - listing, pricing, or issuer authority is not bound to the provider
+///   ([`BiddingError::AuthorityMismatch`]);
+/// - the listing is not active, its freshness window has elapsed, or its
+///   pricing hint has expired ([`BiddingError::ListingNotActive`],
+///   [`BiddingError::ListingStale`], [`BiddingError::PricingExpired`]);
+/// - the bid currency or ceiling does not satisfy the advertised price
+///   ([`BiddingError::CurrencyMismatch`],
+///   [`BiddingError::BidCeilingTooLow`]);
+/// - the requested scope prefix or server falls outside the listing
+///   ([`BiddingError::ScopeOutsideListing`]); or
+/// - the window or total cost overflows
+///   ([`BiddingError::WindowOutOfBounds`],
+///   [`BiddingError::TotalCostOverflow`]).
 pub fn bid(
     request: &SignedBidRequest,
     context: BidMintContext<'_>,
@@ -436,6 +493,30 @@ pub fn bid(
 }
 
 /// Record signed bid acceptance against a verified settlement reservation.
+///
+/// # Errors
+///
+/// Returns a [`BiddingError`] when:
+///
+/// - the ask schema is unsupported, the reservation receipt id is empty,
+///   acceptance precedes the ask `issued_at`, or the signed acceptance
+///   cannot be produced or re-verified ([`BiddingError::InvalidRequest`]);
+/// - the ask signature does not verify
+///   ([`BiddingError::PricingSignatureInvalid`]);
+/// - the token offer issuer does not match the ask signer or the acceptor
+///   key does not match the token subject
+///   ([`BiddingError::AuthorityMismatch`]);
+/// - the token offer signature does not verify
+///   ([`BiddingError::TokenSignatureInvalid`]);
+/// - the token validity window does not enclose the ask window
+///   ([`BiddingError::WindowOutOfBounds`]);
+/// - acceptance occurs at or after the ask expiry
+///   ([`BiddingError::PricingExpired`]);
+/// - the reservation does not cover the token offer liability or its bound
+///   fields disagree with the ask ([`BiddingError::ReservationReceiptInvalid`]);
+///   or
+/// - the token offer liability overflows
+///   ([`BiddingError::TotalCostOverflow`]).
 pub fn accept(
     ask: &SignedAskResponse,
     reservation: &VerifiedReservationReceipt,

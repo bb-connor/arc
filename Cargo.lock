@@ -2843,6 +2843,7 @@ dependencies = [
  "axum 0.8.8",
  "base64 0.22.1",
  "chio-acp-proxy",
+ "chio-anchor",
  "chio-api-protect",
  "chio-appraisal",
  "chio-arena",
@@ -2957,6 +2958,7 @@ name = "chio-commerce-order"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-credit",
  "chio-risk-comptroller",
  "chio-test-support",
  "chrono",
@@ -3641,6 +3643,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-custody-hw",
+ "chio-disclosure-lineage",
  "chio-federation",
  "chio-kernel-core",
  "chio-link",
@@ -4550,6 +4553,7 @@ name = "chio-trust-market-context"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-credentials",
  "chio-risk-comptroller",
  "chio-test-support",
  "chio-transaction-passport",

@@ -105,6 +105,13 @@ impl BudgetEnforcer {
     /// Returns `Ok(())` if the cost is within budget, or `Err(BudgetViolation)`
     /// describing which limit would be exceeded.
     ///
+    /// # Errors
+    ///
+    /// Returns [`BudgetViolation::Total`] when the total limit would be exceeded,
+    /// and [`BudgetViolation::Session`], [`BudgetViolation::Agent`], or
+    /// [`BudgetViolation::Tool`] when the matching per-scope limit would be
+    /// exceeded.
+    ///
     /// The `cost_units` must already be denominated in the policy currency.
     /// Use chio-link oracle to convert cross-currency costs before calling this.
     pub fn check(&self, meta: &CostMetadata, cost_units: u64) -> Result<(), BudgetViolation> {

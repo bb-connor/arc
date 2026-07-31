@@ -83,6 +83,15 @@ use crate::CliError;
 /// free tier. In particular it is the PROVENANCE of `accepted_kernel_keys`: the
 /// pinned trusted-kernel-key allowlist the genuine-use scan checks every receipt
 /// against, never an ad-hoc per-request caller value.
+///
+/// Tenant binding: the `tenant_id` every served receipt and own-stream read is
+/// scoped by is the raw canonical `did:chio` written VERBATIM (it is never
+/// re-derived, hashed, or re-encoded). It MUST match the
+/// `chio://receipts/tenant/<tenant>/*` SQL read guard byte-for-byte; any
+/// derivation mismatch silently denies ALL of the holder's own-stream reads
+/// (fail-closed, but invisibly), so the canonical DID string flows unchanged from
+/// issuance (`mint_chio_pass` derives it once from the subject key) through the
+/// genuine-use scan and the served read scopes.
 #[derive(Debug, Clone)]
 pub struct ChioPassConfig {
     /// Aggregate free-tier pool ceiling. Its `allotment_unit` MUST be the Pass XCC
@@ -132,6 +141,65 @@ impl ChioPassConfig {
             active_population_cap: 100_000,
             min_genuine_use_receipts: MIN_GENUINE_USE_RECEIPTS,
             board_approval_ref,
+            accepted_kernel_keys,
+        }
+    }
+
+    /// The single board-approved launch defaults.
+    ///
+    /// Returns ONE fail-closed [`ChioPassConfig`] pinned to the launch numbers.
+    /// Unlike [`Self::m0_placeholder`], the board-approved governance numbers are
+    /// pinned HERE; the only caller-supplied input is `accepted_kernel_keys`,
+    /// because the trusted-kernel allowlist is sourced from the trust-market
+    /// market-authority registry and its membership rotates per rotation epoch,
+    /// so it is loaded from that registry at install time, never hard-coded into
+    /// this binary. The returned surface still loads fail-closed:
+    /// [`Self::validate`] rejects it when the supplied `accepted_kernel_keys` is
+    /// empty.
+    ///
+    /// Pinned launch defaults:
+    /// - tier -> units 1000 / 1000 / 2500 / 5000 (unverified / attested / verified /
+    ///   premier): the committed [`TierAllotmentTable`] launch table. The floor is
+    ///   unconditional; the tier scales allotment SIZE only, never existence.
+    /// - allotment unit XCC ([`CHIO_PASS_ALLOTMENT_UNIT`]); the per-invocation XCC
+    ///   cost is the committed positive floor, so the metered grant's
+    ///   `max_cost_per_invocation.units > 0` always holds and the free-tier pool
+    ///   co-debit bounds spend (it can never request zero units).
+    /// - `window_token_capacity` / `active_population_cap`: anti-farm throttle
+    ///   placeholders.
+    /// - `min_genuine_use_receipts`: the committed spec floor.
+    #[must_use]
+    pub fn launch_default(accepted_kernel_keys: Vec<PublicKey>) -> Self {
+        // BOARD-PENDING: replace with the ratified launch governance reference once
+        // the board vote lands. This audit-only ref records provenance and never
+        // enters any arithmetic; it is non-empty so `validate` accepts the surface.
+        let board_approval_ref = "board-approval-pending/chio-pass-M1-launch".to_string();
+        // BOARD-PENDING: monthly aggregate free-tier POOL ceiling, in XCC. Documented
+        // launch default = active_population_cap (100_000) x the attested tier floor
+        // (1_000 XCC). The pool ceiling makes liability min(N x allotment, pool), so
+        // the gift degrades to "the pool shrinks", never "the treasury drains".
+        let monthly_pool_units: u64 = 100_000_000;
+        Self {
+            free_tier_pool: FreeTierPoolConfig {
+                monthly_pool_units,
+                allotment_unit: CHIO_PASS_ALLOTMENT_UNIT.to_string(),
+                board_approval_ref: board_approval_ref.clone(),
+            },
+            // tier -> units 1000 / 1000 / 2500 / 5000 (unverified/attested/verified/
+            // premier): the committed launch allotment table.
+            tier_allotment_table: TierAllotmentTable::default(),
+            window_token_capacity: 10_000,  // placeholder
+            active_population_cap: 100_000, // placeholder
+            // The committed spec genuine-use floor. Whether the launch floor is the
+            // >= 1 default or a stricter >= 3 is board-decidable;
+            // both are honored by `refresh_chio_pass_window` without touching the
+            // const inside `chio_pass_refresh_decision`.
+            min_genuine_use_receipts: MIN_GENUINE_USE_RECEIPTS,
+            board_approval_ref,
+            // Non-empty by contract: the launch trusted-kernel-key allowlist is
+            // sourced from the trust-market market-authority registry and rotates
+            // per rotation epoch. `validate` rejects an empty set fail-closed
+            // (an empty allowlist would silently force every identity dormant).
             accepted_kernel_keys,
         }
     }
@@ -740,14 +808,30 @@ mod tests {
     use chio_core::web3::identity::{
         Web3IdentityBindingCertificate, Web3KeyBindingPurpose, CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
     };
+    use std::sync::Arc;
+
+    use chio_core::capability::token::CapabilityTokenBody;
     use chio_credentials::{revoke_chio_pass_record, CHIO_PASS_ALLOTMENT_COST_NAME};
-    use chio_kernel::{validate_checkpoint_predecessor, LocalCapabilityAuthority, ReceiptStore};
+    use chio_kernel::pass_gating::{
+        assert_pass_capability_id_deterministic, pass_authorizes_read, pass_baseline_read_uris,
+        pass_receipt_read_context, pass_stream_uri, ChioPassStream,
+    };
+    use chio_kernel::{
+        validate_checkpoint_predecessor, BudgetStore, ChioKernel, InMemoryBudgetStore,
+        KernelConfig, LocalCapabilityAuthority, ReceiptStore, ToolCallRequest, Verdict,
+        DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+        DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    };
+    use chio_mcp_adapter::native::{NativeChioServiceBuilder, NativeTool};
 
     use super::*;
 
-    // 2026-06-15T12:00:00Z (inside June 2026) and the contiguous July window.
+    // 2026-06-15T12:00:00Z: a fixed historical instant for the pure-function
+    // suites below (issuance admission, anchor publication, scope shape) that
+    // inject explicit clocks and never read the wall clock. The e2e pipeline
+    // suite must NOT use it: the kernel charge path reads the REAL clock, so
+    // that suite derives its window dynamically (see `current_window`).
     const MID_JUNE_2026: u64 = 1_781_524_800;
-    const JULY_2026: u64 = 1_782_864_000; // 2026-07-01T00:00:00Z
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
@@ -757,12 +841,35 @@ mod tests {
         std::env::temp_dir().join(format!("chio-pass-t9-{prefix}-{nonce}.sqlite3"))
     }
 
-    fn june_window() -> AttestationWindowId {
-        attestation_window_containing(MID_JUNE_2026).expect("june window")
+    /// The UTC calendar-month attestation window containing the REAL wall
+    /// clock now, computed dynamically so these tests are not wall-clock time
+    /// bombs (mirrors `current_month_window` in the kernel free-tier pool
+    /// tests). The e2e charge below runs through the public kernel pipeline,
+    /// which reads the real clock, so a Pass pinned to an absolute month would
+    /// start failing with CapabilityExpired once that month passed.
+    fn current_window() -> AttestationWindowId {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time before epoch")
+            .as_secs();
+        attestation_window_containing(now).expect("current window")
     }
 
-    fn july_window() -> AttestationWindowId {
-        attestation_window_containing(JULY_2026).expect("july window")
+    /// The contiguous monthly window immediately after `window`, derived from
+    /// its exclusive `until` boundary (no clock read).
+    fn next_window_after(window: &AttestationWindowId) -> AttestationWindowId {
+        attestation_window_containing(window.until).expect("next window")
+    }
+
+    /// The contiguous monthly window immediately before `window`, derived from
+    /// the instant just before `since` (no clock read).
+    fn prior_window_before(window: &AttestationWindowId) -> AttestationWindowId {
+        attestation_window_containing(window.since.saturating_sub(1)).expect("prior window")
+    }
+
+    /// A mint instant in the middle of `window`, far from both boundaries.
+    fn mid_window(window: &AttestationWindowId) -> u64 {
+        window.since + (window.until - window.since) / 2
     }
 
     fn config_with_keys(keys: Vec<PublicKey>) -> ChioPassConfig {
@@ -831,9 +938,406 @@ mod tests {
             .expect("ed25519")
             .to_string();
         let key_hex = subject.public_key().to_hex();
-        let window = june_window();
+        let window = current_window();
         let capability_id = window_scoped_capability_id(&did, &window).expect("cap id");
         (did, key_hex, window, capability_id)
+    }
+
+    // ---- Launch evidence: e2e Pass issue -> mint -> charge -> read ->
+    //      rollover + dormant. ----
+    //
+    // The metered XCC grant is charged through the PUBLIC
+    // `evaluate_tool_call_blocking` pipeline. That is the only public charge
+    // surface (the lower-level `check_and_increment_budget` is crate-private to
+    // chio-kernel), and it is the faithful "REAL kernel charge": the call runs
+    // the full admission path (the deterministic-id gate at
+    // `assert_pass_capability_id_deterministic`), the per-Pass `(cap.id, 0)`
+    // budget row, AND the aggregate `freetier:global:<YYYY-MM>` pool co-debit.
+    // The deterministic `chiopass:<hash>` id minted by `LocalCapabilityAuthority`
+    // is what lets the Pass clear that gate (a naive XCC-bearing capability is
+    // rejected at admission). Budget rows are read back through the installed
+    // `BudgetStore` handle. The attestation window is derived from the real wall
+    // clock (see `current_window`), so the minted Pass is always time-valid at
+    // the wall clock the pipeline reads, whatever month the suite runs in.
+
+    /// Build a kernel wired exactly as the Pass free-tier path needs it: the
+    /// aggregate free-tier pool installed, a caller-held `BudgetStore` handle (so the test
+    /// can read `(cap.id, 0)` and `freetier:global:*` rows back), and a
+    /// `chio.pass.compute` tool server so an admitted metered charge dispatches
+    /// and commits. `ca_public_keys` pins the trusted capability issuers so the
+    /// `LocalCapabilityAuthority`-minted Pass clears signature admission.
+    fn wired_pass_kernel(
+        ca_public_keys: Vec<PublicKey>,
+        pool_units: u64,
+    ) -> (ChioKernel, Arc<dyn BudgetStore>) {
+        let budget_store: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let config = KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys,
+            max_delegation_depth: 5,
+            policy_hash: "pass-e2e-policy".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        };
+        let pool = FreeTierPoolConfig {
+            monthly_pool_units: pool_units,
+            allotment_unit: CHIO_PASS_ALLOTMENT_UNIT.to_string(),
+            board_approval_ref: "board-2026-06-pass-e2e".to_string(),
+        };
+        let mut kernel = ChioKernel::new(config)
+            .with_free_tier_pool(pool)
+            .expect("install free-tier pool");
+        kernel.set_budget_store_handle(budget_store.clone());
+        let service = NativeChioServiceBuilder::new(PASS_COMPUTE_SERVER_ID, "pass-e2e-compute")
+            .tool(
+                NativeTool::new("run", "metered pass compute", serde_json::json!({})),
+                |arguments| Ok(serde_json::json!({ "echo": arguments })),
+            )
+            .build()
+            .expect("build pass-compute tool server");
+        kernel.register_tool_server(Box::new(service));
+        (kernel, budget_store)
+    }
+
+    fn pass_tool_request(
+        request_id: &str,
+        capability: &CapabilityToken,
+        subject: &PublicKey,
+    ) -> ToolCallRequest {
+        ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: capability.clone(),
+            tool_name: "run".to_string(),
+            server_id: PASS_COMPUTE_SERVER_ID.to_string(),
+            agent_id: subject.to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        }
+    }
+
+    /// Committed (held + realized) cost units on the `(capability_id, grant 0)`
+    /// budget row. Both the per-Pass row and the aggregate pool row key off grant
+    /// index 0. A missing row reads as zero.
+    fn committed_units_in(store: &Arc<dyn BudgetStore>, capability_id: &str) -> u64 {
+        store
+            .get_usage(capability_id, 0)
+            .expect("budget usage lookup")
+            .map(|record| record.committed_cost_units().expect("committed cost units"))
+            .unwrap_or(0)
+    }
+
+    /// How many distinct budget rows exist for a capability id. The re-mint test
+    /// asserts this is exactly ONE (the deterministic id never opens a second row).
+    fn per_pass_row_count(store: &Arc<dyn BudgetStore>, capability_id: &str) -> usize {
+        store
+            .list_usages(4096, None)
+            .expect("list budget usages")
+            .into_iter()
+            .filter(|record| record.capability_id == capability_id)
+            .count()
+    }
+
+    /// `cost_charged` rendered onto the signed receipt's financial metadata. A deny
+    /// that never charges (or a deny built before the financial leg) reads as zero.
+    fn receipt_cost_charged(receipt: &ChioReceipt) -> u64 {
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("financial"))
+            .and_then(|financial| financial.get("cost_charged"))
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0)
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn e2e_pass_issue_charge_rollover_dormant() {
+        let issuer = Keypair::generate();
+        let authority_key = Keypair::generate();
+        let authority_pub = authority_key.public_key();
+        let authority = LocalCapabilityAuthority::new(authority_key);
+        // The genuine-use-scan trust anchor is independent of the kernel CA trust;
+        // any non-empty allowlist keeps the orchestrator config fail-closed valid.
+        let config = config_with_keys(vec![Keypair::generate().public_key()]);
+
+        // A dedicated trusted signer for the non-deterministic-id negative token
+        // below, so its pipeline denial is attributable to the deterministic-id
+        // gate, not an untrusted issuer.
+        let nondet_signer = Keypair::generate();
+        let (kernel, store) =
+            wired_pass_kernel(vec![authority_pub, nondet_signer.public_key()], 1_000_000);
+
+        // ================================================================
+        // Re-mint-reset-closed: a deterministic id maps to ONE row.
+        // ================================================================
+        let subject = Keypair::generate();
+        let (did, _key_hex, window, expected_cap_id) = subject_context(&subject);
+        let minted_at = mid_window(&window);
+        let current_pool_term =
+            FreeTierPoolConfig::window_ym_from_issued_at(window.since).expect("current pool term");
+
+        // (1a) Two Passes minted for the SAME subject+window are byte-identical.
+        let pass_a = issue_chio_pass_command(
+            &config,
+            &authority,
+            &issuer,
+            &subject.public_key(),
+            TrustTier::Attested,
+            minted_at,
+            0,
+            0,
+        )
+        .expect("mint Pass A");
+        let pass_b = issue_chio_pass_command(
+            &config,
+            &authority,
+            &issuer,
+            &subject.public_key(),
+            TrustTier::Attested,
+            minted_at,
+            1,
+            1,
+        )
+        .expect("mint Pass B");
+        assert_eq!(pass_a.capability.id, expected_cap_id);
+        assert_eq!(
+            pass_a.capability.id.as_bytes(),
+            pass_b.capability.id.as_bytes(),
+            "a re-mint in the same window yields a byte-identical capability id"
+        );
+
+        // (1b) Charge BOTH through the real kernel; they land on ONE per-Pass row.
+        let resp_a = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "remint-a",
+                &pass_a.capability,
+                &subject.public_key(),
+            ))
+            .expect("charge Pass A");
+        assert_eq!(
+            resp_a.verdict,
+            Verdict::Allow,
+            "first metered charge admitted"
+        );
+        assert_eq!(receipt_cost_charged(&resp_a.receipt), 1);
+        assert_eq!(committed_units_in(&store, &expected_cap_id), 1);
+        let resp_b = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "remint-b",
+                &pass_b.capability,
+                &subject.public_key(),
+            ))
+            .expect("charge Pass B");
+        assert_eq!(
+            resp_b.verdict,
+            Verdict::Allow,
+            "second metered charge admitted"
+        );
+        assert_eq!(
+            committed_units_in(&store, &expected_cap_id),
+            2,
+            "the re-minted Pass accumulates onto the SAME row (the counter is not reset)"
+        );
+        assert_eq!(
+            per_pass_row_count(&store, &expected_cap_id),
+            1,
+            "exactly ONE per-Pass budget row exists for the deterministic id, not two"
+        );
+        assert_eq!(
+            committed_units_in(&store, &current_pool_term),
+            2,
+            "both charges co-debit the SAME freetier:global pool row for the window"
+        );
+
+        // (1c) Past `until` the old token is denied; the next window is a FRESH row.
+        assert!(
+            pass_a.capability.validate_time(minted_at).is_ok(),
+            "the token is valid inside its window"
+        );
+        assert!(
+            pass_a.capability.validate_time(window.until).is_err(),
+            "validate_time denies the old token at the window boundary (until is exclusive)"
+        );
+        assert!(
+            pass_a
+                .capability
+                .validate_time(window.until.saturating_add(86_400))
+                .is_err(),
+            "validate_time denies the old token past until"
+        );
+        let next_window = next_window_after(&window);
+        assert_eq!(
+            window.until, next_window.since,
+            "contiguous monthly rollover"
+        );
+        let next_cap_id =
+            window_scoped_capability_id(&did, &next_window).expect("next-window cap id");
+        assert_ne!(
+            next_cap_id, expected_cap_id,
+            "the next window has a different deterministic id"
+        );
+        assert_eq!(
+            committed_units_in(&store, &next_cap_id),
+            0,
+            "the next window opens a FRESH zero per-Pass usage row"
+        );
+        let next_pool_term = FreeTierPoolConfig::window_ym_from_issued_at(next_window.since)
+            .expect("next pool term");
+        assert_ne!(
+            next_pool_term, current_pool_term,
+            "the next window has its own pool term"
+        );
+        assert_eq!(
+            committed_units_in(&store, &next_pool_term),
+            0,
+            "the next window opens a FRESH freetier:global pool row (the monthly reset is a clean slate)"
+        );
+
+        // (1d) A non-deterministic (UUIDv7-style) id carrying the XCC metered
+        //      grant is rejected at admission.
+        let nondet_subject = Keypair::generate();
+        let xcc_scope = build_pass_scope(&pass_a.pass, &did).expect("xcc metered scope");
+        let nondeterministic = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-018f9b2c-7e3a-7c91-a0b2-uuidv7nonpassid".to_string(),
+                issuer: nondet_signer.public_key(),
+                subject: nondet_subject.public_key(),
+                scope: xcc_scope,
+                issued_at: window.since,
+                expires_at: window.until,
+                delegation_chain: vec![],
+            },
+            &nondet_signer,
+        )
+        .expect("sign non-deterministic Pass-shaped token");
+        assert!(
+            assert_pass_capability_id_deterministic(&nondeterministic).is_err(),
+            "a UUIDv7-id token carrying the XCC metered grant must be rejected"
+        );
+        let nondet_resp = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "nondet-id",
+                &nondeterministic,
+                &nondet_subject.public_key(),
+            ))
+            .expect("non-deterministic-id admission evaluation");
+        assert_eq!(
+            nondet_resp.verdict,
+            Verdict::Deny,
+            "the deterministic-id gate denies the non-deterministic Pass-shaped capability at admission"
+        );
+        assert_eq!(
+            receipt_cost_charged(&nondet_resp.receipt),
+            0,
+            "a denied non-deterministic call charges nothing"
+        );
+
+        // ================================================================
+        // Dormant-stops-drawing: a 0-ceiling metered draw denies
+        // fail-closed, but the five gifted streams stay readable.
+        // ================================================================
+        let dormant_subject = Keypair::generate();
+        let dormant_did = DidChio::from_public_key(dormant_subject.public_key())
+            .expect("dormant did")
+            .to_string();
+        // A genuinely empty prior window => no genuine use => WithheldDormant. The
+        // dormant window is the CURRENT wall-clock window so the token is time-valid.
+        let prior_window = prior_window_before(&window);
+        assert_eq!(
+            prior_window.until, window.since,
+            "contiguous prior -> current rollover"
+        );
+        let empty_store = {
+            let path = unique_db_path("pass-e2e-dormant");
+            SqliteReceiptStore::open(&path).expect("open empty receipt store")
+        };
+        let refresh = refresh_chio_pass_window(
+            &config,
+            &empty_store,
+            &authority,
+            &issuer,
+            &dormant_subject.public_key(),
+            TrustTier::Attested,
+            &prior_window,
+            &window,
+            true,
+        )
+        .expect("dormant refresh");
+        let dormant = match refresh {
+            ChioPassRefreshResult::Dormant { decision, issuance } => {
+                assert_eq!(decision.outcome, ChioPassRefreshOutcome::WithheldDormant);
+                assert_eq!(decision.next_allotment_units, 0, "dormant ceiling is 0");
+                issuance
+            }
+            other => panic!("expected WithheldDormant, got {other:?}"),
+        };
+        let dormant_scope = build_pass_scope(&dormant.pass, &dormant_did).expect("dormant scope");
+        assert_eq!(
+            dormant_scope.grants[0]
+                .max_total_cost
+                .as_ref()
+                .expect("dormant ceiling")
+                .units,
+            0,
+            "the dormant metered grant carries a 0 ceiling"
+        );
+
+        // (2a) The metered draw denies fail-closed: BudgetExhausted -> cost_charged == 0.
+        let dormant_resp = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "dormant-draw",
+                &dormant.capability,
+                &dormant_subject.public_key(),
+            ))
+            .expect("dormant metered charge");
+        assert_eq!(
+            dormant_resp.verdict,
+            Verdict::Deny,
+            "the dormant 0-ceiling metered draw is denied"
+        );
+        let reason = dormant_resp.reason.clone().unwrap_or_default();
+        assert!(
+            reason.contains("budget") && reason.contains("exhausted"),
+            "the deny is a budget-exhaustion deny, got {reason:?}"
+        );
+        assert_eq!(
+            receipt_cost_charged(&dormant_resp.receipt),
+            0,
+            "the deny renders cost_charged == 0"
+        );
+        assert_eq!(
+            committed_units_in(&store, &dormant.capability.id),
+            0,
+            "nothing stuck to the dormant Pass row (the per-Pass hold was reversed)"
+        );
+
+        // (2b) Every one of the five gifted streams STILL authorizes a read for the
+        //      SAME dormant token: dormant stops the metered draw, never the gift.
+        let gifted_uris = pass_baseline_read_uris(&dormant_did).expect("baseline read uris");
+        assert_eq!(
+            gifted_uris.len(),
+            5,
+            "the Pass gifts exactly five baseline streams"
+        );
+        for uri in &gifted_uris {
+            assert!(
+                pass_authorizes_read(&dormant.capability, uri).expect("read authorization"),
+                "dormant token must still authorize the gifted read: {uri}"
+            );
+        }
     }
 
     #[test]
@@ -969,7 +1473,7 @@ mod tests {
         let trusted = Keypair::generate();
         let subject = Keypair::generate();
         let (did, key_hex, prior_window, prior_cap) = subject_context(&subject);
-        let next_window = july_window();
+        let next_window = next_window_after(&prior_window);
         assert_eq!(prior_window.until, next_window.since, "contiguous rollover");
 
         let config = config_with_keys(vec![trusted.public_key()]);
@@ -1131,6 +1635,43 @@ mod tests {
         let mut no_board = config_with_keys(vec![key]);
         no_board.board_approval_ref.clear();
         assert!(no_board.validate().is_err());
+    }
+
+    #[test]
+    fn launch_default_validates_and_rejects_empty_keys() {
+        // The single board-approved launch surface validates fail-closed when the
+        // market-authority-registry trusted-kernel key set is non-empty.
+        let key = Keypair::generate().public_key();
+        let config = ChioPassConfig::launch_default(vec![key]);
+        config
+            .validate()
+            .expect("launch default validates fail-closed");
+
+        // Pinned launch defaults: tier -> units 1000 / 1000 / 2500 / 5000 in XCC.
+        assert_eq!(config.tier_allotment_table.unverified, 1000);
+        assert_eq!(config.tier_allotment_table.attested, 1000);
+        assert_eq!(config.tier_allotment_table.verified, 2500);
+        assert_eq!(config.tier_allotment_table.premier, 5000);
+        assert_eq!(
+            config.free_tier_pool.allotment_unit,
+            CHIO_PASS_ALLOTMENT_UNIT
+        );
+        assert_eq!(config.window_token_capacity, 10_000);
+        assert_eq!(config.active_population_cap, 100_000);
+        assert_eq!(config.min_genuine_use_receipts, MIN_GENUINE_USE_RECEIPTS);
+        assert!(
+            !config.board_approval_ref.is_empty(),
+            "board_approval_ref placeholder must be present so the surface validates"
+        );
+
+        // An empty accepted_kernel_keys set is rejected fail-closed: an empty
+        // allowlist would silently force every identity dormant.
+        let mut empty_keys = config.clone();
+        empty_keys.accepted_kernel_keys.clear();
+        assert!(
+            empty_keys.validate().is_err(),
+            "empty accepted_kernel_keys must reject"
+        );
     }
 
     // ---- T10 read-only anchoring job (spec Sections 3.4 / 6.6, launch gate 6) ----
@@ -1445,5 +1986,556 @@ mod tests {
             denied.is_err(),
             "a binding without the Anchor purpose must be rejected"
         );
+    }
+
+    // -- Mock ChioRootRegistry publishRoot + verifyInclusionDetailed -----------
+    //
+    // A value-free, in-memory mirror of the on-chain `ChioRootRegistry`
+    // (contracts/src/ChioRootRegistry.sol). It reproduces exactly the two calls
+    // the read-only Pass-anchor round-trip needs:
+    //
+    //   * `publishRoot`: store the checkpoint's Merkle root under a per-operator
+    //     STRICTLY-INCREASING `checkpointSeq` (the on-chain
+    //     `if (checkpointSeq <= latestSeq[operator]) revert` rule), reject a zero
+    //     root and a degenerate batch range, and record the root as published.
+    //   * `verifyInclusionDetailed`: a read-only RFC6962 inclusion check that
+    //     first gates on `publishedRoots[operator][root]` and only then verifies
+    //     the audit path, mirroring the Solidity `verifyInclusionDetailed`.
+    //
+    // No method moves value: there is no balance, mint, or transfer surface here
+    // (nor on the contract path these mirror); the round-trip is pure evidence.
+
+    use std::collections::{HashMap, HashSet};
+
+    /// Stored root entry, mirroring `IChioRootRegistry.RootEntry`.
+    #[derive(Debug, Clone)]
+    struct MockRootEntry {
+        merkle_root: Hash,
+        checkpoint_seq: u64,
+        batch_start_seq: u64,
+        batch_end_seq: u64,
+        tree_size: u64,
+        operator_key_hash: String,
+    }
+
+    /// The fail-closed reverts the mirrored `publishRoot` can raise (the
+    /// Solidity `InvalidMerkleRoot` / `InvalidBatchRange` /
+    /// `InvalidCheckpointSequence` reverts).
+    #[derive(Debug, PartialEq, Eq)]
+    enum MockRegistryError {
+        ZeroMerkleRoot,
+        DegenerateBatchRange,
+        NonMonotonicCheckpointSeq,
+    }
+
+    /// In-memory mirror of the on-chain `ChioRootRegistry`. Value-free: it stores
+    /// roots and runs the RFC6962 inclusion check exactly as the contract does,
+    /// with no balance/mint/transfer surface anywhere.
+    #[derive(Debug, Default)]
+    struct MockChioRootRegistry {
+        latest_seq: HashMap<String, u64>,
+        roots: HashMap<String, HashMap<u64, MockRootEntry>>,
+        published_roots: HashSet<(String, Hash)>,
+    }
+
+    impl MockChioRootRegistry {
+        /// Mirror of `publishRoot`: fail-closed on a zero root or a degenerate
+        /// batch range, enforce a strictly-increasing per-operator
+        /// `checkpointSeq`, then store the entry and mark the root published.
+        fn publish_root(
+            &mut self,
+            publication: &PreparedEvmRootPublication,
+        ) -> Result<(), MockRegistryError> {
+            if publication.merkle_root == Hash::zero() {
+                return Err(MockRegistryError::ZeroMerkleRoot);
+            }
+            if publication.batch_start_seq > publication.batch_end_seq || publication.tree_size == 0
+            {
+                return Err(MockRegistryError::DegenerateBatchRange);
+            }
+            let operator = publication.operator_address.clone();
+            let latest = self.latest_seq.get(&operator).copied().unwrap_or(0);
+            if publication.checkpoint_seq <= latest {
+                return Err(MockRegistryError::NonMonotonicCheckpointSeq);
+            }
+            let entry = MockRootEntry {
+                merkle_root: publication.merkle_root,
+                checkpoint_seq: publication.checkpoint_seq,
+                batch_start_seq: publication.batch_start_seq,
+                batch_end_seq: publication.batch_end_seq,
+                tree_size: publication.tree_size,
+                operator_key_hash: publication.operator_key_hash.clone(),
+            };
+            self.roots
+                .entry(operator.clone())
+                .or_default()
+                .insert(publication.checkpoint_seq, entry);
+            self.latest_seq
+                .insert(operator.clone(), publication.checkpoint_seq);
+            self.published_roots
+                .insert((operator, publication.merkle_root));
+            Ok(())
+        }
+
+        /// Mirror of `getLatestSeq`.
+        fn latest_seq(&self, operator: &str) -> u64 {
+            self.latest_seq.get(operator).copied().unwrap_or(0)
+        }
+
+        /// Mirror of `getRoot`.
+        fn get_root(&self, operator: &str, checkpoint_seq: u64) -> Option<&MockRootEntry> {
+            self.roots
+                .get(operator)
+                .and_then(|seqs| seqs.get(&checkpoint_seq))
+        }
+
+        /// Mirror of `verifyInclusionDetailed`: read-only. Returns false unless
+        /// the root was published for `operator`, then runs the RFC6962 audit
+        /// path. No value moves.
+        fn verify_inclusion_detailed(
+            &self,
+            proof: &chio_core::merkle::MerkleProof,
+            root: &Hash,
+            leaf: Hash,
+            operator: &str,
+        ) -> bool {
+            if !self
+                .published_roots
+                .contains(&(operator.to_string(), *root))
+            {
+                return false;
+            }
+            proof.verify_hash(leaf, root)
+        }
+    }
+
+    #[test]
+    fn mock_chio_root_registry_pass_anchor_publish_and_verify_inclusion_roundtrip() {
+        use chio_core::is_supported_signed_artifact_schema;
+        use chio_core::merkle::leaf_hash;
+        use chio_core::signed_artifact::{
+            CHIO_ANCHOR_BATCH_V1_SCHEMA, CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA,
+            CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
+        };
+
+        let operator = Keypair::generate();
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        let target = anchor_target();
+
+        // Anchored Pass set: two issued Passes plus one revoked Pass (whose
+        // revocation digest is the committed Pass artifact id). A fourth Pass is
+        // NEVER anchored; its id must fail the inclusion check.
+        let pass_a = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let pass_b = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
+        let pass_c = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let revoked_c =
+            revoke_chio_pass_record(&pass_c, MID_JUNE_2026 + 5, "superseded".to_string())
+                .expect("revoke pass_c");
+        let pass_excluded = issue_first_window_pass(&Keypair::generate(), TrustTier::Premier);
+
+        let issued = [pass_a.clone(), pass_b.clone()];
+        let revoked = [revoked_c.clone()];
+
+        // (1) Build the anchor batch + strictly-increasing kernel checkpoints
+        // under the Anchor-purpose binding. The kernel genesis checkpoint is
+        // `checkpoint_seq` 1 (validate_checkpoint rejects seq 0), which the
+        // on-chain registry accepts as the first published root (its `latestSeq`
+        // defaults to 0); the seq-2 root chains onto it and seq-3 onto seq-2.
+        let genesis = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            &issued,
+            &revoked,
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect("genesis prepare");
+        assert_eq!(genesis.checkpoint.body.checkpoint_seq, 1);
+
+        let published1 = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            &issued,
+            &revoked,
+            pending_witness(),
+            MID_JUNE_2026 + 1,
+            Some(&genesis.checkpoint),
+        )
+        .expect("seq-1 prepare");
+        let published2 = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            &issued,
+            &revoked,
+            pending_witness(),
+            MID_JUNE_2026 + 2,
+            Some(&published1.checkpoint),
+        )
+        .expect("seq-2 prepare");
+        assert_eq!(published1.publication.checkpoint_seq, 2);
+        assert_eq!(published2.publication.checkpoint_seq, 3);
+        assert!(published2.publication.checkpoint_seq > published1.publication.checkpoint_seq);
+        assert_eq!(
+            published1.publication.operator_address,
+            target.operator_address
+        );
+
+        // (4) No NEW signed-artifact schema: the only signed artifact the
+        // pipeline produces is the already-registered anchor batch
+        // (`chio.anchor_batch.v1`). Its schema, and the two registered
+        // anchor-family schemas the task names, are all known to this verifier
+        // build; nothing here introduces a fresh schema id. The mock signs
+        // nothing (it stores raw hashes only).
+        assert_eq!(published1.batch.body.schema, CHIO_ANCHOR_BATCH_V1_SCHEMA);
+        assert!(is_supported_signed_artifact_schema(
+            &published1.batch.body.schema
+        ));
+        assert!(is_supported_signed_artifact_schema(
+            CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA
+        ));
+        assert!(is_supported_signed_artifact_schema(
+            CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA
+        ));
+        // The batch self-verifies read-only (root, every per-leaf proof, and the
+        // signature) before any registry call; no on-chain value moves.
+        verify_anchor_batch(&published1.batch).expect("anchor batch verifies");
+
+        // (2) Publish into the mock registry. The genesis is now `checkpoint_seq`
+        // 1, so it is the first published root; the seq-2 and seq-3 roots publish
+        // in strictly-increasing order under the same monotonic rule the contract
+        // enforces. NO value moves.
+        let mut registry = MockChioRootRegistry::default();
+        registry
+            .publish_root(&genesis.publication)
+            .expect("publish genesis seq-1 root");
+        registry
+            .publish_root(&published1.publication)
+            .expect("publish seq-2 root");
+        registry
+            .publish_root(&published2.publication)
+            .expect("publish seq-3 root");
+        assert_eq!(registry.latest_seq(&target.operator_address), 3);
+        // Re-publishing an already-anchored (now stale) seq fails closed.
+        assert_eq!(
+            registry.publish_root(&published1.publication),
+            Err(MockRegistryError::NonMonotonicCheckpointSeq),
+            "a stale checkpoint_seq must not re-publish"
+        );
+
+        // The stored entry mirrors the published checkpoint exactly.
+        let stored = registry
+            .get_root(&target.operator_address, 2)
+            .expect("seq-2 entry stored");
+        assert_eq!(stored.merkle_root, published1.publication.merkle_root);
+        assert_eq!(stored.checkpoint_seq, 2);
+        assert_eq!(
+            stored.batch_start_seq,
+            published1.publication.batch_start_seq
+        );
+        assert_eq!(stored.batch_end_seq, published1.publication.batch_end_seq);
+        assert_eq!(stored.tree_size, published1.publication.tree_size);
+        assert_eq!(
+            stored.operator_key_hash,
+            published1.publication.operator_key_hash
+        );
+
+        // Fail-closed parity with the contract reverts: a zero root and a
+        // degenerate batch range are rejected (still value-free).
+        let mut zero_root = published2.publication.clone();
+        zero_root.checkpoint_seq = 4;
+        zero_root.merkle_root = Hash::zero();
+        assert_eq!(
+            registry.publish_root(&zero_root),
+            Err(MockRegistryError::ZeroMerkleRoot)
+        );
+        let mut bad_range = published2.publication.clone();
+        bad_range.checkpoint_seq = 4;
+        bad_range.batch_start_seq = 5;
+        bad_range.batch_end_seq = 4;
+        assert_eq!(
+            registry.publish_root(&bad_range),
+            Err(MockRegistryError::DegenerateBatchRange)
+        );
+
+        // (3) Prove single-Pass membership via verifyInclusionDetailed for each
+        // anchored Pass id, against the published seq-2 root. Read-only.
+        let root = published1.publication.merkle_root;
+        assert_eq!(root, published1.batch.body.tree_root);
+        let included_ids = [
+            chio_pass_artifact_id(&pass_a).expect("pass_a id"),
+            chio_pass_artifact_id(&pass_b).expect("pass_b id"),
+            revoked_c.passport_id.clone(),
+        ];
+        assert_eq!(published1.batch.body.inclusions.len(), included_ids.len());
+        for inclusion in &published1.batch.body.inclusions {
+            assert!(
+                registry.verify_inclusion_detailed(
+                    &inclusion.proof,
+                    &root,
+                    inclusion.leaf_hash,
+                    &target.operator_address,
+                ),
+                "anchored Pass id {} must verify inclusion",
+                inclusion.checkpoint_id
+            );
+            assert!(included_ids.contains(&inclusion.checkpoint_id));
+        }
+
+        // A non-included Pass id FAILS: its leaf is not in the tree, so the
+        // RFC6962 check rejects it even reusing a real (sibling) audit path.
+        let excluded_id = chio_pass_artifact_id(&pass_excluded).expect("excluded id");
+        assert!(!included_ids.contains(&excluded_id));
+        let excluded_leaf =
+            leaf_hash(&canonical_json_bytes(&excluded_id).expect("excluded leaf bytes"));
+        assert!(
+            !registry.verify_inclusion_detailed(
+                &published1.batch.body.inclusions[0].proof,
+                &root,
+                excluded_leaf,
+                &target.operator_address,
+            ),
+            "a non-anchored Pass id must fail the inclusion check"
+        );
+
+        // The published-root gate fails closed: a fully valid leaf + audit path
+        // verified against a root that was NEVER published returns false.
+        let unpublished = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            std::slice::from_ref(&pass_excluded),
+            &[],
+            pending_witness(),
+            MID_JUNE_2026 + 3,
+            Some(&published2.checkpoint),
+        )
+        .expect("unpublished prepare");
+        let unpublished_inclusion = &unpublished.batch.body.inclusions[0];
+        assert!(
+            unpublished_inclusion.proof.verify_hash(
+                unpublished_inclusion.leaf_hash,
+                &unpublished.batch.body.tree_root
+            ),
+            "the unpublished proof is internally valid"
+        );
+        assert!(
+            !registry.verify_inclusion_detailed(
+                &unpublished_inclusion.proof,
+                &unpublished.batch.body.tree_root,
+                unpublished_inclusion.leaf_hash,
+                &target.operator_address,
+            ),
+            "an unpublished root must fail the inclusion gate"
+        );
+
+        // The per-operator gate fails closed: the published root verified under a
+        // different operator address returns false.
+        assert!(
+            !registry.verify_inclusion_detailed(
+                &published1.batch.body.inclusions[0].proof,
+                &root,
+                published1.batch.body.inclusions[0].leaf_hash,
+                EVM_CONTRACT_ADDRESS,
+            ),
+            "a non-publishing operator must fail the inclusion gate"
+        );
+    }
+
+    // -- Cross-tenant denial + byte-identity hardening -------------------------
+
+    /// Issue a first-window Pass for `subject` at `tier`, returning the full
+    /// issuance (the soulbound Pass plus its minted window-scoped capability).
+    fn issue_first_window_issuance(subject: &Keypair, tier: TrustTier) -> ChioPassIssuance {
+        let issuer = Keypair::generate();
+        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let config = config_with_keys(vec![Keypair::generate().public_key()]);
+        issue_chio_pass_command(
+            &config,
+            &authority,
+            &issuer,
+            &subject.public_key(),
+            tier,
+            MID_JUNE_2026,
+            0,
+            0,
+        )
+        .expect("issue first-window pass")
+    }
+
+    #[test]
+    fn build_pass_scope_resource_grants_are_byte_identical_unverified_vs_premier() {
+        // Own-data is a permanent baseline RIGHT, never TrustTier-gated. The SAME
+        // subject minted at tier_0 (Unverified) and at Premier must produce a
+        // byte-identical gifted ResourceGrant set; only the metered allotment
+        // (window_units) is tier-sized.
+        let subject = Keypair::generate();
+        let did = DidChio::from_public_key(subject.public_key())
+            .expect("did:chio")
+            .to_string();
+
+        let pass_tier0 = issue_first_window_pass(&subject, TrustTier::Unverified);
+        let pass_premier = issue_first_window_pass(&subject, TrustTier::Premier);
+
+        let scope_tier0 = build_pass_scope(&pass_tier0, &did).expect("tier0 scope");
+        let scope_premier = build_pass_scope(&pass_premier, &did).expect("premier scope");
+
+        // Five gifted grants, byte-identical across tiers.
+        assert_eq!(scope_tier0.resource_grants.len(), 5);
+        assert_eq!(scope_tier0.resource_grants, scope_premier.resource_grants);
+        assert_eq!(
+            serde_json::to_vec(&scope_tier0.resource_grants).expect("ser tier0"),
+            serde_json::to_vec(&scope_premier.resource_grants).expect("ser premier"),
+            "gifted ResourceGrant set must be byte-identical across tiers",
+        );
+        assert!(
+            scope_tier0.prompt_grants.is_empty() && scope_premier.prompt_grants.is_empty(),
+            "no prompt grants at any tier",
+        );
+
+        // The metered allotment IS tier-sized, proving tier still governs the
+        // metered leg (1000 XCC for Unverified vs 5000 for Premier), just never the
+        // baseline read right.
+        let units_tier0 = scope_tier0.grants[0]
+            .max_total_cost
+            .as_ref()
+            .expect("tier0 total")
+            .units;
+        let units_premier = scope_premier.grants[0]
+            .max_total_cost
+            .as_ref()
+            .expect("premier total")
+            .units;
+        assert_eq!(units_tier0, 1000);
+        assert_eq!(units_premier, 5000);
+        assert_ne!(
+            units_tier0, units_premier,
+            "tier governs the metered allotment, not the gifted streams",
+        );
+    }
+
+    #[test]
+    fn cross_tenant_read_denied_by_uri_binding_and_sql_guard() {
+        // Two distinct subjects => two distinct canonical did:chio tenants.
+        let subject_a = Keypair::generate();
+        let subject_b = Keypair::generate();
+        let did_a = DidChio::from_public_key(subject_a.public_key())
+            .expect("did a")
+            .to_string();
+        let did_b = DidChio::from_public_key(subject_b.public_key())
+            .expect("did b")
+            .to_string();
+        assert_ne!(did_a, did_b);
+
+        // Mint tenant A's Pass; its own-receipts grant binds tenant A only.
+        let issuance_a = issue_first_window_issuance(&subject_a, TrustTier::Unverified);
+        let cap_a = &issuance_a.capability;
+        let own_pattern = pass_stream_uri(ChioPassStream::OwnReceipts, &did_a).expect("uri a");
+        assert_eq!(own_pattern, format!("chio://receipts/tenant/{did_a}/*"));
+
+        // -- Layer (a): the URI tenant binding denies, no store involved. --
+        // A reads its OWN receipts/lineage.
+        assert!(
+            pass_authorizes_read(cap_a, &format!("chio://receipts/tenant/{did_a}/r1"))
+                .expect("read own receipts")
+        );
+        assert!(
+            pass_authorizes_read(cap_a, &format!("chio://lineage/tenant/{did_a}/n1"))
+                .expect("read own lineage")
+        );
+        // A is DENIED tenant B's receipts/lineage purely by the capability/URI
+        // binding (independent of any store).
+        assert!(
+            !pass_authorizes_read(cap_a, &format!("chio://receipts/tenant/{did_b}/r1"))
+                .expect("deny B receipts")
+        );
+        assert!(
+            !pass_authorizes_read(cap_a, &format!("chio://lineage/tenant/{did_b}/n1"))
+                .expect("deny B lineage")
+        );
+
+        // -- Layer (b): the store no-widening SQL guard r.tenant_id = ?12 denies. --
+        let path = unique_db_path("cross-tenant");
+        let store = SqliteReceiptStore::open(&path).expect("open store");
+        assert!(
+            store.strict_tenant_isolation_enabled(),
+            "strict tenant isolation must be on by default",
+        );
+        let kernel_kp = Keypair::generate();
+        // Tenant B and tenant A each write one receipt into the SAME store.
+        store
+            .append_chio_receipt(&metered_receipt(
+                &kernel_kp,
+                "cap-b",
+                &subject_b.public_key().to_hex(),
+                &did_b,
+                MID_JUNE_2026,
+                Some(1),
+                "rcpt-b",
+            ))
+            .expect("append B receipt");
+        store
+            .append_chio_receipt(&metered_receipt(
+                &kernel_kp,
+                "cap-a",
+                &subject_a.public_key().to_hex(),
+                &did_a,
+                MID_JUNE_2026,
+                Some(1),
+                "rcpt-a",
+            ))
+            .expect("append A receipt");
+
+        // A's own-receipts read context is tenant-scoped to did_a with no NULL
+        // fallback: this is the second, independent denial behind the URI binding.
+        let ctx_a = pass_receipt_read_context(&did_a).expect("ctx a");
+        assert!(!ctx_a.include_null_tenant);
+        let query_a = ReceiptQuery {
+            limit: MAX_QUERY_LIMIT,
+            tenant_filter: Some(did_a.clone()),
+            read_context: Some(ctx_a),
+            ..ReceiptQuery::default()
+        };
+        let page_a = store.query_receipts(&query_a).expect("query A");
+        // Tenant B's row is physically present in the store, yet the SQL guard binds
+        // ?12 = did_a so ONLY tenant A's row returns; tenant B's row is filtered out.
+        assert_eq!(page_a.total_count, 1, "only tenant A's own row is visible");
+        assert!(
+            page_a
+                .receipts
+                .iter()
+                .all(|r| r.receipt.tenant_id.as_deref() == Some(did_a.as_str())),
+            "tenant A query must return only tenant A rows",
+        );
+        assert!(
+            !page_a
+                .receipts
+                .iter()
+                .any(|r| r.receipt.tenant_id.as_deref() == Some(did_b.as_str())),
+            "the r.tenant_id = ?12 guard must hide tenant B's receipt from tenant A",
+        );
+
+        // And the read-context layer rejects any attempt to WIDEN tenant A's scope
+        // to tenant B before SQL even runs: a Pass for A cannot form a B query.
+        let widen_attempt = ReceiptQuery {
+            limit: MAX_QUERY_LIMIT,
+            tenant_filter: Some(did_b.clone()),
+            read_context: Some(pass_receipt_read_context(&did_a).expect("ctx a")),
+            ..ReceiptQuery::default()
+        };
+        let err = store
+            .query_receipts(&widen_attempt)
+            .expect_err("widening A's scope to B must fail closed");
+        assert!(
+            err.to_string().contains("cannot widen"),
+            "no-widening guard must reject A->B widening, got: {err}",
+        );
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(format!("{}-wal", path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", path.display()));
     }
 }

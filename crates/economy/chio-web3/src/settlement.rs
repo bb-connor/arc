@@ -34,6 +34,10 @@ pub const CHIO_LINK_CONTROL_TRACE_SCHEMA: &str = "chio.link.control-trace.v1";
 pub const CHIO_SETTLE_CONTROL_STATE_SCHEMA: &str = "chio.settle.control-state.v1";
 pub const CHIO_SETTLE_CONTROL_TRACE_SCHEMA: &str = "chio.settle.control-trace.v1";
 
+/// Lifecycle a web3 settlement moves through, from `PendingDispatch` and
+/// `EscrowLocked` to the terminal `Settled`, `Reversed`, `ChargedBack`,
+/// `TimedOut`, `Failed`, or `Reorged` states (with `PartiallySettled` in
+/// between).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Web3SettlementLifecycleState {
@@ -48,6 +52,10 @@ pub enum Web3SettlementLifecycleState {
     Reorged,
 }
 
+/// Explicit declaration of what a dispatch supports: whether real dispatch is
+/// allowed, anchor proofs and FX oracle evidence are required, custody
+/// boundaries are explicit, and reversals are permitted. These flags are
+/// enforced during validation rather than assumed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Web3SettlementSupportBoundary {
@@ -58,6 +66,10 @@ pub struct Web3SettlementSupportBoundary {
     pub reversal_supported: bool,
 }
 
+/// Signed-body instruction to dispatch a settlement onto a chain: the trust
+/// profile and contract package, the signed capital instruction (and optional
+/// backing bond), the settlement path, amount, escrow and bond-vault
+/// contracts, beneficiary, and the declared support boundary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Web3SettlementDispatchArtifact {
@@ -111,6 +123,10 @@ pub struct Web3SettlementIdentityRegistryEvidenceBinding {
     pub settlement_key: String,
 }
 
+/// Signed-body receipt projecting observed on-chain execution back onto the
+/// originating [`Web3SettlementDispatchArtifact`]: the observed execution, the
+/// reached lifecycle state, a settlement reference, the settled amount, and
+/// optional anchor proof, oracle evidence, reversal, and failure context.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Web3SettlementExecutionReceiptArtifact {
@@ -141,6 +157,22 @@ pub struct Web3SettlementExecutionReceiptArtifact {
 pub type SignedWeb3SettlementExecutionReceipt =
     SignedExportEnvelope<Web3SettlementExecutionReceiptArtifact>;
 
+/// Validate that a settlement dispatch is internally consistent and safe to
+/// hand to a chain.
+///
+/// # Errors
+///
+/// Returns [`Web3ContractError::UnsupportedSchema`] when the dispatch or its
+/// capital instruction carries the wrong schema; [`Web3ContractError::MissingField`]
+/// or [`Web3ContractError::InvalidBinding`] when a required id field is empty
+/// or padded; and [`Web3ContractError::InvalidSettlement`] when the amount is
+/// non-positive or malformed, the support boundary does not mark real dispatch
+/// and explicit custody, a Merkle-proof path omits anchor-proof reconciliation,
+/// the capital instruction signature fails to verify, the action is a cancel,
+/// the rail is not web3, the instruction amount is absent or mismatched, the
+/// instruction is already reconciled, or a backing bond is not active. Errors
+/// from the completion-flow binding and the capital instruction's own
+/// validation are propagated.
 pub fn validate_web3_settlement_dispatch(
     dispatch: &Web3SettlementDispatchArtifact,
 ) -> Result<(), Web3ContractError> {
@@ -309,6 +341,23 @@ pub fn validate_web3_settlement_dispatch(
     Ok(())
 }
 
+/// Validate that an execution receipt faithfully reconciles its dispatch with
+/// observed on-chain execution.
+///
+/// # Errors
+///
+/// Returns [`Web3ContractError::UnsupportedSchema`] on a wrong schema, and
+/// [`Web3ContractError::MissingField`] or [`Web3ContractError::InvalidBinding`]
+/// on empty required fields. Re-runs [`validate_web3_settlement_dispatch`] on
+/// the embedded dispatch and propagates anchor-proof and oracle-evidence
+/// verification errors. Returns [`Web3ContractError::InvalidSettlement`] when
+/// the observed reference is not a valid chain reference, currencies diverge,
+/// the observed amount does not equal the settled amount, the observation
+/// falls outside the execution window, the lifecycle is still non-terminal, a
+/// partial settlement is not strictly between zero and the dispatch amount, a
+/// full settlement does not match the dispatch amount, a reversal lacks a
+/// `reversal_of` or declared reversal support, a failure lacks a reason, or a
+/// required anchor proof or FX oracle evidence is missing.
 pub fn validate_web3_settlement_execution_receipt(
     receipt: &Web3SettlementExecutionReceiptArtifact,
 ) -> Result<(), Web3ContractError> {
@@ -741,6 +790,13 @@ pub(crate) fn settlement_anchor_receipt_content_hash(
     )
 }
 
+/// Compute the SHA-256 content hash that binds an anchor receipt to a
+/// settlement execution, over the canonical JSON of the four identifier parts.
+///
+/// # Errors
+///
+/// Returns [`Web3ContractError::InvalidSettlement`] when the binding cannot be
+/// canonicalized to JSON.
 pub fn settlement_anchor_receipt_content_hash_parts(
     execution_receipt_id: &str,
     settlement_reference: &str,

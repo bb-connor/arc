@@ -1,3 +1,4 @@
+/// Validation failures raised when checking autonomous-automation contract artifacts.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AutonomyContractError {
     #[error("unsupported schema: {0}")]

@@ -3,7 +3,25 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
 use chio_kernel::{RevocationRecord, RevocationStore, RevocationStoreError};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+
+/// Outcome of the atomic anti-farm-cap-enforced Pass issuance admission
+/// ([`SqliteRevocationStore::try_record_pass_issuance_under_caps`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PassIssuanceAdmission {
+    /// The issuance was admitted under the caps and persisted (a new row), or it
+    /// was an idempotent re-record of an already-present window-scoped id.
+    Admitted,
+    /// The per-window distribution cap was already full; nothing was persisted.
+    DeniedWindowExhausted,
+    /// The live-population cap was already reached; nothing was persisted.
+    DeniedPopulationCap,
+    /// The capability id is on the revoked set; nothing was persisted. A revoked
+    /// (subject, window) Pass id must NOT be re-admitted (idempotently or
+    /// otherwise) while the revocation stands; restoring it requires an explicit
+    /// unrevoke, which is out of scope here. Fail-closed.
+    DeniedRevoked,
+}
 
 pub struct SqliteRevocationStore {
     connection: Mutex<Connection>,
@@ -30,12 +48,48 @@ impl SqliteRevocationStore {
 
             CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_revoked_at
                 ON revoked_capabilities(revoked_at);
+
+            CREATE TABLE IF NOT EXISTS issued_passes (
+                capability_id TEXT PRIMARY KEY,
+                window_ym TEXT NOT NULL,
+                valid_from INTEGER NOT NULL DEFAULT 0,
+                expires_at INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_issued_passes_window_ym
+                ON issued_passes(window_ym);
             "#,
         )?;
+
+        // Additive migration: stores created before the live-population fix have
+        // an issued_passes table WITHOUT a valid_from column. Add it idempotently.
+        // The default 0 keeps legacy rows always-eligible by valid_from (so their
+        // prior live-count semantics are preserved), while every new row records
+        // the real window-start so a future-window (e.g. next-month, refresh-
+        // persisted) Pass cannot inflate the current live population.
+        if !Self::issued_passes_has_valid_from(&connection)? {
+            connection.execute_batch(
+                "ALTER TABLE issued_passes ADD COLUMN valid_from INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
 
         Ok(Self {
             connection: Mutex::new(connection),
         })
+    }
+
+    /// Whether the `issued_passes` table already carries the `valid_from` column
+    /// (true for fresh stores; false for pre-migration stores).
+    fn issued_passes_has_valid_from(connection: &Connection) -> Result<bool, RevocationStoreError> {
+        let mut statement = connection.prepare("PRAGMA table_info(issued_passes)")?;
+        let mut rows = statement.query([])?;
+        while let Some(row) = rows.next()? {
+            let column_name: String = row.get(1)?;
+            if column_name == "valid_from" {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, RevocationStoreError> {
@@ -98,6 +152,188 @@ impl SqliteRevocationStore {
             },
         )?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Record (idempotently) that a Pass capability was issued in `window_ym`,
+    /// expiring at `expires_at` (unix seconds). The capability id is the primary
+    /// key, so re-recording the SAME window-scoped Pass id (the deterministic
+    /// `chiopass:<hash>` is subject+window derived) never double-counts the
+    /// issuance. This is the persisted issued-Pass roster the anti-farm
+    /// distribution counters are sourced from.
+    pub fn record_pass_issuance(
+        &self,
+        capability_id: &str,
+        window_ym: &str,
+        valid_from: i64,
+        expires_at: i64,
+    ) -> Result<(), RevocationStoreError> {
+        self.connection()?.execute(
+            r#"
+            INSERT INTO issued_passes (capability_id, window_ym, valid_from, expires_at)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(capability_id) DO UPDATE SET
+                window_ym = excluded.window_ym,
+                valid_from = excluded.valid_from,
+                expires_at = excluded.expires_at
+            "#,
+            params![capability_id, window_ym, valid_from, expires_at],
+        )?;
+        Ok(())
+    }
+
+    /// Atomically admit a Pass issuance against the anti-farm distribution caps
+    /// and persist it, all inside ONE `IMMEDIATE` SQLite transaction.
+    ///
+    /// This closes the read-then-mint-then-write race: two concurrent
+    /// `chio pass issue` processes (each with its own connection) cannot both read
+    /// stale counts, both mint, and both exceed the caps. The transaction takes
+    /// the database write lock before counting, so the count/check/insert is
+    /// serialized across processes and the cap is enforced at WRITE time.
+    ///
+    /// The deterministic `chiopass:<hash>` id is the roster key, so re-recording
+    /// an already-present id is an idempotent update that is admitted even when the
+    /// caps are full (it adds no new population). A NEW id is admitted only when
+    /// `window_issued_count < window_token_capacity` AND
+    /// `active_population < active_population_cap` (counted EXCLUDING the row being
+    /// inserted, matching the pre-mint admission semantics in
+    /// `evaluate_pass_admission`). When a cap is full nothing is persisted and the
+    /// corresponding `Denied*` outcome is returned, so the in-memory mint is
+    /// discarded fail-closed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_record_pass_issuance_under_caps(
+        &self,
+        capability_id: &str,
+        window_ym: &str,
+        valid_from: i64,
+        expires_at: i64,
+        now: i64,
+        window_token_capacity: u64,
+        active_population_cap: u64,
+    ) -> Result<PassIssuanceAdmission, RevocationStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        // Fail-closed revocation gate, taken under the write lock BEFORE the
+        // idempotent/cap logic. The deterministic `chiopass:<subject,window>` id is
+        // the roster key, so an already-present id is otherwise admitted as a
+        // no-growth idempotent update even at a full cap. Without this check a
+        // capability id that has since been REVOKED would be re-admitted (and
+        // returned as success) while the revocation stays in force, so a revoked
+        // Pass could be re-minted. A revoked id is never re-admitted here (restoring
+        // it requires an explicit unrevoke, out of scope); nothing is persisted.
+        let is_revoked = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, i64>(0),
+        )? != 0;
+        if is_revoked {
+            // Dropping the transaction rolls back; nothing is persisted.
+            return Ok(PassIssuanceAdmission::DeniedRevoked);
+        }
+
+        let already_present = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM issued_passes WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, i64>(0),
+        )? != 0;
+
+        if !already_present {
+            let window_count: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM issued_passes WHERE window_ym = ?1",
+                params![window_ym],
+                |row| row.get(0),
+            )?;
+            if u64::try_from(window_count).unwrap_or(u64::MAX) >= window_token_capacity {
+                // Dropping the transaction rolls back; nothing is persisted.
+                return Ok(PassIssuanceAdmission::DeniedWindowExhausted);
+            }
+            let active_count: i64 = transaction.query_row(
+                r#"
+                SELECT COUNT(*)
+                FROM issued_passes AS issued
+                WHERE issued.valid_from <= ?1
+                  AND issued.expires_at > ?1
+                  AND NOT EXISTS (
+                      SELECT 1 FROM revoked_capabilities AS revoked
+                      WHERE revoked.capability_id = issued.capability_id
+                  )
+                "#,
+                params![now],
+                |row| row.get(0),
+            )?;
+            if u64::try_from(active_count).unwrap_or(u64::MAX) >= active_population_cap {
+                return Ok(PassIssuanceAdmission::DeniedPopulationCap);
+            }
+        }
+
+        transaction.execute(
+            r#"
+            INSERT INTO issued_passes (capability_id, window_ym, valid_from, expires_at)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(capability_id) DO UPDATE SET
+                window_ym = excluded.window_ym,
+                valid_from = excluded.valid_from,
+                expires_at = excluded.expires_at
+            "#,
+            params![capability_id, window_ym, valid_from, expires_at],
+        )?;
+        transaction.commit()?;
+        Ok(PassIssuanceAdmission::Admitted)
+    }
+
+    /// Whether `capability_id` is already on the issued-Pass roster. The
+    /// deterministic `chiopass:<hash>` id is the roster key, so a `true` result means
+    /// re-recording it is an idempotent NO-GROWTH update that
+    /// [`Self::try_record_pass_issuance_under_caps`] admits even at a full cap. The
+    /// issuance entrypoint uses this to recognise an idempotent re-issue BEFORE its
+    /// fast pre-mint admission precheck, so a legitimate re-issue at the cap is not
+    /// wrongly denied while the authoritative cap transaction still gates genuinely
+    /// new subjects. Sourced from persisted state; fail-closed on a store IO fault.
+    pub fn pass_issuance_exists(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        let exists = self.connection()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM issued_passes WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, i64>(0),
+        )? != 0;
+        Ok(exists)
+    }
+
+    /// Count the Passes persisted as issued in `window_ym` (the per-window
+    /// anti-farm cap leg). Sourced from persisted state, never recomputed.
+    pub fn count_window_issuances(&self, window_ym: &str) -> Result<u64, RevocationStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            "SELECT COUNT(*) FROM issued_passes WHERE window_ym = ?1",
+            params![window_ym],
+            |row| row.get(0),
+        )?;
+        Ok(u64::try_from(count).unwrap_or(u64::MAX))
+    }
+
+    /// Count the LIVE issued Passes at `now` (the active-population cap leg): an
+    /// issued Pass is live when its window has already opened (`valid_from <= now`)
+    /// and it has not expired (`expires_at > now`) and its capability id is not in
+    /// the revoked set. Sourced from persisted state.
+    ///
+    /// The `valid_from <= now` bound stops a refresh-persisted FUTURE-window Pass
+    /// (e.g. a July Pass minted while refreshing a June Pass) from counting as live
+    /// in the current window and prematurely denying unrelated first-window
+    /// issuances.
+    pub fn count_active_passes(&self, now: i64) -> Result<u64, RevocationStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM issued_passes AS issued
+            WHERE issued.valid_from <= ?1
+              AND issued.expires_at > ?1
+              AND NOT EXISTS (
+                  SELECT 1 FROM revoked_capabilities AS revoked
+                  WHERE revoked.capability_id = issued.capability_id
+              )
+            "#,
+            params![now],
+            |row| row.get(0),
+        )?;
+        Ok(u64::try_from(count).unwrap_or(u64::MAX))
     }
 
     pub fn upsert_revocation(&self, record: &RevocationRecord) -> Result<(), RevocationStoreError> {
@@ -225,6 +461,183 @@ mod tests {
         let filtered = store.list_revocations(10, Some("cap-1")).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].capability_id, "cap-1");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_revocation_store_counts_persisted_issued_passes() {
+        let path = unique_db_path("chio-issued-passes");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+
+        // Two Passes in window 2026-06, one in 2026-07. All open at valid_from 0.
+        store
+            .record_pass_issuance("chiopass:a", "2026-06", 0, 2_000)
+            .unwrap();
+        store
+            .record_pass_issuance("chiopass:b", "2026-06", 0, 2_000)
+            .unwrap();
+        store
+            .record_pass_issuance("chiopass:c", "2026-07", 0, 5_000)
+            .unwrap();
+
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 2);
+        assert_eq!(store.count_window_issuances("2026-07").unwrap(), 1);
+        assert_eq!(store.count_window_issuances("2026-08").unwrap(), 0);
+
+        // At now=1000 all three are live (none expired, none revoked).
+        assert_eq!(store.count_active_passes(1_000).unwrap(), 3);
+
+        // Revoking b removes it from the live population.
+        assert!(store.revoke("chiopass:b").unwrap());
+        assert_eq!(store.count_active_passes(1_000).unwrap(), 2);
+
+        // At now=2500, a and b are expired (expires 2000); c (expires 5000) is the
+        // only live, non-revoked Pass.
+        assert_eq!(store.count_active_passes(2_500).unwrap(), 1);
+
+        // Idempotent: re-recording the same window-scoped id does not inflate the
+        // window count.
+        store
+            .record_pass_issuance("chiopass:a", "2026-06", 0, 2_000)
+            .unwrap();
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 2);
+
+        // The roster persists across reopen.
+        drop(store);
+        let reopened = SqliteRevocationStore::open(&path).unwrap();
+        assert_eq!(reopened.count_window_issuances("2026-06").unwrap(), 2);
+
+        let _ = fs::remove_file(path);
+    }
+
+    /// A FUTURE-window Pass (its window has not opened yet) is NOT
+    /// counted in the current live population, so it cannot prematurely deny an
+    /// unrelated first-window issuance.
+    #[test]
+    fn future_window_pass_is_not_counted_active() {
+        let path = unique_db_path("chio-future-window");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+
+        // A current-window Pass opened at 1_000 expiring at 3_000.
+        store
+            .record_pass_issuance("chiopass:june", "2026-06", 1_000, 3_000)
+            .unwrap();
+        // A future-window (e.g. refresh-persisted July) Pass that does not open
+        // until 3_000 but already has a far-future expiry.
+        store
+            .record_pass_issuance("chiopass:july", "2026-07", 3_000, 6_000)
+            .unwrap();
+
+        // At now=2_000 only the June Pass is live: July has not opened
+        // (valid_from 3_000 > 2_000), even though its expiry is in the future.
+        assert_eq!(store.count_active_passes(2_000).unwrap(), 1);
+        // At now=3_000 June has expired and July has opened: still exactly one.
+        assert_eq!(store.count_active_passes(3_000).unwrap(), 1);
+        // At now=4_000 only July is live.
+        assert_eq!(store.count_active_passes(4_000).unwrap(), 1);
+
+        let _ = fs::remove_file(path);
+    }
+
+    /// The atomic admission guard enforces the anti-farm caps at write
+    /// time. With the window cap full, a NEW distinct id is rejected and nothing
+    /// is persisted; an idempotent re-record of an already-present id is still
+    /// admitted; and the population cap is enforced the same way.
+    #[test]
+    fn atomic_admission_enforces_caps_at_write_time() {
+        let path = unique_db_path("chio-atomic-admission");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+
+        // Window cap of 2: the first two distinct ids are admitted.
+        let now = 1_000;
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:a", "2026-06", 0, 9_000, now, 2, 100)
+                .unwrap(),
+            PassIssuanceAdmission::Admitted
+        );
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:b", "2026-06", 0, 9_000, now, 2, 100)
+                .unwrap(),
+            PassIssuanceAdmission::Admitted
+        );
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 2);
+
+        // The window is full: a THIRD distinct id is denied and not persisted.
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:c", "2026-06", 0, 9_000, now, 2, 100)
+                .unwrap(),
+            PassIssuanceAdmission::DeniedWindowExhausted
+        );
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 2);
+
+        // An idempotent re-record of an already-present id is still admitted even
+        // with the window full (it adds no new population).
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:a", "2026-06", 0, 9_000, now, 2, 100)
+                .unwrap(),
+            PassIssuanceAdmission::Admitted
+        );
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 2);
+
+        // The population cap is enforced the same way: a roomy window but a full
+        // live population denies a new id in a DIFFERENT window.
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:d", "2026-07", 0, 9_000, now, 100, 2)
+                .unwrap(),
+            PassIssuanceAdmission::DeniedPopulationCap
+        );
+        assert_eq!(store.count_window_issuances("2026-07").unwrap(), 0);
+
+        let _ = fs::remove_file(path);
+    }
+
+    /// A REVOKED capability id is never re-admitted, even as a
+    /// no-growth idempotent re-record at a full cap. Re-issuing a revoked id would
+    /// otherwise return success while the revocation stayed in force, re-minting a
+    /// revoked Pass. The admission fails closed with `DeniedRevoked` and persists
+    /// nothing new.
+    #[test]
+    fn atomic_admission_denies_a_revoked_capability_id() {
+        let path = unique_db_path("chio-admission-revoked");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+
+        let now = 1_000;
+        // Admit the id once (a roomy cap), then revoke it.
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:a", "2026-06", 0, 9_000, now, 100, 100)
+                .unwrap(),
+            PassIssuanceAdmission::Admitted
+        );
+        assert!(store.revoke("chiopass:a").unwrap());
+
+        // An idempotent re-record of the now-REVOKED id is denied fail-closed: the
+        // already-present row no longer admits it.
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:a", "2026-06", 0, 9_000, now, 100, 100)
+                .unwrap(),
+            PassIssuanceAdmission::DeniedRevoked
+        );
+
+        // A genuinely NEW id that was pre-revoked is also denied (the gate is not
+        // limited to already-issued ids).
+        assert!(store.revoke("chiopass:b").unwrap());
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:b", "2026-06", 0, 9_000, now, 100, 100)
+                .unwrap(),
+            PassIssuanceAdmission::DeniedRevoked
+        );
+
+        // Neither denial grew the window roster beyond the single admitted id.
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 1);
 
         let _ = fs::remove_file(path);
     }

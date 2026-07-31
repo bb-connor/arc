@@ -263,6 +263,26 @@ COPY_STOP_PATTERNS = {
         re.compile(r"\bOCI tags are trusted artifact references\b", re.IGNORECASE),
         "OCI evidence must bind digest-pinned references, not mutable tags",
     ),
+    "pass_passport_naming_overload": (
+        # Scope: only fire when the Chio Pass credential (proper noun "Chio
+        # Pass" / "the Pass", capital P) is named within proximity of a
+        # passport artifact term. This keeps legitimate prose about the
+        # existing AgentPassport / transaction-passport / order-passport
+        # artifacts (which never sit beside the "Pass" credential noun) from
+        # false-positiving. The Pass is a portable reputation credential, not a
+        # passport.
+        re.compile(
+            r"\b(?:Chio Pass|the Pass)\b.{0,80}"
+            r"(?i:\b(?:AgentPassport|agent[- ]passport|transaction[- ]passport|"
+            r"settlement[- ]passport|order[- ]passport|passport)\b)"
+            r"|"
+            r"(?i:\b(?:AgentPassport|agent[- ]passport|transaction[- ]passport|"
+            r"settlement[- ]passport|order[- ]passport|passport)\b).{0,80}"
+            r"\b(?:Chio Pass|the Pass)\b"
+        ),
+        "the Chio Pass is a portable reputation credential, not an "
+        "AgentPassport/transaction/settlement/order passport",
+    ),
 }
 
 

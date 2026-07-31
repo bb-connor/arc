@@ -16,6 +16,8 @@ pub enum AnchorLaneKind {
     SolanaMemo,
 }
 
+/// A primary EVM inclusion proof together with the secondary lanes (Bitcoin
+/// OTS, Solana memo) the verifier should cross-check it against.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnchorProofBundle {
@@ -43,6 +45,19 @@ pub struct AnchorVerificationReport {
     pub lanes: Vec<AnchorVerificationLane>,
 }
 
+/// Verify a multi-lane anchor proof bundle fail-closed: the primary EVM proof
+/// plus every declared secondary lane must verify and stay consistent with
+/// the anchor data present on the primary proof.
+///
+/// # Errors
+///
+/// Returns [`AnchorError::Verification`] when the bundle schema is
+/// unsupported, when no secondary lane is declared, when the secondary lanes
+/// include the primary EVM lane, when the primary inclusion proof fails to
+/// verify, when declared Bitcoin or Solana lanes disagree with the anchor
+/// data present (or absent) on the primary proof, when a declared Bitcoin or
+/// Solana lane fails its own verification, or when an OTS proof carries no
+/// Bitcoin attestation height to record.
 pub fn verify_proof_bundle(
     bundle: &AnchorProofBundle,
 ) -> Result<AnchorVerificationReport, AnchorError> {
@@ -141,6 +156,15 @@ pub fn verify_proof_bundle(
     })
 }
 
+/// Verify that every checkpoint publication is conflict-free and backed by
+/// either a valid trust-anchor binding or a successor witness.
+///
+/// # Errors
+///
+/// Returns [`AnchorError::Verification`] when the transparency summary records
+/// a checkpoint equivocation, when a publication's trust-anchor binding fails
+/// validation, or when a publication has neither a trust-anchor binding nor a
+/// matching successor witness.
 pub fn verify_checkpoint_publication_records(
     transparency: &CheckpointTransparencySummary,
 ) -> Result<(), AnchorError> {

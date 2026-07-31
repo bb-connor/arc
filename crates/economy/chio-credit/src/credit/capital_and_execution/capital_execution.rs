@@ -160,6 +160,19 @@ impl CapitalExecutionInstructionArtifact {
 pub type SignedCapitalExecutionInstruction =
     SignedExportEnvelope<CapitalExecutionInstructionArtifact>;
 
+/// Validate a capital execution envelope: the authority chain, execution
+/// window, and rail must be well formed, unexpired, and custodian-approved
+/// as of `issued_at`.
+///
+/// # Errors
+///
+/// Returns an error string when the authority chain is empty, when the rail
+/// id or custody-provider id is empty or padded, when the execution window
+/// has `not_before` after `not_after` or has already expired relative to
+/// `issued_at`, when any authority step has an empty principal id, an invalid
+/// step proof, `approved_at` after `expires_at`, an approval or expiry
+/// inconsistent with `issued_at`, or an expiry before the execution window
+/// closes, or when no custodian step authorizes the rail's custody provider.
 pub fn validate_capital_execution_envelope(
     authority_chain: &[CapitalExecutionAuthorityStep],
     execution_window: &CapitalExecutionWindow,
@@ -215,6 +228,12 @@ pub fn validate_capital_execution_envelope(
     ensure_capital_execution_custodian_authority(authority_chain, rail)
 }
 
+/// Ensure the authority chain carries an approval step matching the source
+/// owner's role.
+///
+/// # Errors
+///
+/// Returns an error string when no authority step has `role == owner_role`.
 pub fn ensure_capital_execution_owner_authority(
     authority_chain: &[CapitalExecutionAuthorityStep],
     owner_role: CapitalExecutionRole,
@@ -226,6 +245,14 @@ pub fn ensure_capital_execution_owner_authority(
     }
 }
 
+/// Ensure the authority chain carries a custodian approval step bound to the
+/// rail's custody provider.
+///
+/// # Errors
+///
+/// Returns an error string when no authority step is a
+/// [`CapitalExecutionRole::Custodian`] whose `principal_id` equals the rail's
+/// `custody_provider_id`.
 pub fn ensure_capital_execution_custodian_authority(
     authority_chain: &[CapitalExecutionAuthorityStep],
     rail: &CapitalExecutionRail,

@@ -105,6 +105,11 @@ pub struct IouEnvelope {
 impl IouEnvelope {
     /// Verify the IOU envelope signature against the embedded issuer
     /// key. Returns `Ok(true)` when the signature is valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CreditEvaluatorError::Canonical`] when the body cannot be
+    /// canonically encoded for verification.
     pub fn verify_signature(&self) -> Result<bool, CreditEvaluatorError> {
         self.body
             .issuer_key
@@ -129,6 +134,16 @@ impl IouEnvelope {
 /// `&dyn CreditEvaluatorHook`.
 pub trait CreditEvaluatorHook: Send + Sync {
     /// Evaluate `receipt` and either mint an IOU envelope or skip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CreditEvaluatorError::SignatureInvalid`] when the receipt
+    /// fails verification, [`CreditEvaluatorError::SignerUntrusted`] when it is
+    /// signed by an untrusted kernel key, [`CreditEvaluatorError::Canonical`]
+    /// when canonical encoding fails, [`CreditEvaluatorError::Signing`] when
+    /// the IOU body cannot be signed, and
+    /// [`CreditEvaluatorError::PricingContext`] when the pricing context is
+    /// malformed.
     fn evaluate(&self, receipt: &ChioReceipt) -> Result<Option<IouEnvelope>, CreditEvaluatorError>;
 }
 

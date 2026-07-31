@@ -166,6 +166,15 @@ impl ExposureLedgerQuery {
         normalized
     }
 
+    /// Validate the structural invariants of an exposure ledger query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when any supplied filter is empty or padded
+    /// with surrounding whitespace, when none of `--capability`,
+    /// `--agent-subject`, or `--tool-server` is provided, when `--tool-name`
+    /// is supplied without `--tool-server`, or when `--since` is greater than
+    /// `--until`.
     pub fn validate(&self) -> Result<(), String> {
         validate_optional_query_filter(&self.capability_id, "--capability")?;
         validate_optional_query_filter(&self.agent_subject, "--agent-subject")?;
@@ -329,6 +338,9 @@ pub struct ExposureLedgerSummary {
     pub truncated_decisions: bool,
 }
 
+/// Subject-scoped exposure ledger: the per-currency positions, matching
+/// receipts, and underwriting decisions resolved for an
+/// [`ExposureLedgerQuery`], with a summary and support boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExposureLedgerReport {
@@ -922,3 +934,131 @@ pub struct CreditBondListReport {
 }
 
 include!("credit/capital_and_execution.rs");
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod do_not_weaken {
+    //! DO-NOT-WEAKEN regression suite.
+    //!
+    //! Three credit invariants are frozen here:
+    //!
+    //! 1. `ExposureLedgerSupportBoundary` defaults
+    //!    `cross_currency_netting_supported` to `false`. Credit never
+    //!    nets exposure across currencies on its own authority.
+    //! 2. `CreditScorecardSupportBoundary` defaults
+    //!    `capital_allocation_supported` to `false` (and likewise does
+    //!    not net cross-currency). Scorecards never allocate capital.
+    //! 3. IOUs only arise from a strictly non-zero charged cost. A
+    //!    zero-cost allow receipt mints no IOU. Flipping any flag to
+    //!    `true`, or minting on a zero cost, would weaken the obligation
+    //!    surface; do not do it.
+    use super::{
+        CreditScorecardSupportBoundary, ExposureLedgerSupportBoundary, LocalCreditAccount,
+    };
+    use crate::crypto::{sha256_hex, Ed25519Backend, Keypair};
+    use crate::hook::CreditEvaluatorHook;
+    use crate::receipt::{
+        body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
+        economics::FinancialReceiptMetadata, economics::SettlementStatus, kinds::TrustLevel,
+        metadata::GuardEvidence,
+    };
+
+    #[test]
+    fn exposure_ledger_boundary_does_not_support_cross_currency_netting() {
+        let boundary = ExposureLedgerSupportBoundary::default();
+        assert!(
+            !boundary.cross_currency_netting_supported,
+            "cross-currency netting must stay unsupported on the exposure ledger"
+        );
+    }
+
+    #[test]
+    fn scorecard_boundary_does_not_support_capital_allocation() {
+        let boundary = CreditScorecardSupportBoundary::default();
+        assert!(
+            !boundary.capital_allocation_supported,
+            "capital allocation must stay unsupported on the scorecard"
+        );
+        assert!(
+            !boundary.cross_currency_netting_supported,
+            "cross-currency netting must stay unsupported on the scorecard"
+        );
+    }
+
+    fn priced_receipt(kp: &Keypair, cost_charged: u64) -> ChioReceipt {
+        let financial = FinancialReceiptMetadata {
+            grant_index: 0,
+            cost_charged,
+            currency: "USD".to_string(),
+            budget_remaining: 750,
+            budget_total: 1000,
+            delegation_depth: 1,
+            root_budget_holder: "tenant-a".to_string(),
+            payment_reference: None,
+            settlement_status: SettlementStatus::Pending,
+            cost_breakdown: None,
+            oracle_evidence: None,
+            attempted_cost: None,
+        };
+        let action = ToolCallAction::from_parameters(serde_json::json!({"path": "/tmp/x"}))
+            .expect("action parameters serialize");
+        let body = ChioReceiptBody {
+            id: "rcpt-do-not-weaken-001".to_string(),
+            timestamp: 1_710_000_000,
+            capability_id: "cap-001".to_string(),
+            tool_server: "srv-files".to_string(),
+            tool_name: "file_read".to_string(),
+            action,
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: Default::default(),
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            decision: Some(Decision::Allow),
+            content_hash: sha256_hex(br#"{"ok":true}"#),
+            policy_hash: "abc123def456".to_string(),
+            evidence: vec![GuardEvidence {
+                guard_name: "ForbiddenPathGuard".to_string(),
+                verdict: true,
+                details: None,
+            }],
+            metadata: Some(serde_json::json!({ "financial": financial })),
+            trust_level: TrustLevel::default(),
+            tenant_id: Some("tenant-a".to_string()),
+            kernel_key: kp.public_key(),
+            bbs_projection_version: None,
+        };
+        ChioReceipt::sign(body, kp).expect("sign receipt")
+    }
+
+    #[test]
+    fn zero_cost_allow_receipt_mints_no_iou() {
+        // Deliberate injection: an authorized receipt whose cost is zero
+        // must mint nothing. IOUs only arise from a non-zero cost.
+        let kp = Keypair::generate();
+        let account = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp.clone()),
+            [kp.public_key()],
+        );
+        let receipt = priced_receipt(&kp, 0);
+        let minted = account.evaluate(&receipt).expect("evaluation succeeds");
+        assert!(minted.is_none(), "zero-cost path must not mint an IOU");
+    }
+
+    #[test]
+    fn non_zero_cost_allow_receipt_mints_one_iou() {
+        // Positive control: the only path that DOES mint is a non-zero cost.
+        let kp = Keypair::generate();
+        let account = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp.clone()),
+            [kp.public_key()],
+        );
+        let receipt = priced_receipt(&kp, 250);
+        let envelope = account
+            .evaluate(&receipt)
+            .expect("evaluation succeeds")
+            .expect("non-zero cost mints exactly one IOU");
+        assert_eq!(envelope.body.amount_units, 250);
+    }
+}

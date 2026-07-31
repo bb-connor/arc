@@ -1770,6 +1770,11 @@ fn refresh_commerce_order_passport_graph_binding(
             settlement_packet_bytes,
             mandate_protocol_payloads,
             risk_comptroller_report_bytes,
+            escrow_ledger_bytes: load_commerce_escrow_ledger_bytes(
+                bundle,
+                &graph.nodes,
+                &order_context,
+            )?,
             verified_trust_market_context: fixture_commerce_trust_market_context(
                 bundle,
                 &order_context,

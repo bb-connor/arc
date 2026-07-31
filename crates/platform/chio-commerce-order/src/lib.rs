@@ -1,4 +1,5 @@
 mod error;
+mod escrow;
 mod ids;
 mod mandate;
 mod payment;
@@ -9,17 +10,25 @@ mod types;
 mod validation;
 
 pub use error::CommerceOrderError;
+pub use escrow::{
+    accept, release, CommerceEscrowAcceptRequest, CommerceEscrowAcceptance, CommerceEscrowLedger,
+    CommerceEscrowLeg, CommerceEscrowLegKind, CommerceEscrowRelease, CommerceEscrowStatus,
+    CommerceReservationReceipt, CommerceSettlementDispatch, EscrowBroadcastIntent, OrderState,
+    SignedCommerceReservationReceipt, VerifiedCommerceReservation,
+    COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID,
+};
 pub use ids::{
-    COMMERCE_EVENT_LOG_SCHEMA_ID, COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID,
-    COMMERCE_MANDATE_ALLOWANCE_LEDGER_SCHEMA_ID, COMMERCE_ORDER_CONTEXT_SCHEMA_ID,
-    COMMERCE_ORDER_PASSPORT_SCHEMA_ID, COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID,
-    COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID, COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID,
-    COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID, COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
+    COMMERCE_ESCROW_LEDGER_SCHEMA_ID, COMMERCE_EVENT_LOG_SCHEMA_ID,
+    COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID, COMMERCE_MANDATE_ALLOWANCE_LEDGER_SCHEMA_ID,
+    COMMERCE_ORDER_CONTEXT_SCHEMA_ID, COMMERCE_ORDER_PASSPORT_SCHEMA_ID,
+    COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID, COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID,
+    COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID, COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID,
+    COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
 };
 pub use types::{
     CommerceCoverageRequirement, CommerceEventAuthorityReceiptArtifact,
     CommerceMandateProtocolPayload, CommerceOrderContext, CommerceOrderPassportReport,
-    CommerceOrderVerificationBundle, CommerceTrustMarketRequirement,
+    CommerceOrderVerificationBundle, CommerceSettlementPacket, CommerceTrustMarketRequirement,
     CommerceVerifiedTrustMarketContext,
 };
 
@@ -32,7 +41,7 @@ use settlement::validate_settlement_packet;
 use types::{
     CommerceFederationTrustBundle, CommerceOrderDisclosurePolicy,
     CommerceOrderPassportArtifactDigests, CommercePaymentLifecycle, CommerceProviderPassport,
-    CommerceReputationSnapshot, CommerceSettlementPacket,
+    CommerceReputationSnapshot,
 };
 
 const CLAIM_ORDER_REPLAY_CONSISTENT: &str = "claim.commerce.order_replay_consistent";
@@ -81,11 +90,7 @@ pub fn verify_commerce_order(
         &bundle.order_context.federation_trust_bundle_sha256,
         &bundle.federation_trust_bundle_bytes,
     )?;
-    verify_digest(
-        "settlement packet",
-        &bundle.order_context.settlement_packet_sha256,
-        &bundle.settlement_packet_bytes,
-    )?;
+    verify_escrow_digest(&bundle.order_context, bundle.escrow_ledger_bytes.as_deref())?;
     let coverage_decision_bound = verify_coverage_requirement(
         &bundle.order_context,
         bundle.risk_comptroller_report_bytes.as_deref(),
@@ -109,8 +114,8 @@ pub fn verify_commerce_order(
         "federation trust bundle",
         &bundle.federation_trust_bundle_bytes,
     )?;
-    let settlement: CommerceSettlementPacket =
-        parse_json("settlement packet", &bundle.settlement_packet_bytes)?;
+    let settlement =
+        verify_settlement_packet_digest(&bundle.order_context, &bundle.settlement_packet_bytes)?;
 
     let replay = replay_event_log(
         &event_log,
@@ -425,6 +430,50 @@ fn verify_digest(field: &str, expected: &str, bytes: &[u8]) -> Result<(), Commer
     }
 }
 
+/// Verify the pinned settlement-packet digest with a DUAL binding: the pin matches
+/// EITHER the canonical digest of the parsed packet body OR the raw digest of the
+/// stored artifact bytes. Both bindings prove the packet content; a tampered packet
+/// (different content) matches neither and fails closed.
+///
+/// Two producers pin this field two ways, and a single verifier must accept both:
+/// - `escrow::accept` pins the CANONICAL digest of the signed packet body (the same
+///   way the escrow ledger pins its canonical `digest()`), so an escrow-accepted
+///   order verifies regardless of the byte form its packet is stored in
+///   (pretty-printed, key-reordered, or newline-terminated). This
+///   re-canonicalizing check is what makes an escrow-backed order verifiable.
+/// - The proof-room fixture pipeline pins the RAW digest of the on-disk artifact
+///   file (`sha256` of the newline-terminated bytes the bundle ships). Dropping this
+///   branch would reject every committed commerce-order fixture pinned that way, so
+///   it is retained for backward compatibility.
+///
+/// The packet is parsed exactly once and returned for the downstream
+/// settlement-lifecycle checks. A structurally invalid artifact fails closed at the
+/// parse step before either digest is considered.
+fn verify_settlement_packet_digest(
+    context: &CommerceOrderContext,
+    settlement_packet_bytes: &[u8],
+) -> Result<CommerceSettlementPacket, CommerceOrderError> {
+    let settlement: CommerceSettlementPacket =
+        parse_json("settlement packet", settlement_packet_bytes)?;
+    let canonical = chio_core_types::canonical_json_bytes(&settlement).map_err(|error| {
+        CommerceOrderError::InvalidArtifact {
+            field: "settlement packet",
+            message: format!("settlement packet canonicalization failed: {error}"),
+        }
+    })?;
+    let canonical_digest = sha256_hex(&canonical);
+    let raw_digest = sha256_hex(settlement_packet_bytes);
+    let expected = &context.settlement_packet_sha256;
+    if &canonical_digest != expected && &raw_digest != expected {
+        return Err(CommerceOrderError::DigestMismatch {
+            field: "settlement packet".to_string(),
+            expected: expected.clone(),
+            actual: canonical_digest,
+        });
+    }
+    Ok(settlement)
+}
+
 fn verify_quote_digest(context: &CommerceOrderContext) -> Result<(), CommerceOrderError> {
     let actual = canonical_quote_sha256(context)?;
     if actual == context.quote_sha256 {
@@ -483,4 +532,531 @@ fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
 
     hex::encode(Sha256::digest(bytes))
+}
+
+/// Require proof for the order context's `escrow_digest`. When the context pins
+/// an `escrow_digest`, the bundle MUST carry the escrow-ledger bytes that produced
+/// it; the ledger is parsed, its CANONICAL digest (the same `digest()` the
+/// accept/release code path pins) is recomputed and compared to the pinned value,
+/// its conservation/isolation invariants are re-checked, and it is bound to this
+/// order. Fail-closed: an `escrow_digest` with no backing ledger, a pinned digest
+/// that does not equal the ledger's CANONICAL digest (so a non-canonical wire
+/// encoding whose raw-byte hash is self-consistent is rejected), a ledger that
+/// violates conservation or pool isolation, or a ledger bound to a different order is all
+/// rejected, so an arbitrary 64-hex value (or a non-canonical ledger encoding)
+/// can never appear in a verified order passport. When no `escrow_digest` is
+/// present there is nothing to prove.
+fn verify_escrow_digest(
+    context: &CommerceOrderContext,
+    escrow_ledger_bytes: Option<&[u8]>,
+) -> Result<(), CommerceOrderError> {
+    let Some(expected) = context.escrow_digest.as_deref() else {
+        return Ok(());
+    };
+    let Some(bytes) = escrow_ledger_bytes else {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: "escrow_digest is present but the verification bundle carries no escrow \
+                      ledger bytes to prove it"
+                .to_string(),
+        });
+    };
+    // Parse the ledger first, then compare the pinned digest to the CANONICAL
+    // digest the escrow code path produces. Hashing the raw wire bytes would
+    // trust a non-canonical encoding (a self-consistent raw-byte hash over
+    // whitespace-padded or reordered JSON), which the accept/release path would
+    // never emit.
+    let ledger: CommerceEscrowLedger = parse_json("escrow ledger", bytes)?;
+    let canonical_digest = ledger.digest()?;
+    if expected != canonical_digest {
+        return Err(CommerceOrderError::DigestMismatch {
+            field: "escrow ledger".to_string(),
+            expected: expected.to_string(),
+            actual: canonical_digest,
+        });
+    }
+    // Re-check the ledger invariants a verified order passport must not vouch for
+    // implicitly: value is conserved across all accounts and no leg names a
+    // freetier:global pool row. A malformed ledger whose canonical digest
+    // happens to be the pinned value cannot ride into a verified passport.
+    ledger.assert_conservation()?;
+    // Bind the ledger's SCHEMA, ORDER, ECONOMICS, and PARTIES to the order context.
+    // A digest match plus conservation still proves only that SOME conserved ledger
+    // exists; it does not prove the custody covered THIS order's quote between THIS
+    // order's buyer and merchant, nor that the ledger even uses the canonical
+    // escrow-ledger schema. Without this, a same-order ledger for 1 USD (or one
+    // paying a different beneficiary, or one whose `schema` is not the canonical
+    // escrow-ledger schema) would pass conservation/status and ride into a verified
+    // passport for the real (e.g. 4200 USD) order. The shared helper compares the
+    // ledger schema/order/amount/currency to the signed quote and the
+    // depositor/beneficiary to the order's buyer/merchant (exactly what
+    // `escrow::accept` binds and `escrow::release` re-checks), fail-closed on any
+    // mismatch. Composed with the escrow leg-endpoint binding in
+    // `assert_conservation`, the ledger is fully bound to the order.
+    escrow::bind_escrow_ledger_to_order_context(&ledger, context)?;
+    // Bind the ledger's lifecycle status to the order's settlement state. A digest
+    // match alone proves only that SOME escrow ledger conserves value; it does not
+    // prove the custody actually reached the lifecycle the context claims. The
+    // release leg appends a second leg and flips the ledger to Released, producing a
+    // DIFFERENT canonical digest, so a context that claims settlement reconciliation
+    // (or later) while pinning a still-`Locked` ledger digest is proving only that
+    // custody was LOCKED, never released. Fail closed when the pinned ledger's
+    // status is not the one the order state requires.
+    if let Some(required) = required_escrow_status_for_state(&context.current_state) {
+        if ledger.status != required {
+            return Err(CommerceOrderError::InvalidArtifact {
+                field: "order context",
+                message: format!(
+                    "escrow ledger status mismatch: order state {} requires a {:?} ledger, got {:?}",
+                    context.current_state, required, ledger.status
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The escrow-ledger status an order state requires when an `escrow_digest` is
+/// pinned. The accept leg locks custody (a `Locked` ledger) and advances the order
+/// to the assembly/dispatch/observe states; the release leg drains custody (a
+/// `Released` ledger) and advances the order to settlement reconciliation and
+/// EVERY state at or after it on the shipped spine.
+///
+/// The post-release spine (see `replay::is_allowed_transition`) continues
+/// `settlement_reconciled -> completed -> disputed -> refunded`, so EVERY one of
+/// those terminal states is reached only AFTER custody was released. They must all
+/// require a `Released` ledger: a `disputed`/`refunded` context that pinned a
+/// still-`Locked` ledger digest would otherwise fall through to `None` and vouch
+/// that custody was merely locked, never released, contradicting the order having
+/// passed through reconciliation. `failed_closed` is deliberately left
+/// unconstrained: it is reachable from BOTH pre-release and post-release states, so
+/// no single status applies. Other states impose no escrow-status constraint here
+/// (the field is additive, so legacy/pre-escrow states return `None`).
+fn required_escrow_status_for_state(current_state: &str) -> Option<CommerceEscrowStatus> {
+    match current_state {
+        "settlement_packet_assembled" | "settlement_dispatched" | "settlement_observed" => {
+            Some(CommerceEscrowStatus::Locked)
+        }
+        "settlement_reconciled" | "completed" | "disputed" | "refunded" => {
+            Some(CommerceEscrowStatus::Released)
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod escrow_digest_verification_tests {
+    use super::*;
+    use chio_test_support::prelude::*;
+
+    const HEX64: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+
+    fn order_context(order_id: &str) -> CommerceOrderContext {
+        let value = json!({
+            "schema": ids::COMMERCE_ORDER_CONTEXT_SCHEMA_ID,
+            "id": "ctx-1",
+            "issued_at": "2026-06-25T00:00:00Z",
+            "order_id": order_id,
+            "buyer_subject": "buyer:alice",
+            "agent_subject": "agent:alice",
+            "merchant_subject": "merchant:coffee",
+            "intent_ref": "intent-1",
+            "provider_admission_ref": "admission-1",
+            "provider_passport_ref": "passport-1",
+            "reputation_snapshot_ref": "reputation-1",
+            "federation_trust_bundle_ref": "federation-1",
+            "quote_id": "quote-1",
+            "quote_amount_minor": 4200u64,
+            "quote_currency": "USD",
+            "quote_sha256": HEX64,
+            "settlement_packet_ref": "settlement-packet-1",
+            "reconciliation_ref": "reconciliation-1",
+            "event_log_sha256": HEX64,
+            "event_log_path": "event-log.json",
+            "payment_lifecycle_sha256": HEX64,
+            "payment_lifecycle_path": "payment-lifecycle.json",
+            "mandate_ledger_sha256": HEX64,
+            "mandate_ledger_path": "mandate-ledger.json",
+            "provider_passport_sha256": HEX64,
+            "provider_passport_path": "provider-passport.json",
+            "reputation_snapshot_sha256": HEX64,
+            "reputation_snapshot_path": "reputation-snapshot.json",
+            "federation_trust_bundle_sha256": HEX64,
+            "federation_trust_bundle_path": "federation-trust-bundle.json",
+            "settlement_packet_sha256": HEX64,
+            "settlement_packet_path": "settlement-packet.json",
+            // A locked-phase settlement state, consistent with the `Locked` ledger
+            // these tests pin (the released ledger has a different canonical digest).
+            "current_state": "settlement_packet_assembled",
+        });
+        serde_json::from_value(value).test_expect("order context deserializes")
+    }
+
+    fn ledger(order_id: &str) -> CommerceEscrowLedger {
+        CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: order_id.to_string(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: "merchant:coffee".to_string(),
+            custody_account: "chio:commerce:escrow:custody".to_string(),
+            amount_minor: 4200,
+            legs: vec![CommerceEscrowLeg {
+                kind: CommerceEscrowLegKind::Lock,
+                from_account: "buyer:alice".to_string(),
+                to_account: "chio:commerce:escrow:custody".to_string(),
+                amount_minor: 4200,
+            }],
+            status: CommerceEscrowStatus::Locked,
+        }
+    }
+
+    fn canonical_ledger_bytes(ledger: &CommerceEscrowLedger) -> Vec<u8> {
+        chio_core_types::canonical_json_bytes(ledger).test_expect("canonical ledger bytes")
+    }
+
+    #[test]
+    fn absent_escrow_digest_needs_no_proof() {
+        let context = order_context("order-commerce-001");
+        assert!(context.escrow_digest.is_none());
+        verify_escrow_digest(&context, None).test_expect("no escrow digest is a no-op");
+    }
+
+    #[test]
+    fn settlement_packet_digest_accepts_noncanonical_bytes_and_rejects_tampering() {
+        let mut context = order_context("order-commerce-001");
+        let packet = json!({
+            "schema": ids::COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
+            "id": "settlement-packet-1",
+            "issued_at": "2026-06-10T00:08:00Z",
+            "order_id": "order-commerce-001",
+            "merchant_subject": "merchant:coffee",
+            "psp": "stripe",
+            "payment_intent_id": "pi_commerce_001",
+            "amount_minor": 4200u64,
+            "currency": "USD",
+            "quote_sha256": HEX64,
+            "settlement_rail": "ach",
+            "settlement_account_ref": "acct-1",
+            "dispatch_receipt_ref": "receipt-1",
+            "reconciliation_ref": "reconciliation-1",
+            "status": "settled",
+        });
+        // Pin the CANONICAL packet digest, exactly as `escrow::accept` does.
+        let canonical =
+            chio_core_types::canonical_json_bytes(&packet).test_expect("canonical packet bytes");
+        context.settlement_packet_sha256 = sha256_hex(&canonical);
+
+        // The packet is STORED as pretty (non-canonical) JSON. A raw-byte hash of
+        // these bytes would NOT equal the pinned canonical digest, but the verifier
+        // re-canonicalizes, so an escrow-accepted order whose packet is not stored in
+        // canonical byte form still verifies.
+        let pretty = serde_json::to_vec_pretty(&packet).test_expect("pretty packet bytes");
+        assert_ne!(sha256_hex(&pretty), context.settlement_packet_sha256);
+        let parsed = verify_settlement_packet_digest(&context, &pretty)
+            .test_expect("non-canonical packet verifies against the canonical pin");
+        assert_eq!(parsed.order_id, "order-commerce-001");
+
+        // The RAW-digest binding also verifies: a context that pins the raw digest of
+        // the newline-terminated on-disk bytes (the proof-room fixture convention)
+        // accepts those exact bytes, so committed fixtures keep verifying.
+        let mut raw_context = order_context("order-commerce-001");
+        let mut on_disk = serde_json::to_vec(&packet).test_expect("compact packet bytes");
+        on_disk.push(b'\n');
+        raw_context.settlement_packet_sha256 = sha256_hex(&on_disk);
+        assert_ne!(raw_context.settlement_packet_sha256, sha256_hex(&canonical));
+        verify_settlement_packet_digest(&raw_context, &on_disk)
+            .test_expect("raw-pinned newline-terminated packet verifies");
+
+        // A tampered packet (different content) matches NEITHER binding and fails
+        // closed.
+        let mut tampered = packet;
+        tampered["amount_minor"] = json!(4201u64);
+        let tampered_bytes = serde_json::to_vec(&tampered).test_expect("tampered packet bytes");
+        let error = verify_settlement_packet_digest(&context, &tampered_bytes)
+            .test_expect_err("a tampered settlement packet is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::DigestMismatch { field, .. } if field == "settlement packet"
+        ));
+    }
+
+    #[test]
+    fn present_escrow_digest_with_matching_ledger_verifies() {
+        let order_id = "order-commerce-001";
+        let ledger = ledger(order_id);
+        let bytes = canonical_ledger_bytes(&ledger);
+        let mut context = order_context(order_id);
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        verify_escrow_digest(&context, Some(&bytes)).test_expect("matching ledger proves digest");
+    }
+
+    #[test]
+    fn present_escrow_digest_without_bytes_is_denied() {
+        let mut context = order_context("order-commerce-001");
+        context.escrow_digest = Some(HEX64.to_string());
+        let error = verify_escrow_digest(&context, None)
+            .test_expect_err("escrow digest with no ledger bytes is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("no escrow ledger bytes to prove it")
+        ));
+    }
+
+    #[test]
+    fn escrow_digest_that_does_not_recompute_is_denied() {
+        let order_id = "order-commerce-001";
+        let bytes = canonical_ledger_bytes(&ledger(order_id));
+        let mut context = order_context(order_id);
+        // A digest that does not match the supplied ledger bytes.
+        context.escrow_digest = Some(HEX64.to_string());
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("non-recomputing escrow digest is denied");
+        assert!(matches!(error, CommerceOrderError::DigestMismatch { .. }));
+    }
+
+    #[test]
+    fn escrow_ledger_bound_to_a_different_order_is_denied() {
+        // The ledger proves a digest but is bound to a foreign order.
+        let foreign_ledger = ledger("order-commerce-foreign");
+        let bytes = canonical_ledger_bytes(&foreign_ledger);
+        let mut context = order_context("order-commerce-001");
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("escrow ledger bound to a different order is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("escrow ledger order mismatch")
+        ));
+    }
+
+    /// A NON-CANONICAL ledger encoding whose raw-byte hash is pinned
+    /// (a self-consistent raw-byte hash) is denied: the pinned digest is
+    /// compared to the ledger's CANONICAL `digest()`, never to `sha256(raw wire
+    /// bytes)`. The accept/release path only ever pins the canonical digest, so a
+    /// non-canonical encoding cannot be trusted.
+    #[test]
+    fn non_canonical_ledger_with_self_consistent_raw_hash_is_denied() {
+        let order_id = "order-commerce-001";
+        let ledger = ledger(order_id);
+        // Pretty (whitespace-padded) JSON is a valid but NON-canonical encoding:
+        // its raw-byte hash differs from the canonical digest the escrow path pins.
+        let non_canonical = serde_json::to_vec_pretty(&ledger).test_expect("pretty ledger bytes");
+        let canonical = canonical_ledger_bytes(&ledger);
+        assert_ne!(
+            non_canonical, canonical,
+            "pretty encoding must be non-canonical"
+        );
+
+        let mut context = order_context(order_id);
+        // Self-consistent raw-byte hash over the non-canonical bytes: under the old
+        // `sha256(raw bytes)` check this matched and was trusted.
+        context.escrow_digest = Some(sha256_hex(&non_canonical));
+
+        let error = verify_escrow_digest(&context, Some(&non_canonical))
+            .test_expect_err("a non-canonical ledger encoding is denied");
+        match error {
+            CommerceOrderError::DigestMismatch {
+                field,
+                expected,
+                actual,
+            } => {
+                assert_eq!(field, "escrow ledger");
+                // `expected` is the self-consistent raw-byte hash; `actual` is the
+                // canonical digest the escrow path would have pinned. They differ.
+                assert_eq!(expected, sha256_hex(&non_canonical));
+                assert_eq!(actual, sha256_hex(&canonical));
+                assert_ne!(expected, actual);
+            }
+            other => panic!("expected a DigestMismatch, got {other:?}"),
+        }
+    }
+
+    /// A drained (Released) ledger: the lock leg plus the release leg, status
+    /// Released. Its canonical digest differs from the Locked ledger's.
+    fn released_ledger(order_id: &str) -> CommerceEscrowLedger {
+        CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: order_id.to_string(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: "merchant:coffee".to_string(),
+            custody_account: "chio:commerce:escrow:custody".to_string(),
+            amount_minor: 4200,
+            legs: vec![
+                CommerceEscrowLeg {
+                    kind: CommerceEscrowLegKind::Lock,
+                    from_account: "buyer:alice".to_string(),
+                    to_account: "chio:commerce:escrow:custody".to_string(),
+                    amount_minor: 4200,
+                },
+                CommerceEscrowLeg {
+                    kind: CommerceEscrowLegKind::Release,
+                    from_account: "chio:commerce:escrow:custody".to_string(),
+                    to_account: "merchant:coffee".to_string(),
+                    amount_minor: 4200,
+                },
+            ],
+            status: CommerceEscrowStatus::Released,
+        }
+    }
+
+    /// A context that claims settlement reconciliation while pinning a
+    /// still-`Locked` ledger digest is denied. The release leg drains custody and
+    /// yields a DIFFERENT canonical digest, so a Locked ledger whose digest the
+    /// context pins proves only that custody was locked, never reconciled.
+    #[test]
+    fn reconciled_state_with_locked_ledger_is_denied() {
+        let order_id = "order-commerce-001";
+        let locked = ledger(order_id);
+        assert_eq!(locked.status, CommerceEscrowStatus::Locked);
+        let bytes = canonical_ledger_bytes(&locked);
+        let mut context = order_context(order_id);
+        context.current_state = "settlement_reconciled".to_string();
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a reconciled context with a locked ledger is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("escrow ledger status mismatch")
+        ));
+    }
+
+    /// The consistent reconciled pair (a `Released` ledger pinned by a
+    /// reconciled context) still verifies, so the status gate only denies the
+    /// inconsistent lock-while-reconciled combination.
+    #[test]
+    fn reconciled_state_with_released_ledger_verifies() {
+        let order_id = "order-commerce-001";
+        let released = released_ledger(order_id);
+        let bytes = canonical_ledger_bytes(&released);
+        let mut context = order_context(order_id);
+        context.current_state = "settlement_reconciled".to_string();
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        verify_escrow_digest(&context, Some(&bytes))
+            .test_expect("a reconciled context with a released ledger verifies");
+    }
+
+    /// A digest-consistent, conserved, same-order ledger whose AMOUNT
+    /// does not match the order quote is denied, so a 1 USD ledger can never ride
+    /// into a verified passport for a 4200 USD order.
+    #[test]
+    fn escrow_ledger_amount_mismatch_with_order_quote_is_denied() {
+        let order_id = "order-commerce-001";
+        let mut wrong_amount = ledger(order_id);
+        // Re-shape the ledger to a self-consistent 1 USD lock (so conservation and
+        // the leg-endpoint binding both pass); only the order-quote economics gate
+        // can fire.
+        wrong_amount.amount_minor = 1;
+        wrong_amount.legs = vec![CommerceEscrowLeg {
+            kind: CommerceEscrowLegKind::Lock,
+            from_account: "buyer:alice".to_string(),
+            to_account: "chio:commerce:escrow:custody".to_string(),
+            amount_minor: 1,
+        }];
+        let bytes = canonical_ledger_bytes(&wrong_amount);
+        let mut context = order_context(order_id);
+        assert_eq!(context.quote_amount_minor, 4200);
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a same-order ledger for the wrong amount is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("does not match the order quote amount")
+        ));
+    }
+
+    /// A digest-consistent, conserved, same-order ledger whose
+    /// BENEFICIARY is not the order merchant is denied, so custody can never be
+    /// vouched for paying a third account while the order names its real merchant.
+    #[test]
+    fn escrow_ledger_beneficiary_mismatch_with_order_merchant_is_denied() {
+        let order_id = "order-commerce-001";
+        let mut wrong_beneficiary = ledger(order_id);
+        // The Locked ledger's single lock leg does not name the beneficiary, so the
+        // leg-endpoint binding still passes; only the party-binding gate can fire.
+        wrong_beneficiary.beneficiary_account = "merchant:attacker".to_string();
+        let bytes = canonical_ledger_bytes(&wrong_beneficiary);
+        let mut context = order_context(order_id);
+        assert_eq!(context.merchant_subject, "merchant:coffee");
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a same-order ledger paying a foreign beneficiary is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("beneficiary") && message.contains("does not match the order merchant")
+        ));
+    }
+
+    /// A digest-consistent, conserved, same-order ledger whose
+    /// `schema` is NOT the canonical commerce escrow-ledger schema is denied, so a
+    /// wrong-schema artifact can never ride a pinned digest into a verified passport.
+    #[test]
+    fn escrow_ledger_with_wrong_schema_is_denied() {
+        let order_id = "order-commerce-001";
+        let mut wrong_schema = ledger(order_id);
+        // Every other field (order, economics, parties, legs, status) matches the
+        // order context, so only the schema gate can fire.
+        wrong_schema.schema = "chio.commerce.not-the-escrow-ledger.v1".to_string();
+        let bytes = canonical_ledger_bytes(&wrong_schema);
+        let mut context = order_context(order_id);
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a wrong-schema escrow ledger is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("is not the canonical commerce escrow-ledger schema")
+        ));
+    }
+
+    /// The post-reconciliation terminal states `disputed` and
+    /// `refunded` are reached only AFTER custody was released, so a context in either
+    /// state that pins a still-`Locked` ledger digest is denied. It would otherwise
+    /// fall through to no status constraint and vouch that custody was merely locked,
+    /// contradicting the order having passed through reconciliation/release.
+    #[test]
+    fn post_release_terminal_state_with_locked_ledger_is_denied() {
+        let order_id = "order-commerce-001";
+        let locked = ledger(order_id);
+        assert_eq!(locked.status, CommerceEscrowStatus::Locked);
+        let bytes = canonical_ledger_bytes(&locked);
+        for state in ["disputed", "refunded"] {
+            let mut context = order_context(order_id);
+            context.current_state = state.to_string();
+            context.escrow_digest = Some(sha256_hex(&bytes));
+            let error = verify_escrow_digest(&context, Some(&bytes))
+                .test_expect_err("a post-release terminal context with a locked ledger is denied");
+            assert!(
+                matches!(
+                    &error,
+                    CommerceOrderError::InvalidArtifact { message, .. }
+                        if message.contains("escrow ledger status mismatch")
+                ),
+                "state {state} must require a released ledger, got {error:?}"
+            );
+        }
+    }
+
+    /// The consistent post-release pair (a `Released` ledger
+    /// pinned by a `disputed`/`refunded` context) still verifies, so the extended
+    /// status gate only denies the inconsistent lock-while-post-release combination.
+    #[test]
+    fn post_release_terminal_state_with_released_ledger_verifies() {
+        let order_id = "order-commerce-001";
+        let released = released_ledger(order_id);
+        let bytes = canonical_ledger_bytes(&released);
+        for state in ["disputed", "refunded"] {
+            let mut context = order_context(order_id);
+            context.current_state = state.to_string();
+            context.escrow_digest = Some(sha256_hex(&bytes));
+            verify_escrow_digest(&context, Some(&bytes))
+                .test_expect("a post-release terminal context with a released ledger verifies");
+        }
+    }
 }

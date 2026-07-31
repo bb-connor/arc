@@ -2315,6 +2315,7 @@ fn refresh_commerce_order_passport(bundle: &Path, evidence_graph: &mut serde_jso
         settlement_packet_bytes,
         mandate_protocol_payloads,
         risk_comptroller_report_bytes,
+        escrow_ledger_bytes: None,
         verified_trust_market_context: None,
         trusted_event_authority_receipt_kernel_keys: trusted_public_keys(
             COMMERCE_FIXTURE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS,

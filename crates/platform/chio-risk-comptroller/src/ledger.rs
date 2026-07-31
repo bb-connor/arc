@@ -202,6 +202,8 @@ fn validate_risk_sanction_reserve_ledger_entry(
     ] {
         require_non_empty(value, field)?;
     }
+    ensure_not_freetier_global_pool(&entry.claim_id, "sanction_reserve_ledger_claim_id")?;
+    ensure_not_freetier_global_pool(&entry.reserve_ref, "sanction_reserve_ledger_reserve_ref")?;
     if entry.lane != "market_slash" {
         return Err(claim_failed(
             "risk sanction reserve ledger lane unsupported",
@@ -238,6 +240,8 @@ fn validate_risk_reserve_ledger_entry(
     ] {
         require_non_empty(value, field)?;
     }
+    ensure_not_freetier_global_pool(&entry.claim_id, "reserve_ledger_claim_id")?;
+    ensure_not_freetier_global_pool(&entry.reserve_ref, "reserve_ledger_reserve_ref")?;
     if !matches!(
         entry.lane.as_str(),
         "claim_payout"

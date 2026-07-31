@@ -9,16 +9,28 @@ use chio_transaction_passport::{
 };
 
 mod artifacts;
+mod authority_registry;
 mod claims;
 mod evidence;
+mod pass_eligibility;
 mod policy;
 
+pub use authority_registry::{
+    resolve_rr2_tm_01_kernel_keys, MarketAuthorityRegistry, MarketAuthorityRegistryError,
+    MarketAuthorityRotationEpoch, RR2_TM_01_REGISTRY_REF,
+};
+pub use chio_credentials::TrustTier;
+pub use pass_eligibility::{
+    reconcile_claimed_pass_trust_tier, reconcile_pass_trust_tier, PassReputationEligibility,
+    PASS_COMPLIANCE_SCALE_MAX,
+};
+
 use artifacts::{
-    validate_collateral_guarantee, validate_discovery, validate_jurisdiction,
-    validate_reputation_import, validate_risk_report, validate_scorecard, validate_selection,
-    validate_sla, AdjudicationJurisdictionReceipt, CollateralPositionReport, GuaranteeDecision,
-    ProviderDiscoverySnapshot, ProviderSelectionReport, ReputationImportReport,
-    RiskComptrollerReport, SlaCommitment, SlaPerformanceReport, TrustScorecardSnapshot,
+    validate_collateral_guarantee, validate_discovery, validate_jurisdiction, validate_risk_report,
+    validate_scorecard, validate_selection, validate_sla, AdjudicationJurisdictionReceipt,
+    CollateralPositionReport, GuaranteeDecision, ProviderDiscoverySnapshot,
+    ProviderSelectionReport, ReputationImportReport, RiskComptrollerReport, SlaCommitment,
+    SlaPerformanceReport, TrustScorecardSnapshot,
 };
 use claims::{
     blocked_market_claim, push_claim_once, CLAIM_COLLATERAL_GUARANTEE_BOUND, CLAIM_DISCOVERY_BOUND,
@@ -30,6 +42,7 @@ use evidence::{
     bundle_contains_risk_evidence_kind, bundle_contains_verified_receipt_node_id, parse_graph,
     parse_signed_artifact, require_node, TrustMarketEvidenceRole,
 };
+use pass_eligibility::evaluate_pass_reputation_eligibility;
 use policy::parse_policy;
 
 #[derive(Debug, Clone)]
@@ -76,9 +89,54 @@ pub struct TrustMarketVerifierSections {
     pub selected_provider_subject: String,
 }
 
+/// A fully verified trust-market context plus the Pass portable-reputation
+/// eligibility view derived from the same single verification spine.
+struct VerifiedTrustMarket {
+    report: TrustMarketVerifierReport,
+    pass_eligibility: PassReputationEligibility,
+}
+
+/// Verify the trust-market context of a transaction proof bundle.
+///
+/// Runs the full provider-admission/selection chain (discovery -> selection ->
+/// scorecard, reputation import, SLA, risk, collateral, guarantee, jurisdiction)
+/// and yields the verifier report. This is a thin view over the single
+/// verification spine in [`verify_trust_market_context_inner`].
+///
+/// # Errors
+///
+/// Propagates the fail-closed claim/signature/digest errors raised anywhere in the
+/// trust-market chain.
 pub fn verify_trust_market_context(
     bundle: &TrustMarketBundle,
 ) -> Result<TrustMarketVerifierReport, TransactionPassportError> {
+    Ok(verify_trust_market_context_inner(bundle)?.report)
+}
+
+/// Verify the trust-market context and return the Pass portable-reputation
+/// eligibility bound to it.
+///
+/// Eligibility is NOT computed on a parallel path: it is produced by the same
+/// spine [`verify_trust_market_context`] uses, and only after the reputation
+/// import clears [`artifacts::validate_reputation_import`] and the selection binds
+/// the passport/order/discovery ids. The returned [`PassReputationEligibility`]
+/// carries the policy-capped reputation weight and the tier reconciled from the
+/// scorecard `computed_score`; it can never express collateral or solvency.
+///
+/// # Errors
+///
+/// Propagates every fail-closed error of [`verify_trust_market_context`], plus the
+/// reputation-import refusals (overweight, untrusted issuer, non-`scoring_input`
+/// usage) and the trust-tier reconciliation range errors.
+pub fn evaluate_pass_eligibility(
+    bundle: &TrustMarketBundle,
+) -> Result<PassReputationEligibility, TransactionPassportError> {
+    Ok(verify_trust_market_context_inner(bundle)?.pass_eligibility)
+}
+
+fn verify_trust_market_context_inner(
+    bundle: &TrustMarketBundle,
+) -> Result<VerifiedTrustMarket, TransactionPassportError> {
     let signed_evidence_graph_bytes = bundle
         .root_evidence_graph_bytes
         .as_deref()
@@ -169,7 +227,14 @@ pub fn verify_trust_market_context(
     validate_discovery(&bundle.passport, &discovery)?;
     push_claim_once(&mut verified_claims, CLAIM_DISCOVERY_BOUND);
 
-    validate_reputation_import(
+    // Route Pass portable-reputation eligibility through the shipped
+    // provider-admission reputation gate: this is the SAME validate_reputation_import
+    // gate the chain already enforced, reused here (not re-derived) so the
+    // eligibility view cannot diverge from what the substrate admitted. The tier is
+    // reconciled from the scorecard computed_score that selection binds below.
+    let pass_eligibility = evaluate_pass_reputation_eligibility(
+        &discovery,
+        &selection,
         &reputation_import,
         &scorecard,
         policy.max_reputation_import_weight,
@@ -225,7 +290,7 @@ pub fn verify_trust_market_context(
 
     ensure_required_claims_verified(&policy.required_claims, &verified_claims)?;
 
-    Ok(TrustMarketVerifierReport {
+    let report = TrustMarketVerifierReport {
         schema: TRANSACTION_VERIFIER_REPORT_SCHEMA_ID.to_string(),
         id: format!("trust-market-verifier-report-{}", bundle.passport.id),
         issued_at: bundle.passport.issued_at.clone(),
@@ -248,6 +313,11 @@ pub fn verify_trust_market_context(
             slash_authority_ref: collateral.slash_authority_ref,
             selected_provider_subject: selection.selected_provider_subject,
         },
+    };
+
+    Ok(VerifiedTrustMarket {
+        report,
+        pass_eligibility,
     })
 }
 

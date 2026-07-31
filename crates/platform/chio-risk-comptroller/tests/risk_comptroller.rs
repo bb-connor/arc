@@ -865,3 +865,110 @@ fn report_allows_closed_facility_when_open_appeal_blocks_different_action() {
     validate_risk_report(&passport, &report)
         .test_expect("non-closure appeal must not block facility closure");
 }
+
+// A claim-payout report that `validate_risk_report` accepts and that
+// `validate_risk_portfolio_reports` aggregates cleanly. Each freetier:global
+// pool-isolation test injects exactly one pool-namespaced id into a copy of this
+// known-good report so the exclusion guard is the sole cause of rejection.
+fn valid_claim_payout_report() -> serde_json::Value {
+    let mut report = enterprise_risk_report_value("open-appeal-claim-payout");
+    report["facility"]["capital_units"] = serde_json::json!(12_000);
+    report["coverage"]["covered_claim_ids"] = serde_json::json!(["claim-enterprise-valid"]);
+    report["reconciliation"]["consumed_reserve_units"] = serde_json::json!(500);
+    report["reconciliation"]["payout_units"] = serde_json::json!(500);
+    report["reconciliation"]["settlement_units"] = serde_json::json!(500);
+    report["reserve_ledger"][0]["units"] = serde_json::json!(500);
+    report["appeals"][0]["status"] = serde_json::json!("resolved");
+    set_claim_payout_capital_instruction(&mut report);
+    report
+}
+
+#[test]
+fn reserve_view_rejects_freetier_global_pool_reserve_account() {
+    // The Sybil-ceiling pool is never capital, so it can never be the facility
+    // reserve account in the single-report reserve view.
+    let passport = enterprise_passport("valid-autonomous-commerce");
+    let mut report = enterprise_risk_report_value("valid-autonomous-commerce");
+    report["facility"]["reserve_ref"] = serde_json::json!("freetier:global:2026-06");
+
+    let report: RiskComptrollerReport =
+        serde_json::from_value(report).test_expect("risk report reparses");
+    let error = validate_risk_report(&passport, &report)
+        .test_expect_err("freetier:global pool term must never be a reserve account");
+    assert!(
+        error.to_string().contains("freetier:global pool namespace"),
+        "got {error}"
+    );
+}
+
+#[test]
+fn reserve_view_excludes_freetier_global_pool_reserve_ledger_claim() {
+    let passport = enterprise_passport("open-appeal-claim-payout");
+    let base = valid_claim_payout_report();
+
+    // Sanity: with no pool term, the reserve view accepts the report.
+    let clean: RiskComptrollerReport =
+        serde_json::from_value(base.clone()).test_expect("base risk report reparses");
+    validate_risk_report(&passport, &clean).test_expect("base risk report is a valid reserve view");
+
+    // Inject the current-window pool term as the reserve-ledger claim and keep
+    // every cross-reference consistent so the freetier guard is the sole cause.
+    let pool_term = "freetier:global:2026-06";
+    let mut report = base;
+    report["reserve_ledger"][0]["claim_id"] = serde_json::json!(pool_term);
+    report["coverage"]["covered_claim_ids"] = serde_json::json!([pool_term]);
+    report["appeals"][0]["claim_id"] = serde_json::json!(pool_term);
+    report["capital_instructions"][0]["claim_id"] = serde_json::json!(pool_term);
+
+    let report: RiskComptrollerReport =
+        serde_json::from_value(report).test_expect("risk report reparses");
+    let error = validate_risk_report(&passport, &report)
+        .test_expect_err("freetier:global pool term must never be counted as a reserve hold");
+    assert!(
+        error.to_string().contains("freetier:global pool namespace"),
+        "got {error}"
+    );
+}
+
+#[test]
+fn capital_book_rejects_freetier_global_pool_instruction_order() {
+    // The custodial capital book must never carry a pool-namespaced order.
+    let passport = enterprise_passport("open-appeal-claim-payout");
+    let mut report = valid_claim_payout_report();
+    report["capital_instructions"][0]["order_id"] = serde_json::json!("freetier:global:2026-06");
+
+    let report: RiskComptrollerReport =
+        serde_json::from_value(report).test_expect("risk report reparses");
+    let error = validate_risk_report(&passport, &report)
+        .test_expect_err("freetier:global pool term must never be a capital instruction order");
+    assert!(
+        error.to_string().contains("freetier:global pool namespace"),
+        "got {error}"
+    );
+}
+
+#[test]
+fn portfolio_aggregate_excludes_retained_prior_month_freetier_pool_row() {
+    let base = valid_claim_payout_report();
+
+    // The clean portfolio aggregates the real reserve without complaint.
+    let clean: RiskComptrollerReport =
+        serde_json::from_value(base.clone()).test_expect("base risk report reparses");
+    validate_risk_portfolio_reports(std::slice::from_ref(&clean))
+        .test_expect("clean portfolio aggregates");
+
+    // A RETAINED PRIOR-MONTH pool term leaking in as a reserve-ledger reserve_ref
+    // must be excluded from the aggregate budget/reserve projection, never summed
+    // as real reserve.
+    let mut report = base;
+    report["reserve_ledger"][0]["reserve_ref"] = serde_json::json!("freetier:global:2026-05");
+
+    let report: RiskComptrollerReport =
+        serde_json::from_value(report).test_expect("risk report reparses");
+    let error = validate_risk_portfolio_reports(std::slice::from_ref(&report))
+        .test_expect_err("retained prior-month pool row must never aggregate as reserve");
+    assert!(
+        error.to_string().contains("freetier:global pool namespace"),
+        "got {error}"
+    );
+}

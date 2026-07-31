@@ -119,7 +119,7 @@ mod cli_env_tests {
     ///
     /// The release binary parses argv on the process main thread (8 MiB
     /// stack); the libtest harness runs each test on a worker thread with a
-    /// ~2 MiB stack, which the monomorphised clap parser for the 24-variant
+    /// ~2 MiB stack, which the monomorphised clap parser for the 25-variant
     /// `Commands` enum overflows. Driving the parse through an 8 MiB worker
     /// mirrors the production main-thread stack without changing the CLI
     /// surface. Process env vars are shared across threads, so clap's `env`
@@ -353,6 +353,25 @@ pub(crate) enum Commands {
         command: PassportCommands,
     },
 
+    /// Issue, refresh, and anchor the portable Chio Pass reputation credential.
+    ///
+    /// The Chio Pass is a soulbound, portable reputation credential (NOT a
+    /// passport): it gifts a metered free-tier allotment plus baseline gifted
+    /// stream reads to one attested `did:chio`. These subcommands drive the
+    /// board-approved control-plane orchestrator (the launch governance
+    /// surface) end to end:
+    ///
+    /// - `issue` mints the first-window credential and its deterministic
+    ///   `chiopass:<hash>` window-scoped capability.
+    /// - `refresh` sizes the next monthly window from the prior window's
+    ///   genuine-use scan (renew / dormant / not-reattested).
+    /// - `anchor` folds issued and revoked Pass digests into a prepared
+    ///   (un-broadcast) read-only on-chain root publication.
+    Pass {
+        #[command(subcommand)]
+        command: PassCommands,
+    },
+
     /// Verify proof bundles and Transaction Passport artifacts.
     Proof {
         #[command(subcommand)]
@@ -570,6 +589,197 @@ pub(crate) enum Commands {
         /// the banner short.
         #[arg(long, default_value_t = false)]
         print_config: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum PassCommands {
+    /// Mint the first-window Chio Pass reputation credential for one subject.
+    ///
+    /// Loads the board-approved launch governance surface
+    /// (`ChioPassConfig::launch_default`) and calls the control-plane
+    /// issuance entrypoint. The minted capability id is the deterministic
+    /// `chiopass:<hash>` window-scoped id (subject + window only), so the same
+    /// subject re-minted inside the same monthly window maps to a single budget
+    /// row. The per-window distribution counters are sourced from the revocation
+    /// oracle (`--revocation-db`), never recomputed at the entrypoint.
+    Issue {
+        /// Subject Ed25519 public key in hex. The Pass is soulbound to the
+        /// `did:chio` derived from this key.
+        #[arg(long)]
+        subject_public_key: String,
+
+        /// Attested trust tier governing the allotment SIZE only (never
+        /// existence): one of unverified, attested, verified, premier.
+        #[arg(long, default_value = "attested")]
+        tier: String,
+
+        /// UTC instant (Unix seconds) selecting the monthly attestation window.
+        /// Defaults to now.
+        #[arg(long)]
+        now: Option<u64>,
+
+        /// Trusted kernel signing key (hex) pinned into the genuine-use
+        /// allowlist (registry RR2-TM-01). Repeatable and REQUIRED: at least one
+        /// must be supplied (the local authority key is never trusted as a
+        /// kernel key).
+        #[arg(long = "accepted-kernel-key")]
+        accepted_kernel_key: Vec<String>,
+
+        /// Optional path to write the minted, signed Chio Pass credential JSON
+        /// to. The written file is the issued-Pass artifact `chio pass anchor`
+        /// consumes via `--issued-pass`.
+        #[arg(long = "out-pass")]
+        out_pass: Option<PathBuf>,
+
+        /// Optional path to write the minted window-scoped capability token JSON
+        /// to.
+        #[arg(long = "out-capability")]
+        out_capability: Option<PathBuf>,
+    },
+
+    /// Roll a Pass forward into its next monthly window from genuine use.
+    ///
+    /// Scans the prior window's genuine-use receipts (`--receipt-db`) via the
+    /// control-plane refresh entrypoint and sizes the next window: renewed at
+    /// tier size, withheld-dormant (zero allotment, baseline reads persist), or
+    /// not-reattested (nothing minted).
+    Refresh {
+        /// Subject Ed25519 public key in hex.
+        #[arg(long)]
+        subject_public_key: String,
+
+        /// Attested trust tier governing the next-window allotment SIZE.
+        #[arg(long, default_value = "attested")]
+        tier: String,
+
+        /// UTC instant (Unix seconds) inside the PRIOR window. The next window is
+        /// the contiguous monthly rollover. Defaults to now.
+        #[arg(long)]
+        now: Option<u64>,
+
+        /// Optional UTC instant (Unix seconds) INSIDE the EXPIRING (prior) window
+        /// the refresh renews. The wall-clock `now` alone cannot identify the
+        /// expiring window at or just after a month boundary (it already lands in
+        /// the NEW window), so pin the expiring window explicitly here; the minted
+        /// next window is its contiguous monthly rollover. When omitted, the prior
+        /// window is derived from `now` only when `now` is unambiguously inside a
+        /// window's interior; a run within the rollover boundary fails closed and
+        /// requires this flag.
+        #[arg(long = "prior-window-at")]
+        prior_window_at: Option<u64>,
+
+        /// Operator intent to re-attest at rollover. The verdict is NOT trusted
+        /// from this flag alone: it is only honored when a fresh nonce-bound
+        /// `--reattestation-proof` presentation response is supplied and verifies
+        /// for this subject. When the flag is set without a verifying proof the
+        /// refresh fails closed.
+        #[arg(long, default_value_t = false)]
+        reattested: bool,
+
+        /// Signed passport presentation-response JSON file proving a fresh
+        /// rollover re-attestation challenge was answered by this subject. The CLI
+        /// verifies it (nonce-bound, time-windowed, subject-bound) and derives the
+        /// re-attestation verdict from the verified result, never from the bare
+        /// `--reattested` flag.
+        #[arg(long = "reattestation-proof")]
+        reattestation_proof: Option<PathBuf>,
+
+        /// Optional expected presentation-challenge JSON file the
+        /// `--reattestation-proof` MUST answer. When supplied, the response is
+        /// pinned to this exact challenge (nonce binding); when omitted, the
+        /// response's self-contained challenge is verified for freshness.
+        #[arg(long = "reattestation-challenge")]
+        reattestation_challenge: Option<PathBuf>,
+
+        /// Trusted kernel signing key (hex) pinned into the genuine-use
+        /// allowlist (registry RR2-TM-01). Repeatable. When omitted, the local
+        /// authority key is used as the trust anchor.
+        #[arg(long = "accepted-kernel-key")]
+        accepted_kernel_key: Vec<String>,
+
+        /// Optional path to write the refreshed, signed Chio Pass credential JSON
+        /// to (renewed/dormant outcomes only). The written file is the issued-Pass
+        /// artifact `chio pass anchor` consumes via `--issued-pass`.
+        #[arg(long = "out-pass")]
+        out_pass: Option<PathBuf>,
+
+        /// Optional path to write the refreshed window-scoped capability token JSON
+        /// to (renewed/dormant outcomes only).
+        #[arg(long = "out-capability")]
+        out_capability: Option<PathBuf>,
+    },
+
+    /// Prepare (do NOT broadcast) the read-only Pass anchoring root publication.
+    ///
+    /// Folds the issued and revoked Pass digests into one anchorable Merkle root
+    /// plus inclusion proofs, wraps it in a kernel checkpoint, and prepares the
+    /// on-chain root-publication call data. Value-free: nothing moves on-chain.
+    Anchor {
+        /// Issued Chio Pass credential JSON file. Repeatable.
+        #[arg(long = "issued-pass")]
+        issued_pass: Vec<PathBuf>,
+
+        /// Revoked Pass lifecycle-record JSON file. Repeatable. Each entry MUST be
+        /// paired BY POSITION with a `--revoked-pass` original credential that
+        /// proves its passport_id.
+        #[arg(long = "revoked-record")]
+        revoked_record: Vec<PathBuf>,
+
+        /// Original signed Chio Pass credential JSON for a `--revoked-record`
+        /// entry, paired BY POSITION. The revoked leaf's passport_id is proven by
+        /// recomputing the Pass artifact id from this credential (and verifying its
+        /// issuer signature), so a hand-written revoked record carrying a
+        /// fabricated passport_id is rejected before anchoring. Repeatable; the
+        /// count MUST equal the `--revoked-record` count.
+        #[arg(long = "revoked-pass")]
+        revoked_pass: Vec<PathBuf>,
+
+        /// Trusted Pass-issuer DID (`did:chio`) whose issued Passes may be folded
+        /// into the anchor batch. Repeatable. The operator's own DID (derived from
+        /// the signing seed) is ALWAYS trusted; pin additional issuers here to
+        /// anchor Passes issued by a distinct trusted authority. A Pass issued by
+        /// any other DID is rejected before anchoring (fail-closed), so an operator
+        /// cannot publish a membership root over foreign or self-issued Passes.
+        #[arg(long = "trusted-pass-issuer")]
+        trusted_pass_issuer: Vec<String>,
+
+        /// Anchor-purpose signed Web3 identity binding JSON file.
+        #[arg(long)]
+        binding: PathBuf,
+
+        /// EVM anchor target JSON file (chain id, contract, operator addresses).
+        #[arg(long)]
+        target: PathBuf,
+
+        /// Public-witness descriptor JSON file for the anchor batch.
+        #[arg(long)]
+        witness: PathBuf,
+
+        /// Batch issuance timestamp in Unix seconds. Defaults to now.
+        #[arg(long)]
+        issued_at: Option<u64>,
+
+        /// Optional previous kernel-checkpoint JSON file for the per-operator
+        /// sequence chain. Omit for the genesis batch (checkpoint_seq 0).
+        #[arg(long = "previous-checkpoint")]
+        previous_checkpoint: Option<PathBuf>,
+
+        /// Optional path to write the signed RFC6962 anchor batch JSON (its
+        /// `tree_root` and one inclusion proof per anchored digest) so the
+        /// prepared root can be broadcast and inclusion later verified.
+        #[arg(long = "out-batch")]
+        out_batch: Option<PathBuf>,
+
+        /// Optional path to write the kernel checkpoint JSON wrapping the anchor
+        /// batch tree root under the operator's checkpoint sequence.
+        #[arg(long = "out-checkpoint")]
+        out_checkpoint: Option<PathBuf>,
+
+        /// Optional path to write the prepared (un-broadcast) EVM root-publication
+        /// call data JSON bound to the anchor-purpose identity binding.
+        #[arg(long = "out-publication")]
+        out_publication: Option<PathBuf>,
     },
 }
 

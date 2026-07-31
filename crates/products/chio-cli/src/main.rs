@@ -27,6 +27,7 @@ mod guard;
 mod guards;
 mod lineage;
 mod market;
+mod pass;
 mod passport;
 mod policies;
 mod scaffold;
@@ -94,8 +95,9 @@ pub(crate) use types_cli::{
     ChioAttestCommands, ChioBuyerCommands, ChioFederationCommands, ChioRuntimeQuoteCommands,
     ChioSupplyChainCommands, Cli, Commands, CommerceCommands, ConformanceCommands, DidCommands,
     EvidenceCommands, EvidenceFederationPolicyCommands, GuardBlocklistCommands, GuardCommands,
-    GuardMarketCommands, LineageCommands, McpCommands, OutputFormat, PassportChallengeCommands,
-    PassportCommands, PassportIssuanceCommands, PassportOid4vpCommands, PassportPolicyCommands,
+    GuardMarketCommands, LineageCommands, McpCommands, OutputFormat, PassCommands,
+    PassportChallengeCommands, PassportCommands, PassportIssuanceCommands, PassportOid4vpCommands,
+    PassportPolicyCommands,
     PassportStatusCommands, ProofCollectKind, ProofCommands, ProofDoctorScenario,
     ProofExportRedactProfile, ProofFixtureCommands, ProofVerifyRequirement,
     ReceiptCheckpointCommands, ReceiptCommands, ReplayArgs, ReplaySubcommand, ReputationCommands,

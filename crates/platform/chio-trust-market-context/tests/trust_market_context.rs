@@ -4,8 +4,14 @@ use chio_core_types::Keypair;
 use chio_test_support::prelude::*;
 use serde_json::{json, Value};
 
+use chio_core_types::PublicKey;
 use chio_transaction_passport::TransactionPassport;
-use chio_trust_market_context::{verify_trust_market_context, TrustMarketBundle};
+use chio_trust_market_context::{
+    evaluate_pass_eligibility, reconcile_claimed_pass_trust_tier, reconcile_pass_trust_tier,
+    resolve_rr2_tm_01_kernel_keys, verify_trust_market_context, MarketAuthorityRegistry,
+    MarketAuthorityRegistryError, MarketAuthorityRotationEpoch, TrustMarketBundle, TrustTier,
+    RR2_TM_01_REGISTRY_REF,
+};
 
 const CLAIM_DISCOVERY_BOUND: &str = "claim.trust_market.provider_discovery_bound";
 const CLAIM_SELECTION_BOUND: &str = "claim.trust_market.provider_selection_bound";
@@ -37,6 +43,10 @@ enum TrustMarketCase {
     GlobalScorecardScope,
     ScoreRecomputeMismatch,
     ReputationImportOverweight,
+    ReputationImportClaimsSolvency,
+    SelectionPassportMismatch,
+    SelectionOrderMismatch,
+    SelectionDiscoveryMismatch,
     ScorecardPortableReputationOverweight,
     SlaWrongOrder,
     SlaPerformanceMetricMismatch,
@@ -398,6 +408,13 @@ fn trust_market_bundle(case: TrustMarketCase) -> TrustMarketBundle {
         scorecard,
     );
 
+    // ELIGIBILITY != SOLVENCY: a reputation import that declares a
+    // collateral/solvency usage must be refused by the substrate gate; portable
+    // reputation may only ever be a scoring input.
+    let reputation_usage = match case {
+        TrustMarketCase::ReputationImportClaimsSolvency => "collateral_attestation",
+        _ => "scoring_input",
+    };
     let reputation_import = signed_market_artifact_bytes(json!({
         "schema": "chio.trust.reputation-import-report.v1",
         "id": "reputation-import-trust-market-valid",
@@ -417,7 +434,7 @@ fn trust_market_bundle(case: TrustMarketCase) -> TrustMarketBundle {
             30
         },
         "import_verdict": "accepted",
-        "usage": "scoring_input",
+        "usage": reputation_usage,
         "signature": "sig-reputation-import-valid"
     }));
     push_artifact(
@@ -1026,13 +1043,28 @@ fn trust_market_bundle(case: TrustMarketCase) -> TrustMarketBundle {
             }
         ]),
     };
+    // Selection binds three substrate ids: passport_id, order_id and
+    // discovery_snapshot_ref. Each can be desynchronised independently to prove the
+    // binding is enforced fail-closed.
+    let selection_passport_id = match case {
+        TrustMarketCase::SelectionPassportMismatch => "passport-trust-market-other".to_string(),
+        _ => passport.id.clone(),
+    };
+    let selection_order_id = match case {
+        TrustMarketCase::SelectionOrderMismatch => "order-commerce-other",
+        _ => "order-commerce-001",
+    };
+    let selection_discovery_ref = match case {
+        TrustMarketCase::SelectionDiscoveryMismatch => "discovery-trust-market-other",
+        _ => "discovery-trust-market-valid",
+    };
     let selection = signed_market_artifact_bytes(json!({
         "schema": "chio.commerce.provider-selection-report.v1",
         "id": "selection-trust-market-valid",
         "issued_at": selection_issued_at,
-        "passport_id": passport.id,
-        "order_id": "order-commerce-001",
-        "discovery_snapshot_ref": "discovery-trust-market-valid",
+        "passport_id": selection_passport_id,
+        "order_id": selection_order_id,
+        "discovery_snapshot_ref": selection_discovery_ref,
         "selected_provider_subject": absent_selected_provider,
         "ranking_policy_ref": "ranking-policy-market-valid",
         "scorecard_ref": "scorecard-trust-market-valid",
@@ -1938,6 +1970,516 @@ fn trust_market_rejects_untrusted_risk_sanction_jurisdiction_receipt() {
 
     assert!(
         error.contains("risk market slash jurisdiction missing"),
+        "{error}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// RR2-TM-01 market-authority registry resolver
+//
+// The pinned RR2-TM-01 registry is the provenance for both the Pass
+// `accepted_kernel_keys` and the commerce-proof market-authority trust roots.
+// The resolver yields the kernel-key set for the active rotation epoch; the
+// trust-market verifier then signature-checks every commerce receipt and claim
+// against exactly that pinned set.
+// ---------------------------------------------------------------------------
+
+const ROTATION_EPOCH_BEFORE: u64 = 41;
+const ROTATION_EPOCH_AFTER: u64 = 42;
+
+/// The market-authority key the valid-fixture artifacts are signed under. In the
+/// rotation tests this is the key pinned for [`ROTATION_EPOCH_BEFORE`].
+fn rotated_out_kernel_keypair() -> Keypair {
+    market_authority_keypair()
+}
+
+/// A distinct market-authority key pinned for [`ROTATION_EPOCH_AFTER`]; no
+/// fixture artifact is signed under it, so it stands in for the post-rotation
+/// key set that the rotated-out key is no longer a member of.
+fn rotated_in_kernel_keypair() -> Keypair {
+    Keypair::from_seed(&[61; 32])
+}
+
+/// Pin a single-epoch RR2-TM-01 registry to the supplied kernel keys.
+fn pinned_registry(epoch: u64, kernel_keys: Vec<PublicKey>) -> MarketAuthorityRegistry {
+    MarketAuthorityRegistry::pin(vec![MarketAuthorityRotationEpoch::new(epoch, kernel_keys)])
+        .test_expect("single-epoch RR2-TM-01 registry pins")
+}
+
+/// Pin the two-epoch RR2-TM-01 rotation registry used by the rotation tests:
+/// epoch BEFORE pins the fixture market-authority key, epoch AFTER rotates it out
+/// for a fresh key.
+fn rotation_registry() -> MarketAuthorityRegistry {
+    MarketAuthorityRegistry::pin(vec![
+        MarketAuthorityRotationEpoch::new(
+            ROTATION_EPOCH_BEFORE,
+            vec![rotated_out_kernel_keypair().public_key()],
+        ),
+        MarketAuthorityRotationEpoch::new(
+            ROTATION_EPOCH_AFTER,
+            vec![rotated_in_kernel_keypair().public_key()],
+        ),
+    ])
+    .test_expect("two-epoch RR2-TM-01 rotation registry pins")
+}
+
+/// Rebind the trust-market authority key set the bundle verifies against to the
+/// resolved RR2-TM-01 set, mirroring the verifier-policy mutation pattern used by
+/// `trust_market_bundle_with_required_claim`. This makes the verified trust roots
+/// the RR2-TM-01 resolver output rather than the fixture's ad-hoc default.
+fn rebind_market_authority_keys(bundle: &mut TrustMarketBundle, keys: &[PublicKey]) {
+    let mut policy: Value =
+        serde_json::from_slice(&bundle.verifier_policy_bytes).test_expect("verifier policy parses");
+    policy["trusted_market_authority_keys"] =
+        Value::Array(keys.iter().map(|key| Value::String(key.to_hex())).collect());
+    bundle.verifier_policy_bytes = json_bytes(policy);
+    bundle.passport.verifier_policy_sha256 =
+        chio_core_types::sha256_hex(&bundle.verifier_policy_bytes);
+    sign_transaction_passport(&mut bundle.passport);
+    bundle.trusted_market_authority_keys = keys.to_vec();
+}
+
+/// Tamper a trust-market artifact's bytes WITHOUT recomputing the evidence-graph
+/// node digest or passport digests, so the only thing that changes is the
+/// artifact payload. The digest binding must reject it. Contrast with
+/// `update_trust_market_artifact`, which deliberately rebinds the digests.
+fn tamper_artifact_without_rebinding_digest(bundle: &mut TrustMarketBundle, path: &str) {
+    let bytes = bundle
+        .artifacts
+        .get(path)
+        .test_expect("trust-market artifact exists");
+    let mut value: Value =
+        serde_json::from_slice(bytes).test_expect("trust-market artifact parses");
+    let original_id = value["id"]
+        .as_str()
+        .test_expect("trust-market artifact has an id")
+        .to_string();
+    value["id"] = Value::String(format!("{original_id}-tampered"));
+    bundle.artifacts.insert(path.to_string(), json_bytes(value));
+}
+
+#[test]
+fn rr2_tm_01_resolver_pins_kernel_keys_per_rotation_epoch() {
+    let registry = rotation_registry();
+
+    assert_eq!(registry.registry_ref(), RR2_TM_01_REGISTRY_REF);
+    assert_eq!(registry.registry_ref(), "RR2-TM-01");
+    assert_eq!(registry.latest_epoch(), ROTATION_EPOCH_AFTER);
+
+    let before = resolve_rr2_tm_01_kernel_keys(&registry, ROTATION_EPOCH_BEFORE)
+        .test_expect("epoch BEFORE resolves");
+    assert_eq!(before, vec![rotated_out_kernel_keypair().public_key()]);
+
+    let after = resolve_rr2_tm_01_kernel_keys(&registry, ROTATION_EPOCH_AFTER)
+        .test_expect("epoch AFTER resolves");
+    assert_eq!(after, vec![rotated_in_kernel_keypair().public_key()]);
+
+    // The rotated-out key is not a member of the post-rotation pinned set.
+    assert!(!after.contains(&rotated_out_kernel_keypair().public_key()));
+}
+
+#[test]
+fn rr2_tm_01_resolver_rejects_unknown_active_epoch() {
+    let registry = rotation_registry();
+
+    let error = resolve_rr2_tm_01_kernel_keys(&registry, 999)
+        .test_expect_err("an unpinned active epoch must fail closed");
+
+    assert_eq!(
+        error,
+        MarketAuthorityRegistryError::UnknownActiveEpoch { active_epoch: 999 }
+    );
+    assert!(error
+        .to_string()
+        .contains("active rotation epoch 999 is not pinned"));
+}
+
+#[test]
+fn rr2_tm_01_registry_rejects_empty_registry() {
+    let error = MarketAuthorityRegistry::pin(Vec::new())
+        .test_expect_err("an empty RR2-TM-01 registry must fail closed");
+
+    assert_eq!(error, MarketAuthorityRegistryError::EmptyRegistry);
+}
+
+#[test]
+fn rr2_tm_01_registry_rejects_empty_epoch_key_set() {
+    let error = MarketAuthorityRegistry::pin(vec![MarketAuthorityRotationEpoch::new(
+        ROTATION_EPOCH_BEFORE,
+        Vec::new(),
+    )])
+    .test_expect_err("an epoch pinning no kernel key must fail closed");
+
+    assert_eq!(
+        error,
+        MarketAuthorityRegistryError::EmptyEpochKeySet {
+            epoch: ROTATION_EPOCH_BEFORE
+        }
+    );
+}
+
+#[test]
+fn rr2_tm_01_registry_rejects_non_ascending_epochs() {
+    let error = MarketAuthorityRegistry::pin(vec![
+        MarketAuthorityRotationEpoch::new(
+            ROTATION_EPOCH_AFTER,
+            vec![rotated_in_kernel_keypair().public_key()],
+        ),
+        MarketAuthorityRotationEpoch::new(
+            ROTATION_EPOCH_BEFORE,
+            vec![rotated_out_kernel_keypair().public_key()],
+        ),
+    ])
+    .test_expect_err("non-ascending rotation epochs must fail closed");
+
+    assert_eq!(
+        error,
+        MarketAuthorityRegistryError::NonAscendingEpochs {
+            previous: ROTATION_EPOCH_AFTER,
+            found: ROTATION_EPOCH_BEFORE,
+        }
+    );
+}
+
+#[test]
+fn rr2_tm_01_registry_rejects_duplicate_kernel_key() {
+    let key = rotated_out_kernel_keypair().public_key();
+    let error = MarketAuthorityRegistry::pin(vec![MarketAuthorityRotationEpoch::new(
+        ROTATION_EPOCH_BEFORE,
+        vec![key.clone(), key],
+    )])
+    .test_expect_err("a repeated kernel key must fail closed");
+
+    assert_eq!(
+        error,
+        MarketAuthorityRegistryError::DuplicateKernelKey {
+            epoch: ROTATION_EPOCH_BEFORE
+        }
+    );
+}
+
+#[test]
+fn trust_market_verifies_under_rr2_tm_01_pinned_kernel_key() {
+    // The resolved RR2-TM-01 set is the key the fixture artifacts are signed
+    // under, so verification against the pinned provenance succeeds.
+    let registry = pinned_registry(
+        ROTATION_EPOCH_BEFORE,
+        vec![market_authority_keypair().public_key()],
+    );
+    let pinned = resolve_rr2_tm_01_kernel_keys(&registry, ROTATION_EPOCH_BEFORE)
+        .test_expect("pinned kernel keys resolve");
+
+    let mut bundle = trust_market_bundle(TrustMarketCase::Valid);
+    rebind_market_authority_keys(&mut bundle, &pinned);
+
+    let report = verify_trust_market_context(&bundle)
+        .test_expect("commerce proof verifies under the RR2-TM-01 pinned key");
+    assert_eq!(report.verdict, "verified");
+}
+
+#[test]
+fn trust_market_rejects_receipt_signed_by_non_pinned_kernel_key() {
+    // A selection-override receipt self-signed by a kernel key outside the pinned
+    // RR2-TM-01 set must fail the signature check fail-closed, even though the
+    // bundle's verified trust roots are the resolver output.
+    let registry = pinned_registry(
+        ROTATION_EPOCH_BEFORE,
+        vec![market_authority_keypair().public_key()],
+    );
+    let pinned = resolve_rr2_tm_01_kernel_keys(&registry, ROTATION_EPOCH_BEFORE)
+        .test_expect("pinned kernel keys resolve");
+
+    let mut bundle = trust_market_bundle(TrustMarketCase::LowerRankOverrideReceiptUntrustedSigner);
+    rebind_market_authority_keys(&mut bundle, &pinned);
+
+    let error = verify_trust_market_context(&bundle)
+        .test_expect_err("a receipt under a non-pinned kernel key must fail closed");
+    assert!(error
+        .to_string()
+        .contains("selection override receipt missing"));
+}
+
+#[test]
+fn trust_market_rejects_kernel_key_rotated_out_after_rotation() {
+    let registry = rotation_registry();
+
+    // Before rotation: the fixture key is pinned, so its self-signed commerce
+    // proofs verify.
+    let before = resolve_rr2_tm_01_kernel_keys(&registry, ROTATION_EPOCH_BEFORE)
+        .test_expect("epoch BEFORE resolves");
+    let mut accepted = trust_market_bundle(TrustMarketCase::Valid);
+    rebind_market_authority_keys(&mut accepted, &before);
+    let report = verify_trust_market_context(&accepted)
+        .test_expect("commerce proof verifies in the epoch that pins its signer");
+    assert_eq!(report.verdict, "verified");
+
+    // After rotation: the same key is rotated out of the active pinned set, so
+    // the very same commerce proofs are rejected fail-closed.
+    let after = resolve_rr2_tm_01_kernel_keys(&registry, ROTATION_EPOCH_AFTER)
+        .test_expect("epoch AFTER resolves");
+    assert!(!after.contains(&rotated_out_kernel_keypair().public_key()));
+    let mut rejected = trust_market_bundle(TrustMarketCase::Valid);
+    rebind_market_authority_keys(&mut rejected, &after);
+    let error = verify_trust_market_context(&rejected)
+        .test_expect_err("a rotated-out kernel key must be rejected after rotation");
+    assert!(
+        error
+            .to_string()
+            .contains("trust-market artifact signature invalid"),
+        "{error}"
+    );
+}
+
+#[test]
+fn trust_market_provider_assertions_are_digest_bound_into_order_context() {
+    // The four provider trust assertions (passport verdict, portable reputation
+    // scorecard, federation admission, runtime appraisal) are surfaced into the
+    // verified order context only after signature-and-digest binding.
+    let report = verify_trust_market_context(&trust_market_bundle(TrustMarketCase::Valid))
+        .test_expect("commerce proof verifies");
+    let sections = &report.trust_market_sections;
+
+    // Passport verdict: the selected provider and its selection report.
+    assert_eq!(
+        sections.provider_selection_report_ref,
+        "selection-trust-market-valid"
+    );
+    assert_eq!(
+        sections.selected_provider_subject,
+        "did:chio:provider-alpha"
+    );
+    // Portable reputation scorecard.
+    assert_eq!(sections.trust_scorecard_ref, "scorecard-trust-market-valid");
+    // Federation admission (portable reputation import).
+    assert_eq!(
+        sections.reputation_import_ref,
+        "reputation-import-trust-market-valid"
+    );
+    // Runtime appraisal (risk comptroller report).
+    assert_eq!(
+        sections.risk_comptroller_report_ref,
+        "risk-comptroller-market-valid"
+    );
+}
+
+#[test]
+fn trust_market_rejects_tampered_provider_assertion_digest() {
+    // Tampering any bound provider assertion without rebinding its evidence-graph
+    // digest is rejected, proving the assertions are digest-bound into the order
+    // context before exposure and settlement.
+    for path in [
+        "provider-selection-report.json",
+        "trust-scorecard-snapshot.json",
+        "reputation-import-report.json",
+        "risk-comptroller-report.json",
+    ] {
+        let mut bundle = trust_market_bundle(TrustMarketCase::Valid);
+        tamper_artifact_without_rebinding_digest(&mut bundle, path);
+
+        let error = verify_trust_market_context(&bundle)
+            .test_expect_err("a tampered provider assertion must break its digest binding");
+        assert!(
+            error.to_string().contains("digest mismatch"),
+            "{path}: {error}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pass portable-reputation eligibility + trust-tier reconciliation
+//
+// Pass eligibility is bound to the SAME provider-admission substrate the
+// marketplace verifies: it routes through validate_reputation_import (no parallel
+// admission path, no second authority) and reconciles the coarse Pass TrustTier
+// from the same scorecard computed_score that selection binds into the order
+// context. Portable reputation can never become a collateral/solvency claim.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pass_eligibility_routes_through_substrate_and_carries_no_solvency() {
+    // The valid fixture is a trusted issuer's accepted import at the policy weight
+    // cap (the highest portable reputation the policy admits). Eligibility is
+    // granted only because validate_reputation_import passed inside the single
+    // verification spine, and it exposes the capped weight + reconciled tier -
+    // structurally never any capital, collateral or solvency field.
+    let eligibility = evaluate_pass_eligibility(&trust_market_bundle(TrustMarketCase::Valid))
+        .test_expect("valid fixture yields Pass eligibility");
+
+    assert_eq!(eligibility.subject, "did:chio:provider-alpha");
+    // Eligibility is bound to the same three selection ids verified by the chain.
+    assert_eq!(eligibility.order_id, "order-commerce-001");
+    assert_eq!(
+        eligibility.discovery_snapshot_ref,
+        "discovery-trust-market-valid"
+    );
+    assert_eq!(
+        eligibility.selection_report_ref,
+        "selection-trust-market-valid"
+    );
+    // The weight is the policy-capped portable-reputation weight (30), never a
+    // capital amount.
+    assert_eq!(eligibility.capped_local_weight, 30);
+    // computed_score 92 over [0,100] projects to 920 on the 0..=1000 compliance
+    // scale, which is Premier with no behavioral anomaly.
+    assert_eq!(eligibility.reconciled_trust_tier, TrustTier::Premier);
+}
+
+#[test]
+fn pass_eligibility_rejects_reputation_import_claiming_solvency() {
+    // ELIGIBILITY != SOLVENCY. A reputation import that declares a
+    // collateral/solvency usage is refused by the shipped substrate gate, so even
+    // a top-reputation subject cannot turn portable reputation into a solvency
+    // claim. Both the eligibility entry and the full chain reject it fail-closed.
+    let eligibility_error = evaluate_pass_eligibility(&trust_market_bundle(
+        TrustMarketCase::ReputationImportClaimsSolvency,
+    ))
+    .test_expect_err("portable reputation must not confer a solvency claim");
+    assert!(
+        eligibility_error
+            .to_string()
+            .contains("reputation import cannot prove collateral or solvency"),
+        "{eligibility_error}"
+    );
+
+    let chain_error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::ReputationImportClaimsSolvency,
+    ))
+    .test_expect_err("the trust-market chain must also reject a solvency-claiming import");
+    assert!(
+        chain_error
+            .to_string()
+            .contains("reputation import cannot prove collateral or solvency"),
+        "{chain_error}"
+    );
+}
+
+#[test]
+fn pass_eligibility_routes_through_reputation_weight_cap() {
+    // Proves eligibility is gated by validate_reputation_import: an over-cap
+    // portable-reputation weight is rejected through the eligibility entry, not
+    // only through the marketplace chain.
+    let error = evaluate_pass_eligibility(&trust_market_bundle(
+        TrustMarketCase::ReputationImportOverweight,
+    ))
+    .test_expect_err("an over-cap reputation weight must deny eligibility");
+    assert!(
+        error
+            .to_string()
+            .contains("reputation import local weight exceeds policy"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pass_trust_tier_reconciles_each_computed_score_band() {
+    // Over [0,100], computed_score projects onto the 0..=1000 Pass compliance
+    // scale and reuses the canonical synthesize_trust_tier, so each band maps to
+    // the expected Pass tier deterministically (the two tier notions cannot fork).
+    assert_eq!(
+        reconcile_pass_trust_tier(20, 0, 100, false).test_expect("Unverified band reconciles"),
+        TrustTier::Unverified
+    );
+    assert_eq!(
+        reconcile_pass_trust_tier(50, 0, 100, false).test_expect("Attested band reconciles"),
+        TrustTier::Attested
+    );
+    assert_eq!(
+        reconcile_pass_trust_tier(80, 0, 100, false).test_expect("Verified band reconciles"),
+        TrustTier::Verified
+    );
+    assert_eq!(
+        reconcile_pass_trust_tier(95, 0, 100, false).test_expect("Premier band reconciles"),
+        TrustTier::Premier
+    );
+    // A behavioral anomaly blocks the jump to Premier even at a top score.
+    assert_eq!(
+        reconcile_pass_trust_tier(95, 0, 100, true).test_expect("anomaly blocks Premier"),
+        TrustTier::Verified
+    );
+}
+
+#[test]
+fn pass_trust_tier_reconciliation_rejects_forked_claim_fail_closed() {
+    // computed_score 50 over [0,100] reconciles to Attested; a matching claim is
+    // honoured.
+    let reconciled = reconcile_claimed_pass_trust_tier(50, 0, 100, false, TrustTier::Attested)
+        .test_expect("a matching tier claim reconciles");
+    assert_eq!(reconciled, TrustTier::Attested);
+
+    // A Pass that claims Premier on a score that only supports Attested forks the
+    // scorecard and is rejected fail-closed.
+    let error = reconcile_claimed_pass_trust_tier(50, 0, 100, false, TrustTier::Premier)
+        .test_expect_err("a forked tier claim must be rejected fail-closed");
+    assert!(
+        error.to_string().contains("forks scorecard computed score"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pass_trust_tier_reconciliation_rejects_out_of_range_score() {
+    let error = reconcile_pass_trust_tier(101, 0, 100, false)
+        .test_expect_err("a score outside the scorecard range must fail closed");
+    assert!(error.to_string().contains("outside range"), "{error}");
+
+    let degenerate = reconcile_pass_trust_tier(0, 100, 100, false)
+        .test_expect_err("a degenerate scorecard range must fail closed");
+    assert!(
+        degenerate.to_string().contains("range is invalid"),
+        "{degenerate}"
+    );
+}
+
+#[test]
+fn trust_market_selection_binds_passport_order_discovery_ids() {
+    // The accepted selection binds all three substrate ids; the verified report
+    // surfaces the selection together with its discovery/order context.
+    let report = verify_trust_market_context(&trust_market_bundle(TrustMarketCase::Valid))
+        .test_expect("valid selection binds the three ids");
+
+    assert_eq!(report.passport_id, "passport-trust-market-valid");
+    assert_eq!(
+        report.trust_market_sections.provider_discovery_snapshot_ref,
+        "discovery-trust-market-valid"
+    );
+    assert_eq!(
+        report.trust_market_sections.provider_selection_report_ref,
+        "selection-trust-market-valid"
+    );
+}
+
+#[test]
+fn trust_market_rejects_selection_passport_id_mismatch() {
+    let error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::SelectionPassportMismatch,
+    ))
+    .test_expect_err("selection passport id must match the bundle passport");
+    assert!(
+        error.to_string().contains("selection passport mismatch"),
+        "{error}"
+    );
+}
+
+#[test]
+fn trust_market_rejects_selection_order_id_mismatch() {
+    let error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::SelectionOrderMismatch,
+    ))
+    .test_expect_err("selection order id must match the discovery order");
+    assert!(
+        error.to_string().contains("selection order mismatch"),
+        "{error}"
+    );
+}
+
+#[test]
+fn trust_market_rejects_selection_discovery_ref_mismatch() {
+    let error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::SelectionDiscoveryMismatch,
+    ))
+    .test_expect_err("selection discovery ref must match the discovery snapshot id");
+    assert!(
+        error.to_string().contains("selection discovery mismatch"),
         "{error}"
     );
 }

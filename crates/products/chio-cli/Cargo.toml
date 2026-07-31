@@ -20,6 +20,7 @@ path = "src/bin/chio.rs"
 
 [dependencies]
 async-trait = { workspace = true }
+chio-anchor = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-arena = { workspace = true }
 chio-api-protect = { workspace = true }

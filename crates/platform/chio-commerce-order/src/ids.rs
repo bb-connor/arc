@@ -10,3 +10,4 @@ pub const COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID: &str = "chio.commerce.reputati
 pub const COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID: &str =
     "chio.commerce.federation-trust-bundle.v1";
 pub const COMMERCE_ORDER_PASSPORT_SCHEMA_ID: &str = "chio.commerce.order-passport.v1";
+pub const COMMERCE_ESCROW_LEDGER_SCHEMA_ID: &str = "chio.commerce.escrow-ledger.v1";

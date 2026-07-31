@@ -4,6 +4,18 @@ use crate::capability::scope::MonetaryAmount;
 use crate::error::AutonomyContractError;
 use crate::model::*;
 
+/// Validate an autonomous pricing input artifact against its schema and invariants.
+///
+/// # Errors
+///
+/// Returns [`AutonomyContractError::UnsupportedSchema`] for a schema mismatch,
+/// [`AutonomyContractError::MissingField`] when a required identifier or the
+/// evidence-reference list is empty, [`AutonomyContractError::DuplicateValue`]
+/// when an evidence reference id repeats, [`AutonomyContractError::UnknownReference`]
+/// when a required evidence kind is absent (or loss/web3-settlement state lacks
+/// its backing evidence), and [`AutonomyContractError::InvalidDecision`] when a
+/// numeric or currency invariant fails (mismatched currency, zero history window,
+/// reputation above 10000, or zero available capital).
 pub fn validate_autonomous_pricing_input(
     input: &AutonomousPricingInputArtifact,
 ) -> Result<(), AutonomyContractError> {
@@ -92,6 +104,18 @@ pub fn validate_autonomous_pricing_input(
     Ok(())
 }
 
+/// Validate an autonomous pricing authority envelope against its schema and invariants.
+///
+/// # Errors
+///
+/// Returns [`AutonomyContractError::UnsupportedSchema`] for a schema mismatch,
+/// [`AutonomyContractError::MissingField`] for empty required fields or lists,
+/// [`AutonomyContractError::DuplicateValue`] for repeated permitted actions or
+/// authority-chain references, [`AutonomyContractError::InvalidDecision`] for an
+/// invalid currency code or non-positive amount, and
+/// [`AutonomyContractError::InvalidEnvelope`] for violated envelope invariants
+/// (currency mismatch, rate-change or daily-decision bounds, premium review
+/// threshold rules, time ordering, or permitting bind outside active automation).
 pub fn validate_autonomous_pricing_authority_envelope(
     envelope: &AutonomousPricingAuthorityEnvelopeArtifact,
 ) -> Result<(), AutonomyContractError> {

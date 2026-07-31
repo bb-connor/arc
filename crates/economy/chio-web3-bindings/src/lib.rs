@@ -16,22 +16,32 @@ pub use interfaces::{
     IChioRootRegistry,
 };
 
+/// Bundled interface ABI JSON for the `IChioRootRegistry` contract.
 pub const CHIO_ROOT_REGISTRY_INTERFACE_ARTIFACT: &str =
     include_str!("../artifacts/interfaces/IChioRootRegistry.json");
+/// Bundled interface ABI JSON for the `IChioIdentityRegistry` contract.
 pub const CHIO_IDENTITY_REGISTRY_INTERFACE_ARTIFACT: &str =
     include_str!("../artifacts/interfaces/IChioIdentityRegistry.json");
+/// Bundled interface ABI JSON for the `IChioEscrow` contract.
 pub const CHIO_ESCROW_INTERFACE_ARTIFACT: &str =
     include_str!("../artifacts/interfaces/IChioEscrow.json");
+/// Bundled interface ABI JSON for the `IChioBondVault` contract.
 pub const CHIO_BOND_VAULT_INTERFACE_ARTIFACT: &str =
     include_str!("../artifacts/interfaces/IChioBondVault.json");
+/// Bundled interface ABI JSON for the `IChioPriceResolver` contract.
 pub const CHIO_PRICE_RESOLVER_INTERFACE_ARTIFACT: &str =
     include_str!("../artifacts/interfaces/IChioPriceResolver.json");
 
+/// Bundled implementation artifact (ABI plus bytecode) for `ChioRootRegistry`.
 pub const CHIO_ROOT_REGISTRY_ARTIFACT: &str = include_str!("../artifacts/ChioRootRegistry.json");
+/// Bundled implementation artifact (ABI plus bytecode) for `ChioIdentityRegistry`.
 pub const CHIO_IDENTITY_REGISTRY_ARTIFACT: &str =
     include_str!("../artifacts/ChioIdentityRegistry.json");
+/// Bundled implementation artifact (ABI plus bytecode) for `ChioEscrow`.
 pub const CHIO_ESCROW_ARTIFACT: &str = include_str!("../artifacts/ChioEscrow.json");
+/// Bundled implementation artifact (ABI plus bytecode) for `ChioBondVault`.
 pub const CHIO_BOND_VAULT_ARTIFACT: &str = include_str!("../artifacts/ChioBondVault.json");
+/// Bundled implementation artifact (ABI plus bytecode) for `ChioPriceResolver`.
 pub const CHIO_PRICE_RESOLVER_ARTIFACT: &str = include_str!("../artifacts/ChioPriceResolver.json");
 
 /// Historical local-devnet deployment fixture for parser and integration tests.
