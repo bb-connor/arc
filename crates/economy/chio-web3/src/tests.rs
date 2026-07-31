@@ -67,6 +67,12 @@ use serde_json::json;
 use std::collections::BTreeSet;
 
 mod anchor_versioning;
+mod key_fixtures;
+
+use key_fixtures::{
+    beneficiary_keypair, custodian_keypair, operator_keypair, oracle_keypair,
+    settlement_bundle_keypair, treasury_keypair,
+};
 
 const SAMPLE_ROOT_REGISTRY_RUNTIME_CODEHASH: &str =
     "0xfc5d76d87b02096c6ae32ce644a2b98ca0bdf3c56700ad16731fad2062e6bd7f";
@@ -76,30 +82,6 @@ const SAMPLE_ESCROW_RUNTIME_CODEHASH: &str =
     "0x03d8f545c330922a33db6473430c50eafd527e04474f31abee2dc1f8c6ab2d36";
 const SAMPLE_BOND_VAULT_RUNTIME_CODEHASH: &str =
     "0x17f7936469584b38404765ac44bd7e2384337983e4bc6448a3500d0637711f09";
-
-fn operator_keypair() -> Keypair {
-    Keypair::from_seed(&[7u8; 32])
-}
-
-fn treasury_keypair() -> Keypair {
-    Keypair::from_seed(&[9u8; 32])
-}
-
-fn custodian_keypair() -> Keypair {
-    Keypair::from_seed(&[11u8; 32])
-}
-
-fn beneficiary_keypair() -> Keypair {
-    Keypair::from_seed(&[13u8; 32])
-}
-
-fn oracle_keypair() -> Keypair {
-    Keypair::from_seed(&[15u8; 32])
-}
-
-fn settlement_bundle_keypair() -> Keypair {
-    treasury_keypair()
-}
 
 fn signed_identity_binding(
     signer: Keypair,

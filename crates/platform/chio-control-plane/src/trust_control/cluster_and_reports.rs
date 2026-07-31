@@ -20,6 +20,10 @@ mod cluster_and_reports_tests {
     mod snapshot_budget_authority;
     #[path = "structured_authority.rs"]
     mod structured_authority;
+    #[path = "test_paths.rs"]
+    mod test_paths;
+
+    use test_paths::unique_temp_path;
 
     fn base_config() -> TrustServiceConfig {
         TrustServiceConfig {
@@ -105,14 +109,6 @@ mod cluster_and_reports_tests {
             update_peer_state(&state, peer, |peer| peer.force_snapshot = false);
         }
         state
-    }
-
-    fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .test_unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
     }
 
     fn sample_tool_receipt(id: &str, capability_id: &str) -> ChioReceipt {
