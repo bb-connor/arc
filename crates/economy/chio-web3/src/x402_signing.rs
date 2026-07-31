@@ -270,7 +270,8 @@ fn enforce_x402_prepare_only_testnet_gate(
 /// non-empty. The VERIFIER, however, accepts an externally supplied body and must
 /// NOT trust those invariants to hold: a hand-built body signed by a trusted kernel
 /// key could carry an empty `attestation_id`, `bundle_id`,
-/// `transaction_passport_id`, `settlement_reference`, or `verifier_report_digest`
+/// `transaction_passport_id`, `settlement_reference`, `settlement_tx_hash`,
+/// `anchor_tx_hash`, or `verifier_report_digest`
 /// (and the other recompute-derived identifiers) and still pass schema, flag, chain,
 /// key, and signature checks. [`prepare_x402_broadcast_intent`] would then emit an
 /// intent carrying those empty identifiers. Re-running the field invariants here -
@@ -297,6 +298,20 @@ fn check_x402_attestation_body_invariants(
     ensure_non_empty(
         &body.settlement_reference,
         "x402_settlement_attestation.settlement_reference",
+    )?;
+    // The settlement and anchor tx hashes bind the attestation to the on-chain
+    // settlement and anchoring transactions. The signer derives both from the
+    // recomputed report (whose own invariants guarantee them non-empty), but the
+    // verifier accepts an externally supplied body, so a hand-built signed body
+    // could carry either blank and still attest a settlement not tied to any
+    // settlement/anchor tx. Re-check them non-empty here, fail-closed.
+    ensure_non_empty(
+        &body.settlement_tx_hash,
+        "x402_settlement_attestation.settlement_tx_hash",
+    )?;
+    ensure_non_empty(
+        &body.anchor_tx_hash,
+        "x402_settlement_attestation.anchor_tx_hash",
     )?;
     ensure_non_empty(
         &body.registry_root,

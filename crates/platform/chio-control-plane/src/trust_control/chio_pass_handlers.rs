@@ -922,15 +922,18 @@ pub enum PassProofPanelVerdict {
 /// publication envelope was validated against, a tampered proof set produces both a
 /// `Tampered` verdict AND a different seal (tamper-evident).
 ///
-/// The committed target (`chain_id` + root-registry `contract_address`) is the
-/// load-bearing cross-binding for the publication ENVELOPE: the recompute validates
-/// the publication against the `expected_target` supplied to [`Self::project`], but
-/// that target is a caller input. Committing it in the panel body and the seal makes
-/// it tamper-evident AND visible, and [`Self::verify_seal`] takes the trusted,
-/// registered target and rejects a panel sealed against any other target. Without
-/// this, a panel sealed against a caller-supplied target that matched a tampered
-/// publication would be indistinguishable from one sealed against the registered
-/// root-registry target.
+/// The committed target (`chain_id`, root-registry `contract_address`, operator
+/// address, AND publisher address) is the load-bearing cross-binding for the
+/// publication ENVELOPE: the recompute validates the publication against the
+/// `expected_target` supplied to [`Self::project`], but that target is a caller
+/// input. Committing every field the recompute bound the publication to (not just
+/// the chain id and contract address, but also the operator and publisher
+/// addresses) in the panel body and the seal makes it tamper-evident AND visible,
+/// and [`Self::verify_seal`] takes the trusted, registered target and rejects a
+/// panel sealed against any other target. Without this, a panel sealed against a
+/// caller-supplied target that matched a tampered publication (for example one
+/// sharing the registry contract but naming a different operator) would be
+/// indistinguishable from one sealed against the registered root-registry target.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SealedPassProofPanel {
     rows: Vec<PassProofPanelRow>,
@@ -945,6 +948,15 @@ pub struct SealedPassProofPanel {
     /// The root-registry contract address of that trusted anchor target. Committed
     /// in the seal alongside [`Self::target_chain_id`].
     target_contract_address: String,
+    /// The operator address of that trusted anchor target. The recompute binds the
+    /// publication's `operator_address` to this target, so it is committed in the
+    /// seal alongside the chain id and contract address: without it a panel could
+    /// be projected against a caller-supplied target sharing the registry contract
+    /// but naming a DIFFERENT operator, then verify against the registered target.
+    target_operator_address: String,
+    /// The publisher (broadcast sender) address of that trusted anchor target,
+    /// committed in the seal for the same reason as [`Self::target_operator_address`].
+    target_publisher_address: String,
     issued_count: usize,
     revoked_count: usize,
     verdict: PassProofPanelVerdict,
@@ -983,6 +995,8 @@ impl SealedPassProofPanel {
             &prepared.publication.merkle_root,
             &expected_target.chain_id,
             &expected_target.contract_address,
+            &expected_target.operator_address,
+            &expected_target.publisher_address,
             prepared.issued_count,
             recompute.revoked_count,
             &recompute.verdict,
@@ -995,6 +1009,8 @@ impl SealedPassProofPanel {
             publication_root: prepared.publication.merkle_root,
             target_chain_id: expected_target.chain_id.clone(),
             target_contract_address: expected_target.contract_address.clone(),
+            target_operator_address: expected_target.operator_address.clone(),
+            target_publisher_address: expected_target.publisher_address.clone(),
             issued_count: prepared.issued_count,
             revoked_count: recompute.revoked_count,
             verdict: recompute.verdict,
@@ -1056,6 +1072,18 @@ impl SealedPassProofPanel {
         &self.target_contract_address
     }
 
+    /// The operator address this panel was sealed against.
+    #[must_use]
+    pub fn target_operator_address(&self) -> &str {
+        &self.target_operator_address
+    }
+
+    /// The publisher (broadcast sender) address this panel was sealed against.
+    #[must_use]
+    pub fn target_publisher_address(&self) -> &str {
+        &self.target_publisher_address
+    }
+
     /// Tamper-evidence + target cross-binding check: recompute the seal digest over
     /// this panel's own recomputed body (rows, roots, counts, verdict, AND the
     /// committed target) and confirm it equals the bound seal, THEN confirm the
@@ -1082,12 +1110,21 @@ impl SealedPassProofPanel {
             &self.publication_root,
             &self.target_chain_id,
             &self.target_contract_address,
+            &self.target_operator_address,
+            &self.target_publisher_address,
             self.issued_count,
             self.revoked_count,
             &self.verdict,
         )?;
+        // Cross-bind EVERY envelope field the recompute validated the publication
+        // against, not just the chain id and contract address. A panel projected
+        // against a caller-supplied target that shared the registry contract but
+        // named a different operator/publisher would otherwise verify against the
+        // registered target. Fail closed on any mismatch.
         let target_matches = self.target_chain_id == expected_target.chain_id
-            && self.target_contract_address == expected_target.contract_address;
+            && self.target_contract_address == expected_target.contract_address
+            && self.target_operator_address == expected_target.operator_address
+            && self.target_publisher_address == expected_target.publisher_address;
         Ok(recomputed == self.seal && target_matches)
     }
 }
@@ -1316,6 +1353,8 @@ struct PassProofPanelSealBody<'a> {
     publication_root: &'a Hash,
     target_chain_id: &'a str,
     target_contract_address: &'a str,
+    target_operator_address: &'a str,
+    target_publisher_address: &'a str,
     issued_count: usize,
     revoked_count: usize,
     rows: &'a [PassProofPanelRow],
@@ -1334,6 +1373,8 @@ fn seal_digest_for(
     publication_root: &Hash,
     target_chain_id: &str,
     target_contract_address: &str,
+    target_operator_address: &str,
+    target_publisher_address: &str,
     issued_count: usize,
     revoked_count: usize,
     verdict: &PassProofPanelVerdict,
@@ -1346,6 +1387,8 @@ fn seal_digest_for(
         publication_root,
         target_chain_id,
         target_contract_address,
+        target_operator_address,
+        target_publisher_address,
         issued_count,
         revoked_count,
         rows,
@@ -2259,13 +2302,24 @@ mod tests {
         operator: &Keypair,
         purpose: Vec<Web3KeyBindingPurpose>,
     ) -> SignedWeb3IdentityBinding {
+        operator_binding_with_settlement(operator, purpose, EVM_OPERATOR_ADDRESS)
+    }
+
+    /// Like [`operator_binding`], but lets a test bind the operator identity to a
+    /// `settlement_address` other than the default, so a publication can be prepared
+    /// for an operator address that differs from the registered target.
+    fn operator_binding_with_settlement(
+        operator: &Keypair,
+        purpose: Vec<Web3KeyBindingPurpose>,
+        settlement_address: &str,
+    ) -> SignedWeb3IdentityBinding {
         let certificate = Web3IdentityBindingCertificate {
             schema: CHIO_KEY_BINDING_CERTIFICATE_SCHEMA.to_string(),
             chio_identity: "did:chio:pass-anchor-operator".to_string(),
             chio_public_key: operator.public_key(),
             chain_scope: vec![EVM_CHAIN_ID.to_string()],
             purpose,
-            settlement_address: EVM_OPERATOR_ADDRESS.to_string(),
+            settlement_address: settlement_address.to_string(),
             issued_at: 1_775_100_000,
             expires_at: 1_775_200_000,
             nonce: "pass-anchor-bind-001".to_string(),
@@ -3176,6 +3230,15 @@ mod tests {
     /// revocation digest is the committed Pass artifact id), so the panel has both
     /// issuance and revocation inclusion proofs to seal.
     fn prepared_two_issued_one_revoked() -> PreparedPassAnchorPublication {
+        prepared_two_issued_one_revoked_for(&anchor_target())
+    }
+
+    /// Prepare the two-issued one-revoked publication against an arbitrary anchor
+    /// `target`, binding the operator identity to that target's operator address so
+    /// the publication's envelope (operator + publisher) is the supplied target's.
+    fn prepared_two_issued_one_revoked_for(
+        target: &EvmAnchorTarget,
+    ) -> PreparedPassAnchorPublication {
         let operator = Keypair::generate();
         let pass_a = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
         let pass_b = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
@@ -3183,11 +3246,15 @@ mod tests {
         let revoked_c =
             revoke_chio_pass_record(&pass_c, MID_JUNE_2026 + 5, "superseded".to_string())
                 .expect("revoke pass_c");
-        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        let binding = operator_binding_with_settlement(
+            &operator,
+            vec![Web3KeyBindingPurpose::Anchor],
+            &target.operator_address,
+        );
         prepare_pass_anchor_publication(
             &operator,
             &binding,
-            &anchor_target(),
+            target,
             &[pass_a, pass_b],
             std::slice::from_ref(&revoked_c),
             pending_witness(),
@@ -3464,6 +3531,68 @@ mod tests {
                 .verify_seal(&registered)
                 .expect("verify mutated target"),
             "swapping the committed target after sealing breaks the seal",
+        );
+    }
+
+    /// The seal commits the OPERATOR
+    /// and PUBLISHER addresses the recompute validated the publication envelope
+    /// against, not just the chain id and registry contract, and `verify_seal`
+    /// cross-binds them. A panel projected against a caller-supplied target that
+    /// shares the registry contract and chain but names a DIFFERENT operator or
+    /// publisher therefore no longer verifies against the registered target.
+    #[test]
+    fn sealed_pass_proof_panel_binds_operator_and_publisher_to_seal() {
+        const ATTACKER_ADDRESS: &str = "0x3000000000000000000000000000000000000003";
+        let registered = anchor_target();
+
+        // (a) Genuine publisher substitution. The publisher (broadcast `from`) is NOT
+        // encoded in the ABI call_data and is not tied to the operator binding, so an
+        // attacker can prepare a publication broadcast from a DIFFERENT publisher and
+        // project it against a target naming that publisher. The recompute matches
+        // (publication publisher == supplied target publisher) so the panel SEALS, but
+        // the committed publisher records the attacker address; verify_seal against the
+        // registered target fails closed.
+        let mut publisher_target = anchor_target();
+        publisher_target.publisher_address = ATTACKER_ADDRESS.to_string();
+        let publisher_prepared = prepared_two_issued_one_revoked_for(&publisher_target);
+        let publisher_panel = SealedPassProofPanel::project(&publisher_prepared, &publisher_target)
+            .expect("project publisher-substituted panel");
+        assert!(
+            publisher_panel.is_sealed(),
+            "the publication matches the attacker publisher target so the recompute seals",
+        );
+        assert_eq!(publisher_panel.target_publisher_address(), ATTACKER_ADDRESS);
+        assert!(
+            publisher_panel
+                .verify_seal(&publisher_target)
+                .expect("verify against attacker publisher target"),
+            "the panel verifies against the target it was sealed against",
+        );
+        assert!(
+            !publisher_panel
+                .verify_seal(&registered)
+                .expect("verify publisher-substituted against registered target"),
+            "a panel sealed against a different publisher must not verify against the registered target",
+        );
+
+        // (b) Genuine operator substitution. The operator must match the binding's
+        // settlement address, so the attacker prepares with a binding bound to the
+        // attacker operator and projects against a target naming it. The recompute
+        // seals, but the committed operator records the attacker address; verify_seal
+        // against the registered target fails closed.
+        let mut operator_target = anchor_target();
+        operator_target.operator_address = ATTACKER_ADDRESS.to_string();
+        operator_target.publisher_address = ATTACKER_ADDRESS.to_string();
+        let operator_prepared = prepared_two_issued_one_revoked_for(&operator_target);
+        let operator_panel = SealedPassProofPanel::project(&operator_prepared, &operator_target)
+            .expect("project operator-substituted panel");
+        assert!(operator_panel.is_sealed());
+        assert_eq!(operator_panel.target_operator_address(), ATTACKER_ADDRESS);
+        assert!(
+            !operator_panel
+                .verify_seal(&registered)
+                .expect("verify operator-substituted against registered target"),
+            "a panel sealed against a different operator must not verify against the registered target",
         );
     }
 

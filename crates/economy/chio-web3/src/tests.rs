@@ -3286,6 +3286,57 @@ fn x402_verify_rejects_signed_body_with_empty_required_field() {
     );
 }
 
+/// The settlement and anchor tx hashes
+/// bind the attestation to the on-chain settlement/anchoring transactions. The
+/// signer derives both from the recomputed report, but a hand-built body signed by
+/// a trusted kernel key with either blank would otherwise pass verification and let
+/// a consumer accept an attestation not tied to the settlement/anchor tx. Both must
+/// be re-checked non-empty by the verifier, fail-closed.
+#[test]
+fn x402_verify_rejects_signed_body_with_empty_settlement_or_anchor_tx_hash() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+    // Sanity: the genuine recompute-built attestation carries both tx hashes and
+    // verifies.
+    assert!(!attestation.body.settlement_tx_hash.is_empty());
+    assert!(!attestation.body.anchor_tx_hash.is_empty());
+    verify_x402_settlement_attestation(&attestation, &trust).unwrap();
+
+    for field in ["settlement_tx_hash", "anchor_tx_hash"] {
+        // Hand-build a body with the tx hash blanked and re-sign it with the SAME
+        // trusted kernel key, so every other check (schema, flags, chain gate,
+        // trusted key, signature) passes: only the re-run body-field invariants can
+        // catch the empty tx hash.
+        let mut body = attestation.body.clone();
+        match field {
+            "settlement_tx_hash" => body.settlement_tx_hash = String::new(),
+            _ => body.anchor_tx_hash = String::new(),
+        }
+        let (signature, _) = kernel.sign_canonical(&body).unwrap();
+        let forged = crate::x402_signing::X402SignedSettlementAttestation { body, signature };
+        assert!(
+            matches!(
+                verify_x402_settlement_attestation(&forged, &trust),
+                Err(Web3ContractError::MissingField(missing)) if missing.contains(field)
+            ),
+            "verifier must reject an empty {field}"
+        );
+        // The downstream broadcast-intent path re-verifies, so it is closed too.
+        assert!(
+            prepare_x402_broadcast_intent(&forged, &trust, "x402-intent-1", 1_743_293_950).is_err()
+        );
+    }
+}
+
 /// Testnet-gated, fail-closed. A mainnet chain (here Base mainnet) is
 /// rejected by the prepare-only signing path even when the proof itself would
 /// recompute and the chain is allow-listed.

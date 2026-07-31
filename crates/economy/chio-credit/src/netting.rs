@@ -86,6 +86,13 @@ pub enum ExposureLedgerNettingError {
     /// rather than measure a netting benefit the single-denomination book cannot
     /// produce; callers must aggregate a currency's positions into one row first.
     DuplicateCurrency { currency: String },
+    /// The supplied conversion-rate table carried more than one row for the same
+    /// currency. A first-match lookup would make the collapse ORDER-DEPENDENT (a
+    /// row at `1/2` ahead of one at `2/1` understates exposure, the reverse order
+    /// overstates it), so the rate selection refuses an ambiguous table
+    /// (fail-closed) rather than silently pick whichever row sorts first; callers
+    /// must supply at most one rate per currency.
+    DuplicateRate { currency: String },
     /// The exposure ledger report this collapse would net was produced from a
     /// PAGINATED query that hit its receipt or decision limit: its `summary`
     /// flags `truncated_receipts` or `truncated_decisions`, so its per-currency
@@ -135,6 +142,10 @@ impl fmt::Display for ExposureLedgerNettingError {
             Self::DuplicateCurrency { currency } => write!(
                 f,
                 "exposure ledger netting rejected duplicate position rows for currency `{currency}`; aggregate a currency's positions into one row before collapsing"
+            ),
+            Self::DuplicateRate { currency } => write!(
+                f,
+                "exposure ledger netting rejected duplicate conversion-rate rows for currency `{currency}`; supply at most one rate per currency"
             ),
             Self::TruncatedSource {
                 truncated_receipts,
@@ -271,22 +282,45 @@ impl ExposureLedgerNettingRates {
     /// The canonical currency and USD are pinned one-to-one (the USD/USDC pin):
     /// for those currencies an explicit override is honored ONLY when it is
     /// itself a parity rate, otherwise the collapse fails closed rather than let
-    /// a `1/2` (or any non-parity) override halve canonical exposure. For any
-    /// other currency an explicit rate wins; absent that, the collapse fails
-    /// closed.
+    /// a `1/2` (or any non-parity) override halve canonical exposure. The pin
+    /// recognizes the currency by its CANONICAL (trimmed, uppercase) spelling, so
+    /// a public/deserialized position carrying `usd` or a padded `USD ` cannot
+    /// slip past the pin and be converted with a caller-supplied non-parity rate.
+    /// For any other currency an explicit rate wins; absent that, the collapse
+    /// fails closed.
     ///
     /// # Errors
     ///
-    /// Returns [`ExposureLedgerNettingError::PinnedParityOverride`] when a pinned
-    /// currency is given a non-parity override, and
+    /// Returns [`ExposureLedgerNettingError::DuplicateRate`] when the rate table
+    /// carries more than one row for this currency (a first-match lookup would be
+    /// order-dependent), [`ExposureLedgerNettingError::PinnedParityOverride`] when
+    /// a pinned currency is given a non-parity override, and
     /// [`ExposureLedgerNettingError::MissingRate`] when no rate is known for a
     /// non-parity currency.
     pub fn rate_for(
         &self,
         currency: &str,
     ) -> Result<CanonicalConversionRate, ExposureLedgerNettingError> {
-        let is_pinned_parity = currency == CANONICAL_NETTING_CURRENCY || currency == "USD";
-        if let Some(rate) = self.rates.iter().find(|rate| rate.currency == currency) {
+        // Canonicalize before the pin check. The USD/USDC pin recognizes the
+        // canonical uppercase codes; trimming and uppercasing folds non-canonical
+        // spellings (`usd`, a padded `USD `) onto the pinned set so the pin cannot
+        // be bypassed by case or surrounding whitespace and the position converted
+        // with a non-parity rate (which would, e.g., collapse 100 -> 50).
+        let canonical = currency.trim().to_ascii_uppercase();
+        let is_pinned_parity = canonical == CANONICAL_NETTING_CURRENCY || canonical == "USD";
+        // Fail closed on a rate table carrying more than one row for this currency:
+        // a first-match lookup would make the collapse ORDER-DEPENDENT (a row at
+        // `1/2` ahead of one at `2/1` understates exposure), so reject the ambiguous
+        // table rather than silently pick whichever row sorts first. Mirrors the
+        // duplicate-position-row rejection in the collapse.
+        let mut matching = self.rates.iter().filter(|rate| rate.currency == currency);
+        let selected = matching.next();
+        if matching.next().is_some() {
+            return Err(ExposureLedgerNettingError::DuplicateRate {
+                currency: currency.to_string(),
+            });
+        }
+        if let Some(rate) = selected {
             // The USD/USDC pin takes precedence: a non-parity override for a
             // pinned currency is rejected before it can understate the netted
             // view, never accepted ahead of the pinned identity rate.
@@ -1359,6 +1393,89 @@ mod tests {
             eur_at_1_1().rate_for("EUR").unwrap().convert(10).unwrap(),
             11
         );
+    }
+
+    /// A rate table carrying two rows for the same
+    /// currency is rejected fail-closed. A first-match lookup would make the
+    /// collapse ORDER-DEPENDENT - EUR at `1/2` ahead of EUR at `2/1` understates
+    /// exposure, the reverse overstates it - so the lookup refuses the ambiguous
+    /// table rather than silently pick whichever row sorts first.
+    #[test]
+    fn duplicate_currency_rate_rows_are_rejected_fail_closed() {
+        let ambiguous = ExposureLedgerNettingRates::new(vec![
+            CanonicalConversionRate {
+                currency: "EUR".to_string(),
+                numerator: 1,
+                denominator: 2,
+            },
+            CanonicalConversionRate {
+                currency: "EUR".to_string(),
+                numerator: 2,
+                denominator: 1,
+            },
+        ]);
+        assert_eq!(
+            ambiguous.rate_for("EUR").unwrap_err(),
+            ExposureLedgerNettingError::DuplicateRate {
+                currency: "EUR".to_string()
+            }
+        );
+        // The collapse fails closed rather than netting at whichever row sorts
+        // first, regardless of the position's exposure.
+        let pos = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            ..position("EUR")
+        };
+        assert_eq!(
+            collapse_positions_to_canonical(&[pos], &ambiguous).unwrap_err(),
+            ExposureLedgerNettingError::DuplicateRate {
+                currency: "EUR".to_string()
+            }
+        );
+    }
+
+    /// A public/deserialized position carrying a
+    /// non-canonical USD spelling (`usd` or a padded `USD `) cannot bypass the
+    /// USD/USDC parity pin. Canonicalizing the currency before the pin check folds
+    /// those spellings onto the pinned set, so a caller-supplied non-parity rate is
+    /// rejected and an absent rate falls back to the one-to-one identity, never a
+    /// `1/2` that would collapse 100 -> 50.
+    #[test]
+    fn non_canonical_usd_spelling_cannot_bypass_the_parity_pin() {
+        for spelling in ["usd", "USD ", " usd", "Usd"] {
+            // A non-parity override keyed under the same non-canonical spelling is
+            // rejected by the pin, not honored as an arbitrary currency rate.
+            let halving = ExposureLedgerNettingRates::new(vec![CanonicalConversionRate {
+                currency: spelling.to_string(),
+                numerator: 1,
+                denominator: 2,
+            }]);
+            assert_eq!(
+                halving.rate_for(spelling).unwrap_err(),
+                ExposureLedgerNettingError::PinnedParityOverride {
+                    currency: spelling.to_string()
+                },
+                "non-canonical USD spelling `{spelling}` must hit the parity pin"
+            );
+            let pos = ExposureLedgerCurrencyPosition {
+                reserved_units: 100,
+                ..position(spelling)
+            };
+            assert_eq!(
+                collapse_positions_to_canonical(std::slice::from_ref(&pos), &halving).unwrap_err(),
+                ExposureLedgerNettingError::PinnedParityOverride {
+                    currency: spelling.to_string()
+                }
+            );
+            // With no supplied rate the pin falls back to one-to-one parity, so the
+            // 100 reserved units convert to 100 canonical units (never halved).
+            let view = collapse_positions_to_canonical(
+                std::slice::from_ref(&pos),
+                &ExposureLedgerNettingRates::default(),
+            )
+            .unwrap();
+            assert_eq!(view.netted_position.reserved_units, 100);
+        }
     }
 
     /// The recovery channel rounds DOWN so the net-loss channel
