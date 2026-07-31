@@ -924,16 +924,31 @@ pub fn accept(
 /// the same pinned escrow digest as the acceptance, so a Matched observation can
 /// never be replayed across orders or escrows.
 ///
-/// Fails closed when the acceptance bindings do not re-derive, when the advanced
-/// context is not bound to the locked order/escrow, when the reconciled state is
-/// not [`CapitalExecutionReconciledState::Matched`], when the advanced context is
-/// not a settlement-reconciliation predecessor on the shipped spine, or when the
-/// observed execution does not cover exactly the locked amount and currency.
+/// `trusted_settlement_authorities` is the pinned set of settlement-authority
+/// keys the emitted settlement packet MUST be signed by. It MUST be sourced from
+/// verified, externally pinned launch config (the RR2-TM-01 market-authority
+/// registry), NEVER derived from the acceptance under release: a valid signature
+/// proves only that the packet is self-consistent with its EMBEDDED signer key,
+/// not that that signer is a trusted settlement authority. Because
+/// `CommerceEscrowAcceptance` is public, a caller can self-sign a packet for the
+/// accepted (order, context) pair, pin its body digest into the forged context,
+/// and pass every binding below; only membership in this pinned set distinguishes
+/// the genuine settlement authority from a self-signed forge. Mirrors how
+/// [`accept`] binds the reservation witness to `trusted_reservation_authorities`.
+///
+/// Fails closed when the acceptance bindings do not re-derive, when the settlement
+/// packet is not signed by a member of the pinned trusted settlement-authority set
+/// (or that set is empty), when the advanced context is not bound to the locked
+/// order/escrow, when the reconciled state is not
+/// [`CapitalExecutionReconciledState::Matched`], when the advanced context is not a
+/// settlement-reconciliation predecessor on the shipped spine, or when the observed
+/// execution does not cover exactly the locked amount and currency.
 pub fn release(
     acceptance: &CommerceEscrowAcceptance,
     advanced_context: &CommerceOrderContext,
     observation: &CapitalExecutionObservation,
     reconciled_state: CapitalExecutionReconciledState,
+    trusted_settlement_authorities: &[PublicKey],
 ) -> Result<CommerceEscrowRelease, CommerceOrderError> {
     // Re-validate the sealed acceptance (the acceptance fields are public, so a
     // forged locked acceptance must not be trusted as settlement authority). The
@@ -976,6 +991,32 @@ pub fn release(
                     .to_string(),
             ))
         }
+    }
+
+    // Settlement-authority binding: the re-verified signature above proves ONLY
+    // that the packet is self-consistent with its EMBEDDED signer key, not that
+    // that signer is a trusted settlement authority. `CommerceEscrowAcceptance` is
+    // public, so a caller can self-sign a packet for the accepted (order, context)
+    // pair, pin its body digest into the forged context, and satisfy every binding
+    // below; the genuine settlement authority is distinguished only by membership
+    // in the pinned trusted set. Require the packet signer to be a member of the
+    // externally pinned trusted settlement-authority set (the RR2-TM-01 registry
+    // set), exactly as `accept` binds the reservation witness. Fail closed on an
+    // empty set (no party's settlement may be trusted) and on a non-member signer,
+    // BEFORE any custody is drained.
+    if trusted_settlement_authorities.is_empty() {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: no trusted settlement authority is pinned; pin the \
+             RR2-TM-01 registry authority set before draining custody"
+                .to_string(),
+        ));
+    }
+    if !trusted_settlement_authorities.contains(&acceptance.settlement_packet.signer_key) {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: settlement packet is not signed by a pinned trusted \
+             settlement authority"
+                .to_string(),
+        ));
     }
 
     // Bind the SIGNED settlement packet to the accepted context. A valid signature
@@ -1594,6 +1635,7 @@ mod tests {
             &advanced,
             &observation,
             CapitalExecutionReconciledState::NotObserved,
+            &[authority.public_key()],
         )
         .test_expect_err("release denied without Matched");
         assert!(matches!(
@@ -1608,6 +1650,7 @@ mod tests {
             &advanced,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect("Matched release succeeds");
 
@@ -1673,6 +1716,7 @@ mod tests {
             &advanced,
             &foreign_payment,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("a foreign-reference execution is denied");
         assert!(matches!(
@@ -2091,6 +2135,7 @@ mod tests {
                 &advanced,
                 &observation,
                 CapitalExecutionReconciledState::Matched,
+                &[authority.public_key()],
             )
             .test_expect_err("mismatched observation is denied");
             assert!(matches!(
@@ -2163,6 +2208,7 @@ mod tests {
             &advanced,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("release from a non-reconciliation state is denied");
         assert!(matches!(
@@ -2386,6 +2432,7 @@ mod tests {
             &advanced,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("a cross-order settlement packet cannot release this order");
         assert!(matches!(
@@ -2666,6 +2713,7 @@ mod tests {
             &acceptance.updated_context,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("release on an un-advanced context is denied");
         assert!(matches!(
@@ -2717,6 +2765,7 @@ mod tests {
             &wrong_order,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("cross-order release is denied");
         assert!(matches!(
@@ -2734,6 +2783,7 @@ mod tests {
             &wrong_escrow,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("cross-escrow release is denied");
         assert!(matches!(
@@ -2789,6 +2839,7 @@ mod tests {
             &advanced,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("forged escrow digest is denied");
         assert!(matches!(
@@ -2806,6 +2857,7 @@ mod tests {
             &advanced,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("forged settlement packet is denied");
         assert!(matches!(
@@ -2814,6 +2866,92 @@ mod tests {
                 if message.contains("settlement packet signature is invalid")
         ));
 
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+    }
+
+    /// A forged acceptance whose settlement packet is
+    /// self-signed by an UNTRUSTED key (not a member of the pinned settlement-
+    /// authority set) is denied before custody drains. The re-verified packet
+    /// signature only proves self-consistency with its embedded signer; binding the
+    /// signer to the pinned trusted set is what stops a caller self-signing a packet
+    /// for the accepted (order, context) pair and draining custody. An empty pinned
+    /// set also fails closed.
+    #[test]
+    fn release_fails_closed_on_untrusted_settlement_packet_signer() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept locks the ledger");
+        let advanced = advanced_context(&acceptance, "settlement_observed");
+        let observation = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: "reconciliation-1".to_string(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+
+        // Re-sign the SAME settlement-packet body with an attacker key the trusted
+        // settlement-authority set does NOT contain. The body (and so its canonical
+        // digest, order id, and reconciliation ref) is unchanged, so every
+        // packet<->context binding still passes; only the settlement-authority
+        // membership check can fire.
+        let attacker = keypair(99);
+        let mut forged = acceptance.clone();
+        forged.settlement_packet =
+            SignedExportEnvelope::sign(acceptance.settlement_packet.body.clone(), &attacker)
+                .test_expect("attacker re-signs the settlement packet");
+        // The forged packet still self-verifies against its embedded attacker key.
+        assert!(forged
+            .settlement_packet
+            .verify_signature()
+            .test_expect("attacker-signed packet self-verifies"));
+
+        let denied_untrusted = release(
+            &forged,
+            &advanced,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
+        )
+        .test_expect_err("a self-signed (untrusted-signer) settlement packet is denied");
+        assert!(matches!(
+            denied_untrusted,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("not signed by a pinned trusted settlement authority")
+        ));
+
+        // An EMPTY pinned trusted set fails closed even for the genuine packet.
+        let denied_empty = release(
+            &acceptance,
+            &advanced,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+            &[],
+        )
+        .test_expect_err("an empty trusted settlement-authority set denies");
+        assert!(matches!(
+            denied_empty,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("no trusted settlement authority is pinned")
+        ));
+
+        // Custody is never drained across either denial.
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
     }
 
@@ -2892,6 +3030,7 @@ mod tests {
             &advanced_order,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("a ledger locked for a different order is denied");
         assert!(matches!(
@@ -2932,6 +3071,7 @@ mod tests {
             &advanced_beneficiary,
             &observation,
             CapitalExecutionReconciledState::Matched,
+            &[authority.public_key()],
         )
         .test_expect_err("a ledger paying a foreign beneficiary is denied");
         assert!(matches!(

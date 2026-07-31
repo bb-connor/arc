@@ -33,7 +33,9 @@ use chio_credentials::{
     attestation_window_containing, chio_pass_artifact_id, verify_chio_pass, ChioPass,
     PassportLifecycleRecord, PassportLifecycleState, TierAllotmentTable, TrustTier,
 };
-use chio_kernel::{verify_checkpoint_signature, KernelCheckpoint, LocalCapabilityAuthority};
+use chio_kernel::{
+    validate_checkpoint, verify_checkpoint_signature, KernelCheckpoint, LocalCapabilityAuthority,
+};
 use chio_store_sqlite::{PassIssuanceAdmission, SqliteReceiptStore, SqliteRevocationStore};
 use serde::de::DeserializeOwned;
 
@@ -320,6 +322,13 @@ fn issue_chio_pass_under_caps(
                 "Pass issuance denied: active population cap reached".to_string(),
             ));
         }
+        PassIssuanceAdmission::DeniedRevoked => {
+            return Err(CliError::Other(
+                "Pass issuance denied: the capability id is revoked; a revoked Pass cannot be \
+                 re-issued without an explicit unrevoke"
+                    .to_string(),
+            ));
+        }
     }
     Ok((issuance, counters))
 }
@@ -515,6 +524,11 @@ fn record_refreshed_issuance_under_caps(
         )),
         PassIssuanceAdmission::DeniedPopulationCap => Err(CliError::Other(
             "Pass refresh denied: active population cap reached".to_string(),
+        )),
+        PassIssuanceAdmission::DeniedRevoked => Err(CliError::Other(
+            "Pass refresh denied: the next-window capability id is revoked; a revoked Pass \
+             cannot be re-issued without an explicit unrevoke"
+                .to_string(),
         )),
     }
 }
@@ -838,9 +852,13 @@ fn read_issued_passes(
 ///
 /// FAIL-CLOSED: the checkpoint builder only hashes the previous body and
 /// increments the sequence, so without this gate the CLI could chain its
-/// per-operator sequence to a foreign operator's checkpoint. Require the previous
-/// checkpoint's `kernel_key` to equal this operator's key AND its signature to
-/// verify.
+/// per-operator sequence to a foreign operator's checkpoint OR onto a
+/// signature-valid but body-invalid predecessor. Require the previous checkpoint's
+/// `kernel_key` to equal this operator's key, its signature to verify, AND its body
+/// invariants (schema, non-zero ascending sequence/range, tree size matching the
+/// covered entry count) to hold via [`validate_checkpoint`]. Chaining onto a
+/// well-signed but malformed body would emit an anchor chain that downstream
+/// continuity rejects, so the malformed predecessor is denied here.
 fn validate_previous_checkpoint(
     previous: &KernelCheckpoint,
     operator_public_key: &PublicKey,
@@ -853,14 +871,30 @@ fn validate_previous_checkpoint(
         ));
     }
     match verify_checkpoint_signature(previous) {
-        Ok(true) => Ok(()),
-        Ok(false) => Err(CliError::Other(
-            "previous checkpoint signature does not verify against its operator key".to_string(),
-        )),
-        Err(error) => Err(CliError::Other(format!(
-            "previous checkpoint signature could not be verified: {error}"
-        ))),
+        Ok(true) => {}
+        Ok(false) => {
+            return Err(CliError::Other(
+                "previous checkpoint signature does not verify against its operator key"
+                    .to_string(),
+            ))
+        }
+        Err(error) => {
+            return Err(CliError::Other(format!(
+                "previous checkpoint signature could not be verified: {error}"
+            )))
+        }
     }
+    // Body-validity gate: a verifying signature only proves the body was signed by
+    // this operator, not that the body is well-formed. `build_checkpoint_with_previous`
+    // chains onto the previous body verbatim (it only hashes it and increments the
+    // sequence), so a signature-valid predecessor with a bad schema, a zero or
+    // non-ascending sequence/range, or a tree size that does not match its covered
+    // entry count would produce an anchor chain that downstream continuity rejects.
+    // Fail closed on an invalid previous body before chaining.
+    validate_checkpoint(previous).map_err(|error| {
+        CliError::Other(format!("previous checkpoint body is invalid: {error}"))
+    })?;
+    Ok(())
 }
 
 /// Prepare (do NOT broadcast) the read-only Pass anchoring root publication.

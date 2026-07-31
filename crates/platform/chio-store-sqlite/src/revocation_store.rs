@@ -16,6 +16,11 @@ pub enum PassIssuanceAdmission {
     DeniedWindowExhausted,
     /// The live-population cap was already reached; nothing was persisted.
     DeniedPopulationCap,
+    /// The capability id is on the revoked set; nothing was persisted. A revoked
+    /// (subject, window) Pass id must NOT be re-admitted (idempotently or
+    /// otherwise) while the revocation stands; restoring it requires an explicit
+    /// unrevoke, which is out of scope here. Fail-closed.
+    DeniedRevoked,
 }
 
 pub struct SqliteRevocationStore {
@@ -207,6 +212,24 @@ impl SqliteRevocationStore {
     ) -> Result<PassIssuanceAdmission, RevocationStoreError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        // Fail-closed revocation gate, taken under the write lock BEFORE the
+        // idempotent/cap logic. The deterministic `chiopass:<subject,window>` id is
+        // the roster key, so an already-present id is otherwise admitted as a
+        // no-growth idempotent update even at a full cap. Without this check a
+        // capability id that has since been REVOKED would be re-admitted (and
+        // returned as success) while the revocation stays in force, so a revoked
+        // Pass could be re-minted. A revoked id is never re-admitted here (restoring
+        // it requires an explicit unrevoke, out of scope); nothing is persisted.
+        let is_revoked = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, i64>(0),
+        )? != 0;
+        if is_revoked {
+            // Dropping the transaction rolls back; nothing is persisted.
+            return Ok(PassIssuanceAdmission::DeniedRevoked);
+        }
 
         let already_present = transaction.query_row(
             "SELECT EXISTS(SELECT 1 FROM issued_passes WHERE capability_id = ?1)",
@@ -570,6 +593,51 @@ mod tests {
             PassIssuanceAdmission::DeniedPopulationCap
         );
         assert_eq!(store.count_window_issuances("2026-07").unwrap(), 0);
+
+        let _ = fs::remove_file(path);
+    }
+
+    /// A REVOKED capability id is never re-admitted, even as a
+    /// no-growth idempotent re-record at a full cap. Re-issuing a revoked id would
+    /// otherwise return success while the revocation stayed in force, re-minting a
+    /// revoked Pass. The admission fails closed with `DeniedRevoked` and persists
+    /// nothing new.
+    #[test]
+    fn atomic_admission_denies_a_revoked_capability_id() {
+        let path = unique_db_path("chio-admission-revoked");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+
+        let now = 1_000;
+        // Admit the id once (a roomy cap), then revoke it.
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:a", "2026-06", 0, 9_000, now, 100, 100)
+                .unwrap(),
+            PassIssuanceAdmission::Admitted
+        );
+        assert!(store.revoke("chiopass:a").unwrap());
+
+        // An idempotent re-record of the now-REVOKED id is denied fail-closed: the
+        // already-present row no longer admits it.
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:a", "2026-06", 0, 9_000, now, 100, 100)
+                .unwrap(),
+            PassIssuanceAdmission::DeniedRevoked
+        );
+
+        // A genuinely NEW id that was pre-revoked is also denied (the gate is not
+        // limited to already-issued ids).
+        assert!(store.revoke("chiopass:b").unwrap());
+        assert_eq!(
+            store
+                .try_record_pass_issuance_under_caps("chiopass:b", "2026-06", 0, 9_000, now, 100, 100)
+                .unwrap(),
+            PassIssuanceAdmission::DeniedRevoked
+        );
+
+        // Neither denial grew the window roster beyond the single admitted id.
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 1);
 
         let _ = fs::remove_file(path);
     }
