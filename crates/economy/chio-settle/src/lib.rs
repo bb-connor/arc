@@ -59,8 +59,9 @@ pub use evm::{
 pub use hook::{
     SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
     SettlementFailureReason, SettlementHook, SettlementHookError, SettlementIdempotencyKey,
-    SettlementObservation, SettlementOutcome, SettlementOutcomeValidationError,
-    SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA, SETTLEMENT_OUTCOME_SCHEMA,
+    SettlementObservation, SettlementObservationValidationError, SettlementOutcome,
+    SettlementOutcomeValidationError, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
+    SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
     inspect_finality, inspect_finality_for_receipt, observe_bond, project_escrow_execution_receipt,

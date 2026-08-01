@@ -466,6 +466,14 @@ impl<H: crate::SettlementHook> SettlementRuntime<H> {
         observation: &crate::SettlementObservation,
         prior_attempts: u32,
     ) -> SettlementDriveStep {
+        if let Err(error) = observation.validate() {
+            return SettlementDriveStep::DeadLetter {
+                reason: crate::SettlementFailureReason::from_detail(
+                    crate::SettlementFailureCode::InvalidObservation,
+                    error.to_string(),
+                ),
+            };
+        }
         let idempotency_key = crate::SettlementIdempotencyKey {
             receipt_id: observation.receipt_id.clone(),
             row_version: u64::from(prior_attempts).saturating_add(1),
@@ -529,6 +537,11 @@ impl<H: crate::SettlementHook> SettlementRuntime<H> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
     use super::{
         classify_settlement_lane, ensure_settlement_completion_flow_binding,
         ensure_settlement_operation_allowed, SettlementControlState, SettlementEmergencyControls,
@@ -573,6 +586,23 @@ mod tests {
         }
     }
 
+    struct CountingHook(Arc<AtomicUsize>);
+
+    impl SettlementHook for CountingHook {
+        fn supports_receipt_id_idempotency(&self) -> bool {
+            true
+        }
+
+        fn observe(
+            &self,
+            _observation: &SettlementObservation,
+            _idempotency_key: &SettlementIdempotencyKey,
+        ) -> Result<SettlementOutcome, SettlementHookError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(SettlementOutcome::accepted("counted"))
+        }
+    }
+
     fn observation() -> SettlementObservation {
         SettlementObservation::new(
             "receipt-1",
@@ -584,8 +614,8 @@ mod tests {
                 currency: "USD".to_string(),
                 units: 1,
             },
-            "content",
-            "policy",
+            "11".repeat(32),
+            "policy-v1",
         )
     }
 
@@ -627,6 +657,85 @@ mod tests {
             SettlementDriveStep::DeadLetter { reason }
                 if reason.code() == SettlementFailureCode::InvalidObservation
         ));
+    }
+
+    #[test]
+    fn runtime_rejects_malformed_observations_before_calling_the_hook() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let runtime =
+            SettlementRuntime::new(CountingHook(Arc::clone(&calls)), RetryPolicy::default())
+                .test_expect("valid runtime");
+
+        let mut malformed = Vec::new();
+
+        let mut unsupported_schema = observation();
+        unsupported_schema.schema = "chio.settle.observation.v2".to_string();
+        malformed.push(unsupported_schema);
+
+        let mut missing_receipt = observation();
+        missing_receipt.receipt_id = " ".to_string();
+        malformed.push(missing_receipt);
+
+        let mut missing_finalization_time = observation();
+        missing_finalization_time.finalized_at = 0;
+        malformed.push(missing_finalization_time);
+
+        let mut invalid_tenant = observation();
+        invalid_tenant.tenant_id = Some("tenant\nforged".to_string());
+        malformed.push(invalid_tenant);
+
+        let mut missing_tool_server = observation();
+        missing_tool_server.tool_server.clear();
+        malformed.push(missing_tool_server);
+
+        let mut missing_tool_name = observation();
+        missing_tool_name.tool_name.clear();
+        malformed.push(missing_tool_name);
+
+        let mut oversized_tool_name = observation();
+        oversized_tool_name.tool_name = "t".repeat(513);
+        malformed.push(oversized_tool_name);
+
+        let mut missing_capability = observation();
+        missing_capability.capability_id.clear();
+        malformed.push(missing_capability);
+
+        let mut zero_amount = observation();
+        zero_amount.amount.units = 0;
+        malformed.push(zero_amount);
+
+        let mut inexact_json_amount = observation();
+        inexact_json_amount.amount.units = 1_u64 << 53;
+        malformed.push(inexact_json_amount);
+
+        let mut invalid_currency = observation();
+        invalid_currency.amount.currency = "usd".to_string();
+        malformed.push(invalid_currency);
+
+        let mut missing_content_hash = observation();
+        missing_content_hash.content_hash.clear();
+        malformed.push(missing_content_hash);
+
+        let mut malformed_content_hash = observation();
+        malformed_content_hash.content_hash = "not-a-sha256-digest".to_string();
+        malformed.push(malformed_content_hash);
+
+        let mut missing_policy_hash = observation();
+        missing_policy_hash.policy_hash.clear();
+        malformed.push(missing_policy_hash);
+
+        let mut malformed_policy_hash = observation();
+        malformed_policy_hash.policy_hash = "policy\nforged".to_string();
+        malformed.push(malformed_policy_hash);
+
+        for invalid in malformed {
+            assert!(matches!(
+                runtime.drive(&invalid, 0),
+                SettlementDriveStep::DeadLetter { reason }
+                    if reason.code() == SettlementFailureCode::InvalidObservation
+            ));
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 
     #[test]

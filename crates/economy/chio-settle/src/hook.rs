@@ -115,6 +115,50 @@ pub struct SettlementIdempotencyKey {
     pub row_version: u64,
 }
 
+/// Validation failure for a settlement observation received by the retry runtime.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementObservationValidationError {
+    #[error("unsupported settlement observation schema")]
+    UnsupportedSchema,
+    #[error("invalid settlement receipt identifier")]
+    InvalidReceiptId,
+    #[error("invalid settlement finalization timestamp")]
+    InvalidFinalizedAt,
+    #[error("invalid settlement tenant identifier")]
+    InvalidTenantId,
+    #[error("invalid settlement tool server identifier")]
+    InvalidToolServer,
+    #[error("invalid settlement tool name")]
+    InvalidToolName,
+    #[error("invalid settlement capability identifier")]
+    InvalidCapabilityId,
+    #[error("invalid settlement amount")]
+    InvalidAmount,
+    #[error("invalid settlement currency")]
+    InvalidCurrency,
+    #[error("invalid settlement content hash")]
+    InvalidContentHash,
+    #[error("invalid settlement policy hash")]
+    InvalidPolicyHash,
+}
+
+const SETTLEMENT_OBSERVATION_TEXT_MAX_BYTES: usize = 512;
+const JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
+
+fn is_valid_observation_text(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= SETTLEMENT_OBSERVATION_TEXT_MAX_BYTES
+        && value.trim() == value
+        && !value.chars().any(char::is_control)
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 impl SettlementObservation {
     /// Construct a fresh observation, stamping the canonical schema tag.
     #[must_use]
@@ -156,6 +200,54 @@ impl SettlementObservation {
     #[must_use]
     pub fn ordering_key(&self) -> (u64, &str) {
         (self.finalized_at, self.receipt_id.as_str())
+    }
+
+    /// Validate every caller-mutable field before an effectful hook is invoked.
+    pub fn validate(&self) -> Result<(), SettlementObservationValidationError> {
+        if self.schema != SETTLEMENT_OBSERVATION_SCHEMA {
+            return Err(SettlementObservationValidationError::UnsupportedSchema);
+        }
+        if !is_valid_observation_text(&self.receipt_id) {
+            return Err(SettlementObservationValidationError::InvalidReceiptId);
+        }
+        if self.finalized_at == 0 {
+            return Err(SettlementObservationValidationError::InvalidFinalizedAt);
+        }
+        if self
+            .tenant_id
+            .as_deref()
+            .is_some_and(|tenant_id| !is_valid_observation_text(tenant_id))
+        {
+            return Err(SettlementObservationValidationError::InvalidTenantId);
+        }
+        if !is_valid_observation_text(&self.tool_server) {
+            return Err(SettlementObservationValidationError::InvalidToolServer);
+        }
+        if !is_valid_observation_text(&self.tool_name) {
+            return Err(SettlementObservationValidationError::InvalidToolName);
+        }
+        if !is_valid_observation_text(&self.capability_id) {
+            return Err(SettlementObservationValidationError::InvalidCapabilityId);
+        }
+        if self.amount.units == 0 || self.amount.units > JSON_MAX_SAFE_INTEGER {
+            return Err(SettlementObservationValidationError::InvalidAmount);
+        }
+        if self.amount.currency.len() != 3
+            || !self
+                .amount
+                .currency
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase())
+        {
+            return Err(SettlementObservationValidationError::InvalidCurrency);
+        }
+        if !is_sha256_hex(&self.content_hash) {
+            return Err(SettlementObservationValidationError::InvalidContentHash);
+        }
+        if !is_valid_observation_text(&self.policy_hash) {
+            return Err(SettlementObservationValidationError::InvalidPolicyHash);
+        }
+        Ok(())
     }
 }
 

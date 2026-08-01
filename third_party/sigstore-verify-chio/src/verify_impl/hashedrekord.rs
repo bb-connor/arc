@@ -13,13 +13,19 @@ use x509_cert::der::Decode;
 use x509_cert::Certificate;
 
 /// Verify artifact hash matches what's in Rekor (for hashedrekord entries)
-pub fn verify_hashedrekord_entries(bundle: &Bundle, artifact: &Artifact<'_>) -> Result<()> {
+pub fn verify_hashedrekord_entries(bundle: &Bundle, artifact: &Artifact<'_>) -> Result<usize> {
+    if !matches!(bundle.content, SignatureContent::MessageSignature(_)) {
+        return Ok(0);
+    }
+
+    let mut verified = 0;
     for entry in &bundle.verification_material.tlog_entries {
         if entry.kind_version.kind == "hashedrekord" {
             verify_hashedrekord_entry(entry, bundle, artifact)?;
+            verified += 1;
         }
     }
-    Ok(())
+    Ok(verified)
 }
 
 /// Verify a single hashedrekord entry

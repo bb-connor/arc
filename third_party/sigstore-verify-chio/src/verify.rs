@@ -343,38 +343,101 @@ impl Verifier {
                     Error::Verification(format!("failed to parse in-toto statement: {}", e))
                 })?;
 
-                if !statement.subject.is_empty() && !statement.matches_sha256(&artifact_hash_hex) {
-                    return Err(Error::Verification(
-                        "artifact hash does not match any subject in attestation".to_string(),
-                    ));
-                }
+                verify_statement_artifact_binding(&statement, &artifact_hash_hex)?;
             }
         }
 
-        // For MessageSignature bundles, verify the messageDigest matches the artifact
         if let SignatureContent::MessageSignature(msg_sig) = &bundle.content {
-            if let Some(ref digest) = msg_sig.message_digest {
-                let artifact_hash = compute_artifact_digest(&artifact);
-
-                // Compare the digest in the bundle with the computed artifact hash
-                if digest.digest.as_bytes() != artifact_hash.as_bytes() {
-                    return Err(Error::Verification(
-                        "message digest in bundle does not match artifact hash".to_string(),
-                    ));
-                }
-            }
+            verify_message_signature(
+                &artifact,
+                msg_sig,
+                &cert_info.public_key,
+                cert_info.signing_scheme,
+            )?;
         }
-        // Note: For hashedrekord (MessageSignature), the signature verification
-        // is performed in step (8) by verify_hashedrekord_entries, which properly
-        // handles prehashed signatures.
 
         // (8): Verify the transparency log entry's consistency against the other
         //      materials, to prevent variants of CVE-2022-36056.
-        crate::verify_impl::verify_dsse_entries(bundle)?;
-        crate::verify_impl::verify_intoto_entries(bundle)?;
-        crate::verify_impl::verify_hashedrekord_entries(bundle, &artifact)?;
+        let content_bound_entries = verify_transparency_log_content_binding(bundle, &artifact)?;
+        if policy.verify_tlog && content_bound_entries == 0 {
+            return Err(Error::Verification(
+                "no transparency log entry is bound to the bundle content".to_string(),
+            ));
+        }
 
         Ok(result)
+    }
+}
+
+fn verify_statement_artifact_binding(statement: &Statement, artifact_hash_hex: &str) -> Result<()> {
+    if statement.subject.is_empty() {
+        return Err(Error::Verification(
+            "in-toto statement must contain at least one subject".to_string(),
+        ));
+    }
+    if !statement.matches_sha256(artifact_hash_hex) {
+        return Err(Error::Verification(
+            "artifact hash does not match any subject in attestation".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn verify_message_signature(
+    artifact: &Artifact<'_>,
+    message_signature: &sigstore_types::MessageSignature,
+    public_key: &sigstore_types::DerPublicKey,
+    signing_scheme: sigstore_crypto::SigningScheme,
+) -> Result<()> {
+    let artifact_hash = compute_artifact_digest(artifact);
+    if let Some(digest) = &message_signature.message_digest {
+        if digest.digest.as_bytes() != artifact_hash.as_bytes() {
+            return Err(Error::Verification(
+                "message digest in bundle does not match artifact hash".to_string(),
+            ));
+        }
+    }
+
+    match artifact {
+        Artifact::Bytes(bytes) => sigstore_crypto::verify_signature(
+            public_key,
+            bytes,
+            &message_signature.signature,
+            signing_scheme,
+        ),
+        Artifact::Digest(hash)
+            if signing_scheme.uses_sha256() && signing_scheme.supports_prehashed() =>
+        {
+            sigstore_crypto::verify_signature_prehashed(
+                public_key,
+                hash,
+                &message_signature.signature,
+                signing_scheme,
+            )
+        }
+        Artifact::Digest(_) => {
+            return Err(Error::Verification(
+                "cannot verify message signature from a digest with this signing scheme"
+                    .to_string(),
+            ));
+        }
+    }
+    .map_err(|error| Error::Verification(format!("message signature verification failed: {error}")))
+}
+
+fn verify_transparency_log_content_binding(
+    bundle: &Bundle,
+    artifact: &Artifact<'_>,
+) -> Result<usize> {
+    match &bundle.content {
+        SignatureContent::MessageSignature(_) => {
+            crate::verify_impl::verify_hashedrekord_entries(bundle, artifact)
+        }
+        SignatureContent::DsseEnvelope(_) => {
+            let dsse_entries = crate::verify_impl::verify_dsse_entries(bundle)?;
+            let intoto_entries = crate::verify_impl::verify_intoto_entries(bundle)?;
+            Ok(dsse_entries + intoto_entries)
+        }
     }
 }
 
@@ -514,52 +577,7 @@ pub fn verify_with_key<'a>(
     // Verify the signature
     match &bundle.content {
         SignatureContent::MessageSignature(msg_sig) => {
-            // Verify message digest matches artifact
-            if let Some(ref digest) = msg_sig.message_digest {
-                let artifact_hash = compute_artifact_digest(&artifact);
-                if digest.digest.as_bytes() != artifact_hash.as_bytes() {
-                    return Err(Error::Verification(
-                        "message digest in bundle does not match artifact hash".to_string(),
-                    ));
-                }
-            }
-
-            // Verify signature over the artifact
-            let artifact_hash = compute_artifact_digest(&artifact);
-
-            // Use prehashed verification if supported
-            if signing_scheme.uses_sha256() && signing_scheme.supports_prehashed() {
-                sigstore_crypto::verify_signature_prehashed(
-                    public_key,
-                    &artifact_hash,
-                    &msg_sig.signature,
-                    signing_scheme,
-                )
-                .map_err(|e| {
-                    Error::Verification(format!("signature verification failed: {}", e))
-                })?;
-            } else {
-                // For non-prehashed schemes, we need the original bytes
-                match &artifact {
-                    Artifact::Bytes(bytes) => {
-                        sigstore_crypto::verify_signature(
-                            public_key,
-                            bytes,
-                            &msg_sig.signature,
-                            signing_scheme,
-                        )
-                        .map_err(|e| {
-                            Error::Verification(format!("signature verification failed: {}", e))
-                        })?;
-                    }
-                    Artifact::Digest(_) => {
-                        return Err(Error::Verification(
-                            "cannot verify signature with digest-only for this key type"
-                                .to_string(),
-                        ));
-                    }
-                }
-            }
+            verify_message_signature(&artifact, msg_sig, public_key, signing_scheme)?;
         }
         SignatureContent::DsseEnvelope(envelope) => {
             let payload_bytes = envelope.decode_payload();
@@ -595,13 +613,15 @@ pub fn verify_with_key<'a>(
                     Error::Verification(format!("failed to parse in-toto statement: {}", e))
                 })?;
 
-                if !statement.subject.is_empty() && !statement.matches_sha256(&artifact_hash_hex) {
-                    return Err(Error::Verification(
-                        "artifact hash does not match any subject in attestation".to_string(),
-                    ));
-                }
+                verify_statement_artifact_binding(&statement, &artifact_hash_hex)?;
             }
         }
+    }
+
+    if verify_transparency_log_content_binding(bundle, &artifact)? == 0 {
+        return Err(Error::Verification(
+            "no transparency log entry is bound to the bundle content".to_string(),
+        ));
     }
 
     Ok(result)
@@ -610,6 +630,18 @@ pub fn verify_with_key<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sigstore_crypto::KeyPair;
+    use sigstore_types::{
+        bundle::VerificationMaterialContent, DsseSignature, KeyId, PayloadBytes, SignatureBytes,
+    };
+
+    const COSIGN_V3_BLOB_BUNDLE: &str =
+        include_str!("../test_data/bundles/cosign-v3-blob.sigstore.json");
+    const COSIGN_V3_BLOB: &[u8] = include_bytes!("../test_data/bundles/cosign-v3-blob.txt");
+    const CONDA_ATTESTATION_BUNDLE: &str =
+        include_str!("../test_data/bundles/conda-attestation.sigstore.json");
+    const CONDA_PACKAGE: &[u8] =
+        include_bytes!("../test_data/bundles/signed-package-2.1.0-hb0f4dca_0.conda");
 
     #[test]
     fn test_verification_policy_default() {
@@ -677,5 +709,139 @@ mod tests {
                 if message
                     == "certificate is missing issuer (Fulcio OID extension), but policy requires: https://issuer.example"
         ));
+    }
+
+    #[test]
+    fn skip_tlog_still_rejects_an_invalid_message_signature() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let SignatureContent::MessageSignature(message_signature) = &mut bundle.content else {
+            panic!("expected message signature bundle");
+        };
+        message_signature.signature = SignatureBytes::new(vec![0; 64]);
+        bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps
+            .clear();
+        bundle.verification_material.tlog_entries[0]
+            .kind_version
+            .kind = "dsse".to_string();
+
+        let policy = VerificationPolicy::default()
+            .skip_tlog()
+            .skip_timestamp()
+            .skip_certificate_chain();
+        let result = verify(
+            COSIGN_V3_BLOB,
+            &bundle,
+            &policy,
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        let error = result
+            .expect_err("message signature must be verified independently of hashedrekord entries");
+        assert!(error
+            .to_string()
+            .contains("message signature verification failed"));
+    }
+
+    #[test]
+    fn managed_key_verification_rejects_an_unrelated_transparency_entry() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let unrelated = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("DSSE bundle");
+        let certificate = bundle
+            .signing_certificate()
+            .expect("cosign bundle certificate")
+            .clone();
+        let public_key = parse_certificate_info(certificate.as_bytes())
+            .expect("certificate info")
+            .public_key;
+        bundle.verification_material.content = VerificationMaterialContent::PublicKey {
+            hint: "test-managed-key".to_string(),
+        };
+        bundle.verification_material.tlog_entries = unrelated.verification_material.tlog_entries;
+
+        let result = verify_with_key(
+            COSIGN_V3_BLOB,
+            &bundle,
+            &public_key,
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        let error = result.expect_err(
+            "managed-key verification must bind a verified log entry to the message signature",
+        );
+        assert!(error
+            .to_string()
+            .contains("no transparency log entry is bound"));
+    }
+
+    #[test]
+    fn managed_key_verification_rejects_a_subjectless_attestation() {
+        let mut bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("DSSE bundle");
+        let key_pair = KeyPair::generate_ecdsa_p256().expect("generate managed signing key");
+        let public_key = key_pair.public_key_der().expect("managed public key");
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "_type": "https://in-toto.io/Statement/v1",
+            "subject": [],
+            "predicateType": "https://slsa.dev/provenance/v1",
+            "predicate": {}
+        }))
+        .expect("serialize subjectless statement");
+
+        let SignatureContent::DsseEnvelope(envelope) = &mut bundle.content else {
+            panic!("expected DSSE bundle");
+        };
+        envelope.payload = PayloadBytes::new(payload.clone());
+        let pae = sigstore_types::pae(&envelope.payload_type, &payload);
+        envelope.signatures = vec![DsseSignature {
+            sig: key_pair.sign(&pae).expect("sign subjectless statement"),
+            keyid: KeyId::default(),
+        }];
+        bundle.verification_material.content = VerificationMaterialContent::PublicKey {
+            hint: "test-managed-key".to_string(),
+        };
+
+        let artifact = Sha256Hash::from_bytes([7; 32]);
+        let result = verify_with_key(
+            artifact,
+            &bundle,
+            &public_key,
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        let error =
+            result.expect_err("in-toto attestations without subjects cannot bind the artifact");
+        assert!(error
+            .to_string()
+            .contains("must contain at least one subject"));
+    }
+
+    #[test]
+    fn managed_key_verification_accepts_matching_transparency_entries() {
+        for (bundle_json, artifact) in [
+            (COSIGN_V3_BLOB_BUNDLE, COSIGN_V3_BLOB),
+            (CONDA_ATTESTATION_BUNDLE, CONDA_PACKAGE),
+        ] {
+            let mut bundle = Bundle::from_json(bundle_json).expect("fixture bundle");
+            let certificate = bundle
+                .signing_certificate()
+                .expect("fixture certificate")
+                .clone();
+            let public_key = parse_certificate_info(certificate.as_bytes())
+                .expect("certificate info")
+                .public_key;
+            bundle.verification_material.content = VerificationMaterialContent::PublicKey {
+                hint: "test-managed-key".to_string(),
+            };
+
+            let result = verify_with_key(
+                artifact,
+                &bundle,
+                &public_key,
+                &TrustedRoot::production().expect("production root"),
+            );
+            assert!(result.is_ok(), "matching managed-key bundle: {result:?}");
+        }
     }
 }
