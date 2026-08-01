@@ -395,7 +395,7 @@ fn verify_capability_pure_untrusted() {
 }
 
 #[test]
-fn verify_capability_pure_denies_unnegotiated_and_accepts_negotiated_aggregate_budget() {
+fn verify_capability_pure_denies_aggregate_budget_without_portable_authority() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = make_aggregate_capability(&subject, &issuer);
@@ -428,7 +428,7 @@ fn verify_capability_pure_denies_unnegotiated_and_accepts_negotiated_aggregate_b
         .contains("aggregate invocation budget is not negotiated"));
 
     assert!(rollout_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
-    let verified = verify_capability_pure(
+    let rollout_error = verify_capability_pure(
         VerifyCapabilityRequestJson {
             token: capability,
             trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
@@ -439,8 +439,11 @@ fn verify_capability_pure_denies_unnegotiated_and_accepts_negotiated_aggregate_b
         },
         &clock,
     )
-    .expect("negotiated portable verification must preserve the aggregate semantic");
-    assert_eq!(verified.id, "cap-aggregate");
+    .expect_err("negotiation alone must not invent a browser aggregate quota authority");
+    assert_eq!(rollout_error.code, "capability_verification_failed");
+    assert!(rollout_error
+        .message
+        .contains("aggregate invocation budget enforcement is unavailable"));
 }
 
 #[test]

@@ -337,7 +337,7 @@ fn verify_capability_honors_epoch_zero_clock() {
 }
 
 #[test]
-fn verify_capability_context_denies_unnegotiated_and_accepts_negotiated_aggregate_budget() {
+fn verify_capability_context_denies_aggregate_budget_without_portable_authority() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = make_aggregate_capability(&subject, &issuer);
@@ -374,10 +374,15 @@ fn verify_capability_context_denies_unnegotiated_and_accepts_negotiated_aggregat
         "now_secs": ISSUED_AT as i64 + 1,
         "peer_capabilities": rollout_peer,
     });
-    let verified = verify_capability_with_context_json_str(&rollout_envelope.to_string())
-        .expect("negotiated C++ verification must preserve the aggregate semantic");
-    let verified: serde_json::Value = serde_json::from_str(&verified).unwrap();
-    assert_eq!(verified["id"], "cap-aggregate-ffi");
+    let rollout_error = verify_capability_with_context_json_str(&rollout_envelope.to_string())
+        .expect_err("negotiation alone must not invent a C++ aggregate quota authority");
+    match rollout_error {
+        KernelFfiError::InvalidCapability(message) => assert!(
+            message.contains("aggregate invocation budget enforcement is unavailable"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
 }
 
 #[test]

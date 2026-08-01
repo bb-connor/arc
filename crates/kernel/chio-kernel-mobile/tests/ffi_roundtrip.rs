@@ -597,7 +597,7 @@ fn verify_capability_happy_path() {
 }
 
 #[test]
-fn verify_capability_with_context_denies_unnegotiated_and_accepts_negotiated_aggregate_budget() {
+fn verify_capability_with_context_denies_aggregate_budget_without_portable_authority() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let capability = make_aggregate_capability(&subject, &issuer);
@@ -636,9 +636,15 @@ fn verify_capability_with_context_denies_unnegotiated_and_accepts_negotiated_agg
         "peer_capabilities": rollout_peer,
     })
     .to_string();
-    let verified = verify_capability_with_context(rollout_request)
-        .expect("negotiated mobile verification must preserve the aggregate semantic");
-    assert_eq!(verified.id, "cap-aggregate-ffi");
+    let rollout_error = verify_capability_with_context(rollout_request)
+        .expect_err("negotiation alone must not invent a mobile aggregate quota authority");
+    match rollout_error {
+        ChioMobileError::InvalidCapability { message } => assert!(
+            message.contains("aggregate invocation budget enforcement is unavailable"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
 }
 
 #[test]
