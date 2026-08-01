@@ -21,7 +21,9 @@ mod support {
         ToolCallRequest, ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE,
         DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
-    use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteBudgetStore, SqliteReceiptStore};
+    use chio_store_sqlite::{
+        SqliteBudgetStore, SqliteReceiptStore, SqliteSecurityAdmissionOperationStore,
+    };
 
     pub fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         chio_test_support::private_fs::unique_sqlite_path(prefix)
@@ -434,7 +436,7 @@ mod support {
     pub struct MoneyJournalHarness {
         pub kernel: ChioKernel,
         pub budget_store: Arc<SqliteBudgetStore>,
-        pub operation_store: Arc<SqliteAdmissionOperationStore>,
+        pub operation_store: Arc<SqliteSecurityAdmissionOperationStore>,
         pub receipt_store: Arc<SqliteReceiptStore>,
         pub rail: Arc<CountingRail>,
         pub capability: CapabilityToken,
@@ -580,7 +582,9 @@ mod support {
         let operation_db_path = unique_db_path(&format!("{prefix}-operations"));
         let receipt_store = Arc::new(SqliteReceiptStore::open(&receipt_db_path)?);
         let budget_store = Arc::new(SqliteBudgetStore::open(&budget_db_path)?);
-        let operation_store = Arc::new(SqliteAdmissionOperationStore::open(&operation_db_path)?);
+        let operation_store = Arc::new(SqliteSecurityAdmissionOperationStore::open(
+            &operation_db_path,
+        )?);
         let journal_rows_seen_at_invoke = Arc::new(Mutex::new(Vec::new()));
         let rail = Arc::new(CountingRail::new());
 

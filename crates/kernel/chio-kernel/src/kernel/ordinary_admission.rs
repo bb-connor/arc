@@ -11,18 +11,18 @@ use crate::admission_capture_authority::{
     AdmissionCaptureRequest, AdmissionCaptureRequestInput,
     CombinedAdmissionCaptureReceiptProjection, PartitionEscrowCommitReceiptProjection,
 };
-use crate::admission_operation::{
-    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
-    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationError,
-    AdmissionOperationKind, AdmissionOperationState, AdmissionRequestBindingInput,
-    AdmissionRequestBindingParts, PreparedAdmissionOperation,
-};
 use crate::budget_store::{
     derive_verified_invocation_admission, AuthorizedBudgetHold, BudgetAdmissionOperationBinding,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
     BudgetCommitMetadata, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
     BudgetInvocationReservationState, BudgetMonetaryHoldState, BudgetMutationKind, BudgetQuotaKey,
     BudgetReverseHoldRequest, PartitionEscrowCommitEvidence,
+};
+use crate::security_admission_operation::{
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
+    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationError,
+    AdmissionOperationKind, AdmissionOperationState, AdmissionRequestBindingInput,
+    AdmissionRequestBindingParts, PreparedAdmissionOperation,
 };
 use crate::supplemental_quota::{
     OpaqueSignedSupplementalQuota, SupplementalAdmissionAuthorization,
@@ -969,7 +969,7 @@ impl ChioKernel {
     #[allow(clippy::too_many_arguments)]
     fn replay_existing_ordinary_protocol_admission(
         &self,
-        operation_store: &dyn crate::admission_operation::AdmissionOperationStore,
+        operation_store: &dyn crate::security_admission_operation::AdmissionOperationStore,
         mut operation: AdmissionOperation,
         cap: &CapabilityToken,
         expected_grant_index: usize,

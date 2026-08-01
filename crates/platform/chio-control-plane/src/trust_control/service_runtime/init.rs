@@ -50,6 +50,44 @@ pub(crate) async fn serve_async(
     )?;
     let verifier_policy_registry =
         load_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
+    let joint_authority_store = match config.joint_authority_db_path.as_deref() {
+        Some(path) => {
+            SqliteAuthorityStore::ensure_serving_supported()?;
+            let lock_root = crate::durable_admission_lock_root(path)?;
+            crate::create_private_directory(&lock_root)?;
+            SqliteAuthorityStore::provision(path, &lock_root)?;
+            Some(Arc::new(SqliteAuthorityStore::open_serving(
+                path, &lock_root,
+            )?))
+        }
+        None => None,
+    };
+    let fiscal_runtime = compose_trust_fiscal_runtime(
+        joint_authority_store.as_ref(),
+        config.fiscal_runtime.as_ref(),
+    )?;
+    let budget_store = config
+        .budget_db_path
+        .as_deref()
+        .map(SqliteBudgetStore::open)
+        .transpose()
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to open trust-control budget store: {error}"
+            ))
+        })?
+        .map(Arc::new);
+    let revocation_store = config
+        .revocation_db_path
+        .as_deref()
+        .map(SqliteRevocationStore::open)
+        .transpose()
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to open trust-control revocation store: {error}"
+            ))
+        })?
+        .map(Arc::new);
     let cluster = build_cluster_state(&config, local_addr)?;
     // Thread the operator-configured memory budget into the admission guard so a
     // lowered `admission_key_cap` actually tightens it. Read the cap before
@@ -62,6 +100,10 @@ pub(crate) async fn serve_async(
         super::super::dashboard_reports::DashboardReportBridge::from_config(&config)?;
     let mut state = TrustServiceState {
         config,
+        joint_authority_store,
+        fiscal_runtime,
+        budget_store,
+        revocation_store,
         dashboard_sessions: super::super::dashboard_auth::DashboardSessionStore::production(),
         dashboard_report_bridge,
         authority_keyring,
@@ -260,5 +302,64 @@ mod tests {
                 "teardown at elapsed={elapsed:?} must stay within the drain window"
             );
         }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_authority_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn trust_service_rejects_windows_before_creating_joint_authority_state(
+    ) -> Result<(), CliError> {
+        let directory = tempfile::tempdir()?;
+        let state_parent = directory.path().join("state");
+        let database = state_parent.join("joint-authority.sqlite3");
+        let lock_root = crate::durable_admission_lock_root(&database)?;
+        let config = TrustServiceConfig {
+            listen: SocketAddr::from(([127, 0, 0, 1], 0)),
+            service_token: "service-token".to_string(),
+            tenant_read_tokens: BTreeMap::new(),
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            joint_authority_db_path: Some(database.clone()),
+            fiscal_runtime: None,
+            enterprise_providers_file: None,
+            federation_policies_file: None,
+            scim_lifecycle_file: None,
+            verifier_policies_file: None,
+            verifier_challenge_db_path: None,
+            passport_statuses_file: None,
+            passport_issuance_offers_file: None,
+            certification_registry_file: None,
+            certification_discovery_file: None,
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            advertise_url: None,
+            allow_local_peer_urls: false,
+            certification_public_metadata_ttl_seconds: 300,
+            peer_urls: Vec::new(),
+            cluster_sync_interval: Duration::from_millis(25),
+            roster_policy: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        };
+
+        let Err(error) = serve_async(config).await else {
+            return Err(CliError::cli_other_error(
+                "Windows trust service unexpectedly started with a joint authority database",
+            ));
+        };
+
+        assert!(error
+            .to_string()
+            .contains("sqlite authority serving requires Unix file identity and positioned I/O"));
+        assert!(!state_parent.exists());
+        assert!(!database.exists());
+        assert!(!lock_root.exists());
+        assert!(std::fs::read_dir(directory.path())?.next().is_none());
+        Ok(())
     }
 }

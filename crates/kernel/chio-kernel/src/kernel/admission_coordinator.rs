@@ -1,8 +1,4 @@
 use super::*;
-use crate::admission_operation::{
-    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
-    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationState,
-};
 use crate::approval::{ApprovalReservation, ApprovalSetReservationInput};
 use crate::budget_store::{
     derive_verified_invocation_admission, BudgetAdmissionOperationBinding,
@@ -10,6 +6,10 @@ use crate::budget_store::{
 };
 use crate::execution_nonce::{
     verify_execution_nonce_stateless, ExecutionNonceReservation, NonceBinding,
+};
+use crate::security_admission_operation::{
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
+    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationState,
 };
 use crate::supplemental_quota::{
     OpaqueSignedSupplementalQuota, SupplementalAdmissionAuthorization, SupplementalAdmissionPlan,
@@ -884,7 +884,7 @@ impl ChioKernel {
         }
         self.discharge_admission_cleanup_action(
             &operation,
-            crate::admission_operation::AdmissionCleanupActionKind::Approval,
+            crate::security_admission_operation::AdmissionCleanupActionKind::Approval,
         )?;
         if let Err(error) = self.commit_admission_execution_nonce(&operation) {
             self.compensate_capture_pending_threshold_before_dispatch(
@@ -898,7 +898,7 @@ impl ChioKernel {
         if operation.execution_nonce_id().is_some() {
             self.discharge_admission_cleanup_action(
                 &operation,
-                crate::admission_operation::AdmissionCleanupActionKind::ExecutionNonce,
+                crate::security_admission_operation::AdmissionCleanupActionKind::ExecutionNonce,
             )?;
         }
         let metadata = match self.commit_threshold_protocol_dispatch(cap, admission) {
@@ -1147,7 +1147,7 @@ impl ChioKernel {
 
     fn frozen_threshold_budget_authorization(
         &self,
-        operation_store: &dyn crate::admission_operation::AdmissionOperationStore,
+        operation_store: &dyn crate::security_admission_operation::AdmissionOperationStore,
         operation: &AdmissionOperation,
         cap: &CapabilityToken,
         grant_index: usize,

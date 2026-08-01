@@ -194,17 +194,20 @@ pub(crate) struct ReceiptConnectionManager {
     path: PathBuf,
     flags: rusqlite::OpenFlags,
     database_identity_file: Arc<ReceiptDatabaseIdentityFile>,
+    max_page_count: Option<u32>,
 }
 
 impl ReceiptConnectionManager {
     pub(in crate::receipt_store) fn new(
         path: &Path,
         database_identity_file: Arc<ReceiptDatabaseIdentityFile>,
+        max_page_count: Option<u32>,
     ) -> Self {
         Self {
             path: path.to_path_buf(),
             flags: existing_database_open_flags(),
             database_identity_file,
+            max_page_count,
         }
     }
 }
@@ -229,7 +232,7 @@ impl r2d2::ManageConnection for ReceiptConnectionManager {
         self.database_identity_file
             .validate_live_connection(&connection)
             .map_err(receipt_store_error_as_sqlite_error)?;
-        configure_sqlite_connection(&mut connection)
+        configure_sqlite_connection(&mut connection, self.max_page_count)
             .map_err(receipt_store_error_as_sqlite_error)?;
         self.database_identity_file
             .validate_live_connection(&connection)
@@ -337,13 +340,14 @@ fn build_receipt_pool(
     max_size: u32,
     pool_name: &str,
     database_identity_file: Arc<ReceiptDatabaseIdentityFile>,
+    max_page_count: Option<u32>,
 ) -> Result<Pool<ReceiptConnectionManager>, ReceiptStoreError> {
     if max_size == 0 {
         return Err(ReceiptStoreError::Pool(format!(
             "{pool_name} receipt sqlite pool max_size must be greater than zero"
         )));
     }
-    let manager = ReceiptConnectionManager::new(path, database_identity_file);
+    let manager = ReceiptConnectionManager::new(path, database_identity_file, max_page_count);
     let preflight = r2d2::ManageConnection::connect(&manager)
         .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
     drop(preflight);

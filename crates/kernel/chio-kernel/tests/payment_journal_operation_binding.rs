@@ -22,7 +22,9 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_store_sqlite::budget_store::SqliteCompositeAuthorizeInput;
-use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteBudgetStore, SqliteReceiptStore};
+use chio_store_sqlite::{
+    SqliteBudgetStore, SqliteReceiptStore, SqliteSecurityAdmissionOperationStore,
+};
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     chio_test_support::private_fs::unique_sqlite_path(prefix)
@@ -332,7 +334,7 @@ fn terminal_operation_store(
 ) -> Result<
     (
         std::path::PathBuf,
-        Arc<SqliteAdmissionOperationStore>,
+        Arc<SqliteSecurityAdmissionOperationStore>,
         std::path::PathBuf,
         Arc<SqliteReceiptStore>,
         AdmissionOperation,
@@ -340,7 +342,7 @@ fn terminal_operation_store(
     Box<dyn std::error::Error>,
 > {
     let path = unique_db_path("operation-bound-terminal-owner");
-    let store = Arc::new(SqliteAdmissionOperationStore::open(&path)?);
+    let store = Arc::new(SqliteSecurityAdmissionOperationStore::open(&path)?);
     let receipt_path = unique_db_path("operation-bound-terminal-receipts");
     let receipt_store = Arc::new(SqliteReceiptStore::open(&receipt_path)?);
     let prepared = AdmissionOperation::prepared(PreparedAdmissionOperation {
@@ -521,7 +523,9 @@ fn caller_reserved_operation_defers_payment_recovery_to_admission_owner(
     let operation_db_path = unique_db_path("operation-bound-journal-caller-reserved-operations");
     let receipt_db_path = unique_db_path("operation-bound-journal-caller-reserved-receipts");
     let budget_store = Arc::new(SqliteBudgetStore::open(&budget_db_path)?);
-    let operation_store = Arc::new(SqliteAdmissionOperationStore::open(&operation_db_path)?);
+    let operation_store = Arc::new(SqliteSecurityAdmissionOperationStore::open(
+        &operation_db_path,
+    )?);
     let receipt_store = Arc::new(SqliteReceiptStore::open(&receipt_db_path)?);
     let request_id = "req-operation-caller-reserved";
     let request_binding_hash = "66".repeat(32);

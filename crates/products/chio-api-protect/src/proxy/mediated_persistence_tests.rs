@@ -121,7 +121,7 @@
         budget_path: &str,
         request_id: &str,
     ) -> Vec<chio_kernel::AdmissionOperation> {
-        let store = chio_store_sqlite::SqliteAdmissionOperationStore::open(format!(
+        let store = chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(format!(
             "{budget_path}.admission-operations"
         ))
         .unwrap();
@@ -1002,7 +1002,7 @@
         assert!(std::path::Path::new(&nonce_path).exists());
 
         let operation_store =
-            chio_store_sqlite::SqliteAdmissionOperationStore::open(&operation_path).unwrap();
+            chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(&operation_path).unwrap();
         assert!(operation_store
             .authority_profile()
             .supports_dispatch_workers(1));
@@ -1161,7 +1161,7 @@
         // Persist an unresolved operation owned by the original signer. A valid
         // but different restart seed must fail closed on this immutable owner.
         let operation_store =
-            chio_store_sqlite::SqliteAdmissionOperationStore::open(&operation_path).unwrap();
+            chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(&operation_path).unwrap();
         let operation = chio_kernel::AdmissionOperation::prepared(
             chio_kernel::PreparedAdmissionOperation {
                 kind: chio_kernel::AdmissionOperationKind::ToolDispatch,
@@ -1226,7 +1226,7 @@
         );
 
         let operation_store =
-            chio_store_sqlite::SqliteAdmissionOperationStore::open(&operation_path).unwrap();
+            chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(&operation_path).unwrap();
         assert_eq!(
             operation_store.load(&operation_id).unwrap().unwrap(),
             operation_before,

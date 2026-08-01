@@ -21,7 +21,7 @@ use chio_decoy::{
     MAX_IJSON_INTEGER,
 };
 use chio_flow::{CategoryLabelMap, DeclassificationDispatchOutcome, FlowDenial};
-use chio_kernel::admission_operation::AdmissionOperationStore;
+use chio_kernel::security_admission_operation::AdmissionOperationStore;
 use chio_kernel::approval::ApprovalStore;
 use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::{
@@ -60,7 +60,7 @@ use chio_store_sqlite::security_state::{
     SecurityStateLifecycleOwnerProof, SqliteSecurityStateStore,
 };
 use chio_store_sqlite::{
-    SqliteAdmissionOperationStore, SqliteApprovalStore, SqliteReceiptStore,
+    SqliteSecurityAdmissionOperationStore, SqliteApprovalStore, SqliteReceiptStore,
     SqliteSealedDecoyRegistryStore,
 };
 use hmac::{Hmac, Mac};
@@ -173,7 +173,7 @@ pub(super) struct ProductionSecurityRuntimeFactoryConfig {
 pub(super) struct ProductionSecurityRuntimeFactory {
     security_state_authority: ProductionSecurityStateAuthority,
     security_store: Arc<SqliteSecurityStateStore>,
-    admission_operation_store: Arc<SqliteAdmissionOperationStore>,
+    admission_operation_store: Arc<SqliteSecurityAdmissionOperationStore>,
     approval_store: Arc<SqliteApprovalStore>,
     budget_store: Arc<dyn BudgetStore>,
     receipt_store: Arc<SqliteReceiptStore>,
@@ -910,7 +910,7 @@ impl ProductionSecurityRuntimeFactory {
         let tripwire_detector: Arc<dyn TripwireDetectorPort> = Arc::new(native_detector);
 
         let admission_operation_store = Arc::new(
-            SqliteAdmissionOperationStore::open(&config.admission_operation_database_path)
+            SqliteSecurityAdmissionOperationStore::open(&config.admission_operation_database_path)
                 .map_err(|error| {
                     invalid(format!("admission operation store is unavailable: {error}"))
                 })?,

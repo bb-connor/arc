@@ -28,14 +28,14 @@ fn admission_authority_commits_and_state_writes_recover_exactly() {
     registration.ids.operation_id.clone_from(&operation_id);
     let mut inventory = AuthorityCrashBoundaryInventory::default();
 
-    let before_create = SqliteAdmissionOperationStore::open(&operation_path).test_unwrap();
+    let before_create = SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap();
     assert_eq!(before_create.load(&operation_id).test_unwrap(), None);
     inventory.before("operation.create_prepared", || {
         before_create.create_prepared(prepared.clone())
     });
     drop(before_create);
 
-    let create_store = SqliteAdmissionOperationStore::open(&operation_path).test_unwrap();
+    let create_store = SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap();
     let lost_create = lose_response_after_commit(
         || create_store.create_prepared(prepared.clone()),
         AdmissionOperationError::Unavailable(
@@ -49,7 +49,7 @@ fn admission_authority_commits_and_state_writes_recover_exactly() {
     drop(create_store);
     inventory.response_lost("operation.create_prepared");
 
-    let reopened_create = SqliteAdmissionOperationStore::open(&operation_path).test_unwrap();
+    let reopened_create = SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap();
     let created = reopened_create
         .load(&operation_id)
         .test_unwrap()
@@ -1416,7 +1416,7 @@ fn approval_only_admission_recovers_without_budget_or_nonce_participants() {
     assert!(prepared.budget_hold_id().is_none());
     assert!(prepared.execution_nonce_id().is_none());
     let operation_id = prepared.operation_id().to_string();
-    let store = SqliteAdmissionOperationStore::open(&operation_path).test_unwrap();
+    let store = SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap();
     store.create_prepared(prepared).test_unwrap();
     let AdmissionOperationCasOutcome::Applied(reserved) = store
         .compare_and_swap(AdmissionOperationCompareAndSwap {
@@ -1434,7 +1434,7 @@ fn approval_only_admission_recovers_without_budget_or_nonce_participants() {
     };
     drop(store);
 
-    let reopened = SqliteAdmissionOperationStore::open(&operation_path).test_unwrap();
+    let reopened = SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap();
     assert_eq!(
         reopened.load(&operation_id).test_unwrap(),
         Some(reserved.clone())
@@ -1455,7 +1455,7 @@ fn approval_only_admission_recovers_without_budget_or_nonce_participants() {
     };
     drop(reopened);
 
-    let reopened = SqliteAdmissionOperationStore::open(&operation_path).test_unwrap();
+    let reopened = SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap();
     assert!(matches!(
         reopened
             .compare_and_swap(AdmissionOperationCompareAndSwap {
@@ -1498,7 +1498,7 @@ fn approval_only_admission_recovers_without_budget_or_nonce_participants() {
         panic!("completion and terminal receipt outbox insert must apply atomically");
     };
     drop(reopened);
-    let reopened = SqliteAdmissionOperationStore::open(&operation_path).test_unwrap();
+    let reopened = SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap();
     assert_eq!(reopened.load(&operation_id).test_unwrap(), Some(completed));
     assert_eq!(
         reopened.load_cleanup_actions(&operation_id).test_unwrap(),
@@ -1822,7 +1822,7 @@ fn live_aggregate_kernel(
         .test_unwrap();
     kernel
         .set_admission_operation_store_handle(Arc::new(
-            SqliteAdmissionOperationStore::open(operation_path).test_unwrap(),
+            SqliteSecurityAdmissionOperationStore::open(operation_path).test_unwrap(),
         ))
         .test_unwrap();
     kernel
@@ -1871,7 +1871,7 @@ fn signed_receipt_budget_metadata_matches_durable_store_events() {
     let mut kernel = make_kernel(Keypair::from_seed(&[51; 32]));
     kernel
         .set_admission_operation_store_handle(Arc::new(
-            SqliteAdmissionOperationStore::open(&operation_path).test_unwrap(),
+            SqliteSecurityAdmissionOperationStore::open(&operation_path).test_unwrap(),
         ))
         .test_unwrap();
     kernel

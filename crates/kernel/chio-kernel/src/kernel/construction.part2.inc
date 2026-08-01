@@ -702,9 +702,9 @@ impl ChioKernel {
         }
         if !matches!(
             operation.state(),
-            crate::admission_operation::AdmissionOperationState::BudgetAuthorized
-                | crate::admission_operation::AdmissionOperationState::ReadyToDispatch
-                | crate::admission_operation::AdmissionOperationState::CapturePending
+            crate::security_admission_operation::AdmissionOperationState::BudgetAuthorized
+                | crate::security_admission_operation::AdmissionOperationState::ReadyToDispatch
+                | crate::security_admission_operation::AdmissionOperationState::CapturePending
         ) {
             return Err(KernelError::GovernedTransactionDenied(format!(
                 "admission operation {} cannot reserve an execution nonce from {}",
@@ -745,7 +745,7 @@ impl ChioKernel {
             || reservation.nonce_id() != presented.nonce_id()
             || reservation.signed_expires_at() != presented.expires_at()
             || reservation.state()
-                == crate::admission_operation::ReplayReservationState::Cancelled
+                == crate::security_admission_operation::ReplayReservationState::Cancelled
         {
             return Err(KernelError::GovernedTransactionDenied(
                 "ordinary execution nonce reservation returned a different or cancelled binding"

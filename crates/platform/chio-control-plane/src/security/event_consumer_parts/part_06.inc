@@ -109,7 +109,7 @@
 
     struct RealAdapterRecordingExecutor {
         inner: RealAdapterDurableExecutor,
-        admission_operations: Arc<SqliteAdmissionOperationStore>,
+        admission_operations: Arc<SqliteSecurityAdmissionOperationStore>,
         approvals: Arc<SqliteApprovalStore>,
         calls: AtomicUsize,
         fail_before_effect_once: AtomicBool,
@@ -266,7 +266,7 @@
     struct RealAdapterRuntime {
         kernel: Arc<ChioKernel>,
         coordinator: Arc<KernelAttestedFindingResponseCoordinator>,
-        admission_operations: Arc<SqliteAdmissionOperationStore>,
+        admission_operations: Arc<SqliteSecurityAdmissionOperationStore>,
         approvals: Arc<SqliteApprovalStore>,
         effects: Arc<RealAdapterEffects>,
         executor: Arc<RealAdapterRecordingExecutor>,
@@ -414,7 +414,7 @@
         fail_before_effect_once: bool,
     ) -> RealAdapterRuntime {
         let admission_operations = Arc::new(
-            SqliteAdmissionOperationStore::open(&paths.admission_operations)
+            SqliteSecurityAdmissionOperationStore::open(&paths.admission_operations)
                 .unwrap_or_else(|error| panic!("open real adapter operation store: {error}")),
         );
         let approvals = Arc::new(

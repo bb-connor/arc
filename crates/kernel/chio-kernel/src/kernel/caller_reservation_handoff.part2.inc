@@ -825,7 +825,7 @@ impl ChioKernel {
 
     pub(super) fn validate_caller_reserved_handoff_with_store(
         &self,
-        store: &dyn crate::admission_operation::AdmissionOperationStore,
+        store: &dyn crate::security_admission_operation::AdmissionOperationStore,
         operation: &AdmissionOperation,
     ) -> Result<(), KernelError> {
         self.validated_caller_reserved_handoff_receipt_with_store(store, operation)
@@ -834,7 +834,7 @@ impl ChioKernel {
 
     pub(super) fn validated_caller_reserved_handoff_receipt_with_store(
         &self,
-        store: &dyn crate::admission_operation::AdmissionOperationStore,
+        store: &dyn crate::security_admission_operation::AdmissionOperationStore,
         operation: &AdmissionOperation,
     ) -> Result<ChioReceipt, KernelError> {
         let intent_action = exact_handoff_action(

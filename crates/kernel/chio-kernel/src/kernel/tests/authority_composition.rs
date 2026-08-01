@@ -513,6 +513,7 @@ fn authority_replacement_updates_every_signer_and_then_latches_closed() {
         &[b"receipt".to_vec()],
         checkpoint_backend.as_ref(),
         None,
+        &CheckpointChainFrontier::empty(),
     )
     .unwrap();
     assert_eq!(checkpoint.body.kernel_key, replacement_public_key);
@@ -956,6 +957,7 @@ fn receipt_checkpoint_hydration_requires_resolver_trust_and_accepts_anchored_his
         &[b"current-checkpoint".to_vec()],
         &Ed25519Backend::new(current_signer),
         None,
+        &CheckpointChainFrontier::empty(),
     )
     .unwrap();
     let current_store = Arc::new(AuthorityCompositionReceiptStore::default());
@@ -998,6 +1000,7 @@ fn receipt_checkpoint_hydration_requires_resolver_trust_and_accepts_anchored_his
         &[b"historical-checkpoint".to_vec()],
         &Ed25519Backend::new(historical_signer.clone()),
         None,
+        &CheckpointChainFrontier::empty(),
     )
     .unwrap();
     let historical_artifact =
@@ -1275,6 +1278,7 @@ fn split_backend_fails_closed_for_every_governed_artifact() {
         &[b"receipt".to_vec()],
         kernel.authority_signing_backend.as_ref(),
         None,
+        &CheckpointChainFrontier::empty(),
     )
     .is_err());
 }

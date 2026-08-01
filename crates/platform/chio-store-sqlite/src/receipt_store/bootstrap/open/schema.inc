@@ -736,7 +736,10 @@ fn upgrade_receipt_store_schema(
     Ok(())
 }
 
-fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), ReceiptStoreError> {
+fn configure_sqlite_connection(
+    connection: &mut Connection,
+    max_page_count: Option<u32>,
+) -> Result<(), ReceiptStoreError> {
     connection.execute_batch(
         r#"
         PRAGMA journal_mode = WAL;
@@ -747,6 +750,15 @@ fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), Receip
         "#,
     )?;
     assert_sqlite_durability_pragmas(connection)?;
+    if let Some(max_page_count) = max_page_count {
+        connection.pragma_update(None, "max_page_count", max_page_count)?;
+        let effective: i64 = connection.query_row("PRAGMA max_page_count", [], |row| row.get(0))?;
+        if effective != i64::from(max_page_count) {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "sqlite max_page_count requested {max_page_count} but effective limit is {effective}"
+            )));
+        }
+    }
     Ok(())
 }
 

@@ -1453,7 +1453,7 @@ fn build_sync_response_page(
         .partition_point(|commit| commit.body.checkpoint_sequence <= candidate_checkpoint_sequence);
     let consistency_proof = if event_start > 0 && event_start < page_end {
         let leaves = canonical_event_leaves(&events[..page_end])?;
-        Some(MerkleTree::from_leaves(&leaves)?.consistency_proof(event_start)?)
+        Some(MerkleTree::from_leaves(&leaves)?.consistency_proof_record(event_start)?)
     } else {
         None
     };

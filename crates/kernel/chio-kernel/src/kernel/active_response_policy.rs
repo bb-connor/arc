@@ -291,7 +291,7 @@ impl ChioKernel {
             })?;
             let incomplete = operation_store
                 .count_unresolved_by_authority(
-                    crate::admission_operation::AdmissionOperationKind::GovernedActiveResponse,
+                    crate::security_admission_operation::AdmissionOperationKind::GovernedActiveResponse,
                     installed.identity.authority_id(),
                 )
                 .map_err(|error| {
@@ -361,7 +361,7 @@ impl ChioKernel {
             operation_store.as_ref(),
             self.budget_store.as_ref(),
             self.approval_store.as_deref(),
-            crate::admission_operation::AdmissionOperationKind::GovernedActiveResponse,
+            crate::security_admission_operation::AdmissionOperationKind::GovernedActiveResponse,
             executor_identity.authority_id(),
         )?;
         self.governed_active_response_plans_enabled = true;

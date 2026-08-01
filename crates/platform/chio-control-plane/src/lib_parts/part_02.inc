@@ -71,9 +71,9 @@ pub fn compose_partition_escrow_remote_admission_runtime(
             config.control_token,
             config.authority,
         )?;
-    let operation_store: Arc<dyn chio_kernel::admission_operation::AdmissionOperationStore> =
+    let operation_store: Arc<dyn chio_kernel::security_admission_operation::AdmissionOperationStore> =
         Arc::new(
-            chio_store_sqlite::SqliteAdmissionOperationStore::open(
+            chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(
                 config.admission_operation_db_path,
             )
             .map_err(|error| {
@@ -157,9 +157,9 @@ pub fn compose_ordinary_admission_runtime(
 
     // Open every authority before mutating the kernel. The consuming API then
     // drops the kernel on any subsequent installation or activation failure.
-    let operation_store: Arc<dyn chio_kernel::admission_operation::AdmissionOperationStore> =
+    let operation_store: Arc<dyn chio_kernel::security_admission_operation::AdmissionOperationStore> =
         Arc::new(
-            chio_store_sqlite::SqliteAdmissionOperationStore::open(operation_path).map_err(
+            chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(operation_path).map_err(
                 |error| {
                     CliError::cli_other_error(format!(
                         "failed to open durable admission-operation store: {error}"

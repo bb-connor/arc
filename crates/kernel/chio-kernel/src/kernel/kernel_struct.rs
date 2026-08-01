@@ -557,7 +557,7 @@ pub struct ChioKernel {
         Option<Arc<crate::partition_escrow::PartitionEscrowRegistry>>,
     pub(super) budget_store_lock: Mutex<()>,
     pub(super) admission_operation_store:
-        Option<Arc<dyn crate::admission_operation::AdmissionOperationStore>>,
+        Option<Arc<dyn crate::security_admission_operation::AdmissionOperationStore>>,
     pub(super) approval_store: Option<Arc<dyn crate::approval::ApprovalStore>>,
     pub(super) dispatch_worker_count: usize,
     pub(super) aggregate_invocation_admission_enabled: bool,

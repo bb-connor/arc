@@ -3,12 +3,12 @@ use std::sync::Arc;
 use chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
 use chio_core::PublicKey;
 
-use crate::admission_operation::{
-    AdmissionOperationKind, AdmissionOperationStore, AdmissionOperationStoreProfile,
-};
 use crate::approval::{ApprovalStore, ApprovalStoreProfile};
 use crate::budget_store::{BudgetStore, BudgetStoreProfile};
 use crate::post_invocation::PostInvocationPipeline;
+use crate::security_admission_operation::{
+    AdmissionOperationKind, AdmissionOperationStore, AdmissionOperationStoreProfile,
+};
 use crate::threshold_approval::ThresholdApprovalRequirementResolver;
 use crate::{
     CapabilityIssuanceAdmissionAuthority, Guard, SecurityPreDispatchHook, SecurityPreDispatchPolicy,

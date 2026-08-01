@@ -37,11 +37,7 @@ fn unique_db_path(prefix: &str) -> PathBuf {
 }
 
 fn unique_seed_path(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.seed"))
+    chio_test_support::private_fs::unique_sqlite_path(prefix).with_extension("seed")
 }
 
 fn loopback_bind_available() -> bool {

@@ -404,9 +404,9 @@ mod tests {
         request: &BrokerExecuteRequest,
         provisional_ids: &AttemptIds,
         request_binding_hash: &str,
-    ) -> (SqliteAdmissionOperationStore, AdmissionOperation) {
+    ) -> (SqliteSecurityAdmissionOperationStore, AdmissionOperation) {
         let store = must(
-            SqliteAdmissionOperationStore::open(path),
+            SqliteSecurityAdmissionOperationStore::open(path),
             "open admission operation store",
         );
         let operation = must(
@@ -440,7 +440,7 @@ mod tests {
     }
 
     fn advance_broker_admission_operation(
-        store: &SqliteAdmissionOperationStore,
+        store: &SqliteSecurityAdmissionOperationStore,
         operation_id: &str,
         state: AdmissionOperationState,
         dispatch_state: AdmissionDispatchState,

@@ -745,6 +745,17 @@ pub struct BudgetEventAuthority {
     pub lease_epoch: u64,
 }
 
+impl BudgetEventAuthority {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        if self.authority_id.is_empty() || self.lease_id.is_empty() || self.lease_epoch == 0 {
+            return Err(BudgetStoreError::Invariant(
+                "budget event authority requires a non-empty fenced lease".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BudgetAdmissionOperationBinding {
@@ -840,6 +851,30 @@ pub enum BudgetGuaranteeLevel {
     HaLinearizable,
     PartitionEscrowed,
     AdvisoryPosthoc,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevocationCommitMetadata {
+    pub authority: BudgetEventAuthority,
+    pub guarantee_level: BudgetGuaranteeLevel,
+    pub commit_index: u64,
+}
+
+impl RevocationCommitMetadata {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        self.authority.validate()?;
+        if self.commit_index == 0
+            || !matches!(
+                self.guarantee_level,
+                BudgetGuaranteeLevel::SingleNodeAtomic | BudgetGuaranteeLevel::HaLinearizable
+            )
+        {
+            return Err(BudgetStoreError::Invariant(
+                "revocation commit metadata requires an atomic fenced authority".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -13,7 +13,7 @@ impl SqliteReceiptStore {
         )?;
         self.database_identity_file
             .validate_live_connection(&connection)?;
-        configure_sqlite_connection(&mut connection)?;
+        configure_sqlite_connection(&mut connection, self.max_page_count)?;
         self.database_identity_file
             .validate_live_connection(&connection)?;
         let state = Arc::new(SqliteReceiptBoundConnectionState::new(
@@ -143,7 +143,7 @@ impl SqliteReceiptStore {
                 RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
             )
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-            configure_sqlite_connection(&mut connection)?;
+            configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
             database_identity_file.validate_live_connection(&connection)?;
             if on_disk_version < RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
                 upgrade_receipt_store_schema(&mut connection, on_disk_version)?;
@@ -174,12 +174,14 @@ impl SqliteReceiptStore {
                 options.pool.reader_pool_max_size,
                 "reader",
                 Arc::clone(&database_identity_file),
+                options.pool.max_page_count,
             )?;
             let writer_pool = build_receipt_pool(
                 &path,
                 options.pool.writer_pool_max_size,
                 "writer",
                 Arc::clone(&database_identity_file),
+                options.pool.max_page_count,
             )?;
             database_identity_file.validate_path_binding(&path)?;
 
@@ -194,6 +196,7 @@ impl SqliteReceiptStore {
                 pool: reader_pool,
                 database_identity,
                 database_identity_file,
+                max_page_count: options.pool.max_page_count,
                 strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
                 writer_lifetime_lock,
@@ -215,7 +218,7 @@ impl SqliteReceiptStore {
             RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-        configure_sqlite_connection(&mut connection)?;
+        configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
         database_identity_file.validate_live_connection(&connection)?;
         if on_disk_version == 2 {
             upgrade_receipt_store_schema(&mut connection, on_disk_version)?;
@@ -1210,12 +1213,14 @@ impl SqliteReceiptStore {
             options.pool.reader_pool_max_size,
             "reader",
             Arc::clone(&database_identity_file),
+            options.pool.max_page_count,
         )?;
         let writer_pool = build_receipt_pool(
             &path,
             options.pool.writer_pool_max_size,
             "writer",
             Arc::clone(&database_identity_file),
+            options.pool.max_page_count,
         )?;
         database_identity_file.validate_path_binding(&path)?;
 
@@ -1230,6 +1235,7 @@ impl SqliteReceiptStore {
             pool: reader_pool,
             database_identity,
             database_identity_file,
+            max_page_count: options.pool.max_page_count,
             strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
             writer_lifetime_lock,
@@ -1247,6 +1253,7 @@ impl SqliteReceiptStore {
             crate::SqlitePoolConfig {
                 reader_pool_max_size,
                 writer_pool_max_size,
+                max_page_count: None,
             },
         )
     }

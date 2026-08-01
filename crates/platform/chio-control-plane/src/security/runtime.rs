@@ -3,9 +3,9 @@ use std::sync::Arc;
 use chio_core::receipt::metadata::GuardEvidence;
 use chio_core::PublicKey;
 use chio_guards::{GuardPipeline, RuntimeGuardProfile};
-use chio_kernel::admission_operation::AdmissionOperationStore;
 use chio_kernel::approval::ApprovalStore;
 use chio_kernel::budget_store::BudgetStore;
+use chio_kernel::security_admission_operation::AdmissionOperationStore;
 use chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver;
 use chio_kernel::{
     ActiveResponseExecutorAuthority, ActiveResponseFindingAuthority,

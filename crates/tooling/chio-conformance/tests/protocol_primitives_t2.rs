@@ -72,8 +72,8 @@ use chio_secret_broker::store::{
 use chio_secret_broker::BrokerError;
 use chio_store_sqlite::budget_store::SqliteCompositeAuthorizeInput;
 use chio_store_sqlite::{
-    SqliteAdmissionCaptureAuthority, SqliteAdmissionOperationStore, SqliteApprovalStore,
-    SqliteBudgetStore, SqliteExecutionNonceStore, SqliteReceiptStore,
+    SqliteAdmissionCaptureAuthority, SqliteApprovalStore, SqliteBudgetStore,
+    SqliteExecutionNonceStore, SqliteReceiptStore, SqliteSecurityAdmissionOperationStore,
 };
 use chio_test_support::prelude::*;
 use rusqlite::Connection;
@@ -835,7 +835,7 @@ fn recover_terminal_operation_after_lost_response(
         last_error: terminal.last_error().map(ToOwned::to_owned),
     };
 
-    let before = SqliteAdmissionOperationStore::open(operation_path).test_unwrap();
+    let before = SqliteSecurityAdmissionOperationStore::open(operation_path).test_unwrap();
     assert_eq!(
         before.load(current.operation_id()).test_unwrap(),
         Some(current.clone())
@@ -849,7 +849,7 @@ fn recover_terminal_operation_after_lost_response(
     });
     drop(before);
 
-    let store = SqliteAdmissionOperationStore::open(operation_path).test_unwrap();
+    let store = SqliteSecurityAdmissionOperationStore::open(operation_path).test_unwrap();
     let lost = lose_response_after_commit(
         || store.compare_and_swap_with_cleanup_action(request(), action.clone()),
         AdmissionOperationError::Unavailable(
@@ -860,7 +860,7 @@ fn recover_terminal_operation_after_lost_response(
     drop(store);
     inventory.response_lost(BOUNDARY);
 
-    let reopened = SqliteAdmissionOperationStore::open(operation_path).test_unwrap();
+    let reopened = SqliteSecurityAdmissionOperationStore::open(operation_path).test_unwrap();
     let recovered = reopened
         .load(current.operation_id())
         .test_unwrap()
@@ -1034,7 +1034,7 @@ fn recover_operation_state_after_lost_response(
         next_coordinator_lease_epoch: current.coordinator_lease_epoch(),
         last_error: None,
     };
-    let before = SqliteAdmissionOperationStore::open(path).test_unwrap();
+    let before = SqliteSecurityAdmissionOperationStore::open(path).test_unwrap();
     assert_eq!(
         before.load(operation_id).test_unwrap().as_ref(),
         Some(current)
@@ -1046,7 +1046,7 @@ fn recover_operation_state_after_lost_response(
     inventory.before(boundary, || before.compare_and_swap(request()));
     drop(before);
 
-    let store = SqliteAdmissionOperationStore::open(path).test_unwrap();
+    let store = SqliteSecurityAdmissionOperationStore::open(path).test_unwrap();
     let lost = lose_response_after_commit(
         || store.compare_and_swap(request()),
         AdmissionOperationError::Unavailable(
@@ -1057,7 +1057,7 @@ fn recover_operation_state_after_lost_response(
     drop(store);
     inventory.response_lost(boundary);
 
-    let reopened = SqliteAdmissionOperationStore::open(path).test_unwrap();
+    let reopened = SqliteSecurityAdmissionOperationStore::open(path).test_unwrap();
     let recovered = reopened.load(operation_id).test_unwrap().test_unwrap();
     assert_eq!(recovered.state(), next_state);
     assert_eq!(recovered.dispatch_state(), next_dispatch_state);

@@ -51,7 +51,7 @@ use chio_store_sqlite::budget_store::{
     SqliteAggregateFamilyEvidence, SqliteCompositeAuthorizeInput,
 };
 use chio_store_sqlite::{
-    SqliteAdmissionCaptureAuthority, SqliteAdmissionOperationStore, SqliteBudgetStore,
+    SqliteAdmissionCaptureAuthority, SqliteSecurityAdmissionOperationStore, SqliteBudgetStore,
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
@@ -706,7 +706,7 @@ impl AuthoritativeBrokerExecutionAdapter {
         let database_path = database_path.as_ref();
         let budget = Arc::new(SqliteBudgetStore::open(database_path)?);
         let capture = Arc::new(SqliteAdmissionCaptureAuthority::open(database_path)?);
-        let admission_operations = Arc::new(SqliteAdmissionOperationStore::open(
+        let admission_operations = Arc::new(SqliteSecurityAdmissionOperationStore::open(
             admission_operation_database_path,
         )?);
         let registry = BrokerPendingAdmissionRegistry::open(database_path)?;

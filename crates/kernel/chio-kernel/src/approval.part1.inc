@@ -17,7 +17,7 @@ use chio_core::crypto::{sha256_hex, PublicKey};
 use chio_log_redact::redacted;
 use serde::{Deserialize, Serialize};
 
-use crate::admission_operation::ReplayReservationState;
+use crate::security_admission_operation::ReplayReservationState;
 use crate::runtime::{ToolCallRequest, Verdict};
 use crate::{AgentId, KernelError, ServerId};
 
@@ -450,11 +450,11 @@ fn normalize_approval_reservation_members(
     mut members: Vec<ApprovalReservationMember>,
 ) -> Result<Vec<ApprovalReservationMember>, ApprovalStoreError> {
     if members.is_empty()
-        || members.len() > crate::admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+        || members.len() > crate::security_admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
     {
         return Err(ApprovalStoreError::Invalid(format!(
             "approval member count must be between 1 and {}",
-            crate::admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+            crate::security_admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
         )));
     }
     for member in &members {

@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
 use super::*;
-use crate::admission_operation::{
+use crate::security_admission_operation::{
     AdmissionCleanupAction, AdmissionCleanupActionKind, AdmissionCleanupActionState,
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
     AdmissionOperationCompareAndSwap, AdmissionOperationKind, AdmissionOperationState,

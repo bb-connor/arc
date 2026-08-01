@@ -53,7 +53,8 @@ use chio_security_types::ports::{
 };
 use chio_security_types::PrincipalId;
 use chio_store_sqlite::{
-    SqliteAdmissionOperationStore, SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
+    SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
+    SqliteSecurityAdmissionOperationStore,
 };
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -359,8 +360,10 @@ fn install_test_flow_runtime(kernel: &mut ChioKernel) -> tempfile::TempDir {
         },
     );
     let admission_operation_store = Arc::new(
-        SqliteAdmissionOperationStore::open(directory.path().join("admission-operations.sqlite3"))
-            .unwrap(),
+        SqliteSecurityAdmissionOperationStore::open(
+            directory.path().join("admission-operations.sqlite3"),
+        )
+        .unwrap(),
     );
     let approval_store =
         Arc::new(SqliteApprovalStore::open(directory.path().join("approvals.sqlite3")).unwrap());

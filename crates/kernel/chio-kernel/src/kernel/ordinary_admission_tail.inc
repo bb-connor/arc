@@ -181,7 +181,7 @@ impl ChioKernel {
             }
             self.discharge_admission_cleanup_action(
                 &operation,
-                crate::admission_operation::AdmissionCleanupActionKind::Approval,
+                crate::security_admission_operation::AdmissionCleanupActionKind::Approval,
             )?;
         }
         if mode.commits_presented_replay_reservations() {
@@ -191,7 +191,7 @@ impl ChioKernel {
                     if operation.execution_nonce_id().is_some() {
                         self.discharge_admission_cleanup_action(
                             &operation,
-                            crate::admission_operation::AdmissionCleanupActionKind::ExecutionNonce,
+                            crate::security_admission_operation::AdmissionCleanupActionKind::ExecutionNonce,
                         )?;
                     }
                     Ok(())

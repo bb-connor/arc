@@ -362,6 +362,22 @@ impl SqliteReceiptStore {
                     )
                 })
         })?;
+        let mut prior_chain_leaf_hashes = Vec::new();
+        if let Some(previous) = previous_checkpoint.as_ref() {
+            for seq in 1..=previous.body.checkpoint_seq {
+                let chained = Self::load_checkpoint_by_seq_locked(connection, seq)?.ok_or_else(
+                    || ReceiptStoreError::Conflict(format!("checkpoint chain has a gap at seq {seq}")),
+                )?;
+                prior_chain_leaf_hashes.push(
+                    crate::checkpoint::checkpoint_chain_leaf_hash(&chained.body).map_err(
+                        |error| ReceiptStoreError::Conflict(format!("checkpoint chain leaf failed: {error}")),
+                    )?,
+                );
+            }
+        }
+        let prior_chain = crate::checkpoint::CheckpointChainFrontier::from_leaves(
+            &prior_chain_leaf_hashes,
+        );
         let checkpoint = build_checkpoint_with_backend(
             checkpoint_seq,
             batch_start_seq,
@@ -369,6 +385,7 @@ impl SqliteReceiptStore {
             &receipt_bytes,
             backend,
             previous_checkpoint.as_ref(),
+            &prior_chain,
         )
         .map_err(|error| {
             ReceiptStoreError::Conflict(format!("checkpoint build failed: {error}"))

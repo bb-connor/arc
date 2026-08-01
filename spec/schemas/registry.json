@@ -17,10 +17,34 @@
       "schemaFile": "spec/schemas/chio-web3/v1/anchor-inclusion-proof.schema.json"
     },
     {
+      "schema": "chio.anchor-inclusion-proof.v2",
+      "artifactKind": "anchor_inclusion_proof",
+      "introducedBy": "checkpoint-transparency-v2",
+      "schemaFile": "spec/schemas/chio-web3/v2/anchor-inclusion-proof.schema.json"
+    },
+    {
       "schema": "chio.anchor-proof-bundle.v1",
       "artifactKind": "anchor_proof_bundle",
       "introducedBy": "public-settlement-v1",
       "schemaFile": "spec/schemas/chio-web3/v1/anchor-proof-bundle.schema.json"
+    },
+    {
+      "schema": "chio.anchor-proof-bundle.v2",
+      "artifactKind": "anchor_proof_bundle",
+      "introducedBy": "checkpoint-transparency-v2",
+      "schemaFile": "spec/schemas/chio-web3/v2/anchor-proof-bundle.schema.json"
+    },
+    {
+      "schema": "chio.aggregate-budget-root.v1",
+      "artifactKind": "aggregate_budget_root_binding",
+      "introducedBy": "protocol-primitives-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/aggregate-budget-root.schema.json"
+    },
+    {
+      "schema": "chio.budget-snapshot-anchor-provenance.v1",
+      "artifactKind": "budget_snapshot_anchor_provenance",
+      "introducedBy": "economic-state-continuity-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust-control/budget-snapshot-anchor-provenance.schema.json"
     },
     {
       "schema": "chio.attest.buyer-attestation-explanation.v1",
@@ -1392,6 +1416,12 @@
       "artifactKind": "transparency_inclusion_proof",
       "introducedBy": "crypto-context-v1",
       "schemaFile": "spec/schemas/chio-transparency/v1/inclusion-proof.schema.json"
+    },
+    {
+      "schema": "chio.transparency.inclusion-proof.v2",
+      "artifactKind": "transparency_anchored_inclusion_proof",
+      "introducedBy": "checkpoint-transparency-v2",
+      "schemaFile": "spec/schemas/chio-transparency/v2/inclusion-proof.schema.json"
     },
     {
       "schema": "chio.transaction-passport.v1",

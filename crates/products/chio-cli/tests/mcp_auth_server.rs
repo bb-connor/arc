@@ -50,7 +50,15 @@ fn unique_test_dir() -> TestDir {
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_nanos();
-    TestDir(std::env::temp_dir().join(format!("chio-cli-auth-server-{nonce}")))
+    let path = std::env::temp_dir().join(format!("chio-cli-auth-server-{nonce}"));
+    fs::create_dir_all(&path).expect("create private auth server test directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+            .expect("secure private auth server test directory");
+    }
+    TestDir(path)
 }
 
 fn auth_server_test_guard() -> std::sync::MutexGuard<'static, ()> {

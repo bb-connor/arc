@@ -464,6 +464,9 @@ pub(crate) struct VerifiedHead {
     /// The newest checkpoint the actor has verified, already parsed and
     /// signature-checked once. `None` before the first checkpoint.
     latest_checkpoint: Option<KernelCheckpoint>,
+    /// Cached frontier for the signed checkpoint chain. A missing frontier is
+    /// rebuilt by a full semantic chain audit before checkpoint issuance.
+    chain_frontier: Option<CheckpointChainFrontier>,
     /// Row count of `claim_receipt_log_entries` as last verified.
     claim_log_count: u64,
     /// MAX(entry_seq) of `claim_receipt_log_entries` as last verified.

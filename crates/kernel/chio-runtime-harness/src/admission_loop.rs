@@ -20,6 +20,7 @@ pub(crate) struct RuntimeLoopbackAdmissionOutput {
 pub(crate) fn execute_runtime_admission_loop(
     steps: &[RuntimeLoopbackStep],
     store: &chio_runtime_core::JsonRuntimeAdmissionStore,
+    authority: &chio_store_sqlite::SqliteAuthorityStore,
     now_unix_ms: u64,
     out_dir: &Path,
 ) -> Result<RuntimeLoopbackAdmissionOutput, RuntimeLoopbackError> {
@@ -103,7 +104,8 @@ pub(crate) fn execute_runtime_admission_loop(
                 step.admission_bundle.step_index
             ))
         })?;
-        let execution = execute_runtime_loopback_step(index, step, arguments, now_unix_ms)?;
+        let execution =
+            execute_runtime_loopback_step(index, step, arguments, authority, now_unix_ms)?;
         live_tool_receipts.push(execution.receipt);
         live_treaty_contexts.push(execution.treaty);
     }

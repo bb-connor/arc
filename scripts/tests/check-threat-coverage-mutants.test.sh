@@ -34,6 +34,11 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 # Neutralize ambient CI so argument behavior is deterministic.
 unset CI
 
+# The pre-expiry cases assert bootstrap_placeholder behavior, so the fixture
+# pins a far-future expiry regardless of the wall clock; the post-expiry case
+# overrides this with an explicit past date to assert bootstrap_expired.
+export CHIO_BOOTSTRAP_EXPIRY="2099-01-01"
+
 MODEL="$TMP_DIR/threat-model.json"
 EVIDENCE_DIR="$TMP_DIR/evidence"
 CASES_DIR="$TMP_DIR/cases"

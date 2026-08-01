@@ -90,7 +90,7 @@ pub(crate) fn scope_fixed_runtime_unix_secs_for_current_thread(
     FixedRuntimeUnixSecsScope { previous_unix_secs }
 }
 
-pub(crate) fn fixed_runtime_unix_secs_for_current_thread() -> Option<u64> {
+pub fn fixed_runtime_unix_secs_for_current_thread() -> Option<u64> {
     FIXED_RUNTIME_UNIX_SECS.with(|slot| *slot.borrow())
 }
 

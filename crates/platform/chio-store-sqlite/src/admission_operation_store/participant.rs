@@ -501,25 +501,25 @@ pub(super) fn validate_payment_reconcile_binding(
         }
         None => match (journal.rail_mode, journal.state, journal.settle_action) {
             (
-                chio_kernel::payment::PaymentRailMode::PrepaidFinal,
-                chio_kernel::payment::PaymentJournalState::Settled,
+                chio_kernel::agent_economy_payment::PaymentRailMode::PrepaidFinal,
+                chio_kernel::agent_economy_payment::PaymentJournalState::Settled,
                 None,
             ) => journal.amount_units,
             (
-                chio_kernel::payment::PaymentRailMode::ReversibleHold,
-                chio_kernel::payment::PaymentJournalState::Settling
-                | chio_kernel::payment::PaymentJournalState::Settled,
-                Some(chio_kernel::payment::PaymentSettleAction::Capture),
+                chio_kernel::agent_economy_payment::PaymentRailMode::ReversibleHold,
+                chio_kernel::agent_economy_payment::PaymentJournalState::Settling
+                | chio_kernel::agent_economy_payment::PaymentJournalState::Settled,
+                Some(chio_kernel::agent_economy_payment::PaymentSettleAction::Capture),
             ) => journal.settle_amount_units.ok_or_else(|| {
                 AdmissionPaymentJournalError::Invariant(
                     "capturing payment journal omitted settlement amount".to_owned(),
                 )
             })?,
             (
-                chio_kernel::payment::PaymentRailMode::ReversibleHold,
-                chio_kernel::payment::PaymentJournalState::Settling
-                | chio_kernel::payment::PaymentJournalState::Settled,
-                Some(chio_kernel::payment::PaymentSettleAction::Release),
+                chio_kernel::agent_economy_payment::PaymentRailMode::ReversibleHold,
+                chio_kernel::agent_economy_payment::PaymentJournalState::Settling
+                | chio_kernel::agent_economy_payment::PaymentJournalState::Settled,
+                Some(chio_kernel::agent_economy_payment::PaymentSettleAction::Release),
             ) => 0,
             _ => {
                 return Err(AdmissionPaymentJournalError::Invariant(
@@ -552,7 +552,7 @@ pub(super) fn verify_payment_terminal_source<'a>(
         if !requires_payment {
             return Ok(());
         }
-        let journal = crate::budget_store::load_payment_journal(
+        let journal = crate::agent_economy_budget_store::load_payment_journal(
             transaction,
             operation.binding().operation_id().as_str(),
         )
@@ -565,7 +565,7 @@ pub(super) fn verify_payment_terminal_source<'a>(
         journal
             .validate()
             .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?;
-        if journal.state != chio_kernel::payment::PaymentJournalState::Authorized
+        if journal.state != chio_kernel::agent_economy_payment::PaymentJournalState::Authorized
             || journal.settle_action.is_some()
             || journal.settle_amount_units.is_some()
             || journal.release_authority.is_some()
@@ -583,7 +583,7 @@ pub(super) fn verify_payment_terminal_source<'a>(
     let Some(bytes) = records.first() else {
         return Ok(());
     };
-    let journal = crate::budget_store::load_payment_journal(
+    let journal = crate::agent_economy_budget_store::load_payment_journal(
         transaction,
         operation.binding().operation_id().as_str(),
     )
@@ -598,8 +598,8 @@ pub(super) fn verify_payment_terminal_source<'a>(
         .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?;
     if !matches!(
         journal.state,
-        chio_kernel::payment::PaymentJournalState::Settled
-            | chio_kernel::payment::PaymentJournalState::Closed
+        chio_kernel::agent_economy_payment::PaymentJournalState::Settled
+            | chio_kernel::agent_economy_payment::PaymentJournalState::Closed
     ) {
         return Err(AdmissionOperationStoreError::Invariant(
             "terminal payment source journal is not settled".to_owned(),

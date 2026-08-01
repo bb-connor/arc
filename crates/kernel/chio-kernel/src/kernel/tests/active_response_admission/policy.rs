@@ -157,7 +157,7 @@ fn enable_active_response_plan_feature(
         fixture
             .kernel
             .set_admission_operation_store_handle(Arc::new(super::super::ProfiledTestStore::new(
-                crate::admission_operation::AdmissionOperationStoreProfile::SingleNodeDurable,
+                crate::security_admission_operation::AdmissionOperationStoreProfile::SingleNodeDurable,
             )))
             .expect("durable active-response operation store");
     }
@@ -192,7 +192,7 @@ fn enable_threshold_feature(kernel: &mut ChioKernel) {
         .expect("threshold policy authority");
     kernel
         .set_admission_operation_store_handle(Arc::new(super::super::ProfiledTestStore::new(
-            crate::admission_operation::AdmissionOperationStoreProfile::SingleNodeDurable,
+            crate::security_admission_operation::AdmissionOperationStoreProfile::SingleNodeDurable,
         )))
         .expect("durable operation store");
     kernel

@@ -2,7 +2,7 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_security_types::ResponsePlan;
 use serde::Serialize;
 
-use crate::admission_operation::{
+use crate::security_admission_operation::{
     AdmissionOperation, AdmissionOperationState, AdmissionRequestBindingInput,
     AdmissionRequestBindingParts,
 };

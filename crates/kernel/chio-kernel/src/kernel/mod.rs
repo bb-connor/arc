@@ -213,6 +213,61 @@ pub trait CapabilityIssuanceAdmissionAuthority: Send + Sync {
     ) -> chio_security_types::ports::PortResult<()>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct VerifiedGovernedPayeeBinding {
+    beneficiary_id: String,
+    settlement_destination_ref: String,
+    payee_binding_digest: String,
+    economic_intent_digest: String,
+    pre_action_authority_digest: String,
+}
+
+impl VerifiedGovernedPayeeBinding {
+    pub(in crate::kernel) fn new(
+        beneficiary_id: String,
+        settlement_destination_ref: String,
+        economic_intent_digest: String,
+        pre_action_authority_digest: String,
+    ) -> Result<Self, chio_credit::obligation::ObligationError> {
+        let payee_binding_digest = chio_credit::obligation::derive_obligation_payee_binding_digest(
+            &beneficiary_id,
+            &settlement_destination_ref,
+        )?;
+        Ok(Self {
+            beneficiary_id,
+            settlement_destination_ref,
+            payee_binding_digest,
+            economic_intent_digest,
+            pre_action_authority_digest,
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn beneficiary_id(&self) -> &str {
+        &self.beneficiary_id
+    }
+
+    #[must_use]
+    pub(crate) fn settlement_destination_ref(&self) -> &str {
+        &self.settlement_destination_ref
+    }
+
+    #[must_use]
+    pub(crate) fn payee_binding_digest(&self) -> &str {
+        &self.payee_binding_digest
+    }
+
+    #[must_use]
+    pub(crate) fn economic_intent_digest(&self) -> &str {
+        &self.economic_intent_digest
+    }
+
+    #[must_use]
+    pub(crate) fn pre_action_authority_digest(&self) -> &str {
+        &self.pre_action_authority_digest
+    }
+}
+
 /// Authoritative security identity and isolation state supplied by a trusted
 /// runtime boundary. Tool-call request fields are not a source for this data.
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -6,13 +6,6 @@ use crate::admission_capture_authority::{
     AdmissionCaptureDecision, AdmissionCaptureRequest, AdmissionCaptureRequestInput,
     CombinedAdmissionCaptureReceiptProjection,
 };
-use crate::admission_operation::{
-    AdmissionCleanupAction, AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
-    AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
-    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
-    AdmissionOperationCompareAndSwap, AdmissionOperationKind, AdmissionOperationState,
-    AdmissionOperationStore, ReplayReservationState,
-};
 use crate::approval::ApprovalStore;
 use crate::budget_store::{
     AuthorizedBudgetHold, BudgetAuthorityProfile, BudgetCommitMetadata, BudgetEventAuthority,
@@ -23,6 +16,13 @@ use crate::budget_store::{
 };
 use crate::execution_nonce::{is_supported_execution_nonce_schema, SignedExecutionNonce};
 use crate::payment::{PaymentJournalRecord, PaymentJournalState};
+use crate::security_admission_operation::{
+    AdmissionCleanupAction, AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
+    AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
+    AdmissionOperationCompareAndSwap, AdmissionOperationKind, AdmissionOperationState,
+    AdmissionOperationStore, ReplayReservationState,
+};
 
 const CALLER_RESERVATION_HANDOFF_INTENT_SCHEMA: &str = "chio.caller-reservation-handoff-intent.v1";
 const CALLER_RESERVATION_HANDOFF_INTENT_DOMAIN: &str =
@@ -1396,7 +1396,7 @@ fn parse_handoff_payload(
 }
 
 fn exact_handoff_action(
-    store: &dyn crate::admission_operation::AdmissionOperationStore,
+    store: &dyn crate::security_admission_operation::AdmissionOperationStore,
     operation_id: &str,
     kind: AdmissionCleanupActionKind,
 ) -> Result<AdmissionCleanupAction, KernelError> {

@@ -897,7 +897,7 @@ impl ChioKernel {
             operation_store.as_ref(),
             self.budget_store.as_ref(),
             Some(approval_store.as_ref()),
-            crate::admission_operation::AdmissionOperationKind::ToolDispatch,
+            crate::security_admission_operation::AdmissionOperationKind::ToolDispatch,
             &format!("kernel:{}", self.public_key().to_hex()),
         )
     }

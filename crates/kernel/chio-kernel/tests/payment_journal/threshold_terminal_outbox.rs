@@ -27,7 +27,8 @@ use chio_kernel::{
     ReceiptStore, ToolCallRequest, ToolInvocationCost, ToolServerConnection, Verdict,
 };
 use chio_store_sqlite::{
-    SqliteAdmissionOperationStore, SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
+    SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
+    SqliteSecurityAdmissionOperationStore,
 };
 
 use super::support;
@@ -325,7 +326,7 @@ impl PaymentAdapter for AckLossOperationPaymentRail {
 
 struct ThresholdArtifacts {
     request: ToolCallRequest,
-    operation_store: Arc<SqliteAdmissionOperationStore>,
+    operation_store: Arc<SqliteSecurityAdmissionOperationStore>,
     budget_store: Arc<SqliteBudgetStore>,
     receipt_store: Arc<SqliteReceiptStore>,
     payment: AckLossOperationPaymentRail,
@@ -439,7 +440,9 @@ fn threshold_fixture() -> Result<(ChioKernel, ThresholdArtifacts), Box<dyn std::
     let approval_path = support::unique_db_path("threshold-terminal-approvals");
     let receipt_store = Arc::new(SqliteReceiptStore::open(&receipt_path)?);
     let budget_store = Arc::new(SqliteBudgetStore::open(&budget_path)?);
-    let operation_store = Arc::new(SqliteAdmissionOperationStore::open(&operation_path)?);
+    let operation_store = Arc::new(SqliteSecurityAdmissionOperationStore::open(
+        &operation_path,
+    )?);
     let approval_store = Arc::new(SqliteApprovalStore::open(&approval_path)?);
     let payment = AckLossOperationPaymentRail::new();
     let observations = Arc::new(Mutex::new(Vec::new()));

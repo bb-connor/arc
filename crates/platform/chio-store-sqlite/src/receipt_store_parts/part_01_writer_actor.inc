@@ -826,28 +826,19 @@ fn build_due_checkpoints_and_record(
     let signer = checkpoint_signer.as_ref()?;
     // Panic isolation: a panic mid-build
     // (Merkle build, Ed25519 sign, serde) must not kill the writer thread.
-    // `head.latest_checkpoint` is only ever assigned AFTER the per-checkpoint
-    // transaction commits (see `maybe_build_checkpoint`), so a panic
-    // anywhere before that leaves `head` exactly as it was; a caught panic
-    // is therefore handled identically to a non-panicking `Err`: record
-    // `last_error`, leave the head untouched, keep the thread alive.
+    // A committed or peer-adopted checkpoint can advance the verified head
+    // before a later panic drops its frontier. Record `last_error` and rebuild.
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         build_due_checkpoints(pool, head, signer)
     }))
     .unwrap_or_else(|payload| Err(receipt_writer_job_panic_error(&payload)));
     match result {
-        Ok(built) => {
+        Ok(advanced) => {
             health.store_head_snapshot(head);
             health.resolve_owed_checkpoint_error(head.checkpointed_entry_seq());
-            // Recovery signal: a prior background
-            // checkpoint build may have set `last_error`. A later SUCCESSFUL
-            // build is reached here through a writer-routed op (a `Write` job
-            // crossing the threshold), which does NOT run the append batch's
-            // `last_error` reset, so without this the store keeps reporting
-            // unhealthy after it has recovered. Clear the stale error only on an
-            // ACTUAL build (`built`), never on a no-op due-check, so a genuinely
-            // current error is not masked by an idle refresh.
-            if built {
+            // Clear a stale background error only after this attempt advances
+            // the verified head. An idle refresh must not mask a current error.
+            if advanced {
                 if let Ok(mut last_error) = health.last_error.lock() {
                     *last_error = None;
                 }
@@ -917,6 +908,7 @@ fn build_due_checkpoints(
     let mut connection = pool
         .get()
         .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
+    let checkpoint_seq_before_refresh = head.checkpoint_seq();
     // Shared-file freshness: on a shared receipt DB
     // another writer can commit a checkpoint AFTER this actor's append
     // pre-check but BEFORE its batch tx. `append_receipt_batch` then adopts that
@@ -930,12 +922,14 @@ fn build_due_checkpoints(
     // NOT a full chain verify, so the incremental hot path stays flat per
     // append.
     verify_head_against_latest_checkpoint(&connection, head)?;
-    maybe_build_checkpoint(&mut connection, head, signer)
+    let refreshed = head.checkpoint_seq() > checkpoint_seq_before_refresh;
+    maybe_build_checkpoint(&mut connection, head, signer).map(|advanced| refreshed || advanced)
 }
 
 /// Build every checkpoint the head owes: count-based ADR-0008 trigger, range
 /// derived from the cached head (NOT next_checkpoint_range_for_connection,
-/// which runs a full chain verify), O(b) work per checkpoint.
+/// which runs a full chain verify). Cost is O(b) over the receipt batch plus
+/// O(log n) over the cached checkpoint-chain frontier.
 fn maybe_build_checkpoint(
     connection: &mut SqliteStoreConnection,
     head: &mut VerifiedHead,
@@ -944,7 +938,35 @@ fn maybe_build_checkpoint(
     if signer.max_batch == 0 {
         return Ok(false);
     }
-    let mut built = false;
+    if head
+        .claim_log_max_seq
+        .saturating_sub(head.checkpointed_entry_seq())
+        < signer.max_batch
+    {
+        return Ok(false);
+    }
+    let cached = head
+        .chain_frontier
+        .as_ref()
+        .filter(|frontier| frontier.leaf_count() == head.checkpoint_seq())
+        .cloned();
+    let mut advanced = false;
+    let mut chain_frontier = match cached {
+        Some(frontier) => frontier,
+        None => {
+            let (frontier, cache_advanced) =
+                build_checkpoint_after_frontier_cache_miss(connection, head, signer)?;
+            advanced = cache_advanced;
+            frontier
+        }
+    };
+    if chain_frontier.leaf_count() != head.checkpoint_seq() {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "persisted chain covers {} checkpoints but the head is at {}",
+            chain_frontier.leaf_count(),
+            head.checkpoint_seq()
+        )));
+    }
     while head
         .claim_log_max_seq
         .saturating_sub(head.checkpointed_entry_seq())
@@ -961,7 +983,8 @@ fn maybe_build_checkpoint(
             .checkpoint_seq()
             .checked_add(1)
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
-        // O(b) Merkle build; predecessor digest comes from the cached head.
+        // The pluggable signer preserves HSM/keyring authority while the
+        // frontier binds the complete checkpoint history.
         let checkpoint = chio_kernel::build_checkpoint_with_backend(
             checkpoint_seq,
             start_seq,
@@ -969,6 +992,7 @@ fn maybe_build_checkpoint(
             &receipt_bytes,
             signer.backend.as_ref(),
             head.latest_checkpoint.as_ref(),
+            &chain_frontier,
         )
         .map_err(checkpoint_error_to_receipt_store)?;
         #[cfg(test)]
@@ -983,20 +1007,23 @@ fn maybe_build_checkpoint(
         }
         #[cfg(test)]
         test_hooks::block_during_checkpoint_build(signer.max_batch);
-        ensure_checkpoint_transparency_guards(connection)?;
-        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         // The insert returns the checkpoint now persisted at this seq: either
         // the one we just built, or a concurrently committed winner (clock-skew
         // sibling) it validated and adopted. Catch the cached head up to THAT
         // checkpoint so a later verify_head_against_latest_checkpoint does not
         // see our discarded byte-different build diverge from the persisted row.
-        let adopted =
-            insert_checkpoint_incremental_tx(&tx, head.latest_checkpoint.as_ref(), &checkpoint)?;
-        tx.commit()?;
+        let (adopted, adopted_frontier) = insert_background_checkpoint_guarded(
+            connection,
+            head.latest_checkpoint.as_ref(),
+            &chain_frontier,
+            &checkpoint,
+        )?;
+        chain_frontier = adopted_frontier;
         head.latest_checkpoint = Some(adopted);
-        built = true;
+        advanced = true;
     }
-    Ok(built)
+    head.chain_frontier = Some(chain_frontier);
+    Ok(advanced)
 }
 
 /// Head-resync rule: one indexed delta aggregate plus one

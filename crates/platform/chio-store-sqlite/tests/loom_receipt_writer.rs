@@ -120,10 +120,14 @@ mod model {
         }
 
         fn try_send(&self, job: u64) -> Option<InflightReleaseHandle> {
+            self.try_send_bounded(job, QUEUE_CAPACITY)
+        }
+
+        fn try_send_bounded(&self, job: u64, capacity: usize) -> Option<InflightReleaseHandle> {
             let (inflight, release_handle, _previous_inflight) =
                 InflightLease::acquire(&self.inflight, &self.backlog_started, &self.transition);
             match self.queue.lock() {
-                Ok(mut queue) if queue.len() < QUEUE_CAPACITY => {
+                Ok(mut queue) if queue.len() < capacity => {
                     queue.push_back(Command { job, inflight });
                     Some(release_handle)
                 }
@@ -226,6 +230,29 @@ mod model {
                 0,
                 "inflight must be zero after every accepted intent and consume drains"
             );
+            assert_eq!(channel.backlog_started.load(Ordering::SeqCst), 0);
+        });
+    }
+
+    #[test]
+    fn queue_full_rejection_restores_inflight() {
+        loom::model(|| {
+            let channel = Arc::new(Channel::new());
+            let producer_a = {
+                let channel = Arc::clone(&channel);
+                thread::spawn(move || channel.try_send_bounded(1, 1))
+            };
+            let producer_b = {
+                let channel = Arc::clone(&channel);
+                thread::spawn(move || channel.try_send_bounded(2, 1))
+            };
+            let sent_a = producer_a.join().ok().flatten();
+            let sent_b = producer_b.join().ok().flatten();
+            let accepted = u64::from(sent_a.is_some()) + u64::from(sent_b.is_some());
+            assert_eq!(accepted, 1);
+            assert_eq!(channel.inflight.load(Ordering::SeqCst), accepted);
+            assert_eq!(channel.drain(), accepted);
+            assert_eq!(channel.inflight.load(Ordering::SeqCst), 0);
             assert_eq!(channel.backlog_started.load(Ordering::SeqCst), 0);
         });
     }

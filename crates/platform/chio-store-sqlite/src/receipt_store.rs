@@ -1,5 +1,6 @@
 #[path = "receipt_store/bootstrap.rs"]
 mod bootstrap;
+mod chaos_test_hooks;
 #[path = "receipt_store/evidence_retention.rs"]
 mod evidence_retention;
 #[path = "receipt_store/liability_claims.rs"]

@@ -6,10 +6,10 @@ use chio_core::crypto::sha256_hex;
 pub use chio_core_types::StoreMutationFence;
 use serde::{Deserialize, Serialize};
 
-pub const ADMISSION_OPERATION_SCHEMA: &str = "chio.admission-operation.v1";
-const ADMISSION_OPERATION_DOMAIN: &[u8] = b"chio.admission-operation.v1\0";
-const ADMISSION_REQUEST_BINDING_DOMAIN: &[u8] = b"chio.admission-request-binding.v1\0";
-const ADMISSION_CLEANUP_ACTION_DOMAIN: &[u8] = b"chio.admission-cleanup-action.v1\0";
+pub const ADMISSION_OPERATION_SCHEMA: &str = "chio.security-admission-operation.v1";
+const ADMISSION_OPERATION_DOMAIN: &[u8] = b"chio.security-admission-operation.v1\0";
+const ADMISSION_REQUEST_BINDING_DOMAIN: &[u8] = b"chio.security-admission-request-binding.v1\0";
+const ADMISSION_CLEANUP_ACTION_DOMAIN: &[u8] = b"chio.security-admission-cleanup-action.v1\0";
 const MAX_ADMISSION_IDENTIFIER_BYTES: usize = 512;
 const MAX_ADMISSION_ERROR_BYTES: usize = 4_096;
 // A complete cleanup snapshot can contain every verified quota and the full

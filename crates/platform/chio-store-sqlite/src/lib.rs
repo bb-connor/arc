@@ -28,19 +28,26 @@ use std::path::{Path, PathBuf};
 
 pub mod admission_capture_authority;
 pub mod admission_operation_store;
+pub mod agent_economy_budget_store;
 pub mod aggregate_family_root;
 pub mod approval_store;
 pub mod authority;
 pub mod batch_approval_store;
 pub mod budget_store;
 pub mod capability_lineage;
+pub mod channel_lifecycle_store;
+pub mod channel_release_publisher_store;
+pub mod clearing_lifecycle_store;
 pub mod dead_letters;
 pub mod durable_sqlite;
+pub mod economic_state_cache;
 pub mod eip3009_nonces;
 pub mod encrypted_blob;
 pub mod enterprise_migration_state;
 pub mod evidence_export;
 pub mod execution_nonce_store;
+pub mod fiscal_store;
+pub mod frost_store;
 pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
@@ -50,8 +57,11 @@ pub mod receipt_store;
 pub mod revocation_store;
 pub mod schema_version;
 pub mod sealed_decoy_registry;
+pub mod security_admission_operation_store;
 pub mod security_state;
+pub mod serving_owner;
 pub mod settle_attempts;
+pub mod tool_outcome_store;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
 pub use chio_core::{CanonicalBytes, CanonicalJsonWitness};
@@ -68,11 +78,21 @@ pub const DEFAULT_READER_POOL_MAX_SIZE: u32 = 8;
 /// writer pool defaults to a single connection.
 pub const DEFAULT_WRITER_POOL_MAX_SIZE: u32 = 1;
 
-/// SQLite pool sizing for receipt-store read and write paths.
+/// SQLite pool sizing and per-connection growth bound for receipt-store read
+/// and write paths.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SqlitePoolConfig {
     pub reader_pool_max_size: u32,
     pub writer_pool_max_size: u32,
+    /// Optional `PRAGMA max_page_count` ceiling applied to every pooled
+    /// connection. An operational bound on the logical page count of the MAIN
+    /// database file: a write that would push the main file past the cap fails
+    /// closed with a full-database error. This bounds the main file only, not the
+    /// `-wal` sidecar, so it is not a whole-volume guard: under checkpoint
+    /// starvation the WAL can still grow unbounded. `None` (the default) leaves
+    /// SQLite's built-in page ceiling in place, so a store opened without this
+    /// knob behaves exactly as before.
+    pub max_page_count: Option<u32>,
 }
 
 impl Default for SqlitePoolConfig {
@@ -80,6 +100,7 @@ impl Default for SqlitePoolConfig {
         Self {
             reader_pool_max_size: DEFAULT_READER_POOL_MAX_SIZE,
             writer_pool_max_size: DEFAULT_WRITER_POOL_MAX_SIZE,
+            max_page_count: None,
         }
     }
 }
@@ -107,7 +128,10 @@ impl Default for SqliteStoreOptions {
 pub use admission_capture_authority::{
     SqliteAdmissionCaptureAuthority, SqliteRevocationWriteOutcome,
 };
-pub use admission_operation_store::SqliteAdmissionOperationStore;
+pub use admission_operation_store::{
+    CreditExposureAccountSnapshot, DurableObligationV1, SqliteAdmissionOperationStore,
+};
+pub use agent_economy_budget_store::SqliteBudgetStore as SqliteAgentEconomyBudgetStore;
 pub use aggregate_family_root::{
     aggregate_family_root_token_digest, AggregateFamilyRootLookupSnapshot,
     AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError, StoredAggregateFamilyRoot,
@@ -117,13 +141,29 @@ pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{
-    BudgetInvocationQuotaUsageRecord, SqliteBudgetAuthorizationAuthority,
+    BudgetInvocationQuotaUsageRecord, BudgetStoreSnapshot, SqliteBudgetAuthorizationAuthority,
     SqliteBudgetAuthorizationOutcome, SqliteBudgetCurrentAuthority, SqliteBudgetStore,
 };
 pub use capability_lineage::{
     CapabilitySessionAdmissionRegistration, FinalizeCapabilityIssuanceInput,
     PrepareCapabilityIssuanceIntentInput, PreparedCapabilityIssuance,
 };
+pub use channel_lifecycle_store::{
+    ChannelLifecycleStoreError, ChannelPreparedAdmissionRecordV1, ChannelPreparedBeginResult,
+    ChannelReservationDispositionV1, ChannelReservationStageRecordV1, SqliteChannelLifecycleStore,
+};
+pub use channel_release_publisher_store::{
+    ChannelReleasePublicationRecordV1, ChannelReleasePublicationStatusV1,
+    ChannelReleasePublisherError, ChannelReleaseSubmissionOutcomeV1,
+    SqliteChannelReleasePublisherStore, VerifiedChannelReleasePublicationV1,
+};
+pub use clearing_lifecycle_store::{ClearingLifecycleStoreError, SqliteClearingLifecycleStore};
+pub use economic_state_cache::{
+    admission_terminal_projection_effect_result, EconomicOperationStageBinding,
+    EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
+    EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
+};
+pub use security_admission_operation_store::SqliteAdmissionOperationStore as SqliteSecurityAdmissionOperationStore;
 
 /// Whether a SQLite path opens a database that lives only in memory for the life
 /// of the process. rusqlite enables URI filenames, so the bare `:memory:`
@@ -270,6 +310,11 @@ fn sqlite_uri_filesystem_path(text: &str) -> PathBuf {
     PathBuf::from(filesystem)
 }
 
+#[must_use]
+pub fn sqlite_filesystem_path(text: &str) -> PathBuf {
+    sqlite_uri_filesystem_path(text)
+}
+
 pub use eip3009_nonces::SqliteEip3009NonceStore;
 pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobReference, BlobReferenceMutationOutcome,
@@ -282,6 +327,16 @@ pub use enterprise_migration_state::{
     SqliteEnterpriseMigrationStateStoreError,
 };
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
+pub use frost_store::{
+    FrostActiveRosterRecord, FrostCeremonyRecord, FrostCeremonyRound1Record,
+    FrostCeremonyRound2Record, FrostCeremonyState, FrostCoordinatorCancellation,
+    FrostCoordinatorCommitment, FrostCoordinatorLease, FrostCoordinatorSessionRecord,
+    FrostCoordinatorSessionRequest, FrostCoordinatorSessionState, FrostCoordinatorShare,
+    FrostCoordinatorSigningPackage, FrostCustodyKey, FrostRotationRecord, FrostRotationState,
+    FrostSignerCommitment, FrostSignerSessionRecord, FrostSignerSessionRequest,
+    FrostSignerSessionState, FrostSignerShare, FrostStoreError, SqliteFrostStore,
+    StagedFrostRotation, StoredFrostCeremonyCompletion,
+};
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
 pub use receipt_store::{
@@ -294,7 +349,14 @@ pub use schema_version::{
 };
 pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
 pub use security_state::SqliteSecurityStateStore;
-pub use settle_attempts::SqliteSettlementRetryStore;
+pub use serving_owner::{
+    scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, SqliteAuthorityStore,
+    SqliteServingOwnerError,
+};
+pub use settle_attempts::{
+    SqliteSettlementOutcomeStore, SqliteSettlementRetryStore, SETTLE_ATTEMPTS_MIGRATION,
+};
+pub use tool_outcome_store::SqliteToolOutcomeStore;
 
 #[cfg(test)]
 mod tests {

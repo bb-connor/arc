@@ -20,12 +20,12 @@ use chio_security_types::{
 };
 use serde::Serialize;
 
-use crate::admission_operation::{
+use crate::approval::{ApprovalReservation, ApprovalSetReservationInput};
+use crate::security_admission_operation::{
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
     AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationKind,
     AdmissionOperationState, PreparedAdmissionOperation, ReplayReservationState,
 };
-use crate::approval::{ApprovalReservation, ApprovalSetReservationInput};
 use crate::threshold_approval::{
     verify_threshold_approval_set, ThresholdApprovalProposal, ThresholdApprovalVerificationInput,
     VerifiedThresholdApprovalSet,

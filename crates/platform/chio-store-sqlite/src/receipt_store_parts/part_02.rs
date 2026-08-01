@@ -51,10 +51,12 @@ pub(crate) struct WriterHeadSnapshot {
 /// once (the startup path for the O(N) check; also the audit-repair path).
 fn seed_verified_head(connection: &Connection) -> Result<VerifiedHead, ReceiptStoreError> {
     validate_claim_receipt_log_entries(connection)?;
-    let latest_checkpoint = verify_checkpoint_chain_integrity(connection)?;
+    let (latest_checkpoint, chain_frontier) =
+        verify_checkpoint_chain_integrity_with_frontier(connection)?;
     let (claim_log_count, claim_log_max_seq) = claim_log_delta_count_and_max_seq(connection, 0)?;
     Ok(VerifiedHead {
         latest_checkpoint,
+        chain_frontier: Some(chain_frontier),
         claim_log_count,
         claim_log_max_seq,
     })
@@ -71,6 +73,7 @@ fn seed_head_snapshot(connection: &Connection) -> Result<VerifiedHead, ReceiptSt
     let (claim_log_count, claim_log_max_seq) = claim_log_delta_count_and_max_seq(connection, 0)?;
     Ok(VerifiedHead {
         latest_checkpoint,
+        chain_frontier: None,
         claim_log_count,
         claim_log_max_seq,
     })
@@ -256,6 +259,12 @@ fn catch_up_verified_head_to(
         // this adopted checkpoint's projection rows (O(b) for its batch, not full
         // history), fail closed on any divergence.
         validate_checkpoint_projection_rows(connection, &row, &checkpoint)?;
+        head.chain_frontier = Some(advance_verified_checkpoint_chain_frontier(
+            connection,
+            head.chain_frontier.as_ref(),
+            head.latest_checkpoint.as_ref(),
+            &checkpoint,
+        )?);
         head.latest_checkpoint = Some(checkpoint);
         cursor = next_seq;
     }
@@ -375,6 +384,8 @@ fn append_receipt_batch(
         .copied()
         .collect::<std::collections::BTreeSet<u64>>()
         .len() as u64;
+    #[cfg(feature = "chaos-test-hooks")]
+    chaos_test_hooks::pause_after_receipt_write_before_commit(inserted > 0)?;
     // O(b) projection cross-check over the delta only: the claim-log
     // projection triggers (bootstrap/open.rs:676 tool, :711 child) must have
     // advanced the projection by exactly the rows this batch inserted.

@@ -175,7 +175,7 @@ pub(crate) fn build_mediation_admission_authorities_with_paths(
         ));
     }
     let operation_store: Arc<dyn AdmissionOperationStore> = Arc::new(
-        chio_store_sqlite::SqliteAdmissionOperationStore::open_hardened(
+        chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open_hardened(
             operation_path,
             Arc::clone(&authority_directory),
         )

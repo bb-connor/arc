@@ -17,7 +17,7 @@ use chio_core::capability::threshold_approval::{
 use chio_core::crypto::Keypair;
 use chio_core::receipt::body::ChioReceipt;
 use chio_guards::{GuardPipeline, RuntimeGuardProfile};
-use chio_kernel::admission_operation::InMemoryAdmissionOperationStore;
+use chio_kernel::security_admission_operation::InMemoryAdmissionOperationStore;
 use chio_kernel::approval::InMemoryApprovalStore;
 use chio_kernel::budget_store::InMemoryBudgetStore;
 use chio_kernel::{
@@ -63,7 +63,7 @@ use chio_security_types::{
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 use chio_store_sqlite::{
-    SqliteAdmissionOperationStore, SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
+    SqliteSecurityAdmissionOperationStore, SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
 };
 use rusqlite::Connection;
 use serde_json::Value;
@@ -635,7 +635,7 @@ fn runtime_parts() -> SecurityRuntimeParts {
 struct ProductionAuthorityFixture {
     _database_directory: TempDir,
     active_response_requirement_resolver: Arc<dyn chio_kernel::ActiveResponseRequirementResolver>,
-    admission_operation_store: Arc<SqliteAdmissionOperationStore>,
+    admission_operation_store: Arc<SqliteSecurityAdmissionOperationStore>,
     approval_store: Arc<SqliteApprovalStore>,
     budget_store: Arc<SqliteBudgetStore>,
     session_throttle_store: Arc<SqliteSecurityStateStore>,
@@ -649,7 +649,7 @@ impl ProductionAuthorityFixture {
         let database_directory = tempfile::tempdir()
             .unwrap_or_else(|error| panic!("create security authority directory: {error}"));
         let admission_operation_store = Arc::new(
-            SqliteAdmissionOperationStore::open(
+            SqliteSecurityAdmissionOperationStore::open(
                 database_directory
                     .path()
                     .join("admission-operation.sqlite3"),

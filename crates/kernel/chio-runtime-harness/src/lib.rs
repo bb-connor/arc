@@ -106,12 +106,25 @@ fn run_runtime_loopback_scenario_with_static_baseline(
     })?;
     let (run_id, steps) = normalize_runtime_loopback_steps(scenario)?;
 
+    chio_store_sqlite::SqliteAuthorityStore::ensure_serving_supported().map_err(|error| {
+        RuntimeLoopbackError::message(format!("Chio runtime loopback authority platform: {error}"))
+    })?;
     fs::create_dir_all(store_dir).map_err(|error| {
         RuntimeLoopbackError::message(format!(
             "failed to create Chio runtime store directory {}: {error}",
             store_dir.display()
         ))
     })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(store_dir, fs::Permissions::from_mode(0o700)).map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "failed to secure Chio runtime store directory {}: {error}",
+                store_dir.display()
+            ))
+        })?;
+    }
     fs::create_dir_all(out_dir).map_err(|error| {
         RuntimeLoopbackError::message(format!(
             "failed to create Chio runtime output directory {}: {error}",
@@ -125,8 +138,52 @@ fn run_runtime_loopback_scenario_with_static_baseline(
                 "Chio runtime loopback admission store open: {error}"
             ))
         })?;
+    let authority_path = store_dir.join("kernel-authority.sqlite3");
+    let authority_lock_root = store_dir.join("kernel-authority-locks");
+    fs::create_dir_all(&authority_lock_root).map_err(|error| {
+        RuntimeLoopbackError::message(format!(
+            "failed to create Chio runtime authority lock directory {}: {error}",
+            authority_lock_root.display()
+        ))
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&authority_lock_root, fs::Permissions::from_mode(0o700)).map_err(
+            |error| {
+                RuntimeLoopbackError::message(format!(
+                    "failed to secure Chio runtime authority lock directory {}: {error}",
+                    authority_lock_root.display()
+                ))
+            },
+        )?;
+    }
+    let authority = {
+        let _identity_scope = chio_store_sqlite::scope_fixed_authority_ids_for_current_thread(
+            RUNTIME_LOOPBACK_AUTHORITY_STORE_UUID,
+            [RUNTIME_LOOPBACK_AUTHORITY_LEASE_ID.to_string()],
+        )
+        .map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback authority identity: {error}"
+            ))
+        })?;
+        chio_store_sqlite::SqliteAuthorityStore::provision(&authority_path, &authority_lock_root)
+            .map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback authority provision: {error}"
+            ))
+        })?;
+        chio_store_sqlite::SqliteAuthorityStore::open_serving(&authority_path, &authority_lock_root)
+            .map_err(|error| {
+                RuntimeLoopbackError::message(format!(
+                    "Chio runtime loopback authority open: {error}"
+                ))
+            })?
+    };
 
-    let admission = execute_runtime_admission_loop(&steps, &store, now_unix_ms, out_dir)?;
+    let admission =
+        execute_runtime_admission_loop(&steps, &store, &authority, now_unix_ms, out_dir)?;
     assemble_runtime_loopback_outputs(
         &run_id,
         &steps,
@@ -138,6 +195,56 @@ fn run_runtime_loopback_scenario_with_static_baseline(
             report: static_report,
         },
     )
+}
+
+#[cfg(all(test, windows))]
+mod windows_authority_tests {
+    use super::run_runtime_loopback_scenario;
+    use std::path::Path;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn runtime_loopback_rejects_authority_before_startup_mutates_paths(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let unique = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "chio-runtime-harness-windows-authority-{}-{unique}",
+            std::process::id()
+        ));
+        let store_dir = root.join("store");
+        let out_dir = root.join("out");
+        let scenario = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../examples/chio-3vendor/fixtures/runtime-spine/scenario.json");
+
+        assert!(!root.exists(), "temporary test path already exists");
+        let error =
+            match run_runtime_loopback_scenario(&scenario, &store_dir, 1_800_000_001_000, &out_dir)
+            {
+                Ok(()) => {
+                    return Err(std::io::Error::other(
+                        "Windows runtime loopback authority startup unexpectedly succeeded",
+                    )
+                    .into());
+                }
+                Err(error) => error,
+            };
+
+        assert_eq!(
+            error.to_string(),
+            "Chio runtime loopback authority platform: invalid sqlite authority store: \
+             sqlite authority serving requires Unix file identity and positioned I/O"
+        );
+        assert!(
+            !store_dir.exists(),
+            "authority preflight created store state"
+        );
+        assert!(
+            !out_dir.exists(),
+            "authority preflight created output state"
+        );
+        assert!(!root.exists(), "authority preflight created caller paths");
+        Ok(())
+    }
 }
 
 #[cfg(test)]

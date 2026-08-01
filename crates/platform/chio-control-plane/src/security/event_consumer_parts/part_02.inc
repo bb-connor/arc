@@ -36,7 +36,7 @@ mod tests {
         ActiveDefenseReceiptBody, CorrelatedFindingReceiptBody,
     };
     use chio_core_types::SignedSecurityEvent;
-    use chio_kernel::admission_operation::{
+    use chio_kernel::security_admission_operation::{
         AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
         ReplayReservationState,
     };
@@ -91,7 +91,7 @@ mod tests {
     };
     use chio_store_sqlite::security_state::SqliteSecurityStateStore;
     use chio_store_sqlite::{
-        SqliteAdmissionOperationStore, SqliteApprovalStore, SqliteBudgetStore,
+        SqliteSecurityAdmissionOperationStore, SqliteApprovalStore, SqliteBudgetStore,
         SqliteReceiptStore,
     };
     use rusqlite::Connection;

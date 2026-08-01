@@ -571,12 +571,33 @@ mod tests {
             std::sync::Arc::new(chio_store_sqlite::SqliteRevocationStore::open(
                 dir.path().join("revocations.db"),
             )?);
+        let authority_database = dir.path().join("authority.db");
+        let authority_locks = dir.path().join("authority-locks");
+        std::fs::create_dir(&authority_locks)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
+            std::fs::set_permissions(&authority_locks, std::fs::Permissions::from_mode(0o700))?;
+        }
+        chio_store_sqlite::SqliteAuthorityStore::provision(&authority_database, &authority_locks)?;
+        let authority_store = chio_store_sqlite::SqliteAuthorityStore::open_serving(
+            &authority_database,
+            &authority_locks,
+        )?;
+        let admission_store = std::sync::Arc::new(authority_store.admission_operation_store());
+        let outcome_store = std::sync::Arc::new(authority_store.tool_outcome_store());
         let evaluator = ChioEvaluator::builder(
             Keypair::generate(),
             chio_core_types::crypto::sha256_hex(b"test-policy"),
         )
         .receipt_store(receipt_store)
         .revocation_store(revocation_store)
+        .durable_admission_stores(
+            admission_store,
+            outcome_store,
+            authority_store.mutation_fence(),
+        )
         .build()?;
         assert!(!evaluator.is_fail_open());
 

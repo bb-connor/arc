@@ -20,7 +20,7 @@ use chio_core::receipt::{
 use chio_core::session::{
     OperationTerminalState, RequestLineageMode, RequestLineageRecord, SessionAnchorReference,
 };
-use chio_kernel::checkpoint::{KernelCheckpoint, KernelCheckpointBody};
+use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint, KernelCheckpointBody};
 use chio_kernel::cost_attribution::{
     CostAttributionChainHop, CostAttributionQuery, CostAttributionReceiptRow,
     CostAttributionReport, CostAttributionSummary, LeafCostAttributionRow, RootCostAttributionRow,
@@ -647,6 +647,7 @@ pub struct SqliteReceiptStore {
     receipt_commit_actor: ReceiptCommitActor,
     database_identity: chio_core::Hash,
     database_identity_file: Arc<ReceiptDatabaseIdentityFile>,
+    max_page_count: Option<u32>,
     /// Multi-tenant receipt isolation: when true, tenant-
     /// scoped queries exclude the pre-multitenant NULL-tagged set. When
     /// false, queries with `tenant_filter = Some(id)` return rows where

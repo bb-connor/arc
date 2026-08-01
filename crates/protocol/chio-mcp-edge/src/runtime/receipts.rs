@@ -17,3 +17,26 @@ pub(super) fn record_receipt_write_kernel_error(error: &chio_kernel::KernelError
         crate::metrics::record_receipt_write(outcome);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::receipt_write_outcome_for_kernel_error;
+    use chio_kernel::KernelError;
+
+    #[test]
+    fn receipt_write_error_classifier_excludes_control_flow_errors() {
+        let cancelled = KernelError::RequestCancelled {
+            request_id: chio_core::session::RequestId::new("cancelled-request"),
+            reason: "cancelled by client".to_string(),
+        };
+        let url_elicitation = KernelError::UrlElicitationsRequired {
+            message: "URL elicitation required".to_string(),
+            elicitations: Vec::new(),
+        };
+        let internal = KernelError::Internal("receipt sink unavailable".to_string());
+
+        assert!(receipt_write_outcome_for_kernel_error(&cancelled).is_none());
+        assert!(receipt_write_outcome_for_kernel_error(&url_elicitation).is_none());
+        assert!(receipt_write_outcome_for_kernel_error(&internal).is_some());
+    }
+}

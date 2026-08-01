@@ -15,12 +15,12 @@ pub use chio_core::capability::threshold_approval::{
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{sha256_hex, PublicKey, SigningAlgorithm};
 
-use crate::admission_operation::{
+use crate::approval::{ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStoreError};
+use crate::canonical_json_bytes;
+use crate::security_admission_operation::{
     AdmissionOperation, AdmissionOperationKind, AdmissionRequestBindingInput,
     AdmissionRequestBindingParts, PreparedAdmissionOperation,
 };
-use crate::approval::{ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStoreError};
-use crate::canonical_json_bytes;
 
 const CHIO_LEGACY_GOVERNED_APPROVAL_SET_DOMAIN: &[u8] = b"chio.legacy-governed-approval-set.v1\0";
 
@@ -255,7 +255,8 @@ impl PreparedGovernedToolAdmission {
         approval_set: ApprovalSetReservationInput,
     ) -> Result<Self, ThresholdApprovalVerificationError> {
         if operation.kind() != AdmissionOperationKind::ToolDispatch
-            || operation.state() != crate::admission_operation::AdmissionOperationState::Prepared
+            || operation.state()
+                != crate::security_admission_operation::AdmissionOperationState::Prepared
             || operation.approval_set_hash() != Some(approval_set.approval_set_hash())
         {
             return Err(denied(

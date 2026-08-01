@@ -659,6 +659,8 @@ mod tests {
             &[b"three".to_vec(), b"four".to_vec()],
             &keypair,
             Some(&first),
+            &[crate::checkpoint::checkpoint_chain_leaf_hash(&first.body)
+                .expect("first chain leaf")],
         )
         .expect("second checkpoint");
         let bundle = EvidenceExportBundle {
@@ -715,6 +717,8 @@ mod tests {
             &[b"three".to_vec(), b"four".to_vec()],
             &keypair,
             Some(&first),
+            &[crate::checkpoint::checkpoint_chain_leaf_hash(&first.body)
+                .expect("first chain leaf")],
         )
         .expect("second checkpoint");
         let bundle = EvidenceExportBundle {

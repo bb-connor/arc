@@ -412,6 +412,11 @@ pub struct AuthorizationReceiptConsumption {
     pub consumed_at_unix_ms: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PendingSettlementObservation {
+    pub next_visible_at_ms: u64,
+}
+
 /// Fenced lease over one durable settlement-observer outbox row.
 ///
 /// The row is keyed by the exact signed receipt id. A worker may acknowledge
@@ -588,6 +593,9 @@ pub enum ReceiptStoreError {
     #[error("conflict: {0}")]
     Conflict(String),
 
+    #[error("unsupported: {0}")]
+    Unsupported(String),
+
     #[error("not found: {0}")]
     NotFound(String),
 
@@ -652,6 +660,21 @@ fn receipt_writer_liveness_unknown_label() -> String {
 
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+
+    fn admission_projection_capabilities(
+        &self,
+    ) -> crate::admission_operation::AdmissionProjectionCapabilities {
+        crate::admission_operation::AdmissionProjectionCapabilities::default()
+    }
+
+    fn commit_admission_projection(
+        &self,
+        _projection: &crate::admission_operation::AdmissionTerminalProjection,
+    ) -> Result<crate::admission_operation::AdmissionTerminal, ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "atomic admission terminal projection".to_string(),
+        ))
+    }
 
     /// Return the immutable identity of the durable commit domain backing this
     /// store. Production compositions that bind one store across independent

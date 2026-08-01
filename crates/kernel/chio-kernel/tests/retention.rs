@@ -188,6 +188,7 @@ mod retention {
                 &bytes,
                 keypair,
                 Some(previous),
+                &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&previous.body).unwrap()],
             )
             .unwrap(),
         };

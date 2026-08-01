@@ -318,14 +318,14 @@ impl ChioKernel {
 
     pub fn set_admission_operation_store(
         &mut self,
-        store: Box<dyn crate::admission_operation::AdmissionOperationStore>,
+        store: Box<dyn crate::security_admission_operation::AdmissionOperationStore>,
     ) -> Result<(), KernelError> {
         self.set_admission_operation_store_handle(Arc::from(store))
     }
 
     pub fn set_admission_operation_store_handle(
         &mut self,
-        store: Arc<dyn crate::admission_operation::AdmissionOperationStore>,
+        store: Arc<dyn crate::security_admission_operation::AdmissionOperationStore>,
     ) -> Result<(), KernelError> {
         self.require_no_atomic_security_runtime_publication()?;
         if self
@@ -426,7 +426,7 @@ impl ChioKernel {
     }
 
     pub(super) fn validate_admission_operation_store_profile(
-        profile: crate::admission_operation::AdmissionOperationStoreProfile,
+        profile: crate::security_admission_operation::AdmissionOperationStoreProfile,
         dispatch_worker_count: usize,
     ) -> Result<(), KernelError> {
         if profile.supports_dispatch_workers(dispatch_worker_count) {
@@ -434,7 +434,7 @@ impl ChioKernel {
         }
         if matches!(
             profile,
-            crate::admission_operation::AdmissionOperationStoreProfile::EphemeralLocal
+            crate::security_admission_operation::AdmissionOperationStoreProfile::EphemeralLocal
         ) {
             return Err(KernelError::Internal(
                 "durable admission operation store authority is required".to_string(),
@@ -448,8 +448,8 @@ impl ChioKernel {
 
     pub fn persist_prepared_admission_operation(
         &self,
-        operation: crate::admission_operation::AdmissionOperation,
-    ) -> Result<crate::admission_operation::AdmissionOperation, KernelError> {
+        operation: crate::security_admission_operation::AdmissionOperation,
+    ) -> Result<crate::security_admission_operation::AdmissionOperation, KernelError> {
         let store = self.admission_operation_store.as_ref().ok_or_else(|| {
             KernelError::Internal("durable admission operation store is not installed".to_string())
         })?;
@@ -460,8 +460,8 @@ impl ChioKernel {
         match store.create_prepared(operation).map_err(|error| {
             KernelError::Internal(format!("failed to persist admission operation: {error}"))
         })? {
-            crate::admission_operation::AdmissionOperationCreateOutcome::Created(operation)
-            | crate::admission_operation::AdmissionOperationCreateOutcome::Existing(operation) => {
+            crate::security_admission_operation::AdmissionOperationCreateOutcome::Created(operation)
+            | crate::security_admission_operation::AdmissionOperationCreateOutcome::Existing(operation) => {
                 Ok(operation)
             }
         }
@@ -536,7 +536,7 @@ impl ChioKernel {
             operation_store.as_ref(),
             self.budget_store.as_ref(),
             self.approval_store.as_deref(),
-            crate::admission_operation::AdmissionOperationKind::ToolDispatch,
+            crate::security_admission_operation::AdmissionOperationKind::ToolDispatch,
             &format!("kernel:{}", self.public_key().to_hex()),
         )?;
         self.aggregate_invocation_admission_enabled = true;
@@ -561,7 +561,7 @@ impl ChioKernel {
             operation_store.as_ref(),
             self.budget_store.as_ref(),
             self.approval_store.as_deref(),
-            crate::admission_operation::AdmissionOperationKind::ToolDispatch,
+            crate::security_admission_operation::AdmissionOperationKind::ToolDispatch,
             &format!("kernel:{}", self.public_key().to_hex()),
         )?;
         self.supplemental_broker_admission_enabled = true;

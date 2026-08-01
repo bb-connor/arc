@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 use uuid::Uuid;
 
-use crate::admission_operation::ReplayReservationState;
+use crate::security_admission_operation::ReplayReservationState;
 use crate::KernelError;
 
 const MAX_NONCE_RESERVATION_IDENTIFIER_BYTES: usize = 512;

@@ -498,7 +498,7 @@ mod support {
             let operation_db_path = unique_kernel_db_path("chio-intent-journal-operations");
             let budget_db_path = unique_kernel_db_path("chio-intent-journal-budget");
             kernel.set_admission_operation_store_handle(Arc::new(
-                chio_store_sqlite::SqliteAdmissionOperationStore::open(&operation_db_path)?,
+                chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(&operation_db_path)?,
             ))?;
             kernel.set_budget_store_handle(Arc::new(
                 chio_store_sqlite::SqliteBudgetStore::open(&budget_db_path)?,

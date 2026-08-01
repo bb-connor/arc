@@ -32,7 +32,9 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_store_sqlite::budget_store::SqliteCompositeAuthorizeInput;
-use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteBudgetStore, SqliteReceiptStore};
+use chio_store_sqlite::{
+    SqliteBudgetStore, SqliteReceiptStore, SqliteSecurityAdmissionOperationStore,
+};
 
 #[derive(Clone, Copy)]
 enum NoPaymentRestartScenario {
@@ -244,7 +246,7 @@ fn apply_operation_state(
 }
 
 fn seed_caller_reserved_operation(
-    store: &SqliteAdmissionOperationStore,
+    store: &SqliteSecurityAdmissionOperationStore,
     scenario: NoPaymentRestartScenario,
     request_id: &str,
     hold_id: &str,
@@ -373,7 +375,7 @@ fn seed_no_payment_state(
 ) -> Result<SeededNoPaymentState, Box<dyn Error>> {
     let request_id = format!("request-{}-non-mustprepay-restart", scenario.label());
     let hold_id = format!("hold-{}-non-mustprepay-restart", scenario.label());
-    let operation_store = SqliteAdmissionOperationStore::open(operation_path)?;
+    let operation_store = SqliteSecurityAdmissionOperationStore::open(operation_path)?;
     let budget_store = SqliteBudgetStore::open(budget_path)?;
     let operation = if scenario.operation_owned() {
         let operation =
@@ -475,7 +477,7 @@ fn seed_no_payment_state(
 
 fn assert_no_payment_recovery_effects(
     budget_store: &SqliteBudgetStore,
-    operation_store: &SqliteAdmissionOperationStore,
+    operation_store: &SqliteSecurityAdmissionOperationStore,
     seeded: &SeededNoPaymentState,
     calls: &AtomicUsize,
 ) -> Result<(), Box<dyn Error>> {
@@ -520,7 +522,9 @@ fn assert_persisted_state_restart_has_no_payment_recovery(
     let seeded = seed_no_payment_state(scenario, &budget_path, &operation_path)?;
 
     let budget_store = Arc::new(SqliteBudgetStore::open(&budget_path)?);
-    let operation_store = Arc::new(SqliteAdmissionOperationStore::open(&operation_path)?);
+    let operation_store = Arc::new(SqliteSecurityAdmissionOperationStore::open(
+        &operation_path,
+    )?);
     let calls = Arc::new(AtomicUsize::new(0));
     assert_no_payment_recovery_effects(
         budget_store.as_ref(),

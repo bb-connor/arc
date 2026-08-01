@@ -26,10 +26,18 @@ fn unique_test_dir() -> TestDir {
         .expect("system time before unix epoch")
         .as_nanos();
     let counter = UNIQUE_TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
-    TestDir(std::env::temp_dir().join(format!(
+    let path = std::env::temp_dir().join(format!(
         "chio-cli-mcp-http-{}-{nonce}-{counter}",
         std::process::id()
-    )))
+    ));
+    fs::create_dir_all(&path).expect("create private MCP HTTP test directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+            .expect("secure private MCP HTTP test directory");
+    }
+    TestDir(path)
 }
 
 macro_rules! skip_when_loopback_denied {
