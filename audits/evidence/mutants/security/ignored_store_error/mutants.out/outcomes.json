@@ -8,7 +8,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 0.525312,
+          "duration": 0.528087584,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -21,7 +21,7 @@
         },
         {
           "phase": "Test",
-          "duration": 0.53926775,
+          "duration": 0.532029416,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -75,7 +75,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 2.164456125,
+          "duration": 2.140982417,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -88,7 +88,7 @@
         },
         {
           "phase": "Test",
-          "duration": 1.05723275,
+          "duration": 1.292270625,
           "process_status": {
             "Failure": 101
           },

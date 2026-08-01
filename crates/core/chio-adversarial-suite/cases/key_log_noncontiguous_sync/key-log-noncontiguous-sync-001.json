@@ -31,8 +31,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/key_log_noncontiguous_sync/mutants.out/outcomes.json",
-          "sha256": "be6b08ad3385861b70666e278c764de6b1e58631bf075ed81fcc9fa9495b2e03",
-          "inputs_sha256": "c6349b9512c3ef6558da3cbf0e32f80b46f5bc9fee4ec005280c94f81038bf5e"
+          "sha256": "8b355f71d3873872589d15dd2723d0034ed5c48db68bf6f478e2e09ac573ca29",
+          "inputs_sha256": "a3ac627189341b01c8ef4553b11788b1fb50a031014c7d1ff7cf46a5a81c4f85"
         }
       }
     ]
