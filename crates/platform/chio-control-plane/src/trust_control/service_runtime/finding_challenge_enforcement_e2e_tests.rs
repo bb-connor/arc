@@ -7473,6 +7473,10 @@ fn finding_challenge_quarantined_reconciliation_leaves_purchases_blocked() -> Te
 #[test]
 fn finding_status_retraction_enforced_challenge_stays_pending_until_the_broadcast_lands(
 ) -> TestResult {
+    run_enforced_challenge_status_retraction()
+}
+
+pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
     let case = finalizing_liability()?;
     let publisher = MiningPublisher::new();
 
@@ -8366,6 +8370,10 @@ fn finding_challenge_a_snapshot_from_an_expired_observer_key_authorizes_nothing(
 
 #[test]
 fn finding_challenge_digest_mismatch_reaches_an_enforced_sanction() -> TestResult {
+    run_finding_challenge_digest_mismatch()
+}
+
+pub(super) fn run_finding_challenge_digest_mismatch() -> TestResult {
     let deployment = deployment()?;
     let coordinator = deployment.coordinator(FindingDisputeLockDisposition::Forfeited)?;
     let governance = governance()?;

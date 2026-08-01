@@ -42,8 +42,6 @@
 //!   the injected publisher, and settles only on a confirmed
 //!   reconciliation the chain still qualifies.
 //!
-//! Compiled only under the `cognition-market-experimental` feature.
-
 use std::sync::Arc;
 
 use chio_core::canonical::{canonical_json_bytes, canonical_json_bytes_from_str};
