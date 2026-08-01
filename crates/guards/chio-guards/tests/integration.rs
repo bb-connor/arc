@@ -10,6 +10,7 @@ use chio_core::crypto::Keypair;
 use chio_core::session::{
     OperationContext, RequestId, RootDefinition, SessionOperation, ToolCallOperation,
 };
+use chio_guards::path_allowlist::PathAllowlistConfig;
 use chio_guards::{
     EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline, InternalNetworkGuard,
     PathAllowlistGuard, ShellCommandGuard,
@@ -552,10 +553,15 @@ async fn filesystem_tool_session_roots_deny_out_of_root_path() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn filesystem_tool_session_roots_fail_closed_when_missing() {
+/// Run one filesystem tool call through a session that never negotiates roots,
+/// which is what `chio check`, `chio run`, and `chio replay` all do.
+async fn session_filesystem_verdict_without_roots(
+    guard: PathAllowlistGuard,
+    request_id: &str,
+    path: &str,
+) -> Verdict {
     let (mut kernel, _kp) = make_kernel();
-    kernel.add_guard(Box::new(PathAllowlistGuard::new()));
+    kernel.add_guard(Box::new(guard));
 
     let agent_kp = make_keypair();
     let session_id = kernel
@@ -581,7 +587,7 @@ async fn filesystem_tool_session_roots_fail_closed_when_missing() {
         .expect("issue cap");
     let context = OperationContext {
         session_id: session_id.clone(),
-        request_id: RequestId::new("sess-tool-missing-roots"),
+        request_id: RequestId::new(request_id),
         agent_id: agent_kp.public_key().to_hex(),
         parent_request_id: None,
         progress_token: None,
@@ -590,7 +596,7 @@ async fn filesystem_tool_session_roots_fail_closed_when_missing() {
         capability: cap,
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
-        arguments: serde_json::json!({"path": "/workspace/project/src/main.rs"}),
+        arguments: serde_json::json!({ "path": path }),
         governed_intent: None,
         approval_token: None,
         approval_tokens: Vec::new(),
@@ -605,7 +611,65 @@ async fn filesystem_tool_session_roots_fail_closed_when_missing() {
         .evaluate_session_operation(&context, &operation)
         .unwrap();
     match response {
-        SessionOperationResponse::ToolCall(result) => assert_eq!(result.verdict, Verdict::Deny),
+        SessionOperationResponse::ToolCall(result) => result.verdict,
         other => panic!("unexpected response: {other:?}"),
     }
+}
+
+/// A session that never negotiated roots reports an empty root set, which is
+/// no filesystem boundary at all. With no allowlist configured either, there
+/// is no path policy in force and the call proceeds.
+///
+/// This test previously asserted Deny. That reading made every session-backed
+/// caller unable to touch any file: `chio check`, `chio run`, and `chio replay`
+/// open a session and never negotiate roots, so every filesystem tool call
+/// they made was denied before any policy was consulted.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn filesystem_tool_without_session_roots_is_unconstrained_when_no_allowlist_is_set() {
+    let verdict = session_filesystem_verdict_without_roots(
+        PathAllowlistGuard::new(),
+        "sess-tool-missing-roots",
+        "/workspace/project/src/main.rs",
+    )
+    .await;
+    assert_eq!(verdict, Verdict::Allow);
+}
+
+/// The end-to-end shape of a `chio check` run against a `path_allowlist`
+/// policy: session-backed, no roots negotiated, allowlist enabled. The
+/// allowlist is what decides, and an allowlisted path is allowed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn filesystem_tool_without_session_roots_allows_allowlisted_path() {
+    let guard = PathAllowlistGuard::with_config(PathAllowlistConfig {
+        enabled: true,
+        file_access_allow: vec!["/workspace/project/**".to_string()],
+        file_write_allow: vec!["/workspace/project/**".to_string()],
+        patch_allow: vec![],
+    });
+    let verdict = session_filesystem_verdict_without_roots(
+        guard,
+        "sess-tool-allowlisted-no-roots",
+        "/workspace/project/src/main.rs",
+    )
+    .await;
+    assert_eq!(verdict, Verdict::Allow);
+}
+
+/// The other half: the allowlist is still deny-by-default over the same
+/// rootless session.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn filesystem_tool_without_session_roots_denies_non_allowlisted_path() {
+    let guard = PathAllowlistGuard::with_config(PathAllowlistConfig {
+        enabled: true,
+        file_access_allow: vec!["/workspace/project/**".to_string()],
+        file_write_allow: vec!["/workspace/project/**".to_string()],
+        patch_allow: vec![],
+    });
+    let verdict = session_filesystem_verdict_without_roots(
+        guard,
+        "sess-tool-not-allowlisted-no-roots",
+        "/etc/passwd",
+    )
+    .await;
+    assert_eq!(verdict, Verdict::Deny);
 }

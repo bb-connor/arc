@@ -40,6 +40,28 @@ pub(in crate::runtime) fn paginate_response(
     paginate_named_response(id, start, page_size, "resources", values)
 }
 
+/// Attach MCP's optional `nextCursor` to a paginated result object.
+///
+/// Every MCP `*Result` that paginates declares `nextCursor: CursorSchema.optional()`
+/// where `CursorSchema = z.string()`. `optional()` admits `undefined`, never
+/// `null`, so the last page of a listing MUST omit the key rather than send
+/// JSON `null`: a null fails validation in every published
+/// `@modelcontextprotocol/sdk` release (checked 1.17.0 through 1.30.0) and the
+/// client rejects the entire response, not just the field.
+///
+/// This is the single place that knows the rule. Callers that build a listing
+/// result route their `Option<String>` cursor through here instead of dropping
+/// it into `json!({ "nextCursor": next_cursor })`, which serializes `None` as
+/// `null`.
+pub(in crate::runtime) fn insert_next_cursor(
+    result: &mut serde_json::Map<String, Value>,
+    next_cursor: Option<String>,
+) {
+    if let Some(next_cursor) = next_cursor {
+        result.insert("nextCursor".to_string(), Value::String(next_cursor));
+    }
+}
+
 pub(in crate::runtime) fn paginate_named_response(
     id: Value,
     start: usize,
@@ -60,10 +82,7 @@ pub(in crate::runtime) fn paginate_named_response(
         field_name.to_string(),
         Value::Array(values[start..end].to_vec()),
     );
-    result.insert(
-        "nextCursor".to_string(),
-        next_cursor.map(Value::String).unwrap_or(Value::Null),
-    );
+    insert_next_cursor(&mut result, next_cursor);
 
     jsonrpc_result(id, Value::Object(result))
 }

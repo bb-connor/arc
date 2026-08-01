@@ -142,6 +142,11 @@ fn nonce_manifest() -> ToolManifest {
 
 #[test]
 fn execute_bridge_mcp_tool_call_presents_execution_nonce_in_strict_mode() {
+    // Strict-mode preflight returns a kernel error, which the edge counts as a
+    // receipt-write error on a crate-global counter. Tests in `runtime_tests`
+    // assert exact deltas on that counter, so this one has to take the same
+    // lock or it corrupts their measurement at random.
+    let _metrics_guard = metrics_test_guard();
     let kernel = make_nonce_kernel();
     let agent = Keypair::generate();
     let mut request = make_bridge_nonce_request(&kernel, &agent);
@@ -182,6 +187,9 @@ fn execute_bridge_mcp_tool_call_presents_execution_nonce_in_strict_mode() {
 
 #[test]
 fn tools_call_round_trips_execution_nonce_through_meta() {
+    // Same reason as above: the preflight leg of this round trip increments the
+    // shared receipt-write error counter.
+    let _metrics_guard = metrics_test_guard();
     let kernel = make_nonce_kernel();
     let agent = Keypair::generate();
     let capabilities = issue_nonce_capability(&kernel, &agent);

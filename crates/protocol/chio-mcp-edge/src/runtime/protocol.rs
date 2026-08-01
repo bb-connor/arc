@@ -51,8 +51,8 @@ pub(super) use self::response::{
     queue_progress_notification, read_jsonrpc_line, write_jsonrpc_line,
 };
 pub(super) use self::serialization::{
-    paginate_named_response, paginate_response, serialize_prompts, serialize_resource_contents,
-    serialize_resource_templates, serialize_resources,
+    insert_next_cursor, paginate_named_response, paginate_response, serialize_prompts,
+    serialize_resource_contents, serialize_resource_templates, serialize_resources,
 };
 pub(super) use self::tasks::{
     cancellation_reason_from_tool_result, edge_task_status_label, iso8601_now,

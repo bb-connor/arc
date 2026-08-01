@@ -260,14 +260,12 @@ impl ChioMcpEdge {
             .map(|task| serde_json::to_value(task).unwrap_or_else(|_| json!({})))
             .collect::<Vec<_>>();
 
-        jsonrpc_result(
-            id,
-            json!({
-                "tasks": page,
-                "nextCursor": next_cursor,
-                "total": tasks.len(),
-            }),
-        )
+        let mut result = serde_json::Map::new();
+        result.insert("tasks".to_string(), Value::Array(page));
+        insert_next_cursor(&mut result, next_cursor);
+        result.insert("total".to_string(), Value::from(tasks.len()));
+
+        jsonrpc_result(id, Value::Object(result))
     }
 
     pub(super) fn handle_tasks_get(&mut self, id: Value, params: Value) -> Value {

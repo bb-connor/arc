@@ -44,12 +44,38 @@ pub(super) fn jsonrpc_protocol_error(args: JsonRpcProtocolErrorArgs<'_>) -> Valu
     jsonrpc_error_with_data(id, jsonrpc_code, message, Some(Value::Object(data)))
 }
 
+/// Result of hosted MCP protocol version negotiation.
+pub(super) struct NegotiatedProtocolVersion {
+    /// The revision the edge will speak for this session. Echoed in
+    /// `result.protocolVersion`.
+    pub(super) selected: &'static str,
+    /// What the client asked for, when it asked for anything. Reported back
+    /// under `chioProtocol` so a downgrade is observable instead of silent.
+    pub(super) requested: Option<String>,
+}
+
+/// Negotiate the MCP protocol version for a hosted `initialize`.
+///
+/// The MCP lifecycle rule has been the same since 2024-11-05: if the server
+/// supports the version the client requested it MUST respond with that same
+/// version; otherwise it MUST respond with a version it does support, and the
+/// client decides whether to continue or disconnect. Answering a version
+/// mismatch with a JSON-RPC error is not one of the permitted outcomes, and in
+/// practice it locked out nearly every deployed client, because
+/// `@modelcontextprotocol/sdk` negotiated `2025-06-18` up to and including
+/// 1.29.x while the edge accepted only `2025-11-25`.
+///
+/// The only remaining error is a structurally invalid request: a
+/// `protocolVersion` that is present but not a string.
 pub(super) fn negotiate_protocol_version(
     id: &Value,
     params: &Value,
-) -> Result<&'static str, Value> {
+) -> Result<NegotiatedProtocolVersion, Value> {
     let Some(requested) = params.get("protocolVersion") else {
-        return Ok(MCP_PROTOCOL_VERSION);
+        return Ok(NegotiatedProtocolVersion {
+            selected: MCP_PROTOCOL_VERSION,
+            requested: None,
+        });
     };
     let Some(requested) = requested.as_str() else {
         return Err(jsonrpc_protocol_error(JsonRpcProtocolErrorArgs {
@@ -65,21 +91,13 @@ pub(super) fn negotiate_protocol_version(
             })),
         }));
     };
-    if SUPPORTED_MCP_PROTOCOL_VERSIONS.contains(&requested) {
-        Ok(MCP_PROTOCOL_VERSION)
-    } else {
-        Err(jsonrpc_protocol_error(JsonRpcProtocolErrorArgs {
-            id: id.clone(),
-            jsonrpc_code: JSONRPC_INVALID_REQUEST,
-            message: "unsupported protocolVersion",
-            chio_code: CHIO_ERROR_PROTOCOL_VERSION_UNSUPPORTED,
-            name: "protocol_version_unsupported",
-            retry_strategy: "do_not_retry_until_version_change",
-            guidance: "retry only after selecting one of the server's supported protocol versions",
-            context: Some(json!({
-                "requestedProtocolVersion": requested,
-                "supportedProtocolVersions": SUPPORTED_MCP_PROTOCOL_VERSIONS,
-            })),
-        }))
-    }
+    let selected = SUPPORTED_MCP_PROTOCOL_VERSIONS
+        .iter()
+        .copied()
+        .find(|supported| *supported == requested)
+        .unwrap_or(MCP_PROTOCOL_VERSION);
+    Ok(NegotiatedProtocolVersion {
+        selected,
+        requested: Some(requested.to_string()),
+    })
 }

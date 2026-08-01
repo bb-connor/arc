@@ -78,15 +78,39 @@ use tool_calls::{
     BridgeMcpToolCallRequest,
 };
 
+/// The MCP protocol revision the edge speaks natively, and the version it
+/// answers with when a client asks for something outside the supported set.
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
-const SUPPORTED_MCP_PROTOCOL_VERSIONS: &[&str] = &[MCP_PROTOCOL_VERSION];
+/// Protocol revisions the edge will echo back verbatim during `initialize`.
+///
+/// The edge's request handling and result shapes are identical across these
+/// four revisions: the newer fields it emits (`tools[].annotations`,
+/// `tools[].outputSchema`, `tools[].execution`, `capabilities.tasks`,
+/// `structuredContent`) are additive, and every one of these revisions
+/// specifies that unknown fields are ignored rather than rejected. The one
+/// wire feature the edge does not implement, JSON-RPC batching, was optional
+/// for clients in the single revision that had it (2025-03-26) and is
+/// forbidden from 2025-06-18 onward.
+///
+/// Newest first: an unsupported request falls back to `MCP_PROTOCOL_VERSION`,
+/// which the MCP lifecycle requires to be a version the server supports.
+const SUPPORTED_MCP_PROTOCOL_VERSIONS: &[&str] = &[
+    MCP_PROTOCOL_VERSION,
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05",
+];
 const JSONRPC_INVALID_REQUEST: i64 = -32600;
 const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;
 const JSONRPC_INVALID_PARAMS: i64 = -32602;
 const JSONRPC_INTERNAL_ERROR: i64 = -32603;
 const JSONRPC_SERVER_NOT_INITIALIZED: i64 = -32002;
 const JSONRPC_URL_ELICITATION_REQUIRED: i64 = -32042;
-const CHIO_ERROR_PROTOCOL_VERSION_UNSUPPORTED: i64 = 1000;
+// Registry code 1000, `protocol_version_unsupported`, is deliberately absent
+// here. The hosted MCP edge no longer refuses a handshake over a version
+// mismatch: the MCP lifecycle requires it to answer with a version it does
+// support instead. The code stays in the registry for the native Chio framed
+// transport, whose negotiation is out of band and does reject.
 const CHIO_ERROR_INVALID_REQUEST_SHAPE: i64 = 1002;
 const CLIENT_IDLE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
@@ -411,6 +435,32 @@ impl ChioMcpEdge {
                 Err(mpsc::RecvTimeoutError::Disconnected) => return Ok(()),
             }
         }
+    }
+}
+
+/// Serializes every test that observes or moves the crate-global receipt-write
+/// counters (`crate::receipt_write_total`).
+///
+/// The counters are one process-wide `AtomicU64` per outcome label, and libtest
+/// runs tests in parallel, so a test that reads the counter, does one governed
+/// call, and asserts the delta is only meaningful while no other test is moving
+/// the same label. The lock lives here rather than in one test module because
+/// both `runtime_tests` and `execution_nonce_tests` drive tool calls that land
+/// on the receipt-write sink; a lock held by only one of them serializes
+/// nothing. Any new test that performs a governed tool call belongs behind it.
+#[cfg(test)]
+static METRICS_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Take the receipt-write counter lock, recovering from poisoning.
+///
+/// A panicking test inside the guarded section poisons the mutex. The lock
+/// protects a counter rather than data, so recovering keeps one real failure
+/// from cascading into a dozen misleading ones.
+#[cfg(test)]
+fn metrics_test_guard() -> std::sync::MutexGuard<'static, ()> {
+    match METRICS_TEST_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
     }
 }
 

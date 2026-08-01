@@ -24,15 +24,6 @@ use std::sync::{Arc, Mutex};
 #[path = "runtime_tests/channel_roots.rs"]
 mod channel_roots;
 
-static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
-
-fn metrics_test_guard() -> std::sync::MutexGuard<'static, ()> {
-    match METRICS_TEST_LOCK.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    }
-}
-
 struct EchoServer;
 struct StreamingEchoServer;
 struct UrlRequiredServer;
@@ -1774,7 +1765,7 @@ fn initialize_then_initialized_enters_ready_state() {
     assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
             ["supportedProtocolVersions"],
-        json!([MCP_PROTOCOL_VERSION])
+        json!(SUPPORTED_MCP_PROTOCOL_VERSIONS)
     );
     assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
@@ -1784,13 +1775,21 @@ fn initialize_then_initialized_enters_ready_state() {
     assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
             ["compatibility"],
-        "exact_match"
+        "exact_match_from_supported_set"
     );
     assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
             ["downgradeBehavior"],
-        "reject"
+        "respond_with_latest_supported"
     );
+    // The client sent no `protocolVersion`, so there is nothing to report back
+    // and nothing to downgrade.
+    assert!(initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
+        .get("requestedProtocolVersion")
+        .is_none());
+    assert!(initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
+        .get("downgraded")
+        .is_none());
     assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
             ["requestIdentity"]["stableRequestIdMetaField"],
@@ -1869,8 +1868,16 @@ fn malformed_initialized_notification_does_not_enter_ready_state() {
     assert_eq!(tools_list["error"]["code"], JSONRPC_SERVER_NOT_INITIALIZED);
 }
 
+/// This test used to be `initialize_unsupported_protocol_version_rejected` and
+/// asserted a `-32600` for any `protocolVersion` other than the edge's own.
+/// That assertion encoded a defect. The MCP lifecycle gives a server exactly
+/// two permitted answers to a version it does not support, and an error is
+/// neither of them: it must respond with a version it does support, and the
+/// client decides whether to proceed. Rejecting instead failed the handshake
+/// for every `@modelcontextprotocol/sdk` client through 1.29.x, all of which
+/// negotiate `2025-06-18`.
 #[test]
-fn initialize_unsupported_protocol_version_rejected() {
+fn initialize_unknown_protocol_version_downgrades_instead_of_rejecting() {
     let mut edge = make_edge(10);
 
     let response = edge
@@ -1884,33 +1891,93 @@ fn initialize_unsupported_protocol_version_rejected() {
         }))
         .unwrap();
 
+    assert!(
+        response.get("error").is_none(),
+        "a version mismatch must not fail the handshake: {response}"
+    );
+    // The answer is a version the edge actually supports.
+    assert_eq!(response["result"]["protocolVersion"], MCP_PROTOCOL_VERSION);
+    assert!(SUPPORTED_MCP_PROTOCOL_VERSIONS
+        .contains(&response["result"]["protocolVersion"].as_str().unwrap()));
+    // And the downgrade is reported rather than silent.
+    let chio_protocol =
+        &response["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY];
+    assert_eq!(chio_protocol["requestedProtocolVersion"], "2024-01-01");
+    assert_eq!(chio_protocol["downgraded"], true);
+    assert_eq!(
+        chio_protocol["supportedProtocolVersions"],
+        json!(SUPPORTED_MCP_PROTOCOL_VERSIONS)
+    );
+    assert!(matches!(
+        edge.state,
+        EdgeState::WaitingForInitialized { .. }
+    ));
+}
+
+/// Every version in the supported set is echoed back verbatim, which is what
+/// the MCP lifecycle requires when the server does support what was asked for.
+/// `2025-06-18` is the load-bearing entry: it is what every published SDK up to
+/// and including 1.29.x sends.
+#[test]
+fn initialize_echoes_each_supported_protocol_version() {
+    for supported in SUPPORTED_MCP_PROTOCOL_VERSIONS {
+        let mut edge = make_edge(10);
+
+        let response = edge
+            .handle_jsonrpc(json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": supported
+                }
+            }))
+            .unwrap();
+
+        assert!(
+            response.get("error").is_none(),
+            "{supported} must be accepted: {response}"
+        );
+        assert_eq!(
+            response["result"]["protocolVersion"], *supported,
+            "{supported} must be echoed back, not replaced"
+        );
+        let chio_protocol =
+            &response["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY];
+        assert_eq!(chio_protocol["requestedProtocolVersion"], *supported);
+        assert_eq!(chio_protocol["downgraded"], false);
+    }
+    assert!(
+        SUPPORTED_MCP_PROTOCOL_VERSIONS.contains(&"2025-06-18"),
+        "dropping 2025-06-18 locks out every @modelcontextprotocol/sdk client through 1.29.x"
+    );
+}
+
+#[test]
+fn initialize_rejects_non_string_protocol_version() {
+    let mut edge = make_edge(10);
+
+    let response = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": 20251125
+            }
+        }))
+        .unwrap();
+
     assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
-    assert_eq!(response["error"]["message"], "unsupported protocolVersion");
+    assert_eq!(
+        response["error"]["message"],
+        "initialize.params.protocolVersion must be a string"
+    );
     assert_eq!(
         response["error"]["data"]["chioError"]["code"],
-        CHIO_ERROR_PROTOCOL_VERSION_UNSUPPORTED
+        CHIO_ERROR_INVALID_REQUEST_SHAPE
     );
-    assert_eq!(
-        response["error"]["data"]["chioError"]["name"],
-        "protocol_version_unsupported"
-    );
-    assert_eq!(
-        response["error"]["data"]["chioError"]["category"],
-        "protocol"
-    );
-    assert_eq!(response["error"]["data"]["chioError"]["transient"], false);
-    assert_eq!(
-        response["error"]["data"]["chioError"]["retry"]["strategy"],
-        "do_not_retry_until_version_change"
-    );
-    assert_eq!(
-        response["error"]["data"]["requestedProtocolVersion"],
-        "2024-01-01"
-    );
-    assert_eq!(
-        response["error"]["data"]["supportedProtocolVersions"],
-        json!([MCP_PROTOCOL_VERSION])
-    );
+    assert_eq!(response["error"]["data"]["parameter"], "protocolVersion");
     assert!(matches!(edge.state, EdgeState::Uninitialized));
 }
 
@@ -1958,7 +2025,12 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(first_page["result"]["tools"].as_array().unwrap().len(), 2);
-    assert!(first_page["result"]["nextCursor"].is_null());
+    // This used to be `first_page["result"]["nextCursor"].is_null()`, which was
+    // not a test: serde_json's `Index` returns `Value::Null` for a key that is
+    // absent, so it passed whether the edge omitted the field or emitted an
+    // explicit `null`. It could not tell the two apart, and the edge was
+    // emitting `null`. See `list_results_omit_next_cursor_on_the_last_page`.
+    assert!(first_page["result"].get("nextCursor").is_none());
     assert!(
         first_page["result"]["tools"][0]["annotations"]["readOnlyHint"]
             .as_bool()
@@ -1982,7 +2054,79 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(second_page["result"]["tools"].as_array().unwrap().len(), 0);
-    assert!(second_page["result"]["nextCursor"].is_null());
+    assert!(second_page["result"].get("nextCursor").is_none());
+}
+
+/// The regression test for `nextCursor` encoding across every paginated method.
+///
+/// MCP declares `nextCursor: CursorSchema.optional()` with `CursorSchema =
+/// z.string()`. `optional()` admits a string or absence, never `null`. The edge
+/// used to emit an explicit JSON `null` on the last page, and because zod
+/// rejects the whole object rather than the one field, `tools/list`,
+/// `resources/list`, `resources/templates/list`, `prompts/list` and
+/// `tasks/list` all failed validation in every published
+/// `@modelcontextprotocol/sdk` release from 1.17.0 to 1.30.0. A stock client
+/// could initialize and then never obtain a tool.
+///
+/// The assertion has to be `.get("nextCursor").is_none()`. serde_json's `Index`
+/// returns `Value::Null` for a key that is not there, so the older
+/// `result["nextCursor"].is_null()` form passes under both encodings and cannot
+/// tell the fix from the defect.
+#[test]
+fn list_results_omit_next_cursor_on_the_last_page() {
+    // Page size 1 so any fixture with two or more entries paginates.
+    let mut edge = make_edge(1);
+    initialize_edge(&mut edge);
+
+    let mut saw_a_cursor = false;
+    let mut request_id = 100;
+
+    for method in [
+        "tools/list",
+        "resources/list",
+        "resources/templates/list",
+        "prompts/list",
+        "tasks/list",
+    ] {
+        let mut cursor: Option<String> = None;
+        for _ in 0..16 {
+            request_id += 1;
+            let params = match &cursor {
+                Some(cursor) => json!({ "cursor": cursor }),
+                None => json!({}),
+            };
+            let response = edge
+                .handle_jsonrpc(json!({
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": method,
+                    "params": params,
+                }))
+                .unwrap();
+            let result = match response.get("result") {
+                Some(result) => result,
+                None => panic!("{method} did not return a result: {response}"),
+            };
+
+            match result.get("nextCursor") {
+                // Last page: the key is gone, not null.
+                None => break,
+                Some(Value::String(next)) => {
+                    saw_a_cursor = true;
+                    cursor = Some(next.clone());
+                }
+                Some(other) => panic!(
+                    "{method} sent nextCursor as `{other}`. MCP allows a string or nothing; a \
+                     JSON null makes every SDK client reject the entire response."
+                ),
+            }
+        }
+    }
+
+    assert!(
+        saw_a_cursor,
+        "no listing paginated, so the branch that does emit a cursor was never exercised"
+    );
 }
 
 #[test]
