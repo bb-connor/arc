@@ -33,8 +33,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/broker_proof_replay/mutants.out/outcomes.json",
-          "sha256": "e904d271f8a7faa3dc2dc019d81ab627410dd81badee69594486a208ca8ea457",
-          "inputs_sha256": "2f011f49e3da2286e799242dede198911a3524d58ce1386802adb801c8eebfb6"
+          "sha256": "cabd6c0e21dc31ab38c732323dd9e9d85584d81b9249d459ffe37a4e9ad3c21a",
+          "inputs_sha256": "2c62e2c4a3c7dc9cf9c06e8b79ddf005f80f29f54d1a0e2e1eb31c8858789284"
         }
       }
     ]

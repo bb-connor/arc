@@ -57,8 +57,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json",
-          "sha256": "7e28096db64919f8c4d38d3938d47ed2ab0877c0a1793460b1bc92e8f09e1c45",
-          "inputs_sha256": "3ed9550195daf76e7f9aeb7104b1f3107988d7db4ec470b710abb8a13d1887cc"
+          "sha256": "f43b5b4d76e0637e9933c2afd47a7c356f123d7e4eabd6ff0442385b98865353",
+          "inputs_sha256": "805c42edfeddab16cef235c399cf7fe89185d8a34a3dffce7a7ac846e86fc582"
         }
       },
       {
@@ -74,8 +74,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json",
-          "sha256": "f9a84562fc75918b22c698bd7cbf3e8ec0a4398074bb1b68ae078f3c11f9e089",
-          "inputs_sha256": "fa65cc63ba16b6e61c3c5e24ea97c3384236a74bfe58d3ef0f8178d377577175"
+          "sha256": "418152e4199a8fdd6d4a6be90ac539e18be6732569d5759547caa50c1c4963d4",
+          "inputs_sha256": "730e46f11c5dc94b3fd2b0d756ccc43d75cf630f20e8be4d320f18a713f998c1"
         }
       },
       {
@@ -93,8 +93,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/root_only_lift/mutants.out/outcomes.json",
-          "sha256": "116bb528809cfb4486e8f8d36af2ad0b1691f72e1418e7f9d2f61e5cd9bec00d",
-          "inputs_sha256": "85b29f2d8e261fbc72d4db102c492dbd5afbdc389990cb9e71f9b71a6bec8f9c"
+          "sha256": "f4bd6715eba5d90a4d20e19c1eef8805c17e12e469505d628563c0b79e614f77",
+          "inputs_sha256": "b1f2be6cc52f4d32aef7c919cfbebe6695ea98434065f5c246f64fdb3d765851"
         }
       },
       {
@@ -110,8 +110,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json",
-          "sha256": "4084d7cabe5da4f6b0551b49de205c2a0ad648c6de54681e62b6ea655f9d3aa1",
-          "inputs_sha256": "41f2cb75d1194d0c2990d9ae7b2138e88538928a78cfffb0438b34012a9775ce"
+          "sha256": "770bad46c2ab26f4b223011edfaa70adeef15a804858f42d0d79517bd3a88474",
+          "inputs_sha256": "060d8a4c03ae7d249a5770380d3118ae30fe32fbe334a98ba45308bdfc2a5ccf"
         }
       }
     ]

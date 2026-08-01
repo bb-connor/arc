@@ -64,7 +64,7 @@
       "expected_reason": "broker_destination_rebinding_detected",
       "threat_id": "ssrf_via_http_substrate",
       "path": "cases/broker_destination_rebinding/broker-destination-rebinding-001.json",
-      "content_sha256": "173a7c0d634e4b2def5b774f4427d6e322022de1511bdf236603a882b8720228"
+      "content_sha256": "e268de3f753b233d8239605c95d60caa22e866863af247644e8afc8182507613"
     },
     {
       "id": "broker-execution-overspend-001",
@@ -73,7 +73,7 @@
       "expected_reason": "broker_execution_overspend_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/broker_execution_overspend/broker-execution-overspend-001.json",
-      "content_sha256": "1f30e5daecd771fc33a215f695a0da17a64c60910b09e3205df5673427216787"
+      "content_sha256": "0034ecea6aafdfba4403d34a8a42a43d8905b24e3698a4fbe039ae59abf15e81"
     },
     {
       "id": "broker-orphan-hold-001",
@@ -82,7 +82,7 @@
       "expected_reason": "broker_orphan_hold_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/broker_orphan_hold/broker-orphan-hold-001.json",
-      "content_sha256": "3c68899fc68a2a9a76985f641ff794a28d45f6433d04c90ff92055c0078e629d"
+      "content_sha256": "1b9ec1fa6f0323b796e89467f72a2d0275f16bec3e238753f380c2ad14792040"
     },
     {
       "id": "broker-parent-double-charge-001",
@@ -91,7 +91,7 @@
       "expected_reason": "broker_parent_double_charge_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/broker_parent_double_charge/broker-parent-double-charge-001.json",
-      "content_sha256": "83dd4caa62786aa42e61fac58511d146ec63e1dffbfc9d33366f49c8f2cc6e1c"
+      "content_sha256": "01cc0a535ad92a9c889b0f2579a0ae09ccc4aabdb7d5ad30b58aca9415ca1111"
     },
     {
       "id": "broker-proof-replay-001",
@@ -100,7 +100,7 @@
       "expected_reason": "broker_proof_replay_detected",
       "threat_id": "native_channel_replay",
       "path": "cases/broker_proof_replay/broker-proof-replay-001.json",
-      "content_sha256": "91e4b524922b40b62ed2edd77c96dd658144527e1c1688f75c04686c87929606"
+      "content_sha256": "9fffd1dbc19da703bcd3f95529debf41393e9b70be235b3a7e40aff513378feb"
     },
     {
       "id": "broker-revocation-race-001",
@@ -109,7 +109,7 @@
       "expected_reason": "broker_revocation_race_detected",
       "threat_id": "capability_token_theft",
       "path": "cases/broker_revocation_race/broker-revocation-race-001.json",
-      "content_sha256": "96127f480d9f66e168a76863d6d6aec95c5fffaac77f086698d89716df36f045"
+      "content_sha256": "e0940b950b139c4000233b0ced05a4e777edc47711916a29f6bd15cb636e1676"
     },
     {
       "id": "broker-secret-boundary-crossing-001",
@@ -118,7 +118,7 @@
       "expected_reason": "broker_secret_boundary_crossing_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/broker_secret_boundary_crossing/broker-secret-boundary-crossing-001.json",
-      "content_sha256": "e9233e3ca58325dd7caac7ab1166b0fc8ac556af7ca0d6a9c106e33d4278b414"
+      "content_sha256": "fab452e2737306457f87393dd4200fd9030a6a09e571fdc8cf52e0dd64f41ff4"
     },
     {
       "id": "broker-unbound-headers-001",
@@ -127,7 +127,7 @@
       "expected_reason": "broker_unbound_headers_detected",
       "threat_id": "ssrf_via_http_substrate",
       "path": "cases/broker_unbound_headers/broker-unbound-headers-001.json",
-      "content_sha256": "ac6bd170cd42b8484506bee82b1443b8c66c6352ca92594b59aff7c1f165c252"
+      "content_sha256": "9b6bfd462dbdf4c5bbbe05885ee5e6968b1c721947a6dd16b0318bf978e24b04"
     },
     {
       "id": "canary-evasion-001",
@@ -136,7 +136,7 @@
       "expected_reason": "canary_evasion_detected",
       "threat_id": "behavioral_sequence_attack",
       "path": "cases/canary_evasion/canary-evasion-001.json",
-      "content_sha256": "dc47cca73d7b64e5e713336bfadfba2b6ddef0fd81b90906719be9b69ea99f92"
+      "content_sha256": "44156bf2bb23850d914cbb1b961dd120b08bdae09e0dd92b3794cf2c6f5de9cd"
     },
     {
       "id": "clock-rewound-001",
@@ -190,7 +190,7 @@
       "expected_reason": "containment_rollback_detected",
       "threat_id": "resource_exhaustion_dos",
       "path": "cases/containment_rollback/containment-rollback-001.json",
-      "content_sha256": "ade9824a0237d8fe484bac51d1ef5d1192fc75b713067f671a6a103f4c6090a5"
+      "content_sha256": "18d67843865e91a1afc09642bba3b5879372d40cf5ae5fd7e3d57f5831233362"
     },
     {
       "id": "future-dated-001",
@@ -244,7 +244,7 @@
       "expected_reason": "key_log_inconsistent_growth_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/key_log_inconsistent_growth/key-log-inconsistent-growth-001.json",
-      "content_sha256": "d853cd1ca36e8294f2614f19efb48b41267a542c81f1d0d12e354fb2fda237f5"
+      "content_sha256": "387fdd579d1c7d0e7457a0778a6dd0007e0f085c813dca595a7e86f78f2244c7"
     },
     {
       "id": "key-log-noncontiguous-sync-001",
@@ -253,7 +253,7 @@
       "expected_reason": "key_log_noncontiguous_sync_detected",
       "threat_id": "native_channel_replay",
       "path": "cases/key_log_noncontiguous_sync/key-log-noncontiguous-sync-001.json",
-      "content_sha256": "08f0be910556b6ec3238ca561434dc589873ce4d312c1d9d9a145d44d2f76113"
+      "content_sha256": "4357a0a1c6d37cc31bdba538fd7836b9c7dcfbe844f70611a80bb92fbb11c49f"
     },
     {
       "id": "key-log-omission-001",
@@ -262,7 +262,7 @@
       "expected_reason": "key_log_omission_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/key_log_omission/key-log-omission-001.json",
-      "content_sha256": "b273b800516ee474e8952d22b5b37058d6c4c7ec4c40e7800d9ed8bad0aa415d"
+      "content_sha256": "e8b76bdd717a86f73a0f975c08a7f483fed3b87f70a157513b5a937f35f4d253"
     },
     {
       "id": "key-log-split-view-001",
@@ -271,7 +271,7 @@
       "expected_reason": "key_log_split_view_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/key_log_split_view/key-log-split-view-001.json",
-      "content_sha256": "7ed7f7c157b51c3e75524f6df8984f27bc87abc2f398f1a25d5b7517bbeff0ea"
+      "content_sha256": "c3ee4c45a2f9cedb9dd4dcc98c793d13d2778f76db343a9903475d1b20e8ed79"
     },
     {
       "id": "label-downgrade-001",
@@ -280,7 +280,7 @@
       "expected_reason": "label_downgrade_detected",
       "threat_id": "pii_phi_exposure",
       "path": "cases/label_downgrade/label-downgrade-001.json",
-      "content_sha256": "acd40128dd66d0f9da0a1456adb2ae9d52b859d3be9a550732c899671075484f"
+      "content_sha256": "104ab561bb5771c5a56e8384f6da0b9ce9c061b960c30504f7eb80e1d0cfc9c9"
     },
     {
       "id": "old-key-backdating-001",
@@ -289,7 +289,7 @@
       "expected_reason": "old_key_backdating_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/old_key_backdating/old-key-backdating-001.json",
-      "content_sha256": "d9321239fc4764f35a39daa09cf1214174e57cbfa42e3bb6fc50a8d8fdcc8463"
+      "content_sha256": "fb8a19aaad5b259a2b10fd8c1f2c76a060f17a1d878929725ee77b4c24967532"
     },
     {
       "id": "partial-signature-001",
@@ -433,7 +433,7 @@
       "expected_reason": "rotation_partial_commit_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/rotation_partial_commit/rotation-partial-commit-001.json",
-      "content_sha256": "8a0df83773d4cb331e682b7f1df2a542462daa58e1a7ded22314206ef1fd438f"
+      "content_sha256": "8408db60bb3f1f75486e609077065609b0a32eeedf506e445061ea4a59944e69"
     },
     {
       "id": "rotation-unwitnessed-signing-001",
@@ -442,7 +442,7 @@
       "expected_reason": "rotation_unwitnessed_signing_detected",
       "threat_id": "kernel_impersonation",
       "path": "cases/rotation_unwitnessed_signing/rotation-unwitnessed-signing-001.json",
-      "content_sha256": "9bf06a6db3b4c0b66d927b6b32d5fb3ed7c28f791f4eb7bddec28d8ebb21ea3e"
+      "content_sha256": "0544885426f54410fea381ec514c4e9b87fd650d071267114055635e13d632e7"
     },
     {
       "id": "sandbox-false-exec-success-001",
@@ -451,7 +451,7 @@
       "expected_reason": "sandbox_false_exec_success_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/sandbox_false_exec_success/sandbox-false-exec-success-001.json",
-      "content_sha256": "3c6a4b330235cde15221f5daaca99d5b5a004661309c40824dd84a19ef6642cd"
+      "content_sha256": "72b7706358f7263c7c63b0b4b225be36683625d565fc5bf0bcea37c95c0190e8"
     },
     {
       "id": "sandbox-partial-enforcement-001",
@@ -460,7 +460,7 @@
       "expected_reason": "sandbox_partial_enforcement_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/sandbox_partial_enforcement/sandbox-partial-enforcement-001.json",
-      "content_sha256": "688a2009e6314b71bbc15c6b58a52ec06eadd6d63b358132f9d94f2ece936014"
+      "content_sha256": "daea2b2c9f644c25044d599d19778e3e26f7f5dd7fb8138edaa40c19e7b6abfe"
     },
     {
       "id": "sandbox-unsigned-manifest-001",
@@ -469,7 +469,7 @@
       "expected_reason": "sandbox_unsigned_manifest_detected",
       "threat_id": "tool_server_escape",
       "path": "cases/sandbox_unsigned_manifest/sandbox-unsigned-manifest-001.json",
-      "content_sha256": "458817228f4072a6bca61276337b4457298dc468fcab58a45c85698d5a5f12f1"
+      "content_sha256": "989e919ebf0688db81aeedae4fb55fd6ddf4ea50bca4c3f106ee1f896224fe1d"
     },
     {
       "id": "scope-superset-001",
@@ -568,7 +568,7 @@
       "expected_reason": "temporal_evasion_detected",
       "threat_id": "behavioral_sequence_attack",
       "path": "cases/temporal_evasion/temporal-evasion-001.json",
-      "content_sha256": "d02f3ca50aa0fb44334ebed352881974223b7134a96efda9c08d1548f14210e2"
+      "content_sha256": "04c00f455bb835d7373a961bb2382e11a0da41369577309e4de8054ea7348252"
     },
     {
       "id": "threshold-proposal-mutations-001",
