@@ -291,11 +291,6 @@ criteria = "safe-to-deploy"
 version = "0.5.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.ark-ff]]
-version = "0.6.0"
-criteria = "safe-to-deploy"
-notes = "Optional ruint integration added by 1.20.0; not enabled in the resolved Chio build graph."
-
 [[exemptions.ark-ff-asm]]
 version = "0.3.0"
 criteria = "safe-to-deploy"
@@ -307,11 +302,6 @@ criteria = "safe-to-deploy"
 [[exemptions.ark-ff-asm]]
 version = "0.5.0"
 criteria = "safe-to-deploy"
-
-[[exemptions.ark-ff-asm]]
-version = "0.6.0"
-criteria = "safe-to-deploy"
-notes = "Optional ruint integration added by 1.20.0; not enabled in the resolved Chio build graph."
 
 [[exemptions.ark-ff-macros]]
 version = "0.3.0"
@@ -325,11 +315,6 @@ criteria = "safe-to-deploy"
 version = "0.5.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.ark-ff-macros]]
-version = "0.6.0"
-criteria = "safe-to-deploy"
-notes = "Optional ruint integration added by 1.20.0; not enabled in the resolved Chio build graph."
-
 [[exemptions.ark-serialize]]
 version = "0.3.0"
 criteria = "safe-to-deploy"
@@ -341,16 +326,6 @@ criteria = "safe-to-deploy"
 [[exemptions.ark-serialize]]
 version = "0.5.0"
 criteria = "safe-to-deploy"
-
-[[exemptions.ark-serialize]]
-version = "0.6.0"
-criteria = "safe-to-deploy"
-notes = "Optional ruint integration added by 1.20.0; not enabled in the resolved Chio build graph."
-
-[[exemptions.ark-serialize-derive]]
-version = "0.6.0"
-criteria = "safe-to-deploy"
-notes = "Optional ruint integration added by 1.20.0; not enabled in the resolved Chio build graph."
 
 [[exemptions.ark-std]]
 version = "0.3.0"
@@ -363,11 +338,6 @@ criteria = "safe-to-deploy"
 [[exemptions.ark-std]]
 version = "0.5.0"
 criteria = "safe-to-deploy"
-
-[[exemptions.ark-std]]
-version = "0.6.0"
-criteria = "safe-to-deploy"
-notes = "Optional ruint integration added by 1.20.0; not enabled in the resolved Chio build graph."
 
 [[exemptions.askama]]
 version = "0.12.1"
@@ -2303,11 +2273,6 @@ criteria = "safe-to-deploy"
 [[exemptions.rsqlite-vfs]]
 version = "0.1.0"
 criteria = "safe-to-deploy"
-
-[[exemptions.ruint]]
-version = "1.20.0"
-criteria = "safe-to-deploy"
-notes = "Upgrade required by RUSTSEC-2026-0220; replaces the prior 1.17.2 bootstrap exemption."
 
 [[exemptions.ruint-macro]]
 version = "1.2.1"

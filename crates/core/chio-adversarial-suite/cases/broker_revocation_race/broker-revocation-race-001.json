@@ -31,8 +31,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/broker_revocation_race/mutants.out/outcomes.json",
-          "sha256": "f4f9359384c683bf8a8a8c6057d7f7e9e7f2e630c94ab0ce5169dc5d3bea7412",
-          "inputs_sha256": "6a2419402ee25c67dbb94e328946a4055b530ad60c938745e80051fcab83c3e3"
+          "sha256": "71b4549de1341473fe1f51ea7f9e49806afd1877aec0f65eb9507831e09e45cc",
+          "inputs_sha256": "f96438a0bf4f3141fd18f31e4bee54a74f3933e7a7a70052df7fd00371642318"
         }
       }
     ]

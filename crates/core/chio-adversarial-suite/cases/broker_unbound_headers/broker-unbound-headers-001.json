@@ -32,8 +32,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/broker_unbound_headers/mutants.out/outcomes.json",
-          "sha256": "05675940d6ebc2408546d42a9c446f1fc9b83fa5cd4d07485ca825fb09109f2e",
-          "inputs_sha256": "b85d720bb82df2d1ce9fcd3e004908c33b288b7ee27ac1f6d9008b6f3963776c"
+          "sha256": "79ef47d9feb110c11325a2f5f8ace4ad69f8476a3a1ea96aeefc6363ef8cd3bb",
+          "inputs_sha256": "4ecf0c508ade305f9fa12eed047dbbb1d0cd75411dc17963e0b13835c12251f6"
         }
       }
     ]

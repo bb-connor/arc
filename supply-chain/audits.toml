@@ -271,6 +271,42 @@ criteria = "safe-to-deploy"
 delta = "1.0.102 -> 1.0.103"
 notes = "Patch release by dtolnay resolving the Error::downcast_mut soundness fix; the diff adds no new unsafe surface, build script, or IO."
 
+[[audits.ark-ff]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.5.0 -> 0.6.0"
+notes = "Reviewed exact crates.io 0.5.0 to 0.6.0 source delta, manifest, feature surface, unsafe and proc-macro boundaries, and package validation. No build script, process execution, network access, or runtime filesystem access. Version 0.6 is present only through the optional ruint all-features graph and is not enabled by the resolved Chio runtime graph. All-feature library build passed. Unsafe is limited to architecture intrinsics, fixed-layout byte views, and unreachable branches guarded by exact limb ranges. Packaged unit tests require omitted workspace-only ark-test-curves dev fixtures."
+
+[[audits.ark-ff-asm]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.5.0 -> 0.6.0"
+notes = "Reviewed exact crates.io 0.5.0 to 0.6.0 source delta, manifest, feature surface, unsafe and proc-macro boundaries, and package validation. No build script, process execution, network access, or runtime filesystem access. Version 0.6 is present only through the optional ruint all-features graph and is not enabled by the resolved Chio runtime graph. Assembly proc-macro output is restricted to fixed-limb arithmetic templates and architecture-gated call sites."
+
+[[audits.ark-ff-macros]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.5.0 -> 0.6.0"
+notes = "Reviewed exact crates.io 0.5.0 to 0.6.0 source delta, manifest, feature surface, unsafe and proc-macro boundaries, and package validation. No build script, process execution, network access, or runtime filesystem access. Version 0.6 is present only through the optional ruint all-features graph and is not enabled by the resolved Chio runtime graph. Proc macros are pure token transforms for validated field parameters; all-feature package tests passed."
+
+[[audits.ark-serialize]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.5.0 -> 0.6.0"
+notes = "Reviewed exact crates.io 0.5.0 to 0.6.0 source delta, manifest, feature surface, unsafe and proc-macro boundaries, and package validation. No build script, process execution, network access, or runtime filesystem access. Version 0.6 is present only through the optional ruint all-features graph and is not enabled by the resolved Chio runtime graph. All-feature package tests passed. The only new unsafe path initializes and consumes a fixed MaybeUninit array without exposing uninitialized values."
+
+[[audits.ark-serialize-derive]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.6.0"
+notes = "Reviewed exact crates.io source, manifest, and generated token paths. Unsafe code is forbidden; the proc macro only derives canonical serialization, deserialization, and validation for structs; no build script, I/O, process, filesystem, or network access. Package build/tests passed."
+
+[[audits.ark-std]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.5.0 -> 0.6.0"
+notes = "Reviewed exact crates.io 0.5.0 to 0.6.0 source delta, manifest, feature surface, unsafe and proc-macro boundaries, and package validation. No build script, process execution, network access, or runtime filesystem access. Version 0.6 is present only through the optional ruint all-features graph and is not enabled by the resolved Chio runtime graph. Source is unsafe-free and all-feature package tests passed."
+
 [[audits.asn1-rs]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -1392,6 +1428,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "1.5.0"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.ruint]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "1.20.0"
+notes = "Reviewed exact crates.io source, manifest, active Chio features (std, alloc, alloy-rlp, serde), optional feature surface, and unsafe invariants. No build script, process execution, network access, or runtime filesystem access. Unsafe is confined to checked limb indexing, byte-layout views, arithmetic preconditions, fixed-size formatting buffers, and serialization trait contracts. Active-feature suite with proptest passed 159 tests with one upstream TODO ignored."
 
 [[audits.rusqlite]]
 who = "Chio supply-chain reviewer"
