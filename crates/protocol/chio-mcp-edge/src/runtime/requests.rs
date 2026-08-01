@@ -120,10 +120,11 @@ impl ChioMcpEdge {
                 "initialize may only be called once",
             );
         }
-        let selected_protocol_version = match negotiate_protocol_version(&id, &params) {
-            Ok(version) => version,
+        let negotiated_protocol_version = match negotiate_protocol_version(&id, &params) {
+            Ok(negotiated) => negotiated,
             Err(error) => return error,
         };
+        let selected_protocol_version = negotiated_protocol_version.selected;
 
         let opened_session = match self.initial_session_id.clone() {
             Some(session_id) => self.kernel.open_session_with_id(
@@ -205,22 +206,48 @@ impl ChioMcpEdge {
                 "toolCallChunkNotifications": true,
             }),
         );
+        let mut chio_protocol = serde_json::Map::new();
+        chio_protocol.insert(
+            "supportedProtocolVersions".to_string(),
+            json!(SUPPORTED_MCP_PROTOCOL_VERSIONS),
+        );
+        chio_protocol.insert(
+            "selectedProtocolVersion".to_string(),
+            json!(selected_protocol_version),
+        );
+        // The client's requested version, and whether the edge could honour it.
+        // A downgrade is a successful handshake per the MCP lifecycle, so this
+        // is the only place it is visible to an operator.
+        if let Some(requested) = negotiated_protocol_version.requested {
+            let downgraded = requested != selected_protocol_version;
+            chio_protocol.insert("requestedProtocolVersion".to_string(), json!(requested));
+            chio_protocol.insert("downgraded".to_string(), json!(downgraded));
+        }
+        chio_protocol.insert(
+            "compatibility".to_string(),
+            json!("exact_match_from_supported_set"),
+        );
+        chio_protocol.insert(
+            "downgradeBehavior".to_string(),
+            json!("respond_with_latest_supported"),
+        );
+        chio_protocol.insert(
+            "errorRegistry".to_string(),
+            json!({
+                "schema": CHIO_ERROR_REGISTRY_SCHEMA,
+                "path": "spec/errors/chio-error-registry.v1.json",
+            }),
+        );
+        chio_protocol.insert(
+            "requestIdentity".to_string(),
+            json!({
+                "stableRequestIdMetaField": "chioRequestId",
+                "requestBoundArtifactsRequireStableId": true,
+            }),
+        );
         experimental.insert(
             CHIO_PROTOCOL_CAPABILITY_KEY.to_string(),
-            json!({
-                "supportedProtocolVersions": SUPPORTED_MCP_PROTOCOL_VERSIONS,
-                "selectedProtocolVersion": selected_protocol_version,
-                "compatibility": "exact_match",
-                "downgradeBehavior": "reject",
-                "errorRegistry": {
-                    "schema": CHIO_ERROR_REGISTRY_SCHEMA,
-                    "path": "spec/errors/chio-error-registry.v1.json",
-                },
-                "requestIdentity": {
-                    "stableRequestIdMetaField": "chioRequestId",
-                    "requestBoundArtifactsRequireStableId": true,
-                }
-            }),
+            Value::Object(chio_protocol),
         );
         capabilities.insert("experimental".to_string(), Value::Object(experimental));
         capabilities.insert(
@@ -289,13 +316,11 @@ impl ChioMcpEdge {
             .map(|binding| serde_json::to_value(&binding.tool).unwrap_or_else(|_| json!({})))
             .collect::<Vec<_>>();
 
-        jsonrpc_result(
-            id,
-            json!({
-                "tools": tools,
-                "nextCursor": next_cursor,
-            }),
-        )
+        let mut result = serde_json::Map::new();
+        result.insert("tools".to_string(), Value::Array(tools));
+        insert_next_cursor(&mut result, next_cursor);
+
+        jsonrpc_result(id, Value::Object(result))
     }
 
     pub(super) fn handle_resources_list(&mut self, id: Value, params: Value) -> Value {
