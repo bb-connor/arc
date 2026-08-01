@@ -360,27 +360,23 @@ pub(super) fn route_staged_status(
         SettlementObserverStatus::Skipped { reason } => {
             SettlementRoutingInput::Skipped { reason: *reason }
         }
-        SettlementObserverStatus::Observed {
-            outcome: SettlementOutcome::Accepted { .. },
-        } => SettlementRoutingInput::Accepted,
-        SettlementObserverStatus::Observed {
-            outcome: SettlementOutcome::Skipped { .. },
-        } => SettlementRoutingInput::Permanent {
-            reason: SettlementFailureReason::from_detail(
-                SettlementFailureCode::InvalidObservation,
-                "settlement hook skipped a positive economic observation",
-            ),
-        },
-        SettlementObserverStatus::Observed {
-            outcome: SettlementOutcome::Retryable { reason, .. },
-        } => SettlementRoutingInput::Retryable {
-            reason: reason.clone(),
-        },
-        SettlementObserverStatus::Observed {
-            outcome: SettlementOutcome::Permanent { reason, .. },
-        } => SettlementRoutingInput::Permanent {
-            reason: reason.clone(),
-        },
+        SettlementObserverStatus::Observed { outcome } => {
+            match validate_and_sanitize_settlement_outcome(outcome)? {
+                SettlementRoutingInput::Accepted => SettlementRoutingInput::Accepted,
+                SettlementRoutingInput::Skipped { .. } => SettlementRoutingInput::Permanent {
+                    reason: SettlementFailureReason::from_detail(
+                        SettlementFailureCode::InvalidObservation,
+                        "settlement hook skipped a positive economic observation",
+                    ),
+                },
+                SettlementRoutingInput::Retryable { reason } => {
+                    SettlementRoutingInput::Retryable { reason }
+                }
+                SettlementRoutingInput::Permanent { reason } => {
+                    SettlementRoutingInput::Permanent { reason }
+                }
+            }
+        }
         SettlementObserverStatus::HookFailed { class, reason } => {
             match reason.effective_class(*class) {
                 SettlementFailureClass::Retryable => SettlementRoutingInput::Retryable {
@@ -890,6 +886,54 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct RoutingSpyRetryStore {
+        clear_attempt_calls: std::sync::atomic::AtomicUsize,
+        dead_letter_calls: std::sync::atomic::AtomicUsize,
+        upsert_attempt_calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl SettlementRetryStore for RoutingSpyRetryStore {
+        fn load_attempt(
+            &self,
+            _receipt_id: &str,
+        ) -> Result<Option<SettleAttemptRecord>, SettlementRetryError> {
+            Ok(None)
+        }
+
+        fn upsert_attempt(
+            &self,
+            _record: &SettleAttemptRecord,
+        ) -> Result<(), SettlementRetryError> {
+            self.upsert_attempt_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn clear_attempt(&self, _receipt_id: &str) -> Result<(), SettlementRetryError> {
+            self.clear_attempt_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn insert_dead_letter(
+            &self,
+            _record: &chio_settle::DeadLetterRecord,
+        ) -> Result<bool, SettlementRetryError> {
+            self.dead_letter_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(true)
+        }
+
+        fn due_attempts(
+            &self,
+            _now_unix_secs: u64,
+            _limit: usize,
+        ) -> Result<Vec<SettleAttemptRecord>, SettlementRetryError> {
+            Ok(Vec::new())
+        }
+    }
+
     #[test]
     fn build_observation_skips_non_allow_decisions() {
         let receipt = sign_with(
@@ -1156,6 +1200,69 @@ mod tests {
             SettlementObserverStatus::Observed {
                 outcome: SettlementOutcome::accepted(transcript_id),
             }
+        );
+    }
+
+    #[test]
+    fn staged_observer_outcome_is_validated_before_retry_store_mutation() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "financial": {"cost_charged": 250, "currency": "USD"}
+            }),
+            Decision::Allow,
+        );
+        let retry_store = RoutingSpyRetryStore::default();
+        let status = SettlementObserverStatus::Observed {
+            outcome: SettlementOutcome::accepted(""),
+        };
+        let store = DurableFailureReceiptStore {
+            receipt: receipt.clone(),
+            mode: DurableFailureMode::StagedJson,
+            abandoned_error: std::sync::Mutex::new(None),
+        };
+        let verifier = SettlementReceiptTrustVerifier::new(receipt.kernel_key.clone(), None);
+        let hook: Arc<dyn SettlementHook> = Arc::new(AcceptingHook);
+        let mut lease = SettlementObserverOutboxLease {
+            receipt_id: receipt.id.clone(),
+            finalized_at: receipt.timestamp,
+            claim_token: "claim-1".to_string(),
+            claim_deadline_unix_ms: u64::MAX,
+            version: 1,
+            staged_status_json: Some(
+                serde_json::to_string(&status)
+                    .expect("invalid staged outcome remains serializable"),
+            ),
+        };
+
+        let error = deliver_claimed_settlement_observer_outbox(
+            &store,
+            &retry_store,
+            &hook,
+            &chio_settle::RetryPolicy::default(),
+            &verifier,
+            None,
+            &mut lease,
+        )
+        .expect_err("invalid staged observer outcome must fail closed");
+        assert_eq!(error, "settlement-observer durable outcome routing failed");
+
+        assert_eq!(
+            retry_store
+                .clear_attempt_calls
+                .load(std::sync::atomic::Ordering::SeqCst),
+            0
+        );
+        assert_eq!(
+            retry_store
+                .dead_letter_calls
+                .load(std::sync::atomic::Ordering::SeqCst),
+            0
+        );
+        assert_eq!(
+            retry_store
+                .upsert_attempt_calls
+                .load(std::sync::atomic::Ordering::SeqCst),
+            0
         );
     }
 
