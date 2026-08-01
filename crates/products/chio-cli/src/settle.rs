@@ -1481,7 +1481,7 @@ pub fn run_settlement_drive_with_iou_trust(
         chio_settle::RetryPolicy::default(),
     )
     .map_err(|error| {
-        SettleStatusError::Integrity(format!("invalid settlement retry policy: {error}"))
+        SettleStatusError::Integrity(format!("invalid settlement runtime: {error}"))
     })?;
 
     let mut report = SettleDriveReport::default();

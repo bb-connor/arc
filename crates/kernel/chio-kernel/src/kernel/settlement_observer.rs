@@ -63,14 +63,36 @@ impl SettlementReceiptTrustVerifier {
 #[allow(dead_code)]
 pub const SETTLEMENT_OBSERVER_STATUS_SCHEMA: &str = "chio.settle.observer-status.v1";
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SettlementObserverStatusFrame {
+    schema: String,
+    status: SettlementObserverStatusPayload,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
+enum SettlementObserverStatusPayload {
+    NotRegistered,
+    Skipped {
+        reason: SettlementSkipReason,
+    },
+    Observed {
+        outcome: SettlementOutcome,
+    },
+    HookFailed {
+        class: SettlementFailureClass,
+        reason: SettlementFailureReason,
+    },
+}
+
 /// Status the kernel records for each settlement observer invocation.
 ///
 /// Settlement runs after durable receipt append: regardless of which variant lands,
 /// the receipt has already been signed and persisted. The variants
 /// document only what the observer slot did with the hook's return,
 /// not whether the receipt committed (it always committed).
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettlementObserverStatus {
     /// No settlement hook is registered on this kernel; the observation
     /// was not produced.
@@ -89,6 +111,64 @@ pub enum SettlementObserverStatus {
         class: SettlementFailureClass,
         reason: SettlementFailureReason,
     },
+}
+
+impl From<&SettlementObserverStatus> for SettlementObserverStatusPayload {
+    fn from(status: &SettlementObserverStatus) -> Self {
+        match status {
+            SettlementObserverStatus::NotRegistered => Self::NotRegistered,
+            SettlementObserverStatus::Skipped { reason } => Self::Skipped { reason: *reason },
+            SettlementObserverStatus::Observed { outcome } => Self::Observed {
+                outcome: outcome.clone(),
+            },
+            SettlementObserverStatus::HookFailed { class, reason } => Self::HookFailed {
+                class: *class,
+                reason: reason.clone(),
+            },
+        }
+    }
+}
+
+impl From<SettlementObserverStatusPayload> for SettlementObserverStatus {
+    fn from(status: SettlementObserverStatusPayload) -> Self {
+        match status {
+            SettlementObserverStatusPayload::NotRegistered => Self::NotRegistered,
+            SettlementObserverStatusPayload::Skipped { reason } => Self::Skipped { reason },
+            SettlementObserverStatusPayload::Observed { outcome } => Self::Observed { outcome },
+            SettlementObserverStatusPayload::HookFailed { class, reason } => {
+                Self::HookFailed { class, reason }
+            }
+        }
+    }
+}
+
+impl serde::Serialize for SettlementObserverStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        SettlementObserverStatusFrame {
+            schema: SETTLEMENT_OBSERVER_STATUS_SCHEMA.to_string(),
+            status: self.into(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SettlementObserverStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let frame = SettlementObserverStatusFrame::deserialize(deserializer)?;
+        if frame.schema != SETTLEMENT_OBSERVER_STATUS_SCHEMA {
+            return Err(serde::de::Error::custom(format!(
+                "unsupported settlement observer status schema `{}`",
+                frame.schema
+            )));
+        }
+        Ok(frame.status.into())
+    }
 }
 
 impl SettlementObserverStatus {
@@ -1264,6 +1344,34 @@ mod tests {
                 .load(std::sync::atomic::Ordering::SeqCst),
             0
         );
+    }
+
+    #[test]
+    fn observer_status_wire_frame_declares_and_validates_its_schema() {
+        let status = SettlementObserverStatus::skipped(SettlementSkipReason::ZeroCharge);
+        let encoded = serde_json::to_value(&status).expect("observer status must serialize");
+
+        assert_eq!(
+            encoded.get("schema").and_then(serde_json::Value::as_str),
+            Some(SETTLEMENT_OBSERVER_STATUS_SCHEMA)
+        );
+        assert_eq!(
+            serde_json::from_value::<SettlementObserverStatus>(encoded.clone())
+                .expect("current observer status schema must deserialize"),
+            status
+        );
+
+        let mut wrong_schema = encoded.clone();
+        wrong_schema["schema"] =
+            serde_json::Value::String("chio.settle.observer-status.v999".to_string());
+        assert!(serde_json::from_value::<SettlementObserverStatus>(wrong_schema).is_err());
+
+        let mut missing_schema = encoded;
+        missing_schema
+            .as_object_mut()
+            .expect("serialized observer status must be an object")
+            .remove("schema");
+        assert!(serde_json::from_value::<SettlementObserverStatus>(missing_schema).is_err());
     }
 
     #[test]

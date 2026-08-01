@@ -443,9 +443,20 @@ pub struct SettlementRuntime<H> {
     policy: crate::RetryPolicy,
 }
 
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementRuntimeBuildError {
+    #[error("invalid settlement retry policy: {0}")]
+    InvalidRetryPolicy(#[from] crate::RetryPolicyError),
+    #[error("settlement hook does not guarantee receipt-id idempotency")]
+    HookNotReceiptIdIdempotent,
+}
+
 impl<H: crate::SettlementHook> SettlementRuntime<H> {
-    pub fn new(hook: H, policy: crate::RetryPolicy) -> Result<Self, crate::RetryPolicyError> {
+    pub fn new(hook: H, policy: crate::RetryPolicy) -> Result<Self, SettlementRuntimeBuildError> {
         policy.validate()?;
+        if !hook.supports_receipt_id_idempotency() {
+            return Err(SettlementRuntimeBuildError::HookNotReceiptIdIdempotent);
+        }
         Ok(Self { hook, policy })
     }
 
@@ -529,7 +540,7 @@ mod tests {
         settlement_completion_flow_row_id, RetryPolicy, RetryPolicyError, SettlementDriveStep,
         SettlementFailureCode, SettlementFinalityStatus, SettlementHook, SettlementHookError,
         SettlementIdempotencyKey, SettlementObservation, SettlementOutcome,
-        SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX,
+        SettlementRuntimeBuildError, SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX,
     };
 
     use chio_test_support::prelude::*;
@@ -547,6 +558,18 @@ mod tests {
             _idempotency_key: &SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             Ok(SettlementOutcome::accepted("\n"))
+        }
+    }
+
+    struct NonIdempotentHook;
+
+    impl SettlementHook for NonIdempotentHook {
+        fn observe(
+            &self,
+            _observation: &SettlementObservation,
+            _idempotency_key: &SettlementIdempotencyKey,
+        ) -> Result<SettlementOutcome, SettlementHookError> {
+            Ok(SettlementOutcome::accepted("unsafe-runtime"))
         }
     }
 
@@ -577,7 +600,21 @@ mod tests {
         )
         .test_expect_err("invalid retry policy must fail at construction");
 
-        assert_eq!(error, RetryPolicyError::InitialBackoffZero);
+        assert_eq!(
+            error,
+            SettlementRuntimeBuildError::InvalidRetryPolicy(RetryPolicyError::InitialBackoffZero)
+        );
+    }
+
+    #[test]
+    fn runtime_construction_rejects_a_non_idempotent_hook() {
+        let error = SettlementRuntime::new(NonIdempotentHook, RetryPolicy::default())
+            .test_expect_err("non-idempotent settlement hook must fail at construction");
+
+        assert_eq!(
+            error,
+            SettlementRuntimeBuildError::HookNotReceiptIdIdempotent
+        );
     }
 
     #[test]

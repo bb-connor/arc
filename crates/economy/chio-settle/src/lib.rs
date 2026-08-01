@@ -74,8 +74,9 @@ pub use ops::{
     SettlementDriveStep, SettlementEmergencyControls, SettlementEmergencyMode,
     SettlementIncidentAlert, SettlementIndexerCursor, SettlementIndexerCursorInput,
     SettlementIndexerStatus, SettlementLaneRuntimeStatus, SettlementLaneRuntimeStatusInput,
-    SettlementOperationKind, SettlementRecoveryRecord, SettlementRuntime, SettlementRuntimeReport,
-    SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
+    SettlementOperationKind, SettlementRecoveryRecord, SettlementRuntime,
+    SettlementRuntimeBuildError, SettlementRuntimeReport, SettlementRuntimeStatus,
+    CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
 pub use outcome_store::{
     validate_settlement_claim, SettlementAttemptClaim, SettlementClaimValidationError,
