@@ -7,8 +7,9 @@ use core::cell::Cell;
 use crate::canonical::canonical_json_bytes;
 use crate::capability::aggregate_budget::{
     issue_aggregate_family_root, verify_aggregate_invocation_authority,
-    verify_direct_aggregate_family_root, AggregateFamilyPreservationEvidence,
-    AggregateFamilyRootResolution, AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
+    verify_direct_aggregate_family_root, AggregateBudgetDelegationMarker,
+    AggregateFamilyPreservationEvidence, AggregateFamilyRootResolution,
+    AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
     AggregateInvocationAuthorityError, AggregateInvocationBudget, AggregateInvocationScope,
     LegacyUnboundAggregateRoot, VerifiedAggregateFamilyRoot,
 };
@@ -67,6 +68,15 @@ impl FamilyFixture {
         self.verified_root.preservation_evidence()
     }
 
+    fn delegation_marker(&self) -> AggregateBudgetDelegationMarker {
+        self.family_budget()
+            .root_binding
+            .as_ref()
+            .unwrap()
+            .delegation_marker()
+            .unwrap()
+    }
+
     fn child_scope(&self) -> ChioScope {
         ChioScope {
             grants: vec![ToolGrant {
@@ -86,14 +96,13 @@ impl FamilyFixture {
 
     fn proof(&self, evidence: Option<AggregateFamilyPreservationEvidence>) -> AttenuationProof {
         let child_scope = self.child_scope();
+        let mut normalized_subset_proof =
+            compute_attenuation_witness(&self.root_token.scope, &child_scope).unwrap();
+        normalized_subset_proof.aggregate_budget = Some(self.delegation_marker());
         AttenuationProof {
             parent_scope_hash: scope_hash(&self.root_token.scope).unwrap(),
             child_scope_hash: scope_hash(&child_scope).unwrap(),
-            normalized_subset_proof: compute_attenuation_witness(
-                &self.root_token.scope,
-                &child_scope,
-            )
-            .unwrap(),
+            normalized_subset_proof,
             aggregate_family_preservation: evidence,
         }
     }
@@ -107,7 +116,7 @@ impl FamilyFixture {
                 attenuations: Vec::new(),
                 timestamp: 1_100,
                 scope_hash: Some(scope_hash(&self.root_token.scope).unwrap()),
-                aggregate_budget: None,
+                aggregate_budget: Some(self.delegation_marker()),
                 cumulative_approval: None,
                 aggregate_family_preservation: evidence,
             },

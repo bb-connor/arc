@@ -394,7 +394,10 @@ fn plain_remote_capabilities_install_a_signed_session_context_without_a_broker()
         binding.security_session_id.as_str()
     );
     assert_eq!(resolved.as_v1().context_generation(), binding.context_generation);
-    assert_eq!(resolved.as_v1().flow_state_generation(), Some(7));
+    assert_eq!(
+        resolved.as_v1().flow_state_generation(),
+        Some(binding.context_generation)
+    );
 
     let mut mutations = Vec::new();
     let mut mutated = binding.clone();
@@ -455,7 +458,7 @@ fn restore_incarnation_is_persisted_before_launch_and_rotates_capability_context
         "restore-incarnation-token",
         None,
     );
-    record.capability_issuance_binding = derive_capability_issuance_binding(
+    record.capability_issuance_binding = session_core_factory::derive_capability_issuance_binding(
         &config,
         &record.auth_context,
         &record.kernel_session_id,
@@ -482,7 +485,7 @@ fn restore_incarnation_is_persisted_before_launch_and_rotates_capability_context
     persist_active_session_record(&path, &record, &keyring)
         .expect("persist first restore incarnation");
 
-    let next = persist_next_restore_incarnation(
+    let next = session_core_factory::persist_next_restore_incarnation(
         &config,
         &keyring,
         &record,
@@ -547,7 +550,9 @@ fn restore_incarnation_is_persisted_before_launch_and_rotates_capability_context
         invocations: Arc::clone(&invocations),
     }));
     let new_context =
-        security_context_from_issuance_binding(&next.capability_issuance_binding)
+        session_core_factory::security_context_from_issuance_binding(
+            &next.capability_issuance_binding,
+        )
             .expect("build new invocation context");
     let old_error = kernel
         .evaluate_tool_call_blocking_with_security_context(

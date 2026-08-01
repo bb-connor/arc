@@ -1693,10 +1693,21 @@ impl LiveAggregateFamilyFixture {
         }
     }
 
+    fn delegation_marker(&self) -> AggregateBudgetDelegationMarker {
+        let evidence = self.verified_root.preservation_evidence();
+        AggregateBudgetDelegationMarker {
+            root_binding_digest: evidence.root_binding_digest,
+            max_invocations: evidence.max_invocations,
+        }
+    }
+
     fn descendant(&self, id: &str) -> CapabilityToken {
         let now = unix_now();
         let child_scope = aggregate_child_scope();
         let root_scope_hash = scope_hash(&self.root_token.scope).test_unwrap();
+        let mut normalized_subset_proof =
+            compute_attenuation_witness(&self.root_token.scope, &child_scope).test_unwrap();
+        normalized_subset_proof.aggregate_budget = Some(self.delegation_marker());
         let link = DelegationLink::sign(
             DelegationLinkBody {
                 capability_id: self.root_token.id.clone(),
@@ -1705,7 +1716,7 @@ impl LiveAggregateFamilyFixture {
                 attenuations: Vec::new(),
                 timestamp: now.saturating_sub(5),
                 scope_hash: Some(root_scope_hash.clone()),
-                aggregate_budget: None,
+                aggregate_budget: Some(self.delegation_marker()),
                 cumulative_approval: None,
                 aggregate_family_preservation: Some(self.verified_root.preservation_evidence()),
             },
@@ -1732,11 +1743,7 @@ impl LiveAggregateFamilyFixture {
                 attenuation_proof: AttenuationProof {
                     parent_scope_hash: root_scope_hash,
                     child_scope_hash: scope_hash(&child_scope).test_unwrap(),
-                    normalized_subset_proof: compute_attenuation_witness(
-                        &self.root_token.scope,
-                        &child_scope,
-                    )
-                    .test_unwrap(),
+                    normalized_subset_proof,
                     aggregate_family_preservation: Some(self.verified_root.preservation_evidence()),
                 },
                 budget_share_bps: None,

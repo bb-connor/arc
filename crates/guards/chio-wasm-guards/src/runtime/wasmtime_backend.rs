@@ -594,8 +594,13 @@ impl WasmGuardAbi for WasmtimeBackend {
             }
         };
 
-        let instance = pollster::block_on(instance_pre.instantiate_async(&mut store))
-            .map_err(|e| WasmGuardError::Trap(e.to_string()))?;
+        let async_support = self.engine.is_async();
+        let instance = if async_support {
+            pollster::block_on(instance_pre.instantiate_async(&mut store))
+        } else {
+            instance_pre.instantiate(&mut store)
+        }
+        .map_err(|e| WasmGuardError::Trap(e.to_string()))?;
         self.instance_pre_pool
             .return_instance_pre(tenant_id, module_hash, instance_pre);
 
@@ -616,7 +621,12 @@ impl WasmGuardAbi for WasmtimeBackend {
         let request_len: i32 = request_json.len() as i32;
 
         let request_ptr: i32 = if let Some(ref alloc_fn) = chio_alloc_fn {
-            match pollster::block_on(alloc_fn.call_async(&mut store, request_len)) {
+            let allocation = if async_support {
+                pollster::block_on(alloc_fn.call_async(&mut store, request_len))
+            } else {
+                alloc_fn.call(&mut store, request_len)
+            };
+            match allocation {
                 Ok(ptr) => {
                     // Validate returned pointer is in bounds
                     let mem_size = memory.data_size(&store);
@@ -647,25 +657,28 @@ impl WasmGuardAbi for WasmtimeBackend {
             .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
             .map_err(|e| WasmGuardError::MissingExport(format!("evaluate: {e}")))?;
 
-        let result =
+        let evaluation = if async_support {
             pollster::block_on(evaluate_fn.call_async(&mut store, (request_ptr, request_len)))
-                .map_err(|e| {
-                    // Check if this was a fuel exhaustion
-                    let msg = e.to_string();
-                    if msg.contains("fuel") {
-                        let consumed = self
-                            .fuel_limit
-                            .saturating_sub(store.get_fuel().unwrap_or(0));
-                        // Record fuel even on exhaustion
-                        self.last_fuel_consumed = Some(consumed);
-                        WasmGuardError::FuelExhausted {
-                            consumed,
-                            limit: self.fuel_limit,
-                        }
-                    } else {
-                        WasmGuardError::Trap(msg)
-                    }
-                })?;
+        } else {
+            evaluate_fn.call(&mut store, (request_ptr, request_len))
+        };
+        let result = evaluation.map_err(|e| {
+            // Check if this was a fuel exhaustion
+            let msg = e.to_string();
+            if msg.contains("fuel") {
+                let consumed = self
+                    .fuel_limit
+                    .saturating_sub(store.get_fuel().unwrap_or(0));
+                // Record fuel even on exhaustion
+                self.last_fuel_consumed = Some(consumed);
+                WasmGuardError::FuelExhausted {
+                    consumed,
+                    limit: self.fuel_limit,
+                }
+            } else {
+                WasmGuardError::Trap(msg)
+            }
+        })?;
 
         // Track fuel consumed for receipt metadata
         let remaining = store.get_fuel().unwrap_or(0);
@@ -681,7 +694,7 @@ impl WasmGuardAbi for WasmtimeBackend {
                     .ok();
 
                 let reason = if let Some(ref reason_fn) = deny_reason_fn {
-                    read_structured_deny_reason(reason_fn, &memory, &mut store)
+                    read_structured_deny_reason(reason_fn, &memory, &mut store, async_support)
                 } else {
                     // Fallback to core-module offset-64K NUL-terminated deny string (no chio_deny_reason export)
                     read_deny_reason(&memory, &store)
@@ -738,14 +751,18 @@ fn read_structured_deny_reason(
     reason_fn: &wasmtime::TypedFunc<(i32, i32), i32>,
     memory: &Memory,
     store: &mut Store<WasmHostState>,
+    async_support: bool,
 ) -> Option<String> {
     const DENY_BUF_OFFSET: i32 = 65536;
     const DENY_BUF_LEN: i32 = 4096;
 
     // Call the guest's chio_deny_reason function
-    let bytes_written = match pollster::block_on(
-        reason_fn.call_async(&mut *store, (DENY_BUF_OFFSET, DENY_BUF_LEN)),
-    ) {
+    let call = if async_support {
+        pollster::block_on(reason_fn.call_async(&mut *store, (DENY_BUF_OFFSET, DENY_BUF_LEN)))
+    } else {
+        reason_fn.call(&mut *store, (DENY_BUF_OFFSET, DENY_BUF_LEN))
+    };
+    let bytes_written = match call {
         Ok(n) if n > 0 && n <= DENY_BUF_LEN => n,
         Ok(_) => return None,  // 0 or negative or too large
         Err(_) => return None, // call failed, no reason

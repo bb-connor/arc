@@ -95,6 +95,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/security/**",
             "third_party/provenance/**",
             "third_party/nono-chio/**",
+            "third_party/sigstore-verify-chio/**",
         ),
     ),
     ReviewSlice(

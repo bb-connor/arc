@@ -5,8 +5,9 @@ use std::collections::BTreeMap;
 use chio_core::capability::{
     aggregate_budget::{
         issue_aggregate_family_root, verify_aggregate_invocation_authority,
-        verify_direct_aggregate_family_root, AggregateBudgetRootBinding,
-        AggregateFamilyRootResolution, AggregateInvocationBudget, VerifiedAggregateFamilyRoot,
+        verify_direct_aggregate_family_root, AggregateBudgetDelegationMarker,
+        AggregateBudgetRootBinding, AggregateFamilyRootResolution, AggregateInvocationBudget,
+        VerifiedAggregateFamilyRoot,
     },
     attenuation::{
         compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
@@ -201,6 +202,14 @@ impl AggregateFamilyFixture {
         self.root_token.aggregate_invocation_budget.clone().unwrap()
     }
 
+    fn delegation_marker(&self) -> AggregateBudgetDelegationMarker {
+        let evidence = self.verified_root.preservation_evidence();
+        AggregateBudgetDelegationMarker {
+            root_binding_digest: evidence.root_binding_digest,
+            max_invocations: evidence.max_invocations,
+        }
+    }
+
     fn link(&self) -> DelegationLink {
         DelegationLink::sign(
             DelegationLinkBody {
@@ -210,7 +219,7 @@ impl AggregateFamilyFixture {
                 attenuations: Vec::new(),
                 timestamp: 1_100,
                 scope_hash: Some(scope_hash(&self.root_token.scope).unwrap()),
-                aggregate_budget: None,
+                aggregate_budget: Some(self.delegation_marker()),
                 cumulative_approval: None,
                 aggregate_family_preservation: Some(self.verified_root.preservation_evidence()),
             },
@@ -221,6 +230,9 @@ impl AggregateFamilyFixture {
 
     fn descendant(&self, id: &str) -> CapabilityToken {
         let child_scope = invoke_scope();
+        let mut normalized_subset_proof =
+            compute_attenuation_witness(&self.root_token.scope, &child_scope).unwrap();
+        normalized_subset_proof.aggregate_budget = Some(self.delegation_marker());
         CapabilityToken::sign_attenuated(
             CapabilityTokenAttenuationBody {
                 body: CapabilityTokenBody {
@@ -238,11 +250,7 @@ impl AggregateFamilyFixture {
                 attenuation_proof: AttenuationProof {
                     parent_scope_hash: scope_hash(&self.root_token.scope).unwrap(),
                     child_scope_hash: scope_hash(&child_scope).unwrap(),
-                    normalized_subset_proof: compute_attenuation_witness(
-                        &self.root_token.scope,
-                        &child_scope,
-                    )
-                    .unwrap(),
+                    normalized_subset_proof,
                     aggregate_family_preservation: Some(self.verified_root.preservation_evidence()),
                 },
                 budget_share_bps: None,

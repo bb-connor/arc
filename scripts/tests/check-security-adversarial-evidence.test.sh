@@ -173,6 +173,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     )
     valid_campaign_body["outcomes"].pop("sha256", None)
     valid_campaign_body["outcomes"].pop("inputs_sha256", None)
+    valid_case["pending"] = True
     write_json(valid_case_path, valid_case)
     valid_outcome_body = {
         "caught": 1,
@@ -545,6 +546,21 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         )
 
     base_closure_digest = closure_digest()
+    git_metadata = closure_root / ".git"
+    git_metadata.write_text(
+        "gitdir: /host-specific/worktree-metadata\n", encoding="utf-8"
+    )
+    if closure_digest() != base_closure_digest:
+        raise AssertionError("worktree Git metadata invalidated the input closure")
+    git_metadata.unlink()
+    git_metadata.mkdir()
+    (git_metadata / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (git_metadata / "config").write_text(
+        "[core]\n\trepositoryformatversion = 0\n", encoding="utf-8"
+    )
+    if closure_digest() != base_closure_digest:
+        raise AssertionError("checkout Git metadata invalidated the input closure")
+
     derived_artifacts = {
         closure_case_path: b"{}\n",
         closure_root / "crates/core/chio-adversarial-suite/manifest.json": b"{}\n",
@@ -935,6 +951,8 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     candidate_path = candidate_root / "mutants.out/outcomes.json"
     write_json(candidate_path, promotion_outcome)
     candidate_bytes = candidate_path.read_bytes()
+    canonical_outcome = promotion_root / promotion_campaign["outcomes"]["path"]
+    canonical_outcome.parent.mkdir(parents=True, exist_ok=True)
     _pending_cases, pending_index = checker.load_cases(
         promotion_root, promotion_case_path.parents[1], False, True
     )
@@ -948,7 +966,6 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     )
     original_case_bytes = promotion_case_path.read_bytes()
     original_manifest_bytes = manifest_path.read_bytes()
-    canonical_outcome = promotion_root / promotion_campaign["outcomes"]["path"]
     for label, expected_payload, expected_inputs, expected_error in (
         (
             "changed outcome",
@@ -1190,8 +1207,11 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     fixture_manifest = package_root / "Cargo.toml"
     original_fixture_manifest = fixture_manifest.read_text(encoding="utf-8")
     fixture_manifest.write_text(
-        original_fixture_manifest
-        + "fixture-evidence = { path = \"../core/chio-adversarial-suite\" }\n",
+        original_fixture_manifest.replace(
+            "fixture-test-helper = { path = \"../fixture-test-helper\" }\n",
+            "fixture-test-helper = { path = \"../fixture-test-helper\" }\n"
+            "fixture-evidence = { path = \"../core/chio-adversarial-suite\" }\n",
+        ),
         encoding="utf-8",
     )
     recursive_evidence_input = subprocess.run(
@@ -1354,6 +1374,10 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
             "cases": [],
         },
     )
+    for partial_campaign in partial_campaigns:
+        (partial_root / partial_campaign["outcomes"]["path"]).parent.mkdir(
+            parents=True, exist_ok=True
+        )
     for index, campaign_id in enumerate(("sandbox_fd_leak", "sandbox_env_leak")):
         result = subprocess.run(
             [
@@ -2294,8 +2318,11 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
                     f"unsafe verifier mutation output passed: {rejected_output}"
                 )
         with checker.mutation_output_workspace({}, "fixture-output") as output:
-            if output.parent != verifier_output_authority or output.exists():
+            if output.parent != verifier_output_authority or not output.is_dir():
                 raise AssertionError("mutation workspace escaped verifier authority")
+            checker.require_owned_directory_metadata(
+                output.lstat(), "verifier mutation output workspace"
+            )
     finally:
         checker.verifier_artifact_root = actual_verifier_artifact_root
 
@@ -3236,6 +3263,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     if transaction_paths[0].read_bytes() != unknown_destination_edit:
         raise AssertionError("destination race rejection overwrote the unknown edit")
     transaction_paths[0].write_bytes(transaction_originals[transaction_paths[0]])
+    checker.recover_atomic_replace_journal(transaction_root)
 
     rollback_unknown_edit = b"unknown-edit-before-rollback\n"
     real_fchmod = checker.os.fchmod

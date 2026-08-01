@@ -156,10 +156,12 @@ pub fn verify_capability_with_floor(
         trusted_issuers,
         clock,
         crypto_floor,
-        &peer,
-        None,
-        false,
-        false,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            aggregate_invocation_authority: false,
+            cumulative_approval_authority: false,
+        },
     )?;
     admit_delegated_budget(token, budgets)?;
     Ok(verified)
@@ -170,11 +172,14 @@ fn verify_capability_base(
     trusted_issuers: &[PublicKey],
     clock: &dyn Clock,
     crypto_floor: CapabilityCryptoFloor,
-    peer: &CapabilityNegotiation,
-    direct_root: Option<&CapabilityToken>,
-    aggregate_invocation_authority: bool,
-    cumulative_approval_authority: bool,
+    features: CapabilityFeatureContext<'_>,
 ) -> Result<VerifiedCapability, CapabilityError> {
+    let CapabilityFeatureContext {
+        peer,
+        direct_root,
+        aggregate_invocation_authority,
+        cumulative_approval_authority,
+    } = features;
     // Issuer trust check. The full kernel also trusts its own public key
     // and the set returned by the capability authority; callers must
     // provide the full trust set they care about.
@@ -344,10 +349,12 @@ pub fn verify_capability_with_negotiated_floor(
         trusted_issuers,
         clock,
         crypto_floor,
-        peer,
-        None,
-        false,
-        false,
+        CapabilityFeatureContext {
+            peer,
+            direct_root: None,
+            aggregate_invocation_authority: false,
+            cumulative_approval_authority: false,
+        },
     )?;
     admit_delegated_budget(token, &mut budgets)?;
     Ok(verified)
@@ -442,10 +449,12 @@ pub fn verify_capability_with_floor_and_trust_root(
         trusted_issuers,
         clock,
         crypto_floor,
-        &peer,
-        None,
-        false,
-        false,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            aggregate_invocation_authority: false,
+            cumulative_approval_authority: false,
+        },
     )?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_trust_root(token, trust_root_scope_hash)?;
@@ -471,10 +480,12 @@ pub fn verify_capability_with_floor_and_resolver(
         trusted_issuers,
         clock,
         crypto_floor,
-        &peer,
-        None,
-        false,
-        false,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            aggregate_invocation_authority: false,
+            cumulative_approval_authority: false,
+        },
     )?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_resolver(token, trust_root)?;
@@ -519,36 +530,21 @@ pub fn verify_capability_full_with_root(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    let CapabilityFeatureContext {
-        peer,
-        direct_root,
-        aggregate_invocation_authority,
-        cumulative_approval_authority,
-    } = features;
-    if let Some(root) = direct_root {
+    if let Some(root) = features.direct_root {
         verify_capability_base(
             root,
             trusted_issuers,
             clock,
             crypto_floor,
-            peer,
-            None,
-            aggregate_invocation_authority,
-            cumulative_approval_authority,
+            CapabilityFeatureContext {
+                direct_root: None,
+                ..features
+            },
         )?;
     }
-    let verified = verify_capability_base(
-        token,
-        trusted_issuers,
-        clock,
-        crypto_floor,
-        peer,
-        direct_root,
-        aggregate_invocation_authority,
-        cumulative_approval_authority,
-    )?;
+    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, features)?;
     verify_delegation_chain_shape(token)?;
-    verify_chain_binding_with_negotiation(token, peer, trust_root)?;
+    verify_chain_binding_with_negotiation(token, features.peer, trust_root)?;
     admit_delegated_budget(token, budgets)?;
     Ok(verified)
 }

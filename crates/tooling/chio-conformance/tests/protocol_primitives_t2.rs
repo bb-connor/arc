@@ -7,8 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chio_core::capability::{
     aggregate_budget::{
         issue_aggregate_family_root, verify_direct_aggregate_family_root,
-        AggregateFamilyRootResolution, AggregateInvocationBudget, AggregateInvocationScope,
-        VerifiedAggregateFamilyRoot,
+        AggregateBudgetDelegationMarker, AggregateFamilyRootResolution, AggregateInvocationBudget,
+        AggregateInvocationScope, VerifiedAggregateFamilyRoot,
     },
     attenuation::{
         compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,

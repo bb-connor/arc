@@ -94,6 +94,32 @@ fn no_chio_alloc_uses_offset_zero() {
 }
 
 #[test]
+fn synchronous_engine_evaluates_core_module_without_panicking() {
+    let wat = r#"
+            (module
+                (import "chio" "log" (func $log (param i32 i32 i32)))
+                (import "chio" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                (import "chio" "get_time_unix_secs" (func $get_time (result i64)))
+                (memory (export "memory") 1)
+                (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                    (i32.const 0)
+                )
+            )
+        "#;
+
+    let mut config = wasmtime::Config::new();
+    config.consume_fuel(true);
+    let engine = std::sync::Arc::new(wasmtime::Engine::new(&config).unwrap());
+    assert!(!engine.is_async());
+
+    let mut backend = WasmtimeBackend::with_engine(engine);
+    backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+    let result = backend.evaluate(&make_guard_request()).unwrap();
+    assert!(result.is_allow());
+}
+
+#[test]
 fn get_config_reports_full_length_for_truncated_buffer() {
     let wat = r#"
             (module

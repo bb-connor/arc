@@ -149,7 +149,7 @@ impl chio_kernel::SecurityInvocationContextAuthority
     }
 }
 
-fn derive_capability_issuance_binding(
+pub(super) fn derive_capability_issuance_binding(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
     kernel_session_id: &SessionId,
@@ -196,7 +196,7 @@ fn derive_capability_issuance_binding(
     })
 }
 
-fn security_context_from_issuance_binding(
+pub(super) fn security_context_from_issuance_binding(
     binding: &RemoteCapabilityIssuanceBinding,
 ) -> Result<chio_kernel::SecurityInvocationContext, CliError> {
     let context = chio_kernel::SecurityInvocationContextV1::new(
@@ -246,7 +246,7 @@ fn validate_stored_capability_issuance_binding(
     Ok(())
 }
 
-fn persist_next_restore_incarnation(
+pub(super) fn persist_next_restore_incarnation(
     config: &RemoteServeHttpConfig,
     keyring: &RemoteSessionHmacKeyring,
     record: &RemoteSessionResumeRecord,

@@ -6,8 +6,9 @@ use core::cell::Cell;
 
 use crate::capability::aggregate_budget::{
     issue_aggregate_family_root, verify_aggregate_invocation_authority,
-    verify_direct_aggregate_family_root, AggregateFamilyPreservationEvidence,
-    AggregateFamilyRootResolution, AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
+    verify_direct_aggregate_family_root, AggregateBudgetDelegationMarker,
+    AggregateFamilyPreservationEvidence, AggregateFamilyRootResolution,
+    AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
     AggregateInvocationAuthorityError, AggregateInvocationBudget, AggregateInvocationScope,
     LegacyUnboundAggregateRoot,
 };
@@ -222,6 +223,13 @@ fn signed_link(
     timestamp: u64,
     aggregate_family_preservation: Option<AggregateFamilyPreservationEvidence>,
 ) -> DelegationLink {
+    let aggregate_budget =
+        aggregate_family_preservation
+            .as_ref()
+            .map(|evidence| AggregateBudgetDelegationMarker {
+                root_binding_digest: evidence.root_binding_digest.clone(),
+                max_invocations: evidence.max_invocations,
+            });
     DelegationLink::sign(
         DelegationLinkBody {
             capability_id: capability_id.to_string(),
@@ -230,7 +238,7 @@ fn signed_link(
             attenuations: Vec::new(),
             timestamp,
             scope_hash,
-            aggregate_budget: None,
+            aggregate_budget,
             cumulative_approval: None,
             aggregate_family_preservation,
         },

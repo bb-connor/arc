@@ -32,8 +32,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/tripwire_after_dispatch/mutants.out/outcomes.json",
-          "sha256": "591c11bdacd40d64bc0027157c66cd9a29d78595bca211de50c0b868d83dde3d",
-          "inputs_sha256": "1750d8b06f127866d65d842867cda0b74b3ea9531c96c10b67b837b852bbd9ef"
+          "sha256": "f3cf411ddb4cb2530e5e8e62f1695329991c3aa78d601c0384685e189e6b10a8",
+          "inputs_sha256": "56b2cd9dd6bd4afe3515786fcb286c56c24d92d843efd0ae0b25eddeca133085"
         }
       }
     ]

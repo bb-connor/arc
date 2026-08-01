@@ -174,9 +174,7 @@ impl SqliteReceiptStore {
                         )?
                         .collect::<Result<Vec<_>, _>>()?;
                     for existing in &existing_across_shares {
-                        crate::capability_lineage::ensure_snapshots_compatible(
-                            existing, snapshot,
-                        )?;
+                        crate::capability_lineage::ensure_snapshots_compatible(existing, snapshot)?;
                     }
                 }
                 let existing = tx

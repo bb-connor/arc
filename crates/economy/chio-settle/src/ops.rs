@@ -444,10 +444,7 @@ pub struct SettlementRuntime<H> {
 }
 
 impl<H: crate::SettlementHook> SettlementRuntime<H> {
-    pub fn new(
-        hook: H,
-        policy: crate::RetryPolicy,
-    ) -> Result<Self, crate::RetryPolicyError> {
+    pub fn new(hook: H, policy: crate::RetryPolicy) -> Result<Self, crate::RetryPolicyError> {
         policy.validate()?;
         Ok(Self { hook, policy })
     }

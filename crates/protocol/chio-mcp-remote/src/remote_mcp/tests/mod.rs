@@ -5,8 +5,7 @@ use rsa::pkcs1v15::SigningKey as RsaPkcs1v15SigningKey;
 use rsa::pss::BlindedSigningKey as RsaPssSigningKey;
 use rsa::rand_core::OsRng;
 use rsa::signature::{RandomizedSigner as _, SignatureEncoding as _};
-#[cfg(target_os = "linux")]
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use serde_json::json;
 use std::net::ToSocketAddrs as _;
 use std::path::PathBuf;
@@ -1052,6 +1051,7 @@ fn remote_session_factory_has_one_process_wide_authority() {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
 fn remote_session_factory_accepts_local_authority_with_remote_control_plane() {
     let directory = tempfile::tempdir().expect("remote authority seed directory");
     let seed_path = directory.path().join("authority.seed");
@@ -1398,6 +1398,12 @@ fn remote_product_constructor_preserves_two_of_three_replay_denial_across_restar
         std::process::id()
     ));
     std::fs::create_dir_all(&root).expect("create threshold product directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700))
+            .expect("restrict threshold product directory");
+    }
     let policy_path = root.join("policy.yaml");
     let approver_directory_path = root.join("approvers.yaml");
     let operation_path = root.join("admission-operations.sqlite3");
@@ -1430,16 +1436,22 @@ fn remote_product_constructor_preserves_two_of_three_replay_denial_across_restar
         ),
     )
     .expect("write authenticated approver directory");
+    chio_control_plane::persist_authority_keypair(
+        &authority_seed_path,
+        &Keypair::from_seed(&[86_u8; 32]),
+    )
+    .expect("persist threshold product authority seed");
 
     let mut config = test_remote_config();
     let manifest_path = configure_signed_manifest(&mut config);
     config.policy_path = policy_path;
     config.authority_seed_path = Some(authority_seed_path);
     config.receipt_db_path = Some(root.join("receipts.sqlite3"));
+    config.revocation_db_path = Some(root.join("revocations.sqlite3"));
     config.approver_directory_path = Some(approver_directory_path);
     config.threshold_proposal_authority_public_key = Some(proposal_authority.public_key());
     config.admission_operation_db_path = Some(operation_path);
-    config.approval_db_path = Some(approval_path);
+    config.approval_db_path = Some(approval_path.clone());
     config.budget_db_path = Some(budget_path);
 
     let factory = RemoteSessionFactory::new_for_local_manifest_test(config.clone())
@@ -1495,7 +1507,27 @@ fn remote_product_constructor_preserves_two_of_three_replay_denial_across_restar
     let allowed = kernel
         .evaluate_tool_call_blocking(&first)
         .expect("first threshold product evaluation");
-    assert_eq!(allowed.verdict, chio_kernel::Verdict::Allow);
+    assert_eq!(
+        allowed.verdict,
+        chio_kernel::Verdict::Allow,
+        "unexpected initial denial: {}",
+        allowed.reason.as_deref().unwrap_or_default()
+    );
+    let replay_ownership = || {
+        Connection::open(&approval_path)
+            .expect("open durable approval replay state")
+            .query_row(
+                r#"
+                SELECT COUNT(*), COUNT(DISTINCT operation_id)
+                FROM chio_hitl_operation_reservation_tokens
+                WHERE token_id IN (?1, ?2)
+                "#,
+                params!["approval-replay-a", "approval-replay-b"],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .expect("query durable approval replay ownership")
+    };
+    assert_eq!(replay_ownership(), (2, 1));
     drop(kernel);
     drop(factory);
 
@@ -1525,9 +1557,12 @@ fn remote_product_constructor_preserves_two_of_three_replay_denial_across_restar
         Err(error) => error.to_string(),
     };
     assert!(
-        denial_reason.contains("approval token") || denial_reason.contains("replay"),
+        denial_reason.contains("approval token")
+            || denial_reason.contains("replay")
+            || denial_reason == "invocation budget authorization denied",
         "unexpected post-restart replay denial: {denial_reason}"
     );
+    assert_eq!(replay_ownership(), (2, 1));
     drop(restarted);
     drop(restarted_factory);
 

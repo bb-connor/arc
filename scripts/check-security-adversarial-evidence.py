@@ -418,6 +418,8 @@ def repository_input_closure(root: Path) -> tuple[set[Path], set[Path]]:
         relative = relative_input_path(root, path)
         if relative is None:
             raise EvidenceError(f"{path}: repository input escaped the repository")
+        if relative.parts and relative.parts[0] == ".git":
+            return
         if is_derived_or_state_input(relative):
             return
         try:
@@ -1301,58 +1303,62 @@ def open_trusted_state(root: Path, *, create: bool) -> Iterator[TrustedState | N
     flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     parent_descriptor: int | None = None
     state_descriptor: int | None = None
+    state: TrustedState | None = None
     try:
-        parent_descriptor = os.open(canonical_root.parent, flags)
-        named_root = os.stat(
-            canonical_root.name,
-            dir_fd=parent_descriptor,
-            follow_symlinks=False,
-        )
-        if metadata_identity(named_root) != metadata_identity(root_metadata):
-            raise EvidenceError(f"{canonical_root}: repository identity changed")
-        if create:
-            try:
-                os.mkdir(path.name, 0o700, dir_fd=parent_descriptor)
-                os.fsync(parent_descriptor)
-            except FileExistsError:
-                pass
         try:
-            named_state = os.stat(
-                path.name,
+            parent_descriptor = os.open(canonical_root.parent, flags)
+            named_root = os.stat(
+                canonical_root.name,
                 dir_fd=parent_descriptor,
                 follow_symlinks=False,
             )
-        except FileNotFoundError:
-            if not create:
-                yield None
-                return
-            raise
-        require_owned_directory_metadata(named_state, str(path))
-        state_descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
-        opened_state = os.fstat(state_descriptor)
-        require_owned_directory_metadata(opened_state, str(path))
-        if (
-            metadata_identity(opened_state) != metadata_identity(named_state)
-            or opened_state.st_dev != root_metadata.st_dev
-        ):
-            raise EvidenceError(f"{path}: trusted-state identity changed")
-        repeated_state = os.stat(
-            path.name,
-            dir_fd=parent_descriptor,
-            follow_symlinks=False,
-        )
-        if metadata_identity(repeated_state) != metadata_identity(opened_state):
-            raise EvidenceError(f"{path}: trusted-state name was replaced")
-        yield TrustedState(
-            root=canonical_root,
-            root_metadata=root_metadata,
-            path=path,
-            parent_descriptor=parent_descriptor,
-            descriptor=state_descriptor,
-            identity=metadata_identity(opened_state),
-        )
-    except OSError as error:
-        raise EvidenceError(f"{path}: unable to open trusted state: {error}") from error
+            if metadata_identity(named_root) != metadata_identity(root_metadata):
+                raise EvidenceError(f"{canonical_root}: repository identity changed")
+            if create:
+                try:
+                    os.mkdir(path.name, 0o700, dir_fd=parent_descriptor)
+                    os.fsync(parent_descriptor)
+                except FileExistsError:
+                    pass
+            named_state: os.stat_result | None
+            try:
+                named_state = os.stat(
+                    path.name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                if create:
+                    raise
+                named_state = None
+            if named_state is not None:
+                require_owned_directory_metadata(named_state, str(path))
+                state_descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
+                opened_state = os.fstat(state_descriptor)
+                require_owned_directory_metadata(opened_state, str(path))
+                if (
+                    metadata_identity(opened_state) != metadata_identity(named_state)
+                    or opened_state.st_dev != root_metadata.st_dev
+                ):
+                    raise EvidenceError(f"{path}: trusted-state identity changed")
+                repeated_state = os.stat(
+                    path.name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+                if metadata_identity(repeated_state) != metadata_identity(opened_state):
+                    raise EvidenceError(f"{path}: trusted-state name was replaced")
+                state = TrustedState(
+                    root=canonical_root,
+                    root_metadata=root_metadata,
+                    path=path,
+                    parent_descriptor=parent_descriptor,
+                    descriptor=state_descriptor,
+                    identity=metadata_identity(opened_state),
+                )
+        except OSError as error:
+            raise EvidenceError(f"{path}: unable to open trusted state: {error}") from error
+        yield state
     finally:
         if state_descriptor is not None:
             os.close(state_descriptor)
@@ -1368,21 +1374,22 @@ def open_owned_directory_at(
     flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     descriptor: int | None = None
     try:
-        named = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
-        require_owned_directory_metadata(named, label)
-        descriptor = os.open(name, flags, dir_fd=parent_descriptor)
-        opened = os.fstat(descriptor)
-        require_owned_directory_metadata(opened, label)
-        if metadata_identity(opened) != metadata_identity(named):
-            raise EvidenceError(f"{label}: identity changed while opening")
-        repeated = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
-        if metadata_identity(repeated) != metadata_identity(opened):
-            raise EvidenceError(f"{label}: directory name was replaced")
+        try:
+            named = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            require_owned_directory_metadata(named, label)
+            descriptor = os.open(name, flags, dir_fd=parent_descriptor)
+            opened = os.fstat(descriptor)
+            require_owned_directory_metadata(opened, label)
+            if metadata_identity(opened) != metadata_identity(named):
+                raise EvidenceError(f"{label}: identity changed while opening")
+            repeated = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            if metadata_identity(repeated) != metadata_identity(opened):
+                raise EvidenceError(f"{label}: directory name was replaced")
+        except OSError as error:
+            raise EvidenceError(
+                f"{label}: unable to open no-follow directory: {error}"
+            ) from error
         yield descriptor, metadata_identity(opened)
-    except OSError as error:
-        raise EvidenceError(
-            f"{label}: unable to open no-follow directory: {error}"
-        ) from error
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -2998,6 +3005,7 @@ def atomic_replace_many(
             if rollback_errors:
                 raise EvidenceError(
                     "refresh commit failed and rollback was incomplete: "
+                    f"commit error: {error}; rollback errors: "
                     + "; ".join(rollback_errors)
                 ) from error
             if isinstance(error, OSError):
@@ -5353,6 +5361,22 @@ def verifier_artifact_root(environment: dict[str, str]) -> Path | None:
     return artifact_root
 
 
+def create_owned_directory_below_root(root: Path, path: Path, label: str) -> None:
+    parent = open_parent_directory_below_root(root, path, label)
+    try:
+        try:
+            os.mkdir(path.name, 0o700, dir_fd=parent)
+        except FileExistsError as error:
+            raise EvidenceError(f"{path}: refusing to reuse existing directory") from error
+        metadata = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        require_owned_directory_metadata(metadata, label)
+        os.fsync(parent)
+    except OSError as error:
+        raise EvidenceError(f"{label}: unable to create owned directory: {error}") from error
+    finally:
+        os.close(parent)
+
+
 @contextmanager
 def mutation_output_workspace(
     environment: dict[str, str], prefix: str
@@ -5362,10 +5386,13 @@ def mutation_output_workspace(
         output = verifier_root / f"{prefix}-{secrets.token_hex(16)}"
         if output.exists() or output.is_symlink():
             raise EvidenceError(f"{output}: verifier output identity already exists")
+        create_owned_directory_below_root(
+            verifier_root, output, f"{output}: verifier output workspace"
+        )
         yield output
         return
     with tempfile.TemporaryDirectory(prefix=f"{prefix}-") as raw:
-        yield Path(raw)
+        yield Path(raw).resolve()
 
 
 def validate_mutation_output_root(
@@ -5402,6 +5429,7 @@ def run_campaign(
     output_root: Path,
     environment: dict[str, str],
 ) -> Path:
+    output_root = output_root.resolve(strict=False)
     output_authority = validate_mutation_output_root(output_root, environment)
     cargo_mutants = cargo_mutants_executable(
         root, CargoMutantsSourceInventory(), environment
@@ -5413,6 +5441,10 @@ def run_campaign(
         raise EvidenceError(
             f"{output_root}: refusing to overwrite existing mutation output"
         )
+    output_parent = output_authority or output_root.parent.resolve()
+    create_owned_directory_below_root(
+        output_parent, output_root, f"{output_root}: mutation output"
+    )
     source_path = root / campaign["source"]
     source_payload = read_regular_file_no_follow(
         source_path,

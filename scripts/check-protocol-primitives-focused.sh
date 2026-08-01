@@ -72,7 +72,7 @@ run_model() {
     cargo test -p chio-core-types --lib capability::delegation_family_tests::
   run_committed_inventory \
     "portable capability verification" \
-    18 75d54e0edacf61d99e637378a9c5f6ff3385c6a574b51a77ca35a672e33f809a \
+    18 3db37a0a0f201152522614b109d85a88f5650f1a455017d00da02794e2144111 \
     cargo test -p chio-kernel-core --lib capability_verify::tests::
   run_complete_inventory \
     "generated security binding corpus" \

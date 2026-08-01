@@ -5,7 +5,7 @@
     clippy::expect_used,
     clippy::large_enum_variant,
     clippy::unwrap_used,
-    non_snake_case,
+    non_snake_case
 )]
 
 use std::{fs, path::PathBuf};
@@ -39,11 +39,9 @@ fn parse_generated(schema_file: &str, instance: Value) -> Result<Value, serde_js
         "capability/threshold-approval-proposal.schema.json" => round_trip::<
             generated::capability__threshold_approval_proposal::ChioSignedThresholdApprovalProposal,
         >(instance),
-        "capability/governed-approval-token.schema.json" => {
-            round_trip::<generated::capability__governed_approval_token::ChioSignedGovernedApprovalToken>(
-                instance,
-            )
-        }
+        "capability/governed-approval-token.schema.json" => round_trip::<
+            generated::capability__governed_approval_token::ChioSignedGovernedApprovalToken,
+        >(instance),
         "agent/active-response-governed-intent.schema.json" => round_trip::<
             generated::agent__active_response_governed_intent::ChioGovernedActiveResponseIntentBody,
         >(instance),
