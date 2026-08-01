@@ -168,6 +168,9 @@ fn no_ceiling_mustprepay_exact_retry_never_redispatches_or_prepays_twice() {
         .set_admission_operation_store_handle(operations.clone())
         .expect("no-ceiling MustPrepay admission operation store");
     kernel
+        .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
+        .expect("no-ceiling MustPrepay approval store");
+    kernel
         .set_budget_store_handle(durable_atomic_test_budget_store(
             "no-ceiling-mustprepay-retry-budget",
         ))

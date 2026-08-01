@@ -480,7 +480,7 @@ pub(super) fn route_staged_status(
         RetryDecision::Retry {
             attempt,
             backoff,
-            reason,
+            reason: _,
         } => {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -493,7 +493,22 @@ pub(super) fn route_staged_status(
                     attempts: attempt,
                     next_visible_at: now
                         .saturating_add(chio_settle::ceil_retry_delay_seconds(backoff)),
-                    last_reason: Some(reason.code().as_str().to_string()),
+                    last_reason: Some(
+                        match status {
+                            SettlementObserverStatus::Observed {
+                                outcome: SettlementOutcome::Retryable { .. },
+                            } => "settlement hook requested retry",
+                            SettlementObserverStatus::HookFailed { .. } => {
+                                "settlement hook invocation failed"
+                            }
+                            SettlementObserverStatus::NotRegistered
+                            | SettlementObserverStatus::Skipped { .. }
+                            | SettlementObserverStatus::Observed { .. } => {
+                                "settlement observer requested retry"
+                            }
+                        }
+                        .to_string(),
+                    ),
                 })
                 .map(|_| ())
         }

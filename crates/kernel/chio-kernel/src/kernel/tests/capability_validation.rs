@@ -426,8 +426,21 @@ fn expired_capability_denied() {
 
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
-    // TTL=0 means it expires at the same second it was issued.
-    let cap = make_capability(&kernel, &agent_kp, scope, 0);
+    let now = current_unix_timestamp();
+    let cap = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-expired-evaluation".to_string(),
+            issuer: kernel.public_key(),
+            subject: agent_kp.public_key(),
+            scope,
+            issued_at: now.saturating_sub(2),
+            expires_at: now.saturating_sub(1),
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &kernel.config.keypair,
+    )
+    .expect("sign expired capability fixture");
     let request = make_request("req-1", &cap, "read_file", "srv-a");
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();

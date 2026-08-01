@@ -1,4 +1,8 @@
 use super::*;
+use chio_kernel::agent_economy_budget_store::{
+    BudgetAuthorizationOutcome, BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind,
+    BudgetMutationRecord,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -635,9 +639,10 @@ mod tests {
         }
     }
 
-    fn assert_lifecycle_equal(expected: &BudgetMutationRecord, actual: &BudgetMutationRecord) {
-        assert_eq!(actual.kind, expected.kind);
-        assert_eq!(actual.allowed, expected.allowed);
+    fn assert_lifecycle_equal(
+        expected: &BudgetMutationRecord,
+        actual: &ResolvedBudgetMutationLifecycle,
+    ) {
         assert_eq!(actual.authorization_outcome, expected.authorization_outcome);
         assert_eq!(
             actual.invocation_state_before,
@@ -655,62 +660,56 @@ mod tests {
     fn every_mutation_kind_round_trips_complete_lifecycle() {
         for (index, case) in lifecycle_cases().into_iter().enumerate() {
             let original = mutation_record(case, u64::try_from(index + 1).test_unwrap());
-            let view = budget_mutation_event_view(original.clone()).test_unwrap();
-            let round_trip = budget_mutation_record_from_view(&view).test_unwrap();
-            assert_lifecycle_equal(&original, &round_trip);
+            let view = BudgetMutationLifecycleView::from_record(&original);
+            let round_trip: BudgetMutationLifecycleView =
+                serde_json::from_value(serde_json::to_value(view).test_unwrap()).test_unwrap();
+            let resolved = round_trip
+                .resolve(
+                    original.kind,
+                    original.allowed,
+                    original.hold_id.is_some(),
+                    original.exposure_units,
+                    original.realized_spend_units,
+                )
+                .test_unwrap();
+            assert_lifecycle_equal(&original, &resolved);
         }
     }
 
     #[test]
-    fn delta_and_snapshot_envelopes_preserve_lifecycle_fields() {
+    fn serialized_agent_economy_lifecycle_preserves_complete_state() {
         let original = mutation_record(lifecycle_cases()[9], 1);
-        let view = budget_mutation_event_view(original.clone()).test_unwrap();
-        let delta = BudgetDeltaResponse {
-            records: Vec::new(),
-            mutation_events: vec![view.clone()],
-            abandoned_seqs: Vec::new(),
-        };
-        let delta: BudgetDeltaResponse =
-            serde_json::from_value(serde_json::to_value(delta).test_unwrap()).test_unwrap();
-        let from_delta = budget_mutation_record_from_view(&delta.mutation_events[0]).test_unwrap();
-        assert_lifecycle_equal(&original, &from_delta);
-
-        let snapshot = ClusterStateSnapshotResponse {
-            generated_at: 1,
-            election_term: 0,
-            replication: ClusterReplicationHeadsView::default(),
-            authority_lease: None,
-            authority: None,
-            revocations: Vec::new(),
-            tool_receipts: Vec::new(),
-            child_receipts: Vec::new(),
-            lineage: Vec::new(),
-            budgets: Vec::new(),
-            budget_usage_history_anchors: Vec::new(),
-            budget_anchor_provenance: None,
-            budget_mutation_events: vec![view],
-            budget_abandoned_seq_ranges: Vec::new(),
-            budget_origin_ack_heads: Vec::new(),
-        };
-        let snapshot: ClusterStateSnapshotResponse =
-            serde_json::from_value(serde_json::to_value(snapshot).test_unwrap()).test_unwrap();
-        let from_snapshot =
-            budget_mutation_record_from_view(&snapshot.budget_mutation_events[0]).test_unwrap();
-        assert_lifecycle_equal(&original, &from_snapshot);
+        let view = BudgetMutationLifecycleView::from_record(&original);
+        let decoded: BudgetMutationLifecycleView =
+            serde_json::from_value(serde_json::to_value(view).test_unwrap()).test_unwrap();
+        let resolved = decoded
+            .resolve(
+                original.kind,
+                original.allowed,
+                original.hold_id.is_some(),
+                original.exposure_units,
+                original.realized_spend_units,
+            )
+            .test_unwrap();
+        assert_lifecycle_equal(&original, &resolved);
     }
 
     #[test]
-    fn composite_projection_state_is_refused_rather_than_exported() {
-        // `capture_invocation` is absent from the store-side unsupported-kind list, so
-        // a lossy export of one is accepted by peers and silently strips the composite
-        // state instead of failing the import.
+    fn composite_projection_lifecycle_is_preserved_in_the_agent_economy_domain() {
         let mut record = mutation_record(lifecycle_cases()[9], 1);
         record.kind = BudgetMutationKind::CaptureInvocation;
         record.cumulative_approval_set_digest = Some("approval-set-digest".to_string());
-        match budget_mutation_event_view(record) {
-            Ok(_) => panic!("composite projection state must not lower into a cluster view"),
-            Err(error) => assert!(error.to_string().contains("composite projection state")),
-        }
+        let view = BudgetMutationLifecycleView::from_record(&record);
+        let resolved = view
+            .resolve(
+                record.kind,
+                record.allowed,
+                record.hold_id.is_some(),
+                record.exposure_units,
+                record.realized_spend_units,
+            )
+            .test_unwrap();
+        assert_lifecycle_equal(&record, &resolved);
     }
 
     #[test]

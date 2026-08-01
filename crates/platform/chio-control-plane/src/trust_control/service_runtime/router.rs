@@ -765,6 +765,8 @@ mod tests {
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: None,
+            joint_authority_db_path: None,
+            fiscal_runtime: None,
             partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
@@ -790,6 +792,10 @@ mod tests {
         };
         TrustServiceState {
             config,
+            joint_authority_store: None,
+            fiscal_runtime: None,
+            budget_store: None,
+            revocation_store: None,
             dashboard_sessions: dashboard_auth::DashboardSessionStore::production(),
             dashboard_report_bridge: None,
             authority_keyring: None,

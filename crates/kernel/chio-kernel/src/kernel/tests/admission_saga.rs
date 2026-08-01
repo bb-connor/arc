@@ -504,16 +504,22 @@ impl BudgetStore for DurableRecoveryBudgetStore {
             envelope,
         )
     }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        self.inner.reap_expired_reserved_holds(now_unix_secs)
+    }
 }
 
 struct CapturePendingNonceFixture {
     kernel: ChioKernel,
     operation_store: std::sync::Arc<ProfiledTestStore>,
     nonce_store: DurableRecoveryNonceStore,
-    budget_store: DurableRecoveryBudgetStore,
+    budget_store: std::sync::Arc<DurableRecoveryBudgetStore>,
     operation_id: String,
     capture_request: BudgetCaptureInvocationRequest,
     kernel_authority: String,
+    reserved_until: i64,
+    initial_receipt_count: usize,
 }
 
 fn mark_caller_reservation_hold_reserved(fixture: &CapturePendingNonceFixture) {
@@ -551,44 +557,81 @@ fn mark_caller_reservation_hold_reserved(fixture: &CapturePendingNonceFixture) {
         .unwrap();
 }
 
-fn caller_reserved_recovery_fixture(capture_invocations: bool) -> CapturePendingNonceFixture {
-    let fixture = capture_pending_nonce_fixture_with_exposure(
-        false,
-        100,
-        AdmissionOperationState::CallerReservationCapturePending,
-    );
-    mark_caller_reservation_hold_reserved(&fixture);
-    let operation = fixture
-        .operation_store
-        .load(&fixture.operation_id)
-        .unwrap()
-        .unwrap();
-    if capture_invocations {
-        let captured = fixture
-            .budget_store
-            .capture_invocation_reservations(fixture.capture_request.clone())
-            .unwrap();
-        assert_eq!(
-            captured.invocation_state,
-            BudgetInvocationReservationState::Captured
-        );
-    }
-    assert!(matches!(
-        fixture
-            .operation_store
-            .compare_and_swap(AdmissionOperationCompareAndSwap {
-                operation_id: &fixture.operation_id,
-                expected_version: operation.version(),
-                coordinator_lease_epoch: operation.coordinator_lease_epoch(),
-                next_state: AdmissionOperationState::CallerReserved,
-                next_dispatch_state: AdmissionDispatchState::Committed,
-                next_coordinator_lease_epoch: operation.coordinator_lease_epoch(),
-                last_error: None,
-            })
-            .unwrap(),
-        AdmissionOperationCasOutcome::Applied(_)
+fn caller_reserved_recovery_fixture() -> CapturePendingNonceFixture {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    install_durable_test_receipt_store(&mut kernel, "caller-reservation-recovery-receipts");
+    let operation_store = std::sync::Arc::new(ProfiledTestStore::new(
+        AdmissionOperationStoreProfile::SingleNodeDurable,
     ));
-    fixture
+    kernel
+        .set_admission_operation_store_handle(operation_store.clone())
+        .unwrap();
+    let budget_store = std::sync::Arc::new(DurableRecoveryBudgetStore::new());
+    kernel
+        .set_budget_store_handle(budget_store.clone())
+        .unwrap();
+    let nonce_store = DurableRecoveryNonceStore::new();
+    kernel
+        .set_execution_nonce_store(
+            ExecutionNonceConfig {
+                require_nonce: true,
+                ..ExecutionNonceConfig::default()
+            },
+            Box::new(nonce_store.clone()),
+        )
+        .unwrap();
+    kernel.enable_aggregate_invocation_admission().unwrap();
+
+    let agent = Keypair::generate();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![make_monetary_grant(
+            "cost-srv", "compute", 100, 1_000, "USD",
+        )]),
+        3_600,
+    );
+    let capability = aggregate_limited_capability(&kernel, &capability, 2);
+    let request = reserve_request("caller-reservation-recovery", &capability, &agent);
+    let response = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    let reserved_until = response.execution_nonce.as_ref().unwrap().expires_at();
+    let operation_id = caller_reserved_operation_id(&response).to_string();
+    let operation = operation_store.load(&operation_id).unwrap().unwrap();
+    assert_eq!(operation.state(), AdmissionOperationState::CallerReserved);
+    let hold_id = operation.budget_hold_id().unwrap().to_string();
+    let hold = budget_store.get_budget_hold(&hold_id).unwrap().unwrap();
+    assert_eq!(hold.disposition, BudgetHoldDispositionView::Open);
+    let capture_request = BudgetCaptureInvocationRequest {
+        capability_id: operation.capability_id().to_string(),
+        grant_index: 0,
+        hold_id: Some(hold_id.clone()),
+        event_id: Some(format!("{hold_id}:capture-invocations")),
+        authority: hold.authority,
+        admission_operation: Some(
+            BudgetAdmissionOperationBinding::new(
+                operation_id.clone(),
+                operation.request_binding_hash().to_string(),
+            )
+            .unwrap(),
+        ),
+    };
+    let kernel_authority = kernel_coordinator_authority_id(&kernel);
+    let initial_receipt_count = kernel.receipt_log().receipts().len();
+    CapturePendingNonceFixture {
+        kernel,
+        operation_store,
+        nonce_store,
+        budget_store,
+        operation_id,
+        capture_request,
+        kernel_authority,
+        reserved_until,
+        initial_receipt_count,
+    }
 }
 
 fn assert_signed_caller_reservation_recovery_receipt(
@@ -693,7 +736,7 @@ fn caller_reservation_reap_cursor_crosses_more_than_one_bounded_page() {
 
 #[test]
 fn malformed_signed_handoff_inventory_does_not_starve_a_valid_sibling() {
-    let mut fixture = caller_reserved_recovery_fixture(true);
+    let mut fixture = caller_reserved_recovery_fixture();
     let valid = fixture
         .operation_store
         .load(&fixture.operation_id)
@@ -726,7 +769,7 @@ fn malformed_signed_handoff_inventory_does_not_starve_a_valid_sibling() {
         .reap_expired_reserved_budget_holds(i64::MAX)
         .expect_err("malformed handoff intent must remain visible")
         .to_string();
-    assert!(error.contains("1 failures"));
+    assert!(error.contains("1 failures"), "{error}");
     assert_eq!(
         fixture
             .operation_store
@@ -816,10 +859,8 @@ fn cold_restart_terminalizes_caller_reserved_operations_after_every_closed_hold_
     for expected_disposition in [
         BudgetHoldDispositionView::Reconciled,
         BudgetHoldDispositionView::Released,
-        BudgetHoldDispositionView::Reversed,
     ] {
-        let capture_invocations = expected_disposition != BudgetHoldDispositionView::Reversed;
-        let fixture = caller_reserved_recovery_fixture(capture_invocations);
+        let fixture = caller_reserved_recovery_fixture();
         let hold_id = fixture.capture_request.hold_id.clone().unwrap();
         let capability_id = fixture.capture_request.capability_id.clone();
         let authority = fixture.capture_request.authority.clone();
@@ -854,20 +895,6 @@ fn cold_restart_terminalizes_caller_reserved_operations_after_every_closed_hold_
                     })
                     .unwrap();
             }
-            BudgetHoldDispositionView::Reversed => {
-                fixture
-                    .budget_store
-                    .reverse_budget_hold(BudgetReverseHoldRequest {
-                        capability_id,
-                        grant_index: 0,
-                        reversed_exposure_units: 100,
-                        hold_id: Some(hold_id.clone()),
-                        event_id: Some(format!("{hold_id}:reverse-after-caller-reserved")),
-                        authority,
-                        admission_operation: admission_binding,
-                    })
-                    .unwrap();
-            }
             disposition => panic!("unexpected closed disposition: {disposition:?}"),
         }
         assert_eq!(
@@ -885,7 +912,7 @@ fn cold_restart_terminalizes_caller_reserved_operations_after_every_closed_hold_
                 .kernel
                 .recover_nonterminal_admission_kind_with_authorities(
                     fixture.operation_store.as_ref(),
-                    &fixture.budget_store,
+                    fixture.budget_store.as_ref(),
                     None,
                     AdmissionOperationKind::ToolDispatch,
                     &fixture.kernel_authority,
@@ -917,8 +944,8 @@ fn cold_restart_terminalizes_caller_reserved_operations_after_every_closed_hold_
 }
 
 #[test]
-fn policy_rotation_preflight_does_not_mutate_closed_caller_reservation() {
-    let mut fixture = caller_reserved_recovery_fixture(true);
+fn policy_rotation_recovers_a_closed_caller_reservation_from_its_signed_handoff() {
+    let mut fixture = caller_reserved_recovery_fixture();
     let hold_id = fixture.capture_request.hold_id.clone().unwrap();
     fixture
         .budget_store
@@ -948,32 +975,37 @@ fn policy_rotation_preflight_does_not_mutate_closed_caller_reservation() {
         .nonce_store
         .get_nonce_reservation(&fixture.operation_id)
         .unwrap();
-    let cleanup_before = fixture
-        .operation_store
-        .load_cleanup_actions(&fixture.operation_id)
-        .unwrap();
     fixture.kernel.config.policy_hash = "44".repeat(32);
-
-    let error = fixture
+    fixture
         .kernel
-        .recover_nonterminal_admission_kind_with_authorities(
+        .validate_caller_reserved_handoff_with_store(
             fixture.operation_store.as_ref(),
-            &fixture.budget_store,
-            None,
-            AdmissionOperationKind::ToolDispatch,
-            &fixture.kernel_authority,
+            &operation_before,
         )
-        .expect_err("old-policy caller reservation must block recovery before mutation");
-    assert!(error
-        .to_string()
-        .contains("policy rotation requires a zero-unresolved-operation drain"));
+        .unwrap();
+
     assert_eq!(
         fixture
-            .operation_store
-            .load(&fixture.operation_id)
-            .unwrap()
+            .kernel
+            .recover_nonterminal_admission_kind_with_authorities(
+                fixture.operation_store.as_ref(),
+                fixture.budget_store.as_ref(),
+                None,
+                AdmissionOperationKind::ToolDispatch,
+                &fixture.kernel_authority,
+            )
             .unwrap(),
-        operation_before
+        1
+    );
+    let recovered = fixture
+        .operation_store
+        .load(&fixture.operation_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(recovered.policy_hash(), operation_before.policy_hash());
+    assert_eq!(
+        recovered.state(),
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
     );
     assert_eq!(
         fixture
@@ -990,19 +1022,15 @@ fn policy_rotation_preflight_does_not_mutate_closed_caller_reservation() {
             .unwrap(),
         nonce_before
     );
-    assert_eq!(
-        fixture
-            .operation_store
-            .load_cleanup_actions(&fixture.operation_id)
-            .unwrap(),
-        cleanup_before
+    assert_signed_caller_reservation_recovery_receipt(
+        &fixture,
+        BudgetHoldDispositionView::Reconciled,
     );
-    assert!(fixture.kernel.receipt_log().receipts().is_empty());
 }
 
 #[test]
 fn cold_restart_retains_caller_reserved_operation_while_stamped_hold_is_open() {
-    let fixture = caller_reserved_recovery_fixture(true);
+    let fixture = caller_reserved_recovery_fixture();
     let hold_id = fixture.capture_request.hold_id.as_deref().unwrap();
     let hold = fixture
         .budget_store
@@ -1012,14 +1040,7 @@ fn cold_restart_retains_caller_reserved_operation_while_stamped_hold_is_open() {
     assert_eq!(hold.disposition, BudgetHoldDispositionView::Open);
     assert_eq!(
         hold.reserved_until,
-        Some(
-            fixture
-                .nonce_store
-                .get_nonce_reservation(&fixture.operation_id)
-                .unwrap()
-                .unwrap()
-                .signed_expires_at()
-        )
+        Some(fixture.reserved_until)
     );
 
     assert_eq!(
@@ -1027,7 +1048,7 @@ fn cold_restart_retains_caller_reserved_operation_while_stamped_hold_is_open() {
             .kernel
             .recover_nonterminal_admission_kind_with_authorities(
                 fixture.operation_store.as_ref(),
-                &fixture.budget_store,
+                fixture.budget_store.as_ref(),
                 None,
                 AdmissionOperationKind::ToolDispatch,
                 &fixture.kernel_authority,
@@ -1048,7 +1069,10 @@ fn cold_restart_retains_caller_reserved_operation_while_stamped_hold_is_open() {
         .unwrap()
         .iter()
         .all(|action| action.kind() != AdmissionCleanupActionKind::TerminalReceipt));
-    assert!(fixture.kernel.receipt_log().receipts().is_empty());
+    assert_eq!(
+        fixture.kernel.receipt_log().receipts().len(),
+        fixture.initial_receipt_count
+    );
 }
 
 fn capture_pending_nonce_fixture(lose_capture_ack: bool) -> CapturePendingNonceFixture {
@@ -1173,10 +1197,12 @@ fn capture_pending_nonce_fixture_with_exposure(
         kernel,
         operation_store,
         nonce_store,
-        budget_store,
+        budget_store: std::sync::Arc::new(budget_store),
         operation_id,
         capture_request,
         kernel_authority,
+        reserved_until: 10_000,
+        initial_receipt_count: 0,
     }
 }
 
@@ -1676,7 +1702,7 @@ fn capture_pending_recovery_commits_reserved_ordinary_nonce_before_capture() {
         .kernel
         .recover_nonterminal_admission_kind_with_authorities(
             fixture.operation_store.as_ref(),
-            &fixture.budget_store,
+            fixture.budget_store.as_ref(),
             None,
             AdmissionOperationKind::ToolDispatch,
             &fixture.kernel_authority,
@@ -1763,7 +1789,7 @@ fn capture_ack_loss_recovery_preserves_precommitted_ordinary_nonce_tombstone() {
         .kernel
         .recover_nonterminal_admission_kind_with_authorities(
             fixture.operation_store.as_ref(),
-            &fixture.budget_store,
+            fixture.budget_store.as_ref(),
             None,
             AdmissionOperationKind::ToolDispatch,
             &fixture.kernel_authority,

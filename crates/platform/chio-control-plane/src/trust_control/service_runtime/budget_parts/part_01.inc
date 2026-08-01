@@ -16,12 +16,26 @@ pub fn build_remote_budget_store(
     control_url: &str,
     control_token: &str,
 ) -> Result<Box<dyn BudgetStore>, CliError> {
-    Ok(Box::new(RemoteBudgetStore {
+    Ok(Box::new(remote_budget_store(control_url, control_token)?))
+}
+
+pub(crate) fn build_shared_remote_budget_store(
+    control_url: &str,
+    control_token: &str,
+) -> Result<Arc<RemoteBudgetStore>, CliError> {
+    remote_budget_store(control_url, control_token).map(Arc::new)
+}
+
+fn remote_budget_store(
+    control_url: &str,
+    control_token: &str,
+) -> Result<RemoteBudgetStore, CliError> {
+    Ok(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
         partition_escrow_authority: None,
         cached_usage: Mutex::new(HashMap::new()),
         composite_holds: Arc::new(Mutex::new(HashMap::new())),
-    }))
+    })
 }
 
 pub fn build_remote_admission_capture_authority(

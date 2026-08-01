@@ -747,6 +747,9 @@ fn receipt_error_to_port(error: chio_kernel::ReceiptStoreError) -> PortError {
         | chio_kernel::ReceiptStoreError::Pool(_)
         | chio_kernel::ReceiptStoreError::Timeout { .. }
         | chio_kernel::ReceiptStoreError::Io(_)
+        | chio_kernel::ReceiptStoreError::Unsupported(_)
+        | chio_kernel::ReceiptStoreError::Fenced
+        | chio_kernel::ReceiptStoreError::OutcomeUnknown(_)
         | chio_kernel::ReceiptStoreError::WriterDead { .. } => PortError::unavailable(),
     }
 }

@@ -4,19 +4,23 @@ use chio_kernel::admission_operation::{
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
     QualifiedAdmissionOperationStoreExt, StoreMutationFence,
 };
-use chio_kernel::budget_store::{
+use chio_kernel::agent_economy_budget_store::{
     BudgetAuthorizeHoldDecision, BudgetCaptureInvocationRequest, BudgetEventAuthority,
     BudgetInvocationCaptureDecision, BudgetReconcileHoldRequest,
 };
-use chio_kernel::receipt_store::{
+use chio_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
+use chio_kernel::{
     AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlementBegin,
-    QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError,
+    QualifiedAdmissionProjectionStore,
 };
 use chio_kernel::tool_outcome::{
     CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1, RawInvocationOutcomeV1,
     ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
 };
-use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteBudgetStore, SqliteToolOutcomeStore};
+use chio_store_sqlite::{
+    SqliteAdmissionOperationStore, SqliteAgentEconomyBudgetStore as SqliteBudgetStore,
+    SqliteToolOutcomeStore,
+};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

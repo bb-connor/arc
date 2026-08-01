@@ -1,5 +1,5 @@
 use super::*;
-use chio_kernel::InMemoryBudgetStore;
+use chio_kernel::agent_economy_budget_store::InMemoryBudgetStore;
 
 #[path = "tests/composite.rs"]
 mod composite_lifecycle;

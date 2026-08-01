@@ -1,4 +1,143 @@
 use super::*;
+use chio_kernel::agent_economy_budget_store::{
+    BudgetAuthorizationOutcome, BudgetAuthorizeCumulativeApprovalRequest,
+    BudgetAuthorizeHoldDecision, BudgetCancelCapturedBeforeDispatchRequest,
+    BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest,
+    BudgetCapturedBeforeDispatchCancellationDecision, BudgetCommitMetadata,
+    BudgetCumulativeApprovalAuthorizationDecision, BudgetEventAuthority,
+    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetMutationRecord,
+    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
+    BudgetStore as AgentEconomyBudgetStore, BudgetStoreError as AgentEconomyBudgetStoreError,
+};
+use chio_log_redact::redacted;
+use chio_store_sqlite::SqliteAgentEconomyBudgetStore as SqliteBudgetStore;
+
+fn budget_internal_error(
+    error: &AgentEconomyBudgetStoreError,
+    public_message: &'static str,
+) -> Response {
+    warn!(reason = %redacted!(error), message = public_message, "agent-economy budget store operation failed");
+    let status = if matches!(error, AgentEconomyBudgetStoreError::Fenced { .. }) {
+        StatusCode::SERVICE_UNAVAILABLE
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+    plain_http_error(status, public_message)
+}
+
+fn structured_bad_request(error: impl std::fmt::Display) -> Response {
+    plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+}
+
+fn structured_projection_error(error: impl std::fmt::Display) -> Response {
+    warn!(reason = %redacted!(error), "structured budget projection failed");
+    plain_http_error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "structured budget projection failed",
+    )
+}
+
+pub(crate) fn exact_structured_mutation_projection(
+    store: &SqliteBudgetStore,
+    expected_capability_id: Option<&str>,
+    expected_grant_index: Option<u32>,
+    request_hold_id: String,
+    request_event_id: String,
+    decision: StructuredBudgetMutationDecisionView,
+    mutation: BudgetHoldMutationDecision,
+) -> Result<StructuredBudgetMutationResponse, Response> {
+    if mutation.admission_binding.is_some() && mutation.metadata.authority.is_none() {
+        return Err(structured_projection_error(
+            "structured mutation omitted authority",
+        ));
+    }
+    let Some(event_id) = mutation.metadata.event_id.as_deref() else {
+        return Err(structured_projection_error(
+            "mutation omitted event identity",
+        ));
+    };
+    let event = match store.mutation_event_for_event_id(event_id) {
+        Ok(Some(event)) => event,
+        Ok(None) => {
+            return Err(structured_projection_error(
+                "mutation event was not durable",
+            ))
+        }
+        Err(error) => return Err(structured_projection_error(error)),
+    };
+    if expected_capability_id.is_some_and(|expected| event.capability_id != expected)
+        || expected_grant_index.is_some_and(|expected| event.grant_index != expected)
+        || event.hold_id.as_deref() != Some(request_hold_id.as_str())
+    {
+        return Err(structured_projection_error(
+            "mutation event changed the request identity",
+        ));
+    }
+    validate_durable_mutation_projection(&event, &mutation)?;
+    let usage = structured_usage_view_for_event(store, &event)?;
+    StructuredBudgetMutationResponse::from_core(
+        event.capability_id,
+        event.grant_index,
+        request_hold_id,
+        request_event_id,
+        decision,
+        mutation,
+        usage,
+    )
+    .map_err(structured_projection_error)
+}
+
+fn validate_durable_mutation_projection(
+    event: &BudgetMutationRecord,
+    mutation: &BudgetHoldMutationDecision,
+) -> Result<(), Response> {
+    let committed_cost_units_after = event
+        .total_cost_exposed_after
+        .checked_add(event.total_cost_realized_spend_after)
+        .ok_or_else(|| structured_projection_error("mutation event cost overflowed"))?;
+    if event.hold_id != mutation.hold_id
+        || event.admission_binding != mutation.admission_binding
+        || event.exposure_units != mutation.exposure_units
+        || event.realized_spend_units != mutation.realized_spend_units
+        || event.invocation_count_after != mutation.invocation_count_after
+        || event.invocation_quota_usages != mutation.invocation_quota_usages
+        || event.cumulative_approval != mutation.cumulative_approval
+        || event.invocation_state_after != mutation.invocation_state
+        || event.monetary_state_after != mutation.monetary_state
+        || event.authority != mutation.metadata.authority
+        || Some(event.event_seq) != mutation.metadata.budget_commit_index
+        || mutation.metadata.event_id.as_deref() != Some(event.event_id.as_str())
+        || committed_cost_units_after != mutation.committed_cost_units_after
+    {
+        return Err(structured_projection_error(
+            "mutation projection did not match its durable event",
+        ));
+    }
+    Ok(())
+}
+
+fn structured_mutation_response(
+    store: &SqliteBudgetStore,
+    expected_capability_id: Option<&str>,
+    expected_grant_index: Option<u32>,
+    request_hold_id: String,
+    request_event_id: String,
+    decision: StructuredBudgetMutationDecisionView,
+    mutation: BudgetHoldMutationDecision,
+) -> Response {
+    match exact_structured_mutation_projection(
+        store,
+        expected_capability_id,
+        expected_grant_index,
+        request_hold_id,
+        request_event_id,
+        decision,
+        mutation,
+    ) {
+        Ok(response) => Json(response).into_response(),
+        Err(response) => response,
+    }
+}
 
 pub(super) fn structured_usage_view_for_event(
     store: &SqliteBudgetStore,
@@ -44,7 +183,7 @@ pub(crate) fn structured_budget_store(
     })?;
     let fence = authority_store.mutation_fence();
     Ok((
-        state.budget_store()?,
+        state.agent_economy_budget_store()?,
         BudgetEventAuthority {
             authority_id: fence.store_uuid,
             lease_id: fence.lease_id,
@@ -66,9 +205,40 @@ fn structured_lifecycle_budget_store(
             "versioned rich budget lifecycle is unavailable with the legacy cluster coordinator",
         ));
     }
-    let store = state.budget_store()?;
-    let authority = resolve_budget_hold_authority(state, &store, Some(hold_id))?;
+    let store = state.agent_economy_budget_store()?;
+    let authority = resolve_structured_budget_hold_authority(state, &store, Some(hold_id))?;
     Ok((store, authority))
+}
+
+fn resolve_structured_budget_hold_authority(
+    state: &TrustServiceState,
+    store: &SqliteBudgetStore,
+    hold_id: Option<&str>,
+) -> Result<Option<BudgetEventAuthority>, Response> {
+    if let Some(authority_store) = state.joint_authority_store.as_ref() {
+        let fence = authority_store.mutation_fence();
+        return Ok(Some(BudgetEventAuthority {
+            authority_id: fence.store_uuid,
+            lease_id: fence.lease_id,
+            lease_epoch: fence.owner_epoch,
+        }));
+    }
+    if let Some(hold_id) = hold_id {
+        match store.hold_authority(hold_id) {
+            Ok(Some(authority)) => return Ok(Some(authority)),
+            Ok(None) => {}
+            Err(error) => {
+                return Err(budget_internal_error(
+                    &error,
+                    "agent-economy budget hold authority lookup failed",
+                ));
+            }
+        }
+    }
+    Err(plain_http_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "agent-economy budget lifecycle requires a joint authority fence",
+    ))
 }
 
 pub(crate) async fn handle_structured_budget_authorize(

@@ -547,12 +547,18 @@ pub(super) struct OperationOwnedDelegatedBudgetLease {
 
 pub struct ChioKernel {
     pub(super) config: KernelConfig,
+    pub(super) durable_admission_mode: crate::admission_operation::DurableAdmissionMode,
+    pub(super) agent_economy_durable_admission_runtime:
+        Option<super::agent_economy_admission_coordinator::AgentEconomyDurableAdmissionRuntime>,
+    pub(super) unsafe_ephemeral_financial_dispatch: bool,
     /// Guards are stored behind `Arc` so a single guard can be cloned into a
     /// `spawn_blocking` task without moving the whole pipeline, letting the
     /// deadline wrapper bound a blocking guard off the async worker.
     pub(super) guards: Arc<Vec<Arc<dyn Guard>>>,
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
+    pub(super) agent_economy_budget_store:
+        Arc<dyn crate::agent_economy_budget_store::BudgetStore>,
     pub(super) partition_escrow_registry:
         Option<Arc<crate::partition_escrow::PartitionEscrowRegistry>>,
     pub(super) budget_store_lock: Mutex<()>,
@@ -564,6 +570,8 @@ pub struct ChioKernel {
     pub(super) supplemental_broker_admission_enabled: bool,
     pub(super) supplemental_quota_verifier:
         Option<Arc<dyn crate::supplemental_quota::SupplementalQuotaVerifier>>,
+    pub(super) agent_economy_supplemental_quota_verifier:
+        Option<crate::agent_economy_supplemental_quota::SupplementalQuotaVerifierRuntime>,
     pub(super) supplemental_admission_registrar:
         Option<Arc<dyn crate::supplemental_quota::SupplementalAdmissionRegistrar>>,
     pub(super) admission_capture_authority:
@@ -632,6 +640,8 @@ pub struct ChioKernel {
     /// store is attached.
     pub(super) dispatch_intent_recovery: Option<crate::receipt_store::DispatchIntentRecoveryHandle>,
     pub(super) payment_adapter: Option<Box<dyn PaymentAdapter>>,
+    pub(super) agent_economy_payment_adapter:
+        Option<Box<dyn crate::agent_economy_payment::PaymentAdapter>>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
     pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,

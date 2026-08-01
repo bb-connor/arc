@@ -11,15 +11,15 @@ use chio_kernel::admission_operation::{
     QualifiedAdmissionOperationStore, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
     UntrustedAdmissionRecoveryClaim,
 };
-use chio_kernel::budget_store::{
+use chio_kernel::agent_economy_budget_store::{
     BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest, BudgetGuaranteeLevel,
 };
-use chio_kernel::receipt_store::{
+use chio_kernel::{
     AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
     AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
-    AdmissionPaymentSettlementBegin, QualifiedAdmissionProjectionStore, ReceiptStore,
-    ReceiptStoreError,
+    AdmissionPaymentSettlementBegin, QualifiedAdmissionProjectionStore,
 };
+use chio_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
 use chio_kernel::tool_outcome::{
     CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
     QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ToolOutcomeInsertResultV1,
@@ -36,7 +36,7 @@ const ADMISSION_AUTHORITY_RESPONSE_LIMIT: u64 = 384 * 1024 * 1024;
 pub(crate) struct RemoteAdmissionStores {
     pub(crate) operations: Arc<dyn QualifiedAdmissionProjectionStore>,
     pub(crate) outcomes: Arc<dyn QualifiedToolOutcomeStore>,
-    pub(crate) budget: Arc<dyn chio_kernel::BudgetStore>,
+    pub(crate) budget: Arc<dyn chio_kernel::agent_economy_budget_store::BudgetStore>,
     pub(crate) fence: StoreMutationFence,
 }
 
@@ -44,7 +44,7 @@ struct RemoteAdmissionAuthority {
     client: TrustControlClient,
     fence: StoreMutationFence,
     signer: Keypair,
-    budget: Arc<RemoteBudgetStore>,
+    budget: Arc<RemoteAgentEconomyBudgetStore>,
 }
 
 #[derive(Debug)]
@@ -73,7 +73,10 @@ pub(crate) fn build_remote_admission_stores(
     let status: AdmissionAuthorityStatusWire = decode_response(response).map_err(|error| {
         CliError::cli_other_error(format!("failed to connect to admission authority: {error}"))
     })?;
-    let budget = super::budget::build_shared_remote_budget_store(control_url, control_token)?;
+    let budget = super::agent_economy_budget::build_shared_remote_budget_store(
+        control_url,
+        control_token,
+    )?;
     let authority = Arc::new(RemoteAdmissionAuthority {
         client,
         fence: status.fence.clone(),
@@ -404,7 +407,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
         &self,
         operation_id: &str,
         active_fence: &StoreMutationFence,
-    ) -> Result<Option<chio_kernel::payment::PaymentJournalRecord>, AdmissionPaymentJournalError>
+    ) -> Result<Option<chio_kernel::agent_economy_payment::PaymentJournalRecord>, AdmissionPaymentJournalError>
     {
         if active_fence != &self.fence {
             return Err(AdmissionPaymentJournalError::Fenced);
@@ -412,7 +415,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
         let operation_id =
             chio_kernel::admission_operation::AdmissionOperationId::from_persisted(operation_id)
                 .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
-        let journal: Option<chio_kernel::payment::PaymentJournalRecord> = self
+        let journal: Option<chio_kernel::agent_economy_payment::PaymentJournalRecord> = self
             .call(
                 AdmissionAuthorityAction::LoadPaymentJournal,
                 &OperationIdWire {
@@ -436,7 +439,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
     fn advance_payment_journal(
         &self,
         advance: AdmissionPaymentJournalAdvance<'_>,
-    ) -> Result<chio_kernel::payment::PaymentJournalRecord, AdmissionPaymentJournalError> {
+    ) -> Result<chio_kernel::agent_economy_payment::PaymentJournalRecord, AdmissionPaymentJournalError> {
         let AdmissionPaymentJournalAdvance {
             operation,
             recovery_lease,
@@ -458,7 +461,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
         let desired = expected
             .apply_transition(transition)
             .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
-        let journal: chio_kernel::payment::PaymentJournalRecord = self
+        let journal: chio_kernel::agent_economy_payment::PaymentJournalRecord = self
             .call(
                 AdmissionAuthorityAction::AdvancePaymentJournal,
                 &AdmissionPaymentAdvanceWire {
@@ -585,7 +588,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
         operation: &AdmissionOperationV1,
         recovery_lease: &AdmissionRecoveryLease,
         request: BudgetAuthorizeHoldRequest,
-        payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        payment_journal: Option<chio_kernel::agent_economy_payment::PaymentJournalRecord>,
         credit_exposure: Option<chio_kernel::CreditExposureReservationRequest>,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
@@ -644,7 +647,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
             .map_err(AdmissionBudgetAuthorizationError::Operation)?;
         let expected = if matches!(
             decision,
-            chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)
+            chio_kernel::agent_economy_budget_store::BudgetAuthorizeHoldDecision::Authorized(_)
         ) {
             let requirements = operation.binding().participant_requirements();
             if requirements.payment != payment_journal.is_some() {

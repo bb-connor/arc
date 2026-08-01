@@ -707,6 +707,13 @@ impl BudgetStore for StampFailingBudgetStore {
         self.inner.authorize_budget_hold(request)
     }
 
+    fn replay_budget_authorization(
+        &self,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        self.inner.replay_budget_authorization(request)
+    }
+
     fn reverse_budget_hold(
         &self,
         request: crate::budget_store::BudgetReverseHoldRequest,
@@ -733,6 +740,13 @@ impl BudgetStore for StampFailingBudgetStore {
         request: crate::budget_store::BudgetCaptureInvocationRequest,
     ) -> Result<crate::budget_store::BudgetHoldMutationDecision, BudgetStoreError> {
         self.inner.capture_invocation_reservations(request)
+    }
+
+    fn query_invocation_capture(
+        &self,
+        request: &crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<Option<crate::budget_store::BudgetHoldMutationDecision>, BudgetStoreError> {
+        self.inner.query_invocation_capture(request)
     }
 
     fn get_budget_hold(
@@ -818,6 +832,7 @@ impl BudgetStore for StampFailingBudgetStore {
 #[test]
 fn reserving_stamp_failure_reverses_authorized_hold() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_test_receipt_store(&mut kernel, "stamp-failure-receipts");
     kernel
         .set_admission_operation_store_handle(durable_test_admission_operation_store(
             "stamp-failure-operations",
@@ -859,7 +874,7 @@ fn reserving_stamp_failure_reverses_authorized_hold() {
     assert_eq!(
         hold.disposition,
         crate::budget_store::BudgetHoldDispositionView::Reversed,
-        "a failed reservation stamp must reverse the hold, not strand it open"
+        "a failed reservation stamp must reverse the hold, not strand it open: {err}"
     );
     let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(
@@ -960,8 +975,9 @@ fn invocation_only_stamp_failure_reverses_exact_atomic_hold() {
 // no terminal event standing over a reversed hold is a corrupted audit view. The
 // receipt is persisted only after the hold is successfully stamped.
 #[test]
-fn reserving_stamp_failure_persists_no_reserved_receipt() {
+fn reserving_stamp_failure_persists_terminal_compensation_receipt() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_test_receipt_store(&mut kernel, "stamp-receipt-failure-receipts");
     kernel
         .set_admission_operation_store_handle(durable_test_admission_operation_store(
             "stamp-receipt-failure-operations",
@@ -991,16 +1007,20 @@ fn reserving_stamp_failure_persists_no_reserved_receipt() {
         "the reservation stamp failure must surface: {err}"
     );
 
-    // No orphaned reserved receipt: the stamp failed and reversed the hold, so the
-    // preflight receipt must never have been persisted.
+    // The failed stamp reverses the hold and commits one signed terminal
+    // compensation receipt. It must not leave an orphaned reserved receipt.
     assert_eq!(
         kernel.receipt_log().len(),
-        0,
-        "a failed reservation stamp must leave no persisted reserved receipt"
+        1,
+        "a failed reservation stamp must commit one terminal compensation receipt"
     );
+    assert!(matches!(
+        kernel.receipt_log().receipts()[0].decision,
+        Some(Decision::Deny { .. })
+    ));
 
-    // Once the stamp write recovers, the success path persists exactly one reserved
-    // receipt: the persist follows a successfully stamped hold.
+    // Once the stamp write recovers, the success path adds exactly one reserved
+    // receipt after the earlier terminal compensation receipt.
     fail_mark.store(false, Ordering::SeqCst);
     let retry = reserve_request("req-stamp-receipt-ok", &cap, &agent_kp);
     let reserved = kernel
@@ -1009,8 +1029,8 @@ fn reserving_stamp_failure_persists_no_reserved_receipt() {
     assert_eq!(reserved.verdict, Verdict::Allow);
     assert_eq!(
         kernel.receipt_log().len(),
-        1,
-        "a successful reservation persists exactly one reserved receipt"
+        2,
+        "a successful reservation adds exactly one reserved receipt"
     );
 }
 

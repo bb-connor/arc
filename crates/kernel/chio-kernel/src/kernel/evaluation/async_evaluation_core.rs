@@ -517,6 +517,22 @@ impl ChioKernel {
         let verified_governed_approval = validated_governed_admission
             .as_ref()
             .and_then(|admission| admission.verified_governed_approval.as_ref());
+        if validated_governed_admission.is_none() {
+            if let Some(response) = self
+                .try_evaluate_agent_economy_tool_call(
+                    request,
+                    matched,
+                    &pre_invocation_guard_evidence,
+                    extra_metadata.clone(),
+                    security_context,
+                    now,
+                    now_unix_ms,
+                )
+                .await?
+            {
+                return Ok(response);
+            }
+        }
         if verified_governed_approval.is_some()
             && self.execution_nonce_preflight_required(request)
             && matches!(

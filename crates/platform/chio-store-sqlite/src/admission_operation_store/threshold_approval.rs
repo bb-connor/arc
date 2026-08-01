@@ -40,14 +40,15 @@ impl SqliteAdmissionOperationStore {
         };
 
         let proposal = reservation.proposal();
+        let proposal_body = proposal.body();
         let verified_set = reservation.verified_set();
-        if proposal.body.request_id != updated.binding().request_id().as_str() {
+        if proposal_body.request_id() != updated.binding().request_id().as_str() {
             return Err(invariant(
                 "threshold approval proposal request does not match its admission operation",
             ));
         }
         let proposal_hash = proposal
-            .artifact_digest()
+            .proposal_hash()
             .map_err(|error| invariant(error.to_string()))?;
         let approval_set_hash = verified_set
             .approval_set_hash()
@@ -70,7 +71,7 @@ impl SqliteAdmissionOperationStore {
                 "threshold approval replay reservation does not match operation attachments",
             ));
         }
-        if trusted_now_unix_ms / 1_000 >= proposal.body.proposal_deadline {
+        if trusted_now_unix_ms / 1_000 >= proposal_body.proposal_deadline() {
             return Err(invariant(
                 "threshold approval proposal expired before durable reservation",
             ));
@@ -93,17 +94,17 @@ impl SqliteAdmissionOperationStore {
                 )
                 "#,
                 params![
-                    &proposal.body.proposal_id,
+                    proposal_body.proposal_id(),
                     command.operation_id().as_str(),
-                    &proposal.body.request_id,
-                    &proposal.body.governed_intent_hash,
-                    proposal.body.subject.to_hex(),
-                    &proposal.body.authorizing_capability_digest,
-                    &proposal.body.policy_hash,
-                    i64::from(proposal.body.threshold),
-                    &proposal.body.eligible_set_digest,
-                    sqlite_i64(proposal.body.proposal_created_at, "proposal_created_at")?,
-                    sqlite_i64(proposal.body.proposal_deadline, "proposal_deadline")?,
+                    proposal_body.request_id(),
+                    proposal_body.governed_intent_hash(),
+                    proposal_body.subject().to_hex(),
+                    proposal_body.authorization_capability_hash(),
+                    proposal_body.policy_hash(),
+                    i64::from(proposal_body.required()),
+                    proposal_body.eligible_set_digest(),
+                    sqlite_i64(proposal_body.proposal_created_at(), "proposal_created_at")?,
+                    sqlite_i64(proposal_body.proposal_deadline(), "proposal_deadline")?,
                     proposal_hash,
                     approval_set_hash,
                     proposal_json,
@@ -113,7 +114,7 @@ impl SqliteAdmissionOperationStore {
             .map_err(replay_conflict)?;
         for token in reservation.tokens() {
             let token_digest = token
-                .artifact_digest()
+                .token_digest()
                 .map_err(|error| invariant(error.to_string()))?;
             let token_json = canonical_json_bytes(token).map_err(|error| {
                 invariant(format!("threshold approval token encoding failed: {error}"))
@@ -128,7 +129,7 @@ impl SqliteAdmissionOperationStore {
                     "#,
                     params![
                         &token.id,
-                        &proposal.body.proposal_id,
+                        proposal_body.proposal_id(),
                         token.approver.to_hex(),
                         token_digest,
                         token_json,

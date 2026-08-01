@@ -31,8 +31,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/sandbox_unsigned_manifest/mutants.out/outcomes.json",
-          "sha256": "0e54b0a18485ee4362caf91869b3374ef6dfa11aeebde0d63986b4c3872243d5",
-          "inputs_sha256": "8f784750f9e74501fde08e56fa0e8f03f880f358f0af2e2df7ebf080460c8f92"
+          "sha256": "c035adcbb083a8170821cb18897688a044f7430e3817d0ed230384aaea180edb",
+          "inputs_sha256": "7d9cb1e543b7c7b93260929da1ada4430cebf72dda8e36462009be2d711eb947"
         }
       }
     ]

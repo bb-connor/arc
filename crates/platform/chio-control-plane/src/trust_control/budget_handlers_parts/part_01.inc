@@ -340,6 +340,16 @@ pub(crate) async fn handle_try_charge_cost(
             capability_id: authorize_event.capability_id.clone(),
             grant_index: payload.grant_index,
             allowed,
+            decision: BudgetAuthorizeExposureDecision::Authorized,
+            hold_id: authorize_event.hold_id.clone(),
+            event_id: Some(authorize_event.event_id.clone()),
+            exposure_units: Some(authorize_event.exposure_units),
+            realized_spend_units: Some(authorize_event.realized_spend_units),
+            mutation_invocation_count_after: Some(authorize_event.invocation_count_after),
+            mutation_committed_cost_units_after: authorize_event
+                .total_cost_exposed_after
+                .checked_add(authorize_event.total_cost_realized_spend_after),
+            usage_seq: authorize_event.usage_seq,
             invocation_count: Some(authorize_event.invocation_count_after),
             total_cost_exposed: Some(authorize_event.total_cost_exposed_after),
             total_cost_realized_spend: Some(authorize_event.total_cost_realized_spend_after),
@@ -406,6 +416,16 @@ pub(crate) async fn handle_try_charge_cost(
                     capability_id: authorize_event.capability_id.clone(),
                     grant_index: payload.grant_index,
                     allowed,
+                    decision: BudgetAuthorizeExposureDecision::Denied,
+                    hold_id: authorize_event.hold_id.clone(),
+                    event_id: Some(authorize_event.event_id.clone()),
+                    exposure_units: Some(authorize_event.exposure_units),
+                    realized_spend_units: Some(authorize_event.realized_spend_units),
+                    mutation_invocation_count_after: Some(authorize_event.invocation_count_after),
+                    mutation_committed_cost_units_after: authorize_event
+                        .total_cost_exposed_after
+                        .checked_add(authorize_event.total_cost_realized_spend_after),
+                    usage_seq: authorize_event.usage_seq,
                     invocation_count: Some(authorize_event.invocation_count_after),
                     total_cost_exposed: Some(authorize_event.total_cost_exposed_after),
                     total_cost_realized_spend: Some(
@@ -1460,6 +1480,8 @@ pub(crate) async fn handle_reverse_charge_cost(
         ReverseChargeCostResponse {
             capability_id: payload.capability_id.clone(),
             grant_index: payload.grant_index,
+            hold_id: reverse_event.hold_id.clone(),
+            event_id: Some(reverse_event.event_id.clone()),
             invocation_count: Some(reverse_event.invocation_count_after),
             total_cost_exposed: Some(reverse_event.total_cost_exposed_after),
             total_cost_realized_spend: Some(reverse_event.total_cost_realized_spend_after),
@@ -1618,6 +1640,8 @@ pub(crate) async fn handle_reduce_charge_cost(
         ReduceChargeCostResponse {
             capability_id: payload.capability_id.clone(),
             grant_index: payload.grant_index,
+            hold_id: transition_event.hold_id.clone(),
+            event_id: Some(transition_event.event_id.clone()),
             invocation_count: Some(transition_event.invocation_count_after),
             total_cost_exposed: Some(transition_event.total_cost_exposed_after),
             total_cost_realized_spend: Some(transition_event.total_cost_realized_spend_after),
@@ -1771,6 +1795,8 @@ pub(crate) async fn handle_capture_budget_hold(
         ReduceChargeCostResponse {
             capability_id: payload.capability_id.clone(),
             grant_index: payload.grant_index,
+            hold_id: capture_event.hold_id.clone(),
+            event_id: Some(capture_event.event_id.clone()),
             invocation_count: Some(capture_event.invocation_count_after),
             total_cost_exposed: Some(capture_event.total_cost_exposed_after),
             total_cost_realized_spend: Some(capture_event.total_cost_realized_spend_after),

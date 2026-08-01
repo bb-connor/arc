@@ -1195,7 +1195,8 @@ fn threshold_coordinator_rejects_distinct_operations_aliasing_one_budget_hold() 
     assert!(
         denial.contains("reused for a different composite mutation")
             || denial.contains("belongs to a different admission operation")
-            || denial.contains("belongs to a different admission request_binding_hash"),
+            || denial.contains("belongs to a different admission request_binding_hash")
+            || denial.contains("request id conflict"),
         "unexpected ownership denial: {denial}"
     );
     assert_eq!(

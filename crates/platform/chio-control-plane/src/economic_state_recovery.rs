@@ -21,7 +21,7 @@ use chio_kernel::admission_operation::{
     AdmissionProjectionContext, AdmissionTerminal, QualifiedAdmissionOperationStore,
     QualifiedAdmissionOperationStoreExt, StoreMutationFence,
 };
-use chio_kernel::receipt_store::AnchoredAdmissionProjectionStore;
+use chio_kernel::AnchoredAdmissionProjectionStore;
 use chio_kernel::{ReceiptStoreError, ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND};
 use chio_store_sqlite::{
     EconomicOperationStageBinding, EconomicStateCacheError, EconomicStateStageRecord,

@@ -19,6 +19,7 @@ use crate::execution_nonce::{
 };
 
 fn install_fixture_budget_admission_authorities(kernel: &mut ChioKernel, prefix: &str) {
+    install_durable_test_receipt_store(kernel, &format!("{prefix}-receipts"));
     kernel
         .set_admission_operation_store_handle(durable_test_admission_operation_store(&format!(
             "{prefix}-operations"

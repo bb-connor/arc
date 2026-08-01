@@ -285,3 +285,37 @@ pub trait QualifiedAdmissionProjectionStore:
         limit: usize,
     ) -> Result<Vec<ChioReceipt>, ReceiptStoreError>;
 }
+
+pub trait AnchoredAdmissionProjectionStore: QualifiedAdmissionProjectionStore {
+    fn stage_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        envelope: &crate::admission_operation::SignedAdmissionTerminalProjectionV1,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), ReceiptStoreError>;
+
+    fn qualify_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), ReceiptStoreError>;
+
+    fn record_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        committed: &chio_core::economic_continuity::VerifiedEconomicStateView,
+        pins: &chio_core::economic_continuity::EconomicStateAnchorPins,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), ReceiptStoreError>;
+
+    fn commit_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<crate::admission_operation::AdmissionTerminal, ReceiptStoreError>;
+}

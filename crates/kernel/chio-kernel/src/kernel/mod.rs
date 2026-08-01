@@ -17,6 +17,7 @@ mod active_response_policy;
 mod active_response_proof;
 mod admission_cleanup;
 mod admission_coordinator;
+mod agent_economy_admission_coordinator;
 mod admission_terminal_receipt;
 mod approval_cleanup;
 mod budget_sweep;
@@ -94,6 +95,9 @@ use caller_reservation_handoff::{
     CallerReservationCaptureOutcome, PrepareCallerReservationHandoff,
 };
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
+pub(crate) use agent_economy_admission_coordinator::{
+    AgentEconomyDurableToolAdmission, AgentEconomyDurableToolReturnInput,
+};
 pub(crate) use kernel_scopes::{
     current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,
     extract_tenant_id_from_auth_context, scope_receipt_federation_admission,
@@ -242,6 +246,21 @@ impl VerifiedGovernedPayeeBinding {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        beneficiary_id: &str,
+        settlement_destination_ref: &str,
+        economic_intent_digest: &str,
+        pre_action_authority_digest: &str,
+    ) -> Result<Self, chio_credit::obligation::ObligationError> {
+        Self::new(
+            beneficiary_id.to_owned(),
+            settlement_destination_ref.to_owned(),
+            economic_intent_digest.to_owned(),
+            pre_action_authority_digest.to_owned(),
+        )
+    }
+
     #[must_use]
     pub(crate) fn beneficiary_id(&self) -> &str {
         &self.beneficiary_id
@@ -270,14 +289,16 @@ impl VerifiedGovernedPayeeBinding {
 
 /// Authoritative security identity and isolation state supplied by a trusted
 /// runtime boundary. Tool-call request fields are not a source for this data.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "version", content = "context", rename_all = "snake_case")]
 pub enum SecurityInvocationContext {
     /// Version 1 of the authoritative invocation context.
     V1(SecurityInvocationContextV1),
 }
 
 /// Version 1 fields carried by [`SecurityInvocationContext`].
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SecurityInvocationContextV1 {
     tenant_id: chio_security_types::ports::TenantId,
     session_id: chio_security_types::ports::SessionId,

@@ -4,6 +4,72 @@ use super::super::cluster_replay::{
 use super::super::report_validation::normalize_cluster_config_url;
 use super::*;
 
+#[derive(Clone)]
+pub struct TrustFiscalRuntimeConfig {
+    pub genesis_policy: chio_fiscal::FiscalGenesisPolicy,
+    pub anchor_url: String,
+    pub anchor_bearer_token: String,
+    pub anchor_timeout: Duration,
+    pub admission_authority_id: String,
+    pub admission_signer_key_epoch: u64,
+    pub admission_signing_seed_path: PathBuf,
+}
+
+impl std::fmt::Debug for TrustFiscalRuntimeConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TrustFiscalRuntimeConfig")
+            .field("policy_id", &self.genesis_policy.policy_id)
+            .field("anchor_url", &self.anchor_url)
+            .field("anchor_bearer_token", &"[REDACTED]")
+            .field("anchor_timeout", &self.anchor_timeout)
+            .field("admission_authority_id", &self.admission_authority_id)
+            .field(
+                "admission_signer_key_epoch",
+                &self.admission_signer_key_epoch,
+            )
+            .field(
+                "admission_signing_seed_path",
+                &self.admission_signing_seed_path,
+            )
+            .finish()
+    }
+}
+
+impl TrustFiscalRuntimeConfig {
+    pub fn from_policy_file(
+        policy_path: &Path,
+        anchor_url: String,
+        anchor_bearer_token: String,
+        anchor_timeout: Duration,
+        admission_authority_id: String,
+        admission_signer_key_epoch: u64,
+        admission_signing_seed_path: PathBuf,
+    ) -> Result<Self, CliError> {
+        let bytes = std::fs::read(policy_path).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to read fiscal genesis policy {}: {error}",
+                policy_path.display()
+            ))
+        })?;
+        let genesis_policy = serde_json::from_slice(&bytes).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to parse fiscal genesis policy {}: {error}",
+                policy_path.display()
+            ))
+        })?;
+        Ok(Self {
+            genesis_policy,
+            anchor_url,
+            anchor_bearer_token,
+            anchor_timeout,
+            admission_authority_id,
+            admission_signer_key_epoch,
+            admission_signing_seed_path,
+        })
+    }
+}
+
 pub(crate) fn load_strict_cluster_node_keypair(path: &Path) -> Result<Keypair, CliError> {
     load_strict_cluster_node_keypair_with_hook(path, || {})
 }
@@ -331,6 +397,8 @@ pub struct TrustServiceConfig {
     pub authority_db_path: Option<PathBuf>,
     pub authority_keyring_config_path: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
+    pub joint_authority_db_path: Option<PathBuf>,
+    pub fiscal_runtime: Option<TrustFiscalRuntimeConfig>,
     pub partition_escrow_authority:
         Option<Arc<super::super::service_runtime::budget::SealedPartitionEscrowRemoteAuthority>>,
     pub enterprise_providers_file: Option<PathBuf>,
@@ -624,6 +692,64 @@ impl TrustServiceConfig {
                 "certification public metadata TTL must be non-zero".to_string(),
             ));
         }
+        if self.joint_authority_db_path.is_some()
+            && (self.budget_db_path.is_some() || self.revocation_db_path.is_some())
+        {
+            return Err(CliError::cli_other_error(
+                "a joint authority database replaces separate budget and revocation databases"
+                    .to_string(),
+            ));
+        }
+        if self.joint_authority_db_path.is_some() && !self.peer_urls.is_empty() {
+            return Err(CliError::cli_other_error(
+                "a local joint authority database cannot run with the legacy cluster coordinator"
+                    .to_string(),
+            ));
+        }
+        if let Some(fiscal) = &self.fiscal_runtime {
+            if self.joint_authority_db_path.is_none() {
+                return Err(CliError::cli_other_error(
+                    "fiscal runtime requires the joint authority database".to_string(),
+                ));
+            }
+            if fiscal.anchor_timeout.is_zero() {
+                return Err(CliError::cli_other_error(
+                    "fiscal anchor timeout must be non-zero".to_string(),
+                ));
+            }
+            validate_control_secret(&fiscal.anchor_bearer_token, "fiscal anchor bearer token")?;
+            if fiscal.admission_authority_id.trim().is_empty()
+                || fiscal.admission_authority_id.trim() != fiscal.admission_authority_id
+                || fiscal.admission_signer_key_epoch == 0
+            {
+                return Err(CliError::cli_other_error(
+                    "fiscal admission authority configuration is invalid".to_string(),
+                ));
+            }
+        }
+        let mut database_paths = Vec::new();
+        for (label, path) in [
+            (
+                "joint authority database",
+                self.joint_authority_db_path.as_deref(),
+            ),
+            ("receipt database", self.receipt_db_path.as_deref()),
+            ("revocation database", self.revocation_db_path.as_deref()),
+            (
+                "capability authority database",
+                self.authority_db_path.as_deref(),
+            ),
+            ("budget database", self.budget_db_path.as_deref()),
+            (
+                "verifier challenge database",
+                self.verifier_challenge_db_path.as_deref(),
+            ),
+        ] {
+            if let Some(path) = path {
+                database_paths.push((label, path));
+            }
+        }
+        crate::validate_distinct_database_paths(&database_paths)?;
         Ok(())
     }
 
@@ -1039,6 +1165,8 @@ mod service_config_tests {
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: None,
+            joint_authority_db_path: None,
+            fiscal_runtime: None,
             partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,

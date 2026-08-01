@@ -14,18 +14,21 @@ use chio_kernel::admission_operation::{
     AdmissionOperationState, AdmissionOperationStore, AdmissionReceiptMetadataV1,
     AdmissionRecoveryLease, StoreMutationFence, ADMISSION_RECEIPT_METADATA_KEY,
 };
+use chio_kernel::agent_economy_budget_store::BudgetStore;
+use chio_kernel::agent_economy_payment::{
+    PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
+    PaymentError, PaymentJournalState, PaymentRailMode, PaymentReleaseAuthorityKind,
+    PaymentResult, PaymentSettleAction, RailSettlementStatus,
+};
 use chio_kernel::tool_outcome::{
     CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
     QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ToolOutcomeInsertResultV1,
     ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
 };
 use chio_kernel::{
-    BudgetStore, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, PaymentAdapter,
-    PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError,
-    PaymentJournalState, PaymentRailMode, PaymentReleaseAuthorityKind, PaymentResult,
-    PaymentSettleAction, RailSettlementStatus, ReceiptStore, ToolCallRequest, ToolInvocationCost,
-    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ReceiptStore, ToolCallRequest,
+    ToolInvocationCost, ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
@@ -390,6 +393,7 @@ fn kernel_config(keypair: Keypair) -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -468,6 +472,7 @@ fn request(capability: &CapabilityToken) -> ToolCallRequest {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     }
@@ -488,6 +493,7 @@ fn zero_charge_request(capability: &CapabilityToken) -> ToolCallRequest {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     }
@@ -508,6 +514,7 @@ fn paid_request(capability: &CapabilityToken) -> ToolCallRequest {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     }
@@ -547,8 +554,8 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
             }),
             fence.clone(),
         )?;
-        kernel.set_budget_store_handle(budget.clone());
-        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+        kernel.set_agent_economy_budget_store_handle(budget.clone());
+        kernel.set_agent_economy_payment_adapter(Box::new(ReversiblePaymentAdapter {
             calls: Some(payment_calls.clone()),
         }));
         kernel.register_tool_server(Box::new(PaidMutationServer {
@@ -595,8 +602,8 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
     let budget = Arc::new(authority.budget_store());
     let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
     recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
-    recovered_kernel.set_budget_store_handle(budget.clone());
-    recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+    recovered_kernel.set_agent_economy_budget_store_handle(budget.clone());
+    recovered_kernel.set_agent_economy_payment_adapter(Box::new(ReversiblePaymentAdapter {
         calls: Some(payment_calls.clone()),
     }));
     recovered_kernel.register_tool_server(Box::new(PaidMutationServer {
@@ -661,8 +668,8 @@ fn sqlite_restart_completes_a_committed_capture_without_request_replay(
         let budget = Arc::new(authority.budget_store());
         let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
-        kernel.set_budget_store_handle(budget);
-        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+        kernel.set_agent_economy_budget_store_handle(budget);
+        kernel.set_agent_economy_payment_adapter(Box::new(ReversiblePaymentAdapter {
             calls: Some(payment_calls.clone()),
         }));
         kernel.register_tool_server(Box::new(PaidMutationServer {
@@ -698,8 +705,8 @@ fn sqlite_restart_completes_a_committed_capture_without_request_replay(
     let budget = Arc::new(authority.budget_store());
     let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
     recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
-    recovered_kernel.set_budget_store_handle(budget);
-    recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+    recovered_kernel.set_agent_economy_budget_store_handle(budget);
+    recovered_kernel.set_agent_economy_payment_adapter(Box::new(ReversiblePaymentAdapter {
         calls: Some(payment_calls.clone()),
     }));
     recovered_kernel.register_tool_server(Box::new(PaidMutationServer {
@@ -749,8 +756,8 @@ fn sqlite_restart_completes_a_committed_release_without_request_replay(
         let budget = Arc::new(authority.budget_store());
         let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
-        kernel.set_budget_store_handle(budget);
-        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+        kernel.set_agent_economy_budget_store_handle(budget);
+        kernel.set_agent_economy_payment_adapter(Box::new(ReversiblePaymentAdapter {
             calls: Some(payment_calls.clone()),
         }));
         kernel.register_tool_server(Box::new(ZeroCostMutationServer {
@@ -794,8 +801,8 @@ fn sqlite_restart_completes_a_committed_release_without_request_replay(
     let budget = Arc::new(authority.budget_store());
     let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
     recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
-    recovered_kernel.set_budget_store_handle(budget);
-    recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+    recovered_kernel.set_agent_economy_budget_store_handle(budget);
+    recovered_kernel.set_agent_economy_payment_adapter(Box::new(ReversiblePaymentAdapter {
         calls: Some(payment_calls.clone()),
     }));
     recovered_kernel.register_tool_server(Box::new(ZeroCostMutationServer {
@@ -916,8 +923,8 @@ fn sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly(
         let budget = Arc::new(authority.budget_store());
         let mut kernel = ChioKernel::new(kernel_config(kernel_keypair));
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
-        kernel.set_budget_store_handle(budget);
-        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter::default()));
+        kernel.set_agent_economy_budget_store_handle(budget);
+        kernel.set_agent_economy_payment_adapter(Box::new(ReversiblePaymentAdapter::default()));
         kernel.register_tool_server(Box::new(ZeroCostMutationServer {
             invocations: Arc::new(AtomicU64::new(0)),
         }));

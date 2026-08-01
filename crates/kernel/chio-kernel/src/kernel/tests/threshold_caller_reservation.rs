@@ -606,6 +606,7 @@ fn install_threshold_caller_reservation_authorities(
     now: u64,
 ) -> std::sync::Arc<RecordingThresholdOperationStore> {
     install_valid_threshold_artifacts(kernel, capability, intent, request, now);
+    install_durable_test_receipt_store(kernel, "threshold-caller-reservation-receipts");
     let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
     kernel
         .set_admission_operation_store_handle(operations.clone())
@@ -756,6 +757,7 @@ fn supplemental_threshold_caller_reservation_prepares_once_and_combines_capture(
         .expect("supplemental authorization"),
     );
     install_valid_threshold_artifacts(&mut kernel, &capability, &intent, &mut request, now);
+    install_durable_test_receipt_store(&mut kernel, "supplemental-threshold-reservation-receipts");
     let operations = std::sync::Arc::new(RecordingThresholdOperationStore::new());
     kernel
         .set_admission_operation_store_handle(operations.clone())
@@ -919,6 +921,7 @@ fn threshold_non_mustprepay_reservation_survives_kernel_reconstruction_without_p
         durable_test_admission_operation_store("threshold-no-payment-reconstruction-operations");
     let budget = durable_atomic_test_budget_store("threshold-no-payment-reconstruction-budget");
     let payment = SettlingThresholdPaymentAdapter::new();
+    install_durable_test_receipt_store(&mut kernel, "threshold-no-payment-reconstruction-receipts");
     kernel
         .set_admission_operation_store_handle(operations.clone())
         .expect("threshold reconstructed operation store");
@@ -1013,6 +1016,7 @@ fn ordinary_aggregate_non_mustprepay_reservation_survives_kernel_reconstruction_
         durable_test_admission_operation_store("ordinary-no-payment-reconstruction-operations");
     let budget = durable_atomic_test_budget_store("ordinary-no-payment-reconstruction-budget");
     let payment = SettlingThresholdPaymentAdapter::new();
+    install_durable_test_receipt_store(&mut kernel, "ordinary-no-payment-reconstruction-receipts");
     kernel
         .set_admission_operation_store_handle(operations.clone())
         .expect("ordinary reconstructed operation store");
@@ -1121,6 +1125,10 @@ fn ordinary_noncomposite_non_mustprepay_reservation_survives_kernel_reconstructi
     let budget =
         durable_atomic_test_budget_store("ordinary-direct-no-payment-reconstruction-budget");
     let payment = SettlingThresholdPaymentAdapter::new();
+    install_durable_test_receipt_store(
+        &mut kernel,
+        "ordinary-direct-no-payment-reconstruction-receipts",
+    );
     kernel
         .set_admission_operation_store_handle(operations.clone())
         .expect("ordinary direct reconstructed operation store");
@@ -1241,6 +1249,9 @@ fn install_frozen_retry_authorities(
         kernel
             .set_approval_store_handle(std::sync::Arc::new(DurableThresholdApprovalStore::new()))
             .expect("frozen retry approval store");
+        kernel
+            .enable_threshold_governed_approvals()
+            .expect("frozen retry threshold activation");
     }
     kernel
         .set_supplemental_quota_verifier(std::sync::Arc::new(verifier.clone()))

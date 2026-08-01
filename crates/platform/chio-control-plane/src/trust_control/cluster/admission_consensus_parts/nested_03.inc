@@ -416,6 +416,8 @@
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: Some(database_path.to_path_buf()),
+            joint_authority_db_path: None,
+            fiscal_runtime: None,
             partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,

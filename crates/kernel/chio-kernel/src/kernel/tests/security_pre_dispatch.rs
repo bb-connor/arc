@@ -1471,7 +1471,7 @@ fn assert_security_dispatch_outcome_recovery_required(error: &KernelError) {
 }
 
 #[tokio::test]
-async fn security_dispatch_outcome_persistence_failure_marks_ordinary_async_admission_unknown() {
+async fn security_dispatch_outcome_persistence_failure_keeps_ordinary_dispatch_unresolved() {
     let mut kernel = make_kernel(make_config());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(
@@ -1518,13 +1518,13 @@ async fn security_dispatch_outcome_persistence_failure_marks_ordinary_async_admi
     let states = operations.states();
     assert_eq!(
         states.last(),
-        Some(&AdmissionOperationState::OutcomeUnknownAfterDispatch)
+        Some(&AdmissionOperationState::DispatchCommitted)
     );
     assert!(!states.contains(&AdmissionOperationState::Completed));
 }
 
 #[tokio::test]
-async fn security_dispatch_outcome_persistence_failure_marks_threshold_nested_admission_unknown() {
+async fn security_dispatch_outcome_persistence_failure_keeps_nested_dispatch_unresolved() {
     let (mut kernel, capability, _grant, intent, mut request, now) = threshold_test_fixture();
     request.request_id = "security-outcome-persistence-threshold-nested".to_string();
     install_valid_threshold_artifacts(&mut kernel, &capability, &intent, &mut request, now);
@@ -1570,7 +1570,7 @@ async fn security_dispatch_outcome_persistence_failure_marks_threshold_nested_ad
     let states = operations.states();
     assert_eq!(
         states.last(),
-        Some(&AdmissionOperationState::OutcomeUnknownAfterDispatch)
+        Some(&AdmissionOperationState::DispatchCommitted)
     );
     assert!(!states.contains(&AdmissionOperationState::Completed));
     let usage = budget
@@ -1582,7 +1582,7 @@ async fn security_dispatch_outcome_persistence_failure_marks_threshold_nested_ad
 }
 
 #[tokio::test]
-async fn security_dispatch_outcome_persistence_failure_keeps_incomplete_threshold_unknown() {
+async fn security_dispatch_outcome_persistence_failure_keeps_incomplete_dispatch_unresolved() {
     let (mut kernel, capability, _grant, intent, mut request, now) = threshold_test_fixture();
     request.request_id = "security-outcome-persistence-threshold-incomplete".to_string();
     install_valid_threshold_artifacts(&mut kernel, &capability, &intent, &mut request, now);
@@ -1623,13 +1623,13 @@ async fn security_dispatch_outcome_persistence_failure_keeps_incomplete_threshol
     let states = operations.states();
     assert_eq!(
         states.last(),
-        Some(&AdmissionOperationState::OutcomeUnknownAfterDispatch)
+        Some(&AdmissionOperationState::DispatchCommitted)
     );
     assert!(!states.contains(&AdmissionOperationState::Completed));
 }
 
 #[tokio::test]
-async fn security_dispatch_outcome_persistence_failure_preserves_primary_when_terminalization_fails(
+async fn security_dispatch_outcome_persistence_failure_does_not_attempt_unsigned_terminalization(
 ) {
     let (mut kernel, capability, _grant, intent, mut request, now) = threshold_test_fixture();
     request.request_id = "security-outcome-persistence-terminalization-failure".to_string();
@@ -1668,9 +1668,7 @@ async fn security_dispatch_outcome_persistence_failure_preserves_primary_when_te
     assert_security_dispatch_outcome_recovery_required(&error);
     let message = error.to_string();
     assert!(message.contains("injected authoritative security outcome persistence failure"));
-    assert!(message.contains("secondary recovery faults"));
-    assert!(message.contains("threshold admission outcome-unknown transition failed"));
-    assert!(message.contains("injected outcome-unknown persistence failure"));
+    assert!(!message.contains("secondary recovery faults"));
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
     let states = operations.states();

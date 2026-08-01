@@ -14,7 +14,7 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
         let mut state = self.lock()?;
         if let Some(existing) = state.operations.get(operation.operation_id()) {
             if !existing.has_same_prepared_binding(&operation) {
-                return Err(AdmissionOperationError::Invalid(
+                return Err(AdmissionOperationError::Conflict(
                     "operation_id is already bound to different input".to_string(),
                 ));
             }

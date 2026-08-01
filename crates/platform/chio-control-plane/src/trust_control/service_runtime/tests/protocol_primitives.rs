@@ -9,7 +9,7 @@ use chio_core::capability::governance::GovernedApprovalToken;
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
 };
-use chio_kernel::admission_operation::{
+use chio_kernel::security_admission_operation::{
     AdmissionOperationError, AdmissionRequestBindingInput, AdmissionRequestBindingParts,
 };
 use chio_kernel::budget_store::{BudgetCaptureInvocationRequest, BudgetEventAuthority};

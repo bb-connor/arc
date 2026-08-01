@@ -19,14 +19,15 @@ use chio_kernel::agent_economy_budget_store::{
     BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind, BudgetMutationRecord,
     BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
     BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
-    BudgetReverseHoldRequest, DeniedBudgetHold, ReservedHoldEnvelope, RevocationCommitMetadata,
+    BudgetReverseHoldRequest, BudgetStore, BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
+    ReservedHoldEnvelope, RevocationCommitMetadata,
 };
 use chio_kernel::agent_economy_payment::{
     PaymentJournalRecord, PaymentJournalState, PaymentJournalTransition, PaymentRailMode,
     PaymentReleaseAuthorityBinding, PaymentReleaseAuthorityKind, PaymentSettleAction,
 };
 use chio_kernel::tool_outcome::{MonetaryReleaseEvidenceKindV1, MonetaryReleaseEvidenceV1};
-use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord, CanonicalRevocationSet};
+use chio_kernel::AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 mod authorization;

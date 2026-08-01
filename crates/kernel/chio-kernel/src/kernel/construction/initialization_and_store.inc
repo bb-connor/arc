@@ -331,9 +331,15 @@ impl ChioKernel {
         let federation_dsse_envelopes_gauge;
         let mut kernel = Self {
             config,
+            durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
+            agent_economy_durable_admission_runtime: None,
+            unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
+            agent_economy_budget_store: Arc::new(
+                crate::agent_economy_budget_store::InMemoryBudgetStore::new(),
+            ),
             partition_escrow_registry: None,
             budget_store_lock: Mutex::new(()),
             admission_operation_store: None,
@@ -342,6 +348,7 @@ impl ChioKernel {
             aggregate_invocation_admission_enabled: false,
             supplemental_broker_admission_enabled: false,
             supplemental_quota_verifier: None,
+            agent_economy_supplemental_quota_verifier: None,
             supplemental_admission_registrar: None,
             admission_capture_authority: None,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
@@ -392,6 +399,7 @@ impl ChioKernel {
             retention_maintenance: None,
             dispatch_intent_recovery: None,
             payment_adapter: None,
+            agent_economy_payment_adapter: None,
             price_oracle: None,
             runtime_admission_hook: None,
             security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,

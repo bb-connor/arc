@@ -640,14 +640,14 @@ impl AdmissionPaymentCleanupFixture {
         kernel
             .set_admission_operation_store_handle(operation_store.clone())
             .expect("operation store");
-        let operation = prepared_admission_operation(&kernel);
-        operation_store
-            .create_prepared(operation.clone())
-            .expect("prepared operation");
         let store = std::sync::Arc::new(InCratePaymentJournalStore::new());
         kernel
             .set_budget_store_handle(store.clone())
             .expect("budget store");
+        let operation = prepared_admission_operation(&kernel);
+        operation_store
+            .create_prepared(operation.clone())
+            .expect("prepared operation");
         let authorization = PaymentAuthorization {
             authorization_id: "payment-cleanup-authorization".to_string(),
             settled,
@@ -1234,7 +1234,7 @@ fn single_node_cleanup_denial_requires_the_durable_decision_index() {
             },
         ),
         Err(KernelError::GuardDenied(message))
-            if message.contains("exact hard-budget authority evidence")
+            if message.contains("omitted fenced authority evidence")
     ));
 
     let mut zero_commit_index = denied;
@@ -1252,7 +1252,7 @@ fn single_node_cleanup_denial_requires_the_durable_decision_index() {
             },
         ),
         Err(KernelError::GuardDenied(message))
-            if message.contains("exact hard-budget authority evidence")
+            if message.contains("omitted fenced authority evidence")
     ));
 }
 

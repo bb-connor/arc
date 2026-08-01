@@ -9,6 +9,7 @@ use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 
 mod async_evaluation_core;
+mod agent_economy_evaluation;
 mod evaluation_entry;
 mod evaluation_helpers;
 mod nested_flow_evaluation;

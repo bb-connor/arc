@@ -1343,6 +1343,13 @@ impl BudgetStore for DurableThresholdBudgetStore {
         self.inner.capture_budget_hold(request)
     }
 
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
+        self.inner.get_budget_hold(hold_id)
+    }
+
     fn mark_admission_operation_hold_reserved(
         &self,
         hold_id: &str,

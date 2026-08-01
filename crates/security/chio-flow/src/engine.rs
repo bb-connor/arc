@@ -298,13 +298,10 @@ pub fn prepare_pre_invocation(
     for clearance in request.policy_clearances.as_slice() {
         authorize_egress(&egress_source_label, Some(clearance)).map_err(map_policy_denial)?;
     }
-    let manifest_clearance = request
-        .manifest
-        .input_clearance
-        .as_ref()
-        .ok_or(FlowDenial::MissingManifestClearance)?;
-    authorize_egress(&egress_source_label, Some(manifest_clearance))
-        .map_err(map_manifest_denial)?;
+    if let Some(manifest_clearance) = request.manifest.input_clearance.as_ref() {
+        authorize_egress(&egress_source_label, Some(manifest_clearance))
+            .map_err(map_manifest_denial)?;
+    }
     let egress_fence_plan = EgressFencePlan {
         request_id: request.request_id,
         request_hash: request.request_hash,
@@ -1017,16 +1014,16 @@ mod tests {
     }
 
     #[test]
-    fn remote_topology_overrides_publisher_non_egress_declaration() {
+    fn remote_topology_uses_policy_when_manifest_adds_no_egress_clearance() {
         let mut request = request();
         request.policy_clearances = BoundedVec::new(vec![unrestricted_clearance()])
             .unwrap_or_else(|error| panic!("clearances: {error}"));
         request.manifest = ToolFlowDeclaration::new(None, None, false, BTreeSet::new())
             .unwrap_or_else(|error| panic!("manifest: {error}"));
-        assert_eq!(
-            evaluate_pre_invocation(request),
-            Err(FlowDenial::MissingManifestClearance)
-        );
+        let admission =
+            evaluate_pre_invocation(request).unwrap_or_else(|error| panic!("admission: {error}"));
+        assert!(admission.effective_egress);
+        assert!(admission.egress_fence_plan.is_some());
     }
 
     #[test]

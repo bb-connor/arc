@@ -1,6 +1,6 @@
 use super::*;
 
-impl RemoteBudgetStore {
+impl RemoteAgentEconomyBudgetStore {
     pub(super) fn capture_invocation_reservations_remote(
         &self,
         request: BudgetCaptureInvocationRequest,

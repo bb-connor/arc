@@ -60,6 +60,8 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         security_context: &SecurityInvocationContext,
     ) -> Result<ToolCallResponse, KernelError> {
+        request.validate()?;
+        self.validate_security_invocation_context_binding(request, Some(security_context), None)?;
         self.require_manifest_flow_runtime(registry)?;
         let metadata = registry_validated_manifest_security_metadata(
             request,
@@ -88,6 +90,12 @@ impl ChioKernel {
         authenticated_session_id: &SessionId,
         security_context: &SecurityInvocationContext,
     ) -> Result<ToolCallResponse, KernelError> {
+        request.validate()?;
+        self.validate_security_invocation_context_binding(
+            request,
+            Some(security_context),
+            Some(authenticated_session_id),
+        )?;
         self.require_manifest_flow_runtime(registry)?;
         let metadata = registry_validated_manifest_security_metadata(
             request,

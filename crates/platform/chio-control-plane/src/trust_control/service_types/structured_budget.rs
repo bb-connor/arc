@@ -1,4 +1,15 @@
 use super::*;
+use chio_kernel::agent_economy_budget_store::{
+    ApprovalRequiredBudgetHold, AuthorizedBudgetHold, BudgetAdmissionBinding,
+    BudgetAuthorityProfile, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCommitMetadata, BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalRequest,
+    BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationQuota,
+    BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMeteringProfile, BudgetMonetaryState,
+    BudgetQuotaKey, BudgetQuotaProfile, BudgetUsageRecord, DeniedBudgetHold,
+    RevocationCommitMetadata,
+};
+use chio_kernel::agent_economy_revocation_set::AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet;
 
 pub(crate) const STRUCTURED_BUDGET_REQUEST_SCHEMA: &str = "chio.structured-budget-request.v1";
 pub(crate) const STRUCTURED_BUDGET_RESPONSE_SCHEMA: &str = "chio.structured-budget-response.v1";
@@ -494,9 +505,9 @@ impl TryFrom<StructuredBudgetCommitMetadataView> for BudgetCommitMetadata {
         Ok(Self {
             authority: value.authority.map(Into::into),
             guarantee_level,
-            budget_profile: chio_kernel::budget_store::BudgetAuthorityProfile::AuthoritativeHoldEvent,
+            budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
             metering_profile:
-                chio_kernel::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+                BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: value.budget_commit_index,
             event_id: value.event_id,
             recorded_at_unix_seconds: value.recorded_at_unix_seconds,

@@ -534,7 +534,7 @@
             .list_mutation_events(10, Some("cap-budget-1"), Some(0))
             .unwrap();
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].kind, BudgetMutationKind::ReserveInvocations);
+        assert_eq!(events[0].kind, BudgetMutationKind::AuthorizeExposure);
         assert_eq!(events[0].authority.as_ref(), Some(&authority));
         assert_eq!(events[1].kind, BudgetMutationKind::ReconcileSpend);
         assert_eq!(events[1].authority.as_ref(), Some(&authority));

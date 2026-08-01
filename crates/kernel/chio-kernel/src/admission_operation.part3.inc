@@ -72,7 +72,7 @@ mod tests {
         let operation = prepared(AdmissionOperationKind::ToolDispatch);
         assert_eq!(
             operation.operation_id(),
-            "abb08f11721ae2dc1e0c5956c319971108ee2a6d0918f6dcacd162857fd2baf4"
+            "c9cd50e1d749c5d8c7dd1616c4f5ef3269ca4be0dd8587339751c88f94aadbee"
         );
         assert_eq!(operation, prepared(AdmissionOperationKind::ToolDispatch));
 

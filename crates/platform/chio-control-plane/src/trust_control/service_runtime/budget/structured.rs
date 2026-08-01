@@ -1,6 +1,6 @@
 use super::*;
 
-impl RemoteBudgetStore {
+impl RemoteAgentEconomyBudgetStore {
     pub(super) fn get_cumulative_approval_operation_usage_remote(
         &self,
         operation_id: &str,

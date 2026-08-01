@@ -29,6 +29,7 @@ use std::path::{Path, PathBuf};
 pub mod admission_capture_authority;
 pub mod admission_operation_store;
 pub mod agent_economy_budget_store;
+mod agent_economy_revocation_store;
 pub mod aggregate_family_root;
 pub mod approval_store;
 pub mod authority;
@@ -131,7 +132,11 @@ pub use admission_capture_authority::{
 pub use admission_operation_store::{
     CreditExposureAccountSnapshot, DurableObligationV1, SqliteAdmissionOperationStore,
 };
-pub use agent_economy_budget_store::SqliteBudgetStore as SqliteAgentEconomyBudgetStore;
+pub use agent_economy_budget_store::{
+    BudgetStoreSnapshot as AgentEconomyBudgetStoreSnapshot,
+    SqliteBudgetStore as SqliteAgentEconomyBudgetStore,
+};
+pub use agent_economy_revocation_store::SqliteRevocationStore as SqliteAgentEconomyRevocationStore;
 pub use aggregate_family_root::{
     aggregate_family_root_token_digest, AggregateFamilyRootLookupSnapshot,
     AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError, StoredAggregateFamilyRoot,
@@ -141,7 +146,7 @@ pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{
-    BudgetInvocationQuotaUsageRecord, BudgetStoreSnapshot, SqliteBudgetAuthorizationAuthority,
+    BudgetInvocationQuotaUsageRecord, SqliteBudgetAuthorizationAuthority,
     SqliteBudgetAuthorizationOutcome, SqliteBudgetCurrentAuthority, SqliteBudgetStore,
 };
 pub use capability_lineage::{
@@ -164,6 +169,233 @@ pub use economic_state_cache::{
     EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
 };
 pub use security_admission_operation_store::SqliteAdmissionOperationStore as SqliteSecurityAdmissionOperationStore;
+
+impl chio_kernel::QualifiedAdmissionProjectionStore
+    for admission_operation_store::SqliteAdmissionOperationStore
+{
+    fn load_payment_journal(
+        &self,
+        operation_id: &str,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+    ) -> Result<
+        Option<chio_kernel::agent_economy_payment::PaymentJournalRecord>,
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::load_payment_journal(
+            self,
+            operation_id,
+            active_fence,
+        )
+    }
+
+    fn advance_payment_journal(
+        &self,
+        advance: chio_kernel::AdmissionPaymentJournalAdvance<'_>,
+    ) -> Result<
+        chio_kernel::agent_economy_payment::PaymentJournalRecord,
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::advance_payment_journal(
+            self, advance,
+        )
+    }
+
+    fn begin_payment_settlement(
+        &self,
+        begin: chio_kernel::AdmissionPaymentSettlementBegin<'_>,
+    ) -> Result<chio_kernel::AdmissionPaymentSettlement, chio_kernel::AdmissionPaymentJournalError>
+    {
+        admission_operation_store::SqliteAdmissionOperationStore::begin_payment_settlement(
+            self, begin,
+        )
+    }
+
+    fn authorize_budget_and_commit_admission(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        request: chio_kernel::agent_economy_budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<chio_kernel::agent_economy_payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetAuthorization,
+        chio_kernel::AdmissionBudgetAuthorizationError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::authorize_budget_and_commit_admission(
+            self,
+            operation,
+            recovery_lease,
+            request,
+            payment_journal,
+            credit_exposure,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetAuthorization {
+            decision,
+            operation,
+        })
+        .map_err(|error| match error {
+            chio_kernel::admission_operation::AdmissionCaptureError::Unavailable(detail) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Unavailable(detail)
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::Fenced => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Fenced
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::OutcomeUnknown(detail) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::OutcomeUnknown(detail)
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::Invariant(detail) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Invariant(detail)
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::Operation(error) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Operation(error)
+            }
+        })
+    }
+
+    fn capture_invocation_and_commit_dispatch(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        request: chio_kernel::agent_economy_budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_invocation_and_commit_dispatch(
+            self,
+            operation,
+            recovery_lease,
+            request,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetCapture {
+            decision,
+            operation,
+        })
+    }
+
+    fn reserve_threshold_approval_and_commit_admission(
+        &self,
+        command: &chio_kernel::admission_operation::AdmissionOperationCommand,
+        reservation: &chio_kernel::ThresholdApprovalReplayReservationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionCommandResult,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::reserve_threshold_approval_and_commit_admission(
+            self,
+            command,
+            reservation,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn list_admission_receipts_after(
+        &self,
+        after_receipt_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
+        self.list_terminal_receipts_after(after_receipt_id, limit)
+    }
+}
+
+impl chio_credit::obligation::CreditAdmissionStore
+    for admission_operation_store::SqliteAdmissionOperationStore
+{
+    fn lookup_record_by_operation(
+        &self,
+        operation_id: &str,
+    ) -> Result<
+        Option<chio_credit::obligation::CreditExposureReservationRecordV1>,
+        chio_credit::obligation::CreditAdmissionError,
+    > {
+        self.load_credit_exposure_reservation(operation_id)
+            .map_err(|error| {
+                chio_credit::obligation::CreditAdmissionError::Store(error.to_string())
+            })
+    }
+}
+
+impl chio_kernel::AnchoredAdmissionProjectionStore
+    for admission_operation_store::SqliteAdmissionOperationStore
+{
+    fn stage_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        envelope: &chio_kernel::admission_operation::SignedAdmissionTerminalProjectionV1,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), chio_kernel::ReceiptStoreError> {
+        admission_operation_store::SqliteAdmissionOperationStore::stage_anchored_terminal_projection(
+            self,
+            advance,
+            recovery_lease,
+            envelope,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+
+    fn qualify_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), chio_kernel::ReceiptStoreError> {
+        admission_operation_store::SqliteAdmissionOperationStore::qualify_anchored_terminal_projection(
+            self,
+            batch_id,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+
+    fn record_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        committed: &chio_core::economic_continuity::VerifiedEconomicStateView,
+        pins: &chio_core::economic_continuity::EconomicStateAnchorPins,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), chio_kernel::ReceiptStoreError> {
+        admission_operation_store::SqliteAdmissionOperationStore::record_anchored_terminal_projection(
+            self,
+            advance,
+            committed,
+            pins,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+
+    fn commit_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<chio_kernel::admission_operation::AdmissionTerminal, chio_kernel::ReceiptStoreError>
+    {
+        admission_operation_store::SqliteAdmissionOperationStore::commit_anchored_terminal_projection(
+            self,
+            batch_id,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+}
 
 /// Whether a SQLite path opens a database that lives only in memory for the life
 /// of the process. rusqlite enables URI filenames, so the bare `:memory:`
@@ -353,9 +585,7 @@ pub use serving_owner::{
     scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, SqliteAuthorityStore,
     SqliteServingOwnerError,
 };
-pub use settle_attempts::{
-    SqliteSettlementOutcomeStore, SqliteSettlementRetryStore, SETTLE_ATTEMPTS_MIGRATION,
-};
+pub use settle_attempts::SqliteSettlementRetryStore;
 pub use tool_outcome_store::SqliteToolOutcomeStore;
 
 #[cfg(test)]

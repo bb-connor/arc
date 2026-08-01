@@ -20,6 +20,10 @@ use crate::{BrokerError, Result};
 const MAX_RESOLVED_ADDRESSES: usize = 16;
 pub(super) const MAX_RESPONSE_HEAD_BYTES: usize = 16_384;
 
+const fn is_redirect_status(status: u16) -> bool {
+    matches!(status, 300 | 301 | 302 | 303 | 305 | 307 | 308)
+}
+
 mod rustls_transport;
 
 pub(crate) use rustls_transport::RustlsPinnedHttpsTransport;
@@ -305,7 +309,7 @@ impl GenericHttpsExecutor {
                     "transport did not preserve DNS pinning and original-host TLS".to_string(),
                 ));
             }
-            if response.redirected || (300..400).contains(&response.status) {
+            if response.redirected || is_redirect_status(response.status) {
                 return Err(BrokerError::ResponseRejected(
                     "redirect responses are forbidden".to_string(),
                 ));
@@ -692,7 +696,8 @@ fn validate_response_framing(
         ));
     }
     let body_forbidden = status == 204 || status == 205;
-    if request_method == "HEAD" || body_forbidden {
+    let body_absent = status == 304;
+    if request_method == "HEAD" || body_forbidden || body_absent {
         if transfer_chunked || (body_forbidden && content_length.is_some_and(|length| length != 0))
         {
             return Err(BrokerError::ResponseRejected(
@@ -759,6 +764,7 @@ mod tests {
     enum ResponseMode {
         Valid,
         Redirect,
+        NotModified,
         WrongAddress,
         WrongTlsName,
         Oversized,
@@ -785,20 +791,24 @@ mod tests {
             } else {
                 request.original_hostname().to_string()
             };
-            let decoded_body_chunks = if matches!(self.0, ResponseMode::Oversized) {
+            let decoded_body_chunks = if matches!(self.0, ResponseMode::NotModified) {
+                Vec::new()
+            } else if matches!(self.0, ResponseMode::Oversized) {
                 vec![vec![b'x'; 129]]
             } else if matches!(self.0, ResponseMode::Canary) {
                 vec![b"unique-network-canary".to_vec()]
             } else {
                 vec![b"response".to_vec()]
             };
-            let status = if matches!(self.0, ResponseMode::Redirect) {
-                302
-            } else {
-                200
+            let status = match self.0 {
+                ResponseMode::Redirect => 302,
+                ResponseMode::NotModified => 304,
+                _ => 200,
             };
             let (headers, mut response_head_bytes) = if status == 302 {
                 (Vec::new(), b"HTTP/1.1 302 Found\r\n\r\n".len())
+            } else if status == 304 {
+                (Vec::new(), b"HTTP/1.1 304 Not Modified\r\n\r\n".len())
             } else {
                 let body_length = decoded_body_chunks.iter().map(Vec::len).sum::<usize>();
                 let value = body_length.to_string();
@@ -968,6 +978,27 @@ mod tests {
         assert!(restricted
             .prepare(&provider(), &request, &constraints, &credential)
             .is_err());
+    }
+
+    #[test]
+    fn not_modified_is_body_free_without_being_a_redirect() {
+        let (mut request, constraints) = request_and_constraints();
+        request.destination =
+            BrokerDestination::parse("https://example.com/v1", "HEAD", false)
+                .test_expect("destination");
+        let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
+        let executor = executor(
+            ResponseMode::NotModified,
+            vec!["93.184.216.34".parse().test_expect("address")],
+        );
+        let prepared = executor
+            .prepare(&provider(), &request, &constraints, &credential)
+            .test_expect("prepare");
+        let (status, _headers, body) = executor
+            .dispatch(prepared, &constraints, &credential)
+            .test_expect("304 cache validation response");
+        assert_eq!(status, 304);
+        assert!(body.is_empty());
     }
 
     #[test]

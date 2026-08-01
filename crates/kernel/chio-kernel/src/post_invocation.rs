@@ -192,6 +192,29 @@ pub trait PostInvocationHook: Send + Sync {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "verdict", rename_all = "snake_case")]
+enum DurablePostInvocationVerdict {
+    Allow,
+    Redact,
+    Escalate { message: String },
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DurablePipelineStepResult {
+    schema: &'static str,
+    identity: PostInvocationHookIdentity,
+    verdict: DurablePostInvocationVerdict,
+    response: Value,
+    evidence: Vec<GuardEvidence>,
+}
+
+pub(crate) struct DurablePipelineOutcome {
+    pub(crate) outcome: PipelineOutcome,
+    pub(crate) step_results: Vec<DurablePipelineStepResult>,
+}
+
 /// Outcome of running the pipeline.
 #[derive(Debug, Clone)]
 pub struct PipelineOutcome {
@@ -227,6 +250,94 @@ impl PostInvocationPipeline {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.hooks.is_empty()
+    }
+
+    pub(crate) fn durable_identities(&self) -> Result<Vec<PostInvocationHookIdentity>, String> {
+        self.hooks
+            .iter()
+            .map(|hook| {
+                hook.durable_identity()?.ok_or_else(|| {
+                    format!(
+                        "post-invocation hook {:?} has no durable implementation identity",
+                        hook.name()
+                    )
+                })
+            })
+            .collect()
+    }
+
+    pub(crate) fn evaluate_durable_with_context_and_evidence(
+        &self,
+        context: &PostInvocationContext<'_>,
+        response: &Value,
+        expected_identities: &[PostInvocationHookIdentity],
+    ) -> Result<DurablePipelineOutcome, String> {
+        if self.hooks.len() != expected_identities.len() {
+            return Err("post-invocation pipeline changed after durable admission".to_owned());
+        }
+
+        let mut current_response = response.clone();
+        let mut escalations = Vec::new();
+        let mut evidence = Vec::new();
+        let mut step_results = Vec::with_capacity(self.hooks.len());
+
+        for (hook, expected_identity) in self.hooks.iter().zip(expected_identities) {
+            let identity = hook.durable_identity()?.ok_or_else(|| {
+                format!(
+                    "post-invocation hook {:?} lost its durable implementation identity",
+                    hook.name()
+                )
+            })?;
+            if &identity != expected_identity {
+                return Err(format!(
+                    "post-invocation hook {:?} changed after durable admission",
+                    hook.name()
+                ));
+            }
+            let inspection = hook.inspect_with_evidence(context, &current_response);
+            let hook_evidence = inspection.evidence;
+            evidence.extend(hook_evidence.iter().cloned());
+            let durable_verdict = match inspection.verdict {
+                PostInvocationVerdict::Allow => DurablePostInvocationVerdict::Allow,
+                PostInvocationVerdict::Redact(redacted) => {
+                    current_response = redacted;
+                    DurablePostInvocationVerdict::Redact
+                }
+                PostInvocationVerdict::Escalate(message) => {
+                    escalations.push(message.clone());
+                    DurablePostInvocationVerdict::Escalate { message }
+                }
+                PostInvocationVerdict::Block(_) => {
+                    return Err(format!(
+                        "durable post-invocation hook {:?} violated its non-blocking contract",
+                        hook.name()
+                    ));
+                }
+            };
+            step_results.push(DurablePipelineStepResult {
+                schema: "chio.durable-post-invocation-step-result.v1",
+                identity,
+                verdict: durable_verdict,
+                response: current_response.clone(),
+                evidence: hook_evidence,
+            });
+        }
+
+        let verdict = if current_response != *response {
+            PostInvocationVerdict::Redact(current_response)
+        } else if !escalations.is_empty() {
+            PostInvocationVerdict::Escalate(escalations.join("; "))
+        } else {
+            PostInvocationVerdict::Allow
+        };
+        Ok(DurablePipelineOutcome {
+            outcome: PipelineOutcome {
+                verdict,
+                escalations,
+                evidence,
+            },
+            step_results,
+        })
     }
 
     #[must_use]

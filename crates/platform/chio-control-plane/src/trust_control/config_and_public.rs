@@ -1328,6 +1328,8 @@ mod config_and_public_tests {
             authority_db_path: None,
             authority_keyring_config_path: None,
             budget_db_path: None,
+            joint_authority_db_path: None,
+            fiscal_runtime: None,
             partition_escrow_authority: None,
             enterprise_providers_file: None,
             federation_policies_file: None,

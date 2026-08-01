@@ -8,21 +8,37 @@
 /// A receipt store whose `append` fails on demand, so a reservation stamp lands
 /// but the durable receipt persist that follows it fails.
 struct TogglingAppendReceiptStore {
+    inner: SqliteReceiptStore,
     fail: std::sync::Arc<AtomicBool>,
 }
 
 impl ReceiptStore for TogglingAppendReceiptStore {
-    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         if self.fail.load(Ordering::SeqCst) {
             return Err(ReceiptStoreError::Conflict(
                 "receipt append failed (test double)".to_string(),
             ));
         }
-        Ok(())
+        self.inner.append_chio_receipt(receipt)
     }
 
-    fn append_child_receipt(&self, _receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
-        Ok(())
+    fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
+        self.inner.append_child_receipt(receipt)
+    }
+
+    fn durable_storage_identity(&self) -> Result<Option<chio_core::Hash>, ReceiptStoreError> {
+        self.inner.durable_storage_identity()
+    }
+
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
+    }
+
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        self.inner.load_chio_receipt(receipt_id)
     }
 }
 
@@ -48,6 +64,21 @@ impl ReceiptStore for TogglingSnapshotReceiptStore {
         self.inner.append_child_receipt(receipt)
     }
 
+    fn durable_storage_identity(&self) -> Result<Option<chio_core::Hash>, ReceiptStoreError> {
+        self.inner.durable_storage_identity()
+    }
+
+    fn supports_authoritative_chio_receipt_lookup(&self) -> bool {
+        true
+    }
+
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        self.inner.load_chio_receipt(receipt_id)
+    }
+
     fn record_capability_snapshot(
         &self,
         token: &CapabilityToken,
@@ -66,7 +97,7 @@ impl ReceiptStore for TogglingSnapshotReceiptStore {
 }
 
 #[test]
-fn reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable() {
+fn reserving_receipt_persist_failure_is_recovered_by_exact_retry() {
     let mut kernel = make_kernel(make_monetary_config());
     install_fixture_budget_admission_authorities(&mut kernel, "reserve-receipt-persist-failure");
     let agent_kp = Keypair::generate();
@@ -74,6 +105,10 @@ fn reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable() 
     let fail = std::sync::Arc::new(AtomicBool::new(true));
     kernel
         .set_receipt_store(Box::new(TogglingAppendReceiptStore {
+            inner: SqliteReceiptStore::open(unique_receipt_db_path(
+                "reserve-receipt-persist-failure",
+            ))
+            .unwrap(),
             fail: std::sync::Arc::clone(&fail),
         }))
         .unwrap();
@@ -93,14 +128,19 @@ fn reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable() 
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    // The reserve preflight's durable receipt persist fails. The reservation is
-    // already durable in the budget store and the caller receives the minted nonce
-    // to reconcile downstream, so a persistence-log failure must NOT void the
-    // reservation: the response is a normal Allow carrying the nonce.
+    // The reserve preflight's durable receipt persist fails after the reservation
+    // and signed handoff are durable. The caller must not receive an uncommitted
+    // receipt. Once the store recovers, an exact retry publishes and returns that
+    // same operation-owned handoff without repeating budget admission.
     let request = reserve_request("req-persist-fail", &cap, &agent_kp);
+    let error = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .expect_err("an unpublished receipt must fail closed");
+    assert!(matches!(error, KernelError::ReceiptPersistence(_)));
+    fail.store(false, Ordering::SeqCst);
     let reserved = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
-        .expect("a reserve receipt persist failure must not void the durable reservation");
+        .expect("exact retry must publish the durable signed handoff");
     assert_eq!(reserved.verdict, Verdict::Allow);
     let nonce = *reserved
         .execution_nonce
@@ -131,9 +171,8 @@ fn reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable() 
         "the reserved worst-case exposure stays committed"
     );
 
-    // The caller reconciles the durable reservation with the returned nonce once
-    // the receipt store recovers, proving the reservation was never lost.
-    fail.store(false, Ordering::SeqCst);
+    // The caller reconciles the durable reservation with the returned nonce,
+    // proving the publication failure neither lost nor duplicated admission.
     let realized = ToolInvocationCost {
         units: 30,
         currency: "USD".to_string(),
@@ -146,7 +185,7 @@ fn reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable() 
 }
 
 #[test]
-fn reserving_receipt_persist_failure_keeps_delegated_reservation_and_share() {
+fn delegated_reserving_receipt_failure_recovers_by_exact_retry_and_keeps_share() {
     let fixture = make_sibling_sum_monetary_fixture("reserve-persist-sibling");
     let path = fixture.path.clone();
     let mut kernel = fixture.kernel;
@@ -160,23 +199,25 @@ fn reserving_receipt_persist_failure_keeps_delegated_reservation_and_share() {
     install_strict_nonce_store(&mut kernel);
 
     // Child A's reserve stamps a monetary hold and records its sibling-sum share,
-    // then the durable receipt persist fails. That persistence-log failure is
-    // NON-FATAL: child A's reservation is durable in the budget store and child A
-    // receives the nonce to reconcile, so the hold is NOT reversed and its share
-    // stays held.
+    // then durable receipt publication fails. The call fails closed, but the
+    // operation-owned handoff and share remain durable for exact retry.
     let first = delegated_reserve_request("req-a-reserve", &fixture.child_a, &fixture.child_a_kp);
+    let error = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .expect_err("an unpublished delegated receipt must fail closed");
+    assert!(matches!(error, KernelError::ReceiptPersistence(_)));
+    fail.store(false, Ordering::SeqCst);
     let reserved_a = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
-        .expect("a reserve receipt persist failure must not void child A's reservation");
+        .expect("exact retry must publish child A's durable signed handoff");
     assert_eq!(reserved_a.verdict, Verdict::Allow);
     let nonce_a = *reserved_a
         .execution_nonce
         .clone()
         .expect("child A receives its reconcile nonce");
 
-    // The receipt store recovers, but child B stays denied: child A's share is
+    // Child B stays denied: child A's share is
     // still held by its durable reservation, not released by the failed persist.
-    fail.store(false, Ordering::SeqCst);
     let second = delegated_reserve_request("req-b-reserve", &fixture.child_b, &fixture.child_b_kp);
     let denied_b = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
@@ -496,6 +537,10 @@ fn reconcile_by_nonce_receipt_persist_failure_still_returns_authoritative_receip
     let fail = std::sync::Arc::new(AtomicBool::new(false));
     kernel
         .set_receipt_store(Box::new(TogglingAppendReceiptStore {
+            inner: SqliteReceiptStore::open(unique_receipt_db_path(
+                "reconcile-receipt-persist-failure",
+            ))
+            .unwrap(),
             fail: std::sync::Arc::clone(&fail),
         }))
         .unwrap();
@@ -969,6 +1014,20 @@ impl BudgetStore for TransientReconcileFailBudgetStore {
         self.inner.release_budget_hold(request)
     }
 
+    fn capture_invocation_reservations(
+        &self,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<crate::budget_store::BudgetHoldMutationDecision, BudgetStoreError> {
+        self.inner.capture_invocation_reservations(request)
+    }
+
+    fn query_invocation_capture(
+        &self,
+        request: &crate::budget_store::BudgetCaptureInvocationRequest,
+    ) -> Result<Option<crate::budget_store::BudgetHoldMutationDecision>, BudgetStoreError> {
+        self.inner.query_invocation_capture(request)
+    }
+
     fn get_budget_hold(
         &self,
         hold_id: &str,
@@ -1020,6 +1079,7 @@ impl BudgetStore for TransientReconcileFailBudgetStore {
 #[test]
 fn reconcile_by_nonce_transient_settle_error_preserves_nonce_for_retry() {
     let mut kernel = make_kernel(make_monetary_config());
+    install_durable_test_receipt_store(&mut kernel, "transient-reconcile-failure-receipts");
     kernel
         .set_admission_operation_store_handle(durable_test_admission_operation_store(
             "transient-reconcile-failure-operations",

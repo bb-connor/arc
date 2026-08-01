@@ -194,6 +194,8 @@ impl ChioKernel {
                 now,
             },
         )?;
+        self.authority_signing_used
+            .store(true, std::sync::atomic::Ordering::Release);
 
         info!(
             capability_id = %capability.id,

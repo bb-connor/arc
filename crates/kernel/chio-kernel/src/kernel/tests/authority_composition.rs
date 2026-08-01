@@ -370,7 +370,9 @@ fn authority_composition_economic_receipt(kernel: &ChioKernel, label: &str) -> C
             metadata: Some(serde_json::json!({
                 "financial": {
                     "cost_charged": 100,
-                    "currency": "USD"
+                    "currency": "USD",
+                    "payment_reference": "authority-composition-settled-payment",
+                    "settlement_status": "settled"
                 }
             })),
             timestamp: current_unix_timestamp(),

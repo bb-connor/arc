@@ -39,6 +39,10 @@ pub mod agent_economy_payment;
 #[cfg(not(loom))]
 pub mod agent_economy_projection_store;
 #[cfg(not(loom))]
+pub mod agent_economy_revocation_set;
+#[cfg(not(loom))]
+pub mod agent_economy_supplemental_quota;
+#[cfg(not(loom))]
 pub mod approval;
 #[cfg(not(loom))]
 pub mod approval_channels;
@@ -185,8 +189,14 @@ pub use admission_capture_authority::{
 pub use agent_economy_projection_store::{
     AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
     AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
-    AdmissionPaymentSettlementBegin, QualifiedAdmissionProjectionStore,
+    AdmissionPaymentSettlementBegin, AnchoredAdmissionProjectionStore,
+    QualifiedAdmissionProjectionStore,
     ThresholdApprovalReplayReservationV1, ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
+};
+#[cfg(not(loom))]
+pub use agent_economy_revocation_set::{
+    AgentEconomyCanonicalRevocationSet, AgentEconomyRevocationSetError,
+    MAX_AGENT_ECONOMY_ADMISSION_REVOCATION_IDS,
 };
 #[cfg(not(loom))]
 pub use approval::{
@@ -593,8 +603,8 @@ pub use session::{
 };
 #[cfg(not(loom))]
 pub use supplemental_quota::{
-    OpaqueSignedSupplementalQuota, SupplementalAdmissionAuthorization, SupplementalAdmissionPlan,
-    SupplementalAdmissionPrepareRequest, SupplementalAdmissionRegistrar,
+    CanonicalRevocationSet, OpaqueSignedSupplementalQuota, SupplementalAdmissionAuthorization,
+    SupplementalAdmissionPlan, SupplementalAdmissionPrepareRequest, SupplementalAdmissionRegistrar,
     SupplementalQuotaDestination, SupplementalQuotaError, SupplementalQuotaVerificationContext,
     SupplementalQuotaVerifier, VerifiedSupplementalQuotaClaimBody,
 };

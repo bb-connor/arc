@@ -7,7 +7,10 @@ use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 use zeroize::{Zeroize, Zeroizing};
 
-use super::{PinnedHttpsRequest, PinnedHttpsTransport, RawHttpsResponse, MAX_RESPONSE_HEAD_BYTES};
+use super::{
+    is_redirect_status, PinnedHttpsRequest, PinnedHttpsTransport, RawHttpsResponse,
+    MAX_RESPONSE_HEAD_BYTES,
+};
 use crate::protocol::{
     BrokerScheme, HeaderField, MAX_HEADER_COUNT, MAX_HEADER_NAME_BYTES, MAX_HEADER_VALUE_BYTES,
     MAX_WIRE_BYTES,
@@ -129,7 +132,7 @@ impl PinnedHttpsTransport for RustlsPinnedHttpsTransport {
             response_head_bytes: parsed.response_head_bytes,
             connected_address: observed_peer.ip(),
             tls_server_name: verified_tls_server_name,
-            redirected: (300..400).contains(&parsed.status),
+            redirected: is_redirect_status(parsed.status),
         })
     }
 }
@@ -326,9 +329,10 @@ fn parse_http_response(
 
     let framing = response_framing(&headers)?;
     let body_limit = combined_limit - response_head_bytes;
-    let redirected = (300..400).contains(&status);
+    let redirected = is_redirect_status(status);
     let body_forbidden = status == 204 || status == 205;
-    let no_body = request_method == "HEAD" || body_forbidden || redirected;
+    let body_absent = status == 304;
+    let no_body = request_method == "HEAD" || body_forbidden || body_absent || redirected;
     let body = if no_body {
         if framing.transfer_chunked
             || (body_forbidden && framing.content_length.is_some_and(|length| length != 0))

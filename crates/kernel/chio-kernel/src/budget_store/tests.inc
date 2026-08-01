@@ -542,7 +542,7 @@
         rebound_capture.capability_id = "different-capability".to_string();
         assert!(matches!(
             store.query_invocation_capture(&rebound_capture),
-            Err(BudgetStoreError::Invariant(_))
+            Err(BudgetStoreError::Conflict(_))
         ));
         assert_eq!(
             captured.invocation_state,

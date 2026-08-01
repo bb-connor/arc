@@ -6,6 +6,8 @@
 
 use super::*;
 
+#[path = "service_types/admission_authority.rs"]
+mod admission_authority;
 #[path = "service_types/admission_budget.rs"]
 mod admission_budget;
 #[path = "service_types/admission_consensus.rs"]
@@ -14,6 +16,8 @@ mod admission_consensus;
 mod aggregate_family_root;
 #[path = "service_types/budget_mutation_event_query.rs"]
 mod budget_mutation_event_query;
+#[path = "service_types/budget_lifecycle.rs"]
+mod budget_lifecycle;
 #[path = "service_types/capability_issuance.rs"]
 mod capability_issuance;
 #[path = "service_types/cluster_budget.rs"]
@@ -28,7 +32,10 @@ mod requests;
 mod responses;
 #[path = "service_types/state.rs"]
 mod state;
+#[path = "service_types/structured_budget.rs"]
+mod structured_budget;
 
+pub(crate) use self::admission_authority::*;
 pub(crate) use self::admission_budget::{
     AdmissionCaptureInvocationQuotaTransitionView, AdmissionCaptureInvocationQuotaView,
     AdmissionCaptureMetadataView, AdmissionCaptureOutcomeView, AdmissionCapturePointQueryRequest,
@@ -82,7 +89,8 @@ pub(crate) use self::capability_issuance::{
 };
 pub(crate) use self::cluster_budget::{
     AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
-    BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse, BudgetInvocationQuotaUsageRecordView,
+    BudgetAuthorizeExposureDecision, BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse,
+    BudgetInvocationQuotaUsageRecordView,
     BudgetMutationAuthorityView, BudgetMutationEventView, BudgetOriginAck, BudgetWriteCommitView,
     ClusterAuthorityLeaseView, ClusterReplicationHeadsView, ClusterStateSnapshotResponse,
     ClusterStatusResponse, LineageDeltaResponse, PeerStatusView, ReceiptDeltaQuery,
@@ -96,8 +104,22 @@ pub use self::cluster_budget::{
     LeaseHeartbeatRequest, LeaseTerminateRequest, LeaseTerminationReason,
 };
 pub(crate) use self::config::{load_strict_cluster_node_keypair, validate_control_secret};
-pub use self::config::{AuthorityWorkloadPolicy, ClusterMemberIdentity, TrustServiceConfig};
+pub use self::config::{
+    AuthorityWorkloadPolicy, ClusterMemberIdentity, TrustFiscalRuntimeConfig, TrustServiceConfig,
+};
 pub use self::paths::FEDERATED_DELEGATION_POLICY_SCHEMA;
+pub(crate) use self::paths::{
+    AUTHORITY_CACHE_TTL, BUDGET_CAPTURE_INVOCATION_PATH, FISCAL_ACTIVATIONS_PATH,
+    FISCAL_APPROVALS_PATH, FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH,
+    FISCAL_MARKETPLACE_PRICE_PATH, FISCAL_PROPOSALS_PATH, FISCAL_PROPOSAL_ADMIT_PATH,
+    FISCAL_PROPOSAL_PREVIEW_PATH, FISCAL_RESOLVE_PATH, FISCAL_RUNTIME_STATUS_PATH,
+    INTERNAL_ADMISSION_AUTHORITY_PATH, INTERNAL_CLUSTER_PARTITION_PATH,
+    STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH, STRUCTURED_BUDGET_AUTHORIZE_PATH,
+    STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH, STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH,
+    STRUCTURED_BUDGET_CAPTURE_SPEND_PATH, STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH,
+    STRUCTURED_BUDGET_FENCED_REVERSE_PATH, STRUCTURED_BUDGET_RECONCILE_PATH,
+    STRUCTURED_BUDGET_RELEASE_PATH,
+};
 pub(crate) use self::paths::{
     ACTIVE_DEFENSE_EVENTS_PATH, ACTIVE_DEFENSE_HEALTH_PATH, AGENT_RECEIPTS_PATH,
     AGGREGATE_FAMILY_ROOT_LOOKUP_PATH, AUTHORITY_KEY_LOG_SYNC_PATH, AUTHORITY_PATH,
@@ -218,7 +240,9 @@ pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
     BudgetCursor, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
     ClusterRuntimeState, FederationAdmissionRateLimiter, PeerHealth, PeerSyncState,
-    RemoteAdmissionCaptureAuthority, RemoteAuthorityEpoch, RemoteBudgetStore,
-    RemoteCapabilityAuthority, RemoteCompositeHoldEvidence, RemoteReceiptStore,
+    CachedBudgetUsage, RemoteAdmissionCaptureAuthority, RemoteAgentEconomyBudgetStore,
+    RemoteAuthorityEpoch, RemoteBudgetStore, RemoteCapabilityAuthority,
+    RemoteCompositeHoldEvidence, RemoteReceiptStore,
     RemoteRevocationStore, RevocationCursor, TrustServiceState,
 };
+pub(crate) use self::structured_budget::*;

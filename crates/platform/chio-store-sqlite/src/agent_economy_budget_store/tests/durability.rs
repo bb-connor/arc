@@ -130,10 +130,9 @@ fn independent_plain_opens_reject_composite_authorization_without_mutation(
         admission_binding: Some(
             chio_kernel::agent_economy_budget_store::BudgetAdmissionBinding {
                 operation_id: "op-composite".to_string(),
-                revocation_set:
-                    chio_kernel::supplemental_quota::CanonicalRevocationSet::canonicalize(vec![
-                        "cap-composite".to_string(),
-                    ])?,
+                revocation_set: chio_kernel::AgentEconomyCanonicalRevocationSet::canonicalize(
+                    vec!["cap-composite".to_string()],
+                )?,
                 authorization_artifact_digests: Vec::new(),
                 last_observed_revocation: None,
                 supplemental_verifier_id: None,

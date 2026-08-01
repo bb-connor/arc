@@ -1147,6 +1147,12 @@ impl ChioKernel {
                 "supplemental broker admission is not enabled".to_string(),
             ));
         }
+        if !self.aggregate_invocation_admission_enabled
+            && !self.supplemental_broker_admission_enabled
+            && self.partition_escrow_registry.is_none()
+        {
+            return Ok(());
+        }
         self.validate_protocol_budget_admission_profiles()
     }
 

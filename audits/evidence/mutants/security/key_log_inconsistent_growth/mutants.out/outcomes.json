@@ -8,7 +8,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 87.341585958,
+          "duration": 70.921999167,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -20,7 +20,7 @@
         },
         {
           "phase": "Test",
-          "duration": 8.662692542,
+          "duration": 9.725327917,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -44,23 +44,23 @@
             "return_type": "-> Result<()>",
             "span": {
               "start": {
-                "line": 285,
+                "line": 445,
                 "column": 5
               },
               "end": {
-                "line": 356,
+                "line": 459,
                 "column": 6
               }
             }
           },
           "span": {
             "start": {
-              "line": 290,
+              "line": 447,
               "column": 9
             },
             "end": {
-              "line": 355,
-              "column": 10
+              "line": 458,
+              "column": 15
             }
           },
           "replacement": "Ok(())",
@@ -68,12 +68,12 @@
         }
       },
       "summary": "CaughtMutant",
-      "log_path": "log/crates__core__chio-core-types__src__merkle.rs_line_290_col_9.log",
-      "diff_path": "diff/crates__core__chio-core-types__src__merkle.rs_line_290_col_9.diff",
+      "log_path": "log/crates__core__chio-core-types__src__merkle.rs_line_447_col_9.log",
+      "diff_path": "diff/crates__core__chio-core-types__src__merkle.rs_line_447_col_9.diff",
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 21.959190375,
+          "duration": 18.136066458,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -85,7 +85,7 @@
         },
         {
           "phase": "Test",
-          "duration": 4.7131195,
+          "duration": 4.8998205,
           "process_status": {
             "Failure": 101
           },

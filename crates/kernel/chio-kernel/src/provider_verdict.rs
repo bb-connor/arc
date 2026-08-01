@@ -1007,10 +1007,10 @@ mod tests {
             .unwrap_err();
 
         assert!(matches!(
-            error,
+            &error,
             crate::KernelError::GuardDenied(reason)
                 if reason == "authoritative security context principal does not match the request agent"
-        ));
+        ), "unexpected error: {error:?}");
     }
 
     #[test]

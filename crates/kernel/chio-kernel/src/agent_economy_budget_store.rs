@@ -1,6 +1,6 @@
 use chio_core::capability::scope::MonetaryAmount;
 
-use crate::supplemental_quota::CanonicalRevocationSet;
+use crate::agent_economy_revocation_set::AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BudgetStoreError {

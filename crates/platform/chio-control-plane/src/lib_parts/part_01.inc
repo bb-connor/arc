@@ -84,6 +84,17 @@ pub enum CliError {
     #[error("budget store error: {0}")]
     BudgetStore(#[from] chio_kernel::BudgetStoreError),
 
+    #[error("agent-economy budget store error: {0}")]
+    AgentEconomyBudgetStore(#[from] chio_kernel::agent_economy_budget_store::BudgetStoreError),
+
+    #[error("agent-economy admission operation error: {0}")]
+    AgentEconomyAdmissionOperation(
+        #[from] chio_kernel::admission_operation::AdmissionOperationError,
+    ),
+
+    #[error("sqlite serving-owner error: {0}")]
+    SqliteServingOwner(#[from] chio_store_sqlite::SqliteServingOwnerError),
+
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
@@ -260,6 +271,21 @@ impl CliError {
                 "CHIO-CLI-BUDGET-STORE",
                 serde_json::json!({ "source": error.to_string() }),
                 "Check the configured budget store path, permissions, and schema health before retrying.",
+            ),
+            Self::AgentEconomyBudgetStore(error) => self.report_with_context(
+                "CHIO-CLI-AGENT-ECONOMY-BUDGET-STORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Restore the durable agent-economy budget authority invariant before retrying.",
+            ),
+            Self::AgentEconomyAdmissionOperation(error) => self.report_with_context(
+                "CHIO-CLI-AGENT-ECONOMY-ADMISSION",
+                serde_json::json!({ "source": error.to_string() }),
+                "Restore the durable agent-economy admission operation invariant before retrying.",
+            ),
+            Self::SqliteServingOwner(error) => self.report_with_context(
+                "CHIO-CLI-SQLITE-SERVING-OWNER",
+                serde_json::json!({ "source": error.to_string() }),
+                "Restore the provisioned SQLite serving-owner identity and exclusive lease before retrying.",
             ),
             Self::Sqlite(error) => self.report_with_context(
                 "CHIO-CLI-SQLITE",

@@ -3,15 +3,17 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 
 use chio_core::capability::scope::MonetaryAmount;
-use chio_kernel::budget_store::{
+use chio_kernel::agent_economy_budget_store::{
     BudgetAdmissionBinding, BudgetAuthorizationOutcome, BudgetAuthorizeCumulativeApprovalRequest,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
     BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAuthorizationDecision,
     BudgetCumulativeApprovalRequest, BudgetEventAuthority, BudgetInvocationCaptureDecision,
     BudgetInvocationQuota, BudgetInvocationState, BudgetQuotaKey, BudgetQuotaProfile,
-    BudgetReconcileHoldRequest,
+    BudgetReconcileHoldRequest, BudgetStore, BudgetStoreError,
 };
-use chio_kernel::{BudgetStore, CanonicalRevocationSet, RevocationStore};
+use chio_kernel::{
+    AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet, RevocationStore,
+};
 use rusqlite::{params, Connection};
 use tempfile::TempDir;
 
@@ -881,11 +883,11 @@ fn serving_open_rejects_forged_historical_budget_authority() {
         .expect("corrupt event authority");
     assert!(matches!(
         second.budget_store().get_usage("capability-a", 0),
-        Err(chio_kernel::BudgetStoreError::OutcomeUnknown(_))
+        Err(BudgetStoreError::OutcomeUnknown(_))
     ));
     assert!(matches!(
         second.budget_store().authorize_budget_hold(request),
-        Err(chio_kernel::BudgetStoreError::OutcomeUnknown(_))
+        Err(BudgetStoreError::OutcomeUnknown(_))
     ));
     let global_head_after: i64 = connection
         .query_row(

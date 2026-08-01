@@ -1213,6 +1213,13 @@ fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
     ))
 }
 
+fn install_durable_test_receipt_store(kernel: &mut ChioKernel, prefix: &str) {
+    let path = unique_receipt_db_path(prefix);
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(path).expect("open receipt store")))
+        .expect("install durable authoritative receipt store");
+}
+
 fn make_elicited_content() -> CreateElicitationResult {
     CreateElicitationResult {
         action: chio_core::session::ElicitationAction::Accept,

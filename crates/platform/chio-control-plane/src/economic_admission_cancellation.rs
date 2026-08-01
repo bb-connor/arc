@@ -12,7 +12,7 @@ use chio_kernel::admission_operation::{
     AdmissionOperationState, AdmissionProjectionContext, AdmissionTerminal,
     QualifiedAdmissionOperationStoreExt, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
 };
-use chio_kernel::receipt_store::AnchoredAdmissionProjectionStore;
+use chio_kernel::AnchoredAdmissionProjectionStore;
 use chio_kernel::ReceiptStoreError;
 
 const MAX_CANCELLATION_LEASE_DURATION: Duration = Duration::from_secs(5 * 60);

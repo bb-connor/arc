@@ -1,4 +1,11 @@
 impl ChioKernel {
+    pub fn set_agent_economy_payment_adapter(
+        &mut self,
+        payment_adapter: Box<dyn crate::agent_economy_payment::PaymentAdapter>,
+    ) {
+        self.agent_economy_payment_adapter = Some(payment_adapter);
+    }
+
     /// Install or safely replace the payment rail authority. A replacement
     /// first drains operation-owned payment work, then reconciles any durable
     /// payment-journal rows that became resolvable when the adapter attached.
@@ -477,6 +484,21 @@ impl ChioKernel {
             self.prepare_current_admission_authority_replacement()?;
         }
         self.supplemental_quota_verifier = Some(verifier);
+        Ok(())
+    }
+
+    pub fn set_agent_economy_supplemental_quota_verifier(
+        &mut self,
+        verifier: Arc<
+            dyn crate::agent_economy_supplemental_quota::SupplementalQuotaVerifier,
+        >,
+        binding: crate::agent_economy_supplemental_quota::SupplementalQuotaVerifierBinding,
+    ) -> Result<(), crate::agent_economy_supplemental_quota::SupplementalQuotaError> {
+        self.agent_economy_supplemental_quota_verifier = Some(
+            crate::agent_economy_supplemental_quota::SupplementalQuotaVerifierRuntime::new(
+                verifier, binding,
+            )?,
+        );
         Ok(())
     }
 

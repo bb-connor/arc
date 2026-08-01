@@ -5,6 +5,14 @@ use super::*;
 const SETTLEMENT_OBSERVER_CLAIM_LEASE_MS: u64 = 30_000;
 const MAX_SETTLEMENT_OBSERVER_RECOVERY_ROWS: usize = 4_096;
 
+fn receipts_match(left: &ChioReceipt, right: &ChioReceipt) -> Result<bool, KernelError> {
+    let left = chio_core::canonical::canonical_json_bytes(left)
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+    let right = chio_core::canonical::canonical_json_bytes(right)
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+    Ok(left == right)
+}
+
 /// A cost-bearing receipt may claim `TrustLevel::Mediated` only when it carries a
 /// reconciled budget-authority hold. This is the sign-site fail-closed invariant
 /// that turns `Mediated` from a stamp into earned proof.
@@ -263,6 +271,27 @@ impl ChioKernel {
         Ok(())
     }
 
+    pub(crate) fn apply_federation_cosign_for_admitted_request(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        let request_admission = self.receipt_federation_admission_for_request(
+            &request.request_id,
+            request.federated_origin_kernel_id.as_deref(),
+        );
+        let thread_admission = current_scoped_receipt_federation_admission();
+        let thread_admission = thread_admission.as_ref().filter(|admission| {
+            admission.remote_kernel_id.as_deref() == request.federated_origin_kernel_id.as_deref()
+        });
+        let scoped_admission = request_admission.as_ref().or(thread_admission);
+        self.apply_federation_cosign(
+            request,
+            receipt,
+            scoped_admission.and_then(|admission| admission.peer.as_ref()),
+        )
+    }
+
     pub(super) fn record_chio_receipt_with_mode(
         &self,
         request: &crate::runtime::ToolCallRequest,
@@ -298,6 +327,80 @@ impl ChioKernel {
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
         self.record_chio_receipt_consuming_optional_intent(receipt, None)
+    }
+
+    pub(crate) fn materialize_durable_admission_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        if self.receipt_store.is_none() {
+            return Ok(());
+        }
+        let _receipt_store_write = self
+            .receipt_store_write_lock
+            .lock()
+            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
+        let settlement_observer_enabled = self.settlement_observer.is_some();
+        let budget = self.config.deadlines.receipt_append_budget();
+        self.with_receipt_store(|store| match store.load_chio_receipt(&receipt.id)? {
+            Some(existing) => {
+                if receipts_match(&existing, receipt)? {
+                    Ok(())
+                } else {
+                    Err(KernelError::DurableAdmission(format!(
+                        "receipt projection {} conflicts with the canonical admission receipt",
+                        receipt.id
+                    )))
+                }
+            }
+            None => {
+                if settlement_observer_enabled {
+                    store
+                        .append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+                            receipt, budget,
+                        )?;
+                } else {
+                    store.append_chio_receipt_with_timeout(receipt, budget)?;
+                }
+                Ok(())
+            }
+        })?
+        .ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "durable receipt store disappeared during materialization".to_owned(),
+            )
+        })?;
+        Ok(())
+    }
+
+    pub(crate) fn mirror_durable_admission_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        let mut log = match self.receipt_log.lock() {
+            Ok(log) => log,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let existing = log
+            .iter()
+            .find(|existing| existing.id == receipt.id)
+            .cloned();
+        match existing {
+            Some(existing) => {
+                if receipts_match(&existing, receipt)? {
+                    Ok(())
+                } else {
+                    Err(KernelError::DurableAdmission(format!(
+                        "local receipt mirror {} conflicts with the canonical admission receipt",
+                        receipt.id
+                    )))
+                }
+            }
+            None => {
+                log.append(receipt.clone());
+                Ok(())
+            }
+        }
     }
 
     /// Persist a terminal receipt and, when the request journaled a dispatch

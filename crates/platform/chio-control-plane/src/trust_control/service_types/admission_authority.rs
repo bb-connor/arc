@@ -4,7 +4,7 @@ use chio_kernel::admission_operation::{
     PersistedAdmissionOperationV1, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
     UntrustedAdmissionRecoveryClaim,
 };
-use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalTransition};
+use chio_kernel::agent_economy_payment::{PaymentJournalRecord, PaymentJournalTransition};
 use chio_kernel::tool_outcome::{
     PersistedMonetaryReleaseEvidenceV1, PersistedPostReturnEvaluationRecordV1,
     PersistedRawInvocationOutcomeV1, PersistedToolOutcomeRecordV1,

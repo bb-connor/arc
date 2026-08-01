@@ -6,7 +6,7 @@ use crate::agent_economy_budget_store::{
     BudgetEventAuthority, BudgetGuaranteeLevel, BudgetInvocationQuotaUsage, BudgetQuotaProfile,
     MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
-use crate::supplemental_quota::CanonicalRevocationSet;
+use crate::agent_economy_revocation_set::AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet;
 
 use super::*;
 

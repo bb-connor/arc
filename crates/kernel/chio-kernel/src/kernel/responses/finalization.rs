@@ -152,6 +152,73 @@ impl ChioKernel {
         let outcome = self
             .post_invocation_pipeline
             .evaluate_with_context_and_evidence(&context, &response);
+        self.finish_post_invocation_pipeline(
+            output,
+            extra_metadata,
+            outcome,
+            crate::tool_outcome::InvocationStreamLimitsV1 {
+                max_total_bytes: self.config.max_stream_total_bytes,
+                max_chunks: self.config.memory_budget.max_stream_chunks,
+                max_duration_secs: self.config.max_stream_duration_secs,
+            },
+        )
+    }
+
+    pub(crate) fn apply_durable_post_invocation_pipeline(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        matched_grant_index: usize,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
+        identities: &[crate::post_invocation::PostInvocationHookIdentity],
+        stream_limits: crate::tool_outcome::InvocationStreamLimitsV1,
+    ) -> Result<
+        (
+            PostInvocationHandling,
+            Vec<crate::post_invocation::DurablePipelineStepResult>,
+        ),
+        KernelError,
+    > {
+        if self.post_invocation_pipeline.is_empty() {
+            return Ok((
+                PostInvocationHandling {
+                    output,
+                    extra_metadata,
+                    blocked_reason: None,
+                    evidence: Vec::new(),
+                },
+                Vec::new(),
+            ));
+        }
+
+        let response = self.output_to_post_invocation_value(&output);
+        let context =
+            crate::post_invocation::PostInvocationContext::from_request_with_security_context(
+                request,
+                Some(matched_grant_index),
+                security_context,
+            );
+        let durable = self
+            .post_invocation_pipeline
+            .evaluate_durable_with_context_and_evidence(&context, &response, identities)
+            .map_err(KernelError::DurableAdmission)?;
+        let handling = self.finish_post_invocation_pipeline(
+            output,
+            extra_metadata,
+            durable.outcome,
+            stream_limits,
+        )?;
+        Ok((handling, durable.step_results))
+    }
+
+    fn finish_post_invocation_pipeline(
+        &self,
+        output: ToolServerOutput,
+        extra_metadata: Option<serde_json::Value>,
+        outcome: crate::post_invocation::PipelineOutcome,
+        stream_limits: crate::tool_outcome::InvocationStreamLimitsV1,
+    ) -> Result<PostInvocationHandling, KernelError> {
         let metadata =
             merge_metadata_objects(extra_metadata, self.post_invocation_metadata(&outcome));
 
@@ -183,7 +250,7 @@ impl ChioKernel {
                 // kernel materialize the whole redacted stream, nor grow the final
                 // signed output and receipt preimage past the configured budget.
                 Ok(PostInvocationHandling {
-                    output: self.apply_redacted_output(redacted)?,
+                    output: self.apply_redacted_output_with_limits(redacted, stream_limits)?,
                     extra_metadata: metadata,
                     blocked_reason: None,
                     evidence: outcome.evidence,
@@ -238,14 +305,15 @@ impl ChioKernel {
     /// content, and was already decided on the original output. A non-stream
     /// redacted output (a value) is returned unchanged. Any pre-existing
     /// incomplete reason on the redacted stream is preserved unless a cap fires.
-    fn apply_redacted_output(
+    fn apply_redacted_output_with_limits(
         &self,
         redacted: serde_json::Value,
+        limits: crate::tool_outcome::InvocationStreamLimitsV1,
     ) -> Result<ToolServerOutput, KernelError> {
         parse_redacted_output(
             redacted,
-            self.config.max_stream_total_bytes,
-            self.config.memory_budget.max_stream_chunks,
+            limits.max_total_bytes,
+            limits.max_chunks,
         )
     }
 
@@ -287,13 +355,29 @@ impl ChioKernel {
         output: ToolServerOutput,
         elapsed: Duration,
     ) -> Result<ToolServerOutput, KernelError> {
+        self.apply_stream_limit_snapshot(
+            output,
+            elapsed,
+            crate::tool_outcome::InvocationStreamLimitsV1 {
+                max_total_bytes: self.config.max_stream_total_bytes,
+                max_chunks: self.config.memory_budget.max_stream_chunks,
+                max_duration_secs: self.config.max_stream_duration_secs,
+            },
+        )
+    }
+
+    pub(crate) fn apply_stream_limit_snapshot(
+        &self,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        limits: crate::tool_outcome::InvocationStreamLimitsV1,
+    ) -> Result<ToolServerOutput, KernelError> {
         let ToolServerOutput::Stream(stream_result) = output else {
             return Ok(output);
         };
 
-        let duration_limit = Duration::from_secs(self.config.max_stream_duration_secs);
-        let duration_exceeded =
-            self.config.max_stream_duration_secs > 0 && elapsed > duration_limit;
+        let duration_limit = Duration::from_secs(limits.max_duration_secs);
+        let duration_exceeded = limits.max_duration_secs > 0 && elapsed > duration_limit;
 
         let (stream, base_reason) = match stream_result {
             ToolServerStreamResult::Complete(stream) => (stream, None),
@@ -302,19 +386,19 @@ impl ChioKernel {
 
         let (stream, total_bytes, truncation_cause) = truncate_stream_to_limits(
             &stream,
-            self.config.max_stream_total_bytes,
-            self.config.memory_budget.max_stream_chunks,
+            limits.max_total_bytes,
+            limits.max_chunks,
         )?;
 
         let limit_reason = match truncation_cause {
             Some(cause) => Some(stream_limit_reason(
                 cause,
-                self.config.max_stream_total_bytes,
-                self.config.memory_budget.max_stream_chunks,
+                limits.max_total_bytes,
+                limits.max_chunks,
             )),
             None if duration_exceeded => Some(format!(
                 "CHIO_SERVER_STREAM_LIMIT: stream exceeded max duration of {}s",
-                self.config.max_stream_duration_secs
+                limits.max_duration_secs
             )),
             None => None,
         };

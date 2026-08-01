@@ -740,6 +740,8 @@ fn apply_reverse_exposure(
     canonical_result(&ReverseChargeCostResponse {
         capability_id: request.capability_id,
         grant_index: request.grant_index,
+        hold_id: event.hold_id.clone(),
+        event_id: Some(event.event_id.clone()),
         invocation_count: Some(event.invocation_count_after),
         total_cost_exposed: Some(event.total_cost_exposed_after),
         total_cost_realized_spend: Some(event.total_cost_realized_spend_after),
@@ -894,6 +896,8 @@ fn apply_reduce_exposure(
     canonical_result(&ReduceChargeCostResponse {
         capability_id: request.capability_id,
         grant_index: request.grant_index,
+        hold_id: event.hold_id.clone(),
+        event_id: Some(event.event_id.clone()),
         invocation_count: Some(event.invocation_count_after),
         total_cost_exposed: Some(event.total_cost_exposed_after),
         total_cost_realized_spend: Some(event.total_cost_realized_spend_after),

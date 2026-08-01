@@ -599,6 +599,12 @@ pub enum ReceiptStoreError {
     #[error("not found: {0}")]
     NotFound(String),
 
+    #[error("receipt-store mutation was fenced")]
+    Fenced,
+
+    #[error("receipt-store durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
+
     #[error("retention co-archival incomplete for {table}: {live} live rows, {archived} archived; aborting delete to preserve inclusion-proof integrity")]
     RetentionArchiveIncomplete {
         table: &'static str,

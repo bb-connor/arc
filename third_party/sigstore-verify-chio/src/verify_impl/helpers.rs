@@ -225,6 +225,21 @@ pub fn determine_validation_time(
     }
 }
 
+/// Determine certificate validation time from a verified-log time source only.
+///
+/// This deliberately ignores RFC 3161 material for callers that selected
+/// `skip_timestamp`. The later transparency-log verification still validates
+/// the inclusion promise that makes the integrated time authoritative.
+pub fn determine_validation_time_from_tlog(bundle: &Bundle) -> Result<i64> {
+    if let Some(integrated_time) = extract_v1_integrated_time_with_promise(bundle) {
+        return Ok(integrated_time);
+    }
+    Err(Error::Verification(
+        "timestamp verification is disabled and no V1 transparency-log entry provides a signed integrated time"
+            .to_string(),
+    ))
+}
+
 /// Validate certificate is within validity period
 pub fn validate_certificate_time(validation_time: i64, cert_info: &CertificateInfo) -> Result<()> {
     if validation_time < cert_info.not_before {

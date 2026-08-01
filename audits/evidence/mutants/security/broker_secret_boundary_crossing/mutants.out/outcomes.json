@@ -8,7 +8,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 1.744839958,
+          "duration": 0.644739584,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -21,7 +21,7 @@
         },
         {
           "phase": "Test",
-          "duration": 0.600155542,
+          "duration": 0.6454825,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -46,22 +46,22 @@
             "return_type": "-> bool",
             "span": {
               "start": {
-                "line": 716,
+                "line": 721,
                 "column": 1
               },
               "end": {
-                "line": 721,
+                "line": 726,
                 "column": 2
               }
             }
           },
           "span": {
             "start": {
-              "line": 717,
+              "line": 722,
               "column": 5
             },
             "end": {
-              "line": 720,
+              "line": 725,
               "column": 50
             }
           },
@@ -70,12 +70,12 @@
         }
       },
       "summary": "CaughtMutant",
-      "log_path": "log/crates__security__chio-secret-broker__src__generic_https.rs_line_717_col_5.log",
-      "diff_path": "diff/crates__security__chio-secret-broker__src__generic_https.rs_line_717_col_5.diff",
+      "log_path": "log/crates__security__chio-secret-broker__src__generic_https.rs_line_722_col_5.log",
+      "diff_path": "diff/crates__security__chio-secret-broker__src__generic_https.rs_line_722_col_5.diff",
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 5.791023416,
+          "duration": 5.908995083,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -88,7 +88,7 @@
         },
         {
           "phase": "Test",
-          "duration": 1.303326417,
+          "duration": 1.2770763330000001,
           "process_status": {
             "Failure": 101
           },

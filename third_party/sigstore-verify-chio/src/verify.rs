@@ -242,24 +242,47 @@ impl Verifier {
         // validate the certificate chain, so this step comes first.
         // These include TSA timestamps and (in the case of rekor v1 entries)
         // rekor log integrated time.
-        let signature = crate::verify_impl::helpers::extract_signature(&bundle.content)?;
-        let validation_time = crate::verify_impl::helpers::determine_validation_time(
-            bundle,
-            &signature,
-            &self.trusted_root,
-        )?;
+        let validation_time = if policy.verify_timestamp {
+            let signature = crate::verify_impl::helpers::extract_signature(&bundle.content)?;
+            Some(crate::verify_impl::helpers::determine_validation_time(
+                bundle,
+                &signature,
+                &self.trusted_root,
+            )?)
+        } else if policy.verify_certificate {
+            if !policy.verify_tlog {
+                return Err(Error::Verification(
+                    "certificate verification requires a trusted time source when timestamp and transparency-log verification are disabled"
+                        .to_string(),
+                ));
+            }
+            Some(crate::verify_impl::helpers::determine_validation_time_from_tlog(bundle)?)
+        } else {
+            None
+        };
 
         // (1): Verify that the signing certificate chains to the root of trust,
         //      is valid at the time of signing, and has CODE_SIGNING EKU.
         if policy.verify_certificate {
             crate::verify_impl::helpers::verify_certificate_chain(
                 &bundle.verification_material.content,
-                validation_time,
+                validation_time.ok_or_else(|| {
+                    Error::Verification(
+                        "certificate verification has no trusted validation time".to_string(),
+                    )
+                })?,
                 &self.trusted_root,
             )?;
 
             // Also verify the certificate is within its validity period
-            crate::verify_impl::helpers::validate_certificate_time(validation_time, &cert_info)?;
+            crate::verify_impl::helpers::validate_certificate_time(
+                validation_time.ok_or_else(|| {
+                    Error::Verification(
+                        "certificate verification has no trusted validation time".to_string(),
+                    )
+                })?,
+                &cert_info,
+            )?;
 
             // (2): Verify the signing certificate's SCT.
             crate::verify_impl::helpers::verify_sct(
@@ -664,6 +687,22 @@ mod tests {
             Some("https://accounts.google.com".to_string())
         );
         assert!(!policy.verify_tlog);
+    }
+
+    #[test]
+    fn skip_timestamp_ignores_malformed_optional_rfc3161_data() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        bundle.verification_material.timestamp_verification_data.rfc3161_timestamps[0]
+            .signed_timestamp = sigstore_types::TimestampToken::new(vec![0xff, 0x00, 0x7f]);
+
+        let result = verify(
+            COSIGN_V3_BLOB,
+            &bundle,
+            &VerificationPolicy::default().skip_timestamp(),
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        result.expect("trusted transparency-log time remains authoritative");
     }
 
     #[test]

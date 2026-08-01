@@ -6,8 +6,12 @@ use std::sync::Arc;
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
-use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
-use chio_store_sqlite::{SqliteAuthorityStore, SqliteBudgetStore, SqliteRevocationStore};
+use chio_kernel::agent_economy_budget_store::BudgetStore;
+use chio_kernel::{ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
+use chio_store_sqlite::{
+    SqliteAgentEconomyBudgetStore as SqliteBudgetStore,
+    SqliteAgentEconomyRevocationStore as SqliteRevocationStore, SqliteAuthorityStore,
+};
 
 use crate::{load_or_create_authority_keypair, CliError};
 
@@ -128,7 +132,7 @@ impl DurableAdmissionRuntime {
             self.outcomes.clone(),
             self.fence.clone(),
         )?;
-        kernel.set_budget_store_handle(self.budget.clone());
+        kernel.set_agent_economy_budget_store_handle(self.budget.clone());
         kernel.set_revocation_store_handle(self.revocations.clone());
         kernel.reconcile_durable_admission_startup()?;
         Ok(())

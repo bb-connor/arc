@@ -697,7 +697,10 @@ pub(crate) fn verify_active_owner(
     requested: Option<&StoreMutationFence>,
 ) -> Result<(), AdmissionOperationStoreError> {
     crate::serving_owner::verify_budget_fence(transaction, Some(owner)).map_err(|error| {
-        if matches!(error, chio_kernel::BudgetStoreError::Fenced { .. }) {
+        if matches!(
+            error,
+            chio_kernel::agent_economy_budget_store::BudgetStoreError::Fenced { .. }
+        ) {
             AdmissionOperationStoreError::Fenced
         } else {
             AdmissionOperationStoreError::Unavailable(error.to_string())

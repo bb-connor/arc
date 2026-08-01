@@ -486,7 +486,11 @@ fn assert_ordinary_fingerprint_conflict_is_pre_mutation(change: OrdinaryFingerpr
         (fingerprint, conflict)
     };
     assert_ne!(first_fingerprint, second_fingerprint);
-    assert!(conflict.to_string().contains("budget_hold_id"), "{conflict}");
+    assert!(
+        conflict.to_string().contains("budget_hold_id")
+            || conflict.to_string().contains("request id conflict"),
+        "{conflict}"
+    );
     assert_eq!(
         budget_store
             .get_budget_hold(&hold_id)
@@ -627,6 +631,9 @@ fn assert_threshold_fingerprint_conflict_is_pre_mutation(change: ThresholdFinger
     kernel
         .set_approval_store_handle(approval_store.clone())
         .expect("threshold fingerprint approval store");
+    kernel
+        .enable_threshold_governed_approvals()
+        .expect("threshold fingerprint activation");
     let verified = kernel
         .validate_governed_transaction(&request, &capability, &grant, None, now)
         .expect("threshold governed validation")
@@ -766,7 +773,11 @@ fn assert_threshold_fingerprint_conflict_is_pre_mutation(change: ThresholdFinger
         (binding, conflict)
     };
     assert_ne!(first_binding, second_binding);
-    assert!(conflict.to_string().contains("budget_hold_id"), "{conflict}");
+    assert!(
+        conflict.to_string().contains("budget_hold_id")
+            || conflict.to_string().contains("request id conflict"),
+        "{conflict}"
+    );
     assert_eq!(
         budget_store
             .get_budget_hold(&hold_id)

@@ -58,8 +58,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/sandbox_env_leak/mutants.out/outcomes.json",
-          "sha256": "4441d4bf09b129376dc2dae95bac19110471ddf07e8e680fc73c29e0caf47495",
-          "inputs_sha256": "02907a3adc26dc9f7987cf2a3edc7670ff51c1d4e566281608c60ad795a80cc7"
+          "sha256": "9782bd1d08318901a9da8ed4aacc56a7b85ee83eadaf95dffc37467ad361cd52",
+          "inputs_sha256": "32bff851504fca17d425d7d5c9184f8fb050e291fdc6382c61eec2498f04839f"
         }
       }
     ]

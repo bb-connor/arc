@@ -904,11 +904,11 @@ impl ChioKernel {
                 ));
                 continue;
             }
-            let validated_historical_caller_handoff = operation.state()
+            let validated_historical_caller_handoff = expected.state()
                 == AdmissionOperationState::CallerReserved
-                && operation.dispatch_state() == AdmissionDispatchState::Committed
+                && expected.dispatch_state() == AdmissionDispatchState::Committed
                 && self
-                    .validate_caller_reserved_handoff_with_store(operation_store, &operation)
+                    .validate_caller_reserved_handoff_with_store(operation_store, expected)
                     .is_ok();
             if operation.policy_hash() != self.config.policy_hash
                 && !validated_historical_caller_handoff

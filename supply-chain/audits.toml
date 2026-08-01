@@ -1141,6 +1141,12 @@ criteria = "safe-to-deploy"
 version = "0.4.28"
 notes = "Reviewed exact ripgrep ignore and filesystem traversal source. It has no unsafe code, build script, or network path; filesystem IO is limited to requested traversal and ignore-file parsing."
 
+[[audits.ignore]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.4.28 -> 0.4.31"
+notes = "Reviewed the exact crates.io source and manifest delta. No unsafe code, build script, process execution, or network access was added. The new runtime surface is an incremental ignore matcher with directory-granularity caching and bounded metadata and ignore-file reads; invalid absolute or parent paths do not match, and hidden, symlink, depth, and file-size policies remain explicit. Parallel-walker changes construct visitors before spawning and propagate panics without leaving workers blocked. The complete all-feature package suite passed: 186 unit and integration tests plus 7 doctests."
+
 [[audits.indexmap]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"

@@ -18,6 +18,28 @@ impl DurableAtomicTestBudgetStore {
             BudgetStoreError::Invariant("atomic test budget transaction poisoned".to_string())
         })
     }
+
+    fn normalize_authorization_metadata(
+        &self,
+        decision: &mut crate::budget_store::BudgetAuthorizeHoldDecision,
+    ) {
+        let metadata = match decision {
+            crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                &mut authorized.metadata
+            }
+            crate::budget_store::BudgetAuthorizeHoldDecision::Denied(denied) => {
+                &mut denied.metadata
+            }
+        };
+        metadata.guarantee_level = self.budget_guarantee_level();
+    }
+
+    fn normalize_mutation_metadata(
+        &self,
+        decision: &mut crate::budget_store::BudgetHoldMutationDecision,
+    ) {
+        decision.metadata.guarantee_level = self.budget_guarantee_level();
+    }
 }
 
 impl BudgetStore for DurableAtomicTestBudgetStore {
@@ -416,7 +438,8 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
                 )));
             }
         }
-        let decision = self.budget.authorize_budget_hold(request)?;
+        let mut decision = self.budget.authorize_budget_hold(request)?;
+        self.normalize_authorization_metadata(&mut decision);
         if matches!(
             &decision,
             crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)
@@ -433,7 +456,9 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         request: crate::budget_store::BudgetAuthorizeHoldRequest,
     ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
         let _transaction = self.lock_transaction()?;
-        self.budget.replay_budget_authorization(request)
+        let mut decision = self.budget.replay_budget_authorization(request)?;
+        self.normalize_authorization_metadata(&mut decision);
+        Ok(decision)
     }
 
     fn reverse_budget_hold(
@@ -441,7 +466,9 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         request: crate::budget_store::BudgetReverseHoldRequest,
     ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
         let _transaction = self.lock_transaction()?;
-        self.budget.reverse_budget_hold(request)
+        let mut decision = self.budget.reverse_budget_hold(request)?;
+        self.normalize_mutation_metadata(&mut decision);
+        Ok(decision)
     }
 
     fn release_budget_hold(
@@ -449,7 +476,9 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         request: crate::budget_store::BudgetReleaseHoldRequest,
     ) -> Result<crate::budget_store::BudgetReleaseHoldDecision, BudgetStoreError> {
         let _transaction = self.lock_transaction()?;
-        self.budget.release_budget_hold(request)
+        let mut decision = self.budget.release_budget_hold(request)?;
+        self.normalize_mutation_metadata(&mut decision);
+        Ok(decision)
     }
 
     fn reconcile_budget_hold(
@@ -457,7 +486,9 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         request: crate::budget_store::BudgetReconcileHoldRequest,
     ) -> Result<crate::budget_store::BudgetReconcileHoldDecision, BudgetStoreError> {
         let _transaction = self.lock_transaction()?;
-        self.budget.reconcile_budget_hold(request)
+        let mut decision = self.budget.reconcile_budget_hold(request)?;
+        self.normalize_mutation_metadata(&mut decision);
+        Ok(decision)
     }
 
     fn capture_budget_hold(
@@ -465,7 +496,9 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         request: crate::budget_store::BudgetCaptureHoldRequest,
     ) -> Result<crate::budget_store::BudgetCaptureHoldDecision, BudgetStoreError> {
         let _transaction = self.lock_transaction()?;
-        self.budget.capture_budget_hold(request)
+        let mut decision = self.budget.capture_budget_hold(request)?;
+        self.normalize_mutation_metadata(&mut decision);
+        Ok(decision)
     }
 
     fn capture_invocation_reservations(
@@ -473,7 +506,9 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         request: crate::budget_store::BudgetCaptureInvocationRequest,
     ) -> Result<crate::budget_store::BudgetHoldMutationDecision, BudgetStoreError> {
         let _transaction = self.lock_transaction()?;
-        self.budget.capture_invocation_reservations(request)
+        let mut decision = self.budget.capture_invocation_reservations(request)?;
+        self.normalize_mutation_metadata(&mut decision);
+        Ok(decision)
     }
 
     fn query_invocation_capture(
@@ -481,7 +516,11 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         request: &crate::budget_store::BudgetCaptureInvocationRequest,
     ) -> Result<Option<crate::budget_store::BudgetHoldMutationDecision>, BudgetStoreError> {
         let _transaction = self.lock_transaction()?;
-        self.budget.query_invocation_capture(request)
+        let mut decision = self.budget.query_invocation_capture(request)?;
+        if let Some(decision) = decision.as_mut() {
+            self.normalize_mutation_metadata(decision);
+        }
+        Ok(decision)
     }
 
     fn reap_orphaned_holds(
