@@ -351,9 +351,7 @@ impl AuthorityWorkloadPolicy {
         requested_scope: &ChioScope,
         requested_ttl: u64,
     ) -> Result<(ChioScope, u64), String> {
-        let requested = canonical_json_bytes(requested_scope).map_err(|error| error.to_string())?;
         let mut matched_ttl = None;
-        let mut matched_scope = None;
         for capability in &self.allowed_capabilities {
             let mut allowed_scope = capability.scope.clone();
             for grant in &mut allowed_scope.grants {
@@ -361,22 +359,21 @@ impl AuthorityWorkloadPolicy {
                     grant.server_id.clone_from(&self.server_id);
                 }
             }
-            let canonical =
-                canonical_json_bytes(&allowed_scope).map_err(|error| error.to_string())?;
-            if canonical == requested {
+            // The workload policy is the outer authority ceiling. Subject-specific
+            // issuance policies can only narrow this requested scope further.
+            if requested_scope.is_subset_of(&allowed_scope) {
                 matched_ttl =
                     Some(matched_ttl.map_or(capability.ttl, |ttl: u64| ttl.min(capability.ttl)));
-                matched_scope = Some(allowed_scope);
             }
         }
-        let scope = matched_scope.ok_or_else(|| {
-            "requested capability scope is not an exact workload-policy grant".to_string()
+        let matched_ttl = matched_ttl.ok_or_else(|| {
+            "requested capability scope exceeds every workload-policy grant".to_string()
         })?;
-        let ttl = requested_ttl.min(matched_ttl.unwrap_or_default());
+        let ttl = requested_ttl.min(matched_ttl);
         if ttl == 0 {
             return Err("derived capability TTL is zero".to_string());
         }
-        Ok((scope, ttl))
+        Ok((requested_scope.clone(), ttl))
     }
 }
 
@@ -1142,6 +1139,7 @@ pub(crate) fn validate_control_secret(secret: &str, label: &str) -> Result<(), C
 #[cfg(test)]
 mod service_config_tests {
     use super::*;
+    use chio_core::capability::scope::{Constraint, Operation, ToolGrant};
     use chio_test_support::prelude::*;
 
     fn base_config() -> TrustServiceConfig {
@@ -1190,6 +1188,60 @@ mod service_config_tests {
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         }
+    }
+
+    #[test]
+    fn authority_workload_derives_attenuated_capability_without_broadening() {
+        let workload = AuthorityWorkloadPolicy {
+            credential_token: "workload-token".to_string(),
+            tenant_id: "tenant-a".to_string(),
+            workload_id: "workload-a".to_string(),
+            server_id: "filesystem".to_string(),
+            signer_public_key: Keypair::from_seed(&[0x11; 32]).public_key(),
+            session_admission_public_key: Keypair::from_seed(&[0x22; 32]).public_key(),
+            allowed_capabilities: vec![crate::policy::DefaultCapability {
+                scope: ChioScope {
+                    grants: vec![ToolGrant {
+                        server_id: "*".to_string(),
+                        tool_name: "read_file".to_string(),
+                        operations: vec![Operation::Read],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                ttl: 300,
+            }],
+        };
+        let requested = ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "filesystem".to_string(),
+                tool_name: "read_file".to_string(),
+                operations: vec![Operation::Read],
+                constraints: vec![Constraint::PathPrefix("/workspace/safe".to_string())],
+                max_invocations: Some(10),
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: Some(true),
+            }],
+            resource_grants: Vec::new(),
+            prompt_grants: Vec::new(),
+        };
+
+        let (derived, ttl) = workload.derive_capability(&requested, 600).test_unwrap();
+        assert_eq!(
+            canonical_json_bytes(&derived).test_unwrap(),
+            canonical_json_bytes(&requested).test_unwrap()
+        );
+        assert_eq!(ttl, 300);
+
+        let mut broadened = requested;
+        broadened.grants[0].operations.push(Operation::Invoke);
+        assert!(workload.derive_capability(&broadened, 60).is_err());
     }
 
     #[test]

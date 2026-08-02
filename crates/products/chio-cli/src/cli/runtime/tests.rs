@@ -1,5 +1,27 @@
 
 use super::*;
+use chio_core::capability::scope::Operation;
+
+#[test]
+fn authority_workload_ceiling_includes_policy_gated_operations() {
+    let policy_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(3)
+        .expect("workspace root")
+        .join("examples/policies/hushspec-reputation.yaml");
+    let loaded = load_policy(&policy_path).expect("load reputation policy");
+    let capabilities = trust_serve::authority_workload_capabilities(&loaded);
+    let read_file = capabilities
+        .iter()
+        .flat_map(|capability| &capability.scope.grants)
+        .find(|grant| grant.tool_name == "read_file")
+        .expect("read_file workload grant");
+
+    assert!(read_file.operations.contains(&Operation::Invoke));
+    assert!(read_file.operations.contains(&Operation::Read));
+    assert!(read_file.operations.contains(&Operation::Get));
+    assert!(read_file.operations.contains(&Operation::Delegate));
+}
 
 #[test]
 fn production_broker_rejects_split_durable_revocation_authority() {

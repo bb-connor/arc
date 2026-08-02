@@ -41,6 +41,44 @@ fn load_authority_workload_public_key(
     chio_core::PublicKey::from_hex(public_key_hex).map_err(CliError::from)
 }
 
+pub(super) fn authority_workload_capabilities(
+    loaded: &chio_control_plane::policy::LoadedPolicy,
+) -> Vec<chio_control_plane::policy::DefaultCapability> {
+    // The workload boundary must permit every operation that the configured
+    // subject policies might approve. Those policies remain the narrowing
+    // authority for the subject's actual reputation or runtime tier.
+    let mut capabilities = loaded.default_capabilities.clone();
+    let mut issuance_operations = Vec::new();
+    if let Some(policy) = loaded.issuance_policy.as_ref() {
+        for tier in &policy.tiers {
+            for operation in &tier.max_scope.operations {
+                if !issuance_operations.contains(operation) {
+                    issuance_operations.push(operation.clone());
+                }
+            }
+        }
+    }
+    if let Some(policy) = loaded.runtime_assurance_policy.as_ref() {
+        for tier in &policy.tiers {
+            for operation in &tier.max_scope.operations {
+                if !issuance_operations.contains(operation) {
+                    issuance_operations.push(operation.clone());
+                }
+            }
+        }
+    }
+    for capability in &mut capabilities {
+        for grant in &mut capability.scope.grants {
+            for operation in &issuance_operations {
+                if !grant.operations.contains(operation) {
+                    grant.operations.push(operation.clone());
+                }
+            }
+        }
+    }
+    capabilities
+}
+
 pub(crate) fn cmd_trust_serve(
     listen: SocketAddr,
     service_token: &str,
@@ -132,16 +170,13 @@ pub(crate) fn cmd_trust_serve(
                     session_admission_public_key_path,
                     "authority session-admission public-key file",
                 )?;
-            let allowed_capabilities = loaded_policy
-                .as_ref()
-                .ok_or_else(|| {
+            let loaded_policy = loaded_policy.as_ref().ok_or_else(|| {
                     CliError::cli_other_error(
                         "authority workload issuance requires --policy for server-derived scope and TTL"
                             .to_string(),
                     )
-                })?
-                .default_capabilities
-                .clone();
+                })?;
+            let allowed_capabilities = authority_workload_capabilities(loaded_policy);
             Some(trust_control::AuthorityWorkloadPolicy {
                 credential_token: token.to_string(),
                 tenant_id: tenant_id.to_string(),
