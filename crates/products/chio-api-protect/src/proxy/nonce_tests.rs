@@ -279,10 +279,16 @@ async fn proxy_handler_returns_strict_execution_nonce_before_upstream_dispatch()
         .test_unwrap();
 
     let retry_response = proxy_handler(State(Arc::clone(&state)), retry_request).await;
-    assert_eq!(retry_response.status(), StatusCode::OK);
+    let retry_status = retry_response.status();
     let retry_body = to_bytes(retry_response.into_body(), 1024 * 1024)
         .await
         .test_unwrap();
+    assert_eq!(
+        retry_status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&retry_body)
+    );
     assert_eq!(retry_body.as_ref(), br#"{"ok":true}"#);
     let requests = running_upstream.join();
     assert_eq!(requests.len(), 1);

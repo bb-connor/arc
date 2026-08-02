@@ -21,6 +21,7 @@ use chio_kernel::{
     ThresholdApprovalProposalCreationParameters,
 };
 use chio_openapi::PolicyDecision;
+use sha2::Digest;
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -224,9 +225,14 @@ fn make_test_state_with_revocation_store(
     allow_advisory: bool,
     revocation_store_override: Option<Arc<dyn chio_kernel::RevocationStore>>,
 ) -> Arc<ProxyState> {
-    let keypair = Keypair::generate();
+    let keypair = if let Some(path) = receipt_db {
+        let seed: [u8; 32] = sha2::Sha256::digest(path.as_bytes()).into();
+        Keypair::from_seed(&seed)
+    } else {
+        Keypair::generate()
+    };
     let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
-        Arc::new(SqliteApprovalStore::open(path).test_unwrap())
+        Arc::new(SqliteApprovalStore::open_colocated_with_receipt_store(path).test_unwrap())
     } else {
         Arc::new(InMemoryApprovalStore::new())
     };
@@ -471,9 +477,12 @@ fn signed_approval_response_token(
 }
 
 fn temp_receipt_db_path() -> String {
-    chio_test_support::private_fs::unique_sqlite_path("chio-api-protect-test")
-        .to_string_lossy()
-        .into_owned()
+    let path = chio_test_support::private_fs::unique_sqlite_path("chio-api-protect-test");
+    chio_store_sqlite::SqliteReceiptStore::open(&path)
+        .test_unwrap()
+        .close()
+        .test_unwrap();
+    path.to_string_lossy().into_owned()
 }
 
 fn with_peer_addr(mut request: Request<Body>, peer: SocketAddr) -> Request<Body> {

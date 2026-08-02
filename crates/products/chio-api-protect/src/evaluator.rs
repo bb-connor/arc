@@ -319,7 +319,13 @@ impl RequestEvaluator {
         body_length: u64,
         execution_nonce: Option<&SignedExecutionNonce>,
     ) -> Result<EvaluationResult, crate::error::ProtectError> {
-        let request_id = uuid::Uuid::now_v7().to_string();
+        // A strict retry is the same authenticated operation. Reuse the request
+        // identifier covered by the presented nonce so the authority can verify
+        // the full binding instead of assigning a new identifier that must fail.
+        // The nonce signature is still verified by the authority below.
+        let request_id = execution_nonce
+            .map(|nonce| nonce.nonce.bound_to.request_id.clone())
+            .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
         let caller = caller_identity_from_headers(headers);
         let (route_pattern, matched_policy) = self.match_route(method, path);
         let result = self.authority.evaluate(HttpAuthorityInput {

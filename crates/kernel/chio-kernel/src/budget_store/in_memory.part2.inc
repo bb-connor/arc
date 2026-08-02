@@ -1211,7 +1211,12 @@ impl InMemoryBudgetStoreInner {
             request.authority.as_ref(),
             request.admission_operation.as_ref(),
         )?;
-        if hold.monetary_state != BudgetMonetaryHoldState::Exposed
+        let monetary_state_is_settleable = hold.monetary_state
+            == BudgetMonetaryHoldState::Exposed
+            || (request.exposed_cost_units == 0
+                && request.realized_spend_units == 0
+                && hold.monetary_state == BudgetMonetaryHoldState::None);
+        if !monetary_state_is_settleable
             || hold.remaining_exposure_units != request.exposed_cost_units
         {
             return Err(BudgetStoreError::Invariant(format!(

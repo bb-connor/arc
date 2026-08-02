@@ -1,6 +1,6 @@
     #[test]
     fn revocation_preload_is_bounded_to_the_newest_acceleration_window() {
-        let directory = tempfile::tempdir().test_unwrap();
+        let directory = private_test_directory();
         let path = directory.path().join("revocations.sqlite3");
         let store = chio_store_sqlite::SqliteRevocationStore::open(&path).test_unwrap();
         let total = REVOCATION_ACCELERATION_CACHE_MAX_IDS + 17;
@@ -36,13 +36,15 @@
         // sidecar selects from that configuration.
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let dir =
-            std::env::temp_dir().join(format!("chio-budget-both-e2e-{}", uuid::Uuid::now_v7()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let directory = private_test_directory();
+        let dir = directory.path();
         let db = dir.join("budget.sqlite");
         let config = ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
-            spec_content: Some("{}".to_string()),
+            spec_content: Some(
+                r#"{"openapi":"3.0.3","info":{"title":"Chio","version":"1"},"paths":{}}"#
+                    .to_string(),
+            ),
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
@@ -121,17 +123,16 @@
         budget_path: &str,
         request_id: &str,
     ) -> Vec<chio_kernel::AdmissionOperation> {
-        let store = chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(format!(
-            "{budget_path}.admission-operations"
-        ))
-        .unwrap();
-        store
+        let path = format!("{budget_path}.admission-operations");
+        let store = chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(&path).unwrap();
+        let operations = store
             .load_by_request_id(
                 chio_kernel::AdmissionOperationKind::ToolDispatch,
                 request_id,
                 2,
             )
-            .unwrap()
+            .unwrap();
+        operations
     }
 
     #[derive(Debug, PartialEq, Eq)]
@@ -179,22 +180,37 @@
         }
     }
 
-    /// A receipt store whose `append_tool_receipt` fails deterministically: the
-    /// backing `tool_receipts` table is dropped through a second connection to
-    /// the same database, so every append errors.
+    /// A receipt store whose `append_tool_receipt` fails deterministically while
+    /// startup reads remain valid.
     fn failing_receipt_store() -> SqliteReceiptStore {
         let (db, store) = open_temp_receipt_store();
-        let dropper = rusqlite::Connection::open(&db).unwrap();
-        dropper.execute("DROP TABLE tool_receipts", []).unwrap();
-        drop(dropper);
+        let connection = rusqlite::Connection::open(&db).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TRIGGER fail_tool_receipt_append
+                 BEFORE INSERT ON tool_receipts
+                 BEGIN
+                     SELECT RAISE(FAIL, 'forced tool receipt append failure');
+                 END;",
+            )
+            .unwrap();
+        drop(connection);
         store
     }
 
     fn failing_http_receipt_store() -> SqliteReceiptStore {
         let (db, store) = open_temp_receipt_store();
-        let dropper = rusqlite::Connection::open(&db).unwrap();
-        dropper.execute("DROP TABLE http_receipts", []).unwrap();
-        drop(dropper);
+        let connection = rusqlite::Connection::open(&db).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TRIGGER fail_http_receipt_append
+                 BEFORE INSERT ON http_receipts
+                 BEGIN
+                     SELECT RAISE(FAIL, 'forced HTTP receipt append failure');
+                 END;",
+            )
+            .unwrap();
+        drop(connection);
         store
     }
 
@@ -202,11 +218,17 @@
     /// while the authoritative revocation store remains healthy.
     fn failing_revocation_mirror_store() -> SqliteReceiptStore {
         let (db, store) = open_temp_receipt_store();
-        let dropper = rusqlite::Connection::open(&db).unwrap();
-        dropper
-            .execute("DROP TABLE revoked_capabilities", [])
+        let connection = rusqlite::Connection::open(&db).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TRIGGER fail_revocation_mirror_append
+                 BEFORE INSERT ON revoked_capabilities
+                 BEGIN
+                     SELECT RAISE(FAIL, 'forced revocation mirror append failure');
+                 END;",
+            )
             .unwrap();
-        drop(dropper);
+        drop(connection);
         store
     }
 
@@ -233,7 +255,7 @@
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn authoritative_release_failure_leaves_cache_and_legacy_mirror_unchanged() {
         let signer = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let (_, receipt_store) = open_temp_receipt_store();
         let authority: Arc<dyn chio_kernel::RevocationStore> =
             Arc::new(FailingAuthoritativeRevocationStore);
@@ -249,10 +271,11 @@
             None,
         );
 
-        let (status, json) = post_json(
+        let (status, json) = post_json_with_bearer(
             Arc::clone(&state),
             "/v1/capabilities/release",
             &serde_json::json!({ "capability_id": "cap-authority-failure" }),
+            Some(MEDIATED_CONTROL_TOKEN),
         )
         .await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
@@ -289,7 +312,7 @@
         assert!(!json.to_string().contains("/var/lib/chio"));
 
         let signer = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let state = mediated_test_state_inner(
             signer,
             budget,
@@ -298,7 +321,7 @@
             Some(failing_http_receipt_store()),
             true,
         );
-        let (status, json) = post_json(
+        let (status, json) = post_json_with_bearer(
             state,
             "/v1/receipts",
             &serde_json::json!({
@@ -307,6 +330,7 @@
                 "job_uid": "job-1",
                 "outcome": "succeeded",
             }),
+            Some(MEDIATED_CONTROL_TOKEN),
         )
         .await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
@@ -319,7 +343,7 @@
     async fn legacy_mirror_failure_cannot_hide_an_authoritative_release() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let issuing = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let capability = issue_cost_bearing_capability(
             &issuing,
@@ -345,10 +369,11 @@
             None,
         );
 
-        let (status, json) = post_json(
+        let (status, json) = post_json_with_bearer(
             Arc::clone(&state),
             "/v1/capabilities/release",
             &serde_json::json!({ "capability_id": capability_id }),
+            Some(MEDIATED_CONTROL_TOKEN),
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{json}");
@@ -391,7 +416,7 @@
     async fn release_preserves_exact_identifier_without_cross_id_revocation() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let issuing = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let capability = issue_cost_bearing_capability(
             &issuing,
@@ -417,10 +442,11 @@
             None,
         );
 
-        let (status, json) = post_json(
+        let (status, json) = post_json_with_bearer(
             Arc::clone(&state),
             "/v1/capabilities/release",
             &serde_json::json!({ "capability_id": exact_release_id }),
+            Some(MEDIATED_CONTROL_TOKEN),
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{json}");
@@ -621,7 +647,7 @@
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn hold_capable_mediation_rejects_missing_durable_receipt_authority_at_startup() {
-        let directory = tempfile::tempdir().unwrap();
+        let directory = private_test_directory();
         let budget_path = directory.path().join("budget.db");
         let config = ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
@@ -680,7 +706,7 @@
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn invalid_budget_topologies_create_no_durable_authority_files() {
         for invalid_budget in ["", ":memory:", "file:budget.db?mode=rwc"] {
-            let directory = tempfile::tempdir().unwrap();
+            let directory = private_test_directory();
             let receipt_path = directory.path().join("receipts.db");
             let budget_path = directory.path().join("budget.db");
             let configured_budget = match invalid_budget {
@@ -750,7 +776,7 @@
     async fn symlink_aliased_receipt_and_revocation_paths_fail_before_database_mutation() {
         use std::os::unix::fs::symlink;
 
-        let directory = tempfile::tempdir().unwrap();
+        let directory = private_test_directory();
         let receipt_path = directory.path().join("receipts.db");
         let revocation_alias = directory.path().join("revocations-alias.db");
         symlink(&receipt_path, &revocation_alias).unwrap();
@@ -815,7 +841,7 @@
     #[cfg(unix)]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn hardlink_aliased_receipt_and_revocation_paths_fail_before_database_mutation() {
-        let directory = tempfile::tempdir().unwrap();
+        let directory = private_test_directory();
         let receipt_path = directory.path().join("receipts.db");
         let revocation_alias = directory.path().join("revocations-hardlink.db");
         std::fs::File::create(&receipt_path).unwrap();
@@ -849,7 +875,9 @@
             .await
             .unwrap_err();
         assert!(
-            error.to_string().contains("durable authority path conflict"),
+            error
+                .to_string()
+                .contains("database descriptor identity changed or is hard-linked"),
             "unexpected hardlink-alias failure: {error}"
         );
         assert_eq!(std::fs::metadata(&receipt_path).unwrap().len(), 0);
@@ -880,7 +908,7 @@
     async fn symlink_aliased_derived_admission_path_fails_before_database_mutation() {
         use std::os::unix::fs::symlink;
 
-        let directory = tempfile::tempdir().unwrap();
+        let directory = private_test_directory();
         let receipt_path = directory.path().join("receipts.db");
         let budget_path = directory.path().join("budget.db");
         let operation_path = std::path::PathBuf::from(format!(
@@ -1025,7 +1053,7 @@
         let revocation_path = directory.path().join("operator-revocations.db");
         let signer = Keypair::from_seed(&[0x14; 32]);
         let agent = Keypair::generate();
-        let issuing_budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let issuing_budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let issuing = issuing_kernel(&signer, issuing_budget, &[]);
         let capability = issue_cost_bearing_capability(
             &issuing,
@@ -1189,7 +1217,10 @@
 
         let config = ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
-            spec_content: Some("{}".to_string()),
+            spec_content: Some(
+                r#"{"openapi":"3.0.3","info":{"title":"Chio","version":"1"},"paths":{}}"#
+                    .to_string(),
+            ),
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: Some(receipt_path.to_string_lossy().into_owned()),
@@ -1238,7 +1269,7 @@
     async fn mediated_receipt_persistence_failure_returns_nonce_and_keeps_reservation() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
@@ -1295,7 +1326,7 @@
     async fn mediated_receipt_persistence_success_keeps_reservation() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
@@ -1338,7 +1369,7 @@
     async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps_reservation() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
         let cap_id = cap.id.clone();
@@ -1397,7 +1428,7 @@
             "realized_cost": { "units": 0, "currency": "USD" },
         });
         let (recon_status, reconciled) = post_reconcile(state, &reconcile_body).await;
-        assert_eq!(recon_status, StatusCode::OK);
+        assert_eq!(recon_status, StatusCode::OK, "{reconciled}");
         assert_eq!(reconciled["status"], "reconciled");
     }
 
@@ -1497,7 +1528,7 @@
     async fn mediated_invocation_reconcile_keeps_invocation_consumed() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
         let cap_id = cap.id.clone();
@@ -1524,7 +1555,7 @@
             "realized_cost": { "units": 0, "currency": "USD" },
         });
         let (status, reconciled) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
-        assert_eq!(status, StatusCode::OK);
+        assert_eq!(status, StatusCode::OK, "{reconciled}");
         assert_eq!(reconciled["status"], "reconciled");
 
         let usage = budget.get_usage(&cap_id, 0).unwrap();
@@ -1553,7 +1584,7 @@
     async fn reaper_forfeits_expired_invocation_reserve() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
         let cap_id = cap.id.clone();
@@ -1609,7 +1640,7 @@
     async fn mediated_open_invocation_reserve_blocks_oversubscription() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
         let cap_value = serde_json::to_value(&cap).unwrap();

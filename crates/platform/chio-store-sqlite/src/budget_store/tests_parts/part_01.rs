@@ -16,6 +16,21 @@ fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
 }
 
+#[cfg(unix)]
+#[test]
+fn sqlite_budget_store_creates_private_database_file() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = unique_db_path("chio-budgets-private");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+
+    assert_eq!(mode, 0o600);
+
+    drop(store);
+    let _ = fs::remove_file(path);
+}
+
 fn test_row_u64(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
     let value = row.get::<_, i64>(index)?;
     u64::try_from(value).map_err(|error| {

@@ -519,11 +519,19 @@ pub(crate) fn governed_request_metadata(
         return Ok(None);
     };
 
-    let approval_artifact_digest = request.approval_artifact_digest().map_err(|error| {
-        KernelError::ReceiptSigningFailed(format!(
-            "failed to hash governed approval for receipt metadata: {error}"
-        ))
-    })?;
+    // The singular approval block below carries only a one-of-one token. Do not
+    // require an intentionally insufficient threshold set to validate merely to
+    // sign its deny receipt. Verified threshold evidence is projected by the
+    // threshold admission metadata on successful authorization.
+    let approval_artifact_digest = if request.approval_token.is_some() {
+        request.approval_artifact_digest().map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to hash governed approval for receipt metadata: {error}"
+            ))
+        })?
+    } else {
+        None
+    };
     let approval =
         request
             .approval_token

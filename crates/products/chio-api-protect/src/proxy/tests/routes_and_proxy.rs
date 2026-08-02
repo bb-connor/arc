@@ -441,7 +441,7 @@ async fn threshold_approval_production_config_rejects_ephemeral_store() {
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
-        allow_ephemeral_receipts: false,
+        allow_ephemeral_receipts: true,
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),

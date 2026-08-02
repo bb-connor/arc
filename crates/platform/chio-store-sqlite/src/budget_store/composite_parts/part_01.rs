@@ -1225,7 +1225,12 @@ impl SqliteBudgetStore {
         current_hold
             .admission_operation
             .validate_binding(admission_operation, "composite hold")?;
-        if current_hold.monetary_state != BudgetMonetaryHoldState::Exposed
+        let monetary_state_is_settleable = current_hold.monetary_state
+            == BudgetMonetaryHoldState::Exposed
+            || (request.exposed_cost_units == 0
+                && request.realized_spend_units == 0
+                && current_hold.monetary_state == BudgetMonetaryHoldState::None);
+        if !monetary_state_is_settleable
             || base_hold.remaining_exposure_units != request.exposed_cost_units
         {
             return Err(BudgetStoreError::Conflict(format!(
@@ -1316,7 +1321,7 @@ impl SqliteBudgetStore {
                 hold_id,
                 next_monetary_state.as_str(),
                 now,
-                BudgetMonetaryHoldState::Exposed.as_str(),
+                current_hold.monetary_state.as_str(),
             ],
         )?;
         if updated_hold != 1 {

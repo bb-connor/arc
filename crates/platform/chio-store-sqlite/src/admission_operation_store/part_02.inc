@@ -34,6 +34,21 @@ mod tests {
         std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn sqlite_admission_operation_store_creates_private_database_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = unique_db_path("chio-admission-operation-private");
+        let store = SqliteAdmissionOperationStore::open(&path).unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+
+        assert_eq!(mode, 0o600);
+
+        drop(store);
+        let _ = fs::remove_file(path);
+    }
+
     fn operation_with_binding(request_id: &str, budget_hold_id: &str) -> AdmissionOperation {
         AdmissionOperation::prepared(PreparedAdmissionOperation {
             kind: AdmissionOperationKind::ToolDispatch,

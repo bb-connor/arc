@@ -89,7 +89,7 @@ async fn runtime_revocation_cache_caches_positive_hits_until_full_then_requeries
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn sidecar_release_persists_revocation_and_blocks_reuse() {
     let receipt_db = temp_receipt_db_path();
     let state = test_state_with_receipt_db(
@@ -142,12 +142,12 @@ async fn sidecar_release_persists_revocation_and_blocks_reuse() {
         .body(Body::from(r#"{"name":"fido"}"#))
         .test_unwrap();
     let response = proxy_handler(State(Arc::clone(&reloaded)), request).await;
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
-
+    let status = response.status();
     let body = to_bytes(response.into_body(), 1024 * 1024)
         .await
         .test_unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
+    assert_eq!(status, StatusCode::FORBIDDEN, "{json}");
     assert_eq!(json["message"], "capability token has been revoked");
 
     let _ = std::fs::remove_file(&receipt_db);
@@ -515,8 +515,11 @@ async fn sidecar_release_revokes_in_process_without_a_receipt_store() {
 
 #[tokio::test]
 async fn durable_revocation_db_id_is_enforced_by_proxy_state() {
-    let dir = std::env::temp_dir().join(format!("chio-revocation-state-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).test_unwrap();
+    let directory = chio_test_support::private_fs::private_tempdir(
+        "api-protect-revocation-state-",
+    )
+    .test_unwrap();
+    let dir = directory.path();
     let db = dir.join("revocations.sqlite3");
 
     // An operator revokes through the durable store that

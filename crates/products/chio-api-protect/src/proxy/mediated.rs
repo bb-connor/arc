@@ -137,14 +137,8 @@ pub(crate) fn build_mediation_admission_authorities_in_directory(
             "mediation authorities require the resolved absolute budget_db path".to_string(),
         ));
     }
-    let operation_path = resolved_plain_database_path(
-        &format!("{budget_path}.admission-operations"),
-        "admission operation store",
-    )?;
-    let nonce_path = resolved_plain_database_path(
-        &format!("{budget_path}.execution-nonces"),
-        "execution nonce store",
-    )?;
+    let operation_path = format!("{budget_path}.admission-operations");
+    let nonce_path = format!("{budget_path}.execution-nonces");
     build_mediation_admission_authorities_with_paths(
         budget_path,
         &operation_path,
@@ -556,7 +550,11 @@ pub(crate) fn build_mediation_kernel(
                 DpopNonceStore::new(dpop_config.nonce_store_capacity, dpop_ttl),
             )
         };
+    // Exact durable handoff claims may remain owned for 30 seconds. Keep an
+    // additional 30-second issuance window so a nonce cannot become too short
+    // to publish merely because authorization crossed a wall-clock second.
     let nonce_cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 60,
         require_nonce: true,
         ..ExecutionNonceConfig::default()
     };
@@ -1086,7 +1084,7 @@ pub(crate) async fn reap_expired_reserved_holds_once(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
+    use chio_kernel::budget_store::BudgetStore;
     use chio_security_types::flow::{DeclassificationPurpose, InformationLabel, PrincipalId};
     use chio_security_types::ports::{
         DestinationId, Digest32, GrantId, RecordId, SessionId, TenantId,
@@ -1099,6 +1097,16 @@ mod tests {
         budget_path: String,
         approval_path: String,
         threshold_config: Option<ThresholdApprovalCollectorConfig>,
+    }
+
+    fn private_test_directory() -> tempfile::TempDir {
+        chio_test_support::private_fs::private_tempdir("chio-api-protect-").test_unwrap()
+    }
+
+    fn durable_test_budget_store() -> Arc<dyn BudgetStore> {
+        let path =
+            chio_test_support::private_fs::unique_sqlite_path("chio-api-protect-mediated-budget");
+        Arc::new(chio_store_sqlite::budget_store::SqliteBudgetStore::open(path).test_unwrap())
     }
 
     fn durable_mediation_budget_and_admission(
@@ -1350,15 +1358,15 @@ mod tests {
             .test_unwrap()
             .keep();
             let receipt_path = authority_directory.join("receipts.db");
-            let budget_path = authority_directory
-                .join("budget.db")
-                .to_string_lossy()
-                .into_owned();
             let kernel_receipt_store: Arc<dyn chio_kernel::ReceiptStore> =
                 Arc::new(chio_store_sqlite::SqliteReceiptStore::open(&receipt_path).test_unwrap());
             let approval_store: Arc<dyn ApprovalStore> = Arc::new(
                 SqliteApprovalStore::open_colocated_with_receipt_store(&receipt_path).test_unwrap(),
             );
+            let budget_path = authority_directory
+                .join("budget.db")
+                .to_string_lossy()
+                .into_owned();
             let authorities = build_mediation_admission_authorities(
                 &budget_path,
                 Arc::clone(&approval_store),
@@ -1455,10 +1463,10 @@ mod tests {
         let mut request = request;
         request
             .extensions_mut()
-            .insert(ConnectInfo(std::net::SocketAddr::from((
+            .insert(ConnectInfo(CappedPeerAddr(std::net::SocketAddr::from((
                 [127, 0, 0, 1],
                 4100,
-            ))));
+            )))));
         request
     }
 

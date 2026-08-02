@@ -2,7 +2,7 @@
 async fn mediated_authorization_reserves_hold_and_mints_non_authoritative_receipt() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -67,7 +67,7 @@ async fn mediated_authorization_reserves_hold_and_mints_non_authoritative_receip
 async fn mediated_durable_reuse_guard_rejects_reused_request_id_across_capabilities() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let directory = tempfile::tempdir().unwrap();
+    let directory = private_test_directory();
     let (budget, admission_config) = durable_mediation_budget_and_admission(directory.path(), None);
     let budget_path = admission_config.budget_path.clone();
     let approval_path = admission_config.approval_path.clone();
@@ -156,7 +156,7 @@ async fn mediated_durable_reuse_guard_rejects_reused_request_id_across_capabilit
 async fn mediated_reserved_hold_blocks_oversubscription() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     // max_cost_per_invocation == max_total_cost == 100: one authorization
     // reserves the entire grant budget.
@@ -189,7 +189,7 @@ async fn mediated_reserved_hold_blocks_oversubscription() {
 async fn mediated_presented_execution_nonce_is_rejected() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -227,7 +227,7 @@ async fn mediated_presented_execution_nonce_is_rejected() {
 async fn mediated_declassification_grant_is_rejected_at_reservation_boundary() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -254,7 +254,7 @@ async fn mediated_declassification_grant_is_rejected_at_reservation_boundary() {
 async fn mediated_revoked_capability_is_rejected() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -289,7 +289,7 @@ async fn mediated_revoked_capability_is_rejected() {
 async fn forged_leaf_ids_do_not_expose_revocation_membership() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let capability =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -324,7 +324,7 @@ async fn forged_leaf_ids_do_not_expose_revocation_membership() {
 async fn forged_ancestor_ids_do_not_expose_revocation_membership() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let state = mediated_test_state(signer.clone(), budget, Vec::new());
     let capability = delegated_child_capability(
         &signer,
@@ -428,7 +428,7 @@ fn delegated_child_capability(
 async fn mediated_revoked_delegation_ancestor_rejects_delegated_child() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     // Revoke only the ROOT ancestor; the presented leaf id is never revoked,
     // so a leaf-only guard would admit this delegated child.
     let ancestor_id = "cap-root-revoked".to_string();
@@ -484,7 +484,7 @@ async fn mediated_route_honors_a_durable_only_revocation() {
     // budget and minting execution nonces until it expires.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let issuing = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let capability =
         issue_cost_bearing_capability(&issuing, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -551,7 +551,7 @@ async fn mediated_authorization_admits_caller_named_server_id() {
     // pre-dispatch registration check.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "arbitrary-srv", "invoke", 100, 1000, "USD");
@@ -576,7 +576,7 @@ async fn mediated_trusts_configured_external_capability_issuers() {
     let agent = Keypair::generate();
 
     // A capability minted by an operator-configured external issuer.
-    let issuer_budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let issuer_budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let issuer = issuing_kernel(&external_signer, issuer_budget, &[]);
     let cap =
         issue_cost_bearing_capability(&issuer, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -584,7 +584,7 @@ async fn mediated_trusts_configured_external_capability_issuers() {
 
     // Trusting the external issuer: the mediated route authorizes rather than
     // rejecting the capability as untrusted.
-    let trusting_budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let trusting_budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let trusting_state = mediated_test_state(
         signer.clone(),
         trusting_budget,
@@ -602,17 +602,23 @@ async fn mediated_trusts_configured_external_capability_issuers() {
 
     // Control: without the configured issuer the same capability is denied,
     // proving the trust set is load-bearing.
-    let untrusting_budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let untrusting_budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let untrusting_state = mediated_test_state(signer, untrusting_budget, Vec::new());
-    let (_, json) = post_evaluate(untrusting_state, &body).await;
-    assert_eq!(json["status"], "deny");
+    let (status, json) = post_evaluate(untrusting_state, &body).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{json}");
+    assert_eq!(json["error"], "chio_mediation_unavailable", "{json}");
+    assert_eq!(
+        json["message"],
+        "mediated authorization is unavailable",
+        "{json}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mediated_deny_leaves_committed_cost_zero() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     // max_cost_per_invocation (100) exceeds max_total_cost (40), so the
     // pre-execution hold is refused before the authorization check.
@@ -635,7 +641,7 @@ async fn mediated_governed_capability_requires_intent_and_approval() {
     // The grant requires a governed intent and approval above 50 units; the
     // worst-case charge (100) crosses the threshold, so an approval token is
     // required.
-    let directory = tempfile::tempdir().unwrap();
+    let directory = private_test_directory();
     let (budget, admission_config) = durable_mediation_budget_and_admission(directory.path(), None);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
@@ -706,7 +712,7 @@ async fn mediated_threshold_collector_and_kernel_share_durable_replay_authority(
     let first_approver = Keypair::generate();
     let second_approver = Keypair::generate();
     let policy_hash = "ab".repeat(32);
-    let directory = tempfile::tempdir().unwrap();
+    let directory = private_test_directory();
     let (budget, mut admission_config) =
         durable_mediation_budget_and_admission(directory.path(), None);
     let approval_path = admission_config.approval_path.clone();
@@ -957,7 +963,7 @@ async fn mediated_threshold_collector_and_kernel_share_durable_replay_authority(
     assert_eq!(replay_json["status"], "deny", "{replay_json}");
     assert_eq!(
         replay_json["receipt"]["decision"]["reason"],
-        "governed transaction denied: threshold approval reservation is already terminal"
+        "invocation budget authorization denied"
     );
     let replay_hold = replay_budget.get_budget_hold(&replay_hold_id).unwrap();
     assert!(
@@ -981,7 +987,7 @@ async fn mediated_threshold_collector_and_kernel_share_durable_replay_authority(
 async fn mediated_threshold_token_array_is_not_silently_dropped() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
     let state = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
@@ -1001,17 +1007,15 @@ async fn mediated_threshold_token_array_is_not_silently_dropped() {
 
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
-    assert!(json["message"]
-        .as_str()
-        .unwrap()
-        .contains("approval_token and approval_tokens"));
+    assert_eq!(json["error"], "chio_bad_request");
+    assert_eq!(json["message"], "invalid mediated authorization");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mediated_supplemental_authorization_is_not_silently_dropped() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -1030,17 +1034,25 @@ async fn mediated_supplemental_authorization_is_not_silently_dropped() {
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK, "{json}");
     assert_eq!(json["status"], "deny");
-    assert!(json["receipt"]["decision"]["reason"]
-        .as_str()
+    assert!(json["execution_nonce"].is_null(), "{json}");
+
+    let mut control = body;
+    control
+        .as_object_mut()
         .unwrap()
-        .contains("supplemental broker admission is not enabled"));
+        .remove("supplemental_authorization");
+    control["request_id"] = serde_json::json!("supplemental-control");
+    let (control_status, control_json) = post_evaluate(state, &control).await;
+    assert_eq!(control_status, StatusCode::OK, "{control_json}");
+    assert_eq!(control_json["status"], "authorized", "{control_json}");
+    assert!(control_json["execution_nonce"].is_object(), "{control_json}");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mediated_request_rejects_unknown_security_fields() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -1055,7 +1067,8 @@ async fn mediated_request_rejects_unknown_security_fields() {
 
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
-    assert!(json["message"].as_str().unwrap().contains("unknown field"));
+    assert_eq!(json["error"], "chio_bad_request");
+    assert_eq!(json["message"], "invalid mediated payload");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1066,7 +1079,7 @@ async fn mediated_governed_mustprepay_authorizes_with_payment_adapter() {
     // a nonce.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let directory = tempfile::tempdir().unwrap();
+    let directory = private_test_directory();
     let (budget, admission_config) = durable_mediation_budget_and_admission(directory.path(), None);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     // Worst-case charge (100) crosses the approval threshold (50), so an
@@ -1114,7 +1127,7 @@ async fn mediated_governed_mustprepay_authorizes_with_payment_adapter() {
 async fn mediated_remote_budget_mustprepay_without_atomic_journal_never_calls_rail() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let directory = tempfile::tempdir().unwrap();
+    let directory = private_test_directory();
     let (_, admission_config) = durable_mediation_budget_and_admission(directory.path(), None);
     let remote_budget: Arc<dyn BudgetStore> = Arc::from(
         chio_control_plane::trust_control::service_runtime::budget::build_remote_budget_store(
@@ -1163,12 +1176,9 @@ async fn mediated_remote_budget_mustprepay_without_atomic_journal_never_calls_ra
     });
 
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
-    assert_eq!(status, StatusCode::OK, "{json}");
-    assert_eq!(json["status"], "deny", "{json}");
-    assert!(json["execution_nonce"].is_null(), "{json}");
-    assert!(json["receipt"]["decision"]["reason"]
-        .as_str()
-        .is_some_and(|reason| reason.contains("atomically co-commits payment-journal state")));
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{json}");
+    assert_eq!(json["error"], "chio_mediation_failed", "{json}");
+    assert_eq!(json["message"], "mediated authorization failed", "{json}");
     assert_eq!(
         rail_calls.load(std::sync::atomic::Ordering::SeqCst),
         0,
@@ -1193,7 +1203,7 @@ async fn mediated_governed_mustprepay_denied_without_payment_adapter() {
     // quote, so the prepayment gate rejects it before any reservation.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
     let cap_id = cap.id.clone();
@@ -1235,7 +1245,7 @@ async fn mediated_governed_mustprepay_denied_without_payment_adapter() {
 async fn mediated_dpop_capability_requires_valid_proof() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap = issue_dpop_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD");
     let cap_value = serde_json::to_value(&cap).unwrap();
@@ -1278,7 +1288,7 @@ async fn mediated_dpop_capability_requires_valid_proof() {
 async fn mediated_dpop_proof_replay_is_rejected_across_requests() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     // max_total (1000) far exceeds a single reservation (100), so the second
     // request cannot be denied for budget: the only reason to reject it is a
@@ -1325,7 +1335,7 @@ async fn mediated_dpop_proof_replay_is_rejected_across_requests() {
 async fn mediated_exact_request_id_replays_without_new_reservation() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -1362,7 +1372,7 @@ async fn mediated_exact_request_id_replays_without_new_reservation() {
 async fn unauthenticated_requests_cannot_distinguish_mediation_topologies() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let issuing = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let mut forged =
         issue_cost_bearing_capability(&issuing, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -1406,7 +1416,7 @@ async fn unauthenticated_requests_cannot_distinguish_mediation_topologies() {
 async fn mediated_authorization_requires_hold_capable_budget_store() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -1449,7 +1459,7 @@ async fn mediated_authorization_requires_hold_capable_budget_store() {
 async fn mediated_authorization_requires_reconcile_control_token() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -1485,7 +1495,7 @@ async fn mediated_authorization_requires_reconcile_control_token() {
 async fn mediated_authorization_rejects_blank_reconcile_control_token() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
@@ -1527,7 +1537,7 @@ async fn mediated_authorization_rejects_blank_reconcile_control_token() {
 async fn reconcile_requires_hold_capable_budget_store() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -1573,7 +1583,7 @@ async fn reconcile_requires_hold_capable_budget_store() {
 async fn reconcile_rejects_unknown_fields_at_every_signed_nonce_layer() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -1639,7 +1649,7 @@ async fn reconcile_rejects_unknown_fields_at_every_signed_nonce_layer() {
 async fn mediated_exact_request_id_replays_across_restart() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let directory = tempfile::tempdir().unwrap();
+    let directory = private_test_directory();
     let (budget, admission_config) = durable_mediation_budget_and_admission(directory.path(), None);
     let budget_path = admission_config.budget_path.clone();
     let approval_path = admission_config.approval_path.clone();
@@ -1722,7 +1732,7 @@ async fn reconcile_settles_reserved_hold_and_frees_budget() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let signer_pub = signer.public_key();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     // max_per 100, max_total 150: one reservation reserves 100, a second
     // (needing 100 more -> 200 > 150) is blocked until the first frees slack.
@@ -1793,7 +1803,7 @@ async fn reconcile_settles_reserved_hold_and_frees_budget() {
 async fn reconcile_rejects_replayed_nonce() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -1837,7 +1847,7 @@ async fn reconcile_rejects_replayed_nonce() {
 async fn reconcile_rejects_argument_mismatch() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -1878,7 +1888,7 @@ async fn reconcile_rejects_argument_mismatch() {
 async fn reaper_forfeits_expired_hold_at_worst_case() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     // One reservation reserves the whole grant.
     let cap =

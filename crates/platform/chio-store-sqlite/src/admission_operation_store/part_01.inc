@@ -18,6 +18,26 @@ pub struct SqliteAdmissionOperationStore {
     database_identity_file: Option<Arc<crate::durable_sqlite::DurableSqliteFile>>,
 }
 
+#[cfg(unix)]
+fn create_private_plain_database_if_missing(path: &Path) -> Result<(), AdmissionOperationError> {
+    use std::fs::OpenOptions;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    match OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+    {
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(AdmissionOperationError::Unavailable(format!(
+            "failed to create private admission operation database: {error}"
+        ))),
+    }
+}
+
 impl SqliteAdmissionOperationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AdmissionOperationError> {
         let path = path.as_ref();
@@ -31,6 +51,8 @@ impl SqliteAdmissionOperationStore {
                 })?;
             }
         }
+        #[cfg(unix)]
+        create_private_plain_database_if_missing(path)?;
         let connection = Connection::open(path).map_err(sqlite_error)?;
         Self::from_connection(
             connection,

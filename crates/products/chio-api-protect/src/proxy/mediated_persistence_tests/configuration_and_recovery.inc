@@ -1,7 +1,7 @@
     #[test]
     fn prepared_budget_store_opens_local_sqlite_when_no_control_url() {
-        let dir = std::env::temp_dir().join(format!("chio-budget-{}", uuid::Uuid::now_v7()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let directory = private_test_directory();
+        let dir = directory.path();
         let db = dir.join("budget.sqlite");
         let config = ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
@@ -39,6 +39,16 @@
             .prefix("chio-relative-budget-")
             .tempdir_in(&current_dir)
             .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(
+                directory.path(),
+                std::fs::Permissions::from_mode(0o700),
+            )
+            .unwrap();
+        }
         let relative_path = directory
             .path()
             .strip_prefix(&current_dir)
@@ -104,7 +114,10 @@
         use std::os::unix::fs::symlink;
         use std::os::unix::fs::PermissionsExt;
 
-        let directory = tempfile::tempdir().unwrap();
+        let directory = chio_test_support::private_fs::private_tempdir(
+            "api-protect-retained-budget-",
+        )
+        .unwrap();
         let original = directory.path().join("original.sqlite");
         let replacement = directory.path().join("replacement.sqlite");
         std::fs::File::create(&original).unwrap();
@@ -181,7 +194,10 @@
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
         }
 
-        let directory = tempfile::tempdir().unwrap();
+        let directory = chio_test_support::private_fs::private_tempdir(
+            "api-protect-descriptor-substitution-",
+        )
+        .unwrap();
         let budget_path = directory.path().join("budget.sqlite");
         let config = ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
@@ -236,7 +252,7 @@
     fn descriptor_bound_mediation_rejects_symlinked_authority_sibling() {
         use std::os::unix::fs::{symlink, PermissionsExt};
 
-        let directory = tempfile::tempdir().unwrap();
+        let directory = private_test_directory();
         let budget_path = directory.path().join("budget.sqlite");
         let authority_directory = Arc::new(
             chio_store_sqlite::durable_sqlite::TrustedSqliteDirectory::open_for_database(
@@ -268,8 +284,8 @@
     #[cfg(unix)]
     #[test]
     fn descriptor_bound_mediation_requires_one_retained_sibling_parent() {
-        let retained_directory = tempfile::tempdir().unwrap();
-        let other_directory = tempfile::tempdir().unwrap();
+        let retained_directory = private_test_directory();
+        let other_directory = private_test_directory();
         let retained_budget = retained_directory.path().join("budget.sqlite");
         let other_budget = other_directory.path().join("budget.sqlite");
         let authority_directory = Arc::new(
@@ -337,8 +353,8 @@
         // must get the hold-capable local SQLite store for mediation: the remote
         // store cannot persist a reserved hold, so choosing it would disable
         // mediated authorization and reconcile. Prefer the local store.
-        let dir = std::env::temp_dir().join(format!("chio-budget-both-{}", uuid::Uuid::now_v7()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let directory = private_test_directory();
+        let dir = directory.path();
         let db = dir.join("budget.sqlite");
         let config = ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
@@ -386,8 +402,8 @@
 
     #[test]
     fn prepared_revocation_store_loads_and_retains_operator_revocations() {
-        let dir = std::env::temp_dir().join(format!("chio-revocation-{}", uuid::Uuid::now_v7()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let directory = private_test_directory();
+        let dir = directory.path();
         let db = dir.join("revocations.sqlite3");
         let db_path = db.to_string_lossy().to_string();
 
@@ -416,11 +432,16 @@
 
     #[test]
     fn prepared_revocation_store_fails_closed_on_unreadable_store() {
-        let dir =
-            std::env::temp_dir().join(format!("chio-revocation-bad-{}", uuid::Uuid::now_v7()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let directory = private_test_directory();
+        let dir = directory.path();
         let db = dir.join("not-a-db.sqlite3");
         std::fs::write(&db, b"this is not a sqlite database").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(&db, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
 
         let db_path = db.to_string_lossy().into_owned();
         let prepared = prepare_revocation_store(Some(&db_path), None).unwrap();
@@ -435,7 +456,7 @@
     async fn reconcile_requires_sidecar_control_token() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -480,7 +501,7 @@
     async fn reconcile_without_configured_control_token_is_rejected() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -528,7 +549,7 @@
         // register a server or otherwise grow the kernel's tool-server map.
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
 
@@ -557,7 +578,7 @@
     async fn mediated_denied_authorization_retains_durable_request_id_ownership() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
@@ -651,7 +672,7 @@
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn reserved_hold_reaper_handle_is_retained_not_detached() {
         let signer = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let state = mediated_test_state(signer, budget, Vec::new());
 
         // No reaper before spawn.
@@ -685,7 +706,7 @@
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let signer_pub = signer.public_key();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -751,7 +772,7 @@
         // fail closed, never reaching receipt persistence.
         let signer = Keypair::generate();
         let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let budget: Arc<dyn BudgetStore> = durable_test_budget_store();
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
@@ -1040,7 +1061,7 @@
         assert_eq!(operations_before.len(), 1);
         let nonce_authority_before = durable_nonce_authority_snapshot(&budget_path);
         assert_eq!(nonce_authority_before.consumed.len(), 1);
-        assert_eq!(nonce_authority_before.reservations.len(), 1);
+        assert!(nonce_authority_before.reservations.is_empty());
         let authoritative_receipt_count_before =
             SqliteReceiptStore::open(&approval_path)
                 .unwrap()

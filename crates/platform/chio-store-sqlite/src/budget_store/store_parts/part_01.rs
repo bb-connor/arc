@@ -1,5 +1,23 @@
 use super::*;
 
+#[cfg(unix)]
+fn create_private_plain_database_if_missing(path: &Path) -> Result<(), BudgetStoreError> {
+    use std::fs::OpenOptions;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    match OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+    {
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
 /// Quorum-witness identity of a stored budget mutation event: its `event_seq`,
 /// origin `authority_id`, and origin `lease_epoch`.
 pub type BudgetEventWitness = (u64, Option<String>, Option<u64>);
@@ -217,6 +235,8 @@ impl SqliteBudgetStore {
         if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
             fs::create_dir_all(parent)?;
         }
+        #[cfg(unix)]
+        create_private_plain_database_if_missing(path)?;
 
         let connection = Connection::open(path)?;
         let on_disk_version = crate::check_schema_version(

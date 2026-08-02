@@ -5,6 +5,31 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use chio_kernel::{RevocationRecord, RevocationStore, RevocationStoreError};
 use rusqlite::{params, Connection, OptionalExtension};
 
+#[cfg(unix)]
+fn create_private_plain_database_if_missing(path: &Path) -> Result<(), RevocationStoreError> {
+    use std::fs::OpenOptions;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    if path
+        .to_string_lossy()
+        .to_ascii_lowercase()
+        .starts_with("file:")
+    {
+        return Ok(());
+    }
+    match OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+    {
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
 pub(crate) const ADMISSION_AUTHORITY_META_TABLE: &str = "admission_authority_meta";
 
 pub struct SqliteRevocationStore {
@@ -93,6 +118,8 @@ impl SqliteRevocationStore {
             if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
                 fs::create_dir_all(&parent)?;
             }
+            #[cfg(unix)]
+            create_private_plain_database_if_missing(path)?;
         }
 
         let connection = Connection::open(path)?;
@@ -679,6 +706,21 @@ mod tests {
         let reopened = SqliteRevocationStore::open(&path).unwrap();
         assert!(reopened.is_revoked("cap-1").unwrap());
 
+        let _ = fs::remove_file(path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sqlite_revocation_store_creates_private_database_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = unique_db_path("chio-revocations-private");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+
+        assert_eq!(mode, 0o600);
+
+        drop(store);
         let _ = fs::remove_file(path);
     }
 

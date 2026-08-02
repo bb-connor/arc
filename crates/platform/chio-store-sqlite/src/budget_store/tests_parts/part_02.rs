@@ -152,6 +152,56 @@ fn composite_invocation_only_capture_terminalizes_the_base_hold() {
 }
 
 #[test]
+fn composite_invocation_only_reconcile_accepts_zero_monetary_state() {
+    let path = unique_db_path("chio-composite-budget-invocation-only-reconcile");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let mut authorization = composite_authorize_input(
+        "hold-invocation-only-reconcile-1",
+        "event-authorize-invocation-only-reconcile-1",
+        1,
+    );
+    authorization.requested_exposure_units = 0;
+    authorization.max_cost_per_invocation = None;
+    authorization.max_total_cost_units = None;
+    assert!(store
+        .authorize_composite_hold(authorization)
+        .unwrap()
+        .is_authorized());
+
+    let reconcile_request = BudgetReconcileHoldRequest {
+        capability_id: "leaf".to_string(),
+        grant_index: 0,
+        exposed_cost_units: 0,
+        realized_spend_units: 0,
+        hold_id: Some("hold-invocation-only-reconcile-1".to_string()),
+        event_id: Some("event-reconcile-invocation-only-reconcile-1".to_string()),
+        authority: None,
+        admission_operation: Some(composite_admission_binding(
+            "hold-invocation-only-reconcile-1",
+        )),
+    };
+    let reconciled = store
+        .reconcile_budget_hold(reconcile_request.clone())
+        .unwrap();
+    assert_eq!(
+        reconciled.invocation_state,
+        BudgetInvocationReservationState::Authorized
+    );
+    assert_eq!(
+        reconciled.monetary_state,
+        BudgetMonetaryHoldState::Reconciled
+    );
+
+    drop(store);
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    assert_eq!(
+        reopened.reconcile_budget_hold(reconcile_request).unwrap(),
+        reconciled
+    );
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn artifact_bound_hold_rejects_ordinary_invocation_capture() {
     let path = unique_db_path("chio-composite-budget-combined-only");
     let store = SqliteBudgetStore::open(&path).unwrap();

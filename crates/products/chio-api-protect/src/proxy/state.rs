@@ -1917,7 +1917,9 @@ mod receipt_persistence_security_tests {
     fn api_receipt_store_rejects_path_rebinding_on_existing_and_new_bound_connections() {
         use std::os::unix::fs::OpenOptionsExt;
 
-        let directory = tempfile::tempdir().test_unwrap();
+        let directory =
+            chio_test_support::private_fs::private_tempdir("api-protect-receipt-rebinding-")
+                .test_unwrap();
         let directory = std::fs::canonicalize(directory.path()).test_unwrap();
         let path = directory.join("receipts.sqlite3");
         let displaced = directory.join("receipts-displaced.sqlite3");
