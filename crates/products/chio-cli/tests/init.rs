@@ -122,7 +122,7 @@ fn init_rejects_parent_component_after_symlink_segment() {
     );
     assert!(
         String::from_utf8_lossy(&output.stderr)
-            .contains("parent components after a named component"),
+            .contains("refusing to scaffold into symbolic link or non-directory"),
         "unexpected chio init error: {}",
         String::from_utf8_lossy(&output.stderr)
     );

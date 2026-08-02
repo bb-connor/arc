@@ -4,7 +4,8 @@
 
 use super::report_rendering::forward_post_to_leader;
 use super::report_validation::{
-    bearer_token_from_headers, load_capability_authority, validate_service_auth,
+    bearer_token_from_headers, load_capability_authority_with_deferred_lineage,
+    validate_service_auth,
 };
 use super::*;
 
@@ -1304,7 +1305,12 @@ pub(crate) async fn handle_federated_issue(
     } else {
         None
     };
-    match load_capability_authority(&state.config) {
+    let authority = if payload.delegation_policy.is_some() {
+        load_capability_authority_with_deferred_lineage(&state.config)
+    } else {
+        super::report_validation::load_capability_authority(&state.config)
+    };
+    match authority {
         Ok(authority) => {
             if let Some(policy) = payload.delegation_policy.as_ref() {
                 if !authority
@@ -1373,25 +1379,15 @@ pub(crate) async fn handle_federated_issue(
                                 );
                             }
                         };
-                        if let Err(error) = store.upsert_capability_snapshot(&anchor_snapshot) {
-                            return plain_http_error(
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                &error.to_string(),
-                            );
-                        }
-                        if let Some((share_id, parent_snapshot)) = upstream_parent.as_ref() {
-                            if let Err(error) = store.record_federated_lineage_bridge(
-                                &anchor_snapshot.capability_id,
-                                &parent_snapshot.capability_id,
-                                Some(share_id.as_str()),
-                            ) {
-                                return plain_http_error(
-                                    StatusCode::INTERNAL_SERVER_ERROR,
-                                    &error.to_string(),
-                                );
-                            }
-                        }
-                        if let Err(error) = store.upsert_capability_snapshot(&child_snapshot) {
+                        let upstream_bridge =
+                            upstream_parent.as_ref().map(|(share_id, parent_snapshot)| {
+                                (parent_snapshot.capability_id.as_str(), share_id.as_str())
+                            });
+                        if let Err(error) = store.persist_federated_delegation_lineage(
+                            &anchor_snapshot,
+                            upstream_bridge,
+                            &child_snapshot,
+                        ) {
                             return plain_http_error(
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 &error.to_string(),

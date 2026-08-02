@@ -55,7 +55,27 @@ fn signing_fixture_path() -> PathBuf {
 }
 
 fn pretty_json(value: &Value) -> String {
-    let mut rendered = serde_json::to_string_pretty(value).test_unwrap("serialize fixture");
+    fn with_sorted_object_keys(value: &Value) -> Value {
+        match value {
+            Value::Object(object) => {
+                let mut entries = object.iter().collect::<Vec<_>>();
+                entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+                Value::Object(
+                    entries
+                        .into_iter()
+                        .map(|(key, value)| (key.clone(), with_sorted_object_keys(value)))
+                        .collect(),
+                )
+            }
+            Value::Array(values) => {
+                Value::Array(values.iter().map(with_sorted_object_keys).collect())
+            }
+            scalar => scalar.clone(),
+        }
+    }
+
+    let sorted = with_sorted_object_keys(value);
+    let mut rendered = serde_json::to_string_pretty(&sorted).test_unwrap("serialize fixture");
     rendered.push('\n');
     rendered
 }

@@ -29,14 +29,6 @@ enum StructuredUsageSequenceRelation {
     AdvancesAtCommit,
 }
 
-#[cfg(test)]
-pub fn build_remote_budget_store(
-    control_url: &str,
-    control_token: &str,
-) -> Result<Box<dyn BudgetStore>, CliError> {
-    Ok(Box::new(remote_budget_store(control_url, control_token)?))
-}
-
 pub(crate) fn build_shared_remote_budget_store(
     control_url: &str,
     control_token: &str,
@@ -1136,16 +1128,6 @@ impl RemoteAgentEconomyBudgetStore {
             },
         );
         Ok(projected)
-    }
-
-    #[cfg(test)]
-    pub(super) fn cached_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Option<BudgetUsageRecord> {
-        self.cached_entry(capability_id, grant_index)
-            .map(|entry| entry.record)
     }
 
     fn cached_entry(&self, capability_id: &str, grant_index: usize) -> Option<CachedBudgetUsage> {

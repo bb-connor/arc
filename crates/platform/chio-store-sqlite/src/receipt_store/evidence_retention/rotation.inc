@@ -7,6 +7,59 @@ use super::support::{
 use super::*;
 use sha2::{Digest as Sha2Digest, Sha256};
 
+pub(crate) fn receipt_query_sql(
+    query: &ReceiptQuery,
+    tenant_fragment: &str,
+) -> Result<(String, String), ReceiptStoreError> {
+    let currency = query
+        .validated_cost_currency()
+        .map_err(ReceiptStoreError::ReadBoundary)?;
+    let cost_fragment = match (
+        query.min_cost.is_some(),
+        query.max_cost.is_some(),
+        currency.is_some(),
+    ) {
+        (false, false, false) => "AND ?13 IS NULL",
+        (false, false, true) => "AND r.cost_currency = ?13",
+        (true, false, true) => "AND r.cost_currency = ?13 AND r.cost_charged_be >= ?7",
+        (false, true, true) => "AND r.cost_currency = ?13 AND r.cost_charged_be <= ?8",
+        (true, true, true) => {
+            "AND r.cost_currency = ?13 AND r.cost_charged_be >= ?7 AND r.cost_charged_be <= ?8"
+        }
+        _ => {
+            return Err(ReceiptStoreError::ReadBoundary(
+                "receipt query cost bounds require a currency".to_string(),
+            ))
+        }
+    };
+    let from_where = format!(
+        r#"
+        FROM chio_tool_receipts r
+        LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
+        WHERE (?1 IS NULL OR r.capability_id = ?1)
+          AND (?2 IS NULL OR r.tool_server = ?2)
+          AND (?3 IS NULL OR r.tool_name = ?3)
+          AND (?4 IS NULL OR r.decision_kind = ?4)
+          AND (?5 IS NULL OR r.timestamp >= ?5)
+          AND (?6 IS NULL OR r.timestamp <= ?6)
+          {cost_fragment}
+          AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
+          AND {tenant_fragment}
+    "#
+    );
+    let data_sql = format!(
+        r#"
+        SELECT r.seq, r.raw_json
+        {from_where}
+          AND (?10 IS NULL OR r.seq > ?10)
+        ORDER BY r.seq ASC
+        LIMIT ?11
+    "#
+    );
+    let count_sql = format!("SELECT COUNT(*) {from_where}");
+    Ok((data_sql, count_sql))
+}
+
 impl SqliteReceiptStore {
     pub fn append_chio_receipt_returning_seq(
         &self,
@@ -234,64 +287,7 @@ impl SqliteReceiptStore {
             (Some(_), false) => "(r.tenant_id = ?12)",
         };
 
-        // Both queries share the same filter parameters.
-        // Parameters:
-        //   ?1  capability_id
-        //   ?2  tool_server
-        //   ?3  tool_name
-        //   ?4  outcome (decision_kind)
-        //   ?5  since (timestamp >=, inclusive)
-        //   ?6  until (timestamp <=, inclusive)
-        //   ?7  min_cost (json_extract cost_charged >=)
-        //   ?8  max_cost (json_extract cost_charged <=)
-        //   ?9  agent_subject (receipt subject_key, falling back to capability_lineage)
-        //   ?12 tenant_filter (tenant_id exact match or NULL fallback)
-        // Data query also uses:
-        //   ?10 cursor (seq >, exclusive)
-        //   ?11 limit
-        //
-        // When agent_subject is None, the LEFT JOIN produces NULL for cl.subject_key,
-        // and the (?9 IS NULL OR ...) guard passes -- no rows are filtered out.
-        let data_sql = format!(
-            r#"
-            SELECT r.seq, r.raw_json
-            FROM chio_tool_receipts r
-            LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
-            WHERE (?1 IS NULL OR r.capability_id = ?1)
-              AND (?2 IS NULL OR r.tool_server = ?2)
-              AND (?3 IS NULL OR r.tool_name = ?3)
-              AND (?4 IS NULL OR r.decision_kind = ?4)
-              AND (?5 IS NULL OR r.timestamp >= ?5)
-              AND (?6 IS NULL OR r.timestamp <= ?6)
-              AND (?7 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
-              AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
-              AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
-              AND {tenant_fragment}
-              AND (?10 IS NULL OR r.seq > ?10)
-            ORDER BY r.seq ASC
-            LIMIT ?11
-        "#
-        );
-
-        // Count query uses identical WHERE clause but no cursor and no LIMIT.
-        // total_count reflects the full filtered set regardless of pagination.
-        let count_sql = format!(
-            r#"
-            SELECT COUNT(*)
-            FROM chio_tool_receipts r
-            LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
-            WHERE (?1 IS NULL OR r.capability_id = ?1)
-              AND (?2 IS NULL OR r.tool_server = ?2)
-              AND (?3 IS NULL OR r.tool_name = ?3)
-              AND (?4 IS NULL OR r.decision_kind = ?4)
-              AND (?5 IS NULL OR r.timestamp >= ?5)
-              AND (?6 IS NULL OR r.timestamp <= ?6)
-              AND (?7 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
-              AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
-              AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
-              AND {tenant_fragment}
-        "#
-        );
+        let (data_sql, count_sql) = receipt_query_sql(query, tenant_fragment)?;
 
         let cap_id = query.capability_id.as_deref();
         let tool_srv = query.tool_server.as_deref();
@@ -299,10 +295,14 @@ impl SqliteReceiptStore {
         let outcome = query.outcome.as_deref();
         let since = query.since.map(|v| v as i64);
         let until = query.until.map(|v| v as i64);
-        let min_cost = query.min_cost.map(|v| v as i64);
-        let max_cost = query.max_cost.map(|v| v as i64);
+        let min_cost = query.min_cost.map(|value| value.to_be_bytes().to_vec());
+        let max_cost = query.max_cost.map(|value| value.to_be_bytes().to_vec());
         let agent_sub = query.agent_subject.as_deref();
         let tenant = read_scope.tenant.as_deref();
+        let cost_currency = query.cost_currency.as_deref();
+        let mut connection = self.connection()?;
+        let transaction =
+            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)?;
         // Convert cursor to signed i64 for SQLite. SQLite AUTOINCREMENT seq
         // values are bounded by i64::MAX; a cursor above that can never be
         // exceeded. Convert with a checked cast: on overflow return an empty
@@ -319,8 +319,7 @@ impl SqliteReceiptStore {
                     // but must still bind values if we reuse `params!`;
                     // the count SQL uses only ?1..=?9 and ?12, so we need to
                     // bind ?10 and ?11 as NULL / 0 to keep indexes stable.
-                    let total_count: u64 = self
-                        .connection()?
+                    let total_count: u64 = transaction
                         .query_row(
                             &count_sql,
                             params![
@@ -338,10 +337,12 @@ impl SqliteReceiptStore {
                                 None::<i64>,
                                 0i64,
                                 tenant,
+                                cost_currency,
                             ],
                             |row| row.get::<_, i64>(0),
                         )
                         .map(|n| n.max(0) as u64)?;
+                    transaction.commit()?;
                     return Ok(ReceiptQueryResult {
                         receipts: Vec::new(),
                         total_count,
@@ -351,39 +352,40 @@ impl SqliteReceiptStore {
             },
         };
 
-        // Execute data query.
-        let connection = self.connection()?;
-        let mut stmt = connection.prepare(&data_sql)?;
-        let rows = stmt.query_map(
-            params![
-                cap_id,
-                tool_srv,
-                tool_nm,
-                outcome,
-                since,
-                until,
-                min_cost,
-                max_cost,
-                agent_sub,
-                cursor_i64,
-                limit as i64,
-                tenant,
-            ],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-        )?;
+        let receipts = {
+            let mut stmt = transaction.prepare(&data_sql)?;
+            let rows = stmt.query_map(
+                params![
+                    cap_id,
+                    tool_srv,
+                    tool_nm,
+                    outcome,
+                    since,
+                    until,
+                    min_cost,
+                    max_cost,
+                    agent_sub,
+                    cursor_i64,
+                    limit as i64,
+                    tenant,
+                    cost_currency,
+                ],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            )?;
 
-        let mut receipts = Vec::new();
-        for row in rows {
-            let (seq, raw_json) = row?;
-            let seq = seq.max(0) as u64;
-            let receipt =
-                decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
-            receipts.push(StoredToolReceipt { seq, receipt });
-        }
+            let mut receipts = Vec::new();
+            for row in rows {
+                let (seq, raw_json) = row?;
+                let seq = seq.max(0) as u64;
+                let receipt =
+                    decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
+                receipts.push(StoredToolReceipt { seq, receipt });
+            }
+            receipts
+        };
 
         // Execute count query (same filters, no cursor, no limit).
-        let total_count: u64 = self
-            .connection()?
+        let total_count: u64 = transaction
             .query_row(
                 &count_sql,
                 params![
@@ -400,6 +402,7 @@ impl SqliteReceiptStore {
                     None::<i64>,
                     0i64,
                     tenant,
+                    cost_currency,
                 ],
                 |row| row.get::<_, i64>(0),
             )
@@ -411,6 +414,7 @@ impl SqliteReceiptStore {
         } else {
             None
         };
+        transaction.commit()?;
 
         Ok(ReceiptQueryResult {
             receipts,

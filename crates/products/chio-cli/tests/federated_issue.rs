@@ -111,6 +111,8 @@ fn spawn_trust_service_with_verifier(
         advertise_url,
         "--service-token",
         service_token,
+        "--authority-admin-token",
+        "federated-issue-authority-admin-token",
     ]);
     if let Some(path) = enterprise_providers_file {
         command.args([
@@ -1066,8 +1068,12 @@ fn trust_service_federated_issue_consumes_challenge_bound_passport_response() {
     assert_eq!(chain[0]["capability_id"], delegation_anchor);
     assert_eq!(chain[0]["delegation_depth"], 0);
     assert_eq!(chain[1]["capability_id"], body["capability"]["id"]);
-    assert_eq!(chain[1]["parent_capability_id"], delegation_anchor);
-    assert_eq!(chain[1]["delegation_depth"], 1);
+    assert!(chain[1]["parent_capability_id"].is_null());
+    assert_eq!(
+        chain[1]["federated_parent_capability_id"],
+        delegation_anchor
+    );
+    assert_eq!(chain[1]["delegation_depth"], 0);
     let authority_seed = fs::read_to_string(&authority_seed_path).expect("read authority seed");
     let authority_public_key = Keypair::from_seed_hex(authority_seed.trim())
         .expect("authority keypair")
@@ -1839,12 +1845,18 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     assert_eq!(chain[2]["capability_id"], second_anchor_id);
     assert_eq!(chain[3]["capability_id"], second_capability_id);
     assert_eq!(chain[0]["delegation_depth"], 0);
-    assert_eq!(chain[1]["delegation_depth"], 1);
-    assert_eq!(chain[2]["delegation_depth"], 2);
-    assert_eq!(chain[3]["delegation_depth"], 3);
-    assert_eq!(chain[1]["parent_capability_id"], first_anchor_id);
-    assert_eq!(chain[2]["parent_capability_id"], first_capability_id);
-    assert_eq!(chain[3]["parent_capability_id"], second_anchor_id);
+    assert_eq!(chain[1]["delegation_depth"], 0);
+    assert_eq!(chain[2]["delegation_depth"], 0);
+    assert_eq!(chain[3]["delegation_depth"], 0);
+    for snapshot in chain.iter() {
+        assert!(snapshot["parent_capability_id"].is_null());
+    }
+    assert_eq!(chain[1]["federated_parent_capability_id"], first_anchor_id);
+    assert_eq!(
+        chain[2]["federated_parent_capability_id"],
+        first_capability_id
+    );
+    assert_eq!(chain[3]["federated_parent_capability_id"], second_anchor_id);
 }
 
 #[test]

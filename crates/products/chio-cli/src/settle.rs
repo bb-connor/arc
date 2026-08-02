@@ -957,6 +957,7 @@ mod tests {
     use chio_core::credit::{CreditEvaluatorHook, IouEnvelopeStore};
     use chio_kernel::settlement_retry::SettlementRetryStore;
     use chio_kernel::ReceiptStore;
+    use chio_test_support::private_fs::private_tempdir;
     use tempfile::TempDir;
 
     fn status_receipt(
@@ -987,7 +988,21 @@ mod tests {
                 policy_hash: "policy".to_string(),
                 evidence: Vec::new(),
                 metadata: Some(serde_json::json!({
-                    "financial": {"cost_charged": 250, "currency": "USD"}
+                    "financial": chio_core::receipt::economics::FinancialReceiptMetadata {
+                        grant_index: 0,
+                        cost_charged: 250,
+                        currency: "USD".to_string(),
+                        budget_remaining: 750,
+                        budget_total: 1_000,
+                        delegation_depth: 0,
+                        root_budget_holder: "settle-status-holder".to_string(),
+                        payment_reference: None,
+                        settlement_status:
+                            chio_core::receipt::economics::SettlementStatus::Pending,
+                        cost_breakdown: None,
+                        oracle_evidence: None,
+                        attempted_cost: None,
+                    }
                 })),
                 trust_level: chio_core::receipt::kinds::TrustLevel::default(),
                 tenant_id: None,
@@ -1078,7 +1093,7 @@ mod tests {
 
     #[test]
     fn load_classifies_pending_settled_dead_lettered() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let fixture = write_db(&dir);
         let report = SettleStatusReport::load(&fixture.path).expect("load ok");
         assert_eq!(report.pending.len(), 1);
@@ -1092,7 +1107,7 @@ mod tests {
 
     #[test]
     fn render_text_summary_lists_counts_and_rows() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let fixture = write_db(&dir);
         let report = SettleStatusReport::load(&fixture.path).expect("load ok");
         let text = report.render_text();
@@ -1105,7 +1120,7 @@ mod tests {
 
     #[test]
     fn render_json_carries_schema_tag() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let fixture = write_db(&dir);
         let report = SettleStatusReport::load(&fixture.path).expect("load ok");
         let json = report.render_json().expect("render json");
@@ -1118,7 +1133,7 @@ mod tests {
 
     #[test]
     fn bounded_status_reports_explicit_truncation_and_retry_rows() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let fixture = write_db(&dir);
         let receipts = chio_store_sqlite::SqliteReceiptStore::open_existing(&fixture.path)
             .expect("open receipts");
@@ -1161,7 +1176,7 @@ mod tests {
 
     #[test]
     fn status_rejects_tampered_iou_projection() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let fixture = write_db(&dir);
         let changed = tamper_iou_amount(&fixture.path, &fixture.pending_receipt_id);
         assert_eq!(changed, 1, "pending IOU fixture must be tampered");
@@ -1173,7 +1188,7 @@ mod tests {
 
     #[test]
     fn status_rejects_tampered_settled_iou_projection() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let fixture = write_db(&dir);
         let changed = tamper_iou_amount(&fixture.path, &fixture.settled_receipt_id);
         assert_eq!(changed, 1, "settled IOU fixture must be tampered");
@@ -1185,7 +1200,7 @@ mod tests {
 
     #[test]
     fn status_allows_manual_reconciliation_without_iou() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let path = dir.path().join("manual-reconciliation.sqlite");
         let kernel = chio_core::Keypair::from_seed(&[74; 32]);
         let receipts = chio_store_sqlite::SqliteReceiptStore::open(&path).expect("open db");
@@ -1208,7 +1223,7 @@ mod tests {
 
     #[test]
     fn status_rejects_raw_legacy_retry_above_bounded_envelope_without_mutation() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let path = dir.path().join("legacy-retry.sqlite");
         let kernel = chio_core::Keypair::from_seed(&[75; 32]);
         let receipts = chio_store_sqlite::SqliteReceiptStore::open(&path).expect("open db");
@@ -1267,7 +1282,7 @@ mod tests {
 
     #[test]
     fn missing_db_returns_not_found() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let path = dir.path().join("absent.sqlite");
         match SettleStatusReport::load(&path) {
             Err(SettleStatusError::NotFound(_)) => {}
@@ -1277,7 +1292,7 @@ mod tests {
 
     #[test]
     fn missing_tables_return_empty_vectors() {
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let path = dir.path().join("empty.sqlite");
         let conn = Connection::open(&path).expect("open empty");
         // No tables created at all.
@@ -1296,7 +1311,7 @@ mod tests {
         // creates two settled rows whose `updated_at` ordering is the
         // OPPOSITE of their receipt-finalized ordering, then confirms
         // the report follows the receipts ordering.
-        let dir = TempDir::new().expect("tempdir");
+        let dir = private_tempdir("chio-settle-status-").expect("private tempdir");
         let path = dir.path().join("ordered.sqlite");
         let kernel = chio_core::Keypair::from_seed(&[73; 32]);
         let receipts = chio_store_sqlite::SqliteReceiptStore::open(&path).expect("open db");

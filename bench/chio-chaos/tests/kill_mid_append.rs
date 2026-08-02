@@ -56,7 +56,7 @@ fn chaos_kill_mid_append_preserves_durable_acks() {
         chaos_iterations(DEFAULT_ITERATIONS).test_expect("CHIO_CHAOS_ITERATIONS must be a u64");
     let mut rng = ChaosRng::new(seed);
 
-    let dir = tempfile::tempdir().test_unwrap();
+    let dir = chio_test_support::private_fs::private_tempdir("chio-chaos-kill-").test_unwrap();
     let db_path = dir.path().join("receipts.sqlite");
     let ack_path = dir.path().join("acks.log");
 
@@ -225,7 +225,8 @@ fn assert_round_invariants(db_path: &Path, ack_path: &Path, round: u64) -> usize
 /// vacuous: a checker that always returned `Ok` would fail here.
 #[test]
 fn ack_checker_detects_fabricated_loss() {
-    let dir = tempfile::tempdir().test_unwrap();
+    let dir =
+        chio_test_support::private_fs::private_tempdir("chio-chaos-kill-check-").test_unwrap();
     let db_path = dir.path().join("receipts.sqlite");
     let ack_path = dir.path().join("acks.log");
 

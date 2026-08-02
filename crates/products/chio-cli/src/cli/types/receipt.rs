@@ -23,11 +23,14 @@ pub(crate) enum ReceiptCommands {
         #[arg(long)]
         until: Option<u64>,
         /// Filter: minimum cost in minor currency units (only financial receipts).
-        #[arg(long)]
+        #[arg(long, requires = "cost_currency")]
         min_cost: Option<u64>,
         /// Filter: maximum cost in minor currency units (only financial receipts).
-        #[arg(long)]
+        #[arg(long, requires = "cost_currency")]
         max_cost: Option<u64>,
+        /// Currency for cost filters as a three-letter uppercase code.
+        #[arg(long)]
+        cost_currency: Option<String>,
         /// Maximum number of receipts per page.
         #[arg(long, default_value_t = 50)]
         limit: usize,

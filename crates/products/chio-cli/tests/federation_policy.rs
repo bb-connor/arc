@@ -99,6 +99,8 @@ fn spawn_trust_service(
             &format!("http://{listen}"),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "federation-policy-authority-admin-token",
             "--policy",
             policy_path.to_str().expect("policy path"),
             "--federation-policies-file",

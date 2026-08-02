@@ -127,19 +127,14 @@ fn validate_verifier_match(
             expected_verifier,
         ),
         RekorEntryBody::HashedRekordV002(rekord) => {
-            let verifier = &rekord
-                .spec
-                .hashed_rekord_v002
-                .signature
-                .verifier;
+            let verifier = &rekord.spec.hashed_rekord_v002.signature.verifier;
             match (
                 verifier.x509_certificate.as_ref(),
                 verifier.public_key.as_ref(),
             ) {
-                (Some(certificate), None) => verify_certificate_verifier_identity(
-                    &certificate.raw_bytes,
-                    expected_verifier,
-                ),
+                (Some(certificate), None) => {
+                    verify_certificate_verifier_identity(&certificate.raw_bytes, expected_verifier)
+                }
                 (None, Some(public_key)) => match expected_verifier {
                     ExpectedDsseVerifier::PublicKey(expected) => {
                         verify_public_key_verifier_identity(&public_key.raw_bytes, expected)

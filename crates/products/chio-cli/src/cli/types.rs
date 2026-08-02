@@ -185,7 +185,9 @@ pub(crate) struct Cli {
     )]
     pub(crate) threshold_proposal_authority_public_key: Option<chio_core::PublicKey>,
 
-    /// Optional SQLite database path for durable remote MCP session tombstones.
+    /// SQLite database path for durable agent-economy admission, trust
+    /// authority state, or remote MCP session tombstones, depending on the
+    /// selected command and policy.
     #[arg(long, global = true)]
     pub(crate) session_db: Option<PathBuf>,
 

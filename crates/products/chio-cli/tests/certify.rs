@@ -7,7 +7,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -44,7 +44,13 @@ fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
         .expect("system time before unix epoch")
         .as_nanos();
     let sequence = UNIQUE_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
+    static PRIVATE_ROOT: OnceLock<PathBuf> = OnceLock::new();
+    let root = PRIVATE_ROOT.get_or_init(|| {
+        chio_test_support::private_fs::private_tempdir("chio-certify-tests-")
+            .expect("create private certification test directory")
+            .keep()
+    });
+    root.join(format!(
         "{prefix}-{}-{nonce}-{sequence}{suffix}",
         std::process::id()
     ))
@@ -206,6 +212,8 @@ fn spawn_trust_service_with_public_registry(
         &listen.to_string(),
         "--service-token",
         service_token,
+        "--authority-admin-token",
+        "certify-authority-admin-token",
         "--advertise-url",
         advertise_url,
     ]);
@@ -414,6 +422,10 @@ fn issue_local_liability_provider(
     authority_db_path: &Path,
     provider_id: &str,
 ) -> serde_json::Value {
+    drop(
+        SqliteCapabilityAuthority::open(authority_db_path)
+            .expect("initialize local certification authority custody"),
+    );
     let provider_file = unique_path("chio-generic-listing-provider", ".json");
     fs::write(
         &provider_file,

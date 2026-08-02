@@ -115,26 +115,48 @@ pub fn verify_checkpoint(
         )));
     }
 
-    // Get all Rekor keys with their key hints from trusted root
-    let rekor_keys = trusted_root
-        .rekor_keys_with_hints()
-        .map_err(|e| Error::Verification(format!("Failed to get Rekor keys: {}", e)))?;
+    // Checkpoints do not carry an authenticated signing time. A key retained
+    // only for historical SET verification must therefore not authorize a new
+    // checkpoint after its authority window has closed.
+    let verification_time = chrono::Utc::now().timestamp();
+    let mut matched_inactive_key = false;
 
-    // For each signature in the checkpoint, try to find a matching key and verify
+    // For each signature in the checkpoint, try to find a matching active key.
     for sig in &checkpoint.signatures {
-        // Find the key with matching key hint
-        for (key_hint, public_key) in &rekor_keys {
-            if &sig.key_id == key_hint {
-                // Found matching key, verify the signature using automatic key type detection
-                let message = checkpoint.signed_data();
-
-                verify_signature_auto(public_key, &sig.signature, message).map_err(|e| {
-                    Error::Verification(format!("Checkpoint signature verification failed: {}", e))
-                })?;
-
-                return Ok(());
+        for log in &trusted_root.tlogs {
+            let log_id = log.log_id.key_id.decode().map_err(|error| {
+                Error::Verification(format!("Failed to decode Rekor log ID: {error}"))
+            })?;
+            if log_id.len() < 4 || sig.key_id.as_slice() != &log_id[..4] {
+                continue;
             }
+
+            if !super::helpers::validity_period_contains(
+                log.public_key.valid_for.as_ref(),
+                verification_time,
+                "Rekor checkpoint key",
+            )? {
+                matched_inactive_key = true;
+                continue;
+            }
+
+            let message = checkpoint.signed_data();
+            verify_signature_auto(&log.public_key.raw_bytes, &sig.signature, message).map_err(
+                |error| {
+                    Error::Verification(format!(
+                        "Checkpoint signature verification failed: {error}"
+                    ))
+                },
+            )?;
+
+            return Ok(());
         }
+    }
+
+    if matched_inactive_key {
+        return Err(Error::Verification(
+            "Rekor checkpoint key is outside its validity period".to_string(),
+        ));
     }
 
     Err(Error::Verification(
@@ -323,6 +345,27 @@ mod tests {
 
         let error = verify_set(entry, &trusted_root)
             .expect_err("a retired or not-yet-active Rekor key must not verify a SET");
+
+        assert!(error.to_string().contains("validity period"));
+    }
+
+    #[test]
+    fn checkpoint_rejects_a_rekor_key_outside_its_current_authority_window() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let proof = bundle.verification_material.tlog_entries[0]
+            .inclusion_proof
+            .as_ref()
+            .expect("inclusion proof");
+        let mut trusted_root = TrustedRoot::production().expect("production root");
+        for log in &mut trusted_root.tlogs {
+            log.public_key.valid_for = Some(ValidityPeriod {
+                start: None,
+                end: Some("2000-01-01T00:00:00Z".to_string()),
+            });
+        }
+
+        let error = verify_checkpoint(&proof.checkpoint.envelope, proof, &trusted_root)
+            .expect_err("a retired Rekor key must not authorize a new checkpoint");
 
         assert!(error.to_string().contains("validity period"));
     }

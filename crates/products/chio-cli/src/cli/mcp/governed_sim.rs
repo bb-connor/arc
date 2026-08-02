@@ -20,6 +20,7 @@ use chio_kernel::{
     KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest,
     ToolInvocationCost, ToolServerConnection,
 };
+use std::sync::Arc;
 
 const SIM_SERVER_ID: &str = "governed-sim-srv";
 const SIM_TOOL_NAME: &str = "compute";
@@ -43,6 +44,11 @@ pub(crate) struct GovernedSimArgs {
     /// Path to write the receipt bundle JSON.
     #[arg(long)]
     pub out: std::path::PathBuf,
+
+    /// Private directory for durable payment, approval, operation, and receipt state.
+    /// Defaults to the output path with a `.state` extension.
+    #[arg(long)]
+    pub state_dir: Option<std::path::PathBuf>,
 }
 
 /// Flat-cost in-process tool server for the governed sim smoke path.
@@ -87,8 +93,9 @@ impl ToolServerConnection for SimFlatCostServer {
 
 /// Dispatch entry-point for `chio mcp governed-sim`.
 ///
-/// Builds an ephemeral kernel, registers a flat-cost tool server, wires the
-/// selected payment adapter, and executes one governed MustPrepay tool call.
+/// Builds a local kernel with durable admission authorities, registers a
+/// flat-cost tool server, wires the selected payment adapter, and executes one
+/// governed MustPrepay tool call.
 /// Writes the signed receipt bundle to `--out` regardless of verdict, then
 /// returns an error (exit 1) on denial so the no-key CI lane can capture the
 /// nonzero exit code for the fail-closed assertion.
@@ -100,11 +107,51 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
     }
 
     let kernel_kp = Keypair::generate();
+    let state_dir = args
+        .state_dir
+        .clone()
+        .unwrap_or_else(|| args.out.with_extension("state"));
+    let state_root = chio_control_plane::prepare_private_directory(&state_dir).map_err(|error| {
+        CliError::cli_io_error(format!(
+            "prepare governed-sim state directory `{}`: {error}",
+            state_dir.display()
+        ))
+    })?;
+    let budget_store = Arc::new(
+        chio_store_sqlite::SqliteBudgetStore::open(&state_root.path().join("budgets.sqlite3"))
+            .map_err(|error| {
+                CliError::cli_other_error(format!("open governed-sim budget store: {error}"))
+            })?,
+    );
+    let operation_store = Arc::new(
+        chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(
+            &state_root.path().join("operations.sqlite3"),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("open governed-sim operation store: {error}"))
+        })?,
+    );
+    let approval_store = Arc::new(
+        chio_store_sqlite::SqliteApprovalStore::open(
+            &state_root.path().join("approvals.sqlite3"),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("open governed-sim approval store: {error}"))
+        })?,
+    );
+    let receipt_store = Arc::new(
+        chio_store_sqlite::SqliteReceiptStore::open(
+            &state_root.path().join("receipts.sqlite3"),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("open governed-sim receipt store: {error}"))
+        })?,
+    );
     let mut kernel = chio_kernel::ChioKernel::new(KernelConfig {
         keypair: kernel_kp.clone(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "governed-x402-sim-smoke".to_string(),
+        policy_hash: chio_core::sha256_hex(b"governed-x402-sim-smoke"),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -119,6 +166,15 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
+    kernel.set_budget_store_handle(budget_store)?;
+    kernel.set_admission_operation_store_handle(operation_store)?;
+    kernel.set_approval_store_handle(approval_store)?;
+    kernel.set_receipt_store_handle(receipt_store)?;
+    state_root.validate_path_identity().map_err(|error| {
+        CliError::cli_io_error(format!(
+            "governed-sim state directory identity changed during startup: {error}"
+        ))
+    })?;
     kernel.register_tool_server(Box::new(SimFlatCostServer));
 
     match args.payment_adapter.as_str() {

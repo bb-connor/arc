@@ -440,9 +440,6 @@ fn ambiguous_legacy_lifecycle(kind: BudgetMutationKind, field: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trust_control::cluster::{
-        budget_mutation_event_view, budget_mutation_record_from_view,
-    };
     use chio_test_support::prelude::*;
 
     #[derive(Clone, Copy)]

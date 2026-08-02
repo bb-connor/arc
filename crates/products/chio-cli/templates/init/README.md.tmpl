@@ -39,8 +39,9 @@ This project was scaffolded by `chio init`.
    CHIO_BIN=/path/to/chio cargo run --quiet --bin demo
    ```
 
-4. The demo writes the local receipt store under `.chio/receipts.db` and prints
-   the latest receipt after the governed tool call succeeds.
+4. The demo writes the local receipt store under `.chio/receipts.db`, keeps the
+   fenced agent-economy admission coordinator under `.chio/session.db`, and
+   prints the latest receipt after the governed tool call succeeds.
 
 An authenticated migration policy at stage `Disabled` authorizes the portable
 legacy launch while the deployment is being migrated. It is not Linux cage

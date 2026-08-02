@@ -373,6 +373,7 @@ fn cli_product_constructor_preserves_aggregate_exhaustion_across_restart_without
     let policy_path = temp.path().join("policy.yaml");
     let operation_path = temp.path().join("admission-operations.sqlite3");
     let budget_path = temp.path().join("budgets.sqlite3");
+    let revocation_path = temp.path().join("revocations.sqlite3");
     std::fs::write(
         &policy_path,
         "kernel:\n  allow_ephemeral_receipt_log: true\n",
@@ -394,6 +395,8 @@ fn cli_product_constructor_preserves_aggregate_exhaustion_across_restart_without
         None,
     )
     .expect("compose aggregate product kernel");
+    configure_revocation_store(&mut kernel, Some(&revocation_path), None, None)
+        .expect("configure durable revocation store");
     kernel.register_tool_server(Box::new(CheckToolServer {
         id: "aggregate-server".to_string(),
         output: None,
@@ -453,6 +456,8 @@ fn cli_product_constructor_preserves_aggregate_exhaustion_across_restart_without
         None,
     )
     .expect("recompose aggregate product kernel");
+    configure_revocation_store(&mut restarted, Some(&revocation_path), None, None)
+        .expect("reconfigure durable revocation store");
     restarted.register_tool_server(Box::new(CheckToolServer {
         id: "aggregate-server".to_string(),
         output: None,

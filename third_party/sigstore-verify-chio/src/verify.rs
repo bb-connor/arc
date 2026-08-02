@@ -257,8 +257,7 @@ impl Verifier {
             if let SignatureContent::DsseEnvelope(envelope) = &bundle.content {
                 if envelope.signatures.len() != 1 {
                     return Err(Error::Verification(
-                        "RFC 3161 time requires exactly one DSSE signature"
-                            .to_string(),
+                        "RFC 3161 time requires exactly one DSSE signature".to_string(),
                     ));
                 }
             }
@@ -330,11 +329,13 @@ impl Verifier {
                         .to_string(),
                 ));
             }
-            Some(crate::verify_impl::helpers::determine_validation_time_from_tlog(
-                bundle,
-                verified_tlog_content
-                    .and_then(|verified| verified.v1_integrated_time_with_promise),
-            )?)
+            Some(
+                crate::verify_impl::helpers::determine_validation_time_from_tlog(
+                    bundle,
+                    verified_tlog_content
+                        .and_then(|verified| verified.v1_integrated_time_with_promise),
+                )?,
+            )
         } else {
             None
         };
@@ -365,6 +366,11 @@ impl Verifier {
             // (2): Verify the signing certificate's SCT.
             crate::verify_impl::helpers::verify_sct(
                 &bundle.verification_material.content,
+                validation_time.ok_or_else(|| {
+                    Error::Verification(
+                        "SCT verification has no trusted validation time".to_string(),
+                    )
+                })?,
                 &self.trusted_root,
             )?;
         }
@@ -533,23 +539,24 @@ fn verify_transparency_log_content_binding(
     dsse_verifier: Option<crate::verify_impl::rekor::ExpectedDsseVerifier<'_>>,
 ) -> Result<VerifiedTransparencyLogContent> {
     let expected_verifier = dsse_verifier.ok_or_else(|| {
-        Error::Verification("transparency-log content binding requires a verifier identity".to_string())
+        Error::Verification(
+            "transparency-log content binding requires a verifier identity".to_string(),
+        )
     })?;
-    let (entry_count, content_kind) = match &bundle.content {
+    let (entry_count, content_is_dsse) = match &bundle.content {
         SignatureContent::MessageSignature(_) => {
             let entry_count = crate::verify_impl::verify_hashedrekord_entries(
                 bundle,
                 artifact,
                 expected_verifier,
             )?;
-            (entry_count, "hashedrekord")
+            (entry_count, false)
         }
         SignatureContent::DsseEnvelope(_) => {
-            let dsse_entries =
-                crate::verify_impl::verify_dsse_entries(bundle, expected_verifier)?;
+            let dsse_entries = crate::verify_impl::verify_dsse_entries(bundle, expected_verifier)?;
             let intoto_entries =
                 crate::verify_impl::verify_intoto_entries(bundle, expected_verifier)?;
-            (dsse_entries + intoto_entries, "dsse")
+            (dsse_entries + intoto_entries, true)
         }
     };
     let v1_integrated_time_with_promise = bundle
@@ -557,10 +564,14 @@ fn verify_transparency_log_content_binding(
         .tlog_entries
         .iter()
         .filter(|entry| {
-            entry.kind_version.kind == content_kind
-                && entry.kind_version.version == "0.0.1"
-                && entry.inclusion_promise.is_some()
-                && entry.integrated_time > 0
+            let is_v1_time_source = if content_is_dsse {
+                (entry.kind_version.kind == "dsse" && entry.kind_version.version == "0.0.1")
+                    || (entry.kind_version.kind == "intoto"
+                        && entry.kind_version.version == "0.0.2")
+            } else {
+                entry.kind_version.kind == "hashedrekord" && entry.kind_version.version == "0.0.1"
+            };
+            is_v1_time_source && entry.inclusion_promise.is_some() && entry.integrated_time > 0
         })
         .map(|entry| entry.integrated_time)
         .min();
@@ -915,6 +926,9 @@ mod tests {
     #[test]
     fn v2_content_cannot_borrow_an_unrelated_v1_integrated_time() {
         let mut bundle = Bundle::from_json(DSSE_V2_BUNDLE).expect("V2 DSSE bundle");
+        bundle.verification_material.tlog_entries[0]
+            .kind_version
+            .kind = "dsse".to_string();
         let v1_bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("V1 DSSE bundle");
         bundle
             .verification_material
@@ -944,6 +958,35 @@ mod tests {
     }
 
     #[test]
+    fn legacy_intoto_v002_uses_its_content_bound_set_time() {
+        let bundle = Bundle::from_json(DSSE_V2_BUNDLE).expect("legacy intoto bundle");
+        let certificate = bundle.signing_certificate().expect("DSSE certificate");
+        let verified = verify_transparency_log_content_binding(
+            &bundle,
+            &Artifact::Bytes(b"content binding is carried by the DSSE envelope"),
+            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(certificate)),
+        )
+        .expect("legacy intoto entry must bind the DSSE content");
+        let entry = &bundle.verification_material.tlog_entries[0];
+
+        assert!(!crate::verify_impl::helpers::has_v2_tlog_entries(&bundle));
+        assert_eq!(
+            verified.v1_integrated_time_with_promise,
+            Some(entry.integrated_time)
+        );
+        let signature = crate::verify_impl::helpers::extract_signature(&bundle.content)
+            .expect("extract DSSE signature");
+        let validation_time = crate::verify_impl::helpers::determine_validation_time(
+            &bundle,
+            &signature,
+            &TrustedRoot::production().expect("production root"),
+            verified.v1_integrated_time_with_promise,
+        )
+        .expect("the authenticated intoto SET must provide validation time");
+        assert_eq!(validation_time, entry.integrated_time);
+    }
+
+    #[test]
     fn v1_dsse_content_cannot_borrow_an_unrelated_hashedrekord_integrated_time() {
         let mut bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("V1 DSSE bundle");
         bundle.verification_material.tlog_entries[0].inclusion_promise = None;
@@ -956,9 +999,7 @@ mod tests {
         let verified = verify_transparency_log_content_binding(
             &bundle,
             &Artifact::Bytes(CONDA_PACKAGE),
-            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(
-                certificate,
-            )),
+            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(certificate)),
         )
         .expect("the original DSSE entry remains content-bound");
         assert_eq!(verified.entry_count, 1);
@@ -1153,7 +1194,9 @@ mod tests {
             )),
         )
         .expect_err("unrelated managed key must not inherit the logged signature");
-        assert!(error.to_string().contains("does not match the managed signer"));
+        assert!(error
+            .to_string()
+            .contains("does not match the managed signer"));
     }
 
     #[test]

@@ -54,6 +54,7 @@ impl Drop for ServerGuard {
 fn spawn_trust_service(
     listen: std::net::SocketAddr,
     service_token: &str,
+    authority_admin_token: &str,
     receipt_db_path: &Path,
     authority_db_path: &Path,
     joint_authority_db_path: &Path,
@@ -75,6 +76,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            authority_admin_token,
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -151,8 +154,10 @@ fn check_command_persists_receipt_to_sqlite() {
 }
 
 #[test]
-fn check_command_persists_receipt_via_control_service() {
-    if skip_when_loopback_bind_denied("check_command_persists_receipt_via_control_service") {
+fn check_command_rejects_legacy_unpinned_control_service_issuance() {
+    if skip_when_loopback_bind_denied(
+        "check_command_rejects_legacy_unpinned_control_service_issuance",
+    ) {
         return;
     }
 
@@ -165,9 +170,11 @@ fn check_command_persists_receipt_via_control_service() {
     let session_db_path = dir.join("sessions.sqlite3");
     let listen = reserve_listen_addr();
     let service_token = "control-secret";
+    let authority_admin_token = "authority-admin-secret";
     let _service = spawn_trust_service(
         listen,
         service_token,
+        authority_admin_token,
         &receipt_db_path,
         &authority_db_path,
         &joint_authority_db_path,
@@ -198,29 +205,20 @@ fn check_command_persists_receipt_via_control_service() {
         .output()
         .expect("run chio check via control service");
 
+    assert!(!output.status.success(), "legacy remote issuance succeeded");
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        output.status.success(),
-        "stdout:\n{}\n\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+        stderr.contains(
+            "remote aggregate family-root resolution requires an independently pinned control-authority public key"
+        ),
+        "unexpected remote issuance failure: {stderr}"
     );
 
     let connection = Connection::open(&receipt_db_path).expect("open receipt db");
-    let (count, distinct_count, decision_kind): (i64, i64, String) = connection
-        .query_row(
-            "SELECT COUNT(*), COUNT(DISTINCT receipt_id), MIN(decision_kind) FROM chio_tool_receipts",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .expect("query tool receipts");
-    let child_count: i64 = connection
+    let count: i64 = connection
         .query_row("SELECT COUNT(*) FROM chio_child_receipts", [], |row| {
             row.get(0)
         })
-        .expect("query child receipts");
-
-    assert_eq!(count, 1);
-    assert_eq!(distinct_count, 1);
-    assert_eq!(decision_kind, "allow");
-    assert_eq!(child_count, 0);
+        .expect("query child receipts after rejected issuance");
+    assert_eq!(count, 0);
 }

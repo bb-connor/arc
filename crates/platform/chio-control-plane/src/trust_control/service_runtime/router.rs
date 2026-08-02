@@ -873,8 +873,6 @@ mod tests {
             config,
             joint_authority_store: None,
             fiscal_runtime: None,
-            budget_store: None,
-            revocation_store: None,
             dashboard_sessions: dashboard_auth::DashboardSessionStore::production(),
             dashboard_report_bridge: None,
             authority_keyring: None,

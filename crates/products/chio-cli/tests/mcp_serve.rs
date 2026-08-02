@@ -1462,6 +1462,8 @@ kernel:
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
   allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
 capabilities:
   default:
     tools:
@@ -1483,6 +1485,8 @@ kernel:
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
   allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
 capabilities:
   default:
     tools:
@@ -1512,6 +1516,8 @@ kernel:
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
   allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
 capabilities:
   default:
     tools:
@@ -1545,6 +1551,8 @@ kernel:
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
   allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
 capabilities:
   default:
     resources:
@@ -1568,6 +1576,8 @@ kernel:
   delegation_depth_limit: 5
   allow_ephemeral_receipt_log: true
   allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
 capabilities:
   default:
     tools:
@@ -1591,6 +1601,8 @@ kernel:
   allow_elicitation: true
   allow_ephemeral_receipt_log: true
   allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
 capabilities:
   default:
     tools:

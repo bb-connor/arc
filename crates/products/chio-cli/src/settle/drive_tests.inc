@@ -145,7 +145,9 @@
                 tool_origin: Default::default(),
                 redaction_mode: Default::default(),
                 actor_chain: Vec::new(),
-                content_hash: format!("content-{marker}"),
+                content_hash: chio_core::hashing::sha256_hex(
+                    format!("content-{marker}").as_bytes(),
+                ),
                 policy_hash: "policy-1".to_string(),
                 evidence: Vec::new(),
                 metadata: Some(serde_json::json!({
@@ -309,6 +311,10 @@
         let receipts = chio_store_sqlite::SqliteReceiptStore::open(&path).expect("open receipts");
         let current_receipt = signed_money_receipt(&current_kernel, "drive-current", 99);
         let receipt = signed_money_receipt(&historical_kernel, "drive-1", 100);
+        chio_core::credit::validate_credit_facility_election(&current_receipt)
+            .expect("current receipt explicitly elects the credit facility");
+        chio_core::credit::validate_credit_facility_election(&receipt)
+            .expect("historical receipt explicitly elects the credit facility");
         receipts
             .append_chio_receipt(&current_receipt)
             .expect("append current-key receipt");
@@ -321,7 +327,22 @@
 
         let trust_roots = vec![current_kernel.public_key(), historical_kernel.public_key()];
         let report = run_settlement_drive(&path, 16, &iou_issuer, &trust_roots).expect("drive");
-        assert_eq!(report.settled, 2, "both trusted-key attempts settle: {report:?}");
+        let dead_letters = {
+            let connection = Connection::open(&path).expect("open dead-letter diagnostic");
+            let mut statement = connection
+                .prepare("SELECT canonical_json FROM settle_dead_letters ORDER BY receipt_id")
+                .expect("prepare dead-letter diagnostic");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query dead-letter diagnostic")
+                .collect::<Result<Vec<_>, _>>()
+                .expect("collect dead-letter diagnostic")
+        };
+        assert_eq!(
+            report.settled,
+            2,
+            "both trusted-key attempts settle: {report:?}; dead_letters={dead_letters:?}"
+        );
 
         let receipts =
             chio_store_sqlite::SqliteReceiptStore::open_existing(&path).expect("reopen receipts");

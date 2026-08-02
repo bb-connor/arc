@@ -264,7 +264,7 @@ capabilities:
 }
 
 #[test]
-fn configure_capability_authority_uses_sqlite_kernel_key_with_remote_stores() {
+fn configure_capability_authority_rejects_local_custody_with_remote_stores() {
     let authority_db_path = unique_db_path("chio-cli-authority-db");
     let yaml = r#"
 capabilities:
@@ -283,10 +283,9 @@ capabilities:
         .unwrap()
         .local_keypair()
         .unwrap();
-    let expected_issuer = kernel_kp.public_key();
     let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kernel_kp)
         .expect("build session test kernel");
-    configure_capability_authority(
+    let error = configure_capability_authority(
         &mut kernel,
         None,
         Some(&authority_db_path),
@@ -300,18 +299,11 @@ capabilities:
         None,
         None,
     )
-    .unwrap();
-
-    let agent_kp = Keypair::generate();
-    let capability =
-        issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
-            .unwrap()
-            .into_iter()
-            .next()
-            .unwrap();
-
-    assert_eq!(capability.issuer, expected_issuer);
-    assert_eq!(capability.issuer, kernel.public_key());
+    .expect_err("remote control and local authority custody must remain disjoint");
+    assert!(error
+        .to_string()
+        .contains("remote control authority cannot be combined with local authority custody"));
+    assert!(!default_capabilities.is_empty());
 
     let _ = std::fs::remove_file(authority_db_path);
 }

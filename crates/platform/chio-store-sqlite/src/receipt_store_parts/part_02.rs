@@ -979,6 +979,7 @@ fn append_chio_receipt_tx(
     receipt: &ChioReceipt,
     raw_json: &str,
 ) -> Result<u64, ReceiptStoreError> {
+    let (cost_currency, cost_charged_be) = receipt_cost_projection(receipt)?;
     let attribution = extract_receipt_attribution(receipt);
     let mut subject_key = attribution.subject_key;
     let mut issuer_key = attribution.issuer_key;
@@ -1007,7 +1008,7 @@ fn append_chio_receipt_tx(
     let source_seq = tx
         .query_row(
             r#"
-        INSERT INTO chio_tool_receipts (receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index, tool_server, tool_name, decision_kind, policy_hash, content_hash, tenant_id, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(receipt_id) DO NOTHING RETURNING seq
+        INSERT INTO chio_tool_receipts (receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index, tool_server, tool_name, decision_kind, policy_hash, content_hash, tenant_id, raw_json, cost_currency, cost_charged_be) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(receipt_id) DO NOTHING RETURNING seq
         "#,
             params![
                 receipt.id.as_str(),
@@ -1023,21 +1024,36 @@ fn append_chio_receipt_tx(
                 receipt.content_hash.as_str(),
                 receipt.tenant_id.as_deref(),
                 raw_json,
+                cost_currency.as_deref(),
+                cost_charged_be.as_deref(),
             ],
             |row| row.get::<_, i64>(0),
         )
         .optional()?;
     let Some(source_seq) = source_seq else {
-        let (existing_source_seq, existing_raw_json) = tx.query_row(
-            "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+        let (existing_source_seq, existing_raw_json, existing_currency, existing_key) = tx.query_row(
+            "SELECT seq, raw_json, cost_currency, cost_charged_be FROM chio_tool_receipts WHERE receipt_id = ?1",
             params![receipt.id.as_str()],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<Vec<u8>>>(3)?,
+                ))
+            },
         )?;
         let existing_source_seq =
             sqlite_positive_u64(existing_source_seq, "tool receipt source_seq")?;
         if existing_raw_json != raw_json {
             return Err(ReceiptStoreError::Conflict(format!(
                 "tool receipt `{}` already exists with different content",
+                receipt.id
+            )));
+        }
+        if existing_currency != cost_currency || existing_key != cost_charged_be {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "tool receipt `{}` already exists with different cost projection",
                 receipt.id
             )));
         }

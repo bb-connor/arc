@@ -1,6 +1,16 @@
 use super::super::*;
 use super::support::*;
 
+fn stamped_receipt_schema_version(
+    connection: &rusqlite::Connection,
+) -> Result<i32, rusqlite::Error> {
+    connection.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+        [],
+        |row| row.get(0),
+    )
+}
+
 fn replace_settlement_observer_outbox_with_v2(connection: &rusqlite::Connection) {
     connection
         .execute_batch(
@@ -718,7 +728,82 @@ fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
 }
 
 #[test]
-fn receipt_schema_v3_atomically_preserves_valid_v2_outbox_rows() {
+fn receipt_schema_v4_upgrades_a_branch_v3_database_without_cost_projection(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-v3-cost-upgrade");
+    let receipt = sample_financial_receipt("v3-cost-upgrade", u64::MAX)?;
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.append_chio_receipt(&receipt)?;
+    }
+    {
+        let connection = rusqlite::Connection::open(&path)?;
+        crate::receipt_store::support::drop_transparency_projection_guards(&connection)?;
+        connection.execute_batch(
+            "DROP INDEX idx_chio_tool_receipts_cost; \
+             DROP INDEX idx_chio_tool_receipts_cost_global; \
+             ALTER TABLE chio_tool_receipts DROP COLUMN cost_charged_be; \
+             ALTER TABLE chio_tool_receipts DROP COLUMN cost_currency;",
+        )?;
+        crate::stamp_schema_version(&connection, "receipt", 3)?;
+    }
+
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let connection = store.connection()?;
+    let projection = connection.query_row(
+        "SELECT cost_currency, cost_charged_be FROM chio_tool_receipts WHERE receipt_id = ?1",
+        [receipt.id.as_str()],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?)),
+    )?;
+    assert_eq!(
+        projection,
+        ("USD".to_string(), u64::MAX.to_be_bytes().to_vec())
+    );
+    let version = stamped_receipt_schema_version(&connection)?;
+    assert_eq!(
+        version,
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
+    drop(connection);
+    drop(store);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn receipt_schema_v4_upgrades_a_main_v3_database_without_observer_outbox(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-main-v3-upgrade");
+    drop(SqliteReceiptStore::open(&path)?);
+    {
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.execute_batch(
+            "DROP TRIGGER chio_settlement_observer_outbox_validate_update; \
+             DROP TRIGGER chio_settlement_observer_outbox_reject_unfinished_delete; \
+             DROP INDEX idx_chio_settlement_observer_outbox_pending; \
+             DROP TABLE chio_settlement_observer_outbox;",
+        )?;
+        crate::stamp_schema_version(&connection, "receipt", 3)?;
+    }
+
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let connection = store.connection()?;
+    crate::receipt_store::bootstrap::open::validate_settlement_observer_outbox_schema(
+        &connection,
+        false,
+    )?;
+    assert_eq!(
+        stamped_receipt_schema_version(&connection)?,
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
+    drop(connection);
+    drop(store);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn receipt_schema_v4_atomically_preserves_valid_v2_outbox_rows() {
     let path = unique_db_path("chio-receipts-v2-outbox-upgrade");
     drop(SqliteReceiptStore::open(&path).test_unwrap());
     let before = {
@@ -762,7 +847,10 @@ fn receipt_schema_v3_atomically_preserves_valid_v2_outbox_rows() {
             |row| row.get(0),
         )
         .test_unwrap();
-    assert_eq!(version, 3);
+    assert_eq!(
+        version,
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
     let staging_table_exists: i64 = connection
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chio_settlement_observer_outbox_v2')",
@@ -791,13 +879,13 @@ fn receipt_schema_v3_atomically_preserves_valid_v2_outbox_rows() {
         &["chio_tool_receipts", "http_receipts", "tool_receipts"],
     )
     .test_unwrap_err();
-    assert!(old_error.to_string().contains("schema version 3 is newer"));
+    assert!(old_error.to_string().contains("schema version 4 is newer"));
 
     let _ = fs::remove_file(path);
 }
 
 #[test]
-fn receipt_schema_v3_rejects_invalid_v2_rows_without_partial_mutation() {
+fn receipt_schema_v4_rejects_invalid_v2_rows_without_partial_mutation() {
     let path = unique_db_path("chio-receipts-v2-outbox-invalid");
     drop(SqliteReceiptStore::open(&path).test_unwrap());
     let (before_table_sql, before_rows) = {

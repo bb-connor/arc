@@ -690,6 +690,44 @@ pub(crate) fn validate_metered_billing_reconciliation_request(
 pub(crate) fn load_capability_authority(
     config: &TrustServiceConfig,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
+    load_capability_authority_with_lineage_mode(config, true)
+}
+
+pub(crate) fn load_capability_authority_with_deferred_lineage(
+    config: &TrustServiceConfig,
+) -> Result<Box<dyn CapabilityAuthority>, Response> {
+    load_capability_authority_with_lineage_mode(config, false)
+}
+
+fn load_capability_authority_with_lineage_mode(
+    config: &TrustServiceConfig,
+    persist_lineage_immediately: bool,
+) -> Result<Box<dyn CapabilityAuthority>, Response> {
+    let wrap = |inner: Box<dyn CapabilityAuthority>| {
+        let authority = if persist_lineage_immediately {
+            issuance::wrap_capability_authority(
+                inner,
+                config.issuance_policy.clone(),
+                config.runtime_assurance_policy.clone(),
+                config.receipt_db_path.as_deref(),
+                config.budget_db_path.as_deref(),
+            )
+        } else {
+            issuance::wrap_capability_authority_with_deferred_lineage(
+                inner,
+                config.issuance_policy.clone(),
+                config.runtime_assurance_policy.clone(),
+                config.receipt_db_path.as_deref(),
+                config.budget_db_path.as_deref(),
+            )
+        };
+        authority.map_err(|_| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "capability issuance storage is unavailable",
+            )
+        })
+    };
     match (
         config.authority_seed_path.as_deref(),
         config.authority_db_path.as_deref(),
@@ -705,19 +743,7 @@ pub(crate) fn load_capability_authority(
                     "capability authority signing custody is unavailable",
                 )
             })?;
-            issuance::wrap_capability_authority(
-                Box::new(LocalCapabilityAuthority::new(keypair)),
-                config.issuance_policy.clone(),
-                config.runtime_assurance_policy.clone(),
-                config.receipt_db_path.as_deref(),
-                config.budget_db_path.as_deref(),
-            )
-            .map_err(|_| {
-                plain_http_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "capability issuance storage is unavailable",
-                )
-            })
+            wrap(Box::new(LocalCapabilityAuthority::new(keypair)))
         }
         (None, Some(path)) => SqliteCapabilityAuthority::open_existing(path)
             .map_err(|_| {
@@ -726,21 +752,7 @@ pub(crate) fn load_capability_authority(
                     "capability authority storage is unavailable",
                 )
             })
-            .and_then(|authority| {
-                issuance::wrap_capability_authority(
-                    Box::new(authority),
-                    config.issuance_policy.clone(),
-                    config.runtime_assurance_policy.clone(),
-                    config.receipt_db_path.as_deref(),
-                    config.budget_db_path.as_deref(),
-                )
-                .map_err(|_| {
-                    plain_http_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "capability issuance storage is unavailable",
-                    )
-                })
-            }),
+            .and_then(|authority| wrap(Box::new(authority))),
         (None, None) => Err(plain_http_error(
             StatusCode::CONFLICT,
             "trust control service requires --authority-seed-file or --authority-db",

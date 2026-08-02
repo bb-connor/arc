@@ -280,14 +280,19 @@ pub fn extract_tsa_timestamp(
     Ok(earliest_timestamp)
 }
 
-/// Check if bundle contains V2 tlog entries (hashedrekord/dsse v0.0.2)
-/// V2 entries have integrated_time=0 and require RFC3161 timestamps
+/// Check if bundle contains V2 tlog entries (hashedrekord/dsse v0.0.2).
+///
+/// The legacy `intoto` schema also uses version 0.0.2, but it has V1 SET and
+/// integrated-time semantics.
 pub fn has_v2_tlog_entries(bundle: &Bundle) -> bool {
     bundle
         .verification_material
         .tlog_entries
         .iter()
-        .any(|entry| entry.kind_version.version == "0.0.2")
+        .any(|entry| {
+            matches!(entry.kind_version.kind.as_str(), "hashedrekord" | "dsse")
+                && entry.kind_version.version == "0.0.2"
+        })
 }
 
 /// Determine validation time from timestamps.
@@ -500,13 +505,14 @@ pub fn verify_certificate_chain(
 /// for proper RFC 6962 compliant verification.
 pub fn verify_sct(
     verification_material: &VerificationMaterialContent,
+    validation_time: i64,
     trusted_root: &TrustedRoot,
 ) -> Result<()> {
     // Extract certificate for verification
     let cert = extract_certificate(verification_material)?;
 
     // Get issuer SPKI for calculating the issuer key hash
-    let issuer_spki = get_issuer_spki(verification_material, &cert, trusted_root)?;
+    let issuer_spki = get_issuer_spki(verification_material, &cert, validation_time, trusted_root)?;
 
     // Delegate to the new sct module for verification
     super::sct::verify_sct(cert.as_bytes(), issuer_spki.as_bytes(), trusted_root)
@@ -519,49 +525,53 @@ pub fn verify_sct(
 fn get_issuer_spki(
     verification_material: &VerificationMaterialContent,
     cert: &DerCertificate,
+    validation_time: i64,
     trusted_root: &TrustedRoot,
 ) -> Result<DerPublicKey> {
-    use x509_cert::der::{Decode, Encode};
+    use x509_cert::der::Decode;
     use x509_cert::Certificate;
 
-    // 1. Try to get from chain in verification material
+    let parsed_cert = Certificate::from_der(cert.as_bytes())
+        .map_err(|e| Error::Verification(format!("failed to parse certificate: {}", e)))?;
+    let issuer_name = &parsed_cert.tbs_certificate.issuer;
+
+    // Prefer a supplied intermediate, but require it to be the key that
+    // actually signed the leaf. Chain validation has already established that
+    // supplied intermediates lead to an active trusted authority.
     if let VerificationMaterialContent::X509CertificateChain { certificates } =
         verification_material
     {
-        if certificates.len() > 1 {
-            let issuer_der = certificates[1].raw_bytes.as_bytes();
-            let issuer_cert = Certificate::from_der(issuer_der).map_err(|e| {
-                Error::Verification(format!("failed to parse issuer certificate: {}", e))
-            })?;
-            let spki_der = issuer_cert
-                .tbs_certificate
-                .subject_public_key_info
-                .to_der()
-                .map_err(|e| Error::Verification(format!("failed to encode issuer SPKI: {}", e)))?;
-            return Ok(DerPublicKey::new(spki_der));
+        for candidate in certificates.iter().skip(1) {
+            if let Some(spki) = issuer_spki_if_signs(
+                cert,
+                issuer_name,
+                candidate.raw_bytes.as_bytes(),
+                validation_time,
+            )? {
+                return Ok(spki);
+            }
         }
     }
 
-    // 2. Try to find in trusted root
-    let parsed_cert = Certificate::from_der(cert.as_bytes())
-        .map_err(|e| Error::Verification(format!("failed to parse certificate: {}", e)))?;
-    let issuer_name = parsed_cert.tbs_certificate.issuer;
-
-    let fulcio_certs = trusted_root
-        .fulcio_certs()
-        .map_err(|e| Error::Verification(format!("failed to get Fulcio certs: {}", e)))?;
-
-    for ca_der in fulcio_certs {
-        if let Ok(ca_cert) = Certificate::from_der(&ca_der) {
-            if ca_cert.tbs_certificate.subject == issuer_name {
-                let spki_der = ca_cert
-                    .tbs_certificate
-                    .subject_public_key_info
-                    .to_der()
-                    .map_err(|e| {
-                        Error::Verification(format!("failed to encode issuer SPKI: {}", e))
-                    })?;
-                return Ok(DerPublicKey::new(spki_der));
+    // Search only authorities active at the trusted validation time. Subject
+    // equality is insufficient during key rotation because old and new Fulcio
+    // intermediates can share a name.
+    for authority in &trusted_root.certificate_authorities {
+        if !validity_period_contains(
+            authority.valid_for.as_ref(),
+            validation_time,
+            "Fulcio authority",
+        )? {
+            continue;
+        }
+        for candidate in &authority.cert_chain.certificates {
+            if let Some(spki) = issuer_spki_if_signs(
+                cert,
+                issuer_name,
+                candidate.raw_bytes.as_bytes(),
+                validation_time,
+            )? {
+                return Ok(spki);
             }
         }
     }
@@ -571,12 +581,61 @@ fn get_issuer_spki(
     ))
 }
 
+fn issuer_spki_if_signs(
+    leaf: &DerCertificate,
+    issuer_name: &x509_cert::name::Name,
+    candidate_der: &[u8],
+    validation_time: i64,
+) -> Result<Option<DerPublicKey>> {
+    use x509_cert::der::{Decode, Encode};
+    use x509_cert::Certificate;
+
+    let candidate = match Certificate::from_der(candidate_der) {
+        Ok(candidate) if &candidate.tbs_certificate.subject == issuer_name => candidate,
+        Ok(_) | Err(_) => return Ok(None),
+    };
+    let leaf_der = CertificateDer::from(leaf.as_bytes());
+    let end_entity = EndEntityCert::try_from(&leaf_der).map_err(|error| {
+        Error::Verification(format!("failed to parse end-entity certificate: {error}"))
+    })?;
+    let candidate_der = CertificateDer::from(candidate_der);
+    let Ok(anchor) = anchor_from_trusted_cert(&candidate_der) else {
+        return Ok(None);
+    };
+    let verification_time = u64::try_from(validation_time)
+        .map(std::time::Duration::from_secs)
+        .map(UnixTime::since_unix_epoch)
+        .map_err(|_| Error::Verification("certificate validation time is negative".to_string()))?;
+    if end_entity
+        .verify_for_usage(
+            ALL_VERIFICATION_ALGS,
+            &[anchor],
+            &[],
+            verification_time,
+            KeyUsage::required(ID_KP_CODE_SIGNING.as_bytes()),
+            None,
+            None,
+        )
+        .is_err()
+    {
+        return Ok(None);
+    }
+    let spki = candidate
+        .tbs_certificate
+        .subject_public_key_info
+        .to_der()
+        .map_err(|error| Error::Verification(format!("failed to encode issuer SPKI: {error}")))?;
+    Ok(Some(DerPublicKey::new(spki)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use sigstore_crypto::parse_certificate_info;
     use sigstore_trust_root::ValidityPeriod;
     use sigstore_types::bundle::Rfc3161Timestamp;
+    use x509_cert::der::{Decode, Encode};
+    use x509_cert::Certificate;
 
     const COSIGN_V3_BLOB_BUNDLE: &str =
         include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
@@ -603,6 +662,50 @@ mod tests {
         .expect_err("an inactive Fulcio authority must not become a trust anchor");
 
         assert!(error.to_string().contains("validity period"));
+    }
+
+    #[test]
+    fn sct_issuer_resolution_ignores_a_same_subject_key_that_did_not_sign_the_leaf() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let validation_time = bundle.verification_material.tlog_entries[0].integrated_time;
+        let trusted_root = TrustedRoot::production().expect("production root");
+        let expected = get_issuer_spki(
+            &bundle.verification_material.content,
+            &certificate,
+            validation_time,
+            &trusted_root,
+        )
+        .expect("actual issuer");
+
+        let mut wrong_issuer =
+            Certificate::from_der(certificate.as_bytes()).expect("parse signing certificate");
+        wrong_issuer.tbs_certificate.subject = wrong_issuer.tbs_certificate.issuer.clone();
+        let wrong_issuer = DerCertificate::new(
+            wrong_issuer
+                .to_der()
+                .expect("serialize same-subject wrong-key certificate"),
+        );
+        let mut rotated_root = trusted_root;
+        rotated_root.certificate_authorities[0]
+            .cert_chain
+            .certificates
+            .insert(
+                0,
+                sigstore_trust_root::trusted_root::CertificateEntry {
+                    raw_bytes: wrong_issuer,
+                },
+            );
+
+        let resolved = get_issuer_spki(
+            &bundle.verification_material.content,
+            &certificate,
+            validation_time,
+            &rotated_root,
+        )
+        .expect("issuer selected by certificate signature");
+
+        assert_eq!(resolved.as_bytes(), expected.as_bytes());
     }
 
     #[test]

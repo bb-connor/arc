@@ -26,6 +26,41 @@ pub fn wrap_capability_authority(
     receipt_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
 ) -> Result<Box<dyn CapabilityAuthority>, KernelError> {
+    wrap_capability_authority_with_lineage_mode(
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_db_path,
+        budget_db_path,
+        true,
+    )
+}
+
+pub(crate) fn wrap_capability_authority_with_deferred_lineage(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+) -> Result<Box<dyn CapabilityAuthority>, KernelError> {
+    wrap_capability_authority_with_lineage_mode(
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_db_path,
+        budget_db_path,
+        false,
+    )
+}
+
+fn wrap_capability_authority_with_lineage_mode(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    persist_lineage_immediately: bool,
+) -> Result<Box<dyn CapabilityAuthority>, KernelError> {
     if let Some(path) = receipt_db_path {
         drop(
             SqliteReceiptStore::open_existing_strict(path)
@@ -38,6 +73,7 @@ pub fn wrap_capability_authority(
         runtime_assurance_policy,
         receipt_db_path: receipt_db_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        persist_lineage_immediately,
     }))
 }
 
@@ -47,6 +83,7 @@ struct PolicyBackedCapabilityAuthority {
     runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
     receipt_db_path: Option<PathBuf>,
     budget_db_path: Option<PathBuf>,
+    persist_lineage_immediately: bool,
 }
 
 impl PolicyBackedCapabilityAuthority {
@@ -110,7 +147,10 @@ impl PolicyBackedCapabilityAuthority {
             issuance_validation_time,
         )?;
 
-        if let Some(path) = self.receipt_db_path.as_deref() {
+        if self.persist_lineage_immediately {
+            let Some(path) = self.receipt_db_path.as_deref() else {
+                return Ok(capability);
+            };
             let store = SqliteReceiptStore::open_existing_strict(path)
                 .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
             if let Some(context) = security_context {

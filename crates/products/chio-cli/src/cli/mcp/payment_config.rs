@@ -186,11 +186,15 @@ mod tests {
         }
 
         let kernel_kp = Keypair::generate();
+        let authority_root = chio_test_support::private_fs::private_tempdir(
+            "chio-cli-governed-payment-",
+        )
+        .test_unwrap();
         let mut kernel = ChioKernel::new(KernelConfig {
             keypair: kernel_kp.clone(),
             ca_public_keys: vec![],
             max_delegation_depth: 5,
-            policy_hash: "cli-sim-test".to_string(),
+            policy_hash: chio_core::sha256_hex(b"cli-sim-test"),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -205,6 +209,38 @@ mod tests {
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
             dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         });
+        kernel
+            .set_budget_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteBudgetStore::open(
+                    &authority_root.path().join("budgets.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
+        kernel
+            .set_admission_operation_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(
+                    &authority_root.path().join("operations.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
+        kernel
+            .set_approval_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteApprovalStore::open(
+                    &authority_root.path().join("approvals.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
+        kernel
+            .set_receipt_store_handle(std::sync::Arc::new(
+                chio_store_sqlite::SqliteReceiptStore::open(
+                    &authority_root.path().join("receipts.sqlite3"),
+                )
+                .test_unwrap(),
+            ))
+            .test_unwrap();
 
         kernel.register_tool_server(Box::new(FlatCostServer { cost_units: 75 }));
 

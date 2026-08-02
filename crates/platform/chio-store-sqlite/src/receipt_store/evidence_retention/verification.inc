@@ -53,7 +53,9 @@ fn verify_co_archival_complete(
                  AND a.tool_server IS m.tool_server AND a.tool_name IS m.tool_name \
                  AND a.decision_kind IS m.decision_kind AND a.policy_hash IS m.policy_hash \
                  AND a.content_hash IS m.content_hash AND a.raw_json IS m.raw_json \
-                 AND a.tenant_id IS m.tenant_id)"
+                 AND a.tenant_id IS m.tenant_id \
+                 AND a.cost_currency IS m.cost_currency \
+                 AND a.cost_charged_be IS m.cost_charged_be)"
             ),
         ),
         (

@@ -1,21 +1,15 @@
-//! Integration test: capability lineage is recorded at issuance.
+//! Integration tests for capability-authority HTTP role separation.
 //!
-//! Verifies that GET /v1/lineage/{capability_id} returns a snapshot
-//! immediately after POST /v1/capabilities/issue creates the token.
+//! Signed issuance and its durable lineage snapshot are covered by the
+//! control-plane handler tests, where the test-only signing backend can be
+//! injected without weakening the production keyring requirement.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_core::capability::{
-    runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence},
-    scope::{ChioScope, Constraint, Operation, ToolGrant},
-    workload_identity::{WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityScheme},
-};
-use chio_core::crypto::Keypair;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
 use reqwest::header::AUTHORIZATION;
@@ -24,57 +18,10 @@ fn bearer(token: &str) -> String {
     format!("Bearer {token}")
 }
 
-fn unix_timestamp_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs()
-}
-
-fn issue_scope() -> ChioScope {
-    ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "test-server".to_string(),
-            tool_name: "test_tool".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: vec![Constraint::GovernedIntentRequired],
-            max_invocations: None,
-            max_cost_per_invocation: None,
-            max_total_cost: None,
-            dpop_required: None,
-        }],
-        resource_grants: Vec::new(),
-        prompt_grants: Vec::new(),
-    }
-}
-
-fn conflicting_runtime_attestation() -> RuntimeAttestationEvidence {
-    let now = unix_timestamp_now();
-    RuntimeAttestationEvidence {
-        schema: "chio.runtime-attestation.v1".to_string(),
-        verifier: "verifier.chio".to_string(),
-        tier: RuntimeAssuranceTier::Attested,
-        issued_at: now.saturating_sub(5),
-        expires_at: now + 300,
-        evidence_sha256: "attestation-digest".to_string(),
-        runtime_identity: Some("spiffe://prod.chio/payments/worker".to_string()),
-        workload_identity: Some(WorkloadIdentity {
-            scheme: WorkloadIdentityScheme::Spiffe,
-            credential_kind: WorkloadCredentialKind::X509Svid,
-            uri: "spiffe://dev.chio/payments/worker".to_string(),
-            trust_domain: "dev.chio".to_string(),
-            path: "/payments/worker".to_string(),
-        }),
-        claims: None,
-    }
-}
-
 fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 fn workspace_root() -> PathBuf {
@@ -121,6 +68,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "capability-lineage-authority-admin-token",
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -145,124 +94,6 @@ fn wait_for_trust_service(client: &Client, base_url: &str, service: &mut ServerG
         }
     }
     panic!("trust service did not become ready");
-}
-
-#[test]
-fn issue_capability_records_lineage_snapshot() {
-    if skip_when_loopback_bind_denied("issue_capability_records_lineage_snapshot") {
-        return;
-    }
-
-    let dir = unique_dir("chio-cli-lineage-test");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
-
-    let listen = reserve_listen_addr();
-    let service_token = "lineage-test-token";
-    let base_url = format!("http://{listen}");
-
-    let mut service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-
-    let client = Client::builder().build().expect("build reqwest client");
-    wait_for_trust_service(&client, &base_url, &mut service);
-
-    // Generate a fresh Ed25519 keypair for the subject (agent).
-    // We encode the public key as hex for the request body.
-    let subject_kp = Keypair::generate();
-    let subject_hex = subject_kp.public_key().to_hex();
-
-    // Issue a capability via the trust-control HTTP endpoint.
-    let issue_body = serde_json::json!({
-        "schema": "chio.capability-issuance-request.v2",
-        "requestNonce": "11".repeat(32),
-        "requestedAt": unix_timestamp_now(),
-        "tenantId": "tenant-capability-lineage",
-        "lineageId": "lineage-capability-lineage",
-        "subjectPublicKey": subject_hex,
-        "scope": issue_scope(),
-        "ttlSeconds": 3600
-    });
-
-    let issue_resp = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&issue_body)
-        .send()
-        .expect("send issue capability request");
-
-    assert_eq!(
-        issue_resp.status(),
-        reqwest::StatusCode::OK,
-        "issue capability should succeed; body: {}",
-        issue_resp.text().unwrap_or_default()
-    );
-
-    let issue_json: serde_json::Value = issue_resp.json().expect("parse issue capability response");
-    assert_eq!(
-        issue_json["schema"].as_str(),
-        Some("chio.capability-issuance-response-envelope.v2")
-    );
-    assert_eq!(
-        issue_json["body"]["schema"].as_str(),
-        Some("chio.capability-issuance-response.v1")
-    );
-    let capability_id = issue_json["body"]["capability"]["id"]
-        .as_str()
-        .expect("capability.id should be a string")
-        .to_string();
-    assert!(
-        !capability_id.is_empty(),
-        "capability id should not be empty"
-    );
-
-    // Query the lineage endpoint to verify the snapshot was recorded.
-    let lineage_resp = client
-        .get(format!("{base_url}/v1/lineage/{capability_id}"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .send()
-        .expect("send lineage query request");
-
-    assert_eq!(
-        lineage_resp.status(),
-        reqwest::StatusCode::OK,
-        "lineage query should return 200; body: {}",
-        lineage_resp.text().unwrap_or_default()
-    );
-
-    let lineage_json: serde_json::Value = lineage_resp.json().expect("parse lineage response");
-
-    // Verify the snapshot fields match the issued capability.
-    assert_eq!(
-        lineage_json["capability_id"].as_str().unwrap_or(""),
-        capability_id,
-        "lineage capability_id should match issued id"
-    );
-    assert_eq!(
-        lineage_json["subject_key"].as_str().unwrap_or(""),
-        subject_hex,
-        "lineage subject_key should match the agent's public key"
-    );
-    assert_eq!(
-        lineage_json["delegation_depth"].as_u64().unwrap_or(999),
-        0,
-        "root capability should have delegation_depth = 0"
-    );
-    assert!(
-        lineage_json["parent_capability_id"].is_null(),
-        "root capability should have no parent"
-    );
-
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -320,7 +151,10 @@ fn authority_endpoints_require_auth_and_rotate_generation() {
 
     let rotated = client
         .post(format!("{base_url}/v1/authority"))
-        .header(AUTHORIZATION, bearer(service_token))
+        .header(
+            AUTHORIZATION,
+            bearer("capability-lineage-authority-admin-token"),
+        )
         .send()
         .expect("send rotate request");
     assert_eq!(rotated.status(), reqwest::StatusCode::OK);
@@ -341,120 +175,6 @@ fn authority_endpoints_require_auth_and_rotate_generation() {
     assert_eq!(after.status(), reqwest::StatusCode::OK);
     let after: serde_json::Value = after.json().expect("parse post-rotation authority status");
     assert_eq!(after["generation"].as_u64(), Some(rotated_generation));
-
-    let _ = std::fs::remove_dir_all(dir);
-}
-
-#[test]
-fn issue_capability_rejects_invalid_public_key() {
-    if skip_when_loopback_bind_denied("issue_capability_rejects_invalid_public_key") {
-        return;
-    }
-
-    let dir = unique_dir("chio-cli-invalid-capability-key");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
-
-    let listen = reserve_listen_addr();
-    let service_token = "invalid-capability-key-token";
-    let base_url = format!("http://{listen}");
-
-    let mut service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-
-    let client = Client::builder().build().expect("build reqwest client");
-    wait_for_trust_service(&client, &base_url, &mut service);
-
-    let response = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&serde_json::json!({
-            "schema": "chio.capability-issuance-request.v2",
-            "requestNonce": "22".repeat(32),
-            "requestedAt": unix_timestamp_now(),
-            "tenantId": "tenant-invalid-capability-key",
-            "lineageId": "lineage-invalid-capability-key",
-            "subjectPublicKey": "not-a-public-key",
-            "scope": issue_scope(),
-            "ttlSeconds": 120
-        }))
-        .send()
-        .expect("send invalid issue capability request");
-    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    let body: serde_json::Value = response.json().expect("parse invalid key response");
-    assert!(body["error"]
-        .as_str()
-        .expect("invalid key error string")
-        .contains("capability issuance subject public key is invalid"));
-
-    let _ = std::fs::remove_dir_all(dir);
-}
-
-#[test]
-fn issue_capability_rejects_conflicting_runtime_attestation_binding() {
-    if skip_when_loopback_bind_denied(
-        "issue_capability_rejects_conflicting_runtime_attestation_binding",
-    ) {
-        return;
-    }
-
-    let dir = unique_dir("chio-cli-invalid-runtime-attestation");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
-
-    let listen = reserve_listen_addr();
-    let service_token = "invalid-runtime-attestation-token";
-    let base_url = format!("http://{listen}");
-
-    let mut service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-
-    let client = Client::builder().build().expect("build reqwest client");
-    wait_for_trust_service(&client, &base_url, &mut service);
-
-    let subject_kp = Keypair::generate();
-    let response = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&serde_json::json!({
-            "schema": "chio.capability-issuance-request.v2",
-            "requestNonce": "33".repeat(32),
-            "requestedAt": unix_timestamp_now(),
-            "tenantId": "tenant-conflicting-runtime-attestation",
-            "lineageId": "lineage-conflicting-runtime-attestation",
-            "subjectPublicKey": subject_kp.public_key().to_hex(),
-            "scope": issue_scope(),
-            "ttlSeconds": 120,
-            "runtimeAttestation": conflicting_runtime_attestation(),
-        }))
-        .send()
-        .expect("send conflicting runtime attestation request");
-    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    let body: serde_json::Value = response
-        .json()
-        .expect("parse conflicting runtime attestation response");
-    assert!(body["error"]
-        .as_str()
-        .expect("runtime attestation error string")
-        .contains("capability issuance runtime attestation is invalid"));
 
     let _ = std::fs::remove_dir_all(dir);
 }

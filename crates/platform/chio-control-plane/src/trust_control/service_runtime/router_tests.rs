@@ -41,8 +41,6 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         config,
         joint_authority_store: None,
         fiscal_runtime: None,
-        budget_store: None,
-        revocation_store: None,
         enterprise_provider_registry: None,
         verifier_policy_registry: None,
         federation_admission_rate_limiter: Arc::new(Mutex::new(

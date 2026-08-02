@@ -70,6 +70,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            "evidence-export-authority-admin-token",
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -780,8 +782,9 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         return;
     }
 
-    let dir = unique_path("evidence-export-remote", "");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let dir = chio_test_support::private_fs::private_tempdir("evidence-export-remote-")
+        .expect("create private temp dir")
+        .keep();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");

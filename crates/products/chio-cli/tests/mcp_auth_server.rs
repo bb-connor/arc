@@ -175,6 +175,8 @@ fn spawn_http_server_with_local_auth(
     let revocation_db_path = canonical_dir.join("remote-revocations.sqlite3");
     let authority_seed_path = canonical_dir.join("remote-authority.seed");
     let auth_server_seed_path = canonical_dir.join("auth-server.seed");
+    chio_control_plane::persist_authority_keypair(&authority_seed_path, &Keypair::generate())
+        .expect("provision remote MCP authority seed");
     let public_base_url = format!("http://{listen}");
     let audience = format!("{public_base_url}/mcp");
 

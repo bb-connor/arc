@@ -174,7 +174,11 @@ impl SqliteReceiptStore {
                 ensure_capability_lineage_provenance_columns(&connection)?;
                 super::support::ensure_receipt_retention_watermark_table(&connection)?;
                 super::support::ensure_receipt_retention_tombstones(&connection)?;
-                super::support::ensure_transparency_projection_guards(&connection)?;
+                super::support::drop_transparency_projection_guards(&connection)?;
+                let migration = connection
+                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+                super::support::migrate_receipt_cost_projection(&migration)?;
+                migration.commit()?;
             } else {
                 validate_indexed_security_evidence_schema(&connection)?;
                 crate::aggregate_family_root::validate_existing_aggregate_family_root_schema(
@@ -184,6 +188,7 @@ impl SqliteReceiptStore {
                 super::support::validate_receipt_retention_tombstones_schema(&connection)?;
             }
             super::support::ensure_transparency_projection_guards(&connection)?;
+            super::support::verify_receipt_cost_projection(&connection)?;
             database_identity_file.validate_live_connection(&connection)?;
             drop(connection);
 
@@ -1201,6 +1206,7 @@ impl SqliteReceiptStore {
             backfill_tool_receipt_attribution_columns(&connection)?;
             let projection_backfill =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            super::support::migrate_receipt_cost_projection(&projection_backfill)?;
             super::support::backfill_provenance_lineage_tables(&projection_backfill)?;
             super::support::backfill_claim_receipt_log_entries(&projection_backfill)?;
             super::support::backfill_checkpoint_transparency_projections(&projection_backfill)?;
@@ -1218,6 +1224,7 @@ impl SqliteReceiptStore {
                 )));
             }
         }
+        super::support::verify_receipt_cost_projection(&connection)?;
 
         crate::stamp_schema_version(
             &connection,

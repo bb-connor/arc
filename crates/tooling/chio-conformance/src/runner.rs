@@ -74,6 +74,7 @@ struct ConformanceRuntimeState {
     // until the child server has been stopped.
     _directory: tempfile::TempDir,
     auth_server_seed_path: PathBuf,
+    #[cfg(target_os = "linux")]
     session_db_path: PathBuf,
 }
 
@@ -93,10 +94,12 @@ impl ConformanceRuntimeState {
             fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
         }
         let auth_server_seed_path = directory.path().join("auth-server.seed");
+        #[cfg(target_os = "linux")]
         let session_db_path = directory.path().join("mcp-session.sqlite3");
         Ok(Self {
             _directory: directory,
             auth_server_seed_path,
+            #[cfg(target_os = "linux")]
             session_db_path,
         })
     }
@@ -463,16 +466,22 @@ fn spawn_remote_edge(
         .arg(listen.to_string());
 
     let public_base_url = format!("http://{listen}");
-    command
-        .arg("--session-db")
-        .arg(&runtime_state.session_db_path);
     let mut command_description = format!(
-        "{} mcp serve-http --policy {} --server-id conformance-mcp-core --listen {} --session-db {}",
+        "{} mcp serve-http --policy {} --server-id conformance-mcp-core --listen {}",
         chio_executable.display(),
         options.policy_path.display(),
         listen,
-        runtime_state.session_db_path.display()
     );
+    #[cfg(target_os = "linux")]
+    {
+        command
+            .arg("--session-db")
+            .arg(&runtime_state.session_db_path);
+        command_description.push_str(&format!(
+            " --session-db {}",
+            runtime_state.session_db_path.display()
+        ));
+    }
 
     apply_conformance_auth_env(&mut command, options, options.auth_mode);
 

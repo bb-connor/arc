@@ -87,7 +87,8 @@ impl Guard for BlockingGuard {
 #[test]
 fn chaos_hung_tool_server_hits_deadline_and_denies() {
     let rounds = iterations();
-    let dir = tempfile::tempdir().test_unwrap();
+    let dir =
+        chio_test_support::private_fs::private_tempdir("chio-chaos-kernel-hung-").test_unwrap();
     let db_path = dir.path().join("receipts.sqlite");
 
     let config = sqlite_config(db_path);
@@ -149,7 +150,8 @@ fn chaos_hung_tool_server_hits_deadline_and_denies() {
 #[test]
 fn chaos_blocking_guard_times_out_fail_closed() {
     let rounds = iterations();
-    let dir = tempfile::tempdir().test_unwrap();
+    let dir =
+        chio_test_support::private_fs::private_tempdir("chio-chaos-kernel-guard-").test_unwrap();
     let db_path = dir.path().join("receipts.sqlite");
 
     let config = sqlite_config(db_path);

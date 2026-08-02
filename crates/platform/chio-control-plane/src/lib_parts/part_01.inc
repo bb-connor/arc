@@ -476,6 +476,10 @@ where
         .map_err(|error| CliError::cli_other_error(error.to_string()))?,
         None => ChioKernel::new(config),
     };
+    kernel.configure_durable_admission(
+        kernel_policy.durable_admission_mode,
+        kernel_policy.allow_unsafe_durable_admission_off,
+    )?;
     before_security_publication(&mut kernel)?;
 
     let threshold_approval_resolver = threshold_approval_resolver.map(|resolver| {

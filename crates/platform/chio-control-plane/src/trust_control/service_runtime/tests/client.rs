@@ -378,6 +378,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         until: Some(20),
         min_cost: Some(1),
         max_cost: Some(9),
+        cost_currency: Some("USD".to_string()),
         cursor: Some(7),
         limit: Some(5),
         agent_subject: Some("agent-1".to_string()),

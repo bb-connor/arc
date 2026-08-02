@@ -235,7 +235,22 @@ const ARCHIVE_SCHEMA_SQL: &str = r#"
             capability_id TEXT NOT NULL, subject_key TEXT, issuer_key TEXT,
             grant_index INTEGER, tool_server TEXT NOT NULL, tool_name TEXT NOT NULL,
             decision_kind TEXT NOT NULL, policy_hash TEXT NOT NULL,
-            content_hash TEXT NOT NULL, raw_json TEXT NOT NULL, tenant_id TEXT
+            content_hash TEXT NOT NULL, raw_json TEXT NOT NULL, tenant_id TEXT,
+            cost_currency TEXT CHECK (
+                cost_currency IS NULL OR (
+                    typeof(cost_currency) = 'text' AND
+                    length(cost_currency) = 3 AND
+                    cost_currency NOT GLOB '*[^A-Z]*'
+                )
+            ),
+            cost_charged_be BLOB CHECK (
+                (cost_currency IS NULL AND cost_charged_be IS NULL) OR
+                (
+                    cost_currency IS NOT NULL AND
+                    typeof(cost_charged_be) = 'blob' AND
+                    length(cost_charged_be) = 8
+                )
+            )
         );
         CREATE TABLE IF NOT EXISTS archive.chio_child_receipts (
             seq INTEGER PRIMARY KEY,
@@ -329,13 +344,62 @@ const ARCHIVE_SCHEMA_SQL: &str = r#"
             nonce             TEXT NOT NULL UNIQUE,
             commitment_sha256 TEXT NOT NULL UNIQUE
         );
+        CREATE TABLE IF NOT EXISTS archive.chio_store_schema_versions (
+            store_key TEXT PRIMARY KEY,
+            version INTEGER NOT NULL
+        );
         "#;
 
 pub(super) fn create_archive_schema(
     connection: &rusqlite::Connection,
 ) -> Result<(), ReceiptStoreError> {
+    let application_id: i32 =
+        connection.query_row("PRAGMA archive.application_id", [], |row| row.get(0))?;
+    if application_id != 0 && application_id != crate::CHIO_SQLITE_APPLICATION_ID {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "retention archive application_id {application_id:#x} is not a Chio store"
+        )));
+    }
+    let version_table_exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM archive.sqlite_master WHERE type = 'table' AND name = 'chio_store_schema_versions')",
+        [],
+        |row| row.get(0),
+    )?;
+    let archive_schema_version = if version_table_exists {
+        connection
+            .query_row(
+                "SELECT version FROM archive.chio_store_schema_versions WHERE store_key = ?1",
+                [super::RECEIPT_STORE_SCHEMA_KEY],
+                |row| row.get::<_, i32>(0),
+            )
+            .optional()?
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    if archive_schema_version > super::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "retention archive schema version {archive_schema_version} is newer than this binary supports ({})",
+            super::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+        )));
+    }
+
     connection.execute_batch(ARCHIVE_SCHEMA_SQL)?;
+    super::support::migrate_archive_receipt_cost_projection(connection)?;
+    super::support::verify_archive_receipt_cost_projection(connection)?;
     ensure_archive_capability_lineage_provenance_columns(connection, "archive")?;
+    connection.execute_batch(&format!(
+        "PRAGMA archive.application_id = {}",
+        crate::CHIO_SQLITE_APPLICATION_ID
+    ))?;
+    connection.execute(
+        "INSERT INTO archive.chio_store_schema_versions (store_key, version) VALUES (?1, ?2) \
+         ON CONFLICT(store_key) DO UPDATE SET version = excluded.version",
+        rusqlite::params![
+            super::RECEIPT_STORE_SCHEMA_KEY,
+            super::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+        ],
+    )?;
     validate_archive_schema_contract(connection)
 }
 
@@ -481,7 +545,13 @@ pub(in crate::receipt_store) fn validate_archive_schema_contract_in_schema(
     for table in expected_tables {
         let expected_contract = load_archive_table_contract(&expected, "archive", &table)?;
         let actual_contract = load_archive_table_contract(connection, actual_schema, &table)?;
-        if actual_contract != expected_contract {
+        let contract_matches = if table == "chio_tool_receipts" {
+            actual_contract.columns == expected_contract.columns
+                && actual_contract.unique_constraints == expected_contract.unique_constraints
+        } else {
+            actual_contract == expected_contract
+        };
+        if !contract_matches {
             return Err(ReceiptStoreError::Conflict(format!(
                 "archive table {table} does not match the required evidence schema"
             )));
@@ -814,7 +884,9 @@ fn archive_prefix_predicate(schema: &str, table: &str) -> Result<String, Receipt
     let checkpoints = format!("{schema}.kernel_checkpoints");
     let tool_receipts = format!("{schema}.chio_tool_receipts");
     let predicate = match table {
-        "chio_retention_archive_identity" => "?1 > 0".to_string(),
+        "chio_retention_archive_identity" | "chio_store_schema_versions" => {
+            "?1 > 0".to_string()
+        }
         "claim_receipt_log_entries" => "evidence.entry_seq <= ?1".to_string(),
         "chio_tool_receipts" => format!(
             "EXISTS (SELECT 1 FROM {claims} AS claim \
@@ -970,10 +1042,10 @@ pub(super) fn copy_archived_prefix_after_watermark(
         INSERT OR IGNORE INTO archive.chio_tool_receipts
             (seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
              grant_index, tool_server, tool_name, decision_kind, policy_hash,
-             content_hash, raw_json, tenant_id)
+             content_hash, raw_json, tenant_id, cost_currency, cost_charged_be)
             SELECT seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
                    grant_index, tool_server, tool_name, decision_kind, policy_hash,
-                   content_hash, raw_json, tenant_id
+                   content_hash, raw_json, tenant_id, cost_currency, cost_charged_be
             FROM main.chio_tool_receipts WHERE seq IN (
                 SELECT source_seq FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');

@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn check_durable_acks_counts_zero_for_absent_file() {
-        let dir = tempfile::tempdir().test_unwrap();
+        let dir = chio_test_support::private_fs::private_tempdir("chio-chaos-lib-").test_unwrap();
         let db_path = dir.path().join("receipts.sqlite");
         let store = SqliteReceiptStore::open(&db_path).test_unwrap();
         let absent = dir.path().join("does-not-exist.log");

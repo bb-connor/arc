@@ -1,6 +1,6 @@
 ---
 source: crates/products/chio-cli/tests/conformance_cli.rs
-expression: help_text
+expression: normalized_help
 ---
 Execute conformance scenarios against a peer language adapter
 
@@ -45,11 +45,25 @@ Options:
 
       --budget-db <BUDGET_DB>
           Optional SQLite database path for durable shared capability budget state
+
+      --settlement-driver <SETTLEMENT_DRIVER>
+          Settlement driver: `none` (default; the settle drive is inert) or `ops` (run the reference settlement hook when driving due attempts)
+
+          [default: none]
+
       --aggregate-invocation-admission
           Enable durable aggregate invocation admission for ordinary tool calls
 
       --admission-operation-db <ADMISSION_OPERATION_DB>
           SQLite database path for durable aggregate and threshold admission operations
+
+      --partition-escrow-authority-descriptor <PATH>
+          Canonical signed v1 descriptor for one immutable partition-escrow authority. Live descriptor replacement is unsupported; stop and drain the deployment before provisioning a different authority generation
+
+      --partition-escrow-authority-signer-public-key <PARTITION_ESCROW_AUTHORITY_SIGNER_PUBLIC_KEY>
+          Independently pinned signer of the partition-escrow authority descriptor
+
+          [env: CHIO_PARTITION_ESCROW_AUTHORITY_SIGNER_PUBLIC_KEY=]
 
       --approval-db <APPROVAL_DB>
           SQLite database path for durable threshold approval replay state
@@ -62,10 +76,8 @@ Options:
 
           [env: CHIO_THRESHOLD_PROPOSAL_AUTHORITY_PUBLIC_KEY=]
 
-      --settlement-driver <SETTLEMENT_DRIVER>
-          Settlement driver: `none` (default; the settle drive is inert) or `ops` (run the reference settlement hook when driving due attempts) [default: none]
       --session-db <SESSION_DB>
-          Optional SQLite database path for durable remote MCP session tombstones
+          SQLite database path for durable agent-economy admission, trust authority state, or remote MCP session tombstones, depending on the selected command and policy
 
       --resume-hmac-keyring <PATH>
           Dedicated HMAC keyring used only for durable remote MCP resume records

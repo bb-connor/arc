@@ -102,6 +102,7 @@ fn load_policy_with_optional_approver_directory(
     }
 
     let policy: ChioPolicy = serde_yml::from_str(&contents)?;
+    policy.kernel.validate()?;
     let default_capabilities = build_runtime_default_capabilities(&policy)?;
     let (active_defense_rules, active_defense_assets) =
         load_active_defense_rules(path, &policy.active_defense.rule_files)?;
@@ -354,5 +355,6 @@ fn runtime_hash_with_assets(
 /// Parse a policy from a YAML string.
 pub fn parse_policy(yaml: &str) -> Result<ChioPolicy, PolicyError> {
     let policy: ChioPolicy = serde_yml::from_str(yaml)?;
+    policy.kernel.validate()?;
     Ok(policy)
 }

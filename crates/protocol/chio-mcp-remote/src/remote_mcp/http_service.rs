@@ -120,6 +120,12 @@ fn load_enterprise_provider_registry(
 }
 
 async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError> {
+    // The resumable-session contract fingerprints the local authorization
+    // server's public key. Materialize a first-boot seed before constructing
+    // the session factory so fingerprinting never races key creation.
+    if let Some(seed_path) = config.auth_server_seed_path.as_deref() {
+        load_or_create_authority_keypair(seed_path)?;
+    }
     let factory = Arc::new(RemoteSessionFactory::new_ready(config.clone()).await?);
     let serve_result = serve_http_with_factory(config, Arc::clone(&factory)).await;
     session_core_factory::finish_remote_active_defense_with_shutdown(serve_result, || {

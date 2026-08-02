@@ -17,6 +17,9 @@ mod tests;
 #[path = "receipt_store/underwriting_credit.rs"]
 mod underwriting_credit;
 
+pub(crate) const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 4;
+pub(crate) const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
+
 include!("receipt_store_parts/part_01.rs");
 include!("receipt_store_parts/part_02.rs");
 include!("receipt_store_parts/part_03.rs");

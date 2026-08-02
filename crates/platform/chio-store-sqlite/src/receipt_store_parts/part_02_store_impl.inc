@@ -1368,6 +1368,11 @@ impl SqliteReceiptStore {
         }
     }
 
+    pub fn audit_receipt_cost_projection(&self) -> Result<(), ReceiptStoreError> {
+        let connection = self.connection()?;
+        support::audit_receipt_cost_projection(&connection)
+    }
+
     /// Rerun the one-time full verification on the writer connection and
     /// adopt the resulting head. This is the `chio receipt audit --repair`
     /// entry point; it is also safe to call on a healthy store.

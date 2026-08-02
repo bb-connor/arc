@@ -26,6 +26,8 @@ mod query;
 mod retention;
 #[path = "tests/scale_proof.rs"]
 mod scale_proof;
+#[path = "tests/schema_archive.rs"]
+mod schema_archive;
 #[path = "tests/settlement_observer_outbox.rs"]
 mod settlement_observer_outbox;
 #[path = "tests/single_writer.rs"]

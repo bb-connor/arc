@@ -96,6 +96,7 @@ struct RuntimePolicy {
     working_directory: PathBuf,
     runtime_files: BTreeSet<PathBuf>,
     target_argv: Vec<String>,
+    execution_identity: chio_cage::ExecutionIdentity,
 }
 
 #[derive(Serialize)]
@@ -353,6 +354,8 @@ fn materialize_policy(
         target_argv: std::iter::once(target_path_text)
             .chain(target_args.iter().cloned())
             .collect(),
+        execution_identity: chio_cage::ExecutionIdentity::new(10001, 10001, Vec::new())
+            .expect("build fixture execution identity"),
     };
     let limits = LimitPolicy {
         max_artifact_bytes: 1024 * 1024,

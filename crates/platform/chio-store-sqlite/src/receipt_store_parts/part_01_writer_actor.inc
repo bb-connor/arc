@@ -656,6 +656,7 @@ fn handle_non_append_command(
                 .get()
                 .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
                 .and_then(|connection| {
+                    support::audit_receipt_cost_projection(&connection)?;
                     #[cfg(test)]
                     test_hooks::block_during_reseed(&connection);
                     // Reseed always runs the FULL verification. This is the
@@ -755,7 +756,10 @@ fn handle_non_append_command(
                     let reseed = pool
                         .get()
                         .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
-                        .and_then(|connection| seed_verified_head(&connection));
+                        .and_then(|connection| {
+                            support::audit_receipt_cost_projection(&connection)?;
+                            seed_verified_head(&connection)
+                        });
                     match reseed {
                         Ok(head) => {
                             health.store_head_snapshot(&head);

@@ -229,6 +229,140 @@ pub(crate) fn compose_cli_admission_runtime_kernel(
     }
 }
 
+fn select_cli_kernel_signer(
+    keyring_config_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+) -> Result<
+    (
+        Option<Keypair>,
+        Option<chio_control_plane::KeyringRuntimeComposition>,
+    ),
+    CliError,
+> {
+    match (keyring_config_path, authority_seed_path, authority_db_path) {
+        (Some(config_path), Some(seed_path), None) => {
+            let (keypair, runtime) =
+                load_keyring_runtime_from_authority_seed(config_path, seed_path)?;
+            Ok((Some(keypair), Some(runtime)))
+        }
+        (None, Some(seed_path), None) => {
+            Ok((Some(load_or_create_authority_keypair(seed_path)?), None))
+        }
+        (None, None, Some(path)) => Ok((
+            Some(chio_store_sqlite::SqliteCapabilityAuthority::open(path)?.local_keypair()?),
+            None,
+        )),
+        (None, None, None) => Ok((None, None)),
+        (Some(_), None, _) => Err(CliError::cli_other_error(
+            "--keyring-config requires --authority-seed-file for the active signing backend"
+                .to_string(),
+        )),
+        (_, Some(_), Some(_)) => Err(CliError::cli_other_error(
+            "use either --authority-seed-file or --authority-db, not both".to_string(),
+        )),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn open_cli_durable_admission_runtime(
+    mode: chio_kernel::admission_operation::DurableAdmissionMode,
+    session_db_path: Option<&Path>,
+    receipt_db_path: Option<&Path>,
+    revocation_db_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    admission_operation_db_path: Option<&Path>,
+    approval_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+    configured_kernel_keypair: Option<&Keypair>,
+) -> Result<Option<chio_control_plane::DurableAdmissionRuntime>, CliError> {
+    use chio_kernel::admission_operation::DurableAdmissionMode;
+
+    chio_control_plane::validate_durable_admission_participant_paths(
+        mode,
+        control_url,
+        revocation_db_path,
+        budget_db_path,
+    )?;
+    if mode == DurableAdmissionMode::Off {
+        return Ok(None);
+    }
+    let session_db_path = session_db_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "durable agent-economy admission requires --session-db so operations and tool outcomes survive restart"
+                .to_string(),
+        )
+    })?;
+    let mut paths = vec![("durable agent-economy admission database", session_db_path)];
+    for (label, path) in [
+        ("receipt database", receipt_db_path),
+        ("revocation database", revocation_db_path),
+        ("capability authority database", authority_db_path),
+        ("ordinary admission budget database", budget_db_path),
+        ("ordinary admission operation database", admission_operation_db_path),
+        ("threshold approval database", approval_db_path),
+    ] {
+        if let Some(path) = path {
+            paths.push((label, path));
+        }
+    }
+    chio_control_plane::validate_distinct_database_paths(&paths)?;
+
+    match (control_url, configured_kernel_keypair) {
+        (Some(url), Some(keypair)) => {
+            let token = chio_control_plane::require_control_token(control_token)?;
+            chio_control_plane::DurableAdmissionRuntime::open_remote_with_kernel_keypair(
+                session_db_path,
+                url,
+                token,
+                keypair.clone(),
+            )
+            .map(Some)
+        }
+        (Some(url), None) => {
+            let token = chio_control_plane::require_control_token(control_token)?;
+            chio_control_plane::DurableAdmissionRuntime::open_remote(
+                session_db_path,
+                url,
+                token,
+            )
+            .map(Some)
+        }
+        (None, Some(keypair)) => {
+            chio_control_plane::DurableAdmissionRuntime::open_with_kernel_keypair(
+                session_db_path,
+                keypair.clone(),
+            )
+            .map(Some)
+        }
+        (None, None) => chio_control_plane::open_durable_admission_runtime(
+            mode,
+            Some(session_db_path),
+        ),
+    }
+}
+
+fn attach_cli_durable_admission_runtime(
+    kernel: &mut ChioKernel,
+    runtime: Option<&chio_control_plane::DurableAdmissionRuntime>,
+) -> Result<(), CliError> {
+    if kernel.durable_admission_mode()
+        == chio_kernel::admission_operation::DurableAdmissionMode::Off
+    {
+        return Ok(());
+    }
+    runtime
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "durable agent-economy admission runtime is unavailable for an enabled policy"
+                    .to_string(),
+            )
+        })?
+        .attach(kernel)
+}
+
 pub(crate) fn cmd_run(
     policy_path: &Path,
     command: &[String],
@@ -244,7 +378,7 @@ pub(crate) fn cmd_run(
     approval_db_path: Option<&Path>,
     approver_directory_path: Option<&Path>,
     threshold_proposal_authority_public_key: Option<&chio_core::PublicKey>,
-    _session_db_path: Option<&Path>,
+    session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
@@ -261,6 +395,7 @@ pub(crate) fn cmd_run(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let durable_admission_mode = loaded_policy.kernel.durable_admission_mode;
 
     info!(
         policy_path = %policy_path.display(),
@@ -270,42 +405,28 @@ pub(crate) fn cmd_run(
         "loaded policy"
     );
 
-    if authority_seed_path.is_some() && authority_db_path.is_some() {
-        return Err(CliError::cli_other_error(
-            "use either --authority-seed-file or --authority-db, not both".to_string(),
-        ));
-    }
-    if keyring_config_path.is_some() && authority_seed_path.is_none() {
-        return Err(CliError::cli_other_error(
-            "--keyring-config requires --authority-seed-file for the active signing backend"
-                .to_string(),
-        ));
-    }
-    let (kernel_kp, keyring_runtime) =
-        match (keyring_config_path, authority_seed_path, authority_db_path) {
-            (Some(config_path), Some(seed_path), None) => {
-                let (keypair, runtime) =
-                    load_keyring_runtime_from_authority_seed(config_path, seed_path)?;
-                (keypair, Some(runtime))
-            }
-            (None, Some(seed_path), None) => (load_or_create_authority_keypair(seed_path)?, None),
-            (None, None, Some(path)) => (
-                chio_store_sqlite::SqliteCapabilityAuthority::open(path)?.local_keypair()?,
-                None,
-            ),
-            (None, None, None) => (Keypair::generate(), None),
-            (Some(_), None, _) => {
-                return Err(CliError::cli_other_error(
-                "--keyring-config requires --authority-seed-file for the active signing backend"
-                    .to_string(),
-            ));
-            }
-            (_, Some(_), Some(_)) => {
-                return Err(CliError::cli_other_error(
-                    "use either --authority-seed-file or --authority-db, not both".to_string(),
-                ));
-            }
-        };
+    let (configured_kernel_kp, keyring_runtime) =
+        select_cli_kernel_signer(keyring_config_path, authority_seed_path, authority_db_path)?;
+    let durable_admission = open_cli_durable_admission_runtime(
+        durable_admission_mode,
+        session_db_path,
+        receipt_db_path,
+        revocation_db_path,
+        authority_db_path,
+        budget_db_path,
+        admission_operation_db_path,
+        approval_db_path,
+        control_url,
+        control_token,
+        configured_kernel_kp.as_ref(),
+    )?;
+    let kernel_kp = configured_kernel_kp
+        .or_else(|| {
+            durable_admission
+                .as_ref()
+                .map(chio_control_plane::DurableAdmissionRuntime::kernel_keypair)
+        })
+        .unwrap_or_else(Keypair::generate);
     let mut kernel = match keyring_runtime.as_ref() {
         Some(runtime) => build_kernel_with_keyring_composition(loaded_policy, &kernel_kp, runtime)?,
         None => build_kernel(loaded_policy, &kernel_kp)?,
@@ -326,8 +447,11 @@ pub(crate) fn cmd_run(
         })?;
         runtime.attach_receipt_store(receipt_store)?;
     }
-    configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
+    if durable_admission.is_none() {
+        configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
+    }
+    attach_cli_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
         &mut kernel,
         authority_seed_path,
@@ -738,7 +862,7 @@ pub(crate) fn cmd_check(
     approval_db_path: Option<&Path>,
     approver_directory_path: Option<&Path>,
     threshold_proposal_authority_public_key: Option<&chio_core::PublicKey>,
-    _session_db_path: Option<&Path>,
+    session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
@@ -756,43 +880,30 @@ pub(crate) fn cmd_check(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let durable_admission_mode = loaded_policy.kernel.durable_admission_mode;
 
-    if authority_seed_path.is_some() && authority_db_path.is_some() {
-        return Err(CliError::cli_other_error(
-            "use either --authority-seed-file or --authority-db, not both".to_string(),
-        ));
-    }
-    if keyring_config_path.is_some() && authority_seed_path.is_none() {
-        return Err(CliError::cli_other_error(
-            "--keyring-config requires --authority-seed-file for the active signing backend"
-                .to_string(),
-        ));
-    }
-    let (kernel_kp, keyring_runtime) =
-        match (keyring_config_path, authority_seed_path, authority_db_path) {
-            (Some(config_path), Some(seed_path), None) => {
-                let (keypair, runtime) =
-                    load_keyring_runtime_from_authority_seed(config_path, seed_path)?;
-                (keypair, Some(runtime))
-            }
-            (None, Some(seed_path), None) => (load_or_create_authority_keypair(seed_path)?, None),
-            (None, None, Some(path)) => (
-                chio_store_sqlite::SqliteCapabilityAuthority::open(path)?.local_keypair()?,
-                None,
-            ),
-            (None, None, None) => (Keypair::generate(), None),
-            (Some(_), None, _) => {
-                return Err(CliError::cli_other_error(
-                "--keyring-config requires --authority-seed-file for the active signing backend"
-                    .to_string(),
-            ));
-            }
-            (_, Some(_), Some(_)) => {
-                return Err(CliError::cli_other_error(
-                    "use either --authority-seed-file or --authority-db, not both".to_string(),
-                ));
-            }
-        };
+    let (configured_kernel_kp, keyring_runtime) =
+        select_cli_kernel_signer(keyring_config_path, authority_seed_path, authority_db_path)?;
+    let durable_admission = open_cli_durable_admission_runtime(
+        durable_admission_mode,
+        session_db_path,
+        receipt_db_path,
+        revocation_db_path,
+        authority_db_path,
+        budget_db_path,
+        admission_operation_db_path,
+        approval_db_path,
+        control_url,
+        control_token,
+        configured_kernel_kp.as_ref(),
+    )?;
+    let kernel_kp = configured_kernel_kp
+        .or_else(|| {
+            durable_admission
+                .as_ref()
+                .map(chio_control_plane::DurableAdmissionRuntime::kernel_keypair)
+        })
+        .unwrap_or_else(Keypair::generate);
     let mut kernel = match keyring_runtime.as_ref() {
         Some(runtime) => build_kernel_with_keyring_composition(loaded_policy, &kernel_kp, runtime)?,
         None => build_kernel(loaded_policy, &kernel_kp)?,
@@ -813,8 +924,11 @@ pub(crate) fn cmd_check(
         })?;
         runtime.attach_receipt_store(receipt_store)?;
     }
-    configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
+    if durable_admission.is_none() {
+        configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
+    }
+    attach_cli_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
         &mut kernel,
         authority_seed_path,
@@ -1154,43 +1268,10 @@ pub(crate) fn cmd_mcp_serve(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let durable_admission_mode = loaded_policy.kernel.durable_admission_mode;
 
-    if authority_seed_path.is_some() && authority_db_path.is_some() {
-        return Err(CliError::cli_other_error(
-            "use either --authority-seed-file or --authority-db, not both".to_string(),
-        ));
-    }
-    if keyring_config_path.is_some() && authority_seed_path.is_none() {
-        return Err(CliError::cli_other_error(
-            "--keyring-config requires --authority-seed-file for the active signing backend"
-                .to_string(),
-        ));
-    }
-    let (kernel_kp, keyring_runtime) =
-        match (keyring_config_path, authority_seed_path, authority_db_path) {
-            (Some(config_path), Some(seed_path), None) => {
-                let (keypair, runtime) =
-                    load_keyring_runtime_from_authority_seed(config_path, seed_path)?;
-                (keypair, Some(runtime))
-            }
-            (None, Some(seed_path), None) => (load_or_create_authority_keypair(seed_path)?, None),
-            (None, None, Some(path)) => (
-                chio_store_sqlite::SqliteCapabilityAuthority::open(path)?.local_keypair()?,
-                None,
-            ),
-            (None, None, None) => (Keypair::generate(), None),
-            (Some(_), None, _) => {
-                return Err(CliError::cli_other_error(
-                "--keyring-config requires --authority-seed-file for the active signing backend"
-                    .to_string(),
-            ));
-            }
-            (_, Some(_), Some(_)) => {
-                return Err(CliError::cli_other_error(
-                    "use either --authority-seed-file or --authority-db, not both".to_string(),
-                ));
-            }
-        };
+    let (configured_kernel_kp, keyring_runtime) =
+        select_cli_kernel_signer(keyring_config_path, authority_seed_path, authority_db_path)?;
     if broker_config_path.is_some() && keyring_runtime.is_none() {
         return Err(CliError::cli_other_error(
             "production broker composition requires an enterprise keyring-backed authority signer"
@@ -1279,6 +1360,31 @@ pub(crate) fn cmd_mcp_serve(
         effective_approval_db_path = Some(paths.approval_database_path);
         effective_aggregate_invocation_admission = true;
     }
+
+    let durable_admission = open_cli_durable_admission_runtime(
+        durable_admission_mode,
+        session_db_path,
+        effective_receipt_db_path.as_deref(),
+        if broker_config_path.is_some() {
+            None
+        } else {
+            effective_revocation_db_path.as_deref()
+        },
+        authority_db_path,
+        effective_budget_db_path.as_deref(),
+        effective_admission_operation_db_path.as_deref(),
+        effective_approval_db_path.as_deref(),
+        control_url,
+        control_token,
+        configured_kernel_kp.as_ref(),
+    )?;
+    let kernel_kp = configured_kernel_kp
+        .or_else(|| {
+            durable_admission
+                .as_ref()
+                .map(chio_control_plane::DurableAdmissionRuntime::kernel_keypair)
+        })
+        .unwrap_or_else(Keypair::generate);
 
     #[cfg(unix)]
     if broker_runtime.is_some()
@@ -1520,12 +1626,14 @@ pub(crate) fn cmd_mcp_serve(
         }
         #[cfg(unix)]
         if broker_runtime.is_none() {
-            configure_revocation_store(
-                &mut kernel,
-                effective_revocation_db_path.as_deref(),
-                control_url,
-                control_token,
-            )?;
+            if durable_admission.is_none() {
+                configure_revocation_store(
+                    &mut kernel,
+                    effective_revocation_db_path.as_deref(),
+                    control_url,
+                    control_token,
+                )?;
+            }
             configure_capability_authority(
                 &mut kernel,
                 authority_seed_path,
@@ -1543,12 +1651,14 @@ pub(crate) fn cmd_mcp_serve(
         }
         #[cfg(not(unix))]
         {
-            configure_revocation_store(
-                &mut kernel,
-                effective_revocation_db_path.as_deref(),
-                control_url,
-                control_token,
-            )?;
+            if durable_admission.is_none() {
+                configure_revocation_store(
+                    &mut kernel,
+                    effective_revocation_db_path.as_deref(),
+                    control_url,
+                    control_token,
+                )?;
+            }
             configure_capability_authority(
                 &mut kernel,
                 authority_seed_path,
@@ -1564,6 +1674,7 @@ pub(crate) fn cmd_mcp_serve(
                 runtime_assurance_policy,
             )?;
         }
+        attach_cli_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
         #[cfg(unix)]
         let mut kernel = if broker_runtime.is_some() {
             kernel

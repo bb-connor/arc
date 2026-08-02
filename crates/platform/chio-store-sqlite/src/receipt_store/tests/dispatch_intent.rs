@@ -1611,8 +1611,8 @@ fn receipt_schema_revision_covers_the_dispatch_intent_journal(
     let connection = store.reader_connection_for_test()?;
     assert_eq!(
         stamped_receipt_schema_version(&connection)?,
-        1,
-        "a freshly created journal-bearing store stamps revision 1"
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+        "a freshly created store stamps the integrated schema revision"
     );
 
     let _ = std::fs::remove_file(&path);
@@ -1649,8 +1649,8 @@ fn open_existing_migrates_a_pre_journal_database() -> Result<(), Box<dyn std::er
         );
         assert_eq!(
             stamped_receipt_schema_version(&connection)?,
-            1,
-            "the migrated database is stamped with the journal revision"
+            crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+            "the migrated database is stamped with the integrated schema revision"
         );
     }
 

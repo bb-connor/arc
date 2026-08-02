@@ -336,14 +336,11 @@ pub(crate) fn verify_pem_verifier_identity(
     match expected_verifier {
         ExpectedDsseVerifier::Certificate(expected) => {
             let logged = DerCertificate::from_pem(pem).map_err(|e| {
-                Error::Verification(format!(
-                        "Rekor verifier is not a valid certificate: {e}"
-                ))
+                Error::Verification(format!("Rekor verifier is not a valid certificate: {e}"))
             })?;
             if logged.as_bytes() != expected.as_bytes() {
                 return Err(Error::Verification(
-                    "Rekor verifier certificate does not match the bundle signer"
-                        .to_string(),
+                    "Rekor verifier certificate does not match the bundle signer".to_string(),
                 ));
             }
         }
@@ -366,8 +363,7 @@ pub(crate) fn verify_pem_verifier_identity(
             };
             if logged.as_bytes() != expected.as_bytes() {
                 return Err(Error::Verification(
-                    "Rekor verifier public key does not match the managed signer"
-                        .to_string(),
+                    "Rekor verifier public key does not match the managed signer".to_string(),
                 ));
             }
         }

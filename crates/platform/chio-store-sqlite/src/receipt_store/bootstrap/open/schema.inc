@@ -12,12 +12,8 @@ use super::*;
 ///   refuse a database whose pending deliveries it cannot drain.
 /// - 3: enforces exact SQLite types, byte bounds, and nonnegative observer
 ///   lease deadlines.
-const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
-
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table. Distinct from the co-located approval store's key so the
-/// two track their revisions independently in the one sidecar file.
-const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
+/// - 4: adds the lossless currency and full-width cost projection used by
+///   indexed receipt queries.
 
 /// Tables that identify a database this receipt store may open, all of them the
 /// store's own: `chio_tool_receipts` is the current anchor (also the table the
@@ -716,16 +712,31 @@ fn upgrade_receipt_store_schema(
     let transaction =
         connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     transaction.execute_batch(DISPATCH_INTENT_JOURNAL_DDL)?;
-    if on_disk_version < 2 {
-        transaction.execute_batch(SETTLEMENT_OBSERVER_OUTBOX_DDL)?;
-    } else if on_disk_version == 2 {
-        migrate_settlement_observer_outbox_v2_to_v3(&transaction)?;
-    } else {
-        return Err(ReceiptStoreError::Conflict(format!(
-            "unsupported receipt schema upgrade source revision {on_disk_version}"
-        )));
+    match on_disk_version {
+        0 | 1 => transaction.execute_batch(SETTLEMENT_OBSERVER_OUTBOX_DDL)?,
+        2 => {
+            if table_exists(&transaction, "chio_settlement_observer_outbox")? {
+                migrate_settlement_observer_outbox_v2_to_v3(&transaction)?;
+            } else {
+                transaction.execute_batch(SETTLEMENT_OBSERVER_OUTBOX_DDL)?;
+            }
+        }
+        3 => {
+            if !table_exists(&transaction, "chio_settlement_observer_outbox")? {
+                transaction.execute_batch(SETTLEMENT_OBSERVER_OUTBOX_DDL)?;
+            }
+        }
+        _ => {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "unsupported receipt schema upgrade source revision {on_disk_version}"
+            )));
+        }
     }
     validate_settlement_observer_outbox_schema(&transaction, false)?;
+    crate::receipt_store::support::drop_transparency_projection_guards(&transaction)?;
+    crate::receipt_store::support::migrate_receipt_cost_projection(&transaction)?;
+    crate::receipt_store::support::ensure_transparency_projection_guards(&transaction)?;
+    crate::receipt_store::support::verify_receipt_cost_projection(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         RECEIPT_STORE_SCHEMA_KEY,
