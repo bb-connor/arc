@@ -68,7 +68,7 @@
 
         let failure = fixture
             .service
-            .execute_inner(&request, &trusted, 21)
+            .execute_inner(&request, &trusted, 21, &|| Ok(21))
             .test_expect_err("migration quota denial must stop execution");
         assert!(failure
             .error

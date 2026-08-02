@@ -4,6 +4,10 @@
 //! artifact hash verification and certificate/signature matching.
 
 use crate::error::{Error, Result};
+use crate::verify_impl::rekor::{
+    verify_certificate_verifier_identity, verify_pem_verifier_identity,
+    verify_public_key_verifier_identity, ExpectedDsseVerifier,
+};
 use sigstore_rekor::body::RekorEntryBody;
 use sigstore_types::bundle::VerificationMaterialContent;
 use sigstore_types::{
@@ -13,7 +17,11 @@ use x509_cert::der::Decode;
 use x509_cert::Certificate;
 
 /// Verify artifact hash matches what's in Rekor (for hashedrekord entries)
-pub fn verify_hashedrekord_entries(bundle: &Bundle, artifact: &Artifact<'_>) -> Result<usize> {
+pub fn verify_hashedrekord_entries(
+    bundle: &Bundle,
+    artifact: &Artifact<'_>,
+    expected_verifier: ExpectedDsseVerifier<'_>,
+) -> Result<usize> {
     if !matches!(bundle.content, SignatureContent::MessageSignature(_)) {
         return Ok(0);
     }
@@ -21,7 +29,7 @@ pub fn verify_hashedrekord_entries(bundle: &Bundle, artifact: &Artifact<'_>) -> 
     let mut verified = 0;
     for entry in &bundle.verification_material.tlog_entries {
         if entry.kind_version.kind == "hashedrekord" {
-            verify_hashedrekord_entry(entry, bundle, artifact)?;
+            verify_hashedrekord_entry(entry, bundle, artifact, expected_verifier)?;
             verified += 1;
         }
     }
@@ -33,6 +41,7 @@ fn verify_hashedrekord_entry(
     entry: &TransparencyLogEntry,
     bundle: &Bundle,
     artifact: &Artifact<'_>,
+    expected_verifier: ExpectedDsseVerifier<'_>,
 ) -> Result<()> {
     // Parse the Rekor entry body (convert canonicalized body to base64 string)
     let body = RekorEntryBody::from_base64_json(
@@ -69,8 +78,7 @@ fn verify_hashedrekord_entry(
         }
     };
 
-    // Validate certificate matches
-    validate_certificate_match(entry, &body, bundle)?;
+    validate_verifier_match(&body, expected_verifier)?;
 
     // Validate signature matches (for MessageSignature only)
     validate_signature_match(entry, &body, bundle)?;
@@ -107,62 +115,49 @@ fn validate_artifact_hash(artifact_hash: &Sha256Hash, expected_hash: &Sha256Hash
     Ok(())
 }
 
-/// Validate that the certificate in Rekor matches the certificate in the bundle
-fn validate_certificate_match(
-    _entry: &TransparencyLogEntry,
+/// Validate that the verifier recorded by Rekor is the signer authenticated by
+/// the certificate or managed-key verification path.
+fn validate_verifier_match(
     body: &RekorEntryBody,
-    bundle: &Bundle,
+    expected_verifier: ExpectedDsseVerifier<'_>,
 ) -> Result<()> {
-    // Extract certificate DER from Rekor entry
-    let rekor_cert_der_opt = match body {
-        RekorEntryBody::HashedRekordV001(rekord) => {
-            // v0.0.1: parse PEM certificate from publicKey content
-            let cert = rekord
-                .spec
-                .signature
-                .public_key
-                .to_certificate()
-                .map_err(|e| Error::Verification(format!("{}", e)))?;
-            Some(cert.as_bytes().to_vec())
-        }
+    match body {
+        RekorEntryBody::HashedRekordV001(rekord) => verify_pem_verifier_identity(
+            &rekord.spec.signature.public_key.content,
+            expected_verifier,
+        ),
         RekorEntryBody::HashedRekordV002(rekord) => {
-            // v0.0.2: spec.hashedRekordV002.signature.verifier.x509Certificate.rawBytes (DerCertificate)
-            rekord
+            let verifier = &rekord
                 .spec
                 .hashed_rekord_v002
                 .signature
-                .verifier
-                .x509_certificate
-                .as_ref()
-                .map(|cert| cert.raw_bytes.as_bytes().to_vec())
-        }
-        _ => None,
-    };
-
-    if let Some(rekor_cert_der) = rekor_cert_der_opt {
-        // Get the certificate from the bundle
-        let bundle_cert = match &bundle.verification_material.content {
-            VerificationMaterialContent::X509CertificateChain { certificates } => {
-                certificates.first().map(|c| &c.raw_bytes)
-            }
-            VerificationMaterialContent::Certificate(cert) => Some(&cert.raw_bytes),
-            _ => None,
-        };
-
-        if let Some(bundle_cert) = bundle_cert {
-            // Bundle certificate is DerCertificate, get raw bytes
-            let bundle_cert_der = bundle_cert.as_bytes();
-
-            // Compare certificates
-            if bundle_cert_der != rekor_cert_der {
-                return Err(Error::Verification(
-                    "certificate in bundle does not match certificate in Rekor entry".to_string(),
-                ));
+                .verifier;
+            match (
+                verifier.x509_certificate.as_ref(),
+                verifier.public_key.as_ref(),
+            ) {
+                (Some(certificate), None) => verify_certificate_verifier_identity(
+                    &certificate.raw_bytes,
+                    expected_verifier,
+                ),
+                (None, Some(public_key)) => match expected_verifier {
+                    ExpectedDsseVerifier::PublicKey(expected) => {
+                        verify_public_key_verifier_identity(&public_key.raw_bytes, expected)
+                    }
+                    ExpectedDsseVerifier::Certificate(_) => Err(Error::Verification(
+                        "Rekor verifier public key does not match the certificate signer"
+                            .to_string(),
+                    )),
+                },
+                _ => Err(Error::Verification(
+                    "hashedrekord v0.0.2 must contain exactly one verifier identity".to_string(),
+                )),
             }
         }
+        _ => Err(Error::Verification(
+            "expected hashedrekord verifier identity".to_string(),
+        )),
     }
-
-    Ok(())
 }
 
 /// Validate that the signature in the bundle matches the signature in Rekor

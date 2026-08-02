@@ -851,19 +851,32 @@ impl BrokerService {
         trusted: &TrustedExecutionContext,
         now_unix_seconds: u64,
     ) -> Result<BrokerExecuteOutcome> {
+        self.execute_evidenced_with_terminal_clock(request, trusted, now_unix_seconds, &|| {
+            Ok(now_unix_seconds)
+        })
+    }
+
+    pub(crate) fn execute_evidenced_with_terminal_clock(
+        &self,
+        request: &BrokerExecuteRequest,
+        trusted: &TrustedExecutionContext,
+        now_unix_seconds: u64,
+        terminal_clock: &dyn Fn() -> Result<u64>,
+    ) -> Result<BrokerExecuteOutcome> {
         let _operation_guard = self.attempt_operation_guard_for_request(request)?;
         if let Some(failure) = self.replay_failure_locked(request, now_unix_seconds)? {
             return Ok(BrokerExecuteOutcome::Failure(Box::new(failure)));
         }
-        match self.execute_inner(request, trusted, now_unix_seconds) {
+        match self.execute_inner(request, trusted, now_unix_seconds, terminal_clock) {
             Ok(response) => Ok(BrokerExecuteOutcome::Success(Box::new(response))),
             Err(failure) => {
                 if self.targets_completed_attempt(request)? {
                     return Err(failure.error);
                 }
+                let terminal_unix_seconds = terminal_clock()?.max(now_unix_seconds);
                 self.persist_failure_for_origin(
                     request,
-                    now_unix_seconds,
+                    terminal_unix_seconds,
                     &failure.error,
                     FailureOrigin::Execution,
                     failure.projection,

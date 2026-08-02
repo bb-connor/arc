@@ -56,7 +56,10 @@ struct IntotoSignatureWithVerifier {
 }
 
 /// Verify DSSE envelope matches Rekor entry (for DSSE bundles)
-pub fn verify_dsse_entries(bundle: &Bundle) -> Result<usize> {
+pub fn verify_dsse_entries(
+    bundle: &Bundle,
+    expected_verifier: ExpectedDsseVerifier<'_>,
+) -> Result<usize> {
     let envelope = match &bundle.content {
         SignatureContent::DsseEnvelope(env) => env,
         _ => return Ok(0), // Not a DSSE bundle
@@ -67,11 +70,11 @@ pub fn verify_dsse_entries(bundle: &Bundle) -> Result<usize> {
         if entry.kind_version.kind == "dsse" {
             match entry.kind_version.version.as_str() {
                 "0.0.1" => {
-                    verify_dsse_v001(entry, envelope, bundle)?;
+                    verify_dsse_v001(entry, envelope, expected_verifier)?;
                     verified += 1;
                 }
                 "0.0.2" => {
-                    verify_dsse_v002(entry, envelope, bundle)?;
+                    verify_dsse_v002(entry, envelope, expected_verifier)?;
                     verified += 1;
                 }
                 _ => {} // Unknown version, skip
@@ -96,7 +99,7 @@ pub fn verify_dsse_entries(bundle: &Bundle) -> Result<usize> {
 fn verify_dsse_v001(
     entry: &TransparencyLogEntry,
     envelope: &sigstore_types::DsseEnvelope,
-    bundle: &Bundle,
+    expected_verifier: ExpectedDsseVerifier<'_>,
 ) -> Result<()> {
     let body = RekorEntryBody::from_base64_json(
         &entry.canonicalized_body.to_base64(),
@@ -129,8 +132,6 @@ fn verify_dsse_v001(
         )));
     }
 
-    let cert = bundle.signing_certificate();
-
     // Verify that the signatures in the bundle match what's in Rekor
     // This prevents signature substitution attacks
     // Certificate-based bundles bind both the signature bytes and verifier certificate.
@@ -149,16 +150,9 @@ fn verify_dsse_v001(
     for bundle_sig in &envelope.signatures {
         let mut found = false;
         for rekor_sig in rekor_signatures {
-            let verifier_matches = if let Some(cert) = cert {
-                let rekor_cert_der = rekor_sig
-                    .to_certificate()
-                    .map_err(|e| Error::Verification(format!("{}", e)))?;
-                cert.as_bytes() == rekor_cert_der.as_bytes()
-            } else {
-                true
-            };
-
-            if bundle_sig.sig.as_bytes() == rekor_sig.signature.as_bytes() && verifier_matches {
+            if bundle_sig.sig.as_bytes() == rekor_sig.signature.as_bytes()
+                && verify_pem_verifier_identity(&rekor_sig.verifier, expected_verifier).is_ok()
+            {
                 found = true;
                 break;
             }
@@ -177,7 +171,7 @@ fn verify_dsse_v001(
 fn verify_dsse_v002(
     entry: &TransparencyLogEntry,
     envelope: &sigstore_types::DsseEnvelope,
-    bundle: &Bundle,
+    expected_verifier: ExpectedDsseVerifier<'_>,
 ) -> Result<()> {
     let body = RekorEntryBody::from_base64_json(
         &entry.canonicalized_body.to_base64(),
@@ -211,8 +205,6 @@ fn verify_dsse_v002(
         )));
     }
 
-    let cert = bundle.signing_certificate();
-
     // Verify that the signatures in the bundle match what's in Rekor
     // This prevents signature substitution attacks
     // Certificate-based bundles bind both the signature bytes and verifier certificate.
@@ -232,13 +224,13 @@ fn verify_dsse_v002(
     for bundle_sig in &envelope.signatures {
         let mut found = false;
         for rekor_sig in rekor_signatures {
-            let verifier_matches = match cert {
-                Some(cert) => {
-                    cert.as_bytes() == rekor_sig.verifier.x509_certificate.raw_bytes.as_bytes()
-                }
-                None => true,
-            };
-            if bundle_sig.sig.as_bytes() == rekor_sig.content.as_bytes() && verifier_matches {
+            if bundle_sig.sig.as_bytes() == rekor_sig.content.as_bytes()
+                && verify_certificate_verifier_identity(
+                    &rekor_sig.verifier.x509_certificate.raw_bytes,
+                    expected_verifier,
+                )
+                .is_ok()
+            {
                 found = true;
                 break;
             }
@@ -331,6 +323,13 @@ fn verify_intoto_verifier_identity(
     logged_verifier: &PemContent,
     expected_verifier: ExpectedDsseVerifier<'_>,
 ) -> Result<()> {
+    verify_pem_verifier_identity(logged_verifier, expected_verifier)
+}
+
+pub(crate) fn verify_pem_verifier_identity(
+    logged_verifier: &PemContent,
+    expected_verifier: ExpectedDsseVerifier<'_>,
+) -> Result<()> {
     let pem = std::str::from_utf8(logged_verifier.as_bytes()).map_err(|e| {
         Error::Verification(format!("intoto Rekor verifier is not valid UTF-8: {e}"))
     })?;
@@ -338,12 +337,12 @@ fn verify_intoto_verifier_identity(
         ExpectedDsseVerifier::Certificate(expected) => {
             let logged = DerCertificate::from_pem(pem).map_err(|e| {
                 Error::Verification(format!(
-                    "intoto Rekor verifier is not a valid certificate: {e}"
+                        "Rekor verifier is not a valid certificate: {e}"
                 ))
             })?;
             if logged.as_bytes() != expected.as_bytes() {
                 return Err(Error::Verification(
-                    "intoto Rekor verifier certificate does not match the bundle signer"
+                    "Rekor verifier certificate does not match the bundle signer"
                         .to_string(),
                 ));
             }
@@ -354,24 +353,62 @@ fn verify_intoto_verifier_identity(
                     sigstore_crypto::parse_certificate_info(certificate.as_bytes())
                         .map_err(|e| {
                             Error::Verification(format!(
-                                "failed to parse intoto Rekor verifier certificate: {e}"
+                                "failed to parse Rekor verifier certificate: {e}"
                             ))
                         })?
                         .public_key
                 }
                 Err(_) => DerPublicKey::from_pem(pem).map_err(|e| {
                     Error::Verification(format!(
-                        "intoto Rekor verifier is not a valid certificate or public key: {e}"
+                        "Rekor verifier is not a valid certificate or public key: {e}"
                     ))
                 })?,
             };
             if logged.as_bytes() != expected.as_bytes() {
                 return Err(Error::Verification(
-                    "intoto Rekor verifier public key does not match the managed signer"
+                    "Rekor verifier public key does not match the managed signer"
                         .to_string(),
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_certificate_verifier_identity(
+    logged_verifier: &DerCertificate,
+    expected_verifier: ExpectedDsseVerifier<'_>,
+) -> Result<()> {
+    match expected_verifier {
+        ExpectedDsseVerifier::Certificate(expected) => {
+            if logged_verifier.as_bytes() != expected.as_bytes() {
+                return Err(Error::Verification(
+                    "Rekor verifier certificate does not match the bundle signer".to_string(),
+                ));
+            }
+        }
+        ExpectedDsseVerifier::PublicKey(expected) => {
+            let logged = sigstore_crypto::parse_certificate_info(logged_verifier.as_bytes())
+                .map_err(|error| {
+                    Error::Verification(format!(
+                        "failed to parse Rekor verifier certificate: {error}"
+                    ))
+                })?
+                .public_key;
+            verify_public_key_verifier_identity(&logged, expected)?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_public_key_verifier_identity(
+    logged_verifier: &DerPublicKey,
+    expected_verifier: &DerPublicKey,
+) -> Result<()> {
+    if logged_verifier.as_bytes() != expected_verifier.as_bytes() {
+        return Err(Error::Verification(
+            "Rekor verifier public key does not match the managed signer".to_string(),
+        ));
     }
     Ok(())
 }

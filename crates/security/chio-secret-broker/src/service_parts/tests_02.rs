@@ -413,6 +413,38 @@
     }
 
     #[test]
+    fn completed_receipt_uses_post_dispatch_trusted_time() {
+        let fixture = fixture(1, false, false);
+        let (request, trusted) = execution(&fixture, 59, 1);
+        register_execution(&fixture, &request, &trusted, 20);
+
+        let outcome = fixture
+            .service
+            .execute_evidenced_with_terminal_clock(&request, &trusted, 21, &|| Ok(41))
+            .test_expect("execute with terminal clock");
+        let BrokerExecuteOutcome::Success(response) = outcome else {
+            panic!("successful dispatch unexpectedly failed");
+        };
+        assert_eq!(response.receipt.body.issued_at_unix_seconds, 41);
+    }
+
+    #[test]
+    fn failure_receipt_uses_post_dispatch_trusted_time() {
+        let fixture = fixture(1, true, false);
+        let (request, trusted) = execution(&fixture, 60, 1);
+        register_execution(&fixture, &request, &trusted, 20);
+
+        let outcome = fixture
+            .service
+            .execute_evidenced_with_terminal_clock(&request, &trusted, 21, &|| Ok(42))
+            .test_expect("persist failure with terminal clock");
+        let BrokerExecuteOutcome::Failure(failure) = outcome else {
+            panic!("failed dispatch unexpectedly completed");
+        };
+        assert_eq!(failure.receipt.body.issued_at_unix_seconds, 42);
+    }
+
+    #[test]
     fn dispatch_transport_failure_is_terminal_unknown_and_exact_retry_never_resends() {
         let fixture = fixture(1, true, false);
         let (request, trusted) = execution(&fixture, 61, 1);

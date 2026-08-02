@@ -510,15 +510,20 @@ fn verify_transparency_log_content_binding(
     artifact: &Artifact<'_>,
     dsse_verifier: Option<crate::verify_impl::rekor::ExpectedDsseVerifier<'_>>,
 ) -> Result<usize> {
+    let expected_verifier = dsse_verifier.ok_or_else(|| {
+        Error::Verification("transparency-log content binding requires a verifier identity".to_string())
+    })?;
     match &bundle.content {
         SignatureContent::MessageSignature(_) => {
-            crate::verify_impl::verify_hashedrekord_entries(bundle, artifact)
+            crate::verify_impl::verify_hashedrekord_entries(
+                bundle,
+                artifact,
+                expected_verifier,
+            )
         }
         SignatureContent::DsseEnvelope(_) => {
-            let dsse_entries = crate::verify_impl::verify_dsse_entries(bundle)?;
-            let expected_verifier = dsse_verifier.ok_or_else(|| {
-                Error::Verification("DSSE content binding requires a verifier identity".to_string())
-            })?;
+            let dsse_entries =
+                crate::verify_impl::verify_dsse_entries(bundle, expected_verifier)?;
             let intoto_entries =
                 crate::verify_impl::verify_intoto_entries(bundle, expected_verifier)?;
             Ok(dsse_entries + intoto_entries)
@@ -963,6 +968,92 @@ mod tests {
         assert!(error
             .to_string()
             .contains("no transparency log entry is bound"));
+    }
+
+    #[test]
+    fn hashedrekord_content_binding_requires_the_expected_managed_key() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let matching_key = parse_certificate_info(
+            bundle
+                .signing_certificate()
+                .expect("cosign certificate")
+                .as_bytes(),
+        )
+        .expect("matching certificate info")
+        .public_key;
+        let unrelated = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("unrelated bundle");
+        let unrelated_key = parse_certificate_info(
+            unrelated
+                .signing_certificate()
+                .expect("unrelated certificate")
+                .as_bytes(),
+        )
+        .expect("unrelated certificate info")
+        .public_key;
+
+        assert_eq!(
+            verify_transparency_log_content_binding(
+                &bundle,
+                &Artifact::Bytes(COSIGN_V3_BLOB),
+                Some(crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(
+                    &matching_key,
+                )),
+            )
+            .expect("matching managed key must bind to hashedrekord"),
+            1
+        );
+        let error = verify_transparency_log_content_binding(
+            &bundle,
+            &Artifact::Bytes(COSIGN_V3_BLOB),
+            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(
+                &unrelated_key,
+            )),
+        )
+        .expect_err("unrelated managed key must not inherit the logged signature");
+        assert!(error.to_string().contains("does not match the managed signer"));
+    }
+
+    #[test]
+    fn dsse_content_binding_requires_the_expected_managed_key() {
+        let bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("DSSE bundle");
+        let matching_key = parse_certificate_info(
+            bundle
+                .signing_certificate()
+                .expect("DSSE certificate")
+                .as_bytes(),
+        )
+        .expect("matching certificate info")
+        .public_key;
+        let unrelated = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("unrelated bundle");
+        let unrelated_key = parse_certificate_info(
+            unrelated
+                .signing_certificate()
+                .expect("unrelated certificate")
+                .as_bytes(),
+        )
+        .expect("unrelated certificate info")
+        .public_key;
+
+        assert_eq!(
+            verify_transparency_log_content_binding(
+                &bundle,
+                &Artifact::Bytes(CONDA_PACKAGE),
+                Some(crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(
+                    &matching_key,
+                )),
+            )
+            .expect("matching managed key must bind to DSSE Rekor entry"),
+            1
+        );
+        let error = verify_transparency_log_content_binding(
+            &bundle,
+            &Artifact::Bytes(CONDA_PACKAGE),
+            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(
+                &unrelated_key,
+            )),
+        )
+        .expect_err("unrelated managed key must not inherit the logged DSSE signature");
+        assert!(error.to_string().contains("verifier mismatch"));
     }
 
     #[test]

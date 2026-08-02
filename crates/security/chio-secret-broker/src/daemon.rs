@@ -753,10 +753,12 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
                 return denied_response(IpcOperation::Execute, &failure.diagnostic_code, &failure);
             }
         };
-        match self
-            .service
-            .execute_evidenced(&execute, &trusted, now_unix_seconds)?
-        {
+        match self.service.execute_evidenced_with_terminal_clock(
+            &execute,
+            &trusted,
+            now_unix_seconds,
+            &|| self.clock.now_unix_seconds(),
+        )? {
             BrokerExecuteOutcome::Success(response) => {
                 accepted_response(IpcOperation::Execute, response.as_ref())
             }

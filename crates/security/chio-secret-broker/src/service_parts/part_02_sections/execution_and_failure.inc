@@ -4,6 +4,7 @@ impl BrokerService {
         request: &BrokerExecuteRequest,
         trusted: &TrustedExecutionContext,
         now_unix_seconds: u64,
+        terminal_clock: &dyn Fn() -> Result<u64>,
     ) -> ExecutionResult<BrokerExecuteResponse> {
         self.budget.capabilities().require_production()?;
         trusted.validate_for(request)?;
@@ -405,6 +406,18 @@ impl BrokerService {
             }
         };
         drop(retained.credential);
+        let terminal_unix_seconds = terminal_clock()
+            .map(|terminal| terminal.max(now_unix_seconds))
+            .map_err(|error| {
+                ExecutionFailure::at(
+                    error,
+                    FailureProjection {
+                        stage: BrokerFailureStage::Response,
+                        outcome: BrokerFailureOutcome::Failed,
+                        dispatch_knowledge: BrokerDispatchKnowledge::Committed,
+                    },
+                )
+            })?;
         let (response, response_body_sha256, expected_receipt_reference) =
             (|| -> Result<(BrokerExecuteResponse, String, String)> {
                 let response_body_sha256 = response_digest(&body);
@@ -428,7 +441,7 @@ impl BrokerService {
                     BrokerReceiptBody {
                         schema: BROKER_RECEIPT_SCHEMA.to_string(),
                         receipt_id,
-                        issued_at_unix_seconds: now_unix_seconds,
+                        issued_at_unix_seconds: terminal_unix_seconds,
                         evidence: evidence.clone(),
                         operation_id: ids.operation_id.clone(),
                         authorize_event_id: ids.authorize_event_id.clone(),
@@ -498,7 +511,7 @@ impl BrokerService {
                     AttemptState::DispatchCommitted,
                     AttemptState::UnknownOutcome,
                     &capture_evidence,
-                    now_unix_seconds,
+                    terminal_unix_seconds,
                 );
                 return Err(ExecutionFailure::at(
                     error,
@@ -516,7 +529,7 @@ impl BrokerService {
                 AttemptState::DispatchCommitted,
                 AttemptState::UnknownOutcome,
                 &capture_evidence,
-                now_unix_seconds,
+                terminal_unix_seconds,
             );
             return Err(ExecutionFailure::at(
                 error,
@@ -533,7 +546,7 @@ impl BrokerService {
                 AttemptState::DispatchCommitted,
                 AttemptState::UnknownOutcome,
                 &capture_evidence,
-                now_unix_seconds,
+                terminal_unix_seconds,
             );
             return Err(ExecutionFailure::at(
                 BrokerError::Invariant(
@@ -555,7 +568,7 @@ impl BrokerService {
             AttemptState::DispatchCommitted,
             AttemptState::Completed,
             &completion,
-            now_unix_seconds,
+            terminal_unix_seconds,
         )?;
         Ok(response)
     }
