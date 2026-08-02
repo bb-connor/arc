@@ -32,12 +32,7 @@ pub fn verify_tlog_entries(
     for entry in &bundle.verification_material.tlog_entries {
         // Verify checkpoint signature if present
         if let Some(ref inclusion_proof) = entry.inclusion_proof {
-            verify_checkpoint(
-                &inclusion_proof.checkpoint.envelope,
-                inclusion_proof,
-                trusted_root,
-            )?;
-            verify_entry_inclusion(entry, inclusion_proof)?;
+            verify_inclusion_proof(entry, inclusion_proof, trusted_root)?;
         }
 
         // Verify inclusion promise (SET) if present
@@ -147,10 +142,16 @@ pub fn verify_checkpoint(
     ))
 }
 
-fn verify_entry_inclusion(
+pub(crate) fn verify_inclusion_proof(
     entry: &TransparencyLogEntry,
     inclusion_proof: &InclusionProof,
+    trusted_root: &TrustedRoot,
 ) -> Result<()> {
+    verify_checkpoint(
+        &inclusion_proof.checkpoint.envelope,
+        inclusion_proof,
+        trusted_root,
+    )?;
     let proof_log_index = inclusion_proof.log_index.as_u64().ok_or_else(|| {
         Error::Verification("inclusion proof has an invalid log index".to_string())
     })?;

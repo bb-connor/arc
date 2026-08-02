@@ -690,11 +690,7 @@ pub fn verify_with_key<'a>(
     for entry in &bundle.verification_material.tlog_entries {
         // Verify checkpoint signature if present
         if let Some(ref inclusion_proof) = entry.inclusion_proof {
-            crate::verify_impl::tlog::verify_checkpoint(
-                &inclusion_proof.checkpoint.envelope,
-                inclusion_proof,
-                trusted_root,
-            )?;
+            crate::verify_impl::tlog::verify_inclusion_proof(entry, inclusion_proof, trusted_root)?;
         }
 
         // Verify inclusion promise (SET) if present
@@ -1271,5 +1267,37 @@ mod tests {
             );
             assert!(result.is_ok(), "matching managed-key bundle: {result:?}");
         }
+    }
+
+    #[test]
+    fn managed_key_verification_rejects_a_forged_inclusion_path() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle
+            .signing_certificate()
+            .expect("fixture certificate")
+            .clone();
+        let public_key = parse_certificate_info(certificate.as_bytes())
+            .expect("certificate info")
+            .public_key;
+        bundle.verification_material.content = VerificationMaterialContent::PublicKey {
+            hint: "test-managed-key".to_string(),
+        };
+        let entry = &mut bundle.verification_material.tlog_entries[0];
+        entry.inclusion_promise = None;
+        entry
+            .inclusion_proof
+            .as_mut()
+            .expect("inclusion proof")
+            .hashes[0] = Sha256Hash::from_bytes([0; 32]);
+
+        let error = verify_with_key(
+            COSIGN_V3_BLOB,
+            &bundle,
+            &public_key,
+            &TrustedRoot::production().expect("production root"),
+        )
+        .expect_err("a managed-key bundle must prove the content-bound entry is in the log");
+
+        assert!(error.to_string().contains("inclusion proof"));
     }
 }

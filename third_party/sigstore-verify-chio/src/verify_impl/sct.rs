@@ -201,12 +201,7 @@ pub fn verify_sct(
     // Extract the SCT and calculate issuer key hash
     let (scts, issuer_key_hash) = extract_scts(&cert, issuer_spki_der)?;
 
-    // Get CT log keys from trusted root
-    let ct_keys = trusted_root
-        .ctfe_keys_with_ids()
-        .map_err(|e| Error::Verification(format!("failed to get CT log keys: {}", e)))?;
-
-    if ct_keys.is_empty() {
+    if trusted_root.ctlogs.is_empty() {
         return Err(Error::Verification(
             "no CT log keys in trusted root".to_string(),
         ));
@@ -218,12 +213,38 @@ pub fn verify_sct(
     for sct in scts {
         let result = (|| {
             let log_id = &sct.log_id.key_id;
-            let (_, public_key) = ct_keys.iter().find(|(id, _)| id == log_id).ok_or_else(|| {
-                Error::Verification(format!(
-                    "SCT log ID {:?} not found in trusted root CT logs",
-                    hex::encode(log_id)
-                ))
+            let ctlog = trusted_root
+                .ctlogs
+                .iter()
+                .find(|ctlog| {
+                    sigstore_crypto::sha256(ctlog.public_key.raw_bytes.as_bytes()).as_bytes()
+                        == log_id
+                })
+                .ok_or_else(|| {
+                    Error::Verification(format!(
+                        "SCT log ID {:?} not found in trusted root CT logs",
+                        hex::encode(log_id)
+                    ))
+                })?;
+            let timestamp_seconds = i64::try_from(sct.timestamp / 1_000).map_err(|_| {
+                Error::Verification("SCT timestamp cannot be represented".to_string())
             })?;
+            let timestamp_nanos = u32::try_from((sct.timestamp % 1_000) * 1_000_000)
+                .map_err(|_| Error::Verification("SCT timestamp is invalid".to_string()))?;
+            let timestamp = chrono::DateTime::from_timestamp(timestamp_seconds, timestamp_nanos)
+                .ok_or_else(|| {
+                    Error::Verification("SCT timestamp cannot be represented".to_string())
+                })?;
+            if !super::helpers::validity_period_contains_datetime(
+                ctlog.public_key.valid_for.as_ref(),
+                timestamp,
+                "CT log key",
+            )? {
+                return Err(Error::Verification(format!(
+                    "CT log key is outside its validity period at SCT timestamp {}",
+                    sct.timestamp
+                )));
+            }
             let digitally_signed =
                 DigitallySigned::from_embedded_sct(&cert, &sct, issuer_key_hash)?;
             let sig_alg_bytes = sct.signature.algorithm.tls_serialize().map_err(|e| {
@@ -231,7 +252,7 @@ pub fn verify_sct(
             })?;
             let sig_alg = u16::from_be_bytes([sig_alg_bytes[0], sig_alg_bytes[1]]);
             let signature = SignatureBytes::new(sct.signature.signature.clone().into_vec());
-            digitally_signed.verify(public_key, sig_alg, &signature)
+            digitally_signed.verify(&ctlog.public_key.raw_bytes, sig_alg, &signature)
         })();
         match result {
             Ok(()) => {
@@ -315,5 +336,50 @@ mod tests {
 
         verify_sct(&cert_der, &issuer_spki, &trusted_root)
             .expect("one valid SCT must satisfy the verification threshold");
+    }
+
+    #[test]
+    fn sct_rejects_a_ct_key_outside_its_authority_window() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let cert = Certificate::from_der(certificate.as_bytes()).expect("certificate");
+        let scts: SignedCertificateTimestampList = cert
+            .tbs_certificate
+            .get()
+            .expect("SCT extension decode")
+            .expect("SCT extension")
+            .1;
+        let sct = scts.parse_timestamps().expect("SCT list")[0]
+            .parse_timestamp()
+            .expect("SCT");
+        let mut trusted_root = TrustedRoot::production().expect("production root");
+        let matching_log = trusted_root
+            .ctlogs
+            .iter_mut()
+            .find(|log| {
+                sigstore_crypto::sha256(log.public_key.raw_bytes.as_bytes()).as_bytes()
+                    == &sct.log_id.key_id
+            })
+            .expect("matching CT log");
+        matching_log.public_key.valid_for = Some(sigstore_trust_root::ValidityPeriod {
+            start: Some("2999-01-01T00:00:00Z".to_string()),
+            end: None,
+        });
+        let issuer_spki = trusted_root
+            .fulcio_certs()
+            .expect("Fulcio certificates")
+            .into_iter()
+            .filter_map(|der| Certificate::from_der(&der).ok())
+            .find(|issuer| issuer.tbs_certificate.subject == cert.tbs_certificate.issuer)
+            .expect("matching issuer")
+            .tbs_certificate
+            .subject_public_key_info
+            .to_der()
+            .expect("issuer SPKI");
+
+        let error = verify_sct(certificate.as_bytes(), &issuer_spki, &trusted_root)
+            .expect_err("an inactive CT log key must not verify an SCT");
+
+        assert!(error.to_string().contains("validity period"));
     }
 }

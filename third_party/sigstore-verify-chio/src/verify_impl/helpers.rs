@@ -17,12 +17,20 @@ pub(crate) fn validity_period_contains(
     timestamp: i64,
     authority: &str,
 ) -> Result<bool> {
-    let Some(valid_for) = valid_for else {
-        return Ok(true);
-    };
     let timestamp = chrono::DateTime::from_timestamp(timestamp, 0).ok_or_else(|| {
         Error::Verification(format!("{authority} validation time cannot be represented"))
     })?;
+    validity_period_contains_datetime(valid_for, timestamp, authority)
+}
+
+pub(crate) fn validity_period_contains_datetime(
+    valid_for: Option<&ValidityPeriod>,
+    timestamp: chrono::DateTime<chrono::Utc>,
+    authority: &str,
+) -> Result<bool> {
+    let Some(valid_for) = valid_for else {
+        return Ok(true);
+    };
     let start = valid_for
         .start
         .as_deref()
@@ -46,6 +54,96 @@ pub(crate) fn validity_period_contains(
 
     Ok(start.as_ref().map_or(true, |start| timestamp >= *start)
         && end.as_ref().map_or(true, |end| timestamp <= *end))
+}
+
+fn timestamp_signer_certificate(
+    timestamp_token_bytes: &[u8],
+    trusted_root: &TrustedRoot,
+) -> Result<DerCertificate> {
+    use cms::{
+        cert::CertificateChoices,
+        content_info::ContentInfo,
+        signed_data::{SignedData, SignerIdentifier},
+    };
+    use x509_cert::{
+        der::{Decode, Encode},
+        Certificate,
+    };
+
+    let content_info = match sigstore_tsa::TimeStampResp::from_der(timestamp_token_bytes) {
+        Ok(response) => {
+            let token = response.time_stamp_token.ok_or_else(|| {
+                Error::Verification("TSA response is missing its timestamp token".to_string())
+            })?;
+            let token_der = token.to_der().map_err(|error| {
+                Error::Verification(format!("failed to encode TSA timestamp token: {error}"))
+            })?;
+            ContentInfo::from_der(&token_der).map_err(|error| {
+                Error::Verification(format!("failed to parse TSA timestamp token: {error}"))
+            })?
+        }
+        Err(_) => ContentInfo::from_der(timestamp_token_bytes).map_err(|error| {
+            Error::Verification(format!("failed to parse TSA timestamp token: {error}"))
+        })?,
+    };
+    let signed_data_der = content_info.content.to_der().map_err(|error| {
+        Error::Verification(format!("failed to encode TSA signed data: {error}"))
+    })?;
+    let signed_data = SignedData::from_der(&signed_data_der).map_err(|error| {
+        Error::Verification(format!("failed to parse TSA signed data: {error}"))
+    })?;
+    let signer = signed_data
+        .signer_infos
+        .0
+        .get(0)
+        .ok_or_else(|| Error::Verification("TSA token has no signer info".to_string()))?;
+    let mut certificates = Vec::new();
+    if let Some(embedded) = &signed_data.certificates {
+        certificates.extend(embedded.0.iter().filter_map(|choice| match choice {
+            CertificateChoices::Certificate(certificate) => Some(certificate.clone()),
+            CertificateChoices::Other(_) => None,
+        }));
+    }
+    certificates.extend(
+        trusted_root
+            .timestamp_authorities
+            .iter()
+            .filter_map(|authority| authority.cert_chain.certificates.first())
+            .filter_map(|entry| Certificate::from_der(entry.raw_bytes.as_bytes()).ok()),
+    );
+    let certificate = certificates
+        .into_iter()
+        .find(|certificate| match &signer.sid {
+            SignerIdentifier::IssuerAndSerialNumber(issuer_serial) => {
+                certificate.tbs_certificate.issuer == issuer_serial.issuer
+                    && certificate.tbs_certificate.serial_number == issuer_serial.serial_number
+            }
+            SignerIdentifier::SubjectKeyIdentifier(expected) => certificate
+                .tbs_certificate
+                .extensions
+                .as_ref()
+                .and_then(|extensions| {
+                    extensions
+                        .iter()
+                        .find(|extension| extension.extn_id.to_string() == "2.5.29.14")
+                })
+                .and_then(|extension| {
+                    x509_cert::ext::pkix::SubjectKeyIdentifier::from_der(
+                        extension.extn_value.as_bytes(),
+                    )
+                    .ok()
+                })
+                .is_some_and(|actual| &actual == expected),
+        })
+        .ok_or_else(|| {
+            Error::Verification("TSA signer certificate is not present or trusted".to_string())
+        })?;
+    certificate
+        .to_der()
+        .map(DerCertificate::new)
+        .map_err(|error| {
+            Error::Verification(format!("failed to encode TSA signer certificate: {error}"))
+        })
 }
 
 /// Extract and decode the signing certificate from verification material
@@ -101,7 +199,7 @@ pub fn extract_tsa_timestamp(
     }
 
     let mut earliest_timestamp: Option<i64> = None;
-    let mut any_timestamp_verified = false;
+    let mut failures = Vec::new();
 
     for ts in &bundle
         .verification_material
@@ -129,42 +227,54 @@ pub fn extract_tsa_timestamp(
             opts = opts.with_tsa_certificates(tsa_leaves);
         }
 
-        // Verify the timestamp response with full cryptographic validation
-        let result = verify_timestamp_response(ts_bytes, signature_bytes, opts).map_err(|e| {
-            Error::Verification(format!("TSA timestamp verification failed: {}", e))
-        })?;
-
-        // Check that the timestamp falls within the TSA's validity period from the trust root
-        if !trusted_root.is_timestamp_within_tsa_validity(result.time) {
-            return Err(Error::Verification(format!(
-                "TSA timestamp {} is outside the trust root's TSA validity period",
-                result.time
-            )));
-        }
-
-        let timestamp = result.time.timestamp();
-        any_timestamp_verified = true;
-
-        if let Some(earliest) = earliest_timestamp {
-            if timestamp < earliest {
-                earliest_timestamp = Some(timestamp);
+        let attempt = (|| {
+            let result =
+                verify_timestamp_response(ts_bytes, signature_bytes, opts).map_err(|e| {
+                    Error::Verification(format!("TSA timestamp verification failed: {e}"))
+                })?;
+            let signer = timestamp_signer_certificate(ts_bytes, trusted_root)?;
+            let authority = trusted_root
+                .timestamp_authorities
+                .iter()
+                .find(|authority| {
+                    authority
+                        .cert_chain
+                        .certificates
+                        .first()
+                        .is_some_and(|entry| entry.raw_bytes == signer)
+                })
+                .ok_or_else(|| {
+                    Error::Verification(
+                        "TSA signer certificate does not identify a trusted authority".to_string(),
+                    )
+                })?;
+            if !validity_period_contains_datetime(
+                authority.valid_for.as_ref(),
+                result.time,
+                "TSA authority",
+            )? {
+                return Err(Error::Verification(format!(
+                    "TSA authority is outside its validity period at timestamp {}",
+                    result.time
+                )));
             }
-        } else {
-            earliest_timestamp = Some(timestamp);
+            Ok(result.time.timestamp())
+        })();
+
+        match attempt {
+            Ok(timestamp) => {
+                earliest_timestamp =
+                    Some(earliest_timestamp.map_or(timestamp, |earliest| earliest.min(timestamp)));
+            }
+            Err(error) => failures.push(error.to_string()),
         }
     }
 
-    // If we have a trusted root and timestamps were present but none verified, that's an error
-    if !any_timestamp_verified
-        && !bundle
-            .verification_material
-            .timestamp_verification_data
-            .rfc3161_timestamps
-            .is_empty()
-    {
-        return Err(Error::Verification(
-            "TSA timestamps present but none could be verified against trusted root".to_string(),
-        ));
+    if earliest_timestamp.is_none() {
+        return Err(Error::Verification(format!(
+            "TSA timestamps present but none could be verified against trusted root: {}",
+            failures.join("; ")
+        )));
     }
 
     Ok(earliest_timestamp)
@@ -466,6 +576,7 @@ mod tests {
     use super::*;
     use sigstore_crypto::parse_certificate_info;
     use sigstore_trust_root::ValidityPeriod;
+    use sigstore_types::bundle::Rfc3161Timestamp;
 
     const COSIGN_V3_BLOB_BUNDLE: &str =
         include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
@@ -492,5 +603,53 @@ mod tests {
         .expect_err("an inactive Fulcio authority must not become a trust anchor");
 
         assert!(error.to_string().contains("validity period"));
+    }
+
+    #[test]
+    fn tsa_timestamp_is_bound_to_the_signing_authority_window() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let signature = extract_signature(&bundle.content).expect("bundle signature");
+        let mut trusted_root = TrustedRoot::production().expect("production root");
+        let mut unrelated_authority = trusted_root.timestamp_authorities[0].clone();
+        unrelated_authority.cert_chain.certificates[0] = trusted_root.certificate_authorities[0]
+            .cert_chain
+            .certificates[0]
+            .clone();
+        unrelated_authority.valid_for = None;
+        trusted_root.timestamp_authorities[0].valid_for = Some(ValidityPeriod {
+            start: Some("2999-01-01T00:00:00Z".to_string()),
+            end: None,
+        });
+        trusted_root.timestamp_authorities.push(unrelated_authority);
+
+        let error = extract_tsa_timestamp(&bundle, signature.as_bytes(), &trusted_root)
+            .expect_err("another TSA's window must not authorize the signing TSA");
+
+        assert!(error.to_string().contains("validity period"));
+    }
+
+    #[test]
+    fn redundant_tsa_evidence_accepts_a_valid_timestamp_after_a_malformed_one() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let signature = extract_signature(&bundle.content).expect("bundle signature");
+        bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps
+            .insert(
+                0,
+                Rfc3161Timestamp {
+                    signed_timestamp: sigstore_types::TimestampToken::new(vec![0xff]),
+                },
+            );
+
+        let timestamp = extract_tsa_timestamp(
+            &bundle,
+            signature.as_bytes(),
+            &TrustedRoot::production().expect("production root"),
+        )
+        .expect("one valid timestamp must satisfy the evidence threshold");
+
+        assert!(timestamp.is_some());
     }
 }
