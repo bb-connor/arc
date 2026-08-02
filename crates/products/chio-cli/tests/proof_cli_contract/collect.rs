@@ -317,14 +317,16 @@ fn proof_collect_agent_web_envelope_requires_durable_replay_store() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).test_expect("stderr is utf8");
-    assert!(stderr.contains(
-        "CHIO_AGENT_WEB_REPLAY_STORE_PATH is required when Standard Webhooks replay protection is enabled"
-    ));
+    assert!(
+        stderr.contains("CHIO_AGENT_WEB_REPLAY_STORE_PATH must be set and non-empty"),
+        "unexpected proof collect error: {stderr}"
+    );
 }
 
 #[test]
 fn proof_collect_consumes_replay_while_proof_verify_remains_idempotent() {
     let tempdir = tempfile::tempdir().test_expect("tempdir");
+    let (verifier_now, max_age_seconds) = standard_webhooks_clock_env();
     let artifact_dir =
         workspace_root().join("fixtures/proof-room/agent-web/valid-webhook-cloudevents");
     let out_path = tempdir.path().join("collected-agent-web-envelope");
@@ -332,6 +334,14 @@ fn proof_collect_consumes_replay_while_proof_verify_remains_idempotent() {
     let replay_store_path = tempdir.path().join("agent-web-replay.sqlite");
     let collect = chio_command()
         .env("CHIO_AGENT_WEB_REPLAY_STORE_PATH", &replay_store_path)
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS",
+            &verifier_now,
+        )
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS",
+            &max_age_seconds,
+        )
         .arg("proof")
         .arg("collect")
         .arg("--kind")
@@ -347,6 +357,14 @@ fn proof_collect_consumes_replay_while_proof_verify_remains_idempotent() {
 
     let verify = chio_command()
         .env("CHIO_AGENT_WEB_REPLAY_STORE_PATH", &replay_store_path)
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS",
+            &verifier_now,
+        )
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS",
+            &max_age_seconds,
+        )
         .arg("proof")
         .arg("verify")
         .arg(&out_path)
@@ -358,6 +376,14 @@ fn proof_collect_consumes_replay_while_proof_verify_remains_idempotent() {
 
     let repeated_verify = chio_command()
         .env("CHIO_AGENT_WEB_REPLAY_STORE_PATH", &replay_store_path)
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS",
+            &verifier_now,
+        )
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS",
+            &max_age_seconds,
+        )
         .arg("proof")
         .arg("verify")
         .arg(&out_path)
@@ -369,6 +395,14 @@ fn proof_collect_consumes_replay_while_proof_verify_remains_idempotent() {
 
     let second_collect = chio_command()
         .env("CHIO_AGENT_WEB_REPLAY_STORE_PATH", replay_store_path)
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS",
+            verifier_now,
+        )
+        .env(
+            "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS",
+            max_age_seconds,
+        )
         .arg("proof")
         .arg("collect")
         .arg("--kind")
@@ -382,7 +416,10 @@ fn proof_collect_consumes_replay_while_proof_verify_remains_idempotent() {
         .test_expect("second proof collect runs");
     assert!(!second_collect.status.success());
     let stderr = String::from_utf8(second_collect.stderr).test_expect("stderr is utf8");
-    assert!(stderr.contains("replayed Standard Webhooks id"));
+    assert!(
+        stderr.contains("replayed Standard Webhooks id"),
+        "unexpected replay rejection: {stderr}"
+    );
 }
 
 #[test]
