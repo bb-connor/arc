@@ -22,6 +22,8 @@
 //! );
 //! CREATE INDEX idx_chio_memory_provenance_key
 //!     ON chio_memory_provenance(store, entry_key, seq);
+//! CREATE UNIQUE INDEX idx_chio_memory_provenance_receipt
+//!     ON chio_memory_provenance(receipt_id);
 //! ```
 //!
 //! The monotonic `seq` column is the chain position; `verify_entry`
@@ -82,7 +84,7 @@ pub struct SqliteMemoryProvenanceStore {
 }
 
 /// Memory-provenance-store schema revision. Bump on every schema-affecting change.
-const MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const MEMORY_PROVENANCE_STORE_SCHEMA_KEY: &str = "memory_provenance";
@@ -149,6 +151,9 @@ impl SqliteMemoryProvenanceStore {
 
             CREATE INDEX IF NOT EXISTS idx_chio_memory_provenance_key
                 ON chio_memory_provenance(store, entry_key, seq);
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_memory_provenance_receipt
+                ON chio_memory_provenance(receipt_id);
             "#,
         )?;
         crate::stamp_schema_version(
@@ -208,6 +213,35 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
         let tx = conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|error| MemoryProvenanceError::Backend(error.to_string()))?;
+
+        let existing = tx
+            .query_row(
+                r#"
+                SELECT entry_id, store, entry_key, capability_id, receipt_id,
+                       written_at, prev_hash, hash
+                FROM chio_memory_provenance
+                WHERE receipt_id = ?1
+                LIMIT 1
+                "#,
+                params![input.receipt_id.as_str()],
+                map_row,
+            )
+            .optional()
+            .map_err(|error| MemoryProvenanceError::Backend(error.to_string()))?;
+        if let Some(existing) = existing {
+            if existing.store != input.store
+                || existing.key != input.key
+                || existing.capability_id != input.capability_id
+                || existing.written_at != input.written_at
+            {
+                return Err(MemoryProvenanceError::Backend(
+                    "memory provenance receipt id was reused with different fields".to_string(),
+                ));
+            }
+            tx.commit()
+                .map_err(|error| MemoryProvenanceError::Backend(error.to_string()))?;
+            return Ok(existing);
+        }
 
         let prev_hash: String = tx
             .query_row(

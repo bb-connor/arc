@@ -47,6 +47,65 @@ fn append_assigns_genesis_prev_hash_for_first_entry() {
 }
 
 #[test]
+fn append_is_idempotent_by_receipt_id() {
+    let store = SqliteMemoryProvenanceStore::open_in_memory().test_expect("open in-memory store");
+    let input = sample_append("doc-1", "rcpt-1", 100);
+    let first = store
+        .append(input.clone())
+        .test_expect("first append succeeds");
+    let first_digest = store.chain_digest().test_expect("first digest");
+    let replay = store.append(input).test_expect("replay succeeds");
+
+    assert_eq!(replay, first);
+    assert_eq!(
+        store.chain_digest().test_expect("replay digest"),
+        first_digest,
+        "a replay must not extend the provenance chain"
+    );
+    assert!(store.append(sample_append("doc-2", "rcpt-1", 100)).is_err());
+}
+
+#[test]
+fn migration_rejects_legacy_duplicate_receipt_ids() {
+    let path = unique_db_path("chio-mem-prov-duplicate-receipt");
+    let conn = rusqlite::Connection::open(&path).test_expect("open legacy database");
+    conn.execute_batch(&format!(
+        r#"
+        PRAGMA application_id = {};
+        CREATE TABLE chio_memory_provenance (
+            seq           INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id      TEXT NOT NULL UNIQUE,
+            store         TEXT NOT NULL,
+            entry_key     TEXT NOT NULL,
+            capability_id TEXT NOT NULL,
+            receipt_id    TEXT NOT NULL,
+            written_at    INTEGER NOT NULL,
+            prev_hash     TEXT NOT NULL,
+            hash          TEXT NOT NULL
+        );
+        INSERT INTO chio_memory_provenance
+            (entry_id, store, entry_key, capability_id, receipt_id, written_at, prev_hash, hash)
+        VALUES
+            ('entry-a', 'store', 'key-a', 'cap', 'receipt-reused', 1, 'genesis', 'hash-a'),
+            ('entry-b', 'store', 'key-b', 'cap', 'receipt-reused', 2, 'hash-a', 'hash-b');
+        "#,
+        chio_store_sqlite::schema_version::CHIO_SQLITE_APPLICATION_ID
+    ))
+    .test_expect("create legacy duplicate rows");
+    drop(conn);
+
+    let error = match SqliteMemoryProvenanceStore::open(&path) {
+        Ok(_) => panic!("duplicate receipt ids must fail the uniqueness migration"),
+        Err(error) => error,
+    };
+    assert!(
+        error.to_string().contains("UNIQUE constraint failed"),
+        "unexpected migration error: {error}"
+    );
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn append_links_successive_entries_via_prev_hash() {
     let store = SqliteMemoryProvenanceStore::open_in_memory().test_expect("open in-memory store");
     let first = store
