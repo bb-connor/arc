@@ -2386,14 +2386,17 @@ impl FindingChallengeCoordinator {
             // same collateral twice. Re-read the stored transaction before
             // settlement so a later reorg or loss of finality cannot inherit
             // an earlier confirmation as current chain truth.
-            if let Err(error) = self.require_reobserved_impairment(&planned, publisher, None) {
-                self.challenges
-                    .set_liability_quarantine(liability_key, true, now)
-                    .map_err(|store| {
-                        ChallengeCoordinatorError::ChallengeStore(store.to_string())
-                    })?;
-                return Err(error);
-            }
+            let tx_hash = match self.require_reobserved_impairment(&planned, publisher, None) {
+                Ok(tx_hash) => tx_hash,
+                Err(error) => {
+                    self.challenges
+                        .set_liability_quarantine(liability_key, true, now)
+                        .map_err(|store| {
+                            ChallengeCoordinatorError::ChallengeStore(store.to_string())
+                        })?;
+                    return Err(error);
+                }
+            };
             self.require_confirmed_enforcement_root(liability_key, &verified, planned.intent())?;
             let anchor_key = derive_anchor_evidence_intent_key(&planned.intent().evidence_hash);
             self.confirm_effect_intent(&anchor_key, now)?;
@@ -2402,6 +2405,7 @@ impl FindingChallengeCoordinator {
                 enforcement,
                 bond_snapshot,
                 observations,
+                &tx_hash,
                 now,
             );
         }
@@ -3924,14 +3928,14 @@ impl FindingChallengeCoordinator {
         planned: &PlannedFindingImpairment,
         publisher: &dyn FindingImpairmentPublisher,
         expected_tx_hash: Option<&str>,
-    ) -> Result<(), ChallengeCoordinatorError> {
+    ) -> Result<String, ChallengeCoordinatorError> {
         let outcome = reobserve_finding_impairment(planned, publisher)
             .map_err(|error| ChallengeCoordinatorError::Publisher(error.to_string()))?;
         match outcome {
             FindingImpairmentOutcome::Confirmed { tx_hash }
                 if expected_tx_hash.is_none_or(|expected| expected == tx_hash) =>
             {
-                Ok(())
+                Ok(tx_hash)
             }
             FindingImpairmentOutcome::Confirmed { .. } => {
                 Err(ChallengeCoordinatorError::Settlement(
