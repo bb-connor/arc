@@ -1307,6 +1307,11 @@ EXPECTED_APALACHE_CONCURRENCY = {
     "group": "apalache-safety-${{ github.workflow }}-${{ github.ref }}",
     "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
 }
+EXPECTED_APALACHE_CALL_PERMISSIONS = {
+    "actions": "read",
+    "contents": "read",
+    "issues": "write",
+}
 EXPECTED_THREAT_CONCURRENCY = {
     "group": "threat-model-coverage-${{ github.workflow }}-${{ github.ref }}",
     "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
@@ -7576,6 +7581,13 @@ def validate(root: Path) -> None:
             raise ContractError(
                 f"required CI conditionally calls reusable workflow: {identifier}"
             )
+    if (
+        job(ci, "apalache-full-contract").get("permissions")
+        != EXPECTED_APALACHE_CALL_PERMISSIONS
+    ):
+        raise ContractError(
+            "required CI does not delegate exact Apalache permissions"
+        )
 
     apalache_events = apalache.get("on")
     if not isinstance(apalache_events, dict) or set(apalache_events) != {

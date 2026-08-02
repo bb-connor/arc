@@ -444,6 +444,10 @@ jobs:
 
   apalache-full-contract:
     uses: ./.github/workflows/apalache-safety.yml
+    permissions:
+      actions: read
+      contents: read
+      issues: write
 
   threat-model-coverage-contract:
     uses: ./.github/workflows/threat-model-coverage.yml

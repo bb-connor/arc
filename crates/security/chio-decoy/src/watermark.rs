@@ -805,6 +805,7 @@ fn payload_within_key_window(
     payload.issued_at_unix_ms >= key.not_before_unix_ms
         && payload.issued_at_unix_ms < key.signing_cutoff_unix_ms
         && payload.expires_at_unix_ms <= key.verify_until_unix_ms
+        && observed_at_unix_ms >= payload.issued_at_unix_ms
         && observed_at_unix_ms < payload.expires_at_unix_ms
         && observed_at_unix_ms < key.verify_until_unix_ms
 }

@@ -4662,6 +4662,16 @@ assert_rejected(
     "must be callable, manual, and scheduled",
 )
 assert_rejected(
+    "Apalache caller permission narrowed",
+    "ci.yml",
+    replace_in_named_job(
+        "apalache-full-contract",
+        "      issues: write\n",
+        "      issues: read\n",
+    ),
+    "does not delegate exact Apalache permissions",
+)
+assert_rejected(
     "Apalache model removed",
     "apalache-safety.yml",
     replace_once(

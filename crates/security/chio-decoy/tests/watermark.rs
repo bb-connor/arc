@@ -552,6 +552,46 @@ fn active_and_overlap_keys_verify_only_inside_receipt_anchored_windows() {
 }
 
 #[test]
+fn future_issued_watermarks_are_invalid_until_their_issuance_time() {
+    let fixture = Fixture::new(true, 10_000);
+    fixture
+        .contexts
+        .values
+        .lock()
+        .test_expect("contexts lock")
+        .get_mut(&fixture.source_receipt_id)
+        .test_expect("source context")
+        .issued_at_unix_ms = OBSERVED_AT + 5;
+    let token = fixture.issue();
+
+    let early = fixture
+        .verifier()
+        .scan_text(
+            &token,
+            &fixture.observation("observation-early", "evidence-early", OBSERVED_AT),
+        )
+        .test_expect("early observation is advisory");
+    assert_eq!(early.verdict, WatermarkScanVerdict::Advisory);
+    assert_eq!(early.active_hits.len(), 0);
+    assert_eq!(early.invalid_candidates, 1);
+    assert!(fixture
+        .observations
+        .rows
+        .lock()
+        .test_expect("observations lock")
+        .is_empty());
+
+    let current = fixture
+        .verifier()
+        .scan_text(
+            &token,
+            &fixture.observation("observation-current", "evidence-current", OBSERVED_AT + 5),
+        )
+        .test_expect("current observation verifies");
+    assert_eq!(current.verdict, WatermarkScanVerdict::ActiveHit);
+}
+
+#[test]
 fn retired_and_expired_entries_are_verified_inactive_advisories() {
     let fixture = Fixture::new(true, 10_000);
     let token = fixture.issue();
