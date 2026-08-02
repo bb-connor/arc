@@ -29,6 +29,7 @@
 //! The monotonic `seq` column is the chain position; `verify_entry`
 //! looks up the preceding row by `seq` to confirm linkage.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -120,22 +121,27 @@ impl SqliteMemoryProvenanceStore {
     }
 
     fn run_migrations(&self) -> Result<(), SqliteMemoryProvenanceStoreError> {
-        let conn = self
+        let mut conn = self
             .pool
             .get()
             .map_err(|error| SqliteMemoryProvenanceStoreError(format!("pool acquire: {error}")))?;
-        crate::check_schema_version(
-            &conn,
-            MEMORY_PROVENANCE_STORE_SCHEMA_KEY,
-            MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION,
-            MEMORY_PROVENANCE_STORE_LEGACY_ANCHOR_TABLES,
-        )
-        .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = FULL;
             PRAGMA busy_timeout = 5000;
+            "#,
+        )?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let on_disk_version = crate::check_schema_version(
+            &tx,
+            MEMORY_PROVENANCE_STORE_SCHEMA_KEY,
+            MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION,
+            MEMORY_PROVENANCE_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
+        tx.execute_batch(
+            r#"
 
             CREATE TABLE IF NOT EXISTS chio_memory_provenance (
                 seq           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,17 +157,24 @@ impl SqliteMemoryProvenanceStore {
 
             CREATE INDEX IF NOT EXISTS idx_chio_memory_provenance_key
                 ON chio_memory_provenance(store, entry_key, seq);
-
+            "#,
+        )?;
+        if on_disk_version == 0 {
+            migrate_legacy_receipt_replays(&tx)?;
+        }
+        tx.execute_batch(
+            r#"
             CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_memory_provenance_receipt
                 ON chio_memory_provenance(receipt_id);
             "#,
         )?;
         crate::stamp_schema_version(
-            &conn,
+            &tx,
             MEMORY_PROVENANCE_STORE_SCHEMA_KEY,
             MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -184,14 +197,151 @@ impl SqliteMemoryProvenanceStore {
     }
 }
 
+#[derive(Debug)]
+struct LegacyMemoryProvenanceRow {
+    seq: i64,
+    entry: MemoryProvenanceEntry,
+}
+
+fn migrate_legacy_receipt_replays(
+    tx: &rusqlite::Transaction<'_>,
+) -> Result<(), SqliteMemoryProvenanceStoreError> {
+    let rows = {
+        let mut statement = tx.prepare(
+            r#"
+            SELECT seq, entry_id, store, entry_key, capability_id, receipt_id,
+                   written_at, prev_hash, hash
+            FROM chio_memory_provenance
+            ORDER BY seq ASC
+            "#,
+        )?;
+        let collected = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>("seq")?,
+                    row.get::<_, String>("entry_id")?,
+                    row.get::<_, String>("store")?,
+                    row.get::<_, String>("entry_key")?,
+                    row.get::<_, String>("capability_id")?,
+                    row.get::<_, String>("receipt_id")?,
+                    row.get::<_, i64>("written_at")?,
+                    row.get::<_, String>("prev_hash")?,
+                    row.get::<_, String>("hash")?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        collected
+    };
+
+    let mut validated_rows = Vec::with_capacity(rows.len());
+    let mut expected_prev_hash = MEMORY_PROVENANCE_GENESIS_PREV_HASH.to_string();
+    for (seq, entry_id, store, entry_key, capability_id, receipt_id, written_at, prev_hash, hash) in
+        rows
+    {
+        if seq <= 0 {
+            return Err(SqliteMemoryProvenanceStoreError(
+                "legacy provenance sequence is outside the supported range".to_string(),
+            ));
+        }
+        let written_at = u64::try_from(written_at).map_err(|_| {
+            SqliteMemoryProvenanceStoreError(
+                "legacy provenance timestamp is outside the supported range".to_string(),
+            )
+        })?;
+        let entry = MemoryProvenanceEntry {
+            entry_id,
+            store,
+            key: entry_key,
+            capability_id,
+            receipt_id,
+            written_at,
+            prev_hash,
+            hash,
+        };
+        let expected_hash = entry.expected_hash().map_err(|error| {
+            SqliteMemoryProvenanceStoreError(format!("legacy provenance chain is invalid: {error}"))
+        })?;
+        if entry.prev_hash != expected_prev_hash || entry.hash != expected_hash {
+            return Err(SqliteMemoryProvenanceStoreError(
+                "legacy provenance chain is invalid".to_string(),
+            ));
+        }
+        expected_prev_hash = entry.hash.clone();
+        validated_rows.push(LegacyMemoryProvenanceRow { seq, entry });
+    }
+
+    let mut first_by_receipt = BTreeMap::<String, usize>::new();
+    let mut duplicate_sequences = Vec::new();
+    let mut retained_rows: Vec<LegacyMemoryProvenanceRow> =
+        Vec::with_capacity(validated_rows.len());
+    for row in validated_rows {
+        if let Some(&first_index) = first_by_receipt.get(&row.entry.receipt_id) {
+            let first = &retained_rows[first_index];
+            if first.entry.store != row.entry.store
+                || first.entry.key != row.entry.key
+                || first.entry.capability_id != row.entry.capability_id
+                || first.entry.written_at != row.entry.written_at
+            {
+                return Err(SqliteMemoryProvenanceStoreError(
+                    "legacy memory provenance receipt id was reused with different fields"
+                        .to_string(),
+                ));
+            }
+            duplicate_sequences.push(row.seq);
+        } else {
+            first_by_receipt.insert(row.entry.receipt_id.clone(), retained_rows.len());
+            retained_rows.push(row);
+        }
+    }
+
+    if duplicate_sequences.is_empty() {
+        return Ok(());
+    }
+    for seq in duplicate_sequences {
+        tx.execute(
+            "DELETE FROM chio_memory_provenance WHERE seq = ?1",
+            params![seq],
+        )?;
+    }
+
+    let mut prev_hash = MEMORY_PROVENANCE_GENESIS_PREV_HASH.to_string();
+    for row in retained_rows {
+        let hash = recompute_memory_provenance_entry_hash(
+            &row.entry.entry_id,
+            &row.entry.store,
+            &row.entry.key,
+            &row.entry.capability_id,
+            &row.entry.receipt_id,
+            row.entry.written_at,
+            &prev_hash,
+        )
+        .map_err(|error| {
+            SqliteMemoryProvenanceStoreError(format!(
+                "legacy provenance chain rebuild failed: {error}"
+            ))
+        })?;
+        tx.execute(
+            "UPDATE chio_memory_provenance SET prev_hash = ?1, hash = ?2 WHERE seq = ?3",
+            params![prev_hash, hash, row.seq],
+        )?;
+        prev_hash = hash;
+    }
+
+    Ok(())
+}
+
 fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MemoryProvenanceEntry> {
+    let written_at_i64 = row.get::<_, i64>("written_at")?;
+    let written_at_index = row.as_ref().column_index("written_at")?;
+    let written_at = u64::try_from(written_at_i64)
+        .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(written_at_index, written_at_i64))?;
     Ok(MemoryProvenanceEntry {
         entry_id: row.get("entry_id")?,
         store: row.get("store")?,
         key: row.get("entry_key")?,
         capability_id: row.get("capability_id")?,
         receipt_id: row.get("receipt_id")?,
-        written_at: row.get::<_, i64>("written_at")? as u64,
+        written_at,
         prev_hash: row.get("prev_hash")?,
         hash: row.get("hash")?,
     })
@@ -202,6 +352,11 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
         &self,
         input: MemoryProvenanceAppend,
     ) -> Result<MemoryProvenanceEntry, MemoryProvenanceError> {
+        let written_at_i64 = i64::try_from(input.written_at).map_err(|_| {
+            MemoryProvenanceError::Backend(
+                "memory provenance timestamp is outside SQLite INTEGER range".to_string(),
+            )
+        })?;
         let mut conn = self
             .pool
             .get()
@@ -264,7 +419,6 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
             &prev_hash,
         )?;
 
-        let written_at_i64 = i64::try_from(input.written_at).unwrap_or(i64::MAX);
         tx.execute(
             r#"
             INSERT INTO chio_memory_provenance
