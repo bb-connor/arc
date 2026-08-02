@@ -987,6 +987,40 @@ mod tests {
     }
 
     #[test]
+    fn v1_content_bound_set_time_survives_invalid_optional_tsa_material() {
+        let mut bundle = Bundle::from_json(DSSE_V2_BUNDLE).expect("legacy intoto bundle");
+        bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps
+            .push(Rfc3161Timestamp {
+                signed_timestamp: sigstore_types::TimestampToken::new(vec![0xff, 0x00, 0x7f]),
+            });
+        let certificate = bundle.signing_certificate().expect("DSSE certificate");
+        let verified = verify_transparency_log_content_binding(
+            &bundle,
+            &Artifact::Bytes(b"content binding is carried by the DSSE envelope"),
+            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(certificate)),
+        )
+        .expect("legacy intoto entry must bind the DSSE content");
+        let signature = crate::verify_impl::helpers::extract_signature(&bundle.content)
+            .expect("extract DSSE signature");
+
+        let validation_time = crate::verify_impl::helpers::determine_validation_time(
+            &bundle,
+            &signature,
+            &TrustedRoot::production().expect("production root"),
+            verified.v1_integrated_time_with_promise,
+        )
+        .expect("the verified V1 SET time must survive invalid optional TSA material");
+
+        assert_eq!(
+            validation_time,
+            bundle.verification_material.tlog_entries[0].integrated_time
+        );
+    }
+
+    #[test]
     fn v1_dsse_content_cannot_borrow_an_unrelated_hashedrekord_integrated_time() {
         let mut bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("V1 DSSE bundle");
         bundle.verification_material.tlog_entries[0].inclusion_promise = None;

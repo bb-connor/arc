@@ -312,12 +312,24 @@ pub fn determine_validation_time(
     trusted_root: &TrustedRoot,
     content_bound_v1_integrated_time: Option<i64>,
 ) -> Result<i64> {
-    // Try TSA timestamp first (most authoritative)
-    if let Some(tsa_time) = extract_tsa_timestamp(bundle, signature.as_bytes(), trusted_root)? {
-        return Ok(tsa_time);
+    let has_v2_entries = has_v2_tlog_entries(bundle);
+    // Try TSA timestamp first (most authoritative). Invalid optional TSA
+    // material cannot poison a V1 signature that already has a verified,
+    // content-bound SET time. V2 and SET-less bundles retain the TSA failure.
+    match extract_tsa_timestamp(bundle, signature.as_bytes(), trusted_root) {
+        Ok(Some(tsa_time)) => return Ok(tsa_time),
+        Ok(None) => {}
+        Err(error) => {
+            if !has_v2_entries {
+                if let Some(integrated_time) = content_bound_v1_integrated_time {
+                    return Ok(integrated_time);
+                }
+            }
+            return Err(error);
+        }
     }
 
-    if has_v2_tlog_entries(bundle) {
+    if has_v2_entries {
         return Err(Error::Verification(
             "V2 bundle requires RFC3161 timestamp but none could be verified. \
              V2 tlog entries have integrated_time=0 by design. \

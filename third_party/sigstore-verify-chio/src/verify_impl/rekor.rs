@@ -153,7 +153,8 @@ fn verify_dsse_v001(
             && verify_pem_verifier_identity(&rekor_sig.verifier, expected_verifier).is_ok()
     }) {
         return Err(Error::Verification(
-            "DSSE signatures in the bundle do not match the Rekor signature multiset one-to-one"
+            "DSSE signature or verifier mismatch: the bundle does not match the Rekor signature \
+             multiset one-to-one"
                 .to_string(),
         ));
     }
@@ -223,7 +224,8 @@ fn verify_dsse_v002(
             .is_ok()
     }) {
         return Err(Error::Verification(
-            "DSSE signatures in the bundle do not match the Rekor signature multiset one-to-one"
+            "DSSE signature or verifier mismatch: the bundle does not match the Rekor signature \
+             multiset one-to-one"
                 .to_string(),
         ));
     }

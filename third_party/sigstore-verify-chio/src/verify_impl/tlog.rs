@@ -120,6 +120,7 @@ pub fn verify_checkpoint(
     // checkpoint after its authority window has closed.
     let verification_time = chrono::Utc::now().timestamp();
     let mut matched_inactive_key = false;
+    let mut matched_active_key_failures = Vec::new();
 
     // For each signature in the checkpoint, try to find a matching active key.
     for sig in &checkpoint.signatures {
@@ -141,16 +142,18 @@ pub fn verify_checkpoint(
             }
 
             let message = checkpoint.signed_data();
-            verify_signature_auto(&log.public_key.raw_bytes, &sig.signature, message).map_err(
-                |error| {
-                    Error::Verification(format!(
-                        "Checkpoint signature verification failed: {error}"
-                    ))
-                },
-            )?;
-
-            return Ok(());
+            match verify_signature_auto(&log.public_key.raw_bytes, &sig.signature, message) {
+                Ok(()) => return Ok(()),
+                Err(error) => matched_active_key_failures.push(error.to_string()),
+            }
         }
+    }
+
+    if !matched_active_key_failures.is_empty() {
+        return Err(Error::Verification(format!(
+            "No active matching Rekor key verified a checkpoint signature: {}",
+            matched_active_key_failures.join("; ")
+        )));
     }
 
     if matched_inactive_key {
@@ -368,5 +371,68 @@ mod tests {
             .expect_err("a retired Rekor key must not authorize a new checkpoint");
 
         assert!(error.to_string().contains("validity period"));
+    }
+
+    #[test]
+    fn checkpoint_tries_a_valid_signature_after_an_invalid_matching_signature() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let proof = bundle.verification_material.tlog_entries[0]
+            .inclusion_proof
+            .as_ref()
+            .expect("inclusion proof");
+        let (body, signature_block) = proof
+            .checkpoint
+            .envelope
+            .split_once("\n\n")
+            .expect("checkpoint body and signatures");
+        let valid_line = signature_block.lines().next().expect("checkpoint signature");
+        let (line_prefix, encoded_signature) = valid_line
+            .rsplit_once(' ')
+            .expect("checkpoint signature encoding");
+        let mut invalid_signature = base64::engine::general_purpose::STANDARD
+            .decode(encoded_signature)
+            .expect("decode checkpoint signature");
+        *invalid_signature.last_mut().expect("signature bytes") ^= 1;
+        let invalid_line = format!(
+            "{line_prefix} {}",
+            base64::engine::general_purpose::STANDARD.encode(invalid_signature)
+        );
+        let redundant_envelope = format!("{body}\n\n{invalid_line}\n{valid_line}\n");
+
+        verify_checkpoint(
+            &redundant_envelope,
+            proof,
+            &TrustedRoot::production().expect("production root"),
+        )
+        .expect("the later valid redundant signature must verify");
+    }
+
+    #[test]
+    fn checkpoint_tries_a_valid_key_after_a_colliding_invalid_key() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let proof = bundle.verification_material.tlog_entries[0]
+            .inclusion_proof
+            .as_ref()
+            .expect("inclusion proof");
+        let checkpoint = Checkpoint::from_text(&proof.checkpoint.envelope).expect("checkpoint");
+        let key_hint = checkpoint.signatures[0].key_id.as_slice();
+        let mut trusted_root = TrustedRoot::production().expect("production root");
+        let matching_log = trusted_root
+            .tlogs
+            .iter()
+            .find(|log| {
+                log.log_id
+                    .key_id
+                    .decode()
+                    .is_ok_and(|log_id| log_id.len() >= 4 && key_hint == &log_id[..4])
+            })
+            .expect("matching Rekor key")
+            .clone();
+        let mut colliding_invalid_log = matching_log;
+        colliding_invalid_log.public_key.raw_bytes = sigstore_types::DerPublicKey::new(vec![0xff]);
+        trusted_root.tlogs.insert(0, colliding_invalid_log);
+
+        verify_checkpoint(&proof.checkpoint.envelope, proof, &trusted_root)
+            .expect("the later valid colliding key must verify");
     }
 }
