@@ -101,6 +101,23 @@ every query against that feed and stable operator identity. A transport,
 canonicalization, signature, lifecycle, digest, feed, finding, epoch, or
 sparse-path failure exits nonzero.
 
+The standard proof verifier routes `claim.finding.*` bundles through the
+cognition-market verifier. Configure its trust inputs out of band before
+running `chio proof verify <transaction-passport.json>`:
+
+```bash
+export CHIO_TRANSACTION_TRUSTED_ROOT_KEYS=<passport-root-public-key>
+export CHIO_FINDING_VERIFIER_AUTHORITY_KEY=<finding-verifier-public-key>
+export CHIO_FINDING_VERIFIER_PROFILE_ENVELOPE_SHA256=<approved-profile-envelope-digest>
+export CHIO_FINDING_STATUS_OPERATOR_AUTHORIZATION_PATH=<canonical-authorization.json>
+export CHIO_FINDING_STATUS_NOW_UNIX_SECONDS=<trusted-verification-time>
+export CHIO_FINDING_STATUS_MAX_AGE_SECONDS=<deployment-freshness-limit>
+```
+
+The verifier fails closed when any pin, authorization, trusted time, or
+freshness limit is missing or malformed. None of these values are derived
+from the proof bundle.
+
 At minimum, monitoring checks:
 
 - outer signature and governance-pinned operator authorization;
