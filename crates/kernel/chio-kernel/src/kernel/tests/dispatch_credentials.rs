@@ -342,7 +342,7 @@ fn request_with_replayed_approval(
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+    )?;
 
     let arguments = serde_json::json!({"operation": "settle"});
     let mut request =
@@ -421,7 +421,7 @@ fn request_with_panicking_execution_nonce_store(
             reserve_calls: std::sync::Arc::clone(&reserve_calls),
             rollback_calls: std::sync::Arc::clone(&rollback_calls),
         }),
-    );
+    )?;
 
     let arguments = serde_json::json!({"operation": "settle"});
     let mut request =
@@ -485,7 +485,7 @@ fn request_with_legacy_execution_nonce_store(
             consumed: std::sync::Arc::new(Mutex::new(std::collections::HashSet::new())),
             reserve_calls: std::sync::Arc::clone(&reserve_calls),
         }),
-    );
+    )?;
 
     let mut request = make_request_with_arguments(
         request_id,
@@ -876,6 +876,7 @@ fn default_governed_approval_replay_store_accepts_once_and_denies_replay(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let mut reservation = kernel.reserve_dispatch_credentials(

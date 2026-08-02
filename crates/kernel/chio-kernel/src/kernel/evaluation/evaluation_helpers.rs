@@ -61,7 +61,6 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
 
 struct CleanupReleaseOutcome {
     metadata: Option<serde_json::Value>,
-    confirmed: bool,
 }
 
 impl ChioKernel {
@@ -154,16 +153,10 @@ impl ChioKernel {
         metadata: Option<serde_json::Value>,
     ) -> CleanupReleaseOutcome {
         if !lease_acquired {
-            return CleanupReleaseOutcome {
-                metadata,
-                confirmed: true,
-            };
+            return CleanupReleaseOutcome { metadata };
         }
         match self.release_admitted_capability_budget(cap) {
-            Ok(()) => CleanupReleaseOutcome {
-                metadata,
-                confirmed: true,
-            },
+            Ok(()) => CleanupReleaseOutcome { metadata },
             Err(error) => {
                 warn!(
                     capability_id = %cap.id,
@@ -181,7 +174,6 @@ impl ChioKernel {
                             }
                         })),
                     ),
-                    confirmed: false,
                 }
             }
         }
@@ -213,74 +205,78 @@ impl ChioKernel {
         result
     }
 
-    /// Unwind a typed URL-elicitation result without creating a terminal
-    /// receipt. The tool boundary guarantees that this result precedes any
-    /// tool effect, so a clean unwind leaves the request retryable.
-    pub(super) fn unwind_url_elicitation_before_effect(
+    pub(super) fn build_payment_authorization_outcome_unknown_deny_response(
         &self,
         denial: PreDispatchCleanupDeny<'_>,
+        outcome_unknown_reason: &str,
         credential_disposition: PaymentCredentialDisposition,
-    ) -> Result<(), KernelError> {
-        if let Some(operation) =
-            self.threshold_operation_for_budget_mutation(denial.budget_mutation)?
-        {
-            self.reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)?;
-            if let Some(payment_authorization) = denial.payment_authorization {
-                self.release_threshold_payment_authorization(
-                    denial.request,
-                    denial.budget_mutation,
-                    payment_authorization,
-                )?;
-            }
-            if denial.budget_lease_acquired {
-                self.release_threshold_delegated_budget(denial.cap, &operation)?;
-            }
-            let metadata = self.merge_dispatch_credential_disposition_metadata(
-                denial.runtime_admission_metadata,
-                credential_disposition,
-            );
-            let (_, runtime_release_confirmed) =
-                self.release_runtime_admission_reservations_for_pre_dispatch_denial(metadata);
-            return if runtime_release_confirmed {
-                Ok(())
-            } else {
-                Err(KernelError::Internal(
-                    "URL-elicitation runtime admission cleanup could not be confirmed".to_string(),
-                ))
-            };
-        }
+    ) -> Result<ToolCallResponse, KernelError> {
         let runtime_metadata = self.merge_dispatch_credential_disposition_metadata(
             denial.runtime_admission_metadata,
             credential_disposition,
         );
-        let (runtime_metadata, runtime_release_confirmed) =
+        let (runtime_metadata, _) =
             self.release_runtime_admission_reservations_for_pre_dispatch_denial(runtime_metadata);
-        let lease_release = self.release_budget_lease_with_evidence(
-            denial.cap,
-            denial.budget_lease_acquired,
-            runtime_metadata,
-        );
-        let _reverse = match denial.payment_authorization {
-            Some(payment_authorization) => self
-                .unwind_pre_dispatch_monetary_invocation_with_evidence(
-                    denial.request,
-                    denial.cap,
-                    denial.budget_mutation,
-                    Some(payment_authorization),
-                    credential_disposition,
-                )
-                .map(|(reverse, _)| reverse)
-                .map_err(|failure| *failure.error)?,
-            None => {
-                self.reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)?
-            }
-        };
-        if !runtime_release_confirmed || !lease_release.confirmed {
-            return Err(KernelError::Internal(
-                "URL-elicitation admission cleanup could not be confirmed".to_string(),
-            ));
+        let charge = denial.budget_mutation.charge_result();
+        let hold_ids = charge
+            .map(|charge| vec![charge.budget_hold_id.clone()])
+            .unwrap_or_default();
+        let mut outcome = serde_json::json!({
+            "pre_dispatch_monetary_outcome_unknown": true,
+            "payment_authorization_outcome_unknown": true,
+            "payment_credential_disposition": credential_disposition,
+            "retained_capability_budget_lease": denial.budget_lease_acquired,
+            "pre_dispatch_cleanup_failed": true,
+            "pre_dispatch_cleanup_faults": [{
+                "step": "payment_authorization",
+                "reason": redacted!(outcome_unknown_reason).to_string(),
+                "hold_ids": hold_ids
+            }]
+        });
+        if let (Some(charge), Some(outcome)) = (charge, outcome.as_object_mut()) {
+            outcome.insert(
+                "retained_budget_hold_id".to_string(),
+                serde_json::Value::String(charge.budget_hold_id.clone()),
+            );
+            outcome.insert(
+                "retained_budget_exposure_units".to_string(),
+                serde_json::Value::from(charge.cost_charged),
+            );
         }
-        Ok(())
+        if let (Some(binding), Some(outcome)) = (
+            denial.budget_mutation.admission_operation_binding(),
+            outcome.as_object_mut(),
+        ) {
+            outcome.insert(
+                "retained_admission_operation_id".to_string(),
+                serde_json::Value::String(binding.operation_id().to_string()),
+            );
+        }
+        let retained_metadata = merge_metadata_objects(
+            runtime_metadata,
+            Some(serde_json::json!({"chio_runtime": outcome})),
+        );
+        let metadata = self.ambiguous_dispatch_receipt_metadata(
+            denial.budget_mutation,
+            None,
+            retained_metadata,
+        );
+        let metadata = merge_metadata_objects(
+            metadata,
+            Some(serde_json::json!({
+                "financial": {
+                    "payment_authorization_ambiguous": true
+                }
+            })),
+        );
+        self.build_deny_response_with_metadata_and_payee_binding(
+            denial.request,
+            denial.reason,
+            denial.timestamp,
+            Some(denial.matched_grant_index),
+            metadata,
+            denial.verified_payee_binding,
+        )
     }
 
     pub(super) fn build_pre_dispatch_cleanup_deny_response_with_credentials(
@@ -450,22 +446,11 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let threshold_operation =
             self.threshold_operation_for_budget_mutation(denial.budget_mutation)?;
-        let reverse = if let Some(operation) = threshold_operation.as_ref() {
+        let reverse = if threshold_operation.is_some() {
             // The admission reversal first wins the durable compensation CAS.
-            // No participant may be released while dispatch can still win.
-            let reverse =
-                self.reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)?;
-            if let Some(payment_authorization) = denial.payment_authorization {
-                self.release_threshold_payment_authorization(
-                    denial.request,
-                    denial.budget_mutation,
-                    payment_authorization,
-                )?;
-            }
-            if denial.budget_lease_acquired {
-                self.release_threshold_delegated_budget(denial.cap, operation)?;
-            }
-            reverse
+            // Its durable cleanup journal releases every operation-owned
+            // participant exactly once before terminalizing the operation.
+            self.reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)?
         } else {
             let reverse = match denial.payment_authorization {
                 Some(payment_authorization) => self.unwind_aborted_monetary_invocation(
@@ -554,7 +539,7 @@ impl ChioKernel {
         matched_grant_index: usize,
         cap: &CapabilityToken,
         budget_mutation: &PreExecutionBudgetMutation,
-        payment_authorization: Option<&PaymentAuthorization>,
+        _payment_authorization: Option<&PaymentAuthorization>,
         runtime_admission_metadata: Option<serde_json::Value>,
         budget_lease_acquired: bool,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -563,16 +548,7 @@ impl ChioKernel {
         // operation-owned runtime, payment, or delegated-budget participant
         // is released.
         let reverse = self.reverse_pre_execution_budget_mutation(cap, budget_mutation)?;
-        if threshold_operation.is_some() {
-            if let Some(payment_authorization) = payment_authorization {
-                self.release_threshold_payment_authorization(
-                    request,
-                    budget_mutation,
-                    payment_authorization,
-                )?;
-            }
-        }
-        if budget_lease_acquired {
+        if budget_lease_acquired && threshold_operation.is_none() {
             self.release_pre_dispatch_delegated_budget(cap, budget_mutation)?;
         }
         let (runtime_admission_metadata, runtime_release_confirmed) = self

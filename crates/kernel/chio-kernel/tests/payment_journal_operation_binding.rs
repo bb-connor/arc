@@ -327,20 +327,19 @@ fn apply_state(
     applied
 }
 
+type TerminalOperationStoreFixture = (
+    std::path::PathBuf,
+    Arc<SqliteSecurityAdmissionOperationStore>,
+    std::path::PathBuf,
+    Arc<SqliteReceiptStore>,
+    AdmissionOperation,
+);
+
 fn terminal_operation_store(
     request_id: &str,
     request_binding_hash: &str,
     hold_id: &str,
-) -> Result<
-    (
-        std::path::PathBuf,
-        Arc<SqliteSecurityAdmissionOperationStore>,
-        std::path::PathBuf,
-        Arc<SqliteReceiptStore>,
-        AdmissionOperation,
-    ),
-    Box<dyn std::error::Error>,
-> {
+) -> Result<TerminalOperationStoreFixture, Box<dyn std::error::Error>> {
     let path = unique_db_path("operation-bound-terminal-owner");
     let store = Arc::new(SqliteSecurityAdmissionOperationStore::open(&path)?);
     let receipt_path = unique_db_path("operation-bound-terminal-receipts");

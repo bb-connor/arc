@@ -250,7 +250,7 @@ async fn forced_credential_revalidation_preserves_legacy_runtime_admission_verdi
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+    )?;
 
     let agent = make_keypair();
     let capability = make_capability(
@@ -300,6 +300,7 @@ fn guard_dispatch_revalidation_is_opt_in_and_opted_in_errors_fail_closed() {
         server_id: &request.server_id,
         session_filesystem_roots: None,
         matched_grant_index: Some(0),
+        security_context: None,
     };
 
     let legacy = LegacyDefaultGuard;
@@ -352,7 +353,7 @@ fn nested_bridge_cancellation_blocks_next_child_and_drop_clears_dispatch_scope(
             allow_sampling_tool_use: false,
             allow_elicitation: false,
             policy_hash: &kernel.config.policy_hash,
-            kernel_keypair: &kernel.config.keypair,
+            authority_signing_backend: kernel.authority_signing_backend.as_ref(),
             client: &mut client,
         };
         let cancellation: Result<(), KernelError> = Err(KernelError::RequestCancelled {

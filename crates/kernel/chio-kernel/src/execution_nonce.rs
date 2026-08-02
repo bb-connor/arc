@@ -10,9 +10,9 @@
 //! # Design
 //!
 //! * The nonce body is an opaque `nonce_id` plus a `NonceBinding` that
-//!   binds the nonce to the exact `(subject, capability, server, tool,
-//!   parameter_hash)` tuple. Substituting a nonce between unrelated tool
-//!   calls therefore fails the binding check.
+//!   binds the nonce to the exact `(subject, request, capability, server,
+//!   tool, parameter_hash)` tuple. Substituting a nonce between unrelated
+//!   tool calls or request identifiers therefore fails the binding check.
 //! * The kernel signs the full body (nonce id + binding + expires_at)
 //!   with its receipt-signing key, so downstream tool servers can
 //!   cryptographically verify authenticity without a round trip.
@@ -108,7 +108,8 @@ pub struct ExecutionNonce {
     /// Unix timestamp (seconds) when this nonce expires.
     /// Default: `issued_at + 30`. Configurable via `ExecutionNonceConfig`.
     pub expires_at: i64,
-    /// Invocation binding: subject, capability, server, tool, parameter hash.
+    /// Invocation binding: subject, request, capability, server, tool, and
+    /// parameter hash.
     pub bound_to: NonceBinding,
     /// Reserved budget hold this nonce authorizes. Set only by the
     /// pre-execution authorization-reserving path so the reconcile-by-nonce
@@ -1508,6 +1509,7 @@ mod tests {
             [
                 "capability_id",
                 "parameter_hash",
+                "request_id",
                 "subject_id",
                 "tool_name",
                 "tool_server"

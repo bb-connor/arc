@@ -301,7 +301,7 @@ fn legacy_threshold_test_token(
             threshold_proposal_hash: None,
             request_id: request_id.to_string(),
             issued_at: now.saturating_sub(1),
-            expires_at: now + 300,
+            expires_at: now + 600,
             decision: GovernedApprovalDecision::Approved,
         },
         &kernel.config.keypair,

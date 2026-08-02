@@ -230,6 +230,7 @@ fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> Nonc
             .parameter_hash;
     NonceBinding {
         subject_id: cap.subject.to_hex(),
+        request_id: request.request_id.clone(),
         capability_id: cap.id.clone(),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -267,6 +268,7 @@ fn allow_verdict_carries_signed_execution_nonce_and_verifies() {
 
     let expected = NonceBinding {
         subject_id: cap.subject.to_hex(),
+        request_id: request.request_id.clone(),
         capability_id: cap.id.clone(),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -320,6 +322,7 @@ fn stale_nonce_is_rejected_after_ttl() {
     let kp = Keypair::generate();
     let binding = NonceBinding {
         subject_id: "s".into(),
+        request_id: "r".into(),
         capability_id: "c".into(),
         tool_server: "t".into(),
         tool_name: "n".into(),
@@ -353,6 +356,7 @@ fn replayed_nonce_is_rejected_by_store() {
         .expect("allow verdict must carry an execution nonce");
     let expected = NonceBinding {
         subject_id: cap.subject.to_hex(),
+        request_id: request.request_id.clone(),
         capability_id: cap.id.clone(),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -387,6 +391,7 @@ fn mismatched_binding_is_rejected() {
     // but the caller claims write_file.
     let expected = NonceBinding {
         subject_id: cap.subject.to_hex(),
+        request_id: request.request_id.clone(),
         capability_id: cap.id.clone(),
         tool_server: request.server_id.clone(),
         tool_name: "write_file".to_string(),
@@ -412,6 +417,7 @@ fn tampered_signature_is_rejected() {
     let kp = Keypair::generate();
     let binding = NonceBinding {
         subject_id: "s".into(),
+        request_id: "r".into(),
         capability_id: "c".into(),
         tool_server: "t".into(),
         tool_name: "n".into(),
@@ -739,22 +745,33 @@ fn strict_nonce_mode_ordinary_aggregate_admission_owns_replay_reservation() {
         .unwrap();
     assert_eq!(nonce_action.state(), AdmissionCleanupActionState::Completed);
 
-    let mut replay = request;
-    replay.request_id = "req-ordinary-operation-owned-nonce-replay".to_string();
-    let replay = kernel.evaluate_tool_call_blocking(&replay).unwrap();
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("execution nonce reservation")));
+    assert!(
+        !nonce_store.reserve(expected_nonce.nonce_id()).unwrap(),
+        "a committed operation-owned nonce must remain a permanent replay tombstone"
+    );
+    assert!(matches!(
+        nonce_store.reserve_nonce_for_operation(
+            &"aa".repeat(32),
+            expected_nonce.nonce_id(),
+            expected_nonce.expires_at(),
+        ),
+        Err(ExecutionNonceReservationError::Conflict(_))
+    ));
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
 #[test]
-fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
+fn strict_nonce_mode_payment_denial_terminalizes_request_and_blocks_rebinding() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
-    install_fixture_budget_admission_authorities(&mut kernel, "nonce-payment-denial");
+    install_durable_test_receipt_store(&mut kernel, "nonce-payment-denial-receipts");
+    let operations = durable_test_admission_operation_store("nonce-payment-denial-operations");
+    kernel
+        .set_admission_operation_store_handle(operations.clone())
+        .expect("install fixture admission operation store");
+    kernel
+        .set_budget_store_handle(durable_atomic_test_budget_store("nonce-payment-denial-budget"))
+        .expect("install fixture budget store");
     kernel
         .set_payment_adapter(Box::new(OperationDecliningNoncePaymentAdapter::new()))
         .expect("install payment adapter");
@@ -767,11 +784,9 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         nonce_store_capacity: 1024,
         require_nonce: true,
     };
+    let nonce_store = DurableRecoveryNonceStore::new();
     kernel
-        .set_execution_nonce_store(
-            cfg.clone(),
-            Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
-        )
+        .set_execution_nonce_store(cfg.clone(), Box::new(nonce_store.clone()))
         .expect("nonce store installation");
 
     let agent_kp = Keypair::generate();
@@ -798,13 +813,8 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         declassification_grant: None,
     };
 
-    let preflight = kernel.evaluate_tool_call_blocking(&request).unwrap();
-    assert_eq!(preflight.verdict, Verdict::Allow);
-    request.execution_nonce = Some(
-        *preflight
-            .execution_nonce
-            .expect("strict preflight must return an execution nonce"),
-    );
+    let presented_nonce = mint_nonce_for_request(&kernel, &request.capability, &request, &cfg);
+    request.execution_nonce = Some(presented_nonce.clone());
 
     let denied = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(denied.verdict, Verdict::Deny);
@@ -818,13 +828,49 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
     );
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
 
+    let operation = operations
+        .load_by_request_id(
+            AdmissionOperationKind::ToolDispatch,
+            &request.request_id,
+            2,
+        )
+        .expect("load payment-denial operation")
+        .into_iter()
+        .next()
+        .expect("payment denial must persist its admission operation");
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let reservation = nonce_store
+        .get_nonce_reservation(operation.operation_id())
+        .expect("load payment-denial nonce reservation");
+    assert!(
+        reservation.is_none(),
+        "definitive payment denial happens before the nonce effect boundary"
+    );
+
     kernel
         .set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()))
-        .expect("install payment adapter");
-    request.request_id = "req-nonce-payment-allow".to_string();
-    let allowed = kernel.evaluate_tool_call_blocking(&request).unwrap();
-    assert_eq!(allowed.verdict, Verdict::Allow);
-    assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
+        .expect("install succeeding payment adapter");
+    let exact_retry = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(exact_retry.verdict, Verdict::Deny);
+    assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    let mut rebound_request = request.clone();
+    rebound_request.request_id = "req-nonce-payment-rebound".to_string();
+    let rebound_binding = binding_for_request(&rebound_request.capability, &rebound_request);
+    let rebound_error = crate::execution_nonce::verify_execution_nonce_stateless(
+        &presented_nonce,
+        &kernel.public_key(),
+        &rebound_binding,
+        presented_nonce.nonce.issued_at,
+    )
+    .expect_err("a nonce from a terminal request must not bind to a new request id");
+    assert!(matches!(
+        rebound_error,
+        ExecutionNonceError::BindingMismatch { field: "request_id" }
+    ));
 }
 
 #[test]
@@ -951,6 +997,7 @@ fn kernel_ttl_enforces_30s_default() {
     let kp = Keypair::generate();
     let binding = NonceBinding {
         subject_id: "s".into(),
+        request_id: "r".into(),
         capability_id: "c".into(),
         tool_server: "t".into(),
         tool_name: "n".into(),
@@ -1166,9 +1213,8 @@ fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
         declassification_grant: None,
     };
 
-    // The strict retry presents a nonce from a prior allow (the nonce binds the
-    // capability/server/tool/parameter-hash, not the request id), so no nonce is
-    // preminted during this completion.
+    // The strict retry presents a nonce bound to this exact request and call,
+    // so no nonce is preminted during this completion.
     let nonce = mint_nonce_for_request(&kernel, &cap, &request, &cfg);
     request.execution_nonce = Some(nonce.clone());
     let executed = kernel.evaluate_tool_call_blocking(&request).unwrap();

@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use chio_kernel::budget_store::{BudgetCaptureInvocationRequest, BudgetInvocationCaptureDecision};
 use chio_kernel::{BudgetStore, InMemoryBudgetStore};
 use chio_kernel_core::{BudgetRegistry, InMemoryBudgetRegistry};
 use proptest::prelude::*;
@@ -217,20 +216,6 @@ fn terminal_hold(
             )
             .expect("open hold reverses exactly once"),
         TerminalClass::Committed => {
-            let capture = store
-                .capture_invocation_reservations(BudgetCaptureInvocationRequest {
-                    capability_id: CAPABILITY_ID.to_string(),
-                    grant_index: GRANT_INDEX,
-                    hold_id: hold.id.clone(),
-                    event_id: format!("{}:capture-invocation", hold.id),
-                    trusted_time: None,
-                    authority: None,
-                })
-                .expect("open hold captures its invocation before reconciliation");
-            assert!(matches!(
-                capture,
-                BudgetInvocationCaptureDecision::Captured(_)
-            ));
             store
                 .settle_charge_cost_with_ids(
                     CAPABILITY_ID,
@@ -240,7 +225,7 @@ fn terminal_hold(
                     Some(&hold.id),
                     Some(&format!("{}:reconcile", hold.id)),
                 )
-                .expect("open dispatch-captured hold reconciles exactly once");
+                .expect("open legacy hold reconciles exactly once");
         }
     }
     assert!(terminal_history.insert(hold.id, class).is_none());

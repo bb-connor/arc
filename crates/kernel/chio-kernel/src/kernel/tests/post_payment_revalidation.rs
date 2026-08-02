@@ -2,9 +2,20 @@ struct MutatingPaymentAdapter {
     mutable_state: std::sync::Arc<AtomicBool>,
     authorizations: std::sync::Arc<AtomicU64>,
     releases: std::sync::Arc<AtomicU64>,
+    operation_authorization: std::sync::Arc<
+        std::sync::Mutex<Option<(String, String, PaymentAuthorization)>>,
+    >,
 }
 
 impl PaymentAdapter for MutatingPaymentAdapter {
+    fn supports_operation_authorization_recovery(&self) -> bool {
+        true
+    }
+
+    fn supports_operation_payment_mutations(&self) -> bool {
+        true
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -13,7 +24,7 @@ impl PaymentAdapter for MutatingPaymentAdapter {
         self.mutable_state.store(true, Ordering::SeqCst);
         Ok(PaymentAuthorization {
             authorization_id: "post-payment-revalidation".to_string(),
-            state: PaymentAuthorizationState::Held,
+            settled: false,
             metadata: serde_json::json!({"adapter": "mutating-test"}),
         })
     }
@@ -58,6 +69,82 @@ impl PaymentAdapter for MutatingPaymentAdapter {
             metadata: serde_json::json!({"adapter": "mutating-test"}),
         })
     }
+
+    fn authorize_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        if request.operation_id.as_deref() != Some(operation_id)
+            || request.request_binding_hash.as_deref() != Some(request_binding_hash)
+        {
+            return Err(PaymentError::RailError(
+                "post-payment operation binding mismatch".to_string(),
+            ));
+        }
+        let authorization = self.authorize(request)?;
+        *self
+            .operation_authorization
+            .lock()
+            .map_err(|_| PaymentError::Unavailable("payment test state poisoned".to_string()))? =
+            Some((
+                operation_id.to_string(),
+                request_binding_hash.to_string(),
+                authorization.clone(),
+            ));
+        Ok(authorization)
+    }
+
+    fn lookup_authorization_for_operation(
+        &self,
+        operation_id: &str,
+        request_binding_hash: &str,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        Ok(self
+            .operation_authorization
+            .lock()
+            .map_err(|_| PaymentError::Unavailable("payment test state poisoned".to_string()))?
+            .as_ref()
+            .filter(|(stored_operation, stored_binding, _)| {
+                stored_operation == operation_id && stored_binding == request_binding_hash
+            })
+            .map(|(_, _, authorization)| authorization.clone()))
+    }
+
+    fn capture_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentCaptureRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.capture(
+            request.authorization_id,
+            request.amount_units,
+            request.currency,
+            request.reference,
+        )
+    }
+
+    fn release_for_operation(
+        &self,
+        _operation_id: &str,
+        _request_binding_hash: &str,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.release(authorization_id, reference)
+    }
+
+    fn refund_for_operation(
+        &self,
+        request: crate::payment::OperationPaymentRefundRequest<'_>,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.refund(
+            request.transaction_id,
+            request.amount_units,
+            request.currency,
+            request.reference,
+        )
+    }
 }
 
 struct PostPaymentMutationGuard {
@@ -72,6 +159,10 @@ impl Guard for PostPaymentMutationGuard {
 
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         Ok(GuardDecision::allow())
+    }
+
+    fn requires_dispatch_revalidation(&self) -> bool {
+        true
     }
 
     fn revalidate_before_dispatch(&self, _ctx: &GuardContext<'_>) -> Result<(), KernelError> {
@@ -104,6 +195,10 @@ impl RuntimeAdmissionHook for PostPaymentMutationRuntimeHook {
         Ok(RuntimeAdmissionDecision::allow(None))
     }
 
+    fn requires_dispatch_revalidation(&self) -> bool {
+        true
+    }
+
     fn revalidate_before_dispatch(
         &self,
         _context: &RuntimeAdmissionRevalidationContext<'_>,
@@ -130,16 +225,20 @@ fn make_post_payment_mutation_fixture(
     std::sync::Arc<std::sync::atomic::AtomicUsize>,
 ) {
     let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, request_id);
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "post-payment-server".to_string(),
         invocations: invocations.clone(),
     }));
-    kernel.set_payment_adapter(Box::new(MutatingPaymentAdapter {
+    if let Err(error) = kernel.set_payment_adapter(Box::new(MutatingPaymentAdapter {
         mutable_state,
         authorizations,
         releases,
-    }));
+        operation_authorization: std::sync::Arc::new(std::sync::Mutex::new(None)),
+    })) {
+        panic!("install post-payment mutation adapter: {error}");
+    }
 
     let agent = make_keypair();
     let capability = make_capability(
@@ -169,7 +268,12 @@ fn assert_clean_payment_unwind_receipt(
         .as_ref()
         .ok_or_else(|| std::io::Error::other("clean payment unwind metadata missing"))?;
     let unwind = &metadata["chio_runtime"]["pre_dispatch_payment_unwind"];
-    assert_eq!(unwind["authorization_id"], "post-payment-revalidation");
+    assert_eq!(
+        unwind["authorization_id"],
+        "post-payment-revalidation",
+        "unexpected payment unwind receipt metadata for {:?}: {metadata:#}",
+        response.reason
+    );
     assert_eq!(unwind["transaction_id"], "post-payment-revalidation");
     assert_eq!(unwind["settlement_status"], "released");
     assert_eq!(
@@ -203,8 +307,8 @@ async fn async_payment_mutation_is_revalidated_by_guard_before_dispatch(
     };
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+        Box::new(DurableThresholdNonceStore::new()),
+    )?;
     request.execution_nonce = Some(mint_nonce_for_request(
         &kernel,
         &capability,
@@ -252,8 +356,8 @@ async fn nested_payment_mutation_is_revalidated_by_runtime_hook_before_dispatch(
     };
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
+        Box::new(DurableThresholdNonceStore::new()),
+    )?;
     request.execution_nonce = Some(mint_nonce_for_request(
         &kernel,
         &capability,

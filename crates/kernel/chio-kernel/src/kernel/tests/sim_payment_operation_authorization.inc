@@ -409,6 +409,7 @@ fn ordinary_operation_authorization_reuses_preexisting_exact_result() {
             &fixture.request,
             Some(&fixture.charge),
             Some(&fixture.binding),
+            None,
         )
         .expect("preexisting operation authorization")
         .expect("payment authorization");
@@ -436,6 +437,7 @@ fn ordinary_operation_authorization_lost_ack_recovers_and_persists() {
             &fixture.request,
             Some(&fixture.charge),
             Some(&fixture.binding),
+            None,
         )
         .expect("lost authorization acknowledgement recovery")
         .expect("recovered payment authorization");
@@ -466,10 +468,12 @@ fn ordinary_operation_authorization_confirmed_none_preserves_original_error() {
             &fixture.request,
             Some(&fixture.charge),
             Some(&fixture.binding),
+            None,
         )
         .expect_err("confirmed absence must preserve the rail decline");
 
-    assert!(matches!(error, PaymentError::Declined(_)));
+    assert!(!error.outcome_unknown());
+    assert!(error.to_string().contains("injected authorization decline"));
     assert_eq!(fixture.payment.lookups(), 2);
     assert_eq!(fixture.payment.operation_authorizes(), 1);
     assert_eq!(fixture.payment.operation_releases(), 0);
@@ -492,10 +496,12 @@ fn ordinary_operation_authorization_lookup_unavailable_does_not_authorize() {
             &fixture.request,
             Some(&fixture.charge),
             Some(&fixture.binding),
+            None,
         )
         .expect_err("unavailable lookup must fail before authorize");
 
-    assert!(matches!(error, PaymentError::Unavailable(_)));
+    assert!(!error.outcome_unknown());
+    assert!(error.to_string().contains("authorization lookup outage"));
     assert_eq!(fixture.payment.lookups(), 1);
     assert_eq!(fixture.payment.operation_authorizes(), 0);
     assert_eq!(fixture.payment.operation_releases(), 0);
@@ -518,6 +524,7 @@ fn ordinary_operation_authorization_rejects_mismatched_journal_binding() {
             &fixture.request,
             Some(&fixture.charge),
             Some(&fixture.binding),
+            None,
         )
         .expect_err("a rebound payment journal must fail closed");
 
@@ -544,6 +551,7 @@ fn ordinary_operation_authorization_resumes_committed_cleanup_instead_of_dispatc
             &fixture.request,
             Some(&fixture.charge),
             Some(&fixture.binding),
+            None,
         )
         .expect_err("a cleanup-owned authorization cannot return to dispatch");
 
@@ -568,10 +576,11 @@ fn legacy_authorization_failure_is_single_shot_without_operation_lookup() {
 
     let error = fixture
         .kernel
-        .authorize_payment_if_needed(&fixture.request, Some(&fixture.charge), None)
+        .authorize_payment_if_needed(&fixture.request, Some(&fixture.charge), None, None)
         .expect_err("legacy authorization failure");
 
-    assert!(matches!(error, PaymentError::Unavailable(_)));
+    assert!(error.outcome_unknown());
+    assert!(error.to_string().contains("legacy authorization failure"));
     assert_eq!(fixture.payment.legacy_authorizes(), 1);
     assert_eq!(fixture.payment.lookups(), 0);
     assert_eq!(fixture.payment.operation_authorizes(), 0);

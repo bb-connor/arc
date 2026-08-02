@@ -554,33 +554,6 @@ impl BudgetStore for FaultingBudgetStore {
         self.inner.get_usage(capability_id, grant_index)
     }
 
-    fn get_invocation_quota_usage(
-        &self,
-        key: &chio_kernel::budget_store::BudgetQuotaKey,
-    ) -> Result<Option<chio_kernel::budget_store::BudgetInvocationQuotaUsage>, BudgetStoreError>
-    {
-        self.inner.get_invocation_quota_usage(key)
-    }
-
-    fn get_cumulative_approval_account_usage(
-        &self,
-        key: &chio_kernel::budget_store::BudgetCumulativeApprovalAccountKey,
-    ) -> Result<
-        Option<chio_kernel::budget_store::BudgetCumulativeApprovalAccountUsage>,
-        BudgetStoreError,
-    > {
-        self.inner.get_cumulative_approval_account_usage(key)
-    }
-
-    fn get_cumulative_approval_operation_usage(
-        &self,
-        operation_id: &str,
-    ) -> Result<Option<chio_kernel::budget_store::BudgetCumulativeApprovalUsage>, BudgetStoreError>
-    {
-        self.inner
-            .get_cumulative_approval_operation_usage(operation_id)
-    }
-
     fn list_mutation_events(
         &self,
         limit: usize,
@@ -606,31 +579,9 @@ impl BudgetStore for FaultingBudgetStore {
     fn capture_invocation_reservations(
         &self,
         request: chio_kernel::budget_store::BudgetCaptureInvocationRequest,
-    ) -> Result<chio_kernel::budget_store::BudgetInvocationCaptureDecision, BudgetStoreError> {
+    ) -> Result<chio_kernel::budget_store::BudgetHoldMutationDecision, BudgetStoreError> {
         self.mutation("capture_invocation_reservations")?;
         self.inner.capture_invocation_reservations(request)
-    }
-
-    fn authorize_cumulative_approval(
-        &self,
-        request: chio_kernel::budget_store::BudgetAuthorizeCumulativeApprovalRequest,
-    ) -> Result<
-        chio_kernel::budget_store::BudgetCumulativeApprovalAuthorizationDecision,
-        BudgetStoreError,
-    > {
-        self.mutation("authorize_cumulative_approval")?;
-        self.inner.authorize_cumulative_approval(request)
-    }
-
-    fn cancel_captured_before_dispatch(
-        &self,
-        request: chio_kernel::budget_store::BudgetCancelCapturedBeforeDispatchRequest,
-    ) -> Result<
-        chio_kernel::budget_store::BudgetCapturedBeforeDispatchCancellationDecision,
-        BudgetStoreError,
-    > {
-        self.mutation("cancel_captured_before_dispatch")?;
-        self.inner.cancel_captured_before_dispatch(request)
     }
 
     fn authorize_budget_hold(
@@ -749,20 +700,17 @@ impl BudgetStore for FaultingBudgetStore {
 
 pub fn assert_wrapped_budget_replay_outcome() -> Result<(), String> {
     let store = FaultingBudgetStore::new(Arc::new(InMemoryBudgetStore::new()), None);
-    let request = chio_kernel::budget_store::BudgetAuthorizeHoldRequest {
-        capability_id: "dst-replay-capability".to_string(),
-        grant_index: 0,
-        max_invocations: Some(1),
-        invocation_quotas: Vec::new(),
-        cumulative_approval: None,
-        admission_binding: None,
-        requested_exposure_units: 1,
-        max_cost_per_invocation: Some(1),
-        max_total_cost_units: Some(1),
-        hold_id: Some("dst-replay-hold".to_string()),
-        event_id: Some("dst-replay-event".to_string()),
-        authority: None,
-    };
+    let request = chio_kernel::budget_store::BudgetAuthorizeHoldRequest::legacy(
+        "dst-replay-capability".to_string(),
+        0,
+        Some(1),
+        1,
+        Some(1),
+        Some(1),
+        Some("dst-replay-hold".to_string()),
+        Some("dst-replay-event".to_string()),
+        None,
+    );
 
     let first = store
         .authorize_budget_hold(request.clone())
@@ -808,20 +756,19 @@ pub fn assert_wrapped_budget_hold_sweep() -> Result<(), String> {
     );
     let store = FaultingBudgetStore::new(inner, None);
     let authorized = store
-        .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest {
-            capability_id: "dst-hold-sweep-capability".to_string(),
-            grant_index: 0,
-            max_invocations: Some(1),
-            invocation_quotas: Vec::new(),
-            cumulative_approval: None,
-            admission_binding: None,
-            requested_exposure_units: 10,
-            max_cost_per_invocation: Some(10),
-            max_total_cost_units: Some(10),
-            hold_id: Some("dst-hold-sweep-hold".to_string()),
-            event_id: Some("dst-hold-sweep-authorize".to_string()),
-            authority: None,
-        })
+        .authorize_budget_hold(
+            chio_kernel::budget_store::BudgetAuthorizeHoldRequest::legacy(
+                "dst-hold-sweep-capability".to_string(),
+                0,
+                Some(1),
+                10,
+                Some(10),
+                Some(10),
+                Some("dst-hold-sweep-hold".to_string()),
+                Some("dst-hold-sweep-authorize".to_string()),
+                None,
+            ),
+        )
         .map_err(|error| format!("authorize wrapped hold-sweep hold: {error}"))?;
     require(
         matches!(
@@ -997,7 +944,9 @@ pub fn run_episode(seed: u64) -> Result<EpisodeSummary, String> {
         .set_receipt_store_handle(receipt_handle)
         .map_err(|error| format!("install receipt store: {error}"))?;
     let budget_handle: Arc<dyn BudgetStore> = budget_store.clone();
-    kernel.set_budget_store_handle(budget_handle);
+    kernel
+        .set_budget_store_handle(budget_handle)
+        .map_err(|error| format!("install budget store: {error}"))?;
     kernel.set_runtime_admission_hook(Arc::new(FaultingAdmissionHook {
         evaluations: Arc::clone(&admission_evaluations),
         releases: Arc::clone(&admission_releases),
@@ -1601,7 +1550,7 @@ pub fn oracle_conservation(
                     unnamed_outstanding += exposure;
                 }
             }
-            BudgetMutationKind::ReserveInvocation if event.allowed == Some(true) => {
+            BudgetMutationKind::ReserveInvocations if event.allowed == Some(true) => {
                 invocations = invocations
                     .checked_add(1)
                     .ok_or_else(|| "invocation count overflow".to_string())?;
@@ -1619,8 +1568,8 @@ pub fn oracle_conservation(
                     unnamed_outstanding += exposure;
                 }
             }
-            BudgetMutationKind::CaptureInvocation => {}
-            BudgetMutationKind::ReverseInvocation => {
+            BudgetMutationKind::CaptureInvocations => {}
+            BudgetMutationKind::ReverseInvocations => {
                 invocations = invocations
                     .checked_sub(1)
                     .ok_or_else(|| format!("{} reversed without admission", event.event_id))?;
@@ -1646,7 +1595,7 @@ pub fn oracle_conservation(
                     true,
                 )?;
             }
-            BudgetMutationKind::CancelCapturedBeforeDispatch => {
+            BudgetMutationKind::ExpireHold => {
                 invocations = invocations
                     .checked_sub(1)
                     .ok_or_else(|| format!("{} reversed without admission", event.event_id))?;
@@ -1669,7 +1618,7 @@ pub fn oracle_conservation(
                     false,
                 )?;
             }
-            BudgetMutationKind::ReconcileSpend | BudgetMutationKind::CaptureSpend => {
+            BudgetMutationKind::ReconcileSpend | BudgetMutationKind::CaptureExposure => {
                 if event.realized_spend_units > event.exposure_units {
                     return Err(format!("{} realized more than exposed", event.event_id));
                 }
@@ -1681,9 +1630,8 @@ pub fn oracle_conservation(
                 consume_hold(event, &mut holds, &mut unnamed_outstanding, true)?;
             }
             BudgetMutationKind::IncrementInvocation
-            | BudgetMutationKind::ReserveInvocation
-            | BudgetMutationKind::AuthorizeExposure
-            | BudgetMutationKind::AuthorizeCumulativeApproval => {}
+            | BudgetMutationKind::ReserveInvocations
+            | BudgetMutationKind::AuthorizeExposure => {}
         }
         if reserved != outstanding + committed + released {
             return Err(format!("reservation partition drift at {}", event.event_id));
@@ -1844,6 +1792,7 @@ fn kernel_config() -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -1894,6 +1843,7 @@ fn request(seed: u64, capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 

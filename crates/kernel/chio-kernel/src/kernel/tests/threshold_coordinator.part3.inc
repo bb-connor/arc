@@ -89,6 +89,7 @@ fn dropped_threshold_dispatch_is_terminalized_unknown() {
             PostAdmissionReceiptContext {
                 extra_metadata: None,
                 pre_invocation_guard_evidence: Vec::new(),
+                verified_payee_binding: None,
             },
             false,
         );

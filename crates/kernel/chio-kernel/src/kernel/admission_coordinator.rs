@@ -2,7 +2,7 @@ use super::*;
 use crate::approval::{ApprovalReservation, ApprovalSetReservationInput};
 use crate::budget_store::{
     derive_verified_invocation_admission, BudgetAdmissionOperationBinding,
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetReverseHoldRequest,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
 };
 use crate::execution_nonce::{
     verify_execution_nonce_stateless, ExecutionNonceReservation, NonceBinding,
@@ -100,14 +100,56 @@ pub(super) struct ThresholdDispatchPermit {
 }
 
 struct ThresholdPreDispatchCompensation<'a> {
-    request: &'a ToolCallRequest,
     operation: &'a AdmissionOperation,
-    capability: &'a CapabilityToken,
-    grant_index: usize,
-    budget_mutation: &'a PreExecutionBudgetMutation,
-    payment_authorization: Option<&'a PaymentAuthorization>,
-    delegated_budget_lease_acquired: bool,
     reason: &'a str,
+}
+
+pub(super) enum ThresholdToolAdmissionFailure {
+    Kernel(KernelError),
+    PaymentAuthorizationOutcomeUnknown {
+        failure: crate::payment::PaymentAuthorizationFailure,
+        budget_mutation: PreExecutionBudgetMutation,
+        delegated_budget_lease_acquired: bool,
+    },
+}
+
+impl ThresholdToolAdmissionFailure {
+    pub(super) fn into_kernel_error(self) -> KernelError {
+        match self {
+            Self::Kernel(error) => error,
+            Self::PaymentAuthorizationOutcomeUnknown { failure, .. } => {
+                KernelError::GovernedTransactionDenied(format!(
+                    "threshold payment authorization outcome is unknown: {failure}"
+                ))
+            }
+        }
+    }
+}
+
+impl From<KernelError> for ThresholdToolAdmissionFailure {
+    fn from(error: KernelError) -> Self {
+        Self::Kernel(error)
+    }
+}
+
+impl From<crate::security_admission_operation::AdmissionOperationError>
+    for ThresholdToolAdmissionFailure
+{
+    fn from(error: crate::security_admission_operation::AdmissionOperationError) -> Self {
+        Self::Kernel(KernelError::from(error))
+    }
+}
+
+impl core::fmt::Display for ThresholdToolAdmissionFailure {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Kernel(error) => core::fmt::Display::fmt(error, formatter),
+            Self::PaymentAuthorizationOutcomeUnknown { failure, .. } => write!(
+                formatter,
+                "threshold payment authorization outcome is unknown: {failure}"
+            ),
+        }
+    }
 }
 
 impl core::fmt::Debug for ThresholdDispatchPermit {
@@ -314,6 +356,7 @@ impl ChioKernel {
             caller_handoff,
             None,
         )
+        .map_err(ThresholdToolAdmissionFailure::into_kernel_error)
     }
 
     pub(super) fn reserve_threshold_tool_admission_with_payee_binding(
@@ -323,15 +366,18 @@ impl ChioKernel {
         protocol: ThresholdProtocolPreparation,
         caller_handoff: Option<ThresholdCallerReservationHandoffContext<'_>>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-    ) -> Result<(ThresholdDispatchPermit, PreExecutionBudgetMutation), KernelError> {
+    ) -> Result<(ThresholdDispatchPermit, PreExecutionBudgetMutation), ThresholdToolAdmissionFailure>
+    {
         if (context.payment_mode == ThresholdPaymentMode::CallerReservation)
             != caller_handoff.is_some()
         {
             return Err(KernelError::Internal(
                 "threshold caller-reservation handoff context does not match payment mode"
                     .to_string(),
-            ));
+            )
+            .into());
         }
+        self.validate_protocol_budget_admission_profiles()?;
         self.validate_threshold_coordinator_profiles(context.request.execution_nonce.is_some())?;
         self.verify_threshold_execution_nonce_stateless(
             context.request,
@@ -345,7 +391,8 @@ impl ChioKernel {
             return Err(KernelError::GovernedTransactionDenied(
                 "threshold admission participant bindings do not match prepared protocol authority"
                     .to_string(),
-            ));
+            )
+            .into());
         }
         let ThresholdToolAdmissionContext {
             request,
@@ -437,7 +484,8 @@ impl ChioKernel {
                 return Err(KernelError::Internal(format!(
                     "threshold admission operation {} has cleanup owned by another worker",
                     operation.operation_id()
-                )));
+                ))
+                .into());
             }
             operation = operation_store
                 .load(operation.operation_id())?
@@ -454,7 +502,8 @@ impl ChioKernel {
                 "threshold admission operation {} is already {}",
                 operation.operation_id(),
                 operation.state().as_str()
-            )));
+            ))
+            .into());
         }
 
         if operation.state() == AdmissionOperationState::Prepared {
@@ -482,10 +531,11 @@ impl ChioKernel {
                         return Err(KernelError::Internal(
                             "threshold broker registration failure lost the compensation-dispatch race"
                                 .to_string(),
-                        ));
+                        )
+                        .into());
                     }
                     let _ = registrar.release_admission(operation.operation_id());
-                    return Err(KernelError::GuardDenied(error.to_string()));
+                    return Err(KernelError::GuardDenied(error.to_string()).into());
                 }
                 operation = self.threshold_cas_recover(
                     &operation,
@@ -520,12 +570,13 @@ impl ChioKernel {
                 if terminal.is_none() {
                     return Err(KernelError::Internal(
                         "threshold budget denial raced with an admission transition".to_string(),
-                    ));
+                    )
+                    .into());
                 }
                 if let Some(registrar) = self.supplemental_admission_registrar.as_ref() {
                     let _ = registrar.release_admission(operation.operation_id());
                 }
-                return Err(error);
+                return Err(error.into());
             }
             Err(error)
                 if matches!(
@@ -541,11 +592,12 @@ impl ChioKernel {
                 if terminal.is_none() {
                     return Err(KernelError::Internal(
                         "threshold budget failure lost the compensation-dispatch race".to_string(),
-                    ));
+                    )
+                    .into());
                 }
-                return Err(error);
+                return Err(error.into());
             }
-            Err(error) => return Err(error),
+            Err(error) => return Err(error.into()),
         };
 
         if matches!(
@@ -581,17 +633,11 @@ impl ChioKernel {
             ) {
                 if operation.state() == AdmissionOperationState::BudgetAuthorized {
                     self.compensate_threshold_before_dispatch(ThresholdPreDispatchCompensation {
-                        request,
                         operation: &operation,
-                        capability: cap,
-                        grant_index,
-                        budget_mutation: &budget_mutation,
-                        payment_authorization: None,
-                        delegated_budget_lease_acquired: false,
                         reason: &error.to_string(),
                     })?;
                 }
-                return Err(error);
+                return Err(error.into());
             }
         }
 
@@ -617,18 +663,12 @@ impl ChioKernel {
                         ) {
                             self.compensate_threshold_before_dispatch(
                                 ThresholdPreDispatchCompensation {
-                                    request,
                                     operation: &operation,
-                                    capability: cap,
-                                    grant_index,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: payment_authorization.as_ref(),
-                                    delegated_budget_lease_acquired,
                                     reason: &error.to_string(),
                                 },
                             )?;
                         }
-                        return Err(error);
+                        return Err(error.into());
                     }
                 }
             }
@@ -649,6 +689,15 @@ impl ChioKernel {
                 ) {
                     Ok(authorization) => payment_authorization = authorization,
                     Err(error) => {
+                        if error.outcome_unknown_reason().is_some() {
+                            return Err(
+                                ThresholdToolAdmissionFailure::PaymentAuthorizationOutcomeUnknown {
+                                    failure: error,
+                                    budget_mutation,
+                                    delegated_budget_lease_acquired,
+                                },
+                            );
+                        }
                         if !matches!(
                             operation.state(),
                             AdmissionOperationState::CapturePending
@@ -656,18 +705,15 @@ impl ChioKernel {
                         ) {
                             self.compensate_threshold_before_dispatch(
                                 ThresholdPreDispatchCompensation {
-                                    request,
                                     operation: &operation,
-                                    capability: cap,
-                                    grant_index,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: None,
-                                    delegated_budget_lease_acquired,
                                     reason: &error.to_string(),
                                 },
                             )?;
                         }
-                        return Err(error);
+                        return Err(KernelError::GovernedTransactionDenied(format!(
+                            "threshold payment authorization failed: {error}"
+                        ))
+                        .into());
                     }
                 }
             }
@@ -679,17 +725,11 @@ impl ChioKernel {
                         Err(error) => {
                             self.compensate_threshold_before_dispatch(
                                 ThresholdPreDispatchCompensation {
-                                    request,
                                     operation: &operation,
-                                    capability: cap,
-                                    grant_index,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: None,
-                                    delegated_budget_lease_acquired: false,
                                     reason: &error.to_string(),
                                 },
                             )?;
-                            return Err(error);
+                            return Err(error.into());
                         }
                     }
                     self.threshold_cas_recover(
@@ -708,19 +748,25 @@ impl ChioKernel {
                     ) {
                         Ok(authorization) => authorization,
                         Err(error) => {
+                            if error.outcome_unknown_reason().is_some() {
+                                return Err(
+                                    ThresholdToolAdmissionFailure::PaymentAuthorizationOutcomeUnknown {
+                                        failure: error,
+                                        budget_mutation,
+                                        delegated_budget_lease_acquired,
+                                    },
+                                );
+                            }
                             self.compensate_threshold_before_dispatch(
                                 ThresholdPreDispatchCompensation {
-                                    request,
                                     operation: &operation,
-                                    capability: cap,
-                                    grant_index,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: None,
-                                    delegated_budget_lease_acquired,
                                     reason: &error.to_string(),
                                 },
                             )?;
-                            return Err(error);
+                            return Err(KernelError::GovernedTransactionDenied(format!(
+                                "threshold payment authorization failed: {error}"
+                            ))
+                            .into());
                         }
                     };
                     self.threshold_cas_recover(
@@ -736,17 +782,11 @@ impl ChioKernel {
                     {
                         self.compensate_threshold_before_dispatch(
                             ThresholdPreDispatchCompensation {
-                                request,
                                 operation: &operation,
-                                capability: cap,
-                                grant_index,
-                                budget_mutation: &budget_mutation,
-                                payment_authorization: payment_authorization.as_ref(),
-                                delegated_budget_lease_acquired,
                                 reason: &error.to_string(),
                             },
                         )?;
-                        return Err(error);
+                        return Err(error.into());
                     }
                     self.threshold_cas_recover(
                         &operation,
@@ -760,17 +800,11 @@ impl ChioKernel {
                     {
                         self.compensate_threshold_before_dispatch(
                             ThresholdPreDispatchCompensation {
-                                request,
                                 operation: &operation,
-                                capability: cap,
-                                grant_index,
-                                budget_mutation: &budget_mutation,
-                                payment_authorization: payment_authorization.as_ref(),
-                                delegated_budget_lease_acquired,
                                 reason: &error.to_string(),
                             },
                         )?;
-                        return Err(error);
+                        return Err(error.into());
                     }
                     self.threshold_cas_recover(
                         &operation,
@@ -794,17 +828,11 @@ impl ChioKernel {
                         if let Err(error) = preparation {
                             self.compensate_threshold_before_dispatch(
                                 ThresholdPreDispatchCompensation {
-                                    request,
                                     operation: &operation,
-                                    capability: cap,
-                                    grant_index,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: payment_authorization.as_ref(),
-                                    delegated_budget_lease_acquired,
                                     reason: &error.to_string(),
                                 },
                             )?;
-                            return Err(KernelError::GuardDenied(error.to_string()));
+                            return Err(KernelError::GuardDenied(error.to_string()).into());
                         }
                     }
                     return Ok((
@@ -839,13 +867,15 @@ impl ChioKernel {
                         "threshold admission operation {} cannot dispatch from {}",
                         operation.operation_id(),
                         operation.state().as_str()
-                    )));
+                    ))
+                    .into());
                 }
                 AdmissionOperationState::Prepared
                 | AdmissionOperationState::BrokerAttemptRegistered => {
                     return Err(KernelError::Internal(
                         "threshold admission did not persist budget authorization".to_string(),
-                    ));
+                    )
+                    .into());
                 }
             };
         }
@@ -854,7 +884,7 @@ impl ChioKernel {
     pub(super) fn commit_reserved_threshold_protocol_dispatch(
         &self,
         permit: &mut ThresholdDispatchPermit,
-        request: &ToolCallRequest,
+        _request: &ToolCallRequest,
         cap: &CapabilityToken,
         mutation: &PreExecutionBudgetMutation,
     ) -> Result<serde_json::Value, KernelError> {
@@ -944,18 +974,10 @@ impl ChioKernel {
                         "capture denial did not persist threshold compensation".to_string(),
                     ));
                 }
-                // Publish the durable compensation winner to the caller before
-                // releasing any participant. If one of those best-effort
-                // releases fails, the outer coordinator must still observe the
-                // compensated state and release its runtime reservation rather
-                // than treating the permit as capture-pending.
+                // Publish the durable compensation winner to the caller. The
+                // compensation journal has already released every participant
+                // exactly once before terminalizing this operation.
                 permit.operation = compensated.clone();
-                if let Some(authorization) = permit.payment_authorization.as_ref() {
-                    self.release_threshold_payment_authorization(request, mutation, authorization)?;
-                }
-                if permit.delegated_budget_lease_acquired {
-                    self.release_threshold_delegated_budget(cap, &compensated)?;
-                }
                 return Err(error);
             }
             Err(error) => return Err(error),
@@ -1641,7 +1663,7 @@ impl ChioKernel {
         budget_mutation: &PreExecutionBudgetMutation,
         payment_mode: ThresholdPaymentMode,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-    ) -> Result<Option<PaymentAuthorization>, KernelError> {
+    ) -> Result<Option<PaymentAuthorization>, crate::payment::PaymentAuthorizationFailure> {
         if payment_mode == ThresholdPaymentMode::CallerReservation
             && !Self::is_governed_mustprepay_request(request)
         {
@@ -1654,32 +1676,18 @@ impl ChioKernel {
         let binding = budget_mutation
             .admission_operation_binding()
             .ok_or_else(|| {
-                KernelError::Internal(
-                    "threshold payment recovery omitted its admission operation".to_string(),
+                crate::payment::PaymentAuthorizationFailure::before_rail(
+                    "threshold payment recovery omitted its admission operation",
                 )
             })?;
         self.authorize_payment_if_needed(request, charge, Some(binding), verified_payee_binding)
-            .map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "threshold payment authorization failed: {error}"
-                ))
-            })
     }
 
     fn compensate_threshold_before_dispatch(
         &self,
         compensation: ThresholdPreDispatchCompensation<'_>,
     ) -> Result<(), KernelError> {
-        let ThresholdPreDispatchCompensation {
-            request,
-            operation,
-            capability,
-            grant_index,
-            budget_mutation,
-            payment_authorization,
-            delegated_budget_lease_acquired,
-            reason,
-        } = compensation;
+        let ThresholdPreDispatchCompensation { operation, reason } = compensation;
         let compensated = self
             .claim_pre_dispatch_compensation(operation.operation_id(), reason)?
             .ok_or_else(|| {
@@ -1688,56 +1696,16 @@ impl ChioKernel {
                     operation.operation_id()
                 ))
             })?;
-        if let Some(admission) = budget_mutation.ordinary_admission() {
-            self.reverse_ordinary_protocol_admission(capability, admission)?;
-            if let Some(authorization) = payment_authorization {
-                self.release_threshold_payment_authorization(
-                    request,
-                    budget_mutation,
-                    authorization,
-                )?;
-            }
-            if delegated_budget_lease_acquired {
-                self.release_threshold_delegated_budget(capability, &compensated)?;
-            }
-            return Ok(());
-        }
-        let hold_id = compensated.budget_hold_id().ok_or_else(|| {
-            KernelError::Internal("threshold admission is missing its budget hold".to_string())
-        })?;
-        let exposure = budget_mutation
-            .charge_result()
-            .map_or(0, |charge| charge.cost_charged);
-        let budget_authority = self.budget_event_authority();
-        self.with_budget_store(|store| {
-            let request = BudgetReverseHoldRequest {
-                capability_id: capability.id.clone(),
-                grant_index,
-                reversed_exposure_units: exposure,
-                hold_id: Some(hold_id.to_string()),
-                event_id: Some(format!("{hold_id}:reverse")),
-                authority: Some(budget_authority),
-                admission_operation: Some(BudgetAdmissionOperationBinding::new(
-                    operation.operation_id().to_string(),
-                    operation.request_binding_hash().to_string(),
-                )?),
-            };
-            if store.reverse_budget_hold(request.clone()).is_err() {
-                store.reverse_budget_hold(request)?;
-            }
-            Ok(())
-        })?;
-        self.cancel_admission_nonce_if_reserved(compensated.operation_id())?;
-        self.cancel_threshold_approval_if_reserved(compensated.operation_id())?;
-        if let Some(authorization) = payment_authorization {
-            self.release_threshold_payment_authorization(request, budget_mutation, authorization)?;
-        }
-        if delegated_budget_lease_acquired {
-            self.release_threshold_delegated_budget(capability, &compensated)?;
+        if compensated.state() != AdmissionOperationState::CompensatedBeforeDispatch {
+            return Err(KernelError::Internal(format!(
+                "threshold admission operation {} did not finish durable compensation",
+                operation.operation_id()
+            )));
         }
         Ok(())
     }
 
+    #[cfg(test)]
     pub(super) fn release_threshold_payment_authorization(
         &self,
         request: &ToolCallRequest,
@@ -1806,6 +1774,7 @@ impl ChioKernel {
             })
     }
 
+    #[cfg(test)]
     fn threshold_refund_transaction_reference(
         &self,
         request: &ToolCallRequest,

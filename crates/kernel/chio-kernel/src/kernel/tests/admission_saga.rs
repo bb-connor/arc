@@ -430,6 +430,13 @@ impl BudgetStore for DurableRecoveryBudgetStore {
         self.inner.authorize_budget_hold(request)
     }
 
+    fn replay_budget_authorization(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        self.inner.replay_budget_authorization(request)
+    }
+
     fn reverse_budget_hold(
         &self,
         request: BudgetReverseHoldRequest,
@@ -1708,9 +1715,12 @@ fn capture_pending_recovery_commits_reserved_ordinary_nonce_before_capture() {
             &fixture.kernel_authority,
         )
         .unwrap_err();
-    assert!(recovery_error
-        .to_string()
-        .contains("without a signed terminal response"));
+    assert!(
+        recovery_error
+            .to_string()
+            .contains("without a signed terminal response"),
+        "unexpected capture recovery error: {recovery_error}"
+    );
 
     let recovered = fixture
         .operation_store
@@ -1795,9 +1805,12 @@ fn capture_ack_loss_recovery_preserves_precommitted_ordinary_nonce_tombstone() {
             &fixture.kernel_authority,
         )
         .unwrap_err();
-    assert!(recovery_error
-        .to_string()
-        .contains("without a signed terminal response"));
+    assert!(
+        recovery_error
+            .to_string()
+            .contains("without a signed terminal response"),
+        "unexpected capture recovery error: {recovery_error}"
+    );
 
     let recovered = fixture
         .operation_store

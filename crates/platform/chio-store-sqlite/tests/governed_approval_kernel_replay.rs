@@ -4,7 +4,7 @@ use chio_core::{
     capability::{
         governance::{
             GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-            GovernedTransactionIntent,
+            GovernedToolInvocationIntentBody, GovernedTransactionIntent,
         },
         scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
     },
@@ -77,6 +77,7 @@ fn kernel_config(keypair: Keypair) -> KernelConfig {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -132,7 +133,7 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         )
         .test_expect("capability issues");
     let request_id = "durable-approval-replay-request";
-    let intent = GovernedTransactionIntent {
+    let intent = GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "durable-approval-replay-intent".to_string(),
         server_id: server.to_string(),
         tool_name: tool.to_string(),
@@ -144,8 +145,7 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         call_chain: None,
         autonomy: None,
         context: None,
-        body: Default::default(),
-    };
+    });
     let now = now_secs();
     let approval_token = GovernedApprovalToken::sign(
         GovernedApprovalTokenBody {
@@ -178,6 +178,7 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let pre_dispatch_denial = first_kernel

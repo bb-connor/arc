@@ -271,9 +271,12 @@ fn advance_payment_journal(
     let changed = transaction.execute(
         "UPDATE payment_journal SET state = ?1, \
            authorization_id = COALESCE(?2, authorization_id), \
-           transaction_id = COALESCE(?3, transaction_id), \
-           settle_action = COALESCE(?4, settle_action), \
-           settle_amount_units = COALESCE(?5, settle_amount_units), updated_at = ?6 \
+           transaction_id = CASE \
+               WHEN ?1 = 'settling' AND ?4 = 'release' THEN NULL \
+               ELSE COALESCE(?3, transaction_id) END, \
+           settle_action = CASE WHEN ?1 = 'settling' THEN ?4 ELSE settle_action END, \
+           settle_amount_units = CASE WHEN ?1 = 'settling' THEN ?5 ELSE settle_amount_units END, \
+           updated_at = ?6 \
          WHERE request_id = ?7 AND state = ?8",
         params![
             journal_state_str(next), authorization_id, transaction_id, settle_action,
@@ -334,6 +337,26 @@ fn get_payment_journal(
                     settle_amount_units, currency, \
                     state, created_at, tenant_id FROM payment_journal \
              WHERE request_id = ?1 AND state NOT IN ('closed', 'reconcile_failed')",
+            params![request_id],
+            payment_journal_row,
+        )
+        .optional()?;
+    row.map(payment_journal_row_to_record).transpose()
+}
+
+fn get_payment_journal_for_audit(
+    &self,
+    request_id: &str,
+) -> Result<Option<chio_kernel::payment::PaymentJournalRecord>, BudgetStoreError> {
+    let connection = self.connection()?;
+    let row = connection
+        .query_row(
+            "SELECT request_id, capability_id, grant_index, operation_id, request_binding_hash, \
+                    authority_id, lease_id, lease_epoch, hold_id, rail, authorization_id, \
+                    transaction_id, budget_exposure_units, amount_units, settle_action, \
+                    settle_amount_units, currency, \
+                    state, created_at, tenant_id FROM payment_journal \
+             WHERE request_id = ?1",
             params![request_id],
             payment_journal_row,
         )

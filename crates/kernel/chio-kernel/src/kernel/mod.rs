@@ -193,7 +193,10 @@ pub(crate) fn validate_payment_adapter_identifier(
     identifier: &str,
     field_name: &'static str,
 ) -> Result<(), PaymentError> {
-    if identifier.is_empty() || identifier.trim() != identifier {
+    if identifier.is_empty()
+        || identifier.trim() != identifier
+        || identifier.chars().any(char::is_control)
+    {
         return Err(PaymentError::RailError(format!(
             "payment adapter returned an invalid {field_name}; outcome unknown"
         )));

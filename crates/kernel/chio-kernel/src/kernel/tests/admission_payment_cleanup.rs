@@ -324,6 +324,19 @@ impl crate::budget_store::BudgetStore for InCratePaymentJournalStore {
         }).cloned())
     }
 
+    fn get_payment_journal_for_audit(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, crate::budget_store::BudgetStoreError>
+    {
+        let rows = self.rows.lock().map_err(|_| {
+            crate::budget_store::BudgetStoreError::Invariant(
+                "in-crate payment journal lock poisoned".to_string(),
+            )
+        })?;
+        Ok(rows.get(request_id).cloned())
+    }
+
     fn payment_journal_reconcile_failed_rail(
         &self,
         request_id: &str,
@@ -1315,6 +1328,7 @@ fn post_dispatch_drop_omits_forged_budget_authority_when_partition_lineage_is_in
         PostAdmissionReceiptContext {
             extra_metadata: Some(forged_metadata),
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         false,
     );

@@ -620,6 +620,112 @@ fn payment_journal_insert_advance_close_and_conflict() {
 }
 
 #[test]
+fn payment_journal_capture_intent_can_be_restaged_after_exact_rail_recovery() {
+    use chio_kernel::budget_store::BudgetStore;
+    use chio_kernel::payment::{
+        PaymentJournalRecord, PaymentJournalState, PaymentSettleAction, PaymentSettleIntent,
+    };
+
+    let path = unique_db_path("payment-journal-capture-restage");
+    let store = SqliteBudgetStore::open(&path).expect("open budget store");
+    for request_id in ["req-release", "req-refund"] {
+        store
+            .record_payment_journal(&PaymentJournalRecord {
+                request_id: request_id.to_string(),
+                capability_id: "cap".to_string(),
+                grant_index: 0,
+                admission_operation: None,
+                authority: None,
+                hold_id: Some(format!("hold-{request_id}")),
+                rail: "test".to_string(),
+                authorization_id: None,
+                transaction_id: None,
+                budget_exposure_units: 100,
+                amount_units: 100,
+                settle_action: None,
+                settle_amount_units: None,
+                currency: "USD".to_string(),
+                state: PaymentJournalState::HoldPlaced,
+                created_at_unix_ms: 1_000,
+                tenant_id: None,
+            })
+            .expect("insert payment journal");
+        store
+            .advance_payment_journal(
+                request_id,
+                PaymentJournalState::HoldPlaced,
+                PaymentJournalState::Authorized,
+                Some("auth-1"),
+                None,
+                None,
+            )
+            .expect("record authorization");
+        store
+            .advance_payment_journal(
+                request_id,
+                PaymentJournalState::Authorized,
+                PaymentJournalState::Settling,
+                None,
+                None,
+                Some(PaymentSettleIntent {
+                    action: PaymentSettleAction::Capture,
+                    amount_units: Some(100),
+                }),
+            )
+            .expect("stage capture intent");
+    }
+
+    store
+        .advance_payment_journal(
+            "req-release",
+            PaymentJournalState::Settling,
+            PaymentJournalState::Settling,
+            None,
+            None,
+            Some(PaymentSettleIntent {
+                action: PaymentSettleAction::Release,
+                amount_units: None,
+            }),
+        )
+        .expect("restage held authorization for release");
+    store
+        .advance_payment_journal(
+            "req-refund",
+            PaymentJournalState::Settling,
+            PaymentJournalState::Settling,
+            None,
+            Some("txn-captured"),
+            Some(PaymentSettleIntent {
+                action: PaymentSettleAction::Refund,
+                amount_units: Some(100),
+            }),
+        )
+        .expect("restage settled capture for refund");
+
+    let release = store
+        .get_payment_journal("req-release")
+        .expect("read release journal")
+        .expect("release journal exists");
+    assert_eq!(release.state, PaymentJournalState::Settling);
+    assert_eq!(release.authorization_id.as_deref(), Some("auth-1"));
+    assert_eq!(release.transaction_id, None);
+    assert_eq!(release.settle_action, Some(PaymentSettleAction::Release));
+    assert_eq!(release.settle_amount_units, None);
+
+    let refund = store
+        .get_payment_journal("req-refund")
+        .expect("read refund journal")
+        .expect("refund journal exists");
+    assert_eq!(refund.state, PaymentJournalState::Settling);
+    assert_eq!(refund.authorization_id.as_deref(), Some("auth-1"));
+    assert_eq!(refund.transaction_id.as_deref(), Some("txn-captured"));
+    assert_eq!(refund.settle_action, Some(PaymentSettleAction::Refund));
+    assert_eq!(refund.settle_amount_units, Some(100));
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
 fn get_payment_journal_is_scoped_identically_to_the_incomplete_listing() {
     use chio_kernel::budget_store::BudgetStore;
     use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};
@@ -629,6 +735,10 @@ fn get_payment_journal_is_scoped_identically_to_the_incomplete_listing() {
     assert!(store
         .get_payment_journal("req-missing")
         .expect("lookup an absent row")
+        .is_none());
+    assert!(store
+        .get_payment_journal_for_audit("req-missing")
+        .expect("audit lookup of an absent row")
         .is_none());
 
     let record = PaymentJournalRecord {
@@ -657,12 +767,26 @@ fn get_payment_journal_is_scoped_identically_to_the_incomplete_listing() {
         .expect("lookup a present row")
         .expect("row present");
     assert_eq!(found, record);
+    assert_eq!(
+        store
+            .get_payment_journal_for_audit("req-K")
+            .expect("audit lookup of a present row")
+            .expect("audit row present"),
+        record
+    );
 
     assert!(store.close_payment_journal("req-K").expect("close"));
     assert!(store
         .get_payment_journal("req-K")
         .expect("lookup a closed row")
         .is_none());
+    let closed = store
+        .get_payment_journal_for_audit("req-K")
+        .expect("audit lookup of a closed row")
+        .expect("closed journal remains available for evidence");
+    assert_eq!(closed.request_id, record.request_id);
+    assert_eq!(closed.authorization_id, record.authorization_id);
+    assert_eq!(closed.state, PaymentJournalState::Closed);
 
     let _ = std::fs::remove_file(&path);
 }

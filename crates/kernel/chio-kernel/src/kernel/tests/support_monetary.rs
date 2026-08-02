@@ -1106,95 +1106,6 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
     }
 }
 
-fn spawn_payment_test_server(
-    status_code: u16,
-    body: serde_json::Value,
-) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
-    let address = listener
-        .local_addr()
-        .expect("listener should expose local address");
-    let (request_tx, request_rx) = mpsc::channel();
-    let body_text = body.to_string();
-    let handle = thread::spawn(move || {
-        let (mut stream, _) = listener.accept().expect("server should accept request");
-        let mut request = Vec::new();
-        let mut chunk = [0_u8; 1024];
-        let mut header_end = None;
-        let mut content_length = 0_usize;
-
-        stream
-            .set_read_timeout(Some(Duration::from_secs(2)))
-            .expect("server should configure read timeout");
-        loop {
-            let read = stream
-                .read(&mut chunk)
-                .expect("server should read request bytes");
-            if read == 0 {
-                break;
-            }
-            request.extend_from_slice(&chunk[..read]);
-
-            if header_end.is_none() {
-                header_end = find_http_header_end(&request);
-                if let Some(end) = header_end {
-                    content_length = parse_http_content_length(&request[..end]);
-                }
-            }
-
-            if let Some(end) = header_end {
-                if request.len() >= end + content_length {
-                    break;
-                }
-            }
-        }
-
-        request_tx
-            .send(String::from_utf8_lossy(&request).into_owned())
-            .expect("request should be sent to test");
-        let response = format!(
-            "HTTP/1.1 {status_code} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            http_status_text(status_code),
-            body_text.len(),
-            body_text
-        );
-        stream
-            .write_all(response.as_bytes())
-            .expect("server should write response");
-    });
-
-    (format!("http://{address}"), request_rx, handle)
-}
-
-fn find_http_header_end(request: &[u8]) -> Option<usize> {
-    request
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")
-        .map(|position| position + 4)
-}
-
-fn parse_http_content_length(headers: &[u8]) -> usize {
-    let text = String::from_utf8_lossy(headers);
-    text.lines()
-        .find_map(|line| {
-            let (name, value) = line.split_once(':')?;
-            if name.eq_ignore_ascii_case("content-length") {
-                value.trim().parse::<usize>().ok()
-            } else {
-                None
-            }
-        })
-        .unwrap_or(0)
-}
-
-fn http_status_text(status_code: u16) -> &'static str {
-    match status_code {
-        200 => "OK",
-        402 => "Payment Required",
-        _ => "Error",
-    }
-}
-
 fn make_governed_monetary_grant(
     server: &str,
     tool: &str,
@@ -1735,7 +1646,7 @@ fn make_governed_approval_token(
             threshold_proposal_hash: None,
             request_id: request_id.to_string(),
             issued_at: now.saturating_sub(1),
-            expires_at: now + 300,
+            expires_at: now + 600,
             decision: GovernedApprovalDecision::Approved,
         },
         approver,

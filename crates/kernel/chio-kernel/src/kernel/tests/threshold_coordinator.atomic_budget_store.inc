@@ -2,6 +2,7 @@ struct DurableAtomicTestBudgetStore {
     budget: InMemoryBudgetStore,
     journal: InCratePaymentJournalStore,
     transaction: std::sync::Mutex<()>,
+    fail_reverse: bool,
 }
 
 impl DurableAtomicTestBudgetStore {
@@ -10,6 +11,14 @@ impl DurableAtomicTestBudgetStore {
             budget: InMemoryBudgetStore::new(),
             journal: InCratePaymentJournalStore::new(),
             transaction: std::sync::Mutex::new(()),
+            fail_reverse: false,
+        }
+    }
+
+    fn with_reverse_failure() -> Self {
+        Self {
+            fail_reverse: true,
+            ..Self::new()
         }
     }
 
@@ -412,6 +421,14 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         self.journal.get_payment_journal(request_id)
     }
 
+    fn get_payment_journal_for_audit(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        let _transaction = self.lock_transaction()?;
+        self.journal.get_payment_journal_for_audit(request_id)
+    }
+
     fn payment_journal_reconcile_failed_rail(
         &self,
         request_id: &str,
@@ -465,6 +482,11 @@ impl BudgetStore for DurableAtomicTestBudgetStore {
         &self,
         request: crate::budget_store::BudgetReverseHoldRequest,
     ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
+        if self.fail_reverse {
+            return Err(BudgetStoreError::Invariant(
+                "injected budget reversal failure".to_string(),
+            ));
+        }
         let _transaction = self.lock_transaction()?;
         let mut decision = self.budget.reverse_budget_hold(request)?;
         self.normalize_mutation_metadata(&mut decision);

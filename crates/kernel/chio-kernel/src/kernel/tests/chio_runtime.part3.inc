@@ -420,7 +420,7 @@ fn connector_url_elicitation_retains_invocation_nested_flow(
     Ok(())
 }
 
-fn assert_monetary_url_elicitation_release_projection(
+fn assert_monetary_url_elicitation_retention_projection(
     nested: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let request_id = if nested {
@@ -492,7 +492,7 @@ fn assert_monetary_url_elicitation_release_projection(
     assert_eq!(releases.load(Ordering::SeqCst), 0);
     let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert_eq!(usage.total_cost_exposed, 0);
+    assert_eq!(usage.total_cost_exposed, 100);
 
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
@@ -503,24 +503,74 @@ fn assert_monetary_url_elicitation_release_projection(
         metadata["chio_runtime"]["reservations_retained_fail_closed"],
         true
     );
-    let terminal = &metadata["budget_authority"]["terminal"];
-    assert_eq!(terminal["disposition"], "released");
-    assert!(terminal["event_id"]
-        .as_str()
-        .is_some_and(|event_id| event_id.ends_with(":release")));
+    let authority = &metadata["budget_authority"];
+    assert_eq!(authority["admission_retained"], true);
+    assert!(authority["terminal"].is_null());
     Ok(())
 }
 
 #[test]
-fn monetary_url_elicitation_success_projects_release_top_level(
+fn monetary_url_elicitation_retains_authority_top_level(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    assert_monetary_url_elicitation_release_projection(false)
+    assert_monetary_url_elicitation_retention_projection(false)
 }
 
 #[test]
-fn monetary_url_elicitation_success_projects_release_nested(
+fn monetary_url_elicitation_retains_authority_nested(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    assert_monetary_url_elicitation_release_projection(true)
+    assert_monetary_url_elicitation_retention_projection(true)
+}
+
+#[test]
+fn ambiguous_url_elicitation_receipt_failure_is_not_masked(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let request_id = "req-monetary-url-receipt-failure";
+    let mut kernel = make_kernel(make_monetary_config());
+    install_runtime_bounded_budget_authorities(&mut kernel, request_id);
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
+        "cost-srv",
+        vec!["compute"],
+        std::sync::Arc::clone(&stream_attempts),
+    )));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_monetary_grant(
+            "cost-srv", "compute", 100, 1_000, "USD",
+        )]),
+        300,
+    );
+    let receipt_append_called = std::sync::Arc::new(AtomicBool::new(false));
+    kernel.set_receipt_store(Box::new(FailingAppendReceiptStore {
+        called: std::sync::Arc::clone(&receipt_append_called),
+    }))?;
+    let request = make_request_with_arguments(
+        request_id,
+        &cap,
+        "compute",
+        "cost-srv",
+        serde_json::json!({}),
+    );
+
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("ambiguous dispatch without durable evidence must fail closed");
+    assert!(
+        !matches!(error, KernelError::UrlElicitationsRequired { .. }),
+        "receipt persistence failure must not be masked as a retryable URL elicitation"
+    );
+    assert!(
+        error.to_string().contains("receipt append failed"),
+        "unexpected persistence failure: {error}"
+    );
+    assert!(receipt_append_called.load(Ordering::SeqCst));
+    assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.total_cost_exposed, 100);
+    Ok(())
 }
 
 /// Sibling-sum delegation fixture whose child capabilities target a tool server
@@ -840,6 +890,38 @@ fn url_elicitation_retains_runtime_reservations_and_invocation_nested_flow(
     Ok(())
 }
 
+/// Assert that an untyped URL-elicitation connector error retained both the
+/// local budget exposure and the exact payment authorization for reconciliation.
+fn assert_url_elicitation_monetary_authority_retained(
+    kernel: &ChioKernel,
+    capability: &CapabilityToken,
+    authorization_id: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let usage = kernel
+        .budget_store
+        .get_usage(&capability.id, 0)?
+        .ok_or_else(|| std::io::Error::other("retained URL-elicitation usage missing"))?;
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 100);
+    assert_eq!(usage.total_cost_realized_spend, 0);
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_incomplete());
+    let metadata = receipt
+        .metadata
+        .as_ref()
+        .ok_or_else(|| std::io::Error::other("retained URL-elicitation metadata missing"))?;
+    assert_eq!(metadata["budget_authority"]["admission_retained"], true);
+    assert!(metadata["budget_authority"]["terminal"].is_null());
+    assert_eq!(metadata["financial"]["payment_reference"], authorization_id);
+    assert_eq!(
+        metadata["financial"]["payment_authorization_retained"],
+        true
+    );
+    Ok(())
+}
+
 /// Assert that a failed post-dispatch budget or payment release recorded a
 /// signed incomplete receipt naming the cleanup step and stuck hold.
 fn assert_url_elicitation_budget_cleanup_fault_recorded(
@@ -922,6 +1004,7 @@ fn drop_pre_dispatch_cleanup_fault_receipt_includes_monetary_hold_id(
         PostAdmissionReceiptContext {
             extra_metadata: None,
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     ));
@@ -1161,12 +1244,11 @@ impl PaymentAdapter for FailingReleasePaymentAdapter {
 }
 
 #[test]
-fn url_elicitation_monetary_release_failure_records_hold_ids_async(
+fn url_elicitation_monetary_authority_is_retained_async(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // When a MONETARY request hits UrlElicitationsRequired and the payment release
-    // fails during cleanup, the append-only fault must name the stuck MONETARY hold
-    // (the payment authorization id), not just the capability id, so an operator can
-    // locate the hold to recover from the signed fault alone.
+    // Once durable monetary authority exists, an untyped URL-elicitation error
+    // cannot prove the connector stopped before its side effect. Retain the local
+    // exposure and exact payment authorization for later reconciliation.
     let mut kernel = make_kernel(make_monetary_config());
     install_runtime_bounded_budget_authorities(
         &mut kernel,
@@ -1202,17 +1284,16 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
     let result = kernel.evaluate_tool_call_blocking(&request);
     assert!(
         matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "a monetary release failure must not replace the elicitation: {result:?}"
+        "retained monetary authority must not replace the elicitation: {result:?}"
     );
     assert_eq!(
         stream_attempts.load(Ordering::SeqCst),
         1,
-        "dispatch must have been attempted so release ran on the monetary arm"
+        "dispatch must have been attempted before authority is retained"
     );
-    // The stuck payment authorization id must land in the fault hold_ids.
-    assert_url_elicitation_budget_cleanup_fault_recorded(
+    assert_url_elicitation_monetary_authority_retained(
         &kernel,
-        "payment_release",
+        &cap,
         &FailingReleasePaymentAdapter::operation_authorization_id(
             "req-url-elicitation-monetary-release-failure-async",
             100,
@@ -1269,10 +1350,9 @@ fn url_elicitation_public_metadata_rejects_forged_budget_authority_before_dispat
 }
 
 #[test]
-fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
+fn url_elicitation_monetary_authority_is_retained_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Nested-flow mirror of the async monetary-release-failure test: the
-    // nested arm must ALSO name the stuck payment authorization id in the fault.
+    // Nested-flow mirror of the top-level authority-retention test.
     let mut kernel = make_kernel(make_monetary_config());
     install_runtime_bounded_budget_authorities(&mut kernel, "url-monetary-release-failure-nested");
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
@@ -1321,16 +1401,16 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
     });
     assert!(
         matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "the nested monetary release failure must not mask the elicitation: {result:?}"
+        "nested retained monetary authority must not mask the elicitation: {result:?}"
     );
     assert_eq!(
         stream_attempts.load(Ordering::SeqCst),
         1,
-        "dispatch must have been attempted so release ran on the monetary arm"
+        "dispatch must have been attempted before authority is retained"
     );
-    assert_url_elicitation_budget_cleanup_fault_recorded(
+    assert_url_elicitation_monetary_authority_retained(
         &kernel,
-        "payment_release",
+        &cap,
         &FailingReleasePaymentAdapter::operation_authorization_id(
             "req-url-elicitation-monetary-release-failure-nested",
             100,

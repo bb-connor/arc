@@ -610,7 +610,7 @@ impl ChioKernel {
         charge_result: Option<&BudgetChargeResult>,
         admission_operation: Option<&BudgetAdmissionOperationBinding>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+    ) -> Result<Option<PaymentAuthorization>, crate::payment::PaymentAuthorizationFailure> {
         // Derive the authorization amount. A MustPrepay intent prepays its quoted
         // cost, so the quote funds the prepayment whenever it is present, even when
         // a provisional monetary budget hold accompanies it: that hold covers
@@ -635,7 +635,8 @@ impl ChioKernel {
                 return Err(PaymentError::RailError(
                     "MustPrepay intent reached payment authorization without a configured adapter"
                         .to_string(),
-                ));
+                )
+                .into());
             }
             return Ok(None);
         };
@@ -703,7 +704,8 @@ impl ChioKernel {
             {
                 return Err(PaymentError::RailError(
                     "governed commerce payment does not match verified payee binding".to_owned(),
-                ));
+                )
+                .into());
             }
             Some(CommercePaymentContext {
                 seller: binding.beneficiary_id().to_owned(),
@@ -721,7 +723,8 @@ impl ChioKernel {
             if verified_payee_binding.is_some() {
                 return Err(PaymentError::RailError(
                     "verified payee binding has no governed commerce context".to_owned(),
-                ));
+                )
+                .into());
             }
             None
         };
@@ -742,45 +745,105 @@ impl ChioKernel {
             governed,
             commerce,
         };
-        let authorization = match admission_operation {
+        let authorization_result = match admission_operation {
             Some(binding) => {
                 if payment_request.operation_id.as_deref() != Some(binding.operation_id())
                     || payment_request.request_binding_hash.as_deref()
                         != Some(binding.request_binding_hash())
                 {
-                    return Err(PaymentError::RailError(
+                    return Err(crate::payment::PaymentAuthorizationFailure::before_rail(
                         "operation-owned payment request binding diverged before authorization"
                             .to_string(),
                     ));
                 }
                 let lookup = || {
-                    adapter.lookup_authorization_for_operation(
-                        binding.operation_id(),
-                        binding.request_binding_hash(),
-                    )
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        adapter.lookup_authorization_for_operation(
+                            binding.operation_id(),
+                            binding.request_binding_hash(),
+                        )
+                    }))
                 };
-                match lookup()? {
-                    Some(authorization) => authorization,
-                    None => match adapter.authorize_for_operation(
-                        binding.operation_id(),
-                        binding.request_binding_hash(),
-                        &payment_request,
-                    ) {
-                        Ok(authorization) => authorization,
-                        Err(authorize_error) => match lookup() {
-                            Ok(Some(authorization)) => authorization,
-                            Ok(None) => return Err(authorize_error),
-                            Err(lookup_error) => {
-                                return Err(PaymentError::Unavailable(format!(
-                                    "operation-owned payment authorization outcome is unknown after failure ({authorize_error}); recovery lookup failed: {lookup_error}"
-                                )));
-                            }
-                        },
-                    },
+                match lookup() {
+                    Ok(Ok(Some(authorization))) => Ok(authorization),
+                    Ok(Ok(None)) => {
+                        let authorize = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            adapter.authorize_for_operation(
+                                binding.operation_id(),
+                                binding.request_binding_hash(),
+                                &payment_request,
+                            )
+                        }));
+                        match authorize {
+                            Ok(Ok(authorization)) => Ok(authorization),
+                            Ok(Err(authorize_error)) => match lookup() {
+                                Ok(Ok(Some(authorization))) => Ok(authorization),
+                                Ok(Ok(None)) => Err(
+                                    crate::payment::PaymentAuthorizationFailure::before_rail(
+                                        authorize_error.to_string(),
+                                    ),
+                                ),
+                                Ok(Err(lookup_error)) => Err(
+                                    crate::payment::PaymentAuthorizationFailure::from_adapter_error(
+                                        PaymentError::Unavailable(format!(
+                                            "operation-owned payment authorization outcome is unknown after failure ({authorize_error}); recovery lookup failed: {lookup_error}"
+                                        )),
+                                    ),
+                                ),
+                                Err(_) => Err(
+                                    crate::payment::PaymentAuthorizationFailure::adapter_panicked(),
+                                ),
+                            },
+                            Err(_) => Err(
+                                crate::payment::PaymentAuthorizationFailure::adapter_panicked(),
+                            ),
+                        }
+                    }
+                    Ok(Err(error)) => Err(
+                        crate::payment::PaymentAuthorizationFailure::before_rail(error.to_string()),
+                    ),
+                    Err(_) => Err(crate::payment::PaymentAuthorizationFailure::before_rail(
+                        "payment authorization recovery lookup panicked before rail entry",
+                    )),
                 }
             }
-            None => adapter.authorize(&payment_request)?,
+            None => match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                adapter.authorize(&payment_request)
+            })) {
+                Ok(Ok(authorization)) => Ok(authorization),
+                Ok(Err(error)) => Err(
+                    crate::payment::PaymentAuthorizationFailure::from_adapter_error(error),
+                ),
+                Err(_) => Err(crate::payment::PaymentAuthorizationFailure::adapter_panicked()),
+            },
         };
+        let authorization = authorization_result?;
+        validate_payment_adapter_identifier(
+            &authorization.authorization_id,
+            "authorization identifier",
+        )
+        .map_err(|error| {
+            crate::payment::PaymentAuthorizationFailure::invalid_authorization_id(
+                error.to_string(),
+            )
+        })?;
+        if authorization.settled {
+            let transaction_id = Self::payment_authorization_transaction_reference(&authorization)
+                .ok_or_else(|| {
+                    crate::payment::PaymentAuthorizationFailure::invalid_authorization_id(
+                        "settled payment authorization is missing its transaction identifier",
+                    )
+                })?;
+            validate_payment_adapter_identifier(
+                transaction_id,
+                "settled authorization transaction identifier",
+            )
+            .map_err(|error| {
+                crate::payment::PaymentAuthorizationFailure::invalid_authorization_id(
+                    error.to_string(),
+                )
+            })?;
+        }
         // Every operation-owned ordinary admission that authorizes payment writes
         // its HoldPlaced row atomically with budget admission, including a
         // no-ceiling MustPrepay whose budget exposure is zero. Legacy monetary
@@ -813,9 +876,13 @@ impl ChioKernel {
                         "rail cleanup after failed journal advance remains recoverable"
                     );
                 }
-                return Err(PaymentError::Unavailable(format!(
-                    "payment journal advance to authorized failed: {error}"
-                )));
+                return Err(
+                    crate::payment::PaymentAuthorizationFailure::from_adapter_error(
+                        PaymentError::Unavailable(format!(
+                            "payment journal advance to authorized failed: {error}"
+                        )),
+                    ),
+                );
             }
         }
         Ok(Some(authorization))

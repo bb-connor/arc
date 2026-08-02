@@ -1261,13 +1261,42 @@ impl ChioKernel {
         PreDispatchMonetaryUnwindFailure,
     > {
         let charge_result = budget_mutation.charge_result();
-        let mut unwind_evidence = None;
+        let binding = budget_mutation.admission_operation_binding();
 
-        // Operation-owned admission reverses first, winning the shared
-        // compensation-versus-dispatch CAS before any participant is released.
-        let reversed = self
-            .reverse_pre_execution_budget_mutation(cap, budget_mutation)
-            .map_err(PreDispatchMonetaryUnwindFailure::from)?;
+        // Operation-owned admission stages a durable compensation branch. Its
+        // cleanup journal runs payment before budget, so an unconfirmed rail
+        // outcome retains local exposure and blocks a second authorization.
+        if binding.is_some() {
+            let reversed = self.reverse_pre_execution_budget_mutation(cap, budget_mutation);
+            let evidence = payment_authorization.and_then(|authorization| {
+                self.confirmed_operation_payment_unwind_evidence(
+                    request,
+                    authorization,
+                    credential_disposition,
+                )
+                .unwrap_or(None)
+            });
+            return match reversed {
+                Ok(reversed) => {
+                    if payment_authorization.is_some() && evidence.is_none() {
+                        Err(PreDispatchMonetaryUnwindFailure::from(
+                            KernelError::Internal(
+                                "operation-owned payment cleanup completed without durable rail evidence"
+                                    .to_string(),
+                            ),
+                        ))
+                    } else {
+                        Ok((reversed, evidence))
+                    }
+                }
+                Err(error) => Err(PreDispatchMonetaryUnwindFailure {
+                    error: Box::new(error),
+                    evidence,
+                }),
+            };
+        }
+
+        let mut unwind_evidence = None;
         if let Some(authorization) = payment_authorization {
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                 KernelError::Internal(
@@ -1281,39 +1310,23 @@ impl ChioKernel {
                 .or_else(|| {
                     charge_result.map(|charge| (charge.cost_charged, charge.currency.as_str()))
                 });
-            let binding = budget_mutation.admission_operation_binding();
-            let unwind = || match (authorization.settled, binding, refund) {
-                (true, Some(binding), Some((amount_units, currency))) => adapter
-                    .refund_for_operation(OperationPaymentRefundRequest {
-                        operation_id: binding.operation_id(),
-                        request_binding_hash: binding.request_binding_hash(),
-                        transaction_id: &authorization.authorization_id,
-                        amount_units,
-                        currency,
-                        reference: &request.request_id,
-                    }),
-                (true, None, Some((amount_units, currency))) => adapter.refund(
+            let unwind = || match (authorization.settled, refund) {
+                (true, Some((amount_units, currency))) => adapter.refund(
                     &authorization.authorization_id,
                     amount_units,
                     currency,
                     &request.request_id,
                 ),
-                (false, Some(binding), _) => adapter.release_for_operation(
-                    binding.operation_id(),
-                    binding.request_binding_hash(),
-                    &authorization.authorization_id,
-                    &request.request_id,
-                ),
-                (false, None, _) | (true, _, None) => {
+                (false, _) | (true, None) => {
                     adapter.release(&authorization.authorization_id, &request.request_id)
                 }
             };
-            let unwind_result = unwind();
-            let unwind_result = if binding.is_some() {
-                unwind_result.or_else(|_| unwind())
-            } else {
-                unwind_result
-            };
+            let unwind_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(unwind))
+                .map_err(|_| {
+                    PreDispatchMonetaryUnwindFailure::from(KernelError::Internal(
+                        "payment unwind adapter panicked".to_string(),
+                    ))
+                })?;
             match unwind_result {
                 Ok(result)
                     if result.settlement_status
@@ -1360,7 +1373,59 @@ impl ChioKernel {
             }
         }
 
+        let reversed = self
+            .reverse_pre_execution_budget_mutation(cap, budget_mutation)
+            .map_err(|error| PreDispatchMonetaryUnwindFailure {
+                error: Box::new(error),
+                evidence: unwind_evidence.clone(),
+            })?;
         Ok((reversed, unwind_evidence))
+    }
+
+    fn confirmed_operation_payment_unwind_evidence(
+        &self,
+        request: &ToolCallRequest,
+        authorization: &PaymentAuthorization,
+        credential_disposition: PaymentCredentialDisposition,
+    ) -> Result<Option<PreDispatchPaymentUnwindEvidence>, KernelError> {
+        let journal = self.with_budget_store(|store| {
+            store
+                .get_payment_journal_for_audit(&request.request_id)
+                .map_err(KernelError::from)
+        })?;
+        let Some(journal) = journal else {
+            return Ok(None);
+        };
+        if !matches!(
+            journal.state,
+            crate::payment::PaymentJournalState::Settled
+                | crate::payment::PaymentJournalState::Closed
+        ) || journal.authorization_id.as_deref() != Some(authorization.authorization_id.as_str())
+        {
+            return Ok(None);
+        }
+        let settlement_status = match journal.settle_action {
+            Some(crate::payment::PaymentSettleAction::Release) => {
+                PreDispatchPaymentUnwindStatus::Released
+            }
+            Some(crate::payment::PaymentSettleAction::Refund) => {
+                PreDispatchPaymentUnwindStatus::Refunded
+            }
+            Some(crate::payment::PaymentSettleAction::Capture) | None => return Ok(None),
+        };
+        let transaction_id = journal.transaction_id.ok_or_else(|| {
+            KernelError::Internal(
+                "completed payment cleanup omitted its transaction identifier".to_string(),
+            )
+        })?;
+        validate_payment_adapter_identifier(&transaction_id, "unwind transaction_id")
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        Ok(Some(PreDispatchPaymentUnwindEvidence {
+            authorization_id: authorization.authorization_id.clone(),
+            transaction_id,
+            settlement_status,
+            credential_disposition,
+        }))
     }
 
     pub(crate) fn release_post_dispatch_monetary_invocation(

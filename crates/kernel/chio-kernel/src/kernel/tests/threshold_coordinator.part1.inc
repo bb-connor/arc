@@ -195,6 +195,10 @@ impl RuntimeAdmissionHook for OperationAwareThresholdRuntimeHook {
     }
 }
 
+type OperationAwareThresholdAuthorization = std::sync::Arc<
+    std::sync::Mutex<Option<(String, String, String, PaymentAuthorization)>>,
+>;
+
 #[derive(Clone)]
 struct OperationAwareThresholdPaymentAdapter {
     calls: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String)>>>,
@@ -202,9 +206,7 @@ struct OperationAwareThresholdPaymentAdapter {
     lose_authorize_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
     lose_capture_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
     lose_release_ack: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    authorization: std::sync::Arc<
-        std::sync::Mutex<Option<(String, String, String, PaymentAuthorization)>>,
-    >,
+    authorization: OperationAwareThresholdAuthorization,
     authorization_mutations: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 

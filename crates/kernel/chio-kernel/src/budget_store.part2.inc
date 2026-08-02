@@ -330,8 +330,11 @@ pub trait BudgetStore: Send + Sync {
     /// Compare-and-set state advance. `expected` must match the current row
     /// state or the call fails closed. When advancing to `Settling` the
     /// caller MUST pass `settle` so the store stamps the committed action
-    /// and amount atomically with the state change; `settle` is invalid on
-    /// every other transition. Default: unsupported.
+    /// and amount atomically with the state change. A `Settling` to `Settling`
+    /// transition replaces the prior intent only after the kernel has
+    /// authoritatively proved that a prior capture did not commit, or recovered
+    /// its exact transaction for refund. `settle` is invalid on every other
+    /// transition. Default: unsupported.
     fn advance_payment_journal(
         &self,
         _request_id: &str,
@@ -379,6 +382,18 @@ pub trait BudgetStore: Send + Sync {
             .list_incomplete_payment_journal(u64::MAX)?
             .into_iter()
             .find(|row| row.request_id == request_id))
+    }
+
+    /// Look up the exact payment-journal row for signed audit projection,
+    /// including a terminal `Closed` row. Recovery code must use
+    /// [`Self::get_payment_journal`] so closed work is never replayed. Receipt
+    /// construction uses this method only to project the already-committed rail
+    /// result after terminal receipt persistence closes the recovery row.
+    fn get_payment_journal_for_audit(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        self.get_payment_journal(request_id)
     }
 
     /// Rail recorded on `request_id`'s payment-journal row, if (and only if)

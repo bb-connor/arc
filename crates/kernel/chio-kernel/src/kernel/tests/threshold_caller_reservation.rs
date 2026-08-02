@@ -469,17 +469,17 @@ impl PaymentAdapter for SettlingThresholdPaymentAdapter {
     }
 }
 
+type InCrateThresholdCaptureDecisions = std::collections::HashMap<
+    String,
+    (
+        crate::admission_capture_authority::AdmissionCaptureRequest,
+        crate::admission_capture_authority::AdmissionCaptureDecision,
+    ),
+>;
+
 struct InCrateThresholdCaptureAuthority {
     budget: std::sync::Arc<DurableThresholdBudgetStore>,
-    decisions: std::sync::Mutex<
-        std::collections::HashMap<
-            String,
-            (
-                crate::admission_capture_authority::AdmissionCaptureRequest,
-                crate::admission_capture_authority::AdmissionCaptureDecision,
-            ),
-        >,
-    >,
+    decisions: std::sync::Mutex<InCrateThresholdCaptureDecisions>,
 }
 
 impl InCrateThresholdCaptureAuthority {
@@ -493,16 +493,7 @@ impl InCrateThresholdCaptureAuthority {
     fn locked_decisions(
         &self,
     ) -> Result<
-        std::sync::MutexGuard<
-            '_,
-            std::collections::HashMap<
-                String,
-                (
-                    crate::admission_capture_authority::AdmissionCaptureRequest,
-                    crate::admission_capture_authority::AdmissionCaptureDecision,
-                ),
-            >,
-        >,
+        std::sync::MutexGuard<'_, InCrateThresholdCaptureDecisions>,
         crate::admission_capture_authority::AdmissionCaptureError,
     > {
         self.decisions.lock().map_err(|_| {
@@ -1155,7 +1146,7 @@ fn ordinary_noncomposite_non_mustprepay_reservation_survives_kernel_reconstructi
         make_scope(vec![make_monetary_grant(
             "cost-srv", "compute", 100, 1_000, "USD",
         )]),
-        300,
+        600,
     );
     let request = reserve_request(
         "ordinary-direct-caller-reserve-no-payment-reconstruction",
@@ -1166,36 +1157,25 @@ fn ordinary_noncomposite_non_mustprepay_reservation_survives_kernel_reconstructi
         .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
         .expect("ordinary direct non-MustPrepay reservation");
     assert_eq!(response.verdict, Verdict::Allow);
-    let hold_id = response
-        .execution_nonce
-        .as_ref()
-        .and_then(|nonce| nonce.reserved_hold_id())
-        .expect("ordinary direct reserved hold")
+    let operation_id = caller_reserved_operation_id(&response).to_string();
+    let operation_before = operations
+        .load(&operation_id)
+        .expect("ordinary direct operation lookup")
+        .expect("ordinary direct caller-reserved operation");
+    assert_eq!(operation_before.state(), AdmissionOperationState::CallerReserved);
+    let hold_id = operation_before
+        .budget_hold_id()
+        .expect("ordinary direct caller-reserved hold")
         .to_string();
     let hold_before = budget
         .get_budget_hold(&hold_id)
         .expect("ordinary direct hold lookup")
         .expect("ordinary direct caller-reserved hold");
-    assert!(
-        budget
-            .get_payment_journal(&request.request_id)
-            .expect("ordinary direct payment journal lookup")
-            .is_none(),
-        "a direct non-MustPrepay reservation must not create a payment journal row"
-    );
-    assert!(
-        budget
-            .list_incomplete_payment_journal(u64::MAX)
-            .expect("ordinary direct incomplete payment journal")
-            .is_empty(),
-        "a direct non-MustPrepay reservation must leave no startup payment work"
-    );
-    assert!(
-        operations
-            .list_unresolved(Some(AdmissionOperationKind::ToolDispatch), 16)
-            .expect("ordinary direct operation inventory")
-            .is_empty(),
-        "the direct reserve path must not synthesize an admission operation"
+    assert_no_payment_recovery_artifacts(
+        budget.as_ref(),
+        operations.as_ref(),
+        &request.request_id,
+        &operation_id,
     );
     assert!(payment.calls().is_empty(), "reservation moved rail funds");
 
@@ -1203,7 +1183,7 @@ fn ordinary_noncomposite_non_mustprepay_reservation_survives_kernel_reconstructi
     let reconstructed = run_no_payment_reconstructed_kernel_pass(
         "ordinary-direct-no-payment-reconstruction-receipts",
         budget.clone(),
-        operations,
+        operations.clone(),
         payment.clone(),
     );
     assert_eq!(
@@ -1214,10 +1194,17 @@ fn ordinary_noncomposite_non_mustprepay_reservation_survives_kernel_reconstructi
         "startup payment reconciliation must not reverse the direct caller-owned hold"
     );
     assert!(
-        budget
-            .get_payment_journal(&request.request_id)
-            .expect("ordinary direct reconstructed payment journal lookup")
-            .is_none()
+        operations
+            .load(&operation_id)
+            .expect("ordinary direct reconstructed operation lookup")
+            == Some(operation_before),
+        "startup payment reconciliation must not mutate CallerReserved"
+    );
+    assert_no_payment_recovery_artifacts(
+        budget.as_ref(),
+        operations.as_ref(),
+        &request.request_id,
+        &operation_id,
     );
     assert!(
         payment.calls().is_empty(),

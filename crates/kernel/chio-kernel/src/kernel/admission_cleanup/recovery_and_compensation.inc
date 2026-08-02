@@ -124,7 +124,23 @@ impl ChioKernel {
                 operation.state().as_str()
             )));
         }
-        let actions = operation_store.load_cleanup_actions(operation_id)?;
+        let mut actions = operation_store.load_cleanup_actions(operation_id)?;
+        // Rail cleanup is a prerequisite for releasing local budget and every
+        // other admission participant. If the rail outcome is unconfirmed,
+        // retaining the local exposure is what prevents a retry from moving a
+        // second payment. Run payment first and do not cross that boundary
+        // until its durable action is acknowledged complete.
+        actions.sort_by_key(|action| {
+            if action.kind() == AdmissionCleanupActionKind::Payment {
+                0
+            } else {
+                1
+            }
+        });
+        let mut payment_cleanup_confirmed = actions.iter().all(|action| {
+            action.kind() != AdmissionCleanupActionKind::Payment
+                || action.state() == AdmissionCleanupActionState::Completed
+        });
         let mut errors = Vec::new();
         for action in actions {
             if action.state() == AdmissionCleanupActionState::Completed {
@@ -136,6 +152,11 @@ impl ChioKernel {
                     | AdmissionCleanupActionKind::CallerReservationHandoffIntent
                     | AdmissionCleanupActionKind::CallerReservationHandoff
             ) {
+                continue;
+            }
+            if action.kind() != AdmissionCleanupActionKind::Payment
+                && !payment_cleanup_confirmed
+            {
                 continue;
             }
             let now_unix_ms = match cleanup_unix_ms() {
@@ -207,9 +228,18 @@ impl ChioKernel {
                     }
                 }
             };
-            if let Err(error) =
+            let execution = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 self.execute_cleanup_action(budget_store, approval_store, &operation, &claimed)
-            {
+            }));
+            let execution_error = match execution {
+                Ok(Ok(())) => None,
+                Ok(Err(error)) => Some(error),
+                Err(_) => Some(KernelError::Internal(format!(
+                    "cleanup action {} participant panicked",
+                    claimed.action_id()
+                ))),
+            };
+            if let Some(error) = execution_error {
                 let abandoned = operation_store.abandon_cleanup_action(
                     claimed.action_id(),
                     claimed.version(),
@@ -246,20 +276,21 @@ impl ChioKernel {
                 }
                 continue;
             }
-            match operation_store.acknowledge_cleanup_action(
+            let cleanup_acknowledged = match operation_store.acknowledge_cleanup_action(
                 claimed.action_id(),
                 claimed.version(),
                 &claim_token,
             ) {
-                Ok(AdmissionCleanupActionCasOutcome::Applied(_)) => {}
+                Ok(AdmissionCleanupActionCasOutcome::Applied(_)) => true,
                 Ok(AdmissionCleanupActionCasOutcome::Conflict(current))
-                    if current.state() == AdmissionCleanupActionState::Completed => {}
-                Ok(AdmissionCleanupActionCasOutcome::Conflict(_)) => {}
+                    if current.state() == AdmissionCleanupActionState::Completed => true,
+                Ok(AdmissionCleanupActionCasOutcome::Conflict(_)) => false,
                 Ok(AdmissionCleanupActionCasOutcome::Missing) => {
                     errors.push(format!(
                         "action {} disappeared before cleanup acknowledgement",
                         claimed.action_id()
                     ));
+                    false
                 }
                 Err(error) => {
                     let current = match operation_store
@@ -283,8 +314,22 @@ impl ChioKernel {
                             "action {} cleanup acknowledgement is uncertain: {error}",
                             claimed.action_id()
                         ));
+                        false
+                    } else {
+                        true
                     }
                 }
+            };
+            if action.kind() == AdmissionCleanupActionKind::Payment
+                && cleanup_acknowledged
+            {
+                payment_cleanup_confirmed = operation_store
+                    .load_cleanup_actions(operation.operation_id())?
+                    .iter()
+                    .all(|current| {
+                        current.kind() != AdmissionCleanupActionKind::Payment
+                            || current.state() == AdmissionCleanupActionState::Completed
+                    });
             }
         }
         let participants_completed = match operation_store.load_cleanup_actions(operation_id) {
@@ -644,7 +689,7 @@ impl ChioKernel {
         let Some(authorization) = authorization else {
             return Ok(());
         };
-        let journal = self.payment_cleanup_journal(&payload.reference)?;
+        let mut journal = self.payment_cleanup_journal(&payload.reference)?;
         if journal.is_none() {
             return Err(KernelError::Internal(
                 "operation-owned payment cleanup is missing its durable payment journal"
@@ -660,7 +705,65 @@ impl ChioKernel {
                 record,
             )?;
         }
-        let action = payment_cleanup_action(&authorization, journal.as_ref());
+        let mut action = payment_cleanup_action(&authorization, journal.as_ref());
+        if journal.as_ref().is_some_and(|record| {
+            record.state == PaymentJournalState::Settling
+                && record.settle_action == Some(PaymentSettleAction::Capture)
+        }) {
+            let (recovered_action, recovered_transaction_id) = match adapter
+                .settlement_state_for_operation(
+                    operation.operation_id(),
+                    operation.request_binding_hash(),
+                    &payload.reference,
+                    Some(&authorization.authorization_id),
+                )
+            {
+                Ok(RailSettlementState::Held { authorization_id })
+                    if authorization_id == authorization.authorization_id =>
+                {
+                    (PaymentSettleAction::Release, None)
+                }
+                Ok(RailSettlementState::Settled {
+                    authorization_id,
+                    result,
+                }) if authorization_id == authorization.authorization_id
+                    && result.settlement_status == RailSettlementStatus::Settled =>
+                {
+                    validate_payment_adapter_identifier(
+                        &result.transaction_id,
+                        "recovered capture transaction identifier",
+                    )
+                    .map_err(|error| KernelError::Internal(error.to_string()))?;
+                    (PaymentSettleAction::Refund, Some(result.transaction_id))
+                }
+                Ok(_) => {
+                    return Err(KernelError::Internal(
+                        "capture-intent payment cleanup could not prove the exact rail outcome"
+                            .to_string(),
+                    ));
+                }
+                Err(error) => {
+                    return Err(KernelError::Internal(format!(
+                        "capture-intent payment cleanup settlement lookup failed: {error}"
+                    )));
+                }
+            };
+            self.advance_payment_cleanup_journal(
+                true,
+                &payload.reference,
+                PaymentJournalState::Settling,
+                PaymentJournalState::Settling,
+                None,
+                recovered_transaction_id.as_deref(),
+                Some(PaymentSettleIntent {
+                    action: recovered_action,
+                    amount_units: (recovered_action == PaymentSettleAction::Refund)
+                        .then_some(payload.amount_units),
+                }),
+            )?;
+            journal = self.payment_cleanup_journal(&payload.reference)?;
+            action = recovered_action;
+        }
         if journal
             .as_ref()
             .is_some_and(|record| {
@@ -766,15 +869,17 @@ impl ChioKernel {
         } else {
             RailSettlementStatus::Released
         };
-        if result.settlement_status != expected_status
-            || result.transaction_id.is_empty()
-            || result.transaction_id.bytes().any(|byte| byte == 0)
-        {
+        if result.settlement_status != expected_status {
             return Err(KernelError::Internal(
                 "payment cleanup acknowledgement has an invalid result or settlement state"
                     .to_string(),
             ));
         }
+        validate_payment_adapter_identifier(
+            &result.transaction_id,
+            "cleanup transaction identifier",
+        )
+        .map_err(|error| KernelError::Internal(error.to_string()))?;
         let completed = self.advance_payment_cleanup_journal(
             journal.is_some(),
             &payload.reference,

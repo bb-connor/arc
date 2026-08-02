@@ -332,7 +332,19 @@ impl ChioKernel {
                     })),
                 ),
             },
-            None => runtime_metadata,
+            None => match budget_mutation.admission_operation_binding() {
+                Some(binding) => merge_metadata_objects(
+                    runtime_metadata,
+                    Some(serde_json::json!({
+                        "chio_runtime": {
+                            "retained_admission_operation_id": binding.operation_id(),
+                            "retained_request_binding_hash": binding.request_binding_hash(),
+                            "admission_retained": true
+                        }
+                    })),
+                ),
+                None => runtime_metadata,
+            },
         };
         match payment_authorization {
             Some(authorization) => merge_metadata_objects(

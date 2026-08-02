@@ -39,7 +39,7 @@ fn make_mustprepay_intent(
                     currency: currency.to_string(),
                 },
                 issued_at: now.saturating_sub(5),
-                expires_at: Some(now + 300),
+                expires_at: Some(now + 600),
             },
             max_billed_units: Some(15),
             verified_outcome: None,

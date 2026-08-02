@@ -573,11 +573,18 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // receipt so the executed-or-not side effect is on the append-only
         // log. The retained reservations are marked in the receipt metadata
         // so the burned lease is auditable and operator-recoverable.
-        let receipt_metadata = self.kernel.ambiguous_dispatch_receipt_metadata(
-            self.budget_mutation,
-            self.payment_authorization,
-            released_metadata,
-        );
+        let cleanup_has_authoritative_terminal = released_metadata
+            .as_ref()
+            .is_some_and(|metadata| metadata["budget_authority"]["terminal"].is_object());
+        let receipt_metadata = if cleanup_has_authoritative_terminal {
+            released_metadata
+        } else {
+            self.kernel.ambiguous_dispatch_receipt_metadata(
+                self.budget_mutation,
+                self.payment_authorization,
+                released_metadata,
+            )
+        };
         let receipt_metadata = self
             .kernel
             .mark_runtime_admission_reservations_retained_fail_closed(receipt_metadata);

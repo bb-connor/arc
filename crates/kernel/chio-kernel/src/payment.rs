@@ -493,6 +493,70 @@ pub enum PaymentError {
     RailError(String),
 }
 
+impl PaymentError {
+    #[must_use]
+    pub(crate) const fn outcome_unknown(&self) -> bool {
+        matches!(self, Self::Unavailable(_) | Self::RailError(_))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct PaymentAuthorizationFailure {
+    reason: String,
+    outcome_unknown: bool,
+}
+
+impl PaymentAuthorizationFailure {
+    pub(crate) fn before_rail(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+            outcome_unknown: false,
+        }
+    }
+
+    pub(crate) fn from_adapter_error(error: PaymentError) -> Self {
+        Self {
+            outcome_unknown: error.outcome_unknown(),
+            reason: error.to_string(),
+        }
+    }
+
+    pub(crate) fn adapter_panicked() -> Self {
+        Self {
+            reason: "payment adapter panicked during authorization".to_string(),
+            outcome_unknown: true,
+        }
+    }
+
+    pub(crate) fn invalid_authorization_id(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+            outcome_unknown: true,
+        }
+    }
+
+    pub(crate) fn outcome_unknown_reason(&self) -> Option<&str> {
+        self.outcome_unknown.then_some(self.reason.as_str())
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn outcome_unknown(&self) -> bool {
+        self.outcome_unknown
+    }
+}
+
+impl From<PaymentError> for PaymentAuthorizationFailure {
+    fn from(error: PaymentError) -> Self {
+        Self::from_adapter_error(error)
+    }
+}
+
+impl std::fmt::Display for PaymentAuthorizationFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.reason)
+    }
+}
+
 /// Durable money-path journal state. One row per priced request, written
 /// before the rail is touched and advanced around every rail call, so a
 /// crash in any window leaves a recoverable record instead of moved funds
