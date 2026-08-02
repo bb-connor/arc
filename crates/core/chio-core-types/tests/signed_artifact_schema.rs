@@ -109,6 +109,7 @@ fn built_in_signed_artifact_registry_matches_public_metadata() {
     .into_iter()
     .collect();
 
+    let mut metadata_mismatches = Vec::new();
     for entry in chio_core_types::built_in_signed_artifact_registry() {
         let Some((artifact_kind, introduced_by)) = registered_metadata.get(entry.schema.as_str())
         else {
@@ -119,17 +120,18 @@ fn built_in_signed_artifact_registry_matches_public_metadata() {
             );
             continue;
         };
-        assert_eq!(
-            entry.artifact_kind, *artifact_kind,
-            "built-in artifact kind must match registry.json for {}",
-            entry.schema
-        );
-        assert_eq!(
-            entry.introduced_by, *introduced_by,
-            "built-in introducedBy must match registry.json for {}",
-            entry.schema
-        );
+        if entry.artifact_kind != *artifact_kind || entry.introduced_by != *introduced_by {
+            metadata_mismatches.push((
+                entry.schema,
+                (entry.artifact_kind, entry.introduced_by),
+                ((*artifact_kind).to_string(), (*introduced_by).to_string()),
+            ));
+        }
     }
+    assert!(
+        metadata_mismatches.is_empty(),
+        "built-in signed-artifact metadata differs from registry.json: {metadata_mismatches:#?}"
+    );
 }
 
 #[test]

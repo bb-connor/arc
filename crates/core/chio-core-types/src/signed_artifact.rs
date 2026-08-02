@@ -482,51 +482,54 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         CHIO_FINCRED_CREDIT_SCORECARD_V1_SCHEMA,
-        Some(("financial_credit_scorecard", "financial-credentials-v1")),
+        Some(("financial_credit_scorecard", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_EXPOSURE_HISTORY_V1_SCHEMA,
-        Some(("financial_exposure_history", "financial-credentials-v1")),
+        Some(("financial_exposure_history", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SETTLEMENT_RELIABILITY_V1_SCHEMA,
         Some((
             "financial_settlement_reliability",
-            "financial-credentials-v1",
+            "agent-economy-durability-v1",
         )),
     ),
     (
         CHIO_FINCRED_PREMIUM_HISTORY_V1_SCHEMA,
-        Some(("financial_premium_history", "financial-credentials-v1")),
+        Some(("financial_premium_history", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_LOSS_HISTORY_V1_SCHEMA,
-        Some(("financial_loss_history", "financial-credentials-v1")),
+        Some(("financial_loss_history", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SOURCE_MEMBER_V1_SCHEMA,
-        Some(("financial_source_member", "financial-credentials-v1")),
+        Some(("financial_source_member", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SOURCE_CHECKPOINT_V1_SCHEMA,
-        Some(("financial_source_checkpoint", "financial-credentials-v1")),
+        Some(("financial_source_checkpoint", "agent-economy-durability-v1")),
     ),
     (
         CHIO_FINCRED_SOURCE_COMPLETENESS_ATTESTATION_V1_SCHEMA,
         Some((
             "financial_source_completeness_attestation",
-            "financial-credentials-v1",
+            "agent-economy-durability-v1",
         )),
     ),
     (
         CHIO_FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_V1_SCHEMA,
-        Some(("agent_passport_source_manifest", "financial-credentials-v1")),
+        Some((
+            "financial_agent_passport_source_manifest",
+            "agent-economy-durability-v1",
+        )),
     ),
     (
         CHIO_FINANCIAL_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V1_SCHEMA,
         Some((
-            "agent_passport_presentation_challenge",
-            "financial-credentials-v1",
+            "financial_passport_presentation_challenge",
+            "agent-economy-durability-v1",
         )),
     ),
     (
