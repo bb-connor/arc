@@ -265,11 +265,26 @@ impl Verifier {
         // rekor log integrated time.
         let validation_time = if policy.verify_timestamp {
             let signature = crate::verify_impl::helpers::extract_signature(&bundle.content)?;
-            Some(crate::verify_impl::helpers::determine_validation_time(
-                bundle,
-                &signature,
-                &self.trusted_root,
-            )?)
+            let validation_time = if policy.verify_tlog {
+                crate::verify_impl::helpers::determine_validation_time(
+                    bundle,
+                    &signature,
+                    &self.trusted_root,
+                )?
+            } else {
+                crate::verify_impl::helpers::extract_tsa_timestamp(
+                    bundle,
+                    signature.as_bytes(),
+                    &self.trusted_root,
+                )?
+                .ok_or_else(|| {
+                    Error::Verification(
+                        "timestamp verification requires an authenticated RFC 3161 timestamp when transparency-log verification is disabled"
+                            .to_string(),
+                    )
+                })?
+            };
+            Some(validation_time)
         } else if policy.verify_certificate {
             if !policy.verify_tlog {
                 return Err(Error::Verification(
@@ -386,15 +401,17 @@ impl Verifier {
 
         // (8): Verify the transparency log entry's consistency against the other
         //      materials, to prevent variants of CVE-2022-36056.
-        let content_bound_entries = verify_transparency_log_content_binding(
-            bundle,
-            &artifact,
-            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(&cert)),
-        )?;
-        if policy.verify_tlog && content_bound_entries == 0 {
-            return Err(Error::Verification(
-                "no transparency log entry is bound to the bundle content".to_string(),
-            ));
+        if policy.verify_tlog {
+            let content_bound_entries = verify_transparency_log_content_binding(
+                bundle,
+                &artifact,
+                Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(&cert)),
+            )?;
+            if content_bound_entries == 0 {
+                return Err(Error::Verification(
+                    "no transparency log entry is bound to the bundle content".to_string(),
+                ));
+            }
         }
 
         Ok(result)
@@ -763,6 +780,45 @@ mod tests {
         );
 
         result.expect("trusted transparency-log time remains authoritative");
+    }
+
+    #[test]
+    fn skip_tlog_requires_an_authenticated_rfc3161_time() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps
+            .clear();
+
+        let result = verify(
+            COSIGN_V3_BLOB,
+            &bundle,
+            &VerificationPolicy::default().skip_tlog(),
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        let error = result.expect_err("an unverified integrated time must not validate a cert");
+        assert!(error
+            .to_string()
+            .contains("requires an authenticated RFC 3161 timestamp"));
+    }
+
+    #[test]
+    fn skip_tlog_ignores_untrusted_rekor_content() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        bundle.verification_material.tlog_entries[0]
+            .kind_version
+            .kind = "unsupported".to_string();
+
+        let result = verify(
+            COSIGN_V3_BLOB,
+            &bundle,
+            &VerificationPolicy::default().skip_tlog(),
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        result.expect("disabled transparency-log verification must not parse Rekor content");
     }
 
     #[test]
