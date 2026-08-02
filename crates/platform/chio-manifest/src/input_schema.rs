@@ -192,7 +192,7 @@ pub fn trusted_server_tool_input_schema(server_tool: crate::ServerTool) -> Value
                 {
                     "if": {"properties": {"command": {"const": "str_replace"}}},
                     "then": {
-                        "required": ["old_str"],
+                        "required": ["old_str", "new_str"],
                         "not": {
                             "anyOf": [
                                 {"required": ["file_text"]},
@@ -472,6 +472,17 @@ mod tests {
             "path": "/tmp/file",
             "insert_line": 1,
             "new_str": "line"
+        })));
+        assert!(editor.is_valid(&json!({
+            "command": "str_replace",
+            "path": "/tmp/file",
+            "old_str": "remove me",
+            "new_str": ""
+        })));
+        assert!(!editor.is_valid(&json!({
+            "command": "str_replace",
+            "path": "/tmp/file",
+            "old_str": "remove me"
         })));
         assert!(!editor.is_valid(&json!({"command": "create", "path": "/tmp/file"})));
         assert!(!editor.is_valid(&json!({"command": "view", "path": "relative"})));

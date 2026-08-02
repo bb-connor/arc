@@ -19,15 +19,14 @@ pub struct SqliteRevocationStore {
     ephemeral: bool,
 }
 
-/// Whether a SQLite path opens a database that lives only in memory for the life
-/// of the process. rusqlite enables URI filenames, so the bare `:memory:`
-/// sentinel, `file::memory:`, and any `file:...?mode=memory` URI all open a
-/// non-durable database that loses every revocation on restart.
-fn path_opens_in_memory(path: &Path) -> bool {
+/// Whether a SQLite path opens a database whose lifetime is limited to the
+/// connection. SQLite treats empty filenames and empty `file:` URI names as
+/// temporary databases in addition to its explicit in-memory forms.
+fn path_opens_ephemeral_database(path: &Path) -> bool {
     let Some(value) = path.to_str() else {
         return false;
     };
-    if value.eq_ignore_ascii_case(":memory:") {
+    if value.is_empty() || value.eq_ignore_ascii_case(":memory:") {
         return true;
     }
     let Some(rest) = value.strip_prefix("file:") else {
@@ -37,7 +36,7 @@ fn path_opens_in_memory(path: &Path) -> bool {
         Some((name, query)) => (name, Some(query)),
         None => (rest, None),
     };
-    if name.eq_ignore_ascii_case(":memory:") {
+    if name.is_empty() || name.eq_ignore_ascii_case(":memory:") {
         return true;
     }
     query.is_some_and(|query| {
@@ -59,7 +58,7 @@ const REVOCATION_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"]
 impl SqliteRevocationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
         let path = path.as_ref();
-        let ephemeral = path_opens_in_memory(path);
+        let ephemeral = path_opens_ephemeral_database(path);
         if !ephemeral {
             // Derive the directory from the resolved filesystem path: a `file:`
             // URI sibling (`file:/var/lib/chio/receipts.db.revocations?mode=rwc`)
@@ -932,8 +931,15 @@ mod tests {
     }
 
     #[test]
-    fn in_memory_revocation_store_reports_ephemeral() {
-        for path in [":memory:", "file::memory:", "file:rev?mode=memory"] {
+    fn temporary_and_in_memory_revocation_stores_report_ephemeral() {
+        for path in [
+            "",
+            ":memory:",
+            "file:",
+            "file:?mode=rwc",
+            "file::memory:",
+            "file:rev?mode=memory",
+        ] {
             let store = SqliteRevocationStore::open(path).unwrap();
             assert!(
                 store.is_ephemeral(),

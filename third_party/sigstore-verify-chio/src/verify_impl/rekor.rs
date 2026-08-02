@@ -145,23 +145,17 @@ fn verify_dsse_v001(
         )));
     }
 
-    // Check that each signature in the bundle exists in the Rekor entry
-    // We must match both the signature AND the verifier to prevent signature substitution
-    for bundle_sig in &envelope.signatures {
-        let mut found = false;
-        for rekor_sig in rekor_signatures {
-            if bundle_sig.sig.as_bytes() == rekor_sig.signature.as_bytes()
-                && verify_pem_verifier_identity(&rekor_sig.verifier, expected_verifier).is_ok()
-            {
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            return Err(Error::Verification(
-                "DSSE signature in bundle does not match any signature in Rekor entry (signature or verifier mismatch)".to_string(),
-            ));
-        }
+    // Match the signature multiset one-to-one. An existential check lets two
+    // duplicate bundle signatures reuse one logged signature and hide a
+    // distinct Rekor co-signature.
+    if !match_signatures_one_to_one(&envelope.signatures, rekor_signatures, |bundle_sig, rekor_sig| {
+        bundle_sig.sig.as_bytes() == rekor_sig.signature.as_bytes()
+            && verify_pem_verifier_identity(&rekor_sig.verifier, expected_verifier).is_ok()
+    }) {
+        return Err(Error::Verification(
+            "DSSE signatures in the bundle do not match the Rekor signature multiset one-to-one"
+                .to_string(),
+        ));
     }
 
     Ok(())
@@ -219,30 +213,46 @@ fn verify_dsse_v002(
         )));
     }
 
-    // Check that each signature in the bundle exists in the Rekor entry
-    // We must match both the signature AND the verifier to prevent signature substitution
-    for bundle_sig in &envelope.signatures {
-        let mut found = false;
-        for rekor_sig in rekor_signatures {
-            if bundle_sig.sig.as_bytes() == rekor_sig.content.as_bytes()
-                && verify_certificate_verifier_identity(
-                    &rekor_sig.verifier.x509_certificate.raw_bytes,
-                    expected_verifier,
-                )
-                .is_ok()
-            {
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            return Err(Error::Verification(
-                "DSSE signature in bundle does not match any signature in Rekor entry (signature or verifier mismatch)".to_string(),
-            ));
-        }
+    // Match the signature multiset one-to-one for the same reason as v0.0.1.
+    if !match_signatures_one_to_one(&envelope.signatures, rekor_signatures, |bundle_sig, rekor_sig| {
+        bundle_sig.sig.as_bytes() == rekor_sig.content.as_bytes()
+            && verify_certificate_verifier_identity(
+                &rekor_sig.verifier.x509_certificate.raw_bytes,
+                expected_verifier,
+            )
+            .is_ok()
+    }) {
+        return Err(Error::Verification(
+            "DSSE signatures in the bundle do not match the Rekor signature multiset one-to-one"
+                .to_string(),
+        ));
     }
 
     Ok(())
+}
+
+fn match_signatures_one_to_one<BundleSignature, RekorSignature>(
+    bundle_signatures: &[BundleSignature],
+    rekor_signatures: &[RekorSignature],
+    mut signatures_match: impl FnMut(&BundleSignature, &RekorSignature) -> bool,
+) -> bool {
+    if bundle_signatures.len() != rekor_signatures.len() {
+        return false;
+    }
+    let mut consumed = vec![false; rekor_signatures.len()];
+    bundle_signatures.iter().all(|bundle_signature| {
+        let Some(index) = rekor_signatures
+            .iter()
+            .enumerate()
+            .position(|(index, rekor_signature)| {
+                !consumed[index] && signatures_match(bundle_signature, rekor_signature)
+            })
+        else {
+            return false;
+        };
+        consumed[index] = true;
+        true
+    })
 }
 
 /// Verify DSSE payload matches what's in Rekor (for intoto entries)
@@ -475,5 +485,19 @@ mod tests {
         assert!(error
             .to_string()
             .contains("does not match the bundle signer"));
+    }
+
+    #[test]
+    fn dsse_signature_matching_consumes_each_rekor_entry_once() {
+        assert!(match_signatures_one_to_one(
+            &[b"signature-a", b"signature-b"],
+            &[b"signature-b", b"signature-a"],
+            |bundle, rekor| bundle == rekor,
+        ));
+        assert!(!match_signatures_one_to_one(
+            &[b"signature-a", b"signature-a"],
+            &[b"signature-a", b"signature-b"],
+            |bundle, rekor| bundle == rekor,
+        ));
     }
 }
