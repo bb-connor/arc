@@ -1,18 +1,17 @@
 use chio_log_redact::redacted;
 
-/// Default interval between sweeps of orphaned budget holds.
+/// Default interval between inspections of orphaned budget holds.
 pub const DEFAULT_HOLD_SWEEP_INTERVAL_SECS: u64 = 300;
-/// Default age beyond which an open hold counts as orphaned. Generously
-/// above any legitimate in-flight call, so the sweeper only ever collects
-/// true orphans; reclaiming is fail-closed under-spend (a released hold
-/// returns capacity, never records spend).
+/// Default age beyond which an open hold requires recovery investigation.
+/// Age is only a scan trigger. It never proves that an external effect did
+/// not occur and therefore never authorizes capacity release.
 pub const DEFAULT_HOLD_EXPIRY_HORIZON_SECS: u64 = 3_600;
 /// Holds expired per sweep pass, bounding each pass's write volume.
 const HOLD_SWEEP_BATCH: usize = 256;
 
-/// Background task that sweeps orphaned budget holds: once at start, then
-/// periodically. Never panics; joined on drop so a dropped kernel leaves no
-/// detached sweeper thread.
+/// Background task that inventories orphaned budget holds: once at start,
+/// then periodically. Never panics; joined on drop so a dropped kernel leaves
+/// no detached inspection thread.
 pub struct BudgetHoldSweepHandle {
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     join: Option<std::thread::JoinHandle<()>>,
@@ -57,9 +56,11 @@ impl Drop for BudgetHoldSweepHandle {
     }
 }
 
-/// One sweep pass: expire every open hold older than the horizon, then
-/// refresh the open-holds gauge. Errors are warned and retried on the next
-/// pass; the sweeper never unwinds.
+/// One inspection pass: report every open hold older than the horizon, then
+/// refresh the open-holds gauge. An old hold remains reserved until durable
+/// recovery proves no effect or settles its reserved worst case. Age alone is
+/// ambiguous and cannot authorize release. Errors are warned and retried on
+/// the next pass; the inspector never unwinds.
 fn sweep_once(store: &dyn crate::budget_store::BudgetStore, horizon_secs: u64, batch: usize) {
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -69,23 +70,12 @@ fn sweep_once(store: &dyn crate::budget_store::BudgetStore, horizon_secs: u64, b
     match store.list_open_holds_older_than(cutoff, batch) {
         Ok(holds) => {
             for hold in holds {
-                match store.expire_open_hold(&hold.hold_id) {
-                    Ok(true) => {
-                        chio_metrics_spec::runtime::families::BUDGET_HOLDS_EXPIRED.incr(&[]);
-                        tracing::warn!(
-                            hold_id = %hold.hold_id,
-                            capability_id = %hold.capability_id,
-                            released_units = hold.remaining_exposure_units,
-                            "expired an orphaned budget hold; capacity released"
-                        );
-                    }
-                    Ok(false) => {}
-                    Err(error) => tracing::warn!(
-                        hold_id = %hold.hold_id,
-                        reason = %redacted!(&error.to_string()),
-                        "expire_open_hold failed; retrying next sweep"
-                    ),
-                }
+                tracing::warn!(
+                    hold_id = %hold.hold_id,
+                    capability_id = %hold.capability_id,
+                    retained_units = hold.remaining_exposure_units,
+                    "ambiguous orphaned budget hold retained pending durable recovery"
+                );
             }
         }
         Err(error) => {

@@ -291,9 +291,10 @@ pub trait BudgetStore: Send + Sync {
         Ok(Vec::new())
     }
 
-    /// Release the remaining exposure of an open hold, mark it expired, and
-    /// append an expire event. Idempotent: a non-open hold returns
-    /// `Ok(false)`. Default: unsupported.
+    /// Release the remaining exposure of an open hold after durable recovery
+    /// has proved that no external effect occurred, mark it expired, and append
+    /// an expire event. Hold age is never sufficient release authority.
+    /// Idempotent: a non-open hold returns `Ok(false)`. Default: unsupported.
     fn expire_open_hold(&self, _hold_id: &str) -> Result<bool, BudgetStoreError> {
         Err(BudgetStoreError::Invariant(
             "open-hold sweep is not supported by this budget store".to_string(),

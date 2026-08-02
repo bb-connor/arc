@@ -1769,48 +1769,47 @@ fn tenant_scoped_money_path_stamps_journal_row_and_reconciliation_receipt(
 }
 
 #[test]
-fn hold_sweeper_releases_orphaned_capacity() -> Result<(), Box<dyn std::error::Error>> {
+fn hold_sweeper_retains_ambiguous_orphaned_capacity() -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::budget_store::BudgetAuthorizeHoldRequest;
+    use chio_kernel::ChioKernel;
+    use chio_store_sqlite::SqliteBudgetStore;
+    use std::sync::Arc;
 
-    let mut harness = support::money_journal_harness("chio-hold-sweeper", 75)?;
+    let budget_db_path = support::unique_db_path("chio-hold-sweeper");
+    let budget_store = Arc::new(SqliteBudgetStore::open(&budget_db_path)?);
+    let mut kernel = ChioKernel::new(support::money_config(chio_core::crypto::Keypair::generate()));
+    kernel.set_budget_store_handle(Arc::clone(&budget_store) as Arc<dyn BudgetStore>)?;
     // Fabricate an orphaned hold: a crash between authorize and reconcile
     // leaves it open with its exposure still counted.
-    harness
-        .budget_store
-        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
-            "cap".to_string(),
-            0,
-            Some(10),
-            70,
-            Some(70),
-            Some(500),
-            Some("hold-orphan".to_string()),
-            Some("hold-orphan:authorize".to_string()),
-            None,
-        ))?;
-    assert_eq!(harness.budget_store.open_hold_count()?, 1);
+    budget_store.authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+        "cap".to_string(),
+        0,
+        Some(10),
+        70,
+        Some(70),
+        Some(500),
+        Some("hold-orphan".to_string()),
+        Some("hold-orphan:authorize".to_string()),
+        None,
+    ))?;
+    assert_eq!(budget_store.open_hold_count()?, 1);
 
-    // A zero horizon makes the orphan immediately eligible; the sweeper
-    // runs once at start before settling into its interval.
-    harness.kernel.start_budget_hold_sweeper(3_600, 0);
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    while harness.budget_store.open_hold_count()? != 0 {
-        assert!(
-            std::time::Instant::now() < deadline,
-            "sweeper did not expire the orphaned hold in time"
-        );
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
+    // A zero horizon makes the orphan immediately visible to the inspector,
+    // but age cannot prove that the external effect did not occur.
+    kernel.start_budget_hold_sweeper(3_600, 0);
+    std::thread::sleep(std::time::Duration::from_millis(250));
 
-    // Capacity returned by exactly the remainder; no spend recorded.
-    let usage = harness
-        .budget_store
-        .get_usage("cap", 0)?
-        .expect("usage record");
-    assert_eq!(usage.total_cost_exposed, 0);
+    // Fail-closed: the hold and its invocation slot remain reserved until
+    // durable recovery proves no effect or settles the worst case.
+    assert_eq!(budget_store.open_hold_count()?, 1);
+    let usage = budget_store.get_usage("cap", 0)?.expect("usage record");
+    assert_eq!(usage.total_cost_exposed, 70);
     assert_eq!(usage.total_cost_realized_spend, 0);
+    assert_eq!(usage.invocation_count, 1);
 
-    harness.cleanup();
+    drop(kernel);
+    drop(budget_store);
+    let _ = std::fs::remove_file(budget_db_path);
     Ok(())
 }
 

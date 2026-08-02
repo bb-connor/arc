@@ -803,7 +803,7 @@ pub struct ChioKernel {
     /// advancing this cursor lets repeated passes validate every signed intent
     /// even when more than one bounded page is unexpired or damaged.
     pub(super) caller_reservation_reap_cursor: Mutex<Option<String>>,
-    /// Background sweeper for orphaned budget holds. `None` until an
+    /// Background inspector for orphaned budget holds. `None` until an
     /// operator opts in via `start_budget_hold_sweeper`; joined on drop.
     pub(super) budget_hold_sweep: Option<super::budget_sweep::BudgetHoldSweepHandle>,
     /// Recursive-delegation oracle handle. When `Some`, the verifier consults this

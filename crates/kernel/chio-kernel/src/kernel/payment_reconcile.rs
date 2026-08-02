@@ -537,22 +537,15 @@ fn reverse_hold_and_report(
     });
     match reversed {
         Ok(_) => PaymentReconcileOutcome::Released,
-        Err(error) if record.admission_operation.is_some() => {
-            PaymentReconcileOutcome::ReconcileFailed {
-                detail: format!(
+        Err(error) => PaymentReconcileOutcome::ReconcileFailed {
+            detail: if record.admission_operation.is_some() {
+                format!(
                     "operation-owned budget hold reverse during payment reconcile failed: {error}"
-                ),
-            }
-        }
-        Err(error) => {
-            tracing::warn!(
-                request_id = %record.request_id,
-                hold_id = %hold_id,
-                reason = %redacted!(&error.to_string()),
-                "budget hold reverse during payment reconcile failed; the hold sweeper will release it"
-            );
-            PaymentReconcileOutcome::Released
-        }
+                )
+            } else {
+                format!("budget hold reverse during payment reconcile failed: {error}")
+            },
+        },
     }
 }
 

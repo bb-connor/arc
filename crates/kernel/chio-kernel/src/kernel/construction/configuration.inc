@@ -917,15 +917,15 @@ impl ChioKernel {
         ))
     }
 
-    /// Start the background sweeper for orphaned budget holds: once at
+    /// Start the background inspector for orphaned budget holds: once at
     /// start, then every `interval_secs`, every open hold older than
-    /// `horizon_secs` is expired and its remaining exposure released (no
-    /// spend recorded), so a crash between a hold and its reconcile no
-    /// longer burns capacity forever. Use
+    /// `horizon_secs` is reported and remains reserved. Age cannot prove
+    /// whether the external effect occurred, so only durable recovery may
+    /// release the hold or settle its reserved worst case. Use
     /// [`DEFAULT_HOLD_SWEEP_INTERVAL_SECS`] and
     /// [`DEFAULT_HOLD_EXPIRY_HORIZON_SECS`] unless the deployment has a
-    /// reason to deviate; the horizon must sit far above any legitimate
-    /// in-flight call. Restarting replaces (and joins) a previous sweeper.
+    /// reason to deviate; the horizon controls investigation timing only.
+    /// Restarting replaces (and joins) a previous inspector.
     pub fn start_budget_hold_sweeper(&mut self, interval_secs: u64, horizon_secs: u64) {
         self.budget_hold_sweep = Some(super::budget_sweep::BudgetHoldSweepHandle::spawn(
             Arc::clone(&self.budget_store),

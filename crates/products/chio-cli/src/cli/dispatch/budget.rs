@@ -52,29 +52,6 @@ pub(crate) fn dispatch_budget(
                 }
                 Ok(())
             }
-            BudgetHoldsCommands::Release {
-                store,
-                hold_id,
-                json,
-            } => {
-                let path = resolve_store(store, budget_db)?;
-                let released = release_open_hold(&path, &hold_id)?;
-                if json || json_output {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "schema": "chio.cli.budget.holds.release.v1",
-                            "holdId": hold_id,
-                            "released": released,
-                        })
-                    );
-                } else if released {
-                    println!("released hold {hold_id}");
-                } else {
-                    println!("hold {hold_id} was not open (no change)");
-                }
-                Ok(())
-            }
         },
     }
 }
@@ -108,14 +85,6 @@ fn list_open_holds(
         .map_err(|error| CliError::Other(format!("list open holds: {error}")))
 }
 
-fn release_open_hold(path: &std::path::Path, hold_id: &str) -> Result<bool, CliError> {
-    let store = chio_store_sqlite::SqliteBudgetStore::open(path)
-        .map_err(|error| CliError::Other(format!("open budget store: {error}")))?;
-    store
-        .expire_open_hold(hold_id)
-        .map_err(|error| CliError::Other(format!("release hold: {error}")))
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -133,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn holds_list_then_release_removes_the_open_hold() {
+    fn holds_list_preserves_the_open_hold() {
         use chio_kernel::budget_store::BudgetAuthorizeHoldRequest;
 
         let path = unique_db_path("cli-holds");
@@ -157,10 +126,8 @@ mod tests {
         let listed = list_open_holds(&path, u64::MAX).unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].hold_id, "cli-hold-1");
-        // Release expires it; a second release is an idempotent no-op.
-        assert!(release_open_hold(&path, "cli-hold-1").unwrap());
-        assert!(!release_open_hold(&path, "cli-hold-1").unwrap());
-        assert!(list_open_holds(&path, u64::MAX).unwrap().is_empty());
+        // Inspection cannot mutate ambiguous capacity.
+        assert_eq!(list_open_holds(&path, u64::MAX).unwrap().len(), 1);
         let _ = std::fs::remove_file(&path);
     }
 }
