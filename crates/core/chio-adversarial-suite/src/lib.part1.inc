@@ -1190,6 +1190,7 @@ mod tests {
                 "rotation_partial_commit",
                 "rotation_unwitnessed_signing",
                 "old_key_backdating",
+                "authority_binding_mutation",
                 "broker_secret_boundary_crossing",
                 "broker_execution_overspend",
                 "broker_parent_double_charge",
