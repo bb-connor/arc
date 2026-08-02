@@ -185,8 +185,10 @@ fn test_exposure_ledger_report_surfaces() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "exposure-ledger",
             "export",
@@ -487,8 +489,10 @@ fn test_credit_scorecard_report_surfaces() {
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "--budget-db",
             budget_db_path.to_str().expect("budget db path"),
             "trust",
