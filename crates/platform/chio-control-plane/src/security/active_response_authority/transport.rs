@@ -194,3 +194,16 @@ pub(super) fn now_unix_seconds() -> PortResult<u64> {
             }
         })
 }
+
+#[cfg(target_os = "linux")]
+pub(super) fn now_unix_millis() -> PortResult<u64> {
+    let elapsed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| PortError::unavailable())?;
+    let now = u64::try_from(elapsed.as_millis()).map_err(|_| PortError::unavailable())?;
+    if now == 0 {
+        Err(PortError::unavailable())
+    } else {
+        Ok(now)
+    }
+}

@@ -20,7 +20,9 @@ use chio_security_types::ResponsePlan;
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
-use super::transport::{now_unix_seconds, validate_connected_peer, AbsoluteDeadlineUnixStream};
+use super::transport::{
+    now_unix_millis, now_unix_seconds, validate_connected_peer, AbsoluteDeadlineUnixStream,
+};
 #[cfg(target_os = "linux")]
 use super::{
     active_response_authority_request_signing_bytes,
@@ -323,6 +325,7 @@ impl ActiveResponseAuthorityProtocolServer {
             expected_ref,
             response_plan,
             &self.authority_identity,
+            now_unix_millis()?,
         )?;
         Ok(ActiveResponseAdmissionArtifactsWire {
             action_id: draft.action_id,

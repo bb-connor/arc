@@ -384,6 +384,11 @@
         let governed_intent_hash = governed_intent
             .binding_hash()
             .unwrap_or_else(|error| panic!("real adapter governed intent hash: {error}"));
+        let proof_expires_at_unix_ms = response_plan
+            .created_at_unix_ms
+            .checked_add(45_000)
+            .unwrap_or_else(|| panic!("real adapter submission proof expiry overflow"));
+        assert!(proof_expires_at_unix_ms < response_plan.expires_at_unix_ms);
         let body = ActiveResponseSubmissionProofBody::new(
             response_plan.action_id.clone(),
             response_plan.tenant_id.clone(),
@@ -391,7 +396,7 @@
             governed_intent_hash,
             submitter.public_key(),
             response_plan.created_at_unix_ms,
-            response_plan.expires_at_unix_ms,
+            proof_expires_at_unix_ms,
         )
         .unwrap_or_else(|error| panic!("real adapter submission proof body: {error}"));
         ActiveResponseSubmissionProof::sign_with_backend(

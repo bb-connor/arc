@@ -199,8 +199,8 @@ impl SqliteBudgetStore {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)? as u32,
-                row.get::<_, i64>(3)? as u64,
+                budget_u32_from_row(row, 2, "grant_index")?,
+                budget_u64_from_row(row, 3, "remaining_exposure_units")?,
                 row.get::<_, i64>(4)? > 0,
                 authority,
             ))
@@ -341,19 +341,31 @@ impl SqliteBudgetStore {
                     Ok(BudgetHoldSnapshot {
                         hold_id: row.get::<_, String>(0)?,
                         capability_id: row.get::<_, String>(1)?,
-                        grant_index: row.get::<_, i64>(2)? as usize,
-                        authorized_exposure_units: row.get::<_, i64>(3)? as u64,
-                        remaining_exposure_units: row.get::<_, i64>(4)? as u64,
+                        grant_index: budget_usize_from_row(row, 2, "grant_index")?,
+                        authorized_exposure_units: budget_u64_from_row(
+                            row,
+                            3,
+                            "authorized_exposure_units",
+                        )?,
+                        remaining_exposure_units: budget_u64_from_row(
+                            row,
+                            4,
+                            "remaining_exposure_units",
+                        )?,
                         disposition,
                         reserved_until: row.get::<_, Option<i64>>(6)?,
                         reserved_currency: row.get::<_, Option<String>>(10)?,
                         reserved_payment_reference: row.get::<_, Option<String>>(11)?,
-                        reserved_budget_total: row
-                            .get::<_, Option<i64>>(12)?
-                            .map(|value| value as u64),
-                        reserved_delegation_depth: row
-                            .get::<_, Option<i64>>(13)?
-                            .map(|value| value as u32),
+                        reserved_budget_total: optional_budget_u64_from_row(
+                            row,
+                            12,
+                            "reserved_budget_total",
+                        )?,
+                        reserved_delegation_depth: optional_budget_u32_from_row(
+                            row,
+                            13,
+                            "reserved_delegation_depth",
+                        )?,
                         reserved_root_budget_holder: row.get::<_, Option<String>>(14)?,
                         authority,
                     })
@@ -441,8 +453,8 @@ impl SqliteBudgetStore {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)? as u32,
-                row.get::<_, i64>(3)? as u64,
+                budget_u32_from_row(row, 2, "grant_index")?,
+                budget_u64_from_row(row, 3, "remaining_exposure_units")?,
                 row.get::<_, i64>(4)? != 0,
                 authority,
             ))
@@ -735,6 +747,54 @@ mod tests {
             Some("root-holder"),
             "the delegation root is recorded durably on the reserved hold"
         );
+    }
+
+    #[test]
+    fn budget_hold_snapshot_rejects_negative_numeric_fields() {
+        let store = open_temp_store();
+        for (index, field) in [
+            "grant_index",
+            "authorized_exposure_units",
+            "remaining_exposure_units",
+            "reserved_budget_total",
+            "reserved_delegation_depth",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let hold_id = format!("hold-negative-{index}");
+            let capability_id = format!("cap-negative-{index}");
+            authorize(&store, &hold_id, &capability_id);
+            store
+                .mark_hold_reserved_until(
+                    &hold_id,
+                    4_242,
+                    "USD",
+                    None,
+                    &ReservedHoldEnvelope {
+                        budget_total: Some(1_000),
+                        delegation_depth: 2,
+                        root_budget_holder: "root-holder".to_string(),
+                    },
+                )
+                .unwrap();
+            store
+                .connection
+                .lock()
+                .unwrap()
+                .execute(
+                    &format!(
+                        "UPDATE budget_authorization_holds SET {field} = -1 WHERE hold_id = ?1"
+                    ),
+                    params![hold_id],
+                )
+                .unwrap();
+
+            assert!(
+                store.budget_hold_snapshot(&hold_id).is_err(),
+                "negative {field} must fail closed"
+            );
+        }
     }
 
     #[test]

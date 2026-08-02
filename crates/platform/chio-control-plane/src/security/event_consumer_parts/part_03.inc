@@ -121,6 +121,7 @@ impl AttestedFindingAdmissionArtifacts {
         expected_ref: &AdmissionArtifactRef,
         response_plan: &ResponsePlan,
         expected_authority: &PublicKey,
+        admission_time_unix_ms: u64,
     ) -> PortResult<Digest32> {
         match &self.payload {
             AttestedFindingAdmissionArtifactPayload::Kernel(payload) => {
@@ -169,7 +170,9 @@ impl AttestedFindingAdmissionArtifacts {
                         != payload.submission_proof.body.expires_at_unix_ms
                     || attestation.issued_at_unix_ms < response_plan.created_at_unix_ms
                     || attestation.issued_at_unix_ms >= response_plan.expires_at_unix_ms
-                    || attestation.expires_at_unix_ms < response_plan.expires_at_unix_ms
+                    || attestation.issued_at_unix_ms > admission_time_unix_ms
+                    || admission_time_unix_ms >= attestation.expires_at_unix_ms
+                    || attestation.expires_at_unix_ms > response_plan.expires_at_unix_ms
                     || payload_digest.is_zero()
                     || proof_digest.is_zero()
                     || !signature_valid

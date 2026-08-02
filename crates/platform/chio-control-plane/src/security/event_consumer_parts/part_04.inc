@@ -605,6 +605,7 @@ impl DurableAttestedFindingBatchPlanner {
             plan.admission_artifact_ref(),
             plan.response_plan(),
             &trusted_artifact_authority,
+            now_unix_ms,
         ) {
             Ok(digest) => digest,
             Err(error) => return self.close_admission_failure(&claimed, error, report),
