@@ -93,6 +93,39 @@ fn compat_query(tenant: String) -> ReceiptQuery {
 }
 
 #[test]
+fn receipt_query_rejects_timestamps_outside_sqlite_range() {
+    let path = unique_db_path("receipt-query-timestamp-range");
+    let store = SqliteReceiptStore::open(&path).test_expect("open receipt store");
+
+    for (label, query) in [
+        (
+            "since",
+            ReceiptQuery {
+                since: Some((i64::MAX as u64) + 1),
+                ..basic_query(None)
+            },
+        ),
+        (
+            "until",
+            ReceiptQuery {
+                until: Some((i64::MAX as u64) + 1),
+                ..basic_query(None)
+            },
+        ),
+    ] {
+        let error = store
+            .query_receipts(&query)
+            .expect_err("out-of-range timestamp must be rejected");
+        assert!(
+            matches!(error, chio_kernel::ReceiptStoreError::InvalidQuery(ref message) if message.contains(label)),
+            "unexpected query error: {error}"
+        );
+    }
+
+    cleanup(&path);
+}
+
+#[test]
 fn active_security_unique_boundaries_are_tenant_scoped_or_singleton() {
     let path = unique_db_path("active-security-tenant-boundaries");
     let store = SqliteSecurityStateStore::open(&path).test_expect("open security state");

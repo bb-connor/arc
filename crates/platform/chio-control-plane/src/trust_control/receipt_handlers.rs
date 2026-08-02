@@ -292,10 +292,8 @@ pub(crate) async fn handle_query_receipts(
     let result = match store.query_receipts(&kernel_query) {
         Ok(result) => result,
         Err(error) => {
-            return principal.protect_response(plain_http_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &error.to_string(),
-            ));
+            return principal
+                .protect_response(trust_http_error_from_receipt_store(error).into_response());
         }
     };
     let receipts = match result

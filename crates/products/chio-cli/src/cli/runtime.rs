@@ -363,6 +363,23 @@ fn attach_cli_durable_admission_runtime(
         .attach(kernel)
 }
 
+fn validate_production_broker_durable_admission_topology(
+    broker_configured: bool,
+    mode: chio_kernel::admission_operation::DurableAdmissionMode,
+) -> Result<(), CliError> {
+    if broker_configured
+        && mode != chio_kernel::admission_operation::DurableAdmissionMode::Off
+    {
+        return Err(CliError::cli_other_error(
+            "production broker composition cannot be combined with durable agent-economy \
+             admission because their revocation authorities do not share one commit domain; \
+             set kernel.durable_admission_mode to off or remove the production broker"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn cmd_run(
     policy_path: &Path,
     command: &[String],
@@ -1269,6 +1286,10 @@ pub(crate) fn cmd_mcp_serve(
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
     let durable_admission_mode = loaded_policy.kernel.durable_admission_mode;
+    validate_production_broker_durable_admission_topology(
+        broker_config_path.is_some(),
+        durable_admission_mode,
+    )?;
 
     let (configured_kernel_kp, keyring_runtime) =
         select_cli_kernel_signer(keyring_config_path, authority_seed_path, authority_db_path)?;

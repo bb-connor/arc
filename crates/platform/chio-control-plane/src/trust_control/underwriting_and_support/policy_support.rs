@@ -556,6 +556,7 @@ fn derive_underwriting_signals(
 
 pub(crate) fn trust_http_error_from_receipt_store(error: ReceiptStoreError) -> TrustHttpError {
     match error {
+        ReceiptStoreError::InvalidQuery(message) => TrustHttpError::bad_request(message),
         ReceiptStoreError::NotFound(message) => TrustHttpError::new(StatusCode::NOT_FOUND, message),
         ReceiptStoreError::Conflict(message) => TrustHttpError::new(StatusCode::CONFLICT, message),
         ReceiptStoreError::ReadBoundary(message) => {

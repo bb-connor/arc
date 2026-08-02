@@ -587,6 +587,9 @@ pub enum ReceiptStoreError {
     #[error("invalid outcome filter: {0}")]
     InvalidOutcome(String),
 
+    #[error("invalid receipt query: {0}")]
+    InvalidQuery(String),
+
     #[error("receipt read boundary error: {0}")]
     ReadBoundary(String),
 

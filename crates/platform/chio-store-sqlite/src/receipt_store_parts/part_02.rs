@@ -465,6 +465,9 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         ReceiptStoreError::InvalidOutcome(message) => {
             ReceiptStoreError::InvalidOutcome(message.clone())
         }
+        ReceiptStoreError::InvalidQuery(message) => {
+            ReceiptStoreError::InvalidQuery(message.clone())
+        }
         ReceiptStoreError::ReadBoundary(message) => {
             ReceiptStoreError::ReadBoundary(message.clone())
         }

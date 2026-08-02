@@ -85,6 +85,121 @@ fn repeated_rotations_verify_and_archive_only_each_new_suffix(
     Ok(())
 }
 
+#[test]
+fn rotation_migrates_a_committed_legacy_archive_catalog(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::evidence_retention::{
+        legacy_retention_archive_prefix_content_sha256,
+        retention_archive_prefix_content_sha256,
+    };
+    use crate::receipt_store::support::{
+        ensure_receipt_retention_watermark_table, retention_watermark,
+    };
+
+    let path = unique_db_path("legacy-archive-catalog");
+    let archive = unique_db_path("legacy-archive-catalog-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+
+    for index in 0..4_u64 {
+        let timestamp = 100 + (index / 2) * 100;
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("legacy-archive-catalog-{index}"),
+            index + 1,
+            timestamp,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert_eq!(
+        store
+            .archive_receipts_before(150, archive_path)
+            .unwrap_or_else(|error| panic!("legacy fixture initial rotation failed: {error}")),
+        2
+    );
+
+    let legacy_digest = {
+        let archive_connection = rusqlite::Connection::open(&archive)?;
+        archive_connection.execute(
+            "UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = ?2",
+            rusqlite::params![
+                crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION + 1,
+                crate::receipt_store::RECEIPT_STORE_SCHEMA_KEY
+            ],
+        )?;
+        let invalid_version =
+            legacy_retention_archive_prefix_content_sha256(&archive_connection, "main", 2)
+                .expect_err("legacy compatibility must reject an untrusted version row");
+        assert!(invalid_version
+            .to_string()
+            .contains("current singleton receipt schema-version row"));
+        archive_connection.execute(
+            "UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = ?2",
+            rusqlite::params![
+                crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+                crate::receipt_store::RECEIPT_STORE_SCHEMA_KEY
+            ],
+        )?;
+        archive_connection.execute_batch("DROP TABLE chio_store_schema_versions")?;
+        legacy_retention_archive_prefix_content_sha256(&archive_connection, "main", 2)
+            .unwrap_or_else(|error| panic!("legacy archive digest failed: {error}"))
+    };
+    store.writer_handle().run_write({
+        let legacy_digest = legacy_digest.clone();
+        move |connection| {
+            connection.execute_batch(
+                "DROP TRIGGER receipt_retention_watermark_reject_update",
+            )?;
+            connection.execute(
+                "UPDATE receipt_retention_watermark SET archive_content_sha256 = ?1 \
+                 WHERE archived_through_entry_seq = 2",
+                rusqlite::params![legacy_digest],
+            )?;
+            ensure_receipt_retention_watermark_table(connection)?;
+            Ok(())
+        }
+    })?;
+
+    assert_eq!(
+        store
+            .archive_receipts_before(250, archive_path)
+            .unwrap_or_else(|error| panic!("legacy archive migration failed: {error}")),
+        2
+    );
+
+    let live = store.reader_connection_for_test()?;
+    assert_eq!(retention_watermark(&live)?, Some(4));
+    let committed_digest: String = live.query_row(
+        "SELECT archive_content_sha256 FROM receipt_retention_watermark \
+         ORDER BY archived_through_entry_seq DESC LIMIT 1",
+        [],
+        |row| row.get(0),
+    )?;
+    let archived = rusqlite::Connection::open(&archive)?;
+    let schema_version: i32 = archived.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = ?1",
+        [crate::receipt_store::RECEIPT_STORE_SCHEMA_KEY],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        schema_version,
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
+    assert_eq!(
+        retention_archive_prefix_content_sha256(&archived, "main", 4)?,
+        committed_digest
+    );
+
+    drop(archived);
+    drop(live);
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Settlement and metered reconciliation rows are mutated in place by ongoing
 /// reconciliation upserts, so a rotation can copy a reconciliation row, have a
 /// later update change it, and then abort under the write-locked co-archival

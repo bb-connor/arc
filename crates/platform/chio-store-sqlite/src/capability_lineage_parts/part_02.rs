@@ -736,6 +736,7 @@ fn receipt_error_to_port(error: chio_kernel::ReceiptStoreError) -> PortError {
         | chio_kernel::ReceiptStoreError::CryptoDecode(_)
         | chio_kernel::ReceiptStoreError::Canonical(_)
         | chio_kernel::ReceiptStoreError::InvalidOutcome(_)
+        | chio_kernel::ReceiptStoreError::InvalidQuery(_)
         | chio_kernel::ReceiptStoreError::ReadBoundary(_)
         | chio_kernel::ReceiptStoreError::Json(_)
         | chio_kernel::ReceiptStoreError::RetentionArchiveIncomplete { .. }

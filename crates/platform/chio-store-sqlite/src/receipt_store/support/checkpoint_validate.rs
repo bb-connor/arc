@@ -485,13 +485,30 @@ fn archived_prefix_is_backed(
     let Some(archive_content_sha256) = latest_watermark_archive_content_sha256(connection)? else {
         return Ok(false);
     };
-    archive_path_backs_prefix(
+    let current = archive_path_backs_prefix(
         connection,
         &archive_path,
         sqlite_u64(watermark, "watermark")?,
         &archive_identity,
         &archive_content_sha256,
-    )
+    );
+    if matches!(current, Ok(true)) {
+        return Ok(true);
+    }
+    let legacy = crate::receipt_store::evidence_retention::legacy_archive_path_backs_prefix(
+        connection,
+        &archive_path,
+        sqlite_u64(watermark, "watermark")?,
+        &archive_identity,
+        &archive_content_sha256,
+    );
+    match (current, legacy) {
+        (_, Ok(true)) => Ok(true),
+        (Err(error), _) => Err(error),
+        (Ok(false), Ok(false)) => Ok(false),
+        (Ok(false), Err(error)) => Err(error),
+        (Ok(true), _) => Ok(true),
+    }
 }
 
 /// True only when the archive at `archive_path` holds byte-identical checkpoint
@@ -674,12 +691,21 @@ pub(crate) fn load_trusted_archived_chio_receipt(
             )
         })?;
     validate_retention_archive_identity(&archive_read, &expected_archive_identity)?;
-    crate::receipt_store::evidence_retention::validate_retention_archive_prefix_content_sha256(
+    if crate::receipt_store::evidence_retention::validate_retention_archive_prefix_content_sha256(
         &archive_read,
         "main",
         watermark_i64,
         &expected_archive_content_sha256,
-    )?;
+    )
+    .is_err()
+    {
+        crate::receipt_store::evidence_retention::validate_legacy_retention_archive_prefix_content_sha256(
+            &archive_read,
+            "main",
+            watermark_i64,
+            &expected_archive_content_sha256,
+        )?;
+    }
     if !archive_connection_backs_prefix(connection, &archive_read, watermark)? {
         return Err(ReceiptStoreError::Conflict(format!(
             "archived tool receipt `{receipt_id}` is not backed by the signed retention prefix"

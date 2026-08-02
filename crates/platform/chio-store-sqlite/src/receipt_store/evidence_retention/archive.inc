@@ -61,35 +61,53 @@ fn archive_range(
     // `delete_archived_prefix_in_tx`, which is the authoritative check: a
     // concurrent rotation can still commit between here and that locked delete.
     ensure_archive_path_matches_ledger(connection, &archive_path)?;
-    ensure_committed_prefix_still_backed(connection)?;
+    let previous_archive_uses_legacy_content_digest =
+        ensure_committed_prefix_still_backed(connection).map_err(|error| {
+            ReceiptStoreError::Conflict(format!(
+                "retention archive committed-prefix validation failed: {error}"
+            ))
+        })?;
     let (archive_identity, archive_content_sha256) =
         with_attached_retention_archive_transaction(connection, &archive_path, |connection| {
-            create_archive_schema(connection)?;
+            create_archive_schema(connection).map_err(|error| {
+                ReceiptStoreError::Conflict(format!(
+                    "retention archive schema migration failed: {error}"
+                ))
+            })?;
             let archive_identity = super::support::ensure_attached_retention_archive_identity(
                 connection,
                 previous_archive_identity.as_deref(),
             )?;
-            if let Some(previous_content) = previous_archive_content_sha256.as_deref() {
-                validate_retention_archive_prefix_content_sha256(
-                    connection,
-                    "archive",
-                    previous_w,
-                    previous_content,
-                )?;
+            if !previous_archive_uses_legacy_content_digest {
+                if let Some(previous_content) = previous_archive_content_sha256.as_deref() {
+                    validate_retention_archive_prefix_content_sha256(
+                        connection,
+                        "archive",
+                        previous_w,
+                        previous_content,
+                    )?;
+                }
             }
             copy_archived_prefix_after_watermark(connection, previous_w, w)?;
             verify_co_archival_complete(connection, w)?;
-            if let Some(previous_content) = previous_archive_content_sha256.as_deref() {
-                validate_retention_archive_prefix_content_sha256(
-                    connection,
-                    "archive",
-                    previous_w,
-                    previous_content,
-                )?;
+            if !previous_archive_uses_legacy_content_digest {
+                if let Some(previous_content) = previous_archive_content_sha256.as_deref() {
+                    validate_retention_archive_prefix_content_sha256(
+                        connection,
+                        "archive",
+                        previous_w,
+                        previous_content,
+                    )?;
+                }
             }
             let archive_content_sha256 =
                 retention_archive_prefix_content_sha256(connection, "archive", w)?;
             Ok((archive_identity, archive_content_sha256))
+        })
+        .map_err(|error| {
+            ReceiptStoreError::Conflict(format!(
+                "retention archive copy transaction failed: {error}"
+            ))
         })?;
     // The final delete deliberately runs with no archive attached. Its archive
     // ownership guard checkpoints and locks the exact durable file first, then
@@ -104,7 +122,12 @@ fn archive_range(
         &archive_identity,
         previous_archive_content_sha256.as_deref(),
         &archive_content_sha256,
-    )?;
+    )
+    .map_err(|error| {
+        ReceiptStoreError::Conflict(format!(
+            "retention archive live-prefix commit failed: {error}"
+        ))
+    })?;
 
     // Reclaim freelist pages produced by the delete and shrink the WAL.
     connection.execute_batch("PRAGMA incremental_vacuum")?;
@@ -501,8 +524,22 @@ pub(in crate::receipt_store) fn validate_archive_schema_contract_in_schema(
     connection: &rusqlite::Connection,
     actual_schema: &str,
 ) -> Result<(), ReceiptStoreError> {
-    let actual_schema = validated_sqlite_schema_name(actual_schema)?;
     let expected = expected_archive_catalog()?;
+    validate_archive_schema_contract_against(
+        connection,
+        actual_schema,
+        &expected,
+        false,
+    )
+}
+
+fn validate_archive_schema_contract_against(
+    connection: &rusqlite::Connection,
+    actual_schema: &str,
+    expected: &rusqlite::Connection,
+    allow_current_schema_version_table: bool,
+) -> Result<(), ReceiptStoreError> {
+    let actual_schema = validated_sqlite_schema_name(actual_schema)?;
 
     let mut expected_statement = expected.prepare(
         "SELECT name FROM archive.sqlite_master \
@@ -522,10 +559,62 @@ pub(in crate::receipt_store) fn validate_archive_schema_contract_in_schema(
     for actual_row in actual_rows {
         actual_tables.push(actual_row?);
     }
+    if allow_current_schema_version_table {
+        if actual_tables
+            .iter()
+            .any(|table| table == "chio_store_schema_versions")
+        {
+            let current_expected = expected_archive_catalog()?;
+            let expected_contract = load_archive_table_contract(
+                &current_expected,
+                "archive",
+                "chio_store_schema_versions",
+            )?;
+            let actual_contract = load_archive_table_contract(
+                connection,
+                actual_schema,
+                "chio_store_schema_versions",
+            )?;
+            if actual_contract != expected_contract {
+                return Err(ReceiptStoreError::Conflict(
+                    "archive table chio_store_schema_versions does not match the required \
+                     evidence schema"
+                        .to_string(),
+                ));
+            }
+            let version_rows: i64 = connection.query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM {actual_schema}.chio_store_schema_versions \
+                     WHERE store_key = ?1 AND version = ?2"
+                ),
+                rusqlite::params![
+                    super::RECEIPT_STORE_SCHEMA_KEY,
+                    super::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+                ],
+                |row| row.get(0),
+            )?;
+            let total_rows: i64 = connection.query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM {actual_schema}.chio_store_schema_versions"
+                ),
+                [],
+                |row| row.get(0),
+            )?;
+            if version_rows != 1 || total_rows != 1 {
+                return Err(ReceiptStoreError::Conflict(
+                    "legacy archive compatibility accepts only the current singleton receipt \
+                     schema-version row"
+                        .to_string(),
+                ));
+            }
+        }
+        actual_tables.retain(|table| table != "chio_store_schema_versions");
+    }
     if actual_tables != expected_tables {
-        return Err(ReceiptStoreError::Conflict(
-            "archive table catalog does not match the required evidence schema".to_string(),
-        ));
+        return Err(ReceiptStoreError::Conflict(format!(
+            "archive table catalog does not match the required evidence schema: expected \
+             {expected_tables:?}, found {actual_tables:?}"
+        )));
     }
     let active_schema_object = connection
         .query_row(
@@ -564,6 +653,12 @@ fn expected_archive_catalog() -> Result<rusqlite::Connection, ReceiptStoreError>
     let expected = rusqlite::Connection::open_in_memory()?;
     expected.execute_batch("ATTACH DATABASE ':memory:' AS archive")?;
     expected.execute_batch(ARCHIVE_SCHEMA_SQL)?;
+    Ok(expected)
+}
+
+fn expected_legacy_archive_catalog() -> Result<rusqlite::Connection, ReceiptStoreError> {
+    let expected = expected_archive_catalog()?;
+    expected.execute_batch("DROP TABLE archive.chio_store_schema_versions")?;
     Ok(expected)
 }
 
@@ -696,15 +791,67 @@ pub(crate) fn retention_archive_prefix_content_sha256(
     schema: &str,
     watermark: i64,
 ) -> Result<String, ReceiptStoreError> {
+    let expected = expected_archive_catalog()?;
+    retention_archive_prefix_content_sha256_against(
+        connection,
+        schema,
+        watermark,
+        &expected,
+        false,
+    )
+}
+
+pub(crate) fn legacy_retention_archive_prefix_content_sha256(
+    connection: &rusqlite::Connection,
+    schema: &str,
+    watermark: i64,
+) -> Result<String, ReceiptStoreError> {
+    let expected = expected_legacy_archive_catalog()?;
+    retention_archive_prefix_content_sha256_against(
+        connection,
+        schema,
+        watermark,
+        &expected,
+        true,
+    )
+}
+
+pub(in crate::receipt_store) fn validate_legacy_retention_archive_prefix_content_sha256(
+    connection: &rusqlite::Connection,
+    schema: &str,
+    watermark: i64,
+    expected_sha256: &str,
+) -> Result<(), ReceiptStoreError> {
+    let actual = legacy_retention_archive_prefix_content_sha256(connection, schema, watermark)?;
+    if actual != expected_sha256 {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "legacy retention archive canonical content digest {actual:?} for prefix watermark \
+             {watermark} does not match the committed watermark digest {expected_sha256:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn retention_archive_prefix_content_sha256_against(
+    connection: &rusqlite::Connection,
+    schema: &str,
+    watermark: i64,
+    expected: &rusqlite::Connection,
+    allow_current_schema_version_table: bool,
+) -> Result<String, ReceiptStoreError> {
     if watermark <= 0 {
         return Err(ReceiptStoreError::Conflict(
             "retention archive prefix digest requires a positive watermark".to_string(),
         ));
     }
     let schema = validated_sqlite_schema_name(schema)?;
-    validate_archive_schema_contract_in_schema(connection, schema)?;
+    validate_archive_schema_contract_against(
+        connection,
+        schema,
+        expected,
+        allow_current_schema_version_table,
+    )?;
 
-    let expected = expected_archive_catalog()?;
     let mut table_statement = expected.prepare(
         "SELECT name FROM archive.sqlite_master \
          WHERE type = 'table' AND name NOT GLOB 'sqlite_*' ORDER BY name",
@@ -759,6 +906,42 @@ pub(crate) fn validate_retention_archive_prefix_content_sha256(
         )));
     }
     Ok(())
+}
+
+pub(in crate::receipt_store) fn legacy_archive_path_backs_prefix(
+    connection: &rusqlite::Connection,
+    archive_path: &str,
+    watermark: u64,
+    expected_archive_identity: &str,
+    expected_archive_content_sha256: &str,
+) -> Result<bool, ReceiptStoreError> {
+    if watermark == 0 {
+        return Ok(false);
+    }
+    let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+        | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW;
+    let Ok(archive) = rusqlite::Connection::open_with_flags(archive_path, flags) else {
+        return Ok(false);
+    };
+    archive.execute_batch("PRAGMA query_only = ON; BEGIN DEFERRED")?;
+    archive.query_row("SELECT COUNT(*) FROM main.sqlite_master", [], |row| {
+        row.get::<_, i64>(0)
+    })?;
+    super::support::validate_retention_archive_identity(&archive, expected_archive_identity)?;
+    validate_legacy_retention_archive_prefix_content_sha256(
+        &archive,
+        "main",
+        sqlite_i64(watermark, "legacy archive prefix watermark")?,
+        expected_archive_content_sha256,
+    )?;
+    if !super::support::archive_connection_backs_prefix(connection, &archive, watermark)? {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "legacy retention archive does not re-derive the signed checkpoint prefix through \
+             watermark {watermark}"
+        )));
+    }
+    Ok(true)
 }
 
 fn archive_digest_table(

@@ -293,8 +293,24 @@ impl SqliteReceiptStore {
         let tool_srv = query.tool_server.as_deref();
         let tool_nm = query.tool_name.as_deref();
         let outcome = query.outcome.as_deref();
-        let since = query.since.map(|v| v as i64);
-        let until = query.until.map(|v| v as i64);
+        let since = query
+            .since
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| {
+                ReceiptStoreError::InvalidQuery(
+                    "since exceeds SQLite's signed timestamp range".to_string(),
+                )
+            })?;
+        let until = query
+            .until
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| {
+                ReceiptStoreError::InvalidQuery(
+                    "until exceeds SQLite's signed timestamp range".to_string(),
+                )
+            })?;
         let min_cost = query.min_cost.map(|value| value.to_be_bytes().to_vec());
         let max_cost = query.max_cost.map(|value| value.to_be_bytes().to_vec());
         let agent_sub = query.agent_subject.as_deref();
@@ -889,14 +905,14 @@ fn ensure_archive_path_matches_ledger(
 /// watermark, or a zero watermark) is vacuously backed.
 fn ensure_committed_prefix_still_backed(
     connection: &rusqlite::Connection,
-) -> Result<(), ReceiptStoreError> {
+) -> Result<bool, ReceiptStoreError> {
     let Some(current) = super::support::retention_watermark(connection)? else {
-        return Ok(());
+        return Ok(false);
     };
     if current == 0 {
-        return Ok(());
+        return Ok(false);
     }
-    let backed = match super::support::latest_watermark_archive_path(connection)? {
+    let backing_uses_legacy_content_digest = match super::support::latest_watermark_archive_path(connection)? {
         Some(ledger_path) => {
             let Some(archive_identity) =
                 super::support::latest_watermark_archive_sha256(connection)?
@@ -915,25 +931,45 @@ fn ensure_committed_prefix_still_backed(
                         )
                     },
                 )?;
-            super::support::archive_path_backs_prefix(
+            let current_result = super::support::archive_path_backs_prefix(
                 connection,
                 &ledger_path,
                 current,
                 &archive_identity,
                 &archive_content_sha256,
-            )?
+            );
+            if matches!(current_result, Ok(true)) {
+                false
+            } else if legacy_archive_path_backs_prefix(
+                connection,
+                &ledger_path,
+                current,
+                &archive_identity,
+                &archive_content_sha256,
+            )? {
+                true
+            } else {
+                if let Err(error) = current_result {
+                    return Err(error);
+                }
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "retention archive no longer backs the committed watermark {current}; the prior \
+                     archive is missing, unreadable, or does not re-derive the signed checkpoint roots. \
+                     Refusing to rotate and strand the deleted prefix; restore the archive before \
+                     rotating again"
+                )));
+            }
         }
-        None => false,
+        None => {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "retention archive no longer backs the committed watermark {current}; the prior \
+                 archive is missing, unreadable, or does not re-derive the signed checkpoint roots. \
+                 Refusing to rotate and strand the deleted prefix; restore the archive before \
+                 rotating again"
+            )));
+        }
     };
-    if !backed {
-        return Err(ReceiptStoreError::Conflict(format!(
-            "retention archive no longer backs the committed watermark {current}; the prior \
-             archive is missing, unreadable, or does not re-derive the signed checkpoint roots. \
-             Refusing to rotate and strand the deleted prefix; restore the archive before \
-             rotating again"
-        )));
-    }
-    Ok(())
+    Ok(backing_uses_legacy_content_digest)
 }
 
 /// Durable ownership of the archive across a destructive live commit.

@@ -2,6 +2,34 @@
 use super::*;
 
 #[test]
+fn production_broker_rejects_split_durable_revocation_authority() {
+    use chio_kernel::admission_operation::DurableAdmissionMode;
+
+    assert!(validate_production_broker_durable_admission_topology(
+        true,
+        DurableAdmissionMode::Off
+    )
+    .is_ok());
+    assert!(validate_production_broker_durable_admission_topology(
+        false,
+        DurableAdmissionMode::SideEffecting
+    )
+    .is_ok());
+
+    for mode in [
+        DurableAdmissionMode::Monetary,
+        DurableAdmissionMode::SideEffecting,
+        DurableAdmissionMode::All,
+    ] {
+        let error = validate_production_broker_durable_admission_topology(true, mode)
+            .expect_err("split revocation authority must fail closed");
+        assert!(error
+            .to_string()
+            .contains("revocation authorities do not share one commit domain"));
+    }
+}
+
+#[test]
 fn cli_mcp_manifest_uses_local_wrapped_process_topology() {
     let signer = chio_core::Keypair::from_seed(&[92; 32]);
     let manifest = chio_manifest::ToolManifest {

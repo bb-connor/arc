@@ -1185,6 +1185,33 @@ mod tests {
         assert_eq!(after_logout_response.status(), StatusCode::UNAUTHORIZED);
     }
 
+    #[tokio::test]
+    async fn receipt_query_rejects_timestamps_outside_sqlite_range() {
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+
+        let receipt_file = tempfile::NamedTempFile::new().test_unwrap();
+        drop(SqliteReceiptStore::open(receipt_file.path()).test_unwrap());
+        let mut state = metrics_state("service-secret");
+        state.config.receipt_db_path = Some(receipt_file.path().to_path_buf());
+
+        let request = Request::builder()
+            .uri(format!(
+                "{RECEIPT_QUERY_PATH}?since={}",
+                (i64::MAX as u64) + 1
+            ))
+            .header(AUTHORIZATION, "Bearer service-secret")
+            .body(Body::empty())
+            .test_unwrap();
+        let response = super::build_router(state)
+            .oneshot(request)
+            .await
+            .test_unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
     fn active_defense_event_json() -> Vec<u8> {
         let event = chio_security_types::ports::UnverifiedSecurityEvent {
             tenant_id: chio_security_types::ports::TenantId::new("tenant-router").test_unwrap(),
