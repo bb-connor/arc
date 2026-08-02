@@ -38,6 +38,8 @@ use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_d
 use reqwest::blocking::Client;
 use reqwest::header::CONTENT_TYPE;
 
+const AUTHORITY_ADMIN_TOKEN: &str = "passport-authority-admin-token";
+
 fn did_from_public_key(public_key: chio_core::PublicKey) -> DidChio {
     DidChio::from_public_key(public_key).expect("ed25519 key")
 }
@@ -131,6 +133,8 @@ fn spawn_portable_passport_issuance_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            AUTHORITY_ADMIN_TOKEN,
             "--advertise-url",
             advertise_url,
             "--passport-issuance-offers-file",
@@ -165,6 +169,8 @@ fn spawn_portable_passport_lifecycle_issuance_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            AUTHORITY_ADMIN_TOKEN,
             "--advertise-url",
             advertise_url,
             "--passport-issuance-offers-file",
@@ -300,6 +306,8 @@ fn spawn_portable_oid4vp_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            AUTHORITY_ADMIN_TOKEN,
             "--advertise-url",
             advertise_url,
             "--passport-issuance-offers-file",
@@ -341,6 +349,8 @@ fn spawn_portable_oid4vp_trust_service_with_authority_db(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            AUTHORITY_ADMIN_TOKEN,
             "--advertise-url",
             advertise_url,
             "--passport-issuance-offers-file",
@@ -4678,7 +4688,7 @@ fn passport_oid4vp_public_verifier_metadata_and_rotation_preserve_active_request
 
     let rotate = client
         .post(format!("{base_url}/v1/authority"))
-        .bearer_auth(service_token)
+        .bearer_auth(AUTHORITY_ADMIN_TOKEN)
         .send()
         .expect("rotate authority");
     assert_eq!(rotate.status(), reqwest::StatusCode::OK);
