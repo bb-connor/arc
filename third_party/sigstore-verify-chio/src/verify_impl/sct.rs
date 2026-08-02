@@ -145,10 +145,10 @@ impl DigitallySigned {
 }
 
 /// Extract the SCT from a certificate and prepare it for verification
-pub fn extract_sct(
+pub fn extract_scts(
     cert: &Certificate,
     issuer_spki_der: &[u8],
-) -> Result<(SignedCertificateTimestamp, [u8; 32])> {
+) -> Result<(Vec<SignedCertificateTimestamp>, [u8; 32])> {
     // Extract the SCT list extension from the certificate
     let scts: SignedCertificateTimestampList = match cert.tbs_certificate.get() {
         Ok(Some((_, ext))) => ext,
@@ -164,27 +164,24 @@ pub fn extract_sct(
         .parse_timestamps()
         .map_err(|e| Error::Verification(format!("failed to parse SCT list: {:?}", e)))?;
 
-    // We expect exactly one SCT
-    let sct = match timestamps.as_slice() {
-        [single] => single
-            .parse_timestamp()
-            .map_err(|e| Error::Verification(format!("failed to parse SCT: {:?}", e)))?,
-        [] => {
-            return Err(Error::Verification(
-                "no SCTs found in certificate".to_string(),
-            ))
-        }
-        _ => {
-            return Err(Error::Verification(
-                "certificate contains multiple SCTs, expected exactly one".to_string(),
-            ))
-        }
-    };
+    if timestamps.is_empty() {
+        return Err(Error::Verification(
+            "no SCTs found in certificate".to_string(),
+        ));
+    }
+    let scts = timestamps
+        .iter()
+        .map(|timestamp| {
+            timestamp
+                .parse_timestamp()
+                .map_err(|e| Error::Verification(format!("failed to parse SCT: {:?}", e)))
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     // Calculate the issuer key hash (SHA-256 of issuer's SPKI)
     let issuer_key_hash = *sigstore_crypto::sha256(issuer_spki_der).as_bytes();
 
-    Ok((sct, issuer_key_hash))
+    Ok((scts, issuer_key_hash))
 }
 
 /// Verify the Signed Certificate Timestamp (SCT) embedded in the certificate
@@ -202,7 +199,7 @@ pub fn verify_sct(
         .map_err(|e| Error::Verification(format!("failed to parse certificate: {}", e)))?;
 
     // Extract the SCT and calculate issuer key hash
-    let (sct, issuer_key_hash) = extract_sct(&cert, issuer_spki_der)?;
+    let (scts, issuer_key_hash) = extract_scts(&cert, issuer_spki_der)?;
 
     // Get CT log keys from trusted root
     let ct_keys = trusted_root
@@ -215,28 +212,108 @@ pub fn verify_sct(
         ));
     }
 
-    // Find the matching CT log key by log ID
-    let log_id = &sct.log_id.key_id;
-    let (_, public_key) = ct_keys.iter().find(|(id, _)| id == log_id).ok_or_else(|| {
-        Error::Verification(format!(
-            "SCT log ID {:?} not found in trusted root CT logs",
-            hex::encode(log_id)
-        ))
-    })?;
+    const REQUIRED_TRUSTED_SCTS: usize = 1;
+    let mut verified = 0_usize;
+    let mut failures = Vec::new();
+    for sct in scts {
+        let result = (|| {
+            let log_id = &sct.log_id.key_id;
+            let (_, public_key) = ct_keys.iter().find(|(id, _)| id == log_id).ok_or_else(|| {
+                Error::Verification(format!(
+                    "SCT log ID {:?} not found in trusted root CT logs",
+                    hex::encode(log_id)
+                ))
+            })?;
+            let digitally_signed =
+                DigitallySigned::from_embedded_sct(&cert, &sct, issuer_key_hash)?;
+            let sig_alg_bytes = sct.signature.algorithm.tls_serialize().map_err(|e| {
+                Error::Verification(format!("failed to serialize signature algorithm: {}", e))
+            })?;
+            let sig_alg = u16::from_be_bytes([sig_alg_bytes[0], sig_alg_bytes[1]]);
+            let signature = SignatureBytes::new(sct.signature.signature.clone().into_vec());
+            digitally_signed.verify(public_key, sig_alg, &signature)
+        })();
+        match result {
+            Ok(()) => {
+                verified += 1;
+                if verified >= REQUIRED_TRUSTED_SCTS {
+                    return Ok(());
+                }
+            }
+            Err(error) => failures.push(error.to_string()),
+        }
+    }
 
-    // Construct the DigitallySigned structure
-    let digitally_signed = DigitallySigned::from_embedded_sct(&cert, &sct, issuer_key_hash)?;
+    Err(Error::Verification(format!(
+        "certificate has {verified} verified SCTs, requires {REQUIRED_TRUSTED_SCTS}: {}",
+        failures.join("; ")
+    )))
+}
 
-    // Extract signature algorithm and signature bytes for verification
-    // Convert the SignatureAndHashAlgorithm to u16
-    let sig_alg_bytes = sct.signature.algorithm.tls_serialize().map_err(|e| {
-        Error::Verification(format!("failed to serialize signature algorithm: {}", e))
-    })?;
-    let sig_alg = u16::from_be_bytes([sig_alg_bytes[0], sig_alg_bytes[1]]);
-    let signature = SignatureBytes::new(sct.signature.signature.clone().into_vec());
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sigstore_types::Bundle;
+    use x509_cert::{
+        der::{asn1::OctetString, Encode},
+        ext::pkix::sct::SerializedSct,
+    };
 
-    // Verify the signature
-    digitally_signed.verify(public_key, sig_alg, &signature)?;
+    const COSIGN_V3_BLOB_BUNDLE: &str =
+        include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
 
-    Ok(())
+    #[test]
+    fn extract_sct_accepts_multiple_timestamps() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let mut cert = Certificate::from_der(certificate.as_bytes()).expect("certificate");
+        let existing: SignedCertificateTimestampList = cert
+            .tbs_certificate
+            .get()
+            .expect("SCT extension decode")
+            .expect("SCT extension")
+            .1;
+        let serialized = existing.parse_timestamps().expect("timestamp list");
+        let first = serialized[0].parse_timestamp().expect("first SCT");
+        let second = serialized[0].parse_timestamp().expect("second SCT");
+        let duplicate = SignedCertificateTimestampList::new(&[
+            SerializedSct::new(first).expect("serialized first SCT"),
+            SerializedSct::new(second).expect("serialized second SCT"),
+        ])
+        .expect("duplicate SCT list");
+        let extension = cert
+            .tbs_certificate
+            .extensions
+            .as_mut()
+            .and_then(|extensions| {
+                extensions
+                    .iter_mut()
+                    .find(|extension| extension.extn_id == CT_PRECERT_SCTS)
+            })
+            .expect("SCT extension");
+        extension.extn_value =
+            OctetString::new(duplicate.to_der().expect("encoded SCT list")).expect("octets");
+
+        let extracted = extract_scts(&cert, b"issuer SPKI")
+            .expect("a certificate with redundant SCTs must remain verifiable");
+
+        assert_eq!(extracted.0.len(), 2);
+
+        let trusted_root = TrustedRoot::production().expect("production root");
+        let issuer_spki = trusted_root
+            .fulcio_certs()
+            .expect("Fulcio certificates")
+            .into_iter()
+            .filter_map(|der| Certificate::from_der(&der).ok())
+            .find(|issuer| issuer.tbs_certificate.subject == cert.tbs_certificate.issuer)
+            .expect("matching issuer")
+            .tbs_certificate
+            .subject_public_key_info
+            .to_der()
+            .expect("issuer SPKI");
+        let cert_der = cert.to_der().expect("certificate DER");
+
+        verify_sct(&cert_der, &issuer_spki, &trusted_root)
+            .expect("one valid SCT must satisfy the verification threshold");
+    }
 }

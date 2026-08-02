@@ -37,6 +37,7 @@ pub fn verify_tlog_entries(
                 inclusion_proof,
                 trusted_root,
             )?;
+            verify_entry_inclusion(entry, inclusion_proof)?;
         }
 
         // Verify inclusion promise (SET) if present
@@ -110,6 +111,14 @@ pub fn verify_checkpoint(
             proof_root_hash.to_hex()
         )));
     }
+    let proof_tree_size = u64::try_from(inclusion_proof.tree_size)
+        .map_err(|_| Error::Verification("inclusion proof has an invalid tree size".to_string()))?;
+    if checkpoint.tree_size != proof_tree_size {
+        return Err(Error::Verification(format!(
+            "Checkpoint tree size mismatch: expected {}, got {}",
+            checkpoint.tree_size, proof_tree_size
+        )));
+    }
 
     // Get all Rekor keys with their key hints from trusted root
     let rekor_keys = trusted_root
@@ -138,6 +147,26 @@ pub fn verify_checkpoint(
     ))
 }
 
+fn verify_entry_inclusion(
+    entry: &TransparencyLogEntry,
+    inclusion_proof: &InclusionProof,
+) -> Result<()> {
+    let proof_log_index = inclusion_proof.log_index.as_u64().ok_or_else(|| {
+        Error::Verification("inclusion proof has an invalid log index".to_string())
+    })?;
+    let tree_size = u64::try_from(inclusion_proof.tree_size)
+        .map_err(|_| Error::Verification("inclusion proof has an invalid tree size".to_string()))?;
+    let leaf_hash = sigstore_merkle::hash_leaf(entry.canonicalized_body.as_bytes());
+    sigstore_merkle::verify_inclusion_proof(
+        &leaf_hash,
+        proof_log_index,
+        tree_size,
+        &inclusion_proof.hashes,
+        &inclusion_proof.root_hash,
+    )
+    .map_err(|error| Error::Verification(format!("inclusion proof verification failed: {error}")))
+}
+
 #[derive(Serialize)]
 struct RekorPayload {
     body: String,
@@ -156,10 +185,24 @@ pub fn verify_set(entry: &TransparencyLogEntry, trusted_root: &TrustedRoot) -> R
         .as_ref()
         .ok_or(Error::Verification("Missing inclusion promise".into()))?;
 
-    // Find the key for the log ID
-    let log_key = trusted_root
-        .rekor_key_for_log(&entry.log_id.key_id)
-        .map_err(|_| Error::Verification(format!("Unknown log ID: {}", entry.log_id.key_id)))?;
+    // Resolve the key together with its authority window. A historical key may
+    // remain trusted for old entries without retaining authority indefinitely.
+    let log = trusted_root
+        .tlogs
+        .iter()
+        .find(|log| log.log_id.key_id == entry.log_id.key_id)
+        .ok_or_else(|| Error::Verification(format!("Unknown log ID: {}", entry.log_id.key_id)))?;
+    if !super::helpers::validity_period_contains(
+        log.public_key.valid_for.as_ref(),
+        entry.integrated_time,
+        "Rekor key",
+    )? {
+        return Err(Error::Verification(format!(
+            "Rekor key is outside its validity period at integrated time {}",
+            entry.integrated_time
+        )));
+    }
+    let log_key = log.public_key.raw_bytes.clone();
 
     // Construct the payload (base64-encoded body)
     let body = entry.canonicalized_body.to_base64();
@@ -204,6 +247,8 @@ pub fn verify_set(entry: &TransparencyLogEntry, trusted_root: &TrustedRoot) -> R
 mod tests {
     use super::*;
     use sigstore_crypto::parse_certificate_info;
+    use sigstore_trust_root::ValidityPeriod;
+    use sigstore_types::CanonicalizedBody;
 
     const COSIGN_V3_BLOB_BUNDLE: &str =
         include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
@@ -226,5 +271,58 @@ mod tests {
         .expect("inclusion proof remains valid without unsigned chronology");
 
         assert_eq!(integrated_time, None);
+    }
+
+    #[test]
+    fn inclusion_proof_is_bound_to_the_canonicalized_entry() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let certificate_info =
+            parse_certificate_info(certificate.as_bytes()).expect("certificate info");
+        bundle.verification_material.tlog_entries[0].inclusion_promise = None;
+
+        verify_tlog_entries(
+            &bundle,
+            &TrustedRoot::production().expect("production root"),
+            certificate_info.not_before,
+            certificate_info.not_after,
+            crate::verify::DEFAULT_CLOCK_SKEW_SECONDS,
+        )
+        .expect("the original canonicalized entry must match the inclusion proof");
+
+        bundle.verification_material.tlog_entries[0].canonicalized_body =
+            CanonicalizedBody::new(b"{}".to_vec());
+
+        let error = verify_tlog_entries(
+            &bundle,
+            &TrustedRoot::production().expect("production root"),
+            certificate_info.not_before,
+            certificate_info.not_after,
+            crate::verify::DEFAULT_CLOCK_SKEW_SECONDS,
+        )
+        .expect_err("a checkpoint must not authenticate an unrelated entry");
+
+        assert!(error.to_string().contains("inclusion proof"));
+    }
+
+    #[test]
+    fn set_rejects_a_rekor_key_outside_its_authority_window() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let entry = &bundle.verification_material.tlog_entries[0];
+        let mut trusted_root = TrustedRoot::production().expect("production root");
+        let matching_log = trusted_root
+            .tlogs
+            .iter_mut()
+            .find(|log| log.log_id.key_id == entry.log_id.key_id)
+            .expect("matching Rekor log");
+        matching_log.public_key.valid_for = Some(ValidityPeriod {
+            start: Some("2999-01-01T00:00:00Z".to_string()),
+            end: None,
+        });
+
+        let error = verify_set(entry, &trusted_root)
+            .expect_err("a retired or not-yet-active Rekor key must not verify a SET");
+
+        assert!(error.to_string().contains("validity period"));
     }
 }

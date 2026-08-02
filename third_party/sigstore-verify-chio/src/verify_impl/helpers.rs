@@ -7,10 +7,46 @@ use crate::error::{Error, Result};
 use const_oid::db::rfc5912::ID_KP_CODE_SIGNING;
 use rustls_pki_types::{CertificateDer, UnixTime};
 use sigstore_crypto::CertificateInfo;
-use sigstore_trust_root::TrustedRoot;
+use sigstore_trust_root::{TrustedRoot, ValidityPeriod};
 use sigstore_types::bundle::VerificationMaterialContent;
 use sigstore_types::{Bundle, DerCertificate, DerPublicKey, SignatureBytes, SignatureContent};
 use webpki::{anchor_from_trusted_cert, EndEntityCert, KeyUsage, ALL_VERIFICATION_ALGS};
+
+pub(crate) fn validity_period_contains(
+    valid_for: Option<&ValidityPeriod>,
+    timestamp: i64,
+    authority: &str,
+) -> Result<bool> {
+    let Some(valid_for) = valid_for else {
+        return Ok(true);
+    };
+    let timestamp = chrono::DateTime::from_timestamp(timestamp, 0).ok_or_else(|| {
+        Error::Verification(format!("{authority} validation time cannot be represented"))
+    })?;
+    let start = valid_for
+        .start
+        .as_deref()
+        .map(chrono::DateTime::parse_from_rfc3339)
+        .transpose()
+        .map_err(|error| {
+            Error::Verification(format!(
+                "{authority} validity period has an invalid start: {error}"
+            ))
+        })?;
+    let end = valid_for
+        .end
+        .as_deref()
+        .map(chrono::DateTime::parse_from_rfc3339)
+        .transpose()
+        .map_err(|error| {
+            Error::Verification(format!(
+                "{authority} validity period has an invalid end: {error}"
+            ))
+        })?;
+
+    Ok(start.as_ref().map_or(true, |start| timestamp >= *start)
+        && end.as_ref().map_or(true, |end| timestamp <= *end))
+}
 
 /// Extract and decode the signing certificate from verification material
 pub fn extract_certificate(
@@ -266,14 +302,26 @@ pub fn verify_certificate_chain(
         }
     };
 
-    // Get Fulcio certificates from trusted root to use as trust anchors
-    let fulcio_certs = trusted_root
-        .fulcio_certs()
-        .map_err(|e| Error::Verification(format!("failed to get Fulcio certs: {}", e)))?;
+    // Only authorities active at the trusted validation time may become trust
+    // anchors. Retaining a retired CA in the root supports historical artifacts,
+    // but must not extend that CA's signing authority.
+    let mut fulcio_certs = Vec::new();
+    for authority in &trusted_root.certificate_authorities {
+        if !validity_period_contains(
+            authority.valid_for.as_ref(),
+            validation_time,
+            "Fulcio authority",
+        )? {
+            continue;
+        }
+        fulcio_certs.extend(authority.cert_chain.certificates.iter().map(|certificate| {
+            CertificateDer::from(certificate.raw_bytes.as_bytes()).into_owned()
+        }));
+    }
 
     if fulcio_certs.is_empty() {
         return Err(Error::Verification(
-            "no Fulcio certificates in trusted root".to_string(),
+            "no Fulcio certificates are active in the trust root validity period".to_string(),
         ));
     }
 
@@ -411,4 +459,38 @@ fn get_issuer_spki(
     Err(Error::Verification(
         "could not find issuer certificate for SCT verification".to_string(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sigstore_crypto::parse_certificate_info;
+    use sigstore_trust_root::ValidityPeriod;
+
+    const COSIGN_V3_BLOB_BUNDLE: &str =
+        include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
+
+    #[test]
+    fn certificate_chain_rejects_fulcio_anchors_outside_their_authority_window() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let certificate_info =
+            parse_certificate_info(certificate.as_bytes()).expect("certificate info");
+        let mut trusted_root = TrustedRoot::production().expect("production root");
+        for authority in &mut trusted_root.certificate_authorities {
+            authority.valid_for = Some(ValidityPeriod {
+                start: Some("2999-01-01T00:00:00Z".to_string()),
+                end: None,
+            });
+        }
+
+        let error = verify_certificate_chain(
+            &bundle.verification_material.content,
+            certificate_info.not_before,
+            &trusted_root,
+        )
+        .expect_err("an inactive Fulcio authority must not become a trust anchor");
+
+        assert!(error.to_string().contains("validity period"));
+    }
 }
