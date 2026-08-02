@@ -271,6 +271,25 @@ impl Verifier {
         let cert_info = parse_certificate_info(cert.as_bytes())
             .map_err(|e| Error::Verification(format!("failed to parse certificate: {}", e)))?;
 
+        // Content binding must precede certificate-time selection. Otherwise a
+        // SET-authenticated time from an unrelated entry could validate the
+        // certificate used for a different logged signature.
+        let verified_tlog_content = if policy.verify_tlog {
+            let verified = verify_transparency_log_content_binding(
+                bundle,
+                &artifact,
+                Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(&cert)),
+            )?;
+            if verified.entry_count == 0 {
+                return Err(Error::Verification(
+                    "no transparency log entry is bound to the bundle content".to_string(),
+                ));
+            }
+            Some(verified)
+        } else {
+            None
+        };
+
         // Store identity and issuer in result
         result.identity = cert_info.identity.clone();
         result.issuer = cert_info.issuer.clone();
@@ -287,6 +306,8 @@ impl Verifier {
                     bundle,
                     &signature,
                     &self.trusted_root,
+                    verified_tlog_content
+                        .and_then(|verified| verified.v1_integrated_time_with_promise),
                 )?
             } else {
                 crate::verify_impl::helpers::extract_tsa_timestamp(
@@ -309,7 +330,11 @@ impl Verifier {
                         .to_string(),
                 ));
             }
-            Some(crate::verify_impl::helpers::determine_validation_time_from_tlog(bundle)?)
+            Some(crate::verify_impl::helpers::determine_validation_time_from_tlog(
+                bundle,
+                verified_tlog_content
+                    .and_then(|verified| verified.v1_integrated_time_with_promise),
+            )?)
         } else {
             None
         };
@@ -416,21 +441,6 @@ impl Verifier {
             )?;
         }
 
-        // (8): Verify the transparency log entry's consistency against the other
-        //      materials, to prevent variants of CVE-2022-36056.
-        if policy.verify_tlog {
-            let content_bound_entries = verify_transparency_log_content_binding(
-                bundle,
-                &artifact,
-                Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(&cert)),
-            )?;
-            if content_bound_entries == 0 {
-                return Err(Error::Verification(
-                    "no transparency log entry is bound to the bundle content".to_string(),
-                ));
-            }
-        }
-
         Ok(result)
     }
 }
@@ -511,30 +521,53 @@ fn verify_message_signature(
     .map_err(|error| Error::Verification(format!("message signature verification failed: {error}")))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct VerifiedTransparencyLogContent {
+    entry_count: usize,
+    v1_integrated_time_with_promise: Option<i64>,
+}
+
 fn verify_transparency_log_content_binding(
     bundle: &Bundle,
     artifact: &Artifact<'_>,
     dsse_verifier: Option<crate::verify_impl::rekor::ExpectedDsseVerifier<'_>>,
-) -> Result<usize> {
+) -> Result<VerifiedTransparencyLogContent> {
     let expected_verifier = dsse_verifier.ok_or_else(|| {
         Error::Verification("transparency-log content binding requires a verifier identity".to_string())
     })?;
-    match &bundle.content {
+    let (entry_count, content_kind) = match &bundle.content {
         SignatureContent::MessageSignature(_) => {
-            crate::verify_impl::verify_hashedrekord_entries(
+            let entry_count = crate::verify_impl::verify_hashedrekord_entries(
                 bundle,
                 artifact,
                 expected_verifier,
-            )
+            )?;
+            (entry_count, "hashedrekord")
         }
         SignatureContent::DsseEnvelope(_) => {
             let dsse_entries =
                 crate::verify_impl::verify_dsse_entries(bundle, expected_verifier)?;
             let intoto_entries =
                 crate::verify_impl::verify_intoto_entries(bundle, expected_verifier)?;
-            Ok(dsse_entries + intoto_entries)
+            (dsse_entries + intoto_entries, "dsse")
         }
-    }
+    };
+    let v1_integrated_time_with_promise = bundle
+        .verification_material
+        .tlog_entries
+        .iter()
+        .filter(|entry| {
+            entry.kind_version.kind == content_kind
+                && entry.kind_version.version == "0.0.1"
+                && entry.inclusion_promise.is_some()
+                && entry.integrated_time > 0
+        })
+        .map(|entry| entry.integrated_time)
+        .min();
+    Ok(VerifiedTransparencyLogContent {
+        entry_count,
+        v1_integrated_time_with_promise,
+    })
 }
 
 fn verify_identity_policy(expected_identity: &str, actual_identity: Option<&str>) -> Result<()> {
@@ -706,7 +739,9 @@ pub fn verify_with_key<'a>(
         Some(crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(
             public_key,
         )),
-    )? == 0
+    )?
+    .entry_count
+        == 0
     {
         return Err(Error::Verification(
             "no transparency log entry is bound to the bundle content".to_string(),
@@ -897,17 +932,61 @@ mod tests {
             &bundle,
             &signature,
             &trusted_root,
+            None,
         )
         .expect_err("V2 content must require RFC 3161 time");
         assert!(timestamp_error
             .to_string()
             .contains("V2 bundle requires RFC3161 timestamp"));
 
-        let tlog_error = crate::verify_impl::helpers::determine_validation_time_from_tlog(&bundle)
-            .expect_err("V2 content has no signed integrated time");
+        let tlog_error =
+            crate::verify_impl::helpers::determine_validation_time_from_tlog(&bundle, None)
+                .expect_err("V2 content has no signed integrated time");
         assert!(tlog_error
             .to_string()
             .contains("V2 transparency-log content has no signed integrated time"));
+    }
+
+    #[test]
+    fn v1_dsse_content_cannot_borrow_an_unrelated_hashedrekord_integrated_time() {
+        let mut bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("V1 DSSE bundle");
+        bundle.verification_material.tlog_entries[0].inclusion_promise = None;
+        let unrelated = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("unrelated V1 bundle");
+        bundle
+            .verification_material
+            .tlog_entries
+            .push(unrelated.verification_material.tlog_entries[0].clone());
+        let certificate = bundle.signing_certificate().expect("DSSE certificate");
+        let verified = verify_transparency_log_content_binding(
+            &bundle,
+            &Artifact::Bytes(CONDA_PACKAGE),
+            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(
+                certificate,
+            )),
+        )
+        .expect("the original DSSE entry remains content-bound");
+        assert_eq!(verified.entry_count, 1);
+        assert_eq!(verified.v1_integrated_time_with_promise, None);
+        let signature = crate::verify_impl::helpers::extract_signature(&bundle.content)
+            .expect("extract DSSE signature");
+
+        let error = crate::verify_impl::helpers::determine_validation_time(
+            &bundle,
+            &signature,
+            &TrustedRoot::production().expect("production root"),
+            verified.v1_integrated_time_with_promise,
+        )
+        .expect_err("an unrelated hashedrekord SET must not provide DSSE validation time");
+
+        assert!(error.to_string().contains("No verified timestamp found"));
+        let tlog_error = crate::verify_impl::helpers::determine_validation_time_from_tlog(
+            &bundle,
+            verified.v1_integrated_time_with_promise,
+        )
+        .expect_err("the certificate-only path must use the same content-bound V1 time");
+        assert!(tlog_error
+            .to_string()
+            .contains("no V1 transparency-log entry provides a signed integrated time"));
     }
 
     #[test]
@@ -1066,7 +1145,8 @@ mod tests {
                     &matching_key,
                 )),
             )
-            .expect("matching managed key must bind to hashedrekord"),
+            .expect("matching managed key must bind to hashedrekord")
+            .entry_count,
             1
         );
         let error = verify_transparency_log_content_binding(
@@ -1109,7 +1189,8 @@ mod tests {
                     &matching_key,
                 )),
             )
-            .expect("matching managed key must bind to DSSE Rekor entry"),
+            .expect("matching managed key must bind to DSSE Rekor entry")
+            .entry_count,
             1
         );
         let error = verify_transparency_log_content_binding(
