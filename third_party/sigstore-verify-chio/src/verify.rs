@@ -13,6 +13,11 @@ use sigstore_types::{Artifact, Bundle, Sha256Hash, SignatureContent, Statement};
 /// Default clock skew tolerance in seconds (60 seconds = 1 minute)
 pub const DEFAULT_CLOCK_SKEW_SECONDS: i64 = 60;
 
+/// Maximum accepted clock skew tolerance (1 hour).
+pub const MAX_CLOCK_SKEW_SECONDS: i64 = 3_600;
+
+const INTOTO_PAYLOAD_TYPE: &str = "application/vnd.in-toto+json";
+
 /// Policy for verifying signatures
 #[derive(Debug, Clone)]
 pub struct VerificationPolicy {
@@ -100,10 +105,24 @@ impl VerificationPolicy {
     ///
     /// This allows for a tolerance when checking that integrated times
     /// are not in the future. Default is 60 seconds.
-    pub fn with_clock_skew_seconds(mut self, seconds: i64) -> Self {
+    pub fn with_clock_skew_seconds(mut self, seconds: i64) -> Result<Self> {
+        validate_clock_skew_seconds(seconds)?;
         self.clock_skew_seconds = seconds;
-        self
+        Ok(self)
     }
+
+    fn validate(&self) -> Result<()> {
+        validate_clock_skew_seconds(self.clock_skew_seconds)
+    }
+}
+
+pub(crate) fn validate_clock_skew_seconds(seconds: i64) -> Result<()> {
+    if !(0..=MAX_CLOCK_SKEW_SECONDS).contains(&seconds) {
+        return Err(Error::Verification(format!(
+            "clock skew tolerance must be between 0 and {MAX_CLOCK_SKEW_SECONDS} seconds"
+        )));
+    }
+    Ok(())
 }
 
 /// Result of verification
@@ -217,6 +236,8 @@ impl Verifier {
     ) -> Result<VerificationResult> {
         let artifact = artifact.into();
         let mut result = VerificationResult::success();
+
+        policy.validate()?;
 
         // Validate bundle structure first
         let options = ValidationOptions {
@@ -351,23 +372,7 @@ impl Verifier {
                 ));
             }
 
-            // Verify artifact hash matches (for DSSE with in-toto statements)
-            if envelope.payload_type == "application/vnd.in-toto+json" {
-                let payload_bytes = envelope.payload.as_bytes();
-
-                let artifact_hash = compute_artifact_digest(&artifact);
-                let artifact_hash_hex = artifact_hash.to_hex();
-
-                let payload_str = std::str::from_utf8(payload_bytes).map_err(|e| {
-                    Error::Verification(format!("payload is not valid UTF-8: {}", e))
-                })?;
-
-                let statement: Statement = serde_json::from_str(payload_str).map_err(|e| {
-                    Error::Verification(format!("failed to parse in-toto statement: {}", e))
-                })?;
-
-                verify_statement_artifact_binding(&statement, &artifact_hash_hex)?;
-            }
+            verify_dsse_artifact_binding(envelope, &artifact)?;
         }
 
         if let SignatureContent::MessageSignature(msg_sig) = &bundle.content {
@@ -381,7 +386,11 @@ impl Verifier {
 
         // (8): Verify the transparency log entry's consistency against the other
         //      materials, to prevent variants of CVE-2022-36056.
-        let content_bound_entries = verify_transparency_log_content_binding(bundle, &artifact)?;
+        let content_bound_entries = verify_transparency_log_content_binding(
+            bundle,
+            &artifact,
+            Some(crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(&cert)),
+        )?;
         if policy.verify_tlog && content_bound_entries == 0 {
             return Err(Error::Verification(
                 "no transparency log entry is bound to the bundle content".to_string(),
@@ -390,6 +399,26 @@ impl Verifier {
 
         Ok(result)
     }
+}
+
+fn verify_dsse_artifact_binding(
+    envelope: &sigstore_types::DsseEnvelope,
+    artifact: &Artifact<'_>,
+) -> Result<()> {
+    if envelope.payload_type != INTOTO_PAYLOAD_TYPE {
+        return Err(Error::Verification(format!(
+            "unsupported DSSE payload type: {}",
+            envelope.payload_type
+        )));
+    }
+
+    let payload_bytes = envelope.decode_payload();
+    let payload_str = std::str::from_utf8(&payload_bytes)
+        .map_err(|e| Error::Verification(format!("payload is not valid UTF-8: {e}")))?;
+    let statement: Statement = serde_json::from_str(payload_str)
+        .map_err(|e| Error::Verification(format!("failed to parse in-toto statement: {e}")))?;
+    let artifact_hash = compute_artifact_digest(artifact);
+    verify_statement_artifact_binding(&statement, &artifact_hash.to_hex())
 }
 
 fn verify_statement_artifact_binding(statement: &Statement, artifact_hash_hex: &str) -> Result<()> {
@@ -451,6 +480,7 @@ fn verify_message_signature(
 fn verify_transparency_log_content_binding(
     bundle: &Bundle,
     artifact: &Artifact<'_>,
+    dsse_verifier: Option<crate::verify_impl::rekor::ExpectedDsseVerifier<'_>>,
 ) -> Result<usize> {
     match &bundle.content {
         SignatureContent::MessageSignature(_) => {
@@ -458,7 +488,11 @@ fn verify_transparency_log_content_binding(
         }
         SignatureContent::DsseEnvelope(_) => {
             let dsse_entries = crate::verify_impl::verify_dsse_entries(bundle)?;
-            let intoto_entries = crate::verify_impl::verify_intoto_entries(bundle)?;
+            let expected_verifier = dsse_verifier.ok_or_else(|| {
+                Error::Verification("DSSE content binding requires a verifier identity".to_string())
+            })?;
+            let intoto_entries =
+                crate::verify_impl::verify_intoto_entries(bundle, expected_verifier)?;
             Ok(dsse_entries + intoto_entries)
         }
     }
@@ -623,25 +657,18 @@ pub fn verify_with_key<'a>(
                 ));
             }
 
-            // Verify artifact hash matches for in-toto statements
-            if envelope.payload_type == "application/vnd.in-toto+json" {
-                let artifact_hash = compute_artifact_digest(&artifact);
-                let artifact_hash_hex = artifact_hash.to_hex();
-
-                let payload_str = std::str::from_utf8(&payload_bytes).map_err(|e| {
-                    Error::Verification(format!("payload is not valid UTF-8: {}", e))
-                })?;
-
-                let statement: Statement = serde_json::from_str(payload_str).map_err(|e| {
-                    Error::Verification(format!("failed to parse in-toto statement: {}", e))
-                })?;
-
-                verify_statement_artifact_binding(&statement, &artifact_hash_hex)?;
-            }
+            verify_dsse_artifact_binding(envelope, &artifact)?;
         }
     }
 
-    if verify_transparency_log_content_binding(bundle, &artifact)? == 0 {
+    if verify_transparency_log_content_binding(
+        bundle,
+        &artifact,
+        Some(crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(
+            public_key,
+        )),
+    )? == 0
+    {
         return Err(Error::Verification(
             "no transparency log entry is bound to the bundle content".to_string(),
         ));
@@ -690,9 +717,42 @@ mod tests {
     }
 
     #[test]
+    fn clock_skew_policy_rejects_invalid_tolerances() {
+        for invalid in [-1, MAX_CLOCK_SKEW_SECONDS + 1, i64::MAX] {
+            let result = VerificationPolicy::default().with_clock_skew_seconds(invalid);
+            assert!(
+                matches!(result, Err(Error::Verification(message)) if message.contains("clock skew tolerance")),
+                "invalid tolerance {invalid} must fail closed"
+            );
+        }
+        assert!(VerificationPolicy::default()
+            .with_clock_skew_seconds(MAX_CLOCK_SKEW_SECONDS)
+            .is_ok());
+    }
+
+    #[test]
+    fn dsse_artifact_binding_rejects_unsupported_payload_types() {
+        let mut bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("DSSE bundle");
+        let SignatureContent::DsseEnvelope(envelope) = &mut bundle.content else {
+            panic!("expected DSSE bundle");
+        };
+        envelope.payload_type = "application/example+json".to_string();
+
+        let result = verify_dsse_artifact_binding(envelope, &Artifact::Bytes(CONDA_PACKAGE));
+
+        assert!(matches!(
+            result,
+            Err(Error::Verification(message)) if message.contains("unsupported DSSE payload type")
+        ));
+    }
+
+    #[test]
     fn skip_timestamp_ignores_malformed_optional_rfc3161_data() {
         let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
-        bundle.verification_material.timestamp_verification_data.rfc3161_timestamps[0]
+        bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps[0]
             .signed_timestamp = sigstore_types::TimestampToken::new(vec![0xff, 0x00, 0x7f]);
 
         let result = verify(

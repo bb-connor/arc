@@ -5,8 +5,55 @@
 
 use crate::error::{Error, Result};
 use base64::Engine;
+use serde::Deserialize;
 use sigstore_rekor::body::RekorEntryBody;
-use sigstore_types::{Bundle, SignatureContent, TransparencyLogEntry};
+use sigstore_types::{
+    Bundle, DerCertificate, DerPublicKey, PemContent, SignatureBytes, SignatureContent,
+    TransparencyLogEntry,
+};
+
+#[derive(Clone, Copy)]
+pub enum ExpectedDsseVerifier<'a> {
+    Certificate(&'a DerCertificate),
+    PublicKey(&'a DerPublicKey),
+}
+
+#[derive(Deserialize)]
+struct IntotoBodyWithVerifiers {
+    spec: IntotoSpecWithVerifiers,
+}
+
+#[derive(Deserialize)]
+struct IntotoSpecWithVerifiers {
+    content: IntotoContentWithVerifiers,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IntotoContentWithVerifiers {
+    envelope: IntotoEnvelopeWithVerifiers,
+    payload_hash: IntotoPayloadHash,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IntotoEnvelopeWithVerifiers {
+    payload_type: String,
+    signatures: Vec<IntotoSignatureWithVerifier>,
+}
+
+#[derive(Deserialize)]
+struct IntotoPayloadHash {
+    algorithm: String,
+    value: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IntotoSignatureWithVerifier {
+    sig: SignatureBytes,
+    public_key: PemContent,
+}
 
 /// Verify DSSE envelope matches Rekor entry (for DSSE bundles)
 pub fn verify_dsse_entries(bundle: &Bundle) -> Result<usize> {
@@ -207,7 +254,10 @@ fn verify_dsse_v002(
 }
 
 /// Verify DSSE payload matches what's in Rekor (for intoto entries)
-pub fn verify_intoto_entries(bundle: &Bundle) -> Result<usize> {
+pub fn verify_intoto_entries(
+    bundle: &Bundle,
+    expected_verifier: ExpectedDsseVerifier<'_>,
+) -> Result<usize> {
     let envelope = match &bundle.content {
         SignatureContent::DsseEnvelope(env) => env,
         _ => return Ok(0), // Not a DSSE bundle
@@ -216,7 +266,7 @@ pub fn verify_intoto_entries(bundle: &Bundle) -> Result<usize> {
     let mut verified = 0;
     for entry in &bundle.verification_material.tlog_entries {
         if entry.kind_version.kind == "intoto" {
-            verify_intoto_v002(entry, envelope)?;
+            verify_intoto_v002(entry, envelope, expected_verifier)?;
             verified += 1;
         }
     }
@@ -228,64 +278,169 @@ pub fn verify_intoto_entries(bundle: &Bundle) -> Result<usize> {
 fn verify_intoto_v002(
     entry: &TransparencyLogEntry,
     envelope: &sigstore_types::DsseEnvelope,
+    expected_verifier: ExpectedDsseVerifier<'_>,
 ) -> Result<()> {
-    let body = RekorEntryBody::from_base64_json(
-        &entry.canonicalized_body.to_base64(),
-        &entry.kind_version.kind,
-        &entry.kind_version.version,
-    )
-    .map_err(|e| Error::Verification(format!("failed to parse Rekor body: {}", e)))?;
-
-    let (rekor_payload_b64, rekor_signatures) = match &body {
-        RekorEntryBody::IntotoV002(intoto_body) => (
-            &intoto_body.spec.content.envelope.payload,
-            &intoto_body.spec.content.envelope.signatures,
-        ),
-        _ => {
-            return Err(Error::Verification(
-                "expected Intoto v0.0.2 body, got different type".to_string(),
-            ))
-        }
-    };
-
-    // The Rekor entry has the payload double-base64-encoded, decode it once
-    let rekor_payload_bytes = base64::engine::general_purpose::STANDARD
-        .decode(rekor_payload_b64.as_bytes())
-        .map_err(|e| Error::Verification(format!("failed to decode Rekor payload: {}", e)))?;
-
-    // Compare with bundle payload bytes
-    if envelope.payload.as_bytes() != rekor_payload_bytes.as_slice() {
+    if entry.kind_version.version != "0.0.2" {
         return Err(Error::Verification(
-            "DSSE payload in bundle does not match intoto Rekor entry".to_string(),
+            "unsupported intoto Rekor entry version".to_string(),
+        ));
+    }
+    let body: IntotoBodyWithVerifiers = serde_json::from_slice(entry.canonicalized_body.as_bytes())
+        .map_err(|e| {
+            Error::Verification(format!("failed to parse intoto v0.0.2 Rekor body: {e}"))
+        })?;
+    let logged_envelope = &body.spec.content.envelope;
+    if logged_envelope.payload_type != envelope.payload_type {
+        return Err(Error::Verification(
+            "DSSE payload type in bundle does not match intoto Rekor entry".to_string(),
+        ));
+    }
+    if body.spec.content.payload_hash.algorithm != "sha256" {
+        return Err(Error::Verification(
+            "intoto Rekor payload hash must use sha256".to_string(),
+        ));
+    }
+    let payload_hash = hex::encode(sigstore_crypto::sha256(envelope.payload.as_bytes()));
+    if payload_hash != body.spec.content.payload_hash.value {
+        return Err(Error::Verification(
+            "DSSE payload in bundle does not match intoto Rekor payload hash".to_string(),
+        ));
+    }
+    if envelope.signatures.len() != 1 || logged_envelope.signatures.len() != 1 {
+        return Err(Error::Verification(
+            "intoto v0.0.2 verification requires exactly one bundle and Rekor signature"
+                .to_string(),
         ));
     }
 
-    // Validate that the signatures match
-    let mut found_match = false;
-    for bundle_sig in &envelope.signatures {
-        for rekor_sig in rekor_signatures {
-            // The Rekor signature is also double-base64-encoded, decode it once
-            let rekor_sig_decoded = base64::engine::general_purpose::STANDARD
-                .decode(rekor_sig.sig.as_bytes())
-                .map_err(|e| {
-                    Error::Verification(format!("failed to decode Rekor signature: {}", e))
-                })?;
-
-            if bundle_sig.sig.as_bytes() == rekor_sig_decoded.as_slice() {
-                found_match = true;
-                break;
-            }
-        }
-        if found_match {
-            break;
-        }
-    }
-
-    if !found_match {
+    let rekor_sig_decoded = base64::engine::general_purpose::STANDARD
+        .decode(logged_envelope.signatures[0].sig.as_bytes())
+        .map_err(|e| Error::Verification(format!("failed to decode Rekor signature: {e}")))?;
+    if envelope.signatures[0].sig.as_bytes() != rekor_sig_decoded.as_slice() {
         return Err(Error::Verification(
             "DSSE signature in bundle does not match intoto Rekor entry".to_string(),
         ));
     }
 
+    verify_intoto_verifier_identity(&logged_envelope.signatures[0].public_key, expected_verifier)?;
+
     Ok(())
+}
+
+fn verify_intoto_verifier_identity(
+    logged_verifier: &PemContent,
+    expected_verifier: ExpectedDsseVerifier<'_>,
+) -> Result<()> {
+    let pem = std::str::from_utf8(logged_verifier.as_bytes()).map_err(|e| {
+        Error::Verification(format!("intoto Rekor verifier is not valid UTF-8: {e}"))
+    })?;
+    match expected_verifier {
+        ExpectedDsseVerifier::Certificate(expected) => {
+            let logged = DerCertificate::from_pem(pem).map_err(|e| {
+                Error::Verification(format!(
+                    "intoto Rekor verifier is not a valid certificate: {e}"
+                ))
+            })?;
+            if logged.as_bytes() != expected.as_bytes() {
+                return Err(Error::Verification(
+                    "intoto Rekor verifier certificate does not match the bundle signer"
+                        .to_string(),
+                ));
+            }
+        }
+        ExpectedDsseVerifier::PublicKey(expected) => {
+            let logged = match DerCertificate::from_pem(pem) {
+                Ok(certificate) => {
+                    sigstore_crypto::parse_certificate_info(certificate.as_bytes())
+                        .map_err(|e| {
+                            Error::Verification(format!(
+                                "failed to parse intoto Rekor verifier certificate: {e}"
+                            ))
+                        })?
+                        .public_key
+                }
+                Err(_) => DerPublicKey::from_pem(pem).map_err(|e| {
+                    Error::Verification(format!(
+                        "intoto Rekor verifier is not a valid certificate or public key: {e}"
+                    ))
+                })?,
+            };
+            if logged.as_bytes() != expected.as_bytes() {
+                return Err(Error::Verification(
+                    "intoto Rekor verifier public key does not match the managed signer"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const INTOTO_BUNDLE: &str = include_str!("../../test_data/bundles/dsse.sigstore.json");
+    const MULTISIG_INTOTO_BUNDLE: &str =
+        include_str!("../../test_data/bundles/dsse-2sigs.sigstore.json");
+    const UNRELATED_CERTIFICATE_BUNDLE: &str =
+        include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
+
+    fn intoto_parts(bundle: &Bundle) -> (&TransparencyLogEntry, &sigstore_types::DsseEnvelope) {
+        let envelope = match &bundle.content {
+            SignatureContent::DsseEnvelope(envelope) => envelope,
+            _ => panic!("expected DSSE envelope"),
+        };
+        (&bundle.verification_material.tlog_entries[0], envelope)
+    }
+
+    #[test]
+    fn intoto_entry_binds_the_only_signature_and_certificate() {
+        let bundle = Bundle::from_json(INTOTO_BUNDLE).expect("intoto bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let (entry, envelope) = intoto_parts(&bundle);
+
+        verify_intoto_v002(
+            entry,
+            envelope,
+            ExpectedDsseVerifier::Certificate(certificate),
+        )
+        .expect("signature and verifier identity must match");
+    }
+
+    #[test]
+    fn intoto_entry_rejects_ambiguous_multisignature_identity() {
+        let bundle = Bundle::from_json(MULTISIG_INTOTO_BUNDLE).expect("multisig bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let (entry, envelope) = intoto_parts(&bundle);
+
+        let error = verify_intoto_v002(
+            entry,
+            envelope,
+            ExpectedDsseVerifier::Certificate(certificate),
+        )
+        .expect_err("intoto v0.0.2 does not identify multiple signers unambiguously");
+        assert!(error.to_string().contains("requires exactly one"));
+    }
+
+    #[test]
+    fn intoto_entry_rejects_an_unrelated_verifier_identity() {
+        let bundle = Bundle::from_json(INTOTO_BUNDLE).expect("intoto bundle");
+        let unrelated =
+            Bundle::from_json(UNRELATED_CERTIFICATE_BUNDLE).expect("unrelated certificate bundle");
+        let unrelated_certificate = unrelated
+            .signing_certificate()
+            .expect("unrelated signing certificate");
+        let (entry, envelope) = intoto_parts(&bundle);
+
+        let error = verify_intoto_v002(
+            entry,
+            envelope,
+            ExpectedDsseVerifier::Certificate(unrelated_certificate),
+        )
+        .expect_err("logged verifier identity must match the authenticated signer");
+        assert!(error
+            .to_string()
+            .contains("does not match the bundle signer"));
+    }
 }

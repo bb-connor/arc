@@ -286,17 +286,16 @@ pub(in crate::runtime) fn parse_request_threshold_approval_proposal(
     )
 }
 
+pub(in crate::runtime) type ParsedApprovalArtifacts = (
+    Option<GovernedApprovalToken>,
+    Vec<GovernedApprovalToken>,
+    Option<ThresholdApprovalProposal>,
+);
+
 pub(in crate::runtime) fn parse_request_approval_artifacts(
     id: &Value,
     params: &Value,
-) -> Result<
-    (
-        Option<GovernedApprovalToken>,
-        Vec<GovernedApprovalToken>,
-        Option<ThresholdApprovalProposal>,
-    ),
-    Value,
-> {
+) -> Result<ParsedApprovalArtifacts, Value> {
     let singular = parse_request_approval_token(id, params)?;
     let tokens = parse_request_approval_tokens(id, params)?;
     let proposal = parse_request_threshold_approval_proposal(id, params)?;

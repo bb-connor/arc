@@ -741,16 +741,16 @@ fn test_bundle_v3_no_signed_time() {
         "Bundle should have inclusion proof"
     );
 
-    // Verification might still work with inclusion proof alone
-    // Use extracted digest or dummy - we're testing handling of missing signed time
+    // An inclusion proof authenticates membership, but not integratedTime metadata.
     let artifact_digest =
         extract_artifact_digest(&bundle).unwrap_or_else(|| Sha256Hash::from_bytes([0u8; 32]));
-    let policy = VerificationPolicy::default().skip_timestamp();
+    let policy = VerificationPolicy::default()
+        .skip_timestamp()
+        .skip_certificate_chain();
 
-    let result = verify(artifact_digest, &bundle, &policy, &production_root());
-    // Whether this succeeds or fails depends on implementation
-    // We just verify it handles the case
-    let _ = result;
+    let result = verify(artifact_digest, &bundle, &policy, &production_root())
+        .expect("verified inclusion proof remains usable without unsigned chronology");
+    assert_eq!(result.integrated_time, None);
 }
 
 /// Test GitHub Actions release bundle

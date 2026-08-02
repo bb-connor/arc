@@ -26,6 +26,7 @@ pub fn verify_tlog_entries(
     not_after: i64,
     clock_skew_seconds: i64,
 ) -> Result<Option<i64>> {
+    crate::verify::validate_clock_skew_seconds(clock_skew_seconds)?;
     let mut integrated_time_result: Option<i64> = None;
 
     for entry in &bundle.verification_material.tlog_entries {
@@ -39,16 +40,23 @@ pub fn verify_tlog_entries(
         }
 
         // Verify inclusion promise (SET) if present
-        if entry.inclusion_promise.is_some() {
+        let integrated_time_is_authenticated = if entry.inclusion_promise.is_some() {
             verify_set(entry, trusted_root)?;
-        }
+            true
+        } else {
+            false
+        };
 
-        // Validate integrated time (0 indicates missing/invalid time in v2 entries)
+        // Integrated time is authenticated only by the signed entry timestamp.
+        // An inclusion proof authenticates tree membership, not this metadata field.
         let time = entry.integrated_time;
-        if time > 0 {
+        if integrated_time_is_authenticated && time > 0 {
             // Check that integrated time is not in the future (with clock skew tolerance)
             let now = chrono::Utc::now().timestamp();
-            if time > now + clock_skew_seconds {
+            let latest_accepted_time = now
+                .checked_add(clock_skew_seconds)
+                .ok_or_else(|| Error::Verification("clock skew deadline overflowed".to_string()))?;
+            if time > latest_accepted_time {
                 return Err(Error::Verification(format!(
                     "integrated time {} is in the future (current time: {}, tolerance: {}s)",
                     time, now, clock_skew_seconds
@@ -190,4 +198,33 @@ pub fn verify_set(entry: &TransparencyLogEntry, trusted_root: &TrustedRoot) -> R
     .map_err(|e| Error::Verification(format!("SET verification failed: {}", e)))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sigstore_crypto::parse_certificate_info;
+
+    const COSIGN_V3_BLOB_BUNDLE: &str =
+        include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
+
+    #[test]
+    fn unsigned_integrated_time_is_not_consumed() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let certificate_info =
+            parse_certificate_info(certificate.as_bytes()).expect("certificate info");
+        bundle.verification_material.tlog_entries[0].inclusion_promise = None;
+
+        let integrated_time = verify_tlog_entries(
+            &bundle,
+            &TrustedRoot::production().expect("production root"),
+            certificate_info.not_before,
+            certificate_info.not_after,
+            crate::verify::DEFAULT_CLOCK_SKEW_SECONDS,
+        )
+        .expect("inclusion proof remains valid without unsigned chronology");
+
+        assert_eq!(integrated_time, None);
+    }
 }

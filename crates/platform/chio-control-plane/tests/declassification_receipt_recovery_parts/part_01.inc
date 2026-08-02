@@ -1157,6 +1157,46 @@ fn consumption_sink_failure_blocks_dispatch_and_restart_drains_consumption_befor
 }
 
 #[test]
+fn terminal_outcome_uses_post_dispatch_trusted_time() {
+    let temp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = temp.path().join("post-dispatch-outcome-time.sqlite");
+    let sink = Arc::new(ScriptedReceiptSink::default());
+    let (resolver, _store, context, request) = resolver_with_clock(
+        &path,
+        sink.clone(),
+        Arc::new(SequenceClock::new(vec![
+            NOW_UNIX_MS,
+            NOW_UNIX_MS.saturating_add(1),
+            NOW_UNIX_MS.saturating_add(10),
+            NOW_UNIX_MS.saturating_add(20),
+        ])),
+    );
+    let mut recorder = resolver
+        .commit_dispatch(
+            &FlowPreInvocationInput {
+                security_context: &context,
+                request: &request,
+            },
+            record("dispatch-post-time"),
+        )
+        .unwrap_or_else(|error| panic!("commit declassification dispatch: {error}"))
+        .unwrap_or_else(|| panic!("declassification outcome recorder missing"));
+
+    recorder
+        .record(DeclassificationDispatchOutcome::Released)
+        .unwrap_or_else(|error| panic!("record released outcome: {error}"));
+
+    let receipts = sink.accepted();
+    assert_eq!(receipts.len(), 2);
+    assert_eq!(receipts[0].occurred_at_unix_ms, NOW_UNIX_MS);
+    assert_eq!(
+        receipts[1].occurred_at_unix_ms,
+        NOW_UNIX_MS.saturating_add(20)
+    );
+    assert!(receipts[1].occurred_at_unix_ms > receipts[0].occurred_at_unix_ms);
+}
+
+#[test]
 fn released_state_and_terminal_receipt_survive_sink_failure_and_restart() {
     let temp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = temp.path().join("release-sink-failure.sqlite");

@@ -173,6 +173,7 @@ impl ChioKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn apply_durable_post_invocation_pipeline(
         &self,
         request: &ToolCallRequest,

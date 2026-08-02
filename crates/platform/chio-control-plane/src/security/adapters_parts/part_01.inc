@@ -570,11 +570,20 @@ impl DeclassificationUseStore for AtomicDeclassificationConsumptionStore {
 
 struct PersistentDeclassificationOutcomeRecorder {
     evidence: DeclassificationEvidenceConfig,
-    released: DeclassificationOutcomeEvidenceCommit,
-    dispatch_failed: DeclassificationOutcomeEvidenceCommit,
-    outcome_unknown_after_dispatch: DeclassificationOutcomeEvidenceCommit,
-    verified_at_unix_ms: u64,
+    consumption: DeclassificationConsumptionEvidenceCommit,
+    grant_hash: Digest32,
+    released: DeclassificationTransitionBinding,
+    dispatch_failed: DeclassificationTransitionBinding,
+    outcome_unknown_after_dispatch: DeclassificationTransitionBinding,
+    clock: Arc<dyn SecurityClock>,
+    pending_outcome: Option<PendingDeclassificationOutcome>,
     completed_outcome: Option<DeclassificationDispatchOutcome>,
+}
+
+struct PendingDeclassificationOutcome {
+    outcome: DeclassificationDispatchOutcome,
+    evidence: DeclassificationOutcomeEvidenceCommit,
+    occurred_at_unix_ms: u64,
 }
 
 impl FlowDispatchOutcomeRecorder for PersistentDeclassificationOutcomeRecorder {
@@ -586,13 +595,50 @@ impl FlowDispatchOutcomeRecorder for PersistentDeclassificationOutcomeRecorder {
                 Err(FlowDenial::DeclassificationBindingMismatch)
             };
         }
-        let prepared = match outcome {
+        if self.pending_outcome.is_none() {
+            let occurred_at_unix_ms = self
+                .clock
+                .now_unix_ms()
+                .map_err(|_| FlowDenial::StateChanged)?;
+            let transition_binding = match outcome {
+                DeclassificationDispatchOutcome::Released => self.released.clone(),
+                DeclassificationDispatchOutcome::DispatchFailed => self.dispatch_failed.clone(),
+                DeclassificationDispatchOutcome::OutcomeUnknownAfterDispatch => {
+                    self.outcome_unknown_after_dispatch.clone()
+                }
+            };
+            let evidence = prepare_declassification_outcome_evidence(
+                &self.evidence,
+                &self.consumption,
+                self.grant_hash,
+                occurred_at_unix_ms,
+                transition_binding,
+            )?;
+            self.pending_outcome = Some(PendingDeclassificationOutcome {
+                outcome,
+                evidence,
+                occurred_at_unix_ms,
+            });
+        }
+        let pending = self
+            .pending_outcome
+            .as_ref()
+            .ok_or(FlowDenial::DeclassificationStoreFailure)?;
+        if pending.outcome != outcome {
+            return Err(FlowDenial::DeclassificationBindingMismatch);
+        }
+        let prepared = &pending.evidence;
+        let occurred_at_unix_ms = pending.occurred_at_unix_ms;
+        let expected_state = match outcome {
             DeclassificationDispatchOutcome::Released => &self.released,
             DeclassificationDispatchOutcome::DispatchFailed => &self.dispatch_failed,
             DeclassificationDispatchOutcome::OutcomeUnknownAfterDispatch => {
                 &self.outcome_unknown_after_dispatch
             }
         };
+        if prepared.transition_binding != *expected_state {
+            return Err(FlowDenial::DeclassificationBindingMismatch);
+        }
         let store = self.evidence.store.as_ref();
         let receipt = commit_terminal_declassification_evidence(store, prepared)?;
         append_and_ack_exact_evidence(
@@ -602,7 +648,7 @@ impl FlowDispatchOutcomeRecorder for PersistentDeclassificationOutcomeRecorder {
             &prepared.outcome.grant_id,
             DeclassificationEvidencePhase::Outcome,
             &receipt,
-            self.verified_at_unix_ms,
+            occurred_at_unix_ms,
         )?;
         self.completed_outcome = Some(outcome);
         Ok(())
@@ -741,7 +787,6 @@ impl PersistentFlowResolver {
         )?;
         let request = self.resolve_pre(input, false)?;
         let request_id = request.request_id.clone();
-        let verified_at_unix_ms = request.now_unix_ms;
         let verified = request
             .declassification
             .as_ref()
@@ -832,60 +877,35 @@ impl PersistentFlowResolver {
                 return Err(FlowDenial::DeclassificationStoreFailure);
             }
         };
-        let outcome_occurred_at_unix_ms = verified_at_unix_ms;
-        let outcome_binding = DeclassificationTransitionBinding::DispatchFailed {
+        let dispatch_failed = DeclassificationTransitionBinding::DispatchFailed {
             tenant_id: consumption_commit.consumption.tenant_id.clone(),
             grant_id: consumption_commit.consumption.grant_id.clone(),
             request_hash: consumption_commit.consumption.request_hash,
             request_id: request_id.clone(),
             dispatch_commitment_id: dispatch_commitment_id.clone(),
         };
-        let dispatch_failed = prepare_declassification_outcome_evidence(
-            &evidence,
-            &consumption_commit,
-            grant_hash,
-            outcome_occurred_at_unix_ms,
-            outcome_binding,
-        )?;
-        let outcome_unknown_after_dispatch = prepare_declassification_outcome_evidence(
-            &evidence,
-            &consumption_commit,
-            grant_hash,
-            outcome_occurred_at_unix_ms,
+        let outcome_unknown_after_dispatch =
             DeclassificationTransitionBinding::OutcomeUnknownAfterDispatch {
                 tenant_id: consumption_commit.consumption.tenant_id.clone(),
                 grant_id: consumption_commit.consumption.grant_id.clone(),
                 request_hash: consumption_commit.consumption.request_hash,
                 request_id: request_id.clone(),
                 dispatch_commitment_id: dispatch_commitment_id.clone(),
-            },
-        )?;
-        let receipt_failure = prepare_declassification_outcome_evidence(
-            &evidence,
-            &consumption_commit,
-            grant_hash,
-            outcome_occurred_at_unix_ms,
-            DeclassificationTransitionBinding::ReceiptPersistenceFailed {
-                tenant_id: consumption_commit.consumption.tenant_id.clone(),
-                grant_id: consumption_commit.consumption.grant_id.clone(),
-                request_hash: consumption_commit.consumption.request_hash,
-                request_id: request_id.clone(),
-                dispatch_commitment_id: dispatch_commitment_id.clone(),
-            },
-        )?;
-        let released = prepare_declassification_outcome_evidence(
-            &evidence,
-            &consumption_commit,
-            grant_hash,
-            outcome_occurred_at_unix_ms,
-            DeclassificationTransitionBinding::Released {
-                tenant_id: consumption_commit.consumption.tenant_id.clone(),
-                grant_id: consumption_commit.consumption.grant_id.clone(),
-                request_hash: consumption_commit.consumption.request_hash,
-                request_id,
-                dispatch_commitment_id: dispatch_commitment_id.clone(),
-            },
-        )?;
+            };
+        let receipt_failure = DeclassificationTransitionBinding::ReceiptPersistenceFailed {
+            tenant_id: consumption_commit.consumption.tenant_id.clone(),
+            grant_id: consumption_commit.consumption.grant_id.clone(),
+            request_hash: consumption_commit.consumption.request_hash,
+            request_id: request_id.clone(),
+            dispatch_commitment_id: dispatch_commitment_id.clone(),
+        };
+        let released = DeclassificationTransitionBinding::Released {
+            tenant_id: consumption_commit.consumption.tenant_id.clone(),
+            grant_id: consumption_commit.consumption.grant_id.clone(),
+            request_hash: consumption_commit.consumption.request_hash,
+            request_id,
+            dispatch_commitment_id: dispatch_commitment_id.clone(),
+        };
         let atomic_store = AtomicDeclassificationConsumptionStore {
             store: Arc::clone(&evidence.store),
             commit: consumption_commit.clone(),
@@ -901,6 +921,10 @@ impl PersistentFlowResolver {
         {
             return Err(FlowDenial::DeclassificationBindingMismatch);
         }
+        let consumption_acknowledged_at_unix_ms = self
+            .clock
+            .now_unix_ms()
+            .map_err(|_| FlowDenial::StateChanged)?;
         if let Err(error) = append_and_ack_exact_evidence(
             evidence.store.as_ref(),
             evidence.sink.as_ref(),
@@ -908,16 +932,42 @@ impl PersistentFlowResolver {
             consumed.grant_id(),
             DeclassificationEvidencePhase::Consumption,
             &consumption_commit.receipt,
-            verified_at_unix_ms,
+            consumption_acknowledged_at_unix_ms,
         ) {
+            let failed_at_unix_ms = self
+                .clock
+                .now_unix_ms()
+                .map_err(|_| FlowDenial::StateChanged)?;
+            let receipt_failure = prepare_declassification_outcome_evidence(
+                &evidence,
+                &consumption_commit,
+                grant_hash,
+                failed_at_unix_ms,
+                receipt_failure,
+            )?;
             self.persist_dispatch_failed_evidence(&evidence, &receipt_failure)?;
             return Err(error);
         }
+        let committed_at_unix_ms = self
+            .clock
+            .now_unix_ms()
+            .map_err(|_| FlowDenial::StateChanged)?;
         if let Err(error) = self.commit_admission_at(
             &admission,
-            dispatch_commitment_id,
-            outcome_occurred_at_unix_ms,
+            dispatch_commitment_id.clone(),
+            committed_at_unix_ms,
         ) {
+            let failed_at_unix_ms = self
+                .clock
+                .now_unix_ms()
+                .map_err(|_| FlowDenial::StateChanged)?;
+            let dispatch_failed = prepare_declassification_outcome_evidence(
+                &evidence,
+                &consumption_commit,
+                grant_hash,
+                failed_at_unix_ms,
+                dispatch_failed,
+            )?;
             let outcome_receipt =
                 self.persist_dispatch_failed_evidence(&evidence, &dispatch_failed)?;
             append_and_ack_exact_evidence(
@@ -927,16 +977,19 @@ impl PersistentFlowResolver {
                 consumed.grant_id(),
                 DeclassificationEvidencePhase::Outcome,
                 &outcome_receipt,
-                outcome_occurred_at_unix_ms,
+                failed_at_unix_ms,
             )?;
             return Err(error);
         }
         Ok(Some(Box::new(PersistentDeclassificationOutcomeRecorder {
             evidence,
+            consumption: consumption_commit,
+            grant_hash,
             released,
             dispatch_failed,
             outcome_unknown_after_dispatch,
-            verified_at_unix_ms: outcome_occurred_at_unix_ms,
+            clock: Arc::clone(&self.clock),
+            pending_outcome: None,
             completed_outcome: None,
         })))
     }

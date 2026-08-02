@@ -53,7 +53,7 @@ EXPECTED_APK_LOCK_SHA256 = (
     "b4d4642b66191c1923fe7c293b408b570b71df9edb710ffa09bc518ca36a5ad8"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "f2f998ae5c1f1d950d98dc4c0da267e21abcd29fe52fa6cabe85fb6399ff65ee"
+    "5ceb0b6efe3613a3dc3dfc7a85978410aa15b4a901fa47804423d4f7457e68dd"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "8bc51ecab82415fddd8489604f2424e137d71856e7f65cbdcfaa48850d794b46"
@@ -80,10 +80,10 @@ EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "51cfd01140812db5df3310271c0cc12e123d41ddea2e13e9f82b23cfaec18cde"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
-    "773e14bf7d14805539b4e654bdeeb0f3a1fed9a46f4038af1e84e0693852def3"
+    "d77a400edb34778a1718782974b3b0eb1f179741dc227a91ddc1706c6cb5fb4a"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "9d818e4a2f804d7fbe3a8f185d3348aefa62f30e06075dd65efd5b4de44f5a11"
+    "98383fbbdb3cd705a60087009def0af4d04f424e64d9f277c7b5918837ce7dda"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554"
@@ -1320,36 +1320,99 @@ EXPECTED_ENTERPRISE_PYTHON_VALIDATORS_RUN = (
 )
 EXPECTED_APALACHE_SAFETY_RUN = r"""
 set -euo pipefail
-while IFS="|" read -r cfg spec; do
-  apalache-mc check \
-    --length=6 \
-    --config="${cfg}" \
-    "${spec}"
-done <<'EOF'
-formal/apalache/MCMonotoneLogApalache.cfg|formal/apalache/MonotoneLogApalache.tla
-formal/apalache/MCRevocationCutCompleteness.cfg|formal/apalache/RevocationCutCompleteness.tla
-formal/apalache/MCReceiptBeforeAllow.cfg|formal/apalache/ReceiptBeforeAllow.tla
-formal/apalache/MCKernelTransitionCancelSafe.cfg|formal/apalache/KernelTransitionCancelSafe.tla
-formal/tla/MCInformationFlowLattice.cfg|formal/tla/InformationFlowLattice.tla
-formal/tla/MCRevocationPropagation.cfg|formal/tla/RevocationPropagation.tla
-formal/tla/MCDelegationDepthBound.cfg|formal/tla/DelegationDepthBound.tla
-EOF
+./scripts/check-apalache-positive.sh \
+  --invariant "${{ matrix.invariant }}" \
+  --length "${{ matrix.length }}" \
+  --timeout-seconds "${{ matrix.timeout_seconds }}" \
+  --config "${{ matrix.config }}" \
+  "${{ matrix.spec }}"
 """.strip()
 EXPECTED_APALACHE_MUTATION_RUN = r"""
 set -euo pipefail
-negative_log="$(mktemp)"
-trap 'rm -f "${negative_log}"' EXIT
-if apalache-mc check \
-  --length=6 \
-  --config=formal/tla/_negative_tests/MCInformationFlowLatticeReaderDirectionBroken.cfg \
-  formal/tla/_negative_tests/InformationFlowLatticeReaderDirectionBroken.tla \
-  2>&1 | tee "${negative_log}"; then
-  echo "reader-direction mutation unexpectedly satisfied SafetyInv" >&2
-  exit 1
-fi
-grep -Eq "state invariant [0-9]+ violated" "${negative_log}"
-grep -Fq "The outcome is: Error" "${negative_log}"
+./scripts/check-apalache-negative.sh
 """.strip()
+EXPECTED_APALACHE_MATRIX = {
+    "include": [
+        {
+            "name": "monotone-log",
+            "config": "formal/apalache/MCMonotoneLogApalache.cfg",
+            "spec": "formal/apalache/MonotoneLogApalache.tla",
+            "length": "6",
+            "timeout_seconds": "1800",
+            "invariant": "SafetyInv",
+        },
+        {
+            "name": "revocation-cut",
+            "config": "formal/apalache/MCRevocationCutCompleteness.cfg",
+            "spec": "formal/apalache/RevocationCutCompleteness.tla",
+            "length": "6",
+            "timeout_seconds": "1800",
+            "invariant": "SafetyInv",
+        },
+        {
+            "name": "receipt-before-allow",
+            "config": "formal/apalache/MCReceiptBeforeAllow.cfg",
+            "spec": "formal/apalache/ReceiptBeforeAllow.tla",
+            "length": "6",
+            "timeout_seconds": "1800",
+            "invariant": "SafetyInv",
+        },
+        {
+            "name": "transition-cancel",
+            "config": "formal/apalache/MCKernelTransitionCancelSafe.cfg",
+            "spec": "formal/apalache/KernelTransitionCancelSafe.tla",
+            "length": "6",
+            "timeout_seconds": "1800",
+            "invariant": "SafetyInv",
+        },
+        {
+            "name": "post-admission",
+            "config": "formal/apalache/MCPostAdmissionDropGuard.cfg",
+            "spec": "formal/apalache/PostAdmissionDropGuard.tla",
+            "length": "8",
+            "timeout_seconds": "10800",
+            "invariant": "SafetyInv",
+        },
+        {
+            "name": "revocation-propagation",
+            "config": "formal/tla/MCRevocationPropagation.cfg",
+            "spec": "formal/tla/RevocationPropagation.tla",
+            "length": "6",
+            "timeout_seconds": "10800",
+            "invariant": "SafetyInv",
+        },
+        {
+            "name": "distributed-domains",
+            "config": "formal/tla/MCDistributedRevocationDomains.cfg",
+            "spec": "formal/tla/DistributedRevocation.tla",
+            "length": "0",
+            "timeout_seconds": "600",
+            "invariant": "DistributedDomainsOK",
+        },
+        {
+            "name": "distributed-behavior",
+            "config": "formal/tla/MCDistributedRevocation.cfg",
+            "spec": "formal/tla/DistributedRevocation.tla",
+            "length": "6",
+            "timeout_seconds": "1800",
+            "invariant": "BehavioralSafetyInv",
+        },
+        {
+            "name": "delegation-depth",
+            "config": "formal/tla/MCDelegationDepthBound.cfg",
+            "spec": "formal/tla/DelegationDepthBound.tla",
+            "length": "6",
+            "timeout_seconds": "1800",
+            "invariant": "SafetyInv",
+        },
+    ]
+}
+EXPECTED_APALACHE_VERDICT_NEEDS = {
+    "apalache_contracts",
+    "apalache_safety_shards",
+    "apalache_scheduled_bounds_and_refinement",
+    "apalache-negative",
+}
 EXPECTED_THREAT_CARGO_MUTANTS_RUN = r"""
 set -euo pipefail
 cargo install cargo-mutants --locked --version 25.3.1
@@ -7527,21 +7590,46 @@ def validate(root: Path) -> None:
         raise ContractError(
             "full Apalache workflow does not isolate caller concurrency"
         )
-    apalache_job = job(apalache, "apalache-subset")
-    if contains_key(apalache_job, "continue-on-error") or contains_key(
-        apalache_job, "if"
-    ):
+    apalache_contracts = job(apalache, "apalache_contracts")
+    if "continue-on-error" in apalache_contracts or "if" in apalache_contracts:
         raise ContractError(
-            "full Apalache workflow contains a conditional or soft-fail gate"
+            "full Apalache contract checks contain a conditional or soft-fail gate"
         )
-    apalache_safety = named_step(apalache_job, "Apalache safety checks").get("run")
+    workflow_self_test = named_step(
+        apalache_contracts, "Workflow aggregation checks"
+    ).get("run")
+    if (
+        not isinstance(workflow_self_test, str)
+        or workflow_self_test.strip()
+        != "set -euo pipefail\n./scripts/tests/apalache-workflow.test.sh"
+    ):
+        raise ContractError("full Apalache workflow omits its aggregation self-test")
+
+    apalache_shards = job(apalache, "apalache_safety_shards")
+    if (
+        "continue-on-error" in apalache_shards
+        or "if" in apalache_shards
+        or apalache_shards.get("timeout-minutes") != "360"
+        or apalache_shards.get("strategy")
+        != {"fail-fast": "false", "matrix": EXPECTED_APALACHE_MATRIX}
+    ):
+        raise ContractError("full Apalache workflow changes its sharded model matrix")
+    apalache_safety = named_step(apalache_shards, "Apalache safety checks").get("run")
     if (
         not isinstance(apalache_safety, str)
         or apalache_safety.strip() != EXPECTED_APALACHE_SAFETY_RUN
     ):
-        raise ContractError("full Apalache workflow omits the exact seven-model matrix")
+        raise ContractError("full Apalache workflow omits the exact sharded model command")
+
+    scheduled_apalache = job(apalache, "apalache_scheduled_bounds_and_refinement")
+    if scheduled_apalache.get("if") != "github.event_name != 'pull_request'":
+        raise ContractError("full Apalache scheduled bounds are not excluded from PR calls")
+
+    apalache_negative = job(apalache, "apalache-negative")
+    if "continue-on-error" in apalache_negative or "if" in apalache_negative:
+        raise ContractError("full Apalache negative gate is conditional or soft-fail")
     mutation_run = named_step(
-        apalache_job, "Apalache information-flow mutation check"
+        apalache_negative, "Reproduce registered counterexamples"
     ).get("run")
     if (
         not isinstance(mutation_run, str)
@@ -7550,6 +7638,17 @@ def validate(root: Path) -> None:
         raise ContractError(
             "full Apalache workflow omits its negative mutation ratchet"
         )
+
+    apalache_verdict = job(apalache, "apalache_verdict")
+    verdict_needs = apalache_verdict.get("needs")
+    if (
+        apalache_verdict.get("name") != "apalache-subset"
+        or apalache_verdict.get("if") != "${{ always() }}"
+        or not isinstance(verdict_needs, list)
+        or set(verdict_needs) != EXPECTED_APALACHE_VERDICT_NEEDS
+        or "continue-on-error" in apalache_verdict
+    ):
+        raise ContractError("full Apalache verdict does not aggregate every required shard")
 
     threat_events = threat_coverage.get("on")
     if not isinstance(threat_events, dict) or set(threat_events) != {

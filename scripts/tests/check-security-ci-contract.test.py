@@ -4665,15 +4665,19 @@ assert_rejected(
     "Apalache model removed",
     "apalache-safety.yml",
     replace_once(
-        "formal/tla/MCDelegationDepthBound.cfg|formal/tla/DelegationDepthBound.tla\n",
-        "",
+        "            config: formal/tla/MCDelegationDepthBound.cfg\n",
+        "            config: formal/tla/RemovedDelegationDepthBound.cfg\n",
     ),
-    "omits the exact seven-model matrix",
+    "changes its sharded model matrix",
 )
 assert_rejected(
     "Apalache negative ratchet removed",
     "apalache-safety.yml",
-    replace_once('          grep -Fq "The outcome is: Error" "${negative_log}"\n', ""),
+    replace_in_named_step(
+        "Reproduce registered counterexamples",
+        "./scripts/check-apalache-negative.sh",
+        "true",
+    ),
     "omits its negative mutation ratchet",
 )
 assert_rejected(
