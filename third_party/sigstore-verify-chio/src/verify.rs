@@ -247,11 +247,17 @@ impl Verifier {
         validate_bundle_with_options(bundle, &options)
             .map_err(|e| Error::Verification(format!("bundle validation failed: {}", e)))?;
 
-        if policy.verify_timestamp && !policy.verify_tlog {
+        let has_rfc3161_timestamps = !bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps
+            .is_empty();
+        let requires_rfc3161_timestamp = !policy.verify_tlog;
+        if policy.verify_timestamp && (requires_rfc3161_timestamp || has_rfc3161_timestamps) {
             if let SignatureContent::DsseEnvelope(envelope) = &bundle.content {
                 if envelope.signatures.len() != 1 {
                     return Err(Error::Verification(
-                        "timestamp verification without transparency logs requires exactly one DSSE signature"
+                        "RFC 3161 time requires exactly one DSSE signature"
                             .to_string(),
                     ));
                 }
@@ -715,7 +721,8 @@ mod tests {
     use super::*;
     use sigstore_crypto::KeyPair;
     use sigstore_types::{
-        bundle::VerificationMaterialContent, DsseSignature, KeyId, PayloadBytes, SignatureBytes,
+        bundle::{Rfc3161Timestamp, VerificationMaterialContent},
+        DsseSignature, KeyId, PayloadBytes, SignatureBytes,
     };
 
     const COSIGN_V3_BLOB_BUNDLE: &str =
@@ -837,6 +844,36 @@ mod tests {
 
         let error = result.expect_err(
             "the timestamped signature must be unambiguous when transparency logs are skipped",
+        );
+        assert!(error
+            .to_string()
+            .contains("requires exactly one DSSE signature"));
+    }
+
+    #[test]
+    fn default_policy_rejects_ambiguous_multi_signature_dsse_timestamps() {
+        let mut bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("DSSE bundle");
+        let SignatureContent::DsseEnvelope(envelope) = &mut bundle.content else {
+            panic!("expected DSSE bundle");
+        };
+        envelope.signatures.push(envelope.signatures[0].clone());
+        bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps
+            .push(Rfc3161Timestamp {
+                signed_timestamp: sigstore_types::TimestampToken::new(vec![0xff]),
+            });
+
+        let result = verify(
+            CONDA_PACKAGE,
+            &bundle,
+            &VerificationPolicy::default(),
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        let error = result.expect_err(
+            "the timestamped signature must be unambiguous when transparency logs are enabled",
         );
         assert!(error
             .to_string()
