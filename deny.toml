@@ -361,6 +361,31 @@ name = "spin"
 name = "serdect"
 
 [[bans.skip]]
+# last-checked = 2026-08-02. The canonical schema code generator pins
+# typify 0.4.3, which requires regress 0.10.5. The Linux cage stack uses
+# nono 0.53.0, whose build-time typify 0.6.1 requires regress 0.11.1.
+# Updating the former is a spec-affecting four-language codegen rotation;
+# updating the latter would replace the reviewed enforcement dependency.
+name = "regress"
+version = "0.10.5"
+
+[[bans.skip]]
+# last-checked = 2026-08-02. The spec-affecting Chio codegen pin remains
+# typify 0.4.3 while nono 0.53.0 uses typify 0.6.1 at build time. Rotate
+# the older version only with regenerated Rust, Python, TypeScript, and Go
+# wire artifacts.
+name = "typify"
+version = "0.4.3"
+
+[[bans.skip]]
+name = "typify-impl"
+version = "0.4.3"
+
+[[bans.skip]]
+name = "typify-macro"
+version = "0.4.3"
+
+[[bans.skip]]
 name = "strum"
 
 [[bans.skip]]
