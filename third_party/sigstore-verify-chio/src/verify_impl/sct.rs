@@ -192,6 +192,7 @@ pub fn extract_scts(
 pub fn verify_sct(
     cert_der: &[u8],
     issuer_spki_der: &[u8],
+    validation_time: i64,
     trusted_root: &TrustedRoot,
 ) -> Result<()> {
     // Parse the certificate
@@ -212,6 +213,15 @@ pub fn verify_sct(
     let mut failures = Vec::new();
     for sct in scts {
         let result = (|| {
+            let timestamp_seconds = i64::try_from(sct.timestamp / 1_000).map_err(|_| {
+                Error::Verification("SCT timestamp cannot be represented".to_string())
+            })?;
+            if timestamp_seconds > validation_time {
+                return Err(Error::Verification(format!(
+                    "SCT timestamp {} is later than trusted signing time {}",
+                    timestamp_seconds, validation_time
+                )));
+            }
             let log_id = &sct.log_id.key_id;
             let ctlog = trusted_root
                 .ctlogs
@@ -226,9 +236,6 @@ pub fn verify_sct(
                         hex::encode(log_id)
                     ))
                 })?;
-            let timestamp_seconds = i64::try_from(sct.timestamp / 1_000).map_err(|_| {
-                Error::Verification("SCT timestamp cannot be represented".to_string())
-            })?;
             let timestamp_nanos = u32::try_from((sct.timestamp % 1_000) * 1_000_000)
                 .map_err(|_| Error::Verification("SCT timestamp is invalid".to_string()))?;
             let timestamp = chrono::DateTime::from_timestamp(timestamp_seconds, timestamp_nanos)
@@ -334,8 +341,50 @@ mod tests {
             .expect("issuer SPKI");
         let cert_der = cert.to_der().expect("certificate DER");
 
-        verify_sct(&cert_der, &issuer_spki, &trusted_root)
+        let validation_time = bundle.verification_material.tlog_entries[0].integrated_time;
+        verify_sct(&cert_der, &issuer_spki, validation_time, &trusted_root)
             .expect("one valid SCT must satisfy the verification threshold");
+    }
+
+    #[test]
+    fn sct_rejects_timestamp_after_trusted_signing_time() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle.signing_certificate().expect("signing certificate");
+        let cert = Certificate::from_der(certificate.as_bytes()).expect("certificate");
+        let scts: SignedCertificateTimestampList = cert
+            .tbs_certificate
+            .get()
+            .expect("SCT extension decode")
+            .expect("SCT extension")
+            .1;
+        let sct = scts.parse_timestamps().expect("SCT list")[0]
+            .parse_timestamp()
+            .expect("SCT");
+        let trusted_root = TrustedRoot::production().expect("production root");
+        let issuer_spki = trusted_root
+            .fulcio_certs()
+            .expect("Fulcio certificates")
+            .into_iter()
+            .filter_map(|der| Certificate::from_der(&der).ok())
+            .find(|issuer| issuer.tbs_certificate.subject == cert.tbs_certificate.issuer)
+            .expect("matching issuer")
+            .tbs_certificate
+            .subject_public_key_info
+            .to_der()
+            .expect("issuer SPKI");
+        let validation_time = i64::try_from(sct.timestamp / 1_000)
+            .expect("SCT time fits i64")
+            .saturating_sub(1);
+
+        let error = verify_sct(
+            certificate.as_bytes(),
+            &issuer_spki,
+            validation_time,
+            &trusted_root,
+        )
+        .expect_err("an SCT issued after the signing time must not verify");
+
+        assert!(error.to_string().contains("later than trusted signing time"));
     }
 
     #[test]
@@ -377,7 +426,13 @@ mod tests {
             .to_der()
             .expect("issuer SPKI");
 
-        let error = verify_sct(certificate.as_bytes(), &issuer_spki, &trusted_root)
+        let validation_time = bundle.verification_material.tlog_entries[0].integrated_time;
+        let error = verify_sct(
+            certificate.as_bytes(),
+            &issuer_spki,
+            validation_time,
+            &trusted_root,
+        )
             .expect_err("an inactive CT log key must not verify an SCT");
 
         assert!(error.to_string().contains("validity period"));

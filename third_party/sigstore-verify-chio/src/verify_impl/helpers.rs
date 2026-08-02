@@ -527,7 +527,12 @@ pub fn verify_sct(
     let issuer_spki = get_issuer_spki(verification_material, &cert, validation_time, trusted_root)?;
 
     // Delegate to the new sct module for verification
-    super::sct::verify_sct(cert.as_bytes(), issuer_spki.as_bytes(), trusted_root)
+    super::sct::verify_sct(
+        cert.as_bytes(),
+        issuer_spki.as_bytes(),
+        validation_time,
+        trusted_root,
+    )
 }
 
 /// Get the issuer's SubjectPublicKeyInfo DER bytes
