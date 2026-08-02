@@ -200,6 +200,15 @@ pub fn determine_validation_time(
         return Ok(tsa_time);
     }
 
+    if has_v2_tlog_entries(bundle) {
+        return Err(Error::Verification(
+            "V2 bundle requires RFC3161 timestamp but none could be verified. \
+             V2 tlog entries have integrated_time=0 by design. \
+             Ensure TSA certificates are present in the trusted root."
+                .to_string(),
+        ));
+    }
+
     // Try integrated time from V1 tlog entries with inclusion promises
     // Per sigstore-python: integrated_time only counts if accompanied by inclusion_promise
     if let Some(integrated_time) = extract_v1_integrated_time_with_promise(bundle) {
@@ -208,21 +217,11 @@ pub fn determine_validation_time(
 
     // No verified timestamp found - fail verification
     // This matches sigstore-python's behavior: "not enough sources of verified time"
-    let is_v2 = has_v2_tlog_entries(bundle);
-    if is_v2 {
-        Err(Error::Verification(
-            "V2 bundle requires RFC3161 timestamp but none could be verified. \
-             V2 tlog entries have integrated_time=0 by design. \
-             Ensure TSA certificates are present in the trusted root."
-                .to_string(),
-        ))
-    } else {
-        Err(Error::Verification(
-            "No verified timestamp found. V1 bundles require either an RFC3161 timestamp \
-             or a tlog entry with both integrated_time > 0 and an inclusion_promise (SET)."
-                .to_string(),
-        ))
-    }
+    Err(Error::Verification(
+        "No verified timestamp found. V1 bundles require either an RFC3161 timestamp \
+         or a tlog entry with both integrated_time > 0 and an inclusion_promise (SET)."
+            .to_string(),
+    ))
 }
 
 /// Determine certificate validation time from a verified-log time source only.
@@ -231,6 +230,12 @@ pub fn determine_validation_time(
 /// `skip_timestamp`. The later transparency-log verification still validates
 /// the inclusion promise that makes the integrated time authoritative.
 pub fn determine_validation_time_from_tlog(bundle: &Bundle) -> Result<i64> {
+    if has_v2_tlog_entries(bundle) {
+        return Err(Error::Verification(
+            "timestamp verification is disabled and V2 transparency-log content has no signed integrated time"
+                .to_string(),
+        ));
+    }
     if let Some(integrated_time) = extract_v1_integrated_time_with_promise(bundle) {
         return Ok(integrated_time);
     }

@@ -730,6 +730,7 @@ mod tests {
     const COSIGN_V3_BLOB: &[u8] = include_bytes!("../test_data/bundles/cosign-v3-blob.txt");
     const CONDA_ATTESTATION_BUNDLE: &str =
         include_str!("../test_data/bundles/conda-attestation.sigstore.json");
+    const DSSE_V2_BUNDLE: &str = include_str!("../test_data/bundles/dsse.sigstore.json");
     const CONDA_PACKAGE: &[u8] =
         include_bytes!("../test_data/bundles/signed-package-2.1.0-hb0f4dca_0.conda");
 
@@ -878,6 +879,35 @@ mod tests {
         assert!(error
             .to_string()
             .contains("requires exactly one DSSE signature"));
+    }
+
+    #[test]
+    fn v2_content_cannot_borrow_an_unrelated_v1_integrated_time() {
+        let mut bundle = Bundle::from_json(DSSE_V2_BUNDLE).expect("V2 DSSE bundle");
+        let v1_bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("V1 DSSE bundle");
+        bundle
+            .verification_material
+            .tlog_entries
+            .push(v1_bundle.verification_material.tlog_entries[0].clone());
+        let signature = crate::verify_impl::helpers::extract_signature(&bundle.content)
+            .expect("extract V2 signature");
+        let trusted_root = TrustedRoot::production().expect("production root");
+
+        let timestamp_error = crate::verify_impl::helpers::determine_validation_time(
+            &bundle,
+            &signature,
+            &trusted_root,
+        )
+        .expect_err("V2 content must require RFC 3161 time");
+        assert!(timestamp_error
+            .to_string()
+            .contains("V2 bundle requires RFC3161 timestamp"));
+
+        let tlog_error = crate::verify_impl::helpers::determine_validation_time_from_tlog(&bundle)
+            .expect_err("V2 content has no signed integrated time");
+        assert!(tlog_error
+            .to_string()
+            .contains("V2 transparency-log content has no signed integrated time"));
     }
 
     #[test]
