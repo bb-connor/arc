@@ -1059,8 +1059,10 @@ fn test_provider_risk_package_export_surfaces() {
             receipt_db_path.to_str().expect("receipt db path"),
             "--budget-db",
             budget_db_path.to_str().expect("budget db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "provider-risk-package",
             "export",

@@ -1185,8 +1185,10 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
             receipt_db_path.to_str().expect("receipt db path"),
             "--budget-db",
             budget_db_path.to_str().expect("budget db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            trust_service_authority_seed_path(&receipt_db_path)
+                .to_str()
+                .expect("authority seed path"),
             "trust",
             "liability-market",
             "auto-bind-issue",
