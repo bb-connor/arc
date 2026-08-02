@@ -21,16 +21,21 @@ pub fn verify_hashedrekord_entries(
     bundle: &Bundle,
     artifact: &Artifact<'_>,
     expected_verifier: ExpectedDsseVerifier<'_>,
-) -> Result<usize> {
+) -> Result<Vec<usize>> {
     if !matches!(bundle.content, SignatureContent::MessageSignature(_)) {
-        return Ok(0);
+        return Ok(Vec::new());
     }
 
-    let mut verified = 0;
-    for entry in &bundle.verification_material.tlog_entries {
+    let mut verified = Vec::new();
+    for (index, entry) in bundle
+        .verification_material
+        .tlog_entries
+        .iter()
+        .enumerate()
+    {
         if entry.kind_version.kind == "hashedrekord" {
             verify_hashedrekord_entry(entry, bundle, artifact, expected_verifier)?;
-            verified += 1;
+            verified.push(index);
         }
     }
     Ok(verified)

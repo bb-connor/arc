@@ -543,27 +543,42 @@ fn verify_transparency_log_content_binding(
             "transparency-log content binding requires a verifier identity".to_string(),
         )
     })?;
-    let (entry_count, content_is_dsse) = match &bundle.content {
+    let (entry_indices, content_is_dsse) = match &bundle.content {
         SignatureContent::MessageSignature(_) => {
-            let entry_count = crate::verify_impl::verify_hashedrekord_entries(
+            let entry_indices = crate::verify_impl::verify_hashedrekord_entries(
                 bundle,
                 artifact,
                 expected_verifier,
             )?;
-            (entry_count, false)
+            (entry_indices, false)
         }
         SignatureContent::DsseEnvelope(_) => {
-            let dsse_entries = crate::verify_impl::verify_dsse_entries(bundle, expected_verifier)?;
-            let intoto_entries =
-                crate::verify_impl::verify_intoto_entries(bundle, expected_verifier)?;
-            (dsse_entries + intoto_entries, true)
+            let mut entry_indices =
+                crate::verify_impl::verify_dsse_entries(bundle, expected_verifier)?;
+            entry_indices
+                .extend(crate::verify_impl::verify_intoto_entries(bundle, expected_verifier)?);
+            (entry_indices, true)
         }
     };
+    for &index in &entry_indices {
+        let entry = &bundle.verification_material.tlog_entries[index];
+        if entry.inclusion_proof.is_none() && entry.inclusion_promise.is_none() {
+            return Err(Error::Verification(
+                "content-bound transparency log entry has no inclusion proof or promise"
+                    .to_string(),
+            ));
+        }
+    }
     let v1_integrated_time_with_promise = bundle
         .verification_material
         .tlog_entries
         .iter()
+        .enumerate()
         .filter(|entry| {
+            let (index, entry) = entry;
+            if !entry_indices.contains(index) {
+                return false;
+            }
             let is_v1_time_source = if content_is_dsse {
                 (entry.kind_version.kind == "dsse" && entry.kind_version.version == "0.0.1")
                     || (entry.kind_version.kind == "intoto"
@@ -573,10 +588,10 @@ fn verify_transparency_log_content_binding(
             };
             is_v1_time_source && entry.inclusion_promise.is_some() && entry.integrated_time > 0
         })
-        .map(|entry| entry.integrated_time)
+        .map(|(_, entry)| entry.integrated_time)
         .min();
     Ok(VerifiedTransparencyLogContent {
-        entry_count,
+        entry_count: entry_indices.len(),
         v1_integrated_time_with_promise,
     })
 }
@@ -1058,6 +1073,45 @@ mod tests {
         assert!(tlog_error
             .to_string()
             .contains("no V1 transparency-log entry provides a signed integrated time"));
+    }
+
+    #[test]
+    fn content_bound_entry_cannot_borrow_unrelated_inclusion_evidence() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let certificate = bundle
+            .signing_certificate()
+            .expect("cosign certificate")
+            .clone();
+        let public_key = parse_certificate_info(certificate.as_bytes())
+            .expect("cosign certificate info")
+            .public_key;
+        let matching_entry = &mut bundle.verification_material.tlog_entries[0];
+        matching_entry.inclusion_proof = None;
+        matching_entry.inclusion_promise = None;
+
+        let unrelated = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("unrelated bundle");
+        let unrelated_entry = unrelated.verification_material.tlog_entries[0].clone();
+        assert!(unrelated_entry.inclusion_proof.is_some());
+        bundle
+            .verification_material
+            .tlog_entries
+            .push(unrelated_entry);
+
+        for expected_verifier in [
+            crate::verify_impl::rekor::ExpectedDsseVerifier::Certificate(&certificate),
+            crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(&public_key),
+        ] {
+            let error = verify_transparency_log_content_binding(
+                &bundle,
+                &Artifact::Bytes(COSIGN_V3_BLOB),
+                Some(expected_verifier),
+            )
+            .expect_err("unrelated inclusion evidence must not satisfy the matching entry");
+
+            assert!(error
+                .to_string()
+                .contains("content-bound transparency log entry has no inclusion proof"));
+        }
     }
 
     #[test]

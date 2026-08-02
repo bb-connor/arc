@@ -59,23 +59,28 @@ struct IntotoSignatureWithVerifier {
 pub fn verify_dsse_entries(
     bundle: &Bundle,
     expected_verifier: ExpectedDsseVerifier<'_>,
-) -> Result<usize> {
+) -> Result<Vec<usize>> {
     let envelope = match &bundle.content {
         SignatureContent::DsseEnvelope(env) => env,
-        _ => return Ok(0), // Not a DSSE bundle
+        _ => return Ok(Vec::new()), // Not a DSSE bundle
     };
 
-    let mut verified = 0;
-    for entry in &bundle.verification_material.tlog_entries {
+    let mut verified = Vec::new();
+    for (index, entry) in bundle
+        .verification_material
+        .tlog_entries
+        .iter()
+        .enumerate()
+    {
         if entry.kind_version.kind == "dsse" {
             match entry.kind_version.version.as_str() {
                 "0.0.1" => {
                     verify_dsse_v001(entry, envelope, expected_verifier)?;
-                    verified += 1;
+                    verified.push(index);
                 }
                 "0.0.2" => {
                     verify_dsse_v002(entry, envelope, expected_verifier)?;
-                    verified += 1;
+                    verified.push(index);
                 }
                 _ => {} // Unknown version, skip
             }
@@ -261,17 +266,22 @@ fn match_signatures_one_to_one<BundleSignature, RekorSignature>(
 pub fn verify_intoto_entries(
     bundle: &Bundle,
     expected_verifier: ExpectedDsseVerifier<'_>,
-) -> Result<usize> {
+) -> Result<Vec<usize>> {
     let envelope = match &bundle.content {
         SignatureContent::DsseEnvelope(env) => env,
-        _ => return Ok(0), // Not a DSSE bundle
+        _ => return Ok(Vec::new()), // Not a DSSE bundle
     };
 
-    let mut verified = 0;
-    for entry in &bundle.verification_material.tlog_entries {
+    let mut verified = Vec::new();
+    for (index, entry) in bundle
+        .verification_material
+        .tlog_entries
+        .iter()
+        .enumerate()
+    {
         if entry.kind_version.kind == "intoto" {
             verify_intoto_v002(entry, envelope, expected_verifier)?;
-            verified += 1;
+            verified.push(index);
         }
     }
 

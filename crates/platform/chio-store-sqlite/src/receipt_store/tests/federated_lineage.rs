@@ -311,6 +311,75 @@ fn federated_row_decode_rejects_negative_synthetic_timestamp() {
 }
 
 #[test]
+fn federated_import_rejects_values_outside_sqlite_integer_range_before_persistence() {
+    let path = unique_db_path("federated-integer-overflow");
+    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+
+    let mut exported_at = share_import("overflow-exported-at", synthetic_anchor("export", None));
+    exported_at.exported_at = u64::MAX;
+
+    let mut issued_at = share_import("overflow-issued-at", synthetic_anchor("issued", None));
+    issued_at.capability_lineage[0].issued_at = u64::MAX;
+
+    let mut expires_at = share_import("overflow-expires-at", synthetic_anchor("expires", None));
+    expires_at.capability_lineage[0].expires_at = u64::MAX;
+
+    let mut delegation_depth = share_import(
+        "overflow-delegation-depth",
+        synthetic_anchor("delegation", None),
+    );
+    delegation_depth.capability_lineage[0].delegation_depth = u64::MAX;
+
+    let mut receipt_seq = share_import("overflow-receipt-seq", synthetic_anchor("seq", None));
+    receipt_seq.tool_receipts.push(StoredToolReceipt {
+        seq: u64::MAX,
+        receipt: sample_receipt_with_id("overflow-receipt-seq"),
+    });
+
+    let mut receipt_timestamp = share_import(
+        "overflow-receipt-timestamp",
+        synthetic_anchor("timestamp", None),
+    );
+    receipt_timestamp.tool_receipts.push(StoredToolReceipt {
+        seq: 1,
+        receipt: sample_receipt_with_id_and_timestamp("overflow-receipt-timestamp", u64::MAX),
+    });
+
+    for (import, expected_field) in [
+        (exported_at, "federated share exported_at"),
+        (issued_at, "federated lineage issued_at"),
+        (expires_at, "federated lineage expires_at"),
+        (delegation_depth, "federated lineage delegation_depth"),
+        (receipt_seq, "federated tool receipt seq"),
+        (receipt_timestamp, "federated tool receipt timestamp"),
+    ] {
+        let Err(error) = store.import_federated_evidence_share(&import) else {
+            panic!("{expected_field} overflow must fail closed");
+        };
+        assert!(matches!(
+            error,
+            ReceiptStoreError::Conflict(message)
+                if message.contains(expected_field)
+                    && message.contains("exceeds SQLite INTEGER range")
+        ));
+    }
+
+    let persisted_shares: i64 = store
+        .connection()
+        .test_unwrap()
+        .query_row(
+            "SELECT COUNT(*) FROM federated_evidence_shares",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(persisted_shares, 0);
+
+    drop(store);
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn atomic_federated_lineage_is_idempotent_and_concurrent() {
     let path = unique_db_path("federated-lineage-concurrent");
     let store_a = SqliteReceiptStore::open(&path).test_unwrap();

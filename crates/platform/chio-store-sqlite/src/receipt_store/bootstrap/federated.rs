@@ -112,6 +112,33 @@ impl SqliteReceiptStore {
         let import_owned = import.clone();
         self.writer_handle().run_write(move |connection| {
             let import = &import_owned;
+            let imported_at_sql = sqlite_i64(imported_at, "federated share imported_at")?;
+            let exported_at_sql = sqlite_i64(import.exported_at, "federated share exported_at")?;
+            let lineage_sql_values = import
+                .capability_lineage
+                .iter()
+                .map(|snapshot| {
+                    Ok((
+                        sqlite_i64(snapshot.issued_at, "federated lineage issued_at")?,
+                        sqlite_i64(snapshot.expires_at, "federated lineage expires_at")?,
+                        sqlite_i64(
+                            snapshot.delegation_depth,
+                            "federated lineage delegation_depth",
+                        )?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ReceiptStoreError>>()?;
+            let receipt_sql_values = import
+                .tool_receipts
+                .iter()
+                .map(|record| {
+                    Ok((
+                        sqlite_i64(record.seq, "federated tool receipt seq")?,
+                        sqlite_i64(record.receipt.timestamp, "federated tool receipt timestamp")?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ReceiptStoreError>>()?;
+
             let tx = connection.transaction()?;
             tx.execute(
                 r#"
@@ -139,8 +166,8 @@ impl SqliteReceiptStore {
                 params![
                     import.share_id,
                     import.manifest_hash,
-                    imported_at as i64,
-                    import.exported_at as i64,
+                    imported_at_sql,
+                    exported_at_sql,
                     import.issuer,
                     import.partner,
                     import.signer_public_key,
@@ -155,7 +182,9 @@ impl SqliteReceiptStore {
                 .map(|snapshot| (snapshot.capability_id.as_str(), snapshot))
                 .collect::<BTreeMap<_, _>>();
 
-            for snapshot in &import.capability_lineage {
+            for (snapshot, (issued_at_sql, expires_at_sql, delegation_depth_sql)) in
+                import.capability_lineage.iter().zip(&lineage_sql_values)
+            {
                 crate::capability_lineage::validate_snapshot_for_transport(snapshot)?;
                 {
                     let mut statement = tx.prepare(
@@ -224,10 +253,10 @@ impl SqliteReceiptStore {
                         snapshot.capability_id,
                         snapshot.subject_key,
                         snapshot.issuer_key,
-                        snapshot.issued_at as i64,
-                        snapshot.expires_at as i64,
+                        issued_at_sql,
+                        expires_at_sql,
                         snapshot.grants_json,
-                        snapshot.delegation_depth as i64,
+                        delegation_depth_sql,
                         snapshot.parent_capability_id,
                         snapshot.federated_parent_capability_id,
                         snapshot.provenance.as_str(),
@@ -236,7 +265,9 @@ impl SqliteReceiptStore {
                 )?;
             }
 
-            for record in &import.tool_receipts {
+            for (record, (seq_sql, timestamp_sql)) in
+                import.tool_receipts.iter().zip(&receipt_sql_values)
+            {
                 let attribution = extract_receipt_attribution(&record.receipt);
                 let lineage_subject = lineage_by_capability
                     .get(record.receipt.capability_id.as_str())
@@ -266,9 +297,9 @@ impl SqliteReceiptStore {
                 "#,
                     params![
                         import.share_id,
-                        record.seq as i64,
+                        seq_sql,
                         record.receipt.id,
-                        record.receipt.timestamp as i64,
+                        timestamp_sql,
                         record.receipt.capability_id,
                         attribution
                             .subject_key
