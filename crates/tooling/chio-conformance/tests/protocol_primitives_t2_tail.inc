@@ -755,7 +755,7 @@ fn admission_authority_commits_and_state_writes_recover_exactly() {
     let before_revocation = SqliteAdmissionCaptureAuthority::open(&revocation_path).test_unwrap();
     assert_eq!(before_revocation.revocation_head().test_unwrap(), 0);
     assert!(before_revocation
-        .broker_revocation_snapshot(&[revocation_record.capability_id.clone()])
+        .broker_revocation_snapshot(std::slice::from_ref(&revocation_record.capability_id))
         .test_unwrap()
         .revoked_ids()
         .is_empty());
@@ -779,10 +779,10 @@ fn admission_authority_commits_and_state_writes_recover_exactly() {
     assert_eq!(reopened_revocation.revocation_head().test_unwrap(), 1);
     assert_eq!(
         reopened_revocation
-            .broker_revocation_snapshot(&[revocation_record.capability_id.clone()])
+            .broker_revocation_snapshot(std::slice::from_ref(&revocation_record.capability_id))
             .test_unwrap()
             .revoked_ids(),
-        &[revocation_record.capability_id.clone()]
+        std::slice::from_ref(&revocation_record.capability_id)
     );
     let recovered_revocation = reopened_revocation
         .upsert_revocation(&revocation_record)
