@@ -797,6 +797,13 @@ fn write_resume_hmac_keyring(dir: &Path) -> PathBuf {
     path
 }
 
+fn materialize_test_authority_seed(dir: &Path) -> PathBuf {
+    let path = dir.join("remote-authority.seed");
+    chio_control_plane::load_or_create_authority_keypair(&path)
+        .expect("materialize test authority seed");
+    path
+}
+
 fn spawn_http_server(dir: &Path, listen: SocketAddr, token: &str) -> ServerGuard {
     spawn_http_server_with_session_lifecycle_tuning(dir, listen, token, None, None, None, None)
 }
@@ -860,7 +867,7 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -894,6 +901,8 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         &listen.to_string(),
         "--auth-token",
         token,
+        "--admin-token",
+        STATIC_AUTH_ADMIN_TOKEN,
     ]);
     if let Some(value) = idle_expiry_millis {
         command.env(
@@ -916,6 +925,7 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
     spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
 
+#[cfg(target_os = "linux")]
 fn spawn_http_server_with_policy_path_and_jwt_auth(
     dir: &Path,
     policy_path: &Path,
@@ -929,7 +939,7 @@ fn spawn_http_server_with_policy_path_and_jwt_auth(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -990,7 +1000,7 @@ fn spawn_http_server_with_shared_owner(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command
@@ -1017,6 +1027,8 @@ fn spawn_http_server_with_shared_owner(
             &listen.to_string(),
             "--auth-token",
             token,
+            "--admin-token",
+            STATIC_AUTH_ADMIN_TOKEN,
             "--shared-hosted-owner",
         ]);
     spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
@@ -1053,6 +1065,8 @@ fn spawn_http_server_with_authority_db(
         &listen.to_string(),
         "--auth-token",
         token,
+        "--admin-token",
+        STATIC_AUTH_ADMIN_TOKEN,
     ]);
     spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
@@ -1088,7 +1102,7 @@ fn spawn_http_server_with_shared_owner_and_jwt_auth(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -1141,7 +1155,7 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -1195,7 +1209,7 @@ fn spawn_http_server_with_jwt_auth_and_local_discovery(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
     let public_base_url = format!("http://{listen}");
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
@@ -1430,7 +1444,7 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -1491,7 +1505,7 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
-    let authority_seed_path = dir.join("remote-authority.seed");
+    let authority_seed_path = materialize_test_authority_seed(dir);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -1543,6 +1557,7 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
 fn spawn_trust_control_service(
     listen: SocketAddr,
     service_token: &str,
+    authority_admin_token: &str,
     receipt_db_path: &Path,
     revocation_db_path: &Path,
     authority_db_path: &Path,
@@ -1564,6 +1579,8 @@ fn spawn_trust_control_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            authority_admin_token,
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -1578,6 +1595,7 @@ fn spawn_http_server_with_control_plane(
     dir: &Path,
     listen: SocketAddr,
     token: &str,
+    admin_token: &str,
     control_url: &str,
     control_token: &str,
     authority_db_path: &Path,
@@ -1611,6 +1629,8 @@ fn spawn_http_server_with_control_plane(
             &listen.to_string(),
             "--auth-token",
             token,
+            "--admin-token",
+            admin_token,
         ]);
     if !control_authority_trusted_public_keys.is_empty() {
         command

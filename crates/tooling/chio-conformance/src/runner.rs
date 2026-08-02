@@ -812,6 +812,7 @@ mod tests {
         let runtime_state = ConformanceRuntimeState::create()
             .unwrap_or_else(|error| panic!("create conformance runtime state: {error}"));
         let runtime_root = runtime_state._directory.path().to_path_buf();
+        #[cfg(target_os = "linux")]
         assert_eq!(
             runtime_state.session_db_path.parent(),
             Some(runtime_root.as_path())

@@ -882,7 +882,7 @@ impl RemoteSessionFactory {
     }
 
     fn keypair_for_new_kernel(&self) -> Result<Keypair, CliError> {
-        match (
+        let keypair = match (
             self.keyring_runtime.as_ref(),
             self.config.authority_seed_path.as_deref(),
             self.config.authority_db_path.as_deref(),
@@ -892,7 +892,21 @@ impl RemoteSessionFactory {
                 Ok(SqliteCapabilityAuthority::open_existing(authority_db_path)?.local_keypair()?)
             }
             _ => Ok(self.kernel_keypair.clone()),
+        }?;
+        if !self.uses_remote_authority()
+            && self.config.control_url.is_some()
+            && self
+                .config
+                .control_authority_public_key
+                .as_ref()
+                .is_some_and(|pinned| pinned != &keypair.public_key())
+        {
+            return Err(CliError::cli_other_error(
+                "local authority/control-pin epoch mismatch during future kernel selection"
+                    .to_string(),
+            ));
         }
+        Ok(keypair)
     }
 
     fn pin_configured_policy(&mut self) -> Result<(), CliError> {

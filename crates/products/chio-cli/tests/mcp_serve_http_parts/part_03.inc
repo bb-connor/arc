@@ -398,7 +398,8 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
 
     let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
     let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
-    let trust_a: Value = get_admin_session_trust(&client, &base_url, token, &session_a)
+    let trust_a: Value =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_a)
         .json()
         .expect("session A trust json");
     assert_eq!(
@@ -926,7 +927,7 @@ fn mcp_serve_http_admin_receipt_queries_return_tool_and_child_receipts() {
     let tool_receipts = get_admin_tool_receipts(
         &client,
         &base_url,
-        token,
+        STATIC_AUTH_ADMIN_TOKEN,
         &[("tool_name", "echo_json"), ("limit", "10")],
     );
     assert_eq!(tool_receipts.status(), reqwest::StatusCode::OK);
@@ -942,7 +943,7 @@ fn mcp_serve_http_admin_receipt_queries_return_tool_and_child_receipts() {
     let child_receipts = get_admin_child_receipts(
         &client,
         &base_url,
-        token,
+        STATIC_AUTH_ADMIN_TOKEN,
         &[("operation_kind", "create_message"), ("limit", "10")],
     );
     assert_eq!(child_receipts.status(), reqwest::StatusCode::OK);
@@ -975,7 +976,8 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     let base_url = format!("http://{listen}");
 
     let (session_id, _protocol_version) = initialize_session(&client, &base_url, token);
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("trust status json");
     let capability_id = trust_status["capabilities"]
@@ -989,7 +991,7 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     let before = get_admin_revocations(
         &client,
         &base_url,
-        token,
+        STATIC_AUTH_ADMIN_TOKEN,
         &[("capability_id", &capability_id), ("limit", "10")],
     );
     assert_eq!(before.status(), reqwest::StatusCode::OK);
@@ -998,7 +1000,12 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     assert_eq!(before["revoked"], false);
     assert_eq!(before["count"], 0);
 
-    let revoked = post_admin_capability_revoke(&client, &base_url, token, &capability_id);
+    let revoked = post_admin_capability_revoke(
+        &client,
+        &base_url,
+        STATIC_AUTH_ADMIN_TOKEN,
+        &capability_id,
+    );
     assert_eq!(revoked.status(), reqwest::StatusCode::OK);
     let revoked: Value = revoked.json().expect("revoke json");
     assert_eq!(revoked["capabilityId"], capability_id);
@@ -1008,7 +1015,7 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     let after = get_admin_revocations(
         &client,
         &base_url,
-        token,
+        STATIC_AUTH_ADMIN_TOKEN,
         &[("capability_id", &capability_id), ("limit", "10")],
     );
     assert_eq!(after.status(), reqwest::StatusCode::OK);
@@ -1019,7 +1026,12 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0]["capabilityId"], capability_id);
 
-    let all = get_admin_revocations(&client, &base_url, token, &[("limit", "10")]);
+    let all = get_admin_revocations(
+        &client,
+        &base_url,
+        STATIC_AUTH_ADMIN_TOKEN,
+        &[("limit", "10")],
+    );
     assert_eq!(all.status(), reqwest::StatusCode::OK);
     let all: Value = all.json().expect("all revocations json");
     let entries = all["revocations"].as_array().expect("revocations array");
@@ -1048,7 +1060,8 @@ fn mcp_serve_http_admin_revocation_denies_future_calls_for_session() {
 
     let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
 
-    let trust_status_before = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status_before =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status_before.status(), reqwest::StatusCode::OK);
     let trust_status_before: Value = trust_status_before.json().expect("trust status json");
     let capabilities_before = trust_status_before["capabilities"]
@@ -1059,7 +1072,12 @@ fn mcp_serve_http_admin_revocation_denies_future_calls_for_session() {
         .iter()
         .all(|capability| capability["revoked"] == false));
 
-    let revoke = post_admin_session_revoke(&client, &base_url, token, &session_id);
+    let revoke = post_admin_session_revoke(
+        &client,
+        &base_url,
+        STATIC_AUTH_ADMIN_TOKEN,
+        &session_id,
+    );
     assert_eq!(revoke.status(), reqwest::StatusCode::OK);
     let revoke_body: Value = revoke.json().expect("revoke json");
     assert_eq!(revoke_body["revoked"], true);
@@ -1070,7 +1088,8 @@ fn mcp_serve_http_admin_revocation_denies_future_calls_for_session() {
             >= 1
     );
 
-    let trust_status_after = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status_after =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status_after.status(), reqwest::StatusCode::OK);
     let trust_status_after: Value = trust_status_after.json().expect("trust status json");
     let capabilities_after = trust_status_after["capabilities"]
@@ -1127,7 +1146,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
 
     let (session_a, _protocol_a) = initialize_session(&client, &base_url, token);
 
-    let authority_before = get_admin_authority(&client, &base_url, token);
+    let authority_before = get_admin_authority(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(authority_before.status(), reqwest::StatusCode::OK);
     let authority_before: Value = authority_before.json().expect("authority json");
     assert_eq!(authority_before["configured"], true);
@@ -1136,7 +1155,8 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         .expect("old authority public key")
         .to_string();
 
-    let trust_a_before = get_admin_session_trust(&client, &base_url, token, &session_a);
+    let trust_a_before =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_before.status(), reqwest::StatusCode::OK);
     let trust_a_before: Value = trust_a_before.json().expect("session trust json");
     let caps_a_before = trust_a_before["capabilities"]
@@ -1147,7 +1167,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         capability["issuerPublicKey"].as_str() == Some(old_public_key.as_str())
     }));
 
-    let rotated = post_admin_rotate_authority(&client, &base_url, token);
+    let rotated = post_admin_rotate_authority(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(rotated.status(), reqwest::StatusCode::OK);
     let rotated: Value = rotated.json().expect("rotated authority json");
     assert_eq!(rotated["rotated"], true);
@@ -1158,7 +1178,7 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         .to_string();
     assert_ne!(old_public_key, new_public_key);
 
-    let authority_after = get_admin_authority(&client, &base_url, token);
+    let authority_after = get_admin_authority(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(authority_after.status(), reqwest::StatusCode::OK);
     let authority_after: Value = authority_after.json().expect("authority json");
     assert_eq!(
@@ -1167,7 +1187,8 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
     );
 
     let (session_b, _protocol_b) = initialize_session(&client, &base_url, token);
-    let trust_b = get_admin_session_trust(&client, &base_url, token, &session_b);
+    let trust_b =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
     let caps_b = trust_b["capabilities"]
@@ -1178,7 +1199,8 @@ fn mcp_serve_http_admin_authority_rotation_only_affects_future_sessions() {
         capability["issuerPublicKey"].as_str() == Some(new_public_key.as_str())
     }));
 
-    let trust_a_after = get_admin_session_trust(&client, &base_url, token, &session_a);
+    let trust_a_after =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_after.status(), reqwest::StatusCode::OK);
     let trust_a_after: Value = trust_a_after.json().expect("session trust json");
     let caps_a_after = trust_a_after["capabilities"]
@@ -1196,21 +1218,31 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
     let authority_db_path = dir.join("shared-authority.sqlite3");
-    let listen_a = reserve_listen_addr();
-    let listen_b = reserve_listen_addr();
+    drop(
+        chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+            .expect("provision shared capability authority database"),
+    );
     let token = "test-token";
-    let _server_a = spawn_http_server_with_authority_db(&dir, listen_a, token, &authority_db_path);
-    let _server_b = spawn_http_server_with_authority_db(&dir, listen_b, token, &authority_db_path);
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
         .expect("build reqwest client");
+    let (listen_a, _server_a) = spawn_with_bind_retry(
+        &client,
+        "shared-authority MCP server A",
+        |listen| spawn_http_server_with_authority_db(&dir, listen, token, &authority_db_path),
+        wait_for_server_result,
+    );
+    let (listen_b, _server_b) = spawn_with_bind_retry(
+        &client,
+        "shared-authority MCP server B",
+        |listen| spawn_http_server_with_authority_db(&dir, listen, token, &authority_db_path),
+        wait_for_server_result,
+    );
     let base_url_a = format!("http://{listen_a}");
     let base_url_b = format!("http://{listen_b}");
-    wait_for_server(&client, &base_url_a);
-    wait_for_server(&client, &base_url_b);
 
-    let authority_before = get_admin_authority(&client, &base_url_a, token);
+    let authority_before = get_admin_authority(&client, &base_url_a, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(authority_before.status(), reqwest::StatusCode::OK);
     let authority_before: Value = authority_before.json().expect("authority json");
     assert_eq!(authority_before["backend"], "sqlite");
@@ -1223,7 +1255,8 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
         .expect("old authority generation");
 
     let (session_a, _protocol_a) = initialize_session(&client, &base_url_a, token);
-    let trust_a_before = get_admin_session_trust(&client, &base_url_a, token, &session_a);
+    let trust_a_before =
+        get_admin_session_trust(&client, &base_url_a, STATIC_AUTH_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_before.status(), reqwest::StatusCode::OK);
     let trust_a_before: Value = trust_a_before.json().expect("session trust json");
     let caps_a_before = trust_a_before["capabilities"]
@@ -1234,7 +1267,7 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
         capability["issuerPublicKey"].as_str() == Some(old_public_key.as_str())
     }));
 
-    let rotated = post_admin_rotate_authority(&client, &base_url_a, token);
+    let rotated = post_admin_rotate_authority(&client, &base_url_a, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(rotated.status(), reqwest::StatusCode::OK);
     let rotated: Value = rotated.json().expect("rotated authority json");
     assert_eq!(rotated["backend"], "sqlite");
@@ -1248,7 +1281,8 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
     assert_ne!(old_public_key, new_public_key);
     assert_eq!(new_generation, old_generation + 1);
 
-    let authority_seen_from_b = get_admin_authority(&client, &base_url_b, token);
+    let authority_seen_from_b =
+        get_admin_authority(&client, &base_url_b, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(authority_seen_from_b.status(), reqwest::StatusCode::OK);
     let authority_seen_from_b: Value = authority_seen_from_b.json().expect("authority json");
     assert_eq!(
@@ -1261,7 +1295,8 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
     );
 
     let (session_b, _protocol_b) = initialize_session(&client, &base_url_b, token);
-    let trust_b = get_admin_session_trust(&client, &base_url_b, token, &session_b);
+    let trust_b =
+        get_admin_session_trust(&client, &base_url_b, STATIC_AUTH_ADMIN_TOKEN, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
     let caps_b = trust_b["capabilities"]
@@ -1272,7 +1307,8 @@ fn mcp_serve_http_shared_authority_rotation_propagates_across_nodes() {
         capability["issuerPublicKey"].as_str() == Some(new_public_key.as_str())
     }));
 
-    let trust_a_after = get_admin_session_trust(&client, &base_url_a, token, &session_a);
+    let trust_a_after =
+        get_admin_session_trust(&client, &base_url_a, STATIC_AUTH_ADMIN_TOKEN, &session_a);
     assert_eq!(trust_a_after.status(), reqwest::StatusCode::OK);
     let trust_a_after: Value = trust_a_after.json().expect("session trust json");
     let caps_a_after = trust_a_after["capabilities"]
@@ -1300,7 +1336,9 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let authority_db_path = dir.join("control-authority.sqlite3");
     let budget_db_path = dir.join("control-budgets.sqlite3");
     let auth_token = "edge-token";
+    let edge_admin_token = "edge-admin-token";
     let control_token = "control-token";
+    let authority_admin_token = "authority-admin-token";
     let bootstrap_client = Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
@@ -1313,6 +1351,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
             spawn_trust_control_service(
                 listen,
                 control_token,
+                authority_admin_token,
                 &receipt_db_path,
                 &revocation_db_path,
                 &authority_db_path,
@@ -1362,6 +1401,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
                 &node_a_dir,
                 listen,
                 auth_token,
+                edge_admin_token,
                 &control_base_url,
                 control_token,
                 &authority_db_path,
@@ -1380,6 +1420,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
                 &node_b_dir,
                 listen,
                 auth_token,
+                edge_admin_token,
                 &control_base_url,
                 control_token,
                 &authority_db_path,
@@ -1394,7 +1435,8 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let base_url_b = format!("http://{listen_b}");
 
     let (session_a, protocol_a) = initialize_session(&client, &base_url_a, auth_token);
-    let trust_a_before = get_admin_session_trust(&client, &base_url_a, auth_token, &session_a);
+    let trust_a_before =
+        get_admin_session_trust(&client, &base_url_a, edge_admin_token, &session_a);
     assert_eq!(trust_a_before.status(), reqwest::StatusCode::OK);
     let trust_a_before: Value = trust_a_before.json().expect("session trust json");
     let caps_a_before = trust_a_before["capabilities"]
@@ -1448,7 +1490,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let proxied_receipts = get_admin_tool_receipts(
         &client,
         &base_url_b,
-        auth_token,
+        edge_admin_token,
         &[("toolName", "echo_json"), ("limit", "10")],
     );
     assert_eq!(proxied_receipts.status(), reqwest::StatusCode::OK);
@@ -1459,7 +1501,11 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         control_receipts["receipts"][0]["tool_name"]
     );
 
-    let rotated = post_control_rotate_authority(&client, &control_base_url, control_token);
+    let rotated = post_control_rotate_authority(
+        &client,
+        &control_base_url,
+        authority_admin_token,
+    );
     assert_eq!(rotated.status(), reqwest::StatusCode::OK);
     let rotated: Value = rotated.json().expect("rotated authority json");
     let new_public_key = rotated["publicKey"]
@@ -1548,6 +1594,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
                 &node_b_dir,
                 listen,
                 auth_token,
+                edge_admin_token,
                 &control_base_url,
                 control_token,
                 &authority_db_path,
@@ -1561,7 +1608,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let base_url_b = format!("http://{listen_b}");
 
     let (session_b, _protocol_b) = initialize_session(&client, &base_url_b, auth_token);
-    let trust_b = get_admin_session_trust(&client, &base_url_b, auth_token, &session_b);
+    let trust_b = get_admin_session_trust(&client, &base_url_b, edge_admin_token, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
     let caps_b = trust_b["capabilities"]
@@ -1572,7 +1619,12 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         capability["issuerPublicKey"].as_str() == Some(new_public_key.as_str())
     }));
 
-    let revoke = post_admin_capability_revoke(&client, &base_url_b, auth_token, &capability_id);
+    let revoke = post_admin_capability_revoke(
+        &client,
+        &base_url_b,
+        edge_admin_token,
+        &capability_id,
+    );
     assert_eq!(revoke.status(), reqwest::StatusCode::OK);
     let revoke: Value = revoke.json().expect("revoke capability json");
     assert_eq!(revoke["capabilityId"], capability_id);

@@ -29,6 +29,7 @@ mod mcp_security;
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(90);
 const SERVER_STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(50);
+const STATIC_AUTH_ADMIN_TOKEN: &str = "static-auth-admin-token";
 
 include!("mcp_serve_http_parts/part_01.inc");
 include!("mcp_serve_http_parts/part_02.inc");

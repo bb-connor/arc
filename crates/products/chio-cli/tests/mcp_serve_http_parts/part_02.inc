@@ -650,7 +650,8 @@ fn mcp_serve_http_requires_auth_reuses_sessions_and_supports_delete() {
     let deleted = delete_session(&client, &base_url, token, &session_id);
     assert_eq!(deleted.status(), reqwest::StatusCode::NO_CONTENT);
 
-    let deleted_trust = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let deleted_trust =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(deleted_trust.status(), reqwest::StatusCode::OK);
     let deleted_trust: Value = deleted_trust.json().expect("deleted trust json");
     assert_eq!(
@@ -710,7 +711,8 @@ fn mcp_serve_http_session_trust_reports_lifecycle_and_reconnect_contract() {
 
     let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
@@ -828,7 +830,8 @@ fn mcp_serve_http_session_trust_reports_request_stream_lease_while_post_stream_i
         }),
     );
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
@@ -856,7 +859,8 @@ fn mcp_serve_http_session_trust_reports_request_stream_lease_while_post_stream_i
     assert!(events.is_empty());
     assert_eq!(response["result"]["content"][0]["text"], "slow response");
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
@@ -892,7 +896,8 @@ fn mcp_serve_http_idle_expiry_reaps_sessions_and_blocks_reuse() {
 
     let mut expired = None;
     for _ in 0..40 {
-        let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+        let trust_status =
+            get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("session trust json");
         if trust_status["lifecycle"]["state"].as_str() == Some("expired") {
@@ -964,7 +969,12 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     wait_for_server(&client, &base_url);
 
     let (draining_session, draining_protocol) = initialize_session(&client, &base_url, token);
-    let drain = post_admin_session_drain(&client, &base_url, token, &draining_session);
+    let drain = post_admin_session_drain(
+        &client,
+        &base_url,
+        STATIC_AUTH_ADMIN_TOKEN,
+        &draining_session,
+    );
     assert_eq!(drain.status(), reqwest::StatusCode::OK);
     let drain: Value = drain.json().expect("drain json");
     assert_eq!(drain["lifecycle"]["state"].as_str(), Some("draining"));
@@ -986,7 +996,12 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
 
     let mut deleted = None;
     for _ in 0..40 {
-        let trust_status = get_admin_session_trust(&client, &base_url, token, &draining_session);
+        let trust_status = get_admin_session_trust(
+            &client,
+            &base_url,
+            STATIC_AUTH_ADMIN_TOKEN,
+            &draining_session,
+        );
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("draining trust json");
         if trust_status["lifecycle"]["state"].as_str() == Some("deleted") {
@@ -1019,7 +1034,12 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     let (deleted_session, deleted_protocol) = initialize_session(&client, &base_url, token);
     let deleted_direct = delete_session(&client, &base_url, token, &deleted_session);
     assert_eq!(deleted_direct.status(), reqwest::StatusCode::NO_CONTENT);
-    let deleted_trust = get_admin_session_trust(&client, &base_url, token, &deleted_session);
+    let deleted_trust = get_admin_session_trust(
+        &client,
+        &base_url,
+        STATIC_AUTH_ADMIN_TOKEN,
+        &deleted_session,
+    );
     assert_eq!(deleted_trust.status(), reqwest::StatusCode::OK);
     let deleted_trust: Value = deleted_trust.json().expect("deleted trust json");
     assert_eq!(
@@ -1043,7 +1063,12 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     assert_eq!(deleted_post.status(), reqwest::StatusCode::GONE);
 
     let (shutdown_session, shutdown_protocol) = initialize_session(&client, &base_url, token);
-    let shutdown = post_admin_session_shutdown(&client, &base_url, token, &shutdown_session);
+    let shutdown = post_admin_session_shutdown(
+        &client,
+        &base_url,
+        STATIC_AUTH_ADMIN_TOKEN,
+        &shutdown_session,
+    );
     assert_eq!(shutdown.status(), reqwest::StatusCode::OK);
     let shutdown: Value = shutdown.json().expect("shutdown json");
     assert_eq!(shutdown["lifecycle"]["state"].as_str(), Some("closed"));
@@ -1063,12 +1088,13 @@ fn mcp_serve_http_admin_drain_shutdown_and_delete_have_distinct_terminal_states(
     );
     assert_eq!(shutdown_post.status(), reqwest::StatusCode::GONE);
 
-    let sessions = get_admin_sessions(&client, &base_url, token);
+    let sessions = get_admin_sessions(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(sessions.status(), reqwest::StatusCode::OK);
     let sessions: Value = sessions.json().expect("admin sessions json");
     assert!(sessions["terminalCount"].as_u64().unwrap_or(0) >= 3);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
     skip_when_loopback_denied!(mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse);
@@ -1100,7 +1126,12 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         let (deleted_session, deleted_protocol) = initialize_session(&client, &base_url, token);
         let deleted = delete_session(&client, &base_url, token, &deleted_session);
         assert_eq!(deleted.status(), reqwest::StatusCode::NO_CONTENT);
-        let deleted_trust = get_admin_session_trust(&client, &base_url, token, &deleted_session);
+        let deleted_trust = get_admin_session_trust(
+            &client,
+            &base_url,
+            STATIC_AUTH_ADMIN_TOKEN,
+            &deleted_session,
+        );
         assert_eq!(deleted_trust.status(), reqwest::StatusCode::OK);
         let deleted_trust: Value = deleted_trust.json().expect("deleted trust json");
         assert_eq!(
@@ -1140,7 +1171,12 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         let deadline = std::time::Instant::now() + max_wait;
         let mut expired = None;
         while std::time::Instant::now() < deadline {
-            let trust_status = get_admin_session_trust(&client, &base_url, token, &expired_session);
+            let trust_status = get_admin_session_trust(
+                &client,
+                &base_url,
+                STATIC_AUTH_ADMIN_TOKEN,
+                &expired_session,
+            );
             assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
             let trust_status: Value = trust_status.json().expect("expired trust json");
             if trust_status["lifecycle"]["state"].as_str() == Some("expired") {
@@ -1175,7 +1211,12 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         wait_for_server(&client, &base_url);
 
         let (shutdown_session, shutdown_protocol) = initialize_session(&client, &base_url, token);
-        let shutdown = post_admin_session_shutdown(&client, &base_url, token, &shutdown_session);
+        let shutdown = post_admin_session_shutdown(
+            &client,
+            &base_url,
+            STATIC_AUTH_ADMIN_TOKEN,
+            &shutdown_session,
+        );
         assert_eq!(shutdown.status(), reqwest::StatusCode::OK);
         let shutdown: Value = shutdown.json().expect("shutdown json");
         assert_eq!(shutdown["lifecycle"]["state"].as_str(), Some("closed"));
@@ -1199,7 +1240,7 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let sessions = get_admin_sessions(&client, &base_url, token);
+    let sessions = get_admin_sessions(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN);
     assert_eq!(sessions.status(), reqwest::StatusCode::OK);
     let sessions: Value = sessions.json().expect("admin sessions json");
     assert!(sessions["terminalCount"].as_u64().unwrap_or(0) >= 3);
@@ -1209,7 +1250,8 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
         (&expired_session, &expired_protocol, "expired"),
         (&shutdown_session, &shutdown_protocol, "closed"),
     ] {
-        let trust_status = get_admin_session_trust(&client, &base_url, token, session_id);
+        let trust_status =
+            get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, session_id);
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("terminal trust json");
         assert_eq!(
@@ -1234,6 +1276,7 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls() {
     skip_when_loopback_denied!(
@@ -1263,7 +1306,8 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
         wait_for_server(&client, &base_url);
 
         let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
-        let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+        let trust_status =
+            get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
         assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
         let trust_status: Value = trust_status.json().expect("ready trust json");
         assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
@@ -1286,7 +1330,8 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("restored trust json");
     assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
@@ -1322,6 +1367,7 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
     assert_eq!(resumed_get.status(), reqwest::StatusCode::OK);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() {
     skip_when_loopback_denied!(
@@ -1335,7 +1381,7 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     let policy_path = write_policy_with_tools(&dir, &["echo_json", "sampled_echo"]);
 
     let (session_id, protocol_version) = {
-        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        let mut server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
             &dir,
             &policy_path,
             listen,
@@ -1351,7 +1397,12 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
             .build()
             .expect("build reqwest client");
         let base_url = format!("http://{listen}");
-        wait_for_server(&client, &base_url);
+        wait_for_server_result(&client, &base_url, &mut server).unwrap_or_else(|error| {
+            panic!(
+                "{}",
+                error.panic_context("policy-tightening source server")
+            )
+        });
         initialize_session(&client, &base_url, token)
     };
 
@@ -1374,7 +1425,8 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
 
     let denied_response = post_json(
@@ -1412,6 +1464,7 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     assert_eq!(denied_tool_call["result"]["isError"], true);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry() {
     skip_when_loopback_denied!(
@@ -1487,6 +1540,7 @@ fn mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry() {
     assert_ne!(tool_call["result"]["isError"], true);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
     skip_when_loopback_denied!(mcp_serve_http_drops_restored_sessions_when_auth_mode_changes);
@@ -1498,7 +1552,7 @@ fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
     let policy_path = write_policy(&dir);
 
     let session_id = {
-        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        let mut server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
             &dir,
             &policy_path,
             listen,
@@ -1514,7 +1568,12 @@ fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
             .build()
             .expect("build reqwest client");
         let base_url = format!("http://{listen}");
-        wait_for_server(&client, &base_url);
+        wait_for_server_result(&client, &base_url, &mut server).unwrap_or_else(|error| {
+            panic!(
+                "{}",
+                error.panic_context("static auth-mode source server")
+            )
+        });
         let (session_id, _) = initialize_session(&client, &base_url, token);
         session_id
     };
@@ -1523,7 +1582,7 @@ fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
     let issuer = "https://issuer.example/restore-auth-mode";
     let audience = "chio-restore-auth-mode";
     let admin_token = "admin-token";
-    let _server = spawn_http_server_with_policy_path_and_jwt_auth(
+    let mut server = spawn_http_server_with_policy_path_and_jwt_auth(
         &dir,
         &policy_path,
         listen,
@@ -1538,7 +1597,12 @@ fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
         .build()
         .expect("build reqwest client");
     let base_url = format!("http://{listen}");
-    wait_for_server(&client, &base_url);
+    wait_for_server_result(&client, &base_url, &mut server).unwrap_or_else(|error| {
+        panic!(
+            "{}",
+            error.panic_context("JWT auth-mode restart server")
+        )
+    });
 
     let trust_status = get_admin_session_trust(&client, &base_url, admin_token, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::NOT_FOUND);
@@ -1652,7 +1716,8 @@ fn mcp_serve_http_get_stream_owns_session_notifications_when_attached() {
     );
     assert_eq!(get_stream.status(), reqwest::StatusCode::OK);
     let mut get_reader = BufReader::new(get_stream);
-    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    let trust_status =
+        get_admin_session_trust(&client, &base_url, STATIC_AUTH_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
     let trust_status: Value = trust_status.json().expect("session trust json");
     assert_eq!(
