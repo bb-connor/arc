@@ -19,6 +19,32 @@ use chio_kernel::{
 };
 use std::sync::Arc;
 
+pub struct MediationKernel {
+    kernel: ChioKernel,
+    budget_store: Arc<chio_store_sqlite::SqliteBudgetStore>,
+    _directory: tempfile::TempDir,
+}
+
+impl MediationKernel {
+    pub fn budget_store(&self) -> Arc<chio_store_sqlite::SqliteBudgetStore> {
+        Arc::clone(&self.budget_store)
+    }
+}
+
+impl std::ops::Deref for MediationKernel {
+    type Target = ChioKernel;
+
+    fn deref(&self) -> &Self::Target {
+        &self.kernel
+    }
+}
+
+impl std::ops::DerefMut for MediationKernel {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.kernel
+    }
+}
+
 pub struct MonetaryCostServer {
     id: String,
     reported_cost: Option<ToolInvocationCost>,
@@ -67,16 +93,24 @@ impl ToolServerConnection for MonetaryCostServer {
     }
 }
 
-pub fn mediation_kernel(
-    signer: &Keypair,
-    budget: Arc<dyn BudgetStore>,
-    require_nonce: bool,
-) -> ChioKernel {
+pub fn mediation_kernel(signer: &Keypair, require_nonce: bool) -> MediationKernel {
+    let directory = tempfile::Builder::new()
+        .prefix("chio-conformance-admission-")
+        .tempdir()
+        .expect("create conformance admission directory");
+    let budget_store = Arc::new(
+        chio_store_sqlite::SqliteBudgetStore::open(directory.path().join("budget.sqlite3"))
+            .expect("open conformance budget store"),
+    );
+    let admission_store = chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(
+        directory.path().join("operations.sqlite3"),
+    )
+    .expect("open conformance admission operation store");
     let mut kernel = ChioKernel::new(KernelConfig {
         keypair: signer.clone(),
         ca_public_keys: vec![signer.public_key()],
         max_delegation_depth: 5,
-        policy_hash: "chio_api_protect_mediation_v1".to_string(),
+        policy_hash: sha256_hex(b"chio_api_protect_mediation_v1"),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -95,8 +129,11 @@ pub fn mediation_kernel(
         dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel
-        .set_budget_store_handle(budget)
+        .set_budget_store_handle(Arc::clone(&budget_store) as Arc<dyn BudgetStore>)
         .expect("install conformance budget store");
+    kernel
+        .set_admission_operation_store(Box::new(admission_store))
+        .expect("install conformance admission operation store");
     let nonce_cfg = ExecutionNonceConfig {
         require_nonce,
         ..ExecutionNonceConfig::default()
@@ -107,7 +144,11 @@ pub fn mediation_kernel(
             Box::new(InMemoryExecutionNonceStore::from_config(&nonce_cfg)),
         )
         .expect("install conformance execution nonce store");
-    kernel
+    MediationKernel {
+        kernel,
+        budget_store,
+        _directory: directory,
+    }
 }
 
 pub fn issue_cost_bearing_capability(

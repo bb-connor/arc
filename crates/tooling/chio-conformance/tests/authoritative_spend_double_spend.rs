@@ -4,7 +4,7 @@
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::authoritative_spend::is_authoritative_spend_receipt;
-use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
+use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::runtime::{ToolCallRequest, Verdict};
 use std::sync::Arc;
 use std::thread;
@@ -17,11 +17,11 @@ fn concurrent_calls_over_half_budget_yield_exactly_one_allow() {
     // max_total_cost = 100; each call worst-case = 60 (> N/2). Only one can win.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-    let mut kernel = mediation_kernel(&signer, Arc::clone(&budget), false);
+    let mut kernel = mediation_kernel(&signer, false);
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 60, "USD")));
     let cap = issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 60, 100, "USD");
     let cap_id = cap.id.clone();
+    let budget = kernel.budget_store();
     let kernel = Arc::new(kernel);
 
     let mut handles = Vec::new();
@@ -48,22 +48,22 @@ fn concurrent_calls_over_half_budget_yield_exactly_one_allow() {
                 federated_origin_kernel_id: None,
                 declassification_grant: None,
             };
-            kernel
-                .evaluate_tool_call_blocking(&request)
-                .unwrap()
-                .verdict
+            kernel.evaluate_tool_call_blocking(&request).unwrap()
         }));
     }
-    let verdicts: Vec<Verdict> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-    let allows = verdicts
+    let responses: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+    let allows = responses
         .iter()
-        .filter(|v| matches!(v, Verdict::Allow))
+        .filter(|response| matches!(response.verdict, Verdict::Allow))
         .count();
-    let denies = verdicts
+    let denies = responses
         .iter()
-        .filter(|v| matches!(v, Verdict::Deny))
+        .filter(|response| matches!(response.verdict, Verdict::Deny))
         .count();
-    assert_eq!(allows, 1, "exactly one Allow on the atomic integrated path");
+    assert_eq!(
+        allows, 1,
+        "exactly one Allow on the atomic integrated path: {responses:#?}"
+    );
     assert_eq!(denies, 1, "the other must be Denied");
 
     // Total committed cost never exceeds N.
