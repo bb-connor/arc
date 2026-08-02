@@ -85,17 +85,23 @@ merkle::tests::consistency_deserialization_rejects_overlong_paths_before_growth
 merkle::tests::consistency_fixed_paths_match_rfc_6962_example_shape
 merkle::tests::consistency_fixed_roots_match_rfc_6962_tree_hashing
 merkle::tests::consistency_generation_rejects_zero_and_oversized_old_tree
+merkle::tests::consistency_proof_rejects_tampered_roots_and_proofs
+merkle::tests::consistency_proof_size_edge_cases
+merkle::tests::consistency_proofs_match_reference_and_verify_for_all_size_pairs
 merkle::tests::consistency_rejects_malformed_proofs_and_roots
 merkle::tests::empty_tree_fails
 merkle::tests::from_hashes_matches_from_leaves
 merkle::tests::inclusion_proof_rejects_wrong_leaf
 merkle::tests::inclusion_proofs_roundtrip
+merkle::tests::one_tree_derives_every_prefix_root_and_proof
 merkle::tests::proof_out_of_bounds
 merkle::tests::proof_serialization_roundtrip
 merkle::tests::root_matches_recursive_reference
 merkle::tests::single_leaf_tree
+merkle::tests::standard_build_node_hash_uses_rfc6962_sha256
 merkle::tests::two_leaf_tree
 merkle::tests::verify_hash_works
+merkle_fixtures::tests::bounded_fixtures_match_real_tree_builder
 EOF
 )" cargo test -p chio-core-types --lib merkle
 
