@@ -863,6 +863,15 @@ fn catch_up_admission_from_peers(
     Ok(advanced)
 }
 
+pub(crate) fn catch_up_admission_consensus_from_peers(
+    state: &TrustServiceState,
+) -> Result<bool, CliError> {
+    let (self_url, _, membership) =
+        admission_members(state).map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    catch_up_admission_from_peers(state, &membership, &self_url)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}
+
 fn retryable_consensus_contention(error: &AdmissionConsensusError) -> bool {
     let AdmissionConsensusError::Protocol(message) = error else {
         return false;

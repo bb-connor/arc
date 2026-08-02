@@ -112,6 +112,31 @@ pub struct ToolCallRequest {
 }
 
 impl ToolCallRequest {
+    /// Return the canonical signed credit-facility bind carried through the
+    /// existing opaque authorization boundary.
+    #[must_use]
+    pub(crate) fn credit_facility_bind_artifact(&self) -> Option<&[u8]> {
+        self.supplemental_authorization
+            .as_ref()
+            .filter(|authorization| {
+                authorization.reference() == chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA
+            })
+            .map(chio_core_types::OpaqueSupplementalAuthorization::artifact)
+    }
+
+    /// Return an opaque authorization only when it belongs to the supplemental
+    /// quota verifier. Credit-facility binds have their own built-in verifier.
+    #[must_use]
+    pub(crate) fn supplemental_quota_authorization(
+        &self,
+    ) -> Option<&OpaqueSupplementalAuthorization> {
+        self.supplemental_authorization
+            .as_ref()
+            .filter(|authorization| {
+                authorization.reference() != chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA
+            })
+    }
+
     /// Validate bounded request extensions before any authority mutation.
     pub fn validate(&self) -> Result<(), KernelError> {
         if let Some(authorization) = &self.supplemental_authorization {
@@ -159,6 +184,18 @@ impl ToolCallRequest {
                     "threshold approval proposal has no approval tokens".to_string(),
                 ))
             };
+        }
+        if self.approval_tokens.len() == 1 && self.threshold_approval_proposal.is_none() {
+            return self
+                .approval_tokens
+                .first()
+                .ok_or_else(|| {
+                    chio_core::Error::CanonicalJson(
+                        "one-token approval set was unexpectedly empty".to_string(),
+                    )
+                })?
+                .token_digest()
+                .map(Some);
         }
         if self.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
             return Err(chio_core::Error::CanonicalJson(format!(

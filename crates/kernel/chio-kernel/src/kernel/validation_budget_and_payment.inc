@@ -400,7 +400,7 @@ impl ChioKernel {
                         Constraint::RequireCumulativeApprovalAbove { .. }
                     )
                 })
-                || request.supplemental_authorization.is_some()
+                || request.supplemental_quota_authorization().is_some()
                 || self.partition_escrow_registry.is_some()
                 || Self::is_governed_mustprepay_request(request)
             {

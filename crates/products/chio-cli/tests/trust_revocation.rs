@@ -8,6 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
 
+const AUTHORITY_ADMIN_TOKEN: &str = "trust-revocation-authority-admin-token";
+
 fn unique_revocation_db_path(prefix: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -68,6 +70,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--service-token",
             service_token,
+            "--authority-admin-token",
+            AUTHORITY_ADMIN_TOKEN,
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -176,6 +180,12 @@ fn trust_revoke_and_status_can_target_control_service() {
 
     let dir = unique_dir("chio-cli-trust-service");
     std::fs::create_dir_all(&dir).expect("create temp dir");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+            .expect("secure temp dir");
+    }
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");

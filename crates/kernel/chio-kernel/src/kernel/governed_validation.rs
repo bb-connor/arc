@@ -14,6 +14,17 @@ mod verified_outcome;
 
 use verified_outcome::validate_verified_outcome_request;
 
+struct GovernedCreditFacilityBindContext<'a> {
+    request: &'a ToolCallRequest,
+    capability: &'a CapabilityToken,
+    intent: &'a chio_core::capability::governance::GovernedToolInvocationIntentBody,
+    intent_hash: &'a str,
+    requested_units: u64,
+    grant_currency: Option<&'a str>,
+    payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
+    now: u64,
+}
+
 impl ChioKernel {
     fn governed_requirements(
         grant: &ToolGrant,
@@ -1081,6 +1092,117 @@ impl ChioKernel {
         self.validate_governed_autonomy_bond(request, cap, bond_id, now)
     }
 
+    fn verify_governed_credit_facility_bind(
+        &self,
+        context: GovernedCreditFacilityBindContext<'_>,
+    ) -> Result<Option<chio_credit::obligation::VerifiedCreditFacilityBindV1>, KernelError> {
+        let GovernedCreditFacilityBindContext {
+            request,
+            capability,
+            intent,
+            intent_hash,
+            requested_units,
+            grant_currency,
+            payee_binding,
+            now,
+        } = context;
+        let Some(canonical_bind) = request.credit_facility_bind_artifact() else {
+            return Ok(None);
+        };
+        if request.approval_token.is_none()
+            || !request.approval_tokens.is_empty()
+            || request.threshold_approval_proposal.is_some()
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "credit-facility authorization requires one singular approval token".to_string(),
+            ));
+        }
+        if intent.metered_billing.is_some() {
+            return Err(KernelError::GovernedTransactionDenied(
+                "credit-facility authorization cannot also elect metered billing".to_string(),
+            ));
+        }
+        if requested_units == 0 {
+            return Err(KernelError::GovernedTransactionDenied(
+                "credit-facility authorization requires a nonzero invocation charge".to_string(),
+            ));
+        }
+        if !self.tool_server_measures_realized_cost(&request.server_id) {
+            return Err(KernelError::GovernedTransactionDenied(
+                "credit-facility authorization requires a locally measured tool cost".to_string(),
+            ));
+        }
+        let expected_currency = grant_currency.ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "credit-facility authorization requires a monetary capability grant".to_string(),
+            )
+        })?;
+        let payee_binding = payee_binding.ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "credit-facility authorization requires a verified payee binding".to_string(),
+            )
+        })?;
+        const MAX_CREDIT_FACILITY_BIND_BYTES: usize = 64 * 1024;
+        if canonical_bind.len() > MAX_CREDIT_FACILITY_BIND_BYTES {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "credit-facility bind exceeds {MAX_CREDIT_FACILITY_BIND_BYTES} bytes"
+            )));
+        }
+        let trusted_at_unix_ms = now.checked_mul(1_000).ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "credit-facility verification time overflowed".to_string(),
+            )
+        })?;
+        let mut verified = None;
+        for trust in &self.credit_facility_bind_trusts {
+            if let Ok(candidate) = chio_credit::obligation::verify_credit_facility_bind(
+                canonical_bind,
+                &chio_credit::obligation::CreditFacilityBindVerificationContextV1 {
+                    trust,
+                    trusted_at_unix_ms,
+                },
+            ) {
+                if verified.is_some() {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "credit-facility bind matches multiple configured trust records"
+                            .to_string(),
+                    ));
+                }
+                verified = Some(candidate);
+            }
+        }
+        let verified = verified.ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "credit-facility bind did not verify against configured trust".to_string(),
+            )
+        })?;
+        let body = verified.body();
+        let budget_debtor_id = capability.issuer.to_hex();
+        if body.request_id() != request.request_id
+            || body.economic_intent_digest() != intent_hash
+            || body.capability_id() != capability.id
+            || body.tool_server() != request.server_id
+            || body.tool_name() != request.tool_name
+            || body.debtor_id() != budget_debtor_id
+            || body.original_creditor_id() != payee_binding.beneficiary_id()
+            || body.original_settlement_destination_ref()
+                != payee_binding.settlement_destination_ref()
+            || body.payee_binding_digest() != payee_binding.payee_binding_digest()
+            || body.amount().units != requested_units
+            || body.amount().currency != expected_currency
+            || body.effective_ceiling().currency != expected_currency
+            || body.effective_ceiling().units < requested_units
+            || intent.max_amount.as_ref().is_some_and(|amount| {
+                amount.currency != expected_currency || amount.units < requested_units
+            })
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "credit-facility bind does not match the governed invocation".to_string(),
+            ));
+        }
+        Ok(Some(verified))
+    }
+
     pub(crate) fn validate_governed_transaction(
         &self,
         request: &ToolCallRequest,
@@ -1457,7 +1579,7 @@ impl ChioKernel {
         } else {
             None
         };
-        let verified_payee_binding = match (
+        let mut verified_payee_binding = match (
             economy_value_requires_payee,
             commerce,
             approval_artifact_digest.as_ref(),
@@ -1484,6 +1606,26 @@ impl ChioKernel {
             }
             _ => None,
         };
+        let verified_credit_facility_bind =
+            self.verify_governed_credit_facility_bind(GovernedCreditFacilityBindContext {
+                request,
+                capability: cap,
+                intent,
+                intent_hash: &intent_hash,
+                requested_units,
+                grant_currency,
+                payee_binding: verified_payee_binding.as_ref(),
+                now,
+            })?;
+        if let Some(credit_facility_bind) = verified_credit_facility_bind {
+            let payee_binding = verified_payee_binding.take().ok_or_else(|| {
+                KernelError::GovernedTransactionDenied(
+                    "verified credit-facility bind omitted its payee binding".to_string(),
+                )
+            })?;
+            verified_payee_binding =
+                Some(payee_binding.with_credit_facility_bind(credit_facility_bind));
+        }
 
         Ok(Some(ValidatedGovernedAdmission {
             call_chain_proof: validated_upstream_call_chain_proof,

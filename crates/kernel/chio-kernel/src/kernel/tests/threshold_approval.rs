@@ -746,9 +746,174 @@ fn one_element_list_preserves_legacy_semantics_without_threshold_policy() {
         "legacy-list",
         now,
     )];
-    assert!(kernel
+    let result = kernel.validate_governed_transaction(&request, &capability, &grant, None, now);
+    assert!(result.is_ok(), "legacy approval should remain valid: {result:?}");
+}
+
+#[test]
+fn governed_credit_facility_bind_is_verified_before_dispatch() {
+    use chio_credit::obligation::{
+        CreditFacilityBindBodyV1, CreditFacilityBindInputV1, CreditFacilityBindTrustInputV1,
+        CreditFacilityBindTrustV1, SignedCreditFacilityBindV1,
+    };
+
+    let mut config = make_config();
+    config.policy_hash = "33".repeat(32);
+    let mut kernel = make_kernel(config);
+    let subject = Keypair::generate();
+    let creditor = Keypair::generate();
+    let credit_authority = Keypair::generate();
+    let grant = make_governed_acp_monetary_grant(
+        "payments",
+        "purchase",
+        "seller-credit",
+        100,
+        1_000,
+        "USD",
+        50,
+    );
+    let capability = kernel
+        .issue_capability(
+            &subject.public_key(),
+            make_scope(vec![grant.clone()]),
+            3_600,
+        )
+        .expect("credit capability");
+    let intent = make_governed_acp_intent(GovernedAcpIntentFixture {
+        id: "credit-intent",
+        server: "payments",
+        tool: "purchase",
+        purpose: "approved credit purchase",
+        seller: "seller-credit",
+        shared_payment_token_id: "facility-native-1",
+        settlement_destination_ref: Some("acct:seller-credit"),
+        units: 100,
+        currency: "USD",
+    });
+    let now = current_unix_timestamp();
+    let now_ms = now.checked_mul(1_000).expect("test time should fit");
+    let bind_body = CreditFacilityBindBodyV1::new(CreditFacilityBindInputV1 {
+        operation_id: sha256_hex(b"credit-operation-pre-dispatch"),
+        request_id: "credit-request".to_string(),
+        economic_intent_digest: intent.binding_hash().expect("credit intent hash"),
+        facility_id: "facility-native-1".to_string(),
+        facility_artifact_digest: sha256_hex(b"facility-native-artifact"),
+        authority_set_digest: sha256_hex(b"facility-native-authorities"),
+        debtor_id: capability.issuer.to_hex(),
+        original_creditor_id: "seller-credit".to_string(),
+        original_settlement_destination_ref: "acct:seller-credit".to_string(),
+        capability_id: capability.id.clone(),
+        tool_server: "payments".to_string(),
+        tool_name: "purchase".to_string(),
+        amount: MonetaryAmount {
+            units: 100,
+            currency: "USD".to_string(),
+        },
+        effective_ceiling: MonetaryAmount {
+            units: 100,
+            currency: "USD".to_string(),
+        },
+        expected_exposure_version: 1,
+        expected_exposure_fence: 1,
+        due_at_unix_ms: now_ms.saturating_add(1_200_000),
+        action_nonce: "credit-action-pre-dispatch".to_string(),
+        issued_at_unix_ms: now_ms.saturating_sub(1_000),
+        expires_at_unix_ms: now_ms.saturating_add(600_000),
+        authority_id: "credit-authority-native".to_string(),
+        authority_key_epoch: 1,
+        debtor_key_epoch: 1,
+        creditor_key_epoch: 1,
+    })
+    .expect("credit bind body");
+    let signed_bind = SignedCreditFacilityBindV1::sign(
+        bind_body,
+        &credit_authority,
+        &kernel.config.keypair,
+        &creditor,
+    )
+    .expect("signed credit bind");
+    let canonical_bind = signed_bind
+        .canonical_bytes()
+        .expect("canonical credit bind");
+    let trust = CreditFacilityBindTrustV1::new(CreditFacilityBindTrustInputV1 {
+        authority_id: "credit-authority-native".to_string(),
+        authority_key: credit_authority.public_key(),
+        authority_key_epoch: 1,
+        debtor_id: capability.issuer.to_hex(),
+        debtor_key: kernel.config.keypair.public_key(),
+        debtor_key_epoch: 1,
+        creditor_id: "seller-credit".to_string(),
+        creditor_key: creditor.public_key(),
+        creditor_key_epoch: 1,
+        max_lifetime_ms: 700_000,
+    })
+    .expect("credit bind trust");
+    kernel
+        .set_credit_facility_bind_trusts(vec![trust])
+        .expect("credit bind trust installation");
+    let approval = legacy_threshold_test_token(
+        &kernel,
+        &capability,
+        &intent,
+        "credit-request",
+        "credit-approval",
+        now,
+    );
+    let request = ToolCallRequest {
+        request_id: "credit-request".to_string(),
+        capability: capability.clone(),
+        tool_name: "purchase".to_string(),
+        server_id: "payments".to_string(),
+        agent_id: subject.public_key().to_hex(),
+        arguments: serde_json::json!({ "sku": "compute-1" }),
+        supplemental_authorization: Some(
+            chio_core::OpaqueSupplementalAuthorization::new(
+                chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA,
+                canonical_bind.clone(),
+            )
+            .expect("credit authorization boundary"),
+        ),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+
+    let verified = kernel
         .validate_governed_transaction(&request, &capability, &grant, None, now)
-        .is_ok());
+        .expect("trusted credit bind should admit")
+        .expect("credit request should be governed")
+        .verified_payee_binding
+        .expect("credit request should bind its payee");
+    assert_eq!(
+        verified
+            .credit_facility_bind()
+            .expect("verified credit facility")
+            .canonical_bytes(),
+        canonical_bind
+    );
+
+    let mut corrupt_request = request;
+    let mut corrupt_bind = canonical_bind;
+    corrupt_bind[0] ^= 1;
+    corrupt_request.supplemental_authorization = Some(
+        chio_core::OpaqueSupplementalAuthorization::new(
+            chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA,
+            corrupt_bind,
+        )
+        .expect("bounded corrupt authorization"),
+    );
+    let error = kernel
+        .validate_governed_transaction(&corrupt_request, &capability, &grant, None, now)
+        .expect_err("unverified credit bind must fail closed");
+    assert!(error
+        .to_string()
+        .contains("did not verify against configured trust"));
 }
 
 #[test]

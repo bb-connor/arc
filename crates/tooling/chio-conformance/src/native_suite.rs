@@ -1028,13 +1028,27 @@ fn capture_runtime_revocation_trace_with_store(
         return Err(NativeSuiteError::TraceObserverKeyPinMismatch);
     }
     let kernel_key = kernel_keypair();
-    let parent_scope = trace_scope(true, 5);
-    let child_scope = trace_scope(false, 4);
+    let parent_scope = trace_scope(true);
+    let child_scope = trace_scope(false);
     let child_id = "cap-runtime-trace-child";
     let subject = delegated_subject_keypair();
     let parent_scope_hash = scope_hash(&parent_scope)?;
     let child_scope_hash = scope_hash(&child_scope)?;
-    let receipt_store_dir = tempfile::tempdir()?;
+    let mut receipt_store_builder = tempfile::Builder::new();
+    receipt_store_builder.prefix("chio-conformance-receipt-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        receipt_store_builder.permissions(fs::Permissions::from_mode(0o700));
+    }
+    let receipt_store_dir = receipt_store_builder.tempdir()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(receipt_store_dir.path(), fs::Permissions::from_mode(0o700))?;
+    }
     let receipt_store_path = receipt_store_dir.path().join("receipt-trace.sqlite");
     let mut kernel = ChioKernel::new(KernelConfig {
         keypair: kernel_key.clone(),
@@ -1064,11 +1078,7 @@ fn capture_runtime_revocation_trace_with_store(
             capability_id: parent.id.clone(),
             delegator: kernel_key.public_key(),
             delegatee: subject.public_key(),
-            attenuations: vec![Attenuation::ReduceBudget {
-                server_id: "conformance".to_string(),
-                tool_name: "echo".to_string(),
-                max_invocations: 4,
-            }],
+            attenuations: Vec::new(),
             timestamp: now,
             scope_hash: Some(parent_scope_hash.clone()),
             aggregate_budget: None,
@@ -1098,7 +1108,7 @@ fn capture_runtime_revocation_trace_with_store(
             caveats: Vec::new(),
             scope_attenuations: Vec::new(),
             attenuation_proof: proof,
-            budget_share_bps: Some(10_000),
+            budget_share_bps: None,
         },
         &kernel_key,
     )?;
@@ -1123,7 +1133,6 @@ fn capture_runtime_revocation_trace_with_store(
     kernel
         .register_budget_parent(parent.id.clone(), 10_000)
         .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
-
     let allow = kernel.evaluate_tool_call_blocking(&trace_request(
         "runtime-trace-allow",
         &capability,
@@ -1187,7 +1196,7 @@ impl RevocationStore for BlindRevocationStore {
     }
 }
 
-fn trace_scope(delegable: bool, max_invocations: u32) -> ChioScope {
+fn trace_scope(delegable: bool) -> ChioScope {
     let mut operations = vec![Operation::Invoke];
     if delegable {
         operations.push(Operation::Delegate);
@@ -1198,7 +1207,7 @@ fn trace_scope(delegable: bool, max_invocations: u32) -> ChioScope {
             tool_name: "echo".to_string(),
             operations,
             constraints: Vec::new(),
-            max_invocations: Some(max_invocations),
+            max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
             dpop_required: None,
@@ -2305,20 +2314,16 @@ mod enterprise_tests {
     #[cfg(unix)]
     #[test]
     fn load_native_scenarios_rejects_symlinked_json_file() {
-        let dir = std::env::temp_dir().join(format!(
-            "chio-conformance-native-symlink-{}",
-            std::process::id()
-        ));
-        let outside = std::env::temp_dir().join(format!(
-            "chio-conformance-native-symlink-outside-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        let _ = fs::remove_dir_all(&outside);
-        fs::create_dir_all(&dir).expect("create native scenario dir");
-        fs::create_dir_all(&outside).expect("create outside dir");
+        let dir = tempfile::Builder::new()
+            .prefix("chio-conformance-native-symlink-")
+            .tempdir()
+            .expect("create native scenario dir");
+        let outside = tempfile::Builder::new()
+            .prefix("chio-conformance-native-symlink-outside-")
+            .tempdir()
+            .expect("create outside dir");
         fs::write(
-            outside.join("escape.json"),
+            outside.path().join("escape.json"),
             r#"{
               "id": "escape",
               "title": "Escape",
@@ -2330,16 +2335,16 @@ mod enterprise_tests {
             }"#,
         )
         .expect("write outside scenario");
-        std::os::unix::fs::symlink(outside.join("escape.json"), dir.join("escape.json"))
-            .expect("create scenario symlink");
+        std::os::unix::fs::symlink(
+            outside.path().join("escape.json"),
+            dir.path().join("escape.json"),
+        )
+        .expect("create scenario symlink");
 
-        match load_native_scenarios_from_dir(&dir) {
+        match load_native_scenarios_from_dir(dir.path()) {
             Ok(scenarios) => panic!("symlinked native scenario should fail: {scenarios:?}"),
             Err(error) => assert!(error.to_string().contains("symlink")),
         }
-
-        let _ = fs::remove_dir_all(dir);
-        let _ = fs::remove_dir_all(outside);
     }
 
     #[test]

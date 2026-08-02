@@ -45,6 +45,8 @@ pub enum KernelBuildError {
     SettlementObserverStorageTopology(String),
     #[error("settlement-observer outbox recovery failed: {0}")]
     SettlementObserverRecovery(String),
+    #[error("credit-facility bind trust configuration is invalid: {0}")]
+    InvalidCreditFacilityBindTrust(String),
 }
 
 include!("construction.part1.inc");

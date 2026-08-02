@@ -126,6 +126,12 @@ pub(crate) async fn propose_admission_command<T: Serialize>(
     command_kind: AdmissionCommandKind,
     command: &T,
 ) -> Result<AdmissionConsensusResult, Response> {
+    if cluster_consensus_view(state).is_some_and(|consensus| !consensus.has_quorum) {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster quorum is unavailable for admission consensus proposals",
+        ));
+    }
     let command = serde_json::to_value(command).map_err(|error| {
         plain_http_error(
             StatusCode::BAD_REQUEST,

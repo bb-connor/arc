@@ -632,7 +632,7 @@ fn validate_archive_schema_contract_against(
         )));
     }
     for table in expected_tables {
-        let expected_contract = load_archive_table_contract(&expected, "archive", &table)?;
+        let expected_contract = load_archive_table_contract(expected, "archive", &table)?;
         let actual_contract = load_archive_table_contract(connection, actual_schema, &table)?;
         let contract_matches = if table == "chio_tool_receipts" {
             actual_contract.columns == expected_contract.columns

@@ -259,6 +259,8 @@ fn governed_economic_authorization_metadata(
     let Some(intent) = governed_intent.as_tool_invocation() else {
         return Ok(None);
     };
+    let credit_facility_bind =
+        payee_binding.and_then(VerifiedGovernedPayeeBinding::credit_facility_bind);
 
     if let Some(payee_binding) = payee_binding {
         let commerce = intent.commerce.as_ref().ok_or_else(|| {
@@ -291,6 +293,38 @@ fn governed_economic_authorization_metadata(
         {
             return Err(KernelError::ReceiptSigningFailed(
                 "verified governed payee binding does not match the request".to_string(),
+            ));
+        }
+    }
+
+    if let (Some(credit_facility_bind), Some(payee_binding)) = (credit_facility_bind, payee_binding)
+    {
+        let body = credit_facility_bind.body();
+        let intent_digest = governed_intent.binding_hash().map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to hash governed credit-facility intent: {error}"
+            ))
+        })?;
+        if financial.cost_charged == 0
+            || financial.payment_reference.is_some()
+            || financial.settlement_status != SettlementStatus::Pending
+            || body.request_id() != request.request_id
+            || body.economic_intent_digest() != intent_digest
+            || body.capability_id() != request.capability.id
+            || body.tool_server() != request.server_id
+            || body.tool_name() != request.tool_name
+            || body.debtor_id() != financial.root_budget_holder
+            || body.original_creditor_id() != payee_binding.beneficiary_id()
+            || body.original_settlement_destination_ref()
+                != payee_binding.settlement_destination_ref()
+            || body.payee_binding_digest() != payee_binding.payee_binding_digest()
+            || body.amount().units != financial.cost_charged
+            || body.amount().currency != financial.currency
+            || body.effective_ceiling().currency != financial.currency
+            || body.effective_ceiling().units < financial.cost_charged
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "verified credit-facility bind does not match final financial metadata".to_string(),
             ));
         }
     }
@@ -358,7 +392,9 @@ fn governed_economic_authorization_metadata(
         })
         .transpose()?;
 
-    let economic_mode = if let Some(metered) = metered {
+    let economic_mode = if credit_facility_bind.is_some() {
+        chio_core::receipt::economics::EconomicAuthorizationMode::BudgetOnly
+    } else if let Some(metered) = metered {
         match metered.settlement_mode {
             chio_core::capability::governance::MeteredSettlementMode::MustPrepay => {
                 chio_core::receipt::economics::EconomicAuthorizationMode::PrepaidFixed
@@ -385,16 +421,25 @@ fn governed_economic_authorization_metadata(
                 .map(|binding| binding.payee_binding_digest().to_owned()),
             pre_action_authority_digest: payee_binding
                 .map(|binding| binding.pre_action_authority_digest().to_owned()),
-            credit_authority_digest: None,
+            credit_authority_digest: credit_facility_bind
+                .map(|bind| bind.artifact_digest().to_owned()),
             economic_mode,
             payer: chio_core::receipt::economics::EconomicPayerReceiptMetadata {
-                party_id: request.agent_id.clone(),
-                funding_source_ref: commerce
-                    .map(|commerce| commerce.shared_payment_token_id.clone())
-                    .or_else(|| financial.payment_reference.clone())
-                    .unwrap_or_else(|| request.capability.id.clone()),
+                party_id: credit_facility_bind.map_or_else(
+                    || request.agent_id.clone(),
+                    |bind| bind.body().debtor_id().to_owned(),
+                ),
+                funding_source_ref: credit_facility_bind.map_or_else(
+                    || {
+                        commerce
+                            .map(|commerce| commerce.shared_payment_token_id.clone())
+                            .or_else(|| financial.payment_reference.clone())
+                            .unwrap_or_else(|| request.capability.id.clone())
+                    },
+                    |bind| bind.body().facility_id().to_owned(),
+                ),
                 custody_provider: None,
-                obligor_ref: None,
+                obligor_ref: credit_facility_bind.map(|bind| bind.body().debtor_id().to_owned()),
             },
             merchant: chio_core::receipt::economics::EconomicMerchantReceiptMetadata {
                 merchant_id: commerce
@@ -420,7 +465,9 @@ fn governed_economic_authorization_metadata(
                     }),
             },
             rail: chio_core::receipt::economics::EconomicRailReceiptMetadata {
-                kind: if commerce.is_some() {
+                kind: if credit_facility_bind.is_some() {
+                    "credit_facility".to_string()
+                } else if commerce.is_some() {
                     "shared_payment_token".to_string()
                 } else if metered.is_some() {
                     "metered_billing".to_string()
@@ -431,10 +478,12 @@ fn governed_economic_authorization_metadata(
                 },
                 asset: financial.currency.clone(),
                 network: None,
-                facilitator: metered.map(|metered| metered.quote.provider.clone()),
-                contract_or_account_ref: financial
-                    .payment_reference
-                    .clone()
+                facilitator: credit_facility_bind
+                    .map(|bind| bind.body().authority_id().to_owned())
+                    .or_else(|| metered.map(|metered| metered.quote.provider.clone())),
+                contract_or_account_ref: credit_facility_bind
+                    .map(|bind| bind.body().facility_id().to_owned())
+                    .or_else(|| financial.payment_reference.clone())
                     .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone())),
             },
             amount_bounds: chio_core::receipt::economics::EconomicAmountBoundsReceiptMetadata {
@@ -523,7 +572,12 @@ pub(crate) fn governed_request_metadata(
     // require an intentionally insufficient threshold set to validate merely to
     // sign its deny receipt. Verified threshold evidence is projected by the
     // threshold admission metadata on successful authorization.
-    let approval_artifact_digest = if request.approval_token.is_some() {
+    let singular_approval = request.approval_token.as_ref().or_else(|| {
+        (request.threshold_approval_proposal.is_none() && request.approval_tokens.len() == 1)
+            .then(|| request.approval_tokens.first())
+            .flatten()
+    });
+    let approval_artifact_digest = if singular_approval.is_some() {
         request.approval_artifact_digest().map_err(|error| {
             KernelError::ReceiptSigningFailed(format!(
                 "failed to hash governed approval for receipt metadata: {error}"
@@ -532,16 +586,12 @@ pub(crate) fn governed_request_metadata(
     } else {
         None
     };
-    let approval =
-        request
-            .approval_token
-            .as_ref()
-            .map(|approval_token| GovernedApprovalReceiptMetadata {
-                token_id: approval_token.id.clone(),
-                approver_key: approval_token.approver.to_hex(),
-                approval_artifact_digest: approval_artifact_digest.clone(),
-                approved: approval_token.decision == GovernedApprovalDecision::Approved,
-            });
+    let approval = singular_approval.map(|approval_token| GovernedApprovalReceiptMetadata {
+        token_id: approval_token.id.clone(),
+        approver_key: approval_token.approver.to_hex(),
+        approval_artifact_digest: approval_artifact_digest.clone(),
+        approved: approval_token.decision == GovernedApprovalDecision::Approved,
+    });
     let commerce = intent
         .commerce
         .as_ref()

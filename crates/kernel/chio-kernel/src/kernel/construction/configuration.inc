@@ -81,6 +81,29 @@ impl ChioKernel {
         self.attestation_trust_policy = Some(attestation_trust_policy);
     }
 
+    pub fn set_credit_facility_bind_trusts(
+        &mut self,
+        trusts: Vec<chio_credit::obligation::CreditFacilityBindTrustV1>,
+    ) -> Result<(), KernelBuildError> {
+        const MAX_CREDIT_FACILITY_BIND_TRUSTS: usize = 256;
+        if trusts.len() > MAX_CREDIT_FACILITY_BIND_TRUSTS {
+            return Err(KernelBuildError::InvalidCreditFacilityBindTrust(format!(
+                "trust count exceeds {MAX_CREDIT_FACILITY_BIND_TRUSTS}"
+            )));
+        }
+        let unique_digests = trusts
+            .iter()
+            .map(chio_credit::obligation::CreditFacilityBindTrustV1::configuration_digest)
+            .collect::<std::collections::BTreeSet<_>>();
+        if unique_digests.len() != trusts.len() {
+            return Err(KernelBuildError::InvalidCreditFacilityBindTrust(
+                "duplicate trust configuration digest".to_string(),
+            ));
+        }
+        self.credit_facility_bind_trusts = trusts;
+        Ok(())
+    }
+
     /// Accept the default in-memory revocation store instead of requiring a
     /// durable one. A locally-run kernel with no durable or remote revocation
     /// backend keeps its revocation set in memory, so the durability gate would

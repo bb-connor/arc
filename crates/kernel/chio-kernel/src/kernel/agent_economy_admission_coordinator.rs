@@ -331,6 +331,7 @@ struct ImmutableToolAdmissionRequest<'a> {
     agent_id: &'a str,
     arguments: &'a serde_json::Value,
     governed_intent: &'a Option<chio_core::capability::governance::GovernedTransactionIntent>,
+    credit_facility_bind_digest: Option<String>,
     model_metadata: &'a Option<chio_core::capability::scope::ModelMetadata>,
     federated_origin_kernel_id: &'a Option<String>,
     matching_grants: Vec<ImmutableMatchingGrant<'a>>,
@@ -360,6 +361,7 @@ fn immutable_tool_admission_request_hash(
         agent_id: &request.agent_id,
         arguments: &request.arguments,
         governed_intent: &request.governed_intent,
+        credit_facility_bind_digest: request.credit_facility_bind_artifact().map(sha256_hex),
         model_metadata: &request.model_metadata,
         federated_origin_kernel_id: &request.federated_origin_kernel_id,
         matching_grants: matching_grants
@@ -660,9 +662,9 @@ impl ChioKernel {
         // unrelated cumulative grant elsewhere in the capability must not withdraw an
         // otherwise exempt call.
         let requires_structured_admission = aggregate_quota.is_some()
-            || request.supplemental_authorization.is_some()
+            || request.supplemental_quota_authorization().is_some()
             || cumulative_matching_grant_count != 0;
-        if request.supplemental_authorization.is_some()
+        if request.supplemental_quota_authorization().is_some()
             && self.agent_economy_supplemental_quota_verifier.is_none()
         {
             return Err(KernelError::DurableAdmission(
@@ -737,8 +739,7 @@ impl ChioKernel {
         let post_return_plan = self.durable_post_return_plan()?;
 
         let supplemental_authorization_artifact_digest = request
-            .supplemental_authorization
-            .as_ref()
+            .supplemental_quota_authorization()
             .map(|authorization| {
                 supplemental_authorization_artifact_digest(authorization.artifact())
             });
@@ -974,7 +975,7 @@ impl ChioKernel {
         binding: &AdmissionOperationBindingV1,
         now: u64,
     ) -> Result<Option<KernelVerifiedSupplementalQuotaClaim>, KernelError> {
-        let Some(authorization) = request.supplemental_authorization.as_ref() else {
+        let Some(authorization) = request.supplemental_quota_authorization() else {
             return Ok(None);
         };
         let runtime = self

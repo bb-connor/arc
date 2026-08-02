@@ -440,6 +440,7 @@ impl ChioKernel {
             runtime_trace_transition_lock: Mutex::new(()),
             runtime_trace_sequence: AtomicU64::new(0),
             attestation_trust_policy: None,
+            credit_facility_bind_trusts: Vec::new(),
             capability_crypto_floor: KernelCryptoFloor::AllowClassical,
             checkpoint_batch_size,
             checkpoint_seq_counter: AtomicU64::new(0),

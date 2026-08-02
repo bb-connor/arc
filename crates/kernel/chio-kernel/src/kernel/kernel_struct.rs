@@ -651,6 +651,7 @@ pub struct ChioKernel {
     pub(super) runtime_trace_transition_lock: Mutex<()>,
     pub(super) runtime_trace_sequence: AtomicU64,
     pub(super) attestation_trust_policy: Option<AttestationTrustPolicy>,
+    pub(super) credit_facility_bind_trusts: Vec<chio_credit::obligation::CreditFacilityBindTrustV1>,
     pub(super) capability_crypto_floor: KernelCryptoFloor,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
     pub(super) checkpoint_batch_size: u64,

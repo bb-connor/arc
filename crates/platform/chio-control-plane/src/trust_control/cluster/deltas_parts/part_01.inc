@@ -412,6 +412,7 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     // the witness set. The advertised heads are captured in `peer_status` and
     // recorded only in `finalize_peer_sync_round`, after the pull round.
     if peer_should_force_snapshot(state, peer_url) {
+        catch_up_admission_consensus_from_peers(state)?;
         let snapshot = client.cluster_snapshot()?;
         apply_cluster_snapshot(state, peer_url, snapshot)?;
     }

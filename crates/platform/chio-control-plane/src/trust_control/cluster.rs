@@ -24,10 +24,11 @@ mod pull_budget;
 mod snapshots;
 
 pub(crate) use admission_consensus::{
-    bind_initial_partition_escrow_admission_membership, handle_budget_mutation_event_replica_query,
-    handle_internal_admission_append_entries, handle_internal_admission_capture_query,
-    handle_internal_admission_proposal, handle_internal_admission_request_vote,
-    handle_internal_admission_snapshot, handle_internal_admission_snapshot_install,
+    bind_initial_partition_escrow_admission_membership, catch_up_admission_consensus_from_peers,
+    handle_budget_mutation_event_replica_query, handle_internal_admission_append_entries,
+    handle_internal_admission_capture_query, handle_internal_admission_proposal,
+    handle_internal_admission_request_vote, handle_internal_admission_snapshot,
+    handle_internal_admission_snapshot_install,
     handle_internal_committed_composite_authorization_query,
     handle_internal_invocation_capture_query, initialize_admission_consensus,
     persist_initial_partition_escrow_authority_pin, propose_admission_command,

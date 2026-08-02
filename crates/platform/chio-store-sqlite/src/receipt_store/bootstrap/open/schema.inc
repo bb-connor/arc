@@ -14,7 +14,7 @@ use super::*;
 ///   lease deadlines.
 /// - 4: adds the lossless currency and full-width cost projection used by
 ///   indexed receipt queries.
-
+///
 /// Tables that identify a database this receipt store may open, all of them the
 /// store's own: `chio_tool_receipts` is the current anchor (also the table the
 /// store shipped before schema stamping existed) and `http_receipts` /

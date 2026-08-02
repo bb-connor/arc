@@ -65,6 +65,15 @@ impl ChioKernel {
             cap,
         } = cost_context;
         let Some(charge) = charge_result else {
+            if verified_payee_binding
+                .as_ref()
+                .is_some_and(|binding| binding.is_credit_facility())
+            {
+                return Err(KernelError::Internal(
+                    "verified credit-facility admission reached finalization without a budget charge"
+                        .to_string(),
+                ));
+            }
             // When a payment was authorized but the grant carries no monetary ceiling,
             // the realized spend is the prepaid quote. Settle the authorization so the
             // invocation is recorded as a completed prepayment; fail closed if it
@@ -358,6 +367,14 @@ impl ChioKernel {
                     settlement_status: SettlementStatus::Failed,
                 }
             }
+        } else if verified_payee_binding
+            .as_ref()
+            .is_some_and(|binding| binding.is_credit_facility())
+        {
+            ReceiptSettlement {
+                payment_reference: None,
+                settlement_status: SettlementStatus::Pending,
+            }
         } else {
             ReceiptSettlement::settled()
         };
@@ -625,6 +642,19 @@ impl ChioKernel {
         } else {
             return Ok(None);
         };
+
+        if let Some(credit_facility_bind) = verified_payee_binding
+            .and_then(VerifiedGovernedPayeeBinding::credit_facility_bind)
+        {
+            let bound_amount = credit_facility_bind.body().amount();
+            if amount_units != bound_amount.units || currency != bound_amount.currency {
+                return Err(PaymentError::RailError(
+                    "verified credit-facility bind does not match the charged amount".to_string(),
+                )
+                .into());
+            }
+            return Ok(None);
+        }
 
         let Some(adapter) = self.payment_adapter.as_ref() else {
             // The governed gate denies MustPrepay without an adapter earlier, but

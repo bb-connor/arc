@@ -949,9 +949,7 @@ fn ensure_committed_prefix_still_backed(
             )? {
                 true
             } else {
-                if let Err(error) = current_result {
-                    return Err(error);
-                }
+                current_result?;
                 return Err(ReceiptStoreError::Conflict(format!(
                     "retention archive no longer backs the committed watermark {current}; the prior \
                      archive is missing, unreadable, or does not re-derive the signed checkpoint roots. \

@@ -153,7 +153,7 @@ fn load_native_scenarios_reads_checked_in_suite() {
     let scenarios =
         load_native_scenarios_from_dir(repo_root.join("tests/conformance/native/scenarios"))
             .expect("load native scenarios");
-    assert_eq!(scenarios.len(), 6);
+    assert_eq!(scenarios.len(), 10);
     assert!(scenarios
         .iter()
         .any(|scenario| { scenario.category == NativeScenarioCategory::CapabilityValidation }));
@@ -196,20 +196,16 @@ fn load_native_scenarios_rejects_empty_directory() {
 #[cfg(unix)]
 #[test]
 fn load_native_scenarios_rejects_symlinked_json_file() {
-    let dir = std::env::temp_dir().join(format!(
-        "chio-conformance-native-symlink-{}",
-        std::process::id()
-    ));
-    let outside = std::env::temp_dir().join(format!(
-        "chio-conformance-native-symlink-outside-{}",
-        std::process::id()
-    ));
-    let _ = fs::remove_dir_all(&dir);
-    let _ = fs::remove_dir_all(&outside);
-    fs::create_dir_all(&dir).expect("create native scenario dir");
-    fs::create_dir_all(&outside).expect("create outside dir");
+    let dir = tempfile::Builder::new()
+        .prefix("chio-conformance-native-symlink-")
+        .tempdir()
+        .expect("create native scenario dir");
+    let outside = tempfile::Builder::new()
+        .prefix("chio-conformance-native-symlink-outside-")
+        .tempdir()
+        .expect("create outside dir");
     fs::write(
-        outside.join("escape.json"),
+        outside.path().join("escape.json"),
         r#"{
               "id": "escape",
               "title": "Escape",
@@ -221,16 +217,16 @@ fn load_native_scenarios_rejects_symlinked_json_file() {
             }"#,
     )
     .expect("write outside scenario");
-    std::os::unix::fs::symlink(outside.join("escape.json"), dir.join("escape.json"))
-        .expect("create scenario symlink");
+    std::os::unix::fs::symlink(
+        outside.path().join("escape.json"),
+        dir.path().join("escape.json"),
+    )
+    .expect("create scenario symlink");
 
-    match load_native_scenarios_from_dir(&dir) {
+    match load_native_scenarios_from_dir(dir.path()) {
         Ok(scenarios) => panic!("symlinked native scenario should fail: {scenarios:?}"),
         Err(error) => assert!(error.to_string().contains("symlink")),
     }
-
-    let _ = fs::remove_dir_all(dir);
-    let _ = fs::remove_dir_all(outside);
 }
 
 #[test]

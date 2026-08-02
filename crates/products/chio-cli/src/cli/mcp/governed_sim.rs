@@ -118,31 +118,27 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         ))
     })?;
     let budget_store = Arc::new(
-        chio_store_sqlite::SqliteBudgetStore::open(&state_root.path().join("budgets.sqlite3"))
+        chio_store_sqlite::SqliteBudgetStore::open(state_root.path().join("budgets.sqlite3"))
             .map_err(|error| {
                 CliError::cli_other_error(format!("open governed-sim budget store: {error}"))
             })?,
     );
     let operation_store = Arc::new(
         chio_store_sqlite::SqliteSecurityAdmissionOperationStore::open(
-            &state_root.path().join("operations.sqlite3"),
+            state_root.path().join("operations.sqlite3"),
         )
         .map_err(|error| {
             CliError::cli_other_error(format!("open governed-sim operation store: {error}"))
         })?,
     );
     let approval_store = Arc::new(
-        chio_store_sqlite::SqliteApprovalStore::open(
-            &state_root.path().join("approvals.sqlite3"),
-        )
+        chio_store_sqlite::SqliteApprovalStore::open(state_root.path().join("approvals.sqlite3"))
         .map_err(|error| {
             CliError::cli_other_error(format!("open governed-sim approval store: {error}"))
         })?,
     );
     let receipt_store = Arc::new(
-        chio_store_sqlite::SqliteReceiptStore::open(
-            &state_root.path().join("receipts.sqlite3"),
-        )
+        chio_store_sqlite::SqliteReceiptStore::open(state_root.path().join("receipts.sqlite3"))
         .map_err(|error| {
             CliError::cli_other_error(format!("open governed-sim receipt store: {error}"))
         })?,

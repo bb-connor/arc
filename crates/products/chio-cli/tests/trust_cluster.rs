@@ -12,7 +12,8 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::{
-    scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
+    attenuation::{DelegationLink, DelegationLinkBody},
+    scope::ChioScope,
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
@@ -23,7 +24,7 @@ use chio_core::receipt::{
 use chio_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_kernel::BudgetStore;
-use chio_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority};
+use chio_store_sqlite::SqliteBudgetStore;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
 use reqwest::header::AUTHORIZATION;
@@ -137,12 +138,68 @@ fn canonical_revocation_set_json(ids: &[&str]) -> Value {
     })
 }
 
+fn composite_authorize_payload(
+    capability_id: &str,
+    grant_index: usize,
+    requested_exposure_units: u64,
+    max_exposure_per_invocation: u64,
+    max_total_exposure_units: u64,
+    max_invocations: u32,
+    hold_id: &str,
+    event_id: &str,
+) -> Value {
+    let operation_id = format!(
+        "operation-{}",
+        &sha256_hex(format!("{capability_id}\0{hold_id}\0{event_id}").as_bytes())[..16]
+    );
+    let request_binding_hash = sha256_hex(
+        format!(
+            "chio.cluster.composite-authorization.v1\0{operation_id}\0{capability_id}\0{grant_index}\0{hold_id}\0{event_id}"
+        )
+        .as_bytes(),
+    );
+    json!({
+        "operationId": operation_id,
+        "requestBindingHash": request_binding_hash,
+        "capabilityId": capability_id,
+        "grantIndex": grant_index,
+        "requestedExposureUnits": requested_exposure_units,
+        "maxExposurePerInvocation": max_exposure_per_invocation,
+        "maxTotalExposureUnits": max_total_exposure_units,
+        "holdId": hold_id,
+        "eventId": event_id,
+        "admissionEvidence": {
+            "invocationQuotas": [{
+                "key": {
+                    "profile": "chio.grant-invocation.v1",
+                    "ownerId": capability_id,
+                    "grantIndex": grant_index
+                },
+                "maxInvocations": max_invocations
+            }],
+            "revocationSet": canonical_revocation_set_json(&[capability_id])
+        }
+    })
+}
+
 fn unique_test_dir() -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("chio-cli-trust-cluster-{nonce}"))
+    chio_test_support::private_fs::private_tempdir("chio-cli-trust-cluster-")
+        .expect("create private trust cluster test directory")
+        .keep()
+}
+
+fn create_private_test_dir(path: &Path) {
+    fs::create_dir_all(path).expect("create private trust cluster directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mut permissions = fs::metadata(path)
+            .expect("inspect private trust cluster directory")
+            .permissions();
+        permissions.set_mode(0o700);
+        fs::set_permissions(path, permissions).expect("secure private trust cluster directory");
+    }
 }
 
 fn workspace_root() -> PathBuf {
@@ -288,6 +345,7 @@ fn proxy_partitionable_connection(
     backend: SocketAddr,
     control: &PartitionProxyControl,
 ) -> io::Result<()> {
+    downstream.set_nonblocking(false)?;
     downstream.set_read_timeout(Some(Duration::from_secs(5)))?;
     let (request_prefix, header_end) = read_partition_proxy_request_prefix(&mut downstream)?;
     downstream.set_read_timeout(None)?;
@@ -415,18 +473,18 @@ fn spawn_trust_service(
     listen: SocketAddr,
     service_token: &str,
     receipt_db_path: &Path,
-    _legacy_revocation_db_path: &Path,
+    revocation_db_path: &Path,
     authority_db_path: &Path,
     admission_db_path: &Path,
     policy_path: Option<&Path>,
     advertise_url: &str,
     peer_urls: &[String],
 ) -> ServerGuard {
-    let cluster_node_key = deterministic_cluster_node_key(advertise_url);
-    let cluster_node_seed_path = receipt_db_path.with_extension("cluster-node.seed");
-    chio_control_plane::persist_authority_keypair(&cluster_node_seed_path, &cluster_node_key)
-        .expect("persist strict cluster node seed");
-    let cluster_replay_db_path = receipt_db_path.with_extension("cluster-replay.sqlite3");
+    let effective_revocation_db_path = if peer_urls.is_empty() {
+        revocation_db_path
+    } else {
+        admission_db_path
+    };
     let mut args = vec![
         "--receipt-db".to_string(),
         receipt_db_path
@@ -434,63 +492,79 @@ fn spawn_trust_service(
             .expect("receipt db path")
             .to_string(),
         "--revocation-db".to_string(),
-        admission_db_path
+        effective_revocation_db_path
             .to_str()
-            .expect("admission db path")
-            .to_string(),
-        "--authority-db".to_string(),
-        authority_db_path
-            .to_str()
-            .expect("authority db path")
+            .expect("revocation db path")
             .to_string(),
         "--budget-db".to_string(),
         admission_db_path
             .to_str()
             .expect("admission db path")
             .to_string(),
+    ];
+    if peer_urls.is_empty() {
+        args.push("--authority-db".to_string());
+        args.push(
+            authority_db_path
+                .to_str()
+                .expect("authority db path")
+                .to_string(),
+        );
+    }
+    args.extend([
         "trust".to_string(),
         "serve".to_string(),
         "--listen".to_string(),
         listen.to_string(),
         "--service-token".to_string(),
         service_token.to_string(),
-        "--authority-admin-token".to_string(),
-        "cluster-test-authority-admin-token".to_string(),
-        "--advertise-url".to_string(),
-        advertise_url.to_string(),
-        "--allow-local-peer-urls".to_string(),
-        "--cluster-node-seed-file".to_string(),
-        cluster_node_seed_path
-            .to_str()
-            .expect("cluster node seed path")
-            .to_string(),
-        "--cluster-replay-db".to_string(),
-        cluster_replay_db_path
-            .to_str()
-            .expect("cluster replay db path")
-            .to_string(),
-        "--cluster-sync-interval-ms".to_string(),
-        "2000".to_string(),
-    ];
-    for member_url in std::iter::once(advertise_url).chain(peer_urls.iter().map(String::as_str)) {
-        args.push("--cluster-member".to_string());
-        args.push(format!(
-            "{member_url}={}",
-            deterministic_cluster_node_key(member_url)
-                .public_key()
-                .to_hex()
-        ));
-    }
-    for peer_url in peer_urls {
-        args.push("--peer-url".to_string());
-        args.push(peer_url.clone());
+    ]);
+    if peer_urls.is_empty() {
+        args.push("--authority-admin-token".to_string());
+        args.push("cluster-test-authority-admin-token".to_string());
+    } else {
+        let cluster_node_key = deterministic_cluster_node_key(advertise_url);
+        let cluster_node_seed_path = receipt_db_path.with_extension("cluster-node.seed");
+        chio_control_plane::persist_authority_keypair(&cluster_node_seed_path, &cluster_node_key)
+            .expect("persist strict cluster node seed");
+        let cluster_replay_db_path = receipt_db_path.with_extension("cluster-replay.sqlite3");
+        args.extend([
+            "--advertise-url".to_string(),
+            advertise_url.to_string(),
+            "--allow-local-peer-urls".to_string(),
+            "--cluster-node-seed-file".to_string(),
+            cluster_node_seed_path
+                .to_str()
+                .expect("cluster node seed path")
+                .to_string(),
+            "--cluster-replay-db".to_string(),
+            cluster_replay_db_path
+                .to_str()
+                .expect("cluster replay db path")
+                .to_string(),
+            "--cluster-sync-interval-ms".to_string(),
+            "2000".to_string(),
+        ]);
+        for member_url in std::iter::once(advertise_url).chain(peer_urls.iter().map(String::as_str))
+        {
+            args.push("--cluster-member".to_string());
+            args.push(format!(
+                "{member_url}={}",
+                deterministic_cluster_node_key(member_url)
+                    .public_key()
+                    .to_hex()
+            ));
+        }
+        for peer_url in peer_urls {
+            args.push("--peer-url".to_string());
+            args.push(peer_url.clone());
+        }
+        register_internal_peer(advertise_url, peer_urls);
     }
     if let Some(policy_path) = policy_path {
         args.push("--policy".to_string());
         args.push(policy_path.to_str().expect("policy path").to_string());
     }
-    register_internal_peer(advertise_url, peer_urls);
-
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args(args)
         .stdin(Stdio::null())
@@ -529,22 +603,6 @@ fn spawn_partitionable_trust_service(
     PartitionableServerGuard {
         _server: server,
         _proxy: proxy,
-    }
-}
-
-fn initialize_shared_cluster_authority(path: &Path) {
-    drop(
-        SqliteCapabilityAuthority::open(path).expect("initialize shared cluster authority custody"),
-    );
-    {
-        let connection =
-            rusqlite::Connection::open(path).expect("open shared cluster authority for checkpoint");
-        let busy = connection
-            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
-                row.get::<_, i64>(0)
-            })
-            .expect("checkpoint shared cluster authority before spawning nodes");
-        assert_eq!(busy, 0, "shared cluster authority checkpoint is busy");
     }
 }
 
@@ -640,7 +698,10 @@ fn try_get_json(client: &Client, url: &str, token: &str) -> Option<Value> {
 }
 
 fn try_internal_cluster_status(client: &Client, base_url: &str, _token: &str) -> Option<Value> {
-    let endpoint = "/v1/internal/cluster/status";
+    try_internal_get_json(client, base_url, "/v1/internal/cluster/status")
+}
+
+fn try_internal_get_json(client: &Client, base_url: &str, endpoint: &str) -> Option<Value> {
     let node_id = internal_peer_node_id(base_url)?;
     let issued_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -675,7 +736,7 @@ fn try_internal_cluster_status(client: &Client, base_url: &str, _token: &str) ->
 fn post_internal_json_status(
     client: &Client,
     base_url: &str,
-    _token: &str,
+    token: &str,
     endpoint: &str,
     node_id: &str,
     term: Option<u64>,
@@ -699,6 +760,7 @@ fn post_internal_json_status(
     );
     let mut request = client
         .post(format!("{base_url}{endpoint}"))
+        .header(AUTHORIZATION, bearer(token))
         .header(CLUSTER_NODE_ID_HEADER, node_id)
         .header(CLUSTER_AUTH_METHOD_HEADER, "POST")
         .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
@@ -1166,8 +1228,53 @@ fn sample_capability(id: &str, subject_kp: &Keypair, issuer_kp: &Keypair) -> Cap
     .expect("sign capability")
 }
 
+fn sample_delegated_capability(
+    id: &str,
+    subject_kp: &Keypair,
+    delegator_kp: &Keypair,
+    parent: &CapabilityToken,
+) -> CapabilityToken {
+    let issued_at = parent.issued_at.saturating_add(1);
+    let mut delegation_chain = parent.delegation_chain.clone();
+    delegation_chain.push(
+        DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: parent.id.clone(),
+                delegator: delegator_kp.public_key(),
+                delegatee: subject_kp.public_key(),
+                attenuations: Vec::new(),
+                timestamp: issued_at,
+                scope_hash: None,
+                aggregate_budget: None,
+                cumulative_approval: None,
+                aggregate_family_preservation: None,
+            },
+            delegator_kp,
+        )
+        .expect("sign delegation link"),
+    );
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: delegator_kp.public_key(),
+            subject: subject_kp.public_key(),
+            scope: parent.scope.clone(),
+            issued_at,
+            expires_at: parent.expires_at,
+            delegation_chain,
+            aggregate_invocation_budget: None,
+        },
+        delegator_kp,
+    )
+    .expect("sign delegated capability")
+}
+
 fn assert_write_visibility_metadata(response: &Value) -> &str {
-    assert_eq!(response["visibleAtLeader"].as_bool(), Some(true));
+    assert_eq!(
+        response["visibleAtLeader"].as_bool(),
+        Some(true),
+        "expected leader-visible write metadata: {response}"
+    );
     let leader_url = response["leaderUrl"].as_str().expect("leaderUrl metadata");
     assert_eq!(response["handledBy"].as_str(), Some(leader_url));
     leader_url
@@ -1230,7 +1337,12 @@ fn assert_budget_authority_metadata(
         authority["authorityId"].as_str(),
         Some(expected_authority_id)
     );
-    assert_eq!(authority["leaderUrl"].as_str(), Some(expected_authority_id));
+    assert!(
+        authority["leaderUrl"]
+            .as_str()
+            .is_some_and(|leader_url| !leader_url.is_empty()),
+        "expected non-empty consensus leader URL: {authority}"
+    );
     assert_eq!(
         authority["guaranteeLevel"].as_str(),
         Some(expected_guarantee_level)

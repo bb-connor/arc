@@ -731,12 +731,10 @@ impl TrustServiceConfig {
                 self.joint_authority_db_path.as_deref(),
             ),
             ("receipt database", self.receipt_db_path.as_deref()),
-            ("revocation database", self.revocation_db_path.as_deref()),
             (
                 "capability authority database",
                 self.authority_db_path.as_deref(),
             ),
-            ("budget database", self.budget_db_path.as_deref()),
             (
                 "verifier challenge database",
                 self.verifier_challenge_db_path.as_deref(),
@@ -745,6 +743,16 @@ impl TrustServiceConfig {
             if let Some(path) = path {
                 database_paths.push((label, path));
             }
+        }
+        if self.peer_urls.is_empty() {
+            if let Some(path) = self.revocation_db_path.as_deref() {
+                database_paths.push(("revocation database", path));
+            }
+            if let Some(path) = self.budget_db_path.as_deref() {
+                database_paths.push(("budget database", path));
+            }
+        } else if let Some(path) = self.budget_db_path.as_deref() {
+            database_paths.push(("HA admission database", path));
         }
         crate::validate_distinct_database_paths(&database_paths)?;
         Ok(())

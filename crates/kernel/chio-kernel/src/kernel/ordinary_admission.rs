@@ -471,15 +471,14 @@ impl ChioKernel {
                 ))
             })?);
         let supplemental_artifact = request
-            .supplemental_authorization
-            .as_ref()
+            .supplemental_quota_authorization()
             .map(|authorization| {
                 OpaqueSignedSupplementalQuota::new(authorization.artifact().to_vec())
                     .map_err(|error| KernelError::GuardDenied(error.to_string()))
             })
             .transpose()?;
         let supplemental_plan = match (
-            request.supplemental_authorization.as_ref(),
+            request.supplemental_quota_authorization(),
             supplemental_artifact.as_ref(),
         ) {
             (Some(authorization), Some(artifact)) => {
@@ -534,7 +533,9 @@ impl ChioKernel {
         );
         let supplemental_digest = supplemental_artifact
             .as_ref()
-            .map(OpaqueSignedSupplementalQuota::digest);
+            .map(OpaqueSignedSupplementalQuota::digest)
+            .or_else(|| request.credit_facility_bind_artifact().map(sha256_hex));
+        let credit_facility = request.credit_facility_bind_artifact().is_some();
         let request_binding_hash = self.ordinary_request_binding_hash_for_policy(
             request,
             &hold_id,
@@ -686,6 +687,7 @@ impl ChioKernel {
 
         authorization.admission_operation = Some(budget_operation.clone());
         if self.payment_journal_active()
+            && !credit_facility
             && (!caller_reservation || Self::is_governed_mustprepay_request(request))
         {
             let payment_terms = Self::mustprepay_quoted_amount(request)
@@ -901,6 +903,7 @@ impl ChioKernel {
             budget_operation.clone(),
         );
         if self.payment_adapter.is_some()
+            && !credit_facility
             && (!caller_reservation || Self::is_governed_mustprepay_request(request))
         {
             let payment_terms = charge
@@ -1140,7 +1143,7 @@ impl ChioKernel {
                 "aggregate invocation budget is not enabled".to_string(),
             ));
         }
-        if request.supplemental_authorization.is_some()
+        if request.supplemental_quota_authorization().is_some()
             && !self.supplemental_broker_admission_enabled
         {
             return Err(KernelError::GuardDenied(

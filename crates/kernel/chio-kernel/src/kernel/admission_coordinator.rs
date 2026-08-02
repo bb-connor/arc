@@ -265,15 +265,14 @@ impl ChioKernel {
                 ))
             })?);
         let supplemental_artifact = request
-            .supplemental_authorization
-            .as_ref()
+            .supplemental_quota_authorization()
             .map(|authorization| {
                 OpaqueSignedSupplementalQuota::new(authorization.artifact().to_vec())
                     .map_err(|error| KernelError::GuardDenied(error.to_string()))
             })
             .transpose()?;
         let supplemental_plan = match (
-            request.supplemental_authorization.as_ref(),
+            request.supplemental_quota_authorization(),
             supplemental_artifact.as_ref(),
         ) {
             (Some(authorization), Some(artifact)) => {
@@ -327,7 +326,8 @@ impl ChioKernel {
         );
         let supplemental_digest = supplemental_artifact
             .as_ref()
-            .map(OpaqueSignedSupplementalQuota::digest);
+            .map(OpaqueSignedSupplementalQuota::digest)
+            .or_else(|| request.credit_facility_bind_artifact().map(sha256_hex));
         Ok(ThresholdProtocolPreparation {
             capability_digest,
             arguments_digest,
@@ -434,6 +434,8 @@ impl ChioKernel {
                 },
                 &operation,
                 &protocol,
+                verified_payee_binding
+                    .is_some_and(VerifiedGovernedPayeeBinding::is_credit_facility),
             )?
         };
         self.journal_budget_cleanup(
@@ -455,6 +457,7 @@ impl ChioKernel {
             )?;
         }
         if self.payment_adapter.is_some()
+            && verified_payee_binding.is_none_or(|binding| !binding.is_credit_facility())
             && (payment_mode == ThresholdPaymentMode::Dispatch
                 || Self::is_governed_mustprepay_request(request))
         {
@@ -1244,6 +1247,7 @@ impl ChioKernel {
         context: &ThresholdToolAdmissionContext<'_>,
         operation: &AdmissionOperation,
         protocol: &ThresholdProtocolPreparation,
+        credit_facility: bool,
     ) -> Result<ThresholdBudgetAuthorization, KernelError> {
         let ThresholdToolAdmissionContext {
             request,
@@ -1352,6 +1356,7 @@ impl ChioKernel {
             operation.request_binding_hash().to_string(),
         )?);
         if self.payment_journal_active()
+            && !credit_facility
             && (payment_mode == ThresholdPaymentMode::Dispatch
                 || Self::is_governed_mustprepay_request(request))
         {

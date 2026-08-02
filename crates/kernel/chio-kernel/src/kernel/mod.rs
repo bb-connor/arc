@@ -248,6 +248,7 @@ pub(crate) struct VerifiedGovernedPayeeBinding {
     payee_binding_digest: String,
     economic_intent_digest: String,
     pre_action_authority_digest: String,
+    credit_facility_bind: Option<chio_credit::obligation::VerifiedCreditFacilityBindV1>,
 }
 
 impl VerifiedGovernedPayeeBinding {
@@ -267,7 +268,17 @@ impl VerifiedGovernedPayeeBinding {
             payee_binding_digest,
             economic_intent_digest,
             pre_action_authority_digest,
+            credit_facility_bind: None,
         })
+    }
+
+    #[must_use]
+    pub(crate) fn with_credit_facility_bind(
+        mut self,
+        credit_facility_bind: chio_credit::obligation::VerifiedCreditFacilityBindV1,
+    ) -> Self {
+        self.credit_facility_bind = Some(credit_facility_bind);
+        self
     }
 
     #[cfg(test)]
@@ -308,6 +319,18 @@ impl VerifiedGovernedPayeeBinding {
     #[must_use]
     pub(crate) fn pre_action_authority_digest(&self) -> &str {
         &self.pre_action_authority_digest
+    }
+
+    #[must_use]
+    pub(crate) const fn credit_facility_bind(
+        &self,
+    ) -> Option<&chio_credit::obligation::VerifiedCreditFacilityBindV1> {
+        self.credit_facility_bind.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_credit_facility(&self) -> bool {
+        self.credit_facility_bind.is_some()
     }
 }
 

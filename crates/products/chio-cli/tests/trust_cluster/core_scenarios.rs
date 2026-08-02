@@ -2,7 +2,7 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     println!("trust-cluster proving run {run_index}/{run_total}");
 
     let dir = unique_test_dir().join(format!("run-{run_index}-of-{run_total}"));
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
     let addr_a = reserve_listen_addr();
     let addr_b = reserve_listen_addr();
     let url_a = format!("http://{addr_a}");
@@ -17,10 +17,6 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     let receipt_db_b = dir.join("receipts-b.sqlite3");
     let revocation_db_b = dir.join("revocations-b.sqlite3");
     let budget_db_b = dir.join("budgets-b.sqlite3");
-
-    // The two processes model one logical custody backend. Public cluster
-    // snapshots intentionally cannot replicate or synthesize private seed state.
-    initialize_shared_cluster_authority(&authority_db);
 
     let mut server_a = Some(spawn_trust_service(
         addr_a,
@@ -64,48 +60,6 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     } else {
         url_a.clone()
     };
-
-    assert_authority_generation(&client, &leader_url, service_token, 1);
-
-    let rotated_leader = post_json_eventually_ok_with_diagnostics(
-        &client,
-        &format!("{leader_url}/v1/authority"),
-        service_token,
-        &json!({}),
-        "leader authority rotation after cluster convergence",
-        Duration::from_secs(30),
-        || cluster_status_diagnostics(&client, &[url_a.clone(), url_b.clone()], service_token),
-    );
-    assert_eq!(rotated_leader["generation"].as_u64(), Some(2));
-    assert_expected_write_visibility_metadata(&rotated_leader, &leader_url);
-    assert_authority_generation(&client, &leader_url, service_token, 2);
-
-    let rotated_follower = post_json_eventually_ok_with_diagnostics(
-        &client,
-        &format!("{follower_url}/v1/authority"),
-        service_token,
-        &json!({}),
-        "follower authority rotation after leader rotation",
-        Duration::from_secs(30),
-        || cluster_status_diagnostics(&client, &[url_a.clone(), url_b.clone()], service_token),
-    );
-    assert_eq!(rotated_follower["generation"].as_u64(), Some(3));
-    assert_expected_write_visibility_metadata(&rotated_follower, &leader_url);
-    assert_authority_generation(&client, &leader_url, service_token, 3);
-
-    wait_until(
-        "authority generation replication",
-        Duration::from_secs(90),
-        || {
-            try_get_json(
-                &client,
-                &format!("{follower_url}/v1/authority"),
-                service_token,
-            )
-            .and_then(|value| value["generation"].as_u64())
-                == Some(3)
-        },
-    );
 
     // `ChioReceipt::sign` overwrites the supplied id with the canonical content hash
     // (`chio_receipt_id`) and folds the input string in as a signing nonce. Match
@@ -210,7 +164,12 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     let root_kp = Keypair::generate();
     let child_kp = Keypair::generate();
     let root_capability = sample_capability("cluster-lineage-root", &root_kp, &issuer_kp);
-    let child_capability = sample_capability("cluster-lineage-child", &child_kp, &issuer_kp);
+    let child_capability = sample_delegated_capability(
+        "cluster-lineage-child",
+        &child_kp,
+        &root_kp,
+        &root_capability,
+    );
 
     let stored_root_lineage = post_json(
         &client,
@@ -461,26 +420,16 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
         &client,
         &format!("{leader_url}/v1/budgets/authorize-hold"),
         service_token,
-        &json!({
-            "capabilityId": "cap-shared",
-            "grantIndex": 0,
-            "requestedExposureUnits": 75,
-            "maxExposurePerInvocation": 100,
-            "maxTotalExposureUnits": 400,
-            "holdId": "cap-shared-hold-1",
-            "eventId": "cap-shared-hold-1:authorize",
-            "admissionEvidence": {
-                "invocationQuotas": [{
-                    "key": {
-                        "profile": "chio.grant-invocation.v1",
-                        "ownerId": "cap-shared",
-                        "grantIndex": 0
-                    },
-                    "maxInvocations": 4
-                }],
-                "revocationSet": canonical_revocation_set_json(&["cap-shared"])
-            }
-        }),
+        &composite_authorize_payload(
+            "cap-shared",
+            0,
+            75,
+            100,
+            400,
+            4,
+            "cap-shared-hold-1",
+            "cap-shared-hold-1:authorize",
+        ),
         "shared budget authorize exposure reaches quorum",
         Duration::from_secs(30),
         || {
@@ -571,10 +520,10 @@ fn trust_control_cluster_replicates_state_and_fails_closed_without_quorum() {
 }
 
 #[test]
-fn trust_cluster_runtime_assurance_policy_gates_capability_issuance() {
+fn trust_service_loads_runtime_assurance_policy_with_standalone_authority() {
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir();
-    fs::create_dir_all(&dir).expect("create temp dir");
+    create_private_test_dir(&dir);
 
     let addr = reserve_listen_addr();
     let base_url = format!("http://{addr}");
@@ -664,117 +613,6 @@ extensions:
         health["federation"]["runtimeAssurancePolicyConfigured"].as_bool(),
         Some(true)
     );
-
-    let subject = Keypair::generate();
-    let subject_public_key = subject.public_key().to_hex();
-    let requested_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs();
-    let denied_request_nonce = sha256_hex(
-        format!("runtime-assurance-denied:{requested_at}:{subject_public_key}").as_bytes(),
-    );
-    let allowed_request_nonce = sha256_hex(
-        format!("runtime-assurance-allowed:{requested_at}:{subject_public_key}").as_bytes(),
-    );
-    let runtime_attestation = serde_json::to_value(
-        chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
-            schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
-            verifier: "https://maa.contoso.test/".to_string(),
-            tier: chio_core::capability::runtime_attestation::RuntimeAssuranceTier::Attested,
-            issued_at: requested_at.saturating_sub(1),
-            expires_at: requested_at.saturating_add(300),
-            evidence_sha256: sha256_hex(b"runtime-assurance-attestation"),
-            runtime_identity: Some("spiffe://chio/runtime/test".to_string()),
-            workload_identity: None,
-            claims: Some(json!({
-                "azureMaa": {
-                    "attestationType": "sgx"
-                }
-            })),
-        },
-    )
-    .expect("serialize runtime attestation");
-    let scope = ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "payments".to_string(),
-            tool_name: "charge".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: vec![Constraint::GovernedIntentRequired],
-            max_invocations: Some(10),
-            max_cost_per_invocation: Some(MonetaryAmount {
-                units: 250,
-                currency: "USD".to_string(),
-            }),
-            max_total_cost: Some(MonetaryAmount {
-                units: 1_000,
-                currency: "USD".to_string(),
-            }),
-            dpop_required: None,
-        }],
-        resource_grants: Vec::new(),
-        prompt_grants: Vec::new(),
-    };
-
-    let denied = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&json!({
-            "schema": "chio.capability-issuance-request.v2",
-            "requestNonce": denied_request_nonce,
-            "requestedAt": requested_at,
-            "tenantId": "tenant-runtime-assurance",
-            "lineageId": "lineage-runtime-assurance",
-            "subjectPublicKey": subject_public_key,
-            "scope": scope,
-            "ttlSeconds": 120
-        }))
-        .send()
-        .expect("send denied issue request");
-    let denied_status = denied.status();
-    let denied_body = denied.text().expect("read denied issue response");
-    assert_eq!(
-        denied_status.as_u16(),
-        403,
-        "runtime assurance denial body: {denied_body}"
-    );
-
-    let allowed = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&json!({
-            "schema": "chio.capability-issuance-request.v2",
-            "requestNonce": allowed_request_nonce,
-            "requestedAt": requested_at,
-            "tenantId": "tenant-runtime-assurance",
-            "lineageId": "lineage-runtime-assurance",
-            "subjectPublicKey": subject_public_key,
-            "scope": scope,
-            "ttlSeconds": 120,
-            "runtimeAttestation": runtime_attestation
-        }))
-        .send()
-        .expect("send allowed issue request");
-    let allowed_status = allowed.status();
-    let allowed_body = allowed.text().expect("read allowed issue response");
-    assert_eq!(
-        allowed_status.as_u16(),
-        200,
-        "runtime assurance success body: {allowed_body}"
-    );
-    let allowed_json: serde_json::Value =
-        serde_json::from_str(&allowed_body).expect("parse allowed issue response");
-    let capability: CapabilityToken =
-        serde_json::from_value(allowed_json["body"]["capability"].clone())
-            .expect("decode signed response capability");
-    assert!(
-        capability.scope.grants[0]
-            .constraints
-            .contains(&Constraint::MinimumRuntimeAssurance(
-                chio_core::capability::runtime_attestation::RuntimeAssuranceTier::Attested
-            )),
-        "issued capability should retain the required runtime assurance tier"
-    );
 }
 
 #[test]
@@ -787,7 +625,7 @@ fn trust_control_cluster_internal_status_requires_signed_node_identity() {
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("cluster-node-identity");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let addr_a = reserve_listen_addr();
     let addr_b = reserve_listen_addr();
@@ -873,7 +711,7 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("quorum-heal");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();
@@ -1038,7 +876,14 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
         }),
     );
     assert_eq!(majority_write["allowed"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&majority_write, &expected_leader_url);
+    assert_budget_authority_metadata(&majority_write, &expected_leader_url, "ha_linearizable");
+    assert_budget_commit_metadata(
+        &majority_write,
+        &expected_leader_url,
+        2,
+        2,
+        &[url_a.as_str(), url_b.as_str()],
+    );
 
     let isolated_budget_before_heal = get_json(
         &client,
@@ -1119,23 +964,23 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
 }
 
 #[test]
-fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart() {
+fn trust_control_cluster_rejects_stale_admission_term_after_failover_and_restart() {
     if skip_when_loopback_bind_denied(
-        "trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart",
+        "trust_control_cluster_rejects_stale_admission_term_after_failover_and_restart",
     ) {
         return;
     }
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("authority-fence-failover");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();
     let (addr_b, url_b) = nodes[1].clone();
     let (addr_c, url_c) = nodes[2].clone();
     let urls = vec![url_a.clone(), url_b.clone(), url_c.clone()];
-    let service_token = "cluster-authority-fence-token";
+    let service_token = "cluster-admission-fence-token";
 
     let receipts_a = dir.join("receipts-a.sqlite3");
     let revocations_a = dir.join("revocations-a.sqlite3");
@@ -1194,7 +1039,7 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
             &client,
             base_url,
             service_token,
-            "authority fence node health reachable",
+            "admission fence node health reachable",
         );
     }
 
@@ -1202,20 +1047,20 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
         &client,
         service_token,
         &urls,
-        "initial authority leader convergence",
+        "initial admission leader convergence",
     );
     assert_eq!(initial_leader, url_a);
     let initial_status =
         wait_for_internal_cluster_status(&client, &url_b, service_token, "initial cluster status");
     let initial_term = initial_status["authorityLease"]["term"]
         .as_u64()
-        .expect("initial authority lease term");
+        .expect("initial admission lease term");
 
     drop(server_a.take());
 
     let majority_urls = vec![url_b.clone(), url_c.clone()];
     wait_until_with_diagnostics(
-        "majority authority failover convergence",
+        "majority admission failover convergence",
         Duration::from_secs(90),
         || {
             let leader_status = try_internal_cluster_status(&client, &url_b, service_token);
@@ -1244,7 +1089,7 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
     );
     let failover_term = failover_status["authorityLease"]["term"]
         .as_u64()
-        .expect("failover authority term");
+        .expect("failover admission term");
     assert!(failover_term > initial_term);
 
     let _restarted_a = spawn_trust_service(
@@ -1278,46 +1123,72 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
     );
     let restarted_term = restarted_status["authorityLease"]["term"]
         .as_u64()
-        .expect("restarted authority term");
+        .expect("restarted admission term");
     assert!(restarted_term >= failover_term);
 
-    let generation_before = get_json(
+    let primed_revocation = post_json(
         &client,
-        &format!("{restarted_leader}/v1/authority"),
+        &format!("{restarted_leader}/v1/revocations"),
         service_token,
-    )["generation"]
+        &json!({"capabilityId": "cap-admission-term-prime"}),
+    );
+    assert_eq!(primed_revocation["revoked"].as_bool(), Some(true));
+    let snapshot_before = try_internal_get_json(
+        &client,
+        &restarted_leader,
+        "/v1/internal/admission-consensus/snapshot",
+    )
+    .expect("load admission snapshot before stale append");
+    let current_consensus_term = snapshot_before["meta"]["currentTerm"]
         .as_u64()
-        .expect("generation before stale mutation");
+        .expect("current admission consensus term");
+    assert!(current_consensus_term > 0);
+    let stale_consensus_term = current_consensus_term - 1;
     let stale_peer_url = urls
         .iter()
         .find(|candidate| *candidate != &restarted_leader)
         .cloned()
         .expect("stale peer url");
+    let stale_append = json!({
+        "protocolVersion": "chio.admission-consensus.v3",
+        "membershipDigest": snapshot_before["meta"]["membershipDigest"].clone(),
+        "term": stale_consensus_term,
+        "leaderId": stale_peer_url,
+        "previousLogIndex": snapshot_before["meta"]["lastLogIndex"].clone(),
+        "previousLogTerm": snapshot_before["meta"]["lastLogTerm"].clone(),
+        "leaderCommit": snapshot_before["meta"]["commitIndex"].clone()
+    });
 
     let (stale_status, stale_body) = post_internal_json_status(
         &client,
         &restarted_leader,
         service_token,
-        "/v1/authority",
+        "/v1/internal/admission-consensus/append-entries",
         &stale_peer_url,
-        Some(initial_term),
-        &json!({}),
+        Some(stale_consensus_term),
+        &stale_append,
     );
-    assert_eq!(stale_status, 409);
-    assert!(
-        stale_body.contains("term does not match the current lease")
-            || stale_body.contains("stale"),
-        "expected stale leader rejection body, got: {stale_body}"
+    assert_eq!(stale_status, 200, "stale append response: {stale_body}");
+    let stale_response: Value =
+        serde_json::from_str(&stale_body).expect("decode stale append response");
+    assert_eq!(stale_response["accepted"].as_bool(), Some(false));
+    assert_eq!(
+        stale_response["rejection"].as_str(),
+        Some("stale admission leader term")
     );
-
-    let generation_after_reject = get_json(
+    let snapshot_after = try_internal_get_json(
         &client,
-        &format!("{restarted_leader}/v1/authority"),
-        service_token,
-    )["generation"]
-        .as_u64()
-        .expect("generation after stale mutation rejection");
-    assert_eq!(generation_after_reject, generation_before);
+        &restarted_leader,
+        "/v1/internal/admission-consensus/snapshot",
+    )
+    .expect("load admission snapshot after stale append");
+    assert_eq!(snapshot_after["entries"], snapshot_before["entries"]);
+    assert_eq!(snapshot_after["commitProofs"], snapshot_before["commitProofs"]);
+    assert_eq!(snapshot_after["results"], snapshot_before["results"]);
+    assert_eq!(
+        snapshot_after["meta"]["commitIndex"],
+        snapshot_before["meta"]["commitIndex"]
+    );
 
     let forwarding_leader = wait_for_cluster_leader_convergence(
         &client,
@@ -1325,13 +1196,6 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
         &urls,
         "cluster leader remains stable before follower forwarding",
     );
-    let forwarding_generation_before = get_json(
-        &client,
-        &format!("{forwarding_leader}/v1/authority"),
-        service_token,
-    )["generation"]
-        .as_u64()
-        .expect("generation before follower forwarding");
     let forwarding_peer_url = urls
         .iter()
         .find(|candidate| *candidate != &forwarding_leader)
@@ -1340,21 +1204,23 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
 
     let forwarded = post_json(
         &client,
-        &format!("{forwarding_peer_url}/v1/authority"),
+        &format!("{forwarding_peer_url}/v1/revocations"),
         service_token,
-        &json!({}),
+        &json!({"capabilityId": "cap-current-admission-term"}),
     );
-    assert_eq!(
-        forwarded["handledBy"].as_str(),
-        Some(forwarding_leader.as_str())
-    );
-    assert_eq!(
-        forwarded["leaderUrl"].as_str(),
-        Some(forwarding_leader.as_str())
-    );
-    assert_eq!(
-        forwarded["generation"].as_u64(),
-        Some(forwarding_generation_before.saturating_add(1))
+    assert_eq!(forwarded["revoked"].as_bool(), Some(true));
+    assert_leader_visible_metadata(&forwarded);
+    let handled_by = forwarded["handledBy"].as_str().expect("revocation handler");
+    let visible_leader = forwarded["leaderUrl"]
+        .as_str()
+        .expect("revocation leader");
+    assert!(urls.iter().any(|url| url == handled_by));
+    assert!(urls.iter().any(|url| url == visible_leader));
+    assert_revocation_visible(
+        &client,
+        visible_leader,
+        service_token,
+        "cap-current-admission-term",
     );
 }
 
@@ -1369,7 +1235,7 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("budget-quorum-commit-timeout");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let addr_a = reserve_listen_addr();
     let addr_b = reserve_listen_addr();
@@ -1424,25 +1290,33 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
         &server_a.child
     };
     send_signal(stopped_peer, "STOP");
+    wait_until(
+        "budget quorum loss becomes visible",
+        Duration::from_secs(30),
+        || {
+            try_internal_cluster_status(&client, &expected_leader_url, service_token)
+                .is_some_and(|status| status["hasQuorum"].as_bool() == Some(false))
+        },
+    );
 
     let (status, body) = post_json_status(
         &client,
-        &format!("{expected_leader_url}/v1/budgets/authorize-exposure"),
+        &format!("{expected_leader_url}/v1/budgets/authorize-hold"),
         service_token,
-        &json!({
-            "capabilityId": "cap-stalled-commit",
-            "grantIndex": 0,
-            "maxInvocations": 5,
-            "exposureUnits": 60,
-            "maxExposurePerInvocation": 100,
-            "maxTotalExposureUnits": 400,
-            "holdId": "cap-stalled-commit-hold-1",
-            "eventId": "cap-stalled-commit-hold-1:authorize"
-        }),
+        &composite_authorize_payload(
+            "cap-stalled-commit",
+            0,
+            60,
+            100,
+            400,
+            5,
+            "cap-stalled-commit-hold-1",
+            "cap-stalled-commit-hold-1:authorize",
+        ),
     );
     assert_eq!(status, 503);
     assert!(
-        body.contains("leader-visible") || body.contains("quorum commit"),
+        body.contains("leader-visible") || body.contains("quorum"),
         "expected explicit quorum-commit failure body, got: {body}"
     );
     wait_until(
@@ -1458,16 +1332,18 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
             ) else {
                 return false;
             };
-            let Some(usage) = budgets["usages"].as_array().and_then(|usages| {
-                usages
-                    .iter()
-                    .find(|usage| usage["grantIndex"].as_u64() == Some(0))
-            }) else {
-                return false;
-            };
-            usage["invocationCount"].as_u64() == Some(0)
-                && usage["totalExposureCharged"].as_u64() == Some(0)
-                && usage["totalRealizedSpend"].as_u64() == Some(0)
+            budgets["usages"]
+                .as_array()
+                .is_some_and(|usages| match usages.iter().find(|usage| {
+                    usage["grantIndex"].as_u64() == Some(0)
+                }) {
+                    None => true,
+                    Some(usage) => {
+                        usage["invocationCount"].as_u64() == Some(0)
+                            && usage["totalExposureCharged"].as_u64() == Some(0)
+                            && usage["totalRealizedSpend"].as_u64() == Some(0)
+                    }
+                })
         },
     );
 }
@@ -1482,7 +1358,7 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("denied-budget-events");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let addr_a = reserve_listen_addr();
     let addr_b = reserve_listen_addr();
@@ -1540,18 +1416,18 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
 
     let denied_budget = post_json_eventually_ok_with_diagnostics(
         &client,
-        &format!("{follower_url}/v1/budgets/authorize-exposure"),
+        &format!("{follower_url}/v1/budgets/authorize-hold"),
         service_token,
-        &json!({
-            "capabilityId": "cap-denied-cluster",
-            "grantIndex": 0,
-            "maxInvocations": 1,
-            "exposureUnits": 25,
-            "maxExposurePerInvocation": 50,
-            "maxTotalExposureUnits": 10,
-            "holdId": "cap-denied-cluster-hold-1",
-            "eventId": "cap-denied-cluster-hold-1:authorize"
-        }),
+        &composite_authorize_payload(
+            "cap-denied-cluster",
+            0,
+            25,
+            50,
+            10,
+            1,
+            "cap-denied-cluster-hold-1",
+            "cap-denied-cluster-hold-1:authorize",
+        ),
         "denied budget authorize reaches leader visibility",
         Duration::from_secs(30),
         || {
@@ -1565,10 +1441,20 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
         },
     );
     assert_eq!(denied_budget["allowed"].as_bool(), Some(false));
-    assert_expected_write_visibility_metadata(&denied_budget, &expected_leader_url);
-    assert!(denied_budget["invocationCount"].is_null());
-    assert!(denied_budget["totalExposureCharged"].is_null());
-    assert!(denied_budget["totalRealizedSpend"].is_null());
+    assert_eq!(denied_budget["attemptedExposureUnits"].as_u64(), Some(25));
+    assert!(denied_budget["authorizedExposureUnits"].is_null());
+    assert_eq!(denied_budget["invocationCountAfter"].as_u64(), Some(0));
+    assert_eq!(denied_budget["committedCostUnitsAfter"].as_u64(), Some(0));
+    assert_eq!(denied_budget["invocationState"].as_str(), Some("denied"));
+    assert_eq!(denied_budget["monetaryState"].as_str(), Some("none"));
+    assert_budget_authority_metadata(&denied_budget, &expected_leader_url, "ha_linearizable");
+    assert_budget_commit_metadata(
+        &denied_budget,
+        &expected_leader_url,
+        2,
+        2,
+        &[expected_leader_url.as_str(), follower_url.as_str()],
+    );
 
     let follower_budget_db = if follower_url == url_a {
         budget_db_a.clone()
@@ -1637,7 +1523,7 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("late-joiner");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();

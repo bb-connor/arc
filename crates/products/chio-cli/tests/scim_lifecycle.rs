@@ -4,24 +4,21 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::scim_lifecycle::{
     ScimLifecycleRegistry, CHIO_SCIM_USER_EXTENSION_SCHEMA, SCIM_CORE_USER_SCHEMA,
 };
-use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
-use chio_core::crypto::Keypair;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
 
+const AUTHORITY_ADMIN_TOKEN: &str = "scim-authority-admin-token";
+
 fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    chio_test_support::private_fs::private_tempdir(prefix)
+        .expect("create private test directory")
+        .keep()
 }
 
 fn workspace_root() -> PathBuf {
@@ -55,13 +52,6 @@ fn read_child_stderr(child: &mut Child) -> String {
 
 fn bearer(token: &str) -> String {
     format!("Bearer {token}")
-}
-
-fn unix_timestamp_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs()
 }
 
 fn spawn_trust_service(
@@ -103,6 +93,8 @@ fn spawn_trust_service(
         command.args([
             "--authority-seed-file",
             path.to_str().expect("authority seed path"),
+            "--authority-admin-token",
+            AUTHORITY_ADMIN_TOKEN,
         ]);
     }
     let child = command
@@ -368,55 +360,7 @@ fn trust_service_scim_delete_users_deactivates_identity_revokes_capabilities_and
     let create_body: Value = create_response.json().expect("decode create body");
     let user_id = create_body["id"].as_str().expect("created user id");
 
-    let subject_keypair = Keypair::generate();
-    let scope = ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "filesystem".to_string(),
-            tool_name: "read_file".to_string(),
-            operations: vec![Operation::Read],
-            constraints: Vec::new(),
-            max_invocations: Some(1),
-            max_cost_per_invocation: None,
-            max_total_cost: None,
-            dpop_required: None,
-        }],
-        resource_grants: Vec::new(),
-        prompt_grants: Vec::new(),
-    };
-    let request_nonce = "66".repeat(32);
-    let issue_response = client
-        .post(format!("{base_url}/v1/capabilities/issue"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .json(&json!({
-            "schema": "chio.capability-issuance-request.v2",
-            "requestNonce": request_nonce.clone(),
-            "requestedAt": unix_timestamp_now(),
-            "tenantId": "tenant-scim-lifecycle",
-            "lineageId": "lineage-scim-lifecycle-deprovision",
-            "subjectPublicKey": subject_keypair.public_key().to_hex(),
-            "scope": scope,
-            "ttlSeconds": 3600
-        }))
-        .send()
-        .expect("send issue capability request");
-    assert_eq!(issue_response.status(), reqwest::StatusCode::OK);
-    let issue_body: Value = issue_response.json().expect("decode issue capability");
-    assert_eq!(
-        issue_body["schema"].as_str(),
-        Some("chio.capability-issuance-response-envelope.v2")
-    );
-    assert_eq!(
-        issue_body["body"]["schema"].as_str(),
-        Some("chio.capability-issuance-response.v1")
-    );
-    assert_eq!(
-        issue_body["body"]["requestNonce"].as_str(),
-        Some(request_nonce.as_str())
-    );
-    let capability_id = issue_body["body"]["capability"]["id"]
-        .as_str()
-        .expect("issued capability id")
-        .to_string();
+    let capability_id = "cap-scim-lifecycle-deprovision".to_string();
 
     let mut registry =
         ScimLifecycleRegistry::load(&scim_registry_path).expect("load scim registry");

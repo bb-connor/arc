@@ -768,3 +768,258 @@ fn request_receipt_metadata_treats_untyped_financial_extra_metadata_as_pass_thro
 
     assert!(governed.economic_authorization.is_none());
 }
+
+#[test]
+fn verified_credit_facility_bind_projects_a_native_iou_eligible_receipt() {
+    use chio_credit::obligation::{
+        verify_credit_facility_bind, CreditFacilityBindBodyV1, CreditFacilityBindInputV1,
+        CreditFacilityBindTrustInputV1, CreditFacilityBindTrustV1,
+        CreditFacilityBindVerificationContextV1, SignedCreditFacilityBindV1,
+    };
+
+    let authority = Keypair::generate();
+    let debtor = Keypair::generate();
+    let creditor = Keypair::generate();
+    let approver = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-credit-native".to_string(),
+            issuer: debtor.public_key(),
+            subject: debtor.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 100,
+            expires_at: 200,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &debtor,
+    )
+    .expect("credit capability should sign");
+    let governed_intent = GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent-credit-native".to_string(),
+            server_id: "srv-credit".to_string(),
+            tool_name: "purchase".to_string(),
+            purpose: "buy governed service".to_string(),
+            max_amount: Some(chio_core::capability::scope::MonetaryAmount {
+                units: 230,
+                currency: "USD".to_string(),
+            }),
+            commerce: Some(chio_core::capability::governance::GovernedCommerceContext {
+                seller: "seller-credit".to_string(),
+                shared_payment_token_id: "facility-credit-native".to_string(),
+                settlement_destination_ref: Some("acct:seller-credit".to_string()),
+            }),
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: None,
+        },
+    );
+    let intent_digest = governed_intent
+        .binding_hash()
+        .expect("credit intent should hash");
+    let approval = chio_core::capability::governance::GovernedApprovalToken::sign(
+        chio_core::capability::governance::GovernedApprovalTokenBody {
+            id: "approval-credit-native".to_string(),
+            approver: approver.public_key(),
+            subject: capability.subject.clone(),
+            governed_intent_hash: intent_digest.clone(),
+            threshold_proposal_hash: None,
+            request_id: "req-credit-native".to_string(),
+            issued_at: 100,
+            expires_at: 200,
+            decision: chio_core::capability::governance::GovernedApprovalDecision::Approved,
+        },
+        &approver,
+    )
+    .expect("credit approval should sign");
+    let approval_digest = approval
+        .token_digest()
+        .expect("credit approval should hash");
+    let bind_body = CreditFacilityBindBodyV1::new(CreditFacilityBindInputV1 {
+        operation_id: sha256_hex(b"credit-operation-native"),
+        request_id: "req-credit-native".to_string(),
+        economic_intent_digest: intent_digest.clone(),
+        facility_id: "facility-credit-native".to_string(),
+        facility_artifact_digest: sha256_hex(b"credit-facility-artifact"),
+        authority_set_digest: sha256_hex(b"credit-authority-set"),
+        debtor_id: capability.issuer.to_hex(),
+        original_creditor_id: "seller-credit".to_string(),
+        original_settlement_destination_ref: "acct:seller-credit".to_string(),
+        capability_id: capability.id.clone(),
+        tool_server: "srv-credit".to_string(),
+        tool_name: "purchase".to_string(),
+        amount: chio_core::capability::scope::MonetaryAmount {
+            units: 230,
+            currency: "USD".to_string(),
+        },
+        effective_ceiling: chio_core::capability::scope::MonetaryAmount {
+            units: 230,
+            currency: "USD".to_string(),
+        },
+        expected_exposure_version: 1,
+        expected_exposure_fence: 1,
+        due_at_unix_ms: 200_000,
+        action_nonce: "credit-action-native".to_string(),
+        issued_at_unix_ms: 140_000,
+        expires_at_unix_ms: 160_000,
+        authority_id: "credit-authority-native".to_string(),
+        authority_key_epoch: 1,
+        debtor_key_epoch: 1,
+        creditor_key_epoch: 1,
+    })
+    .expect("credit bind body should validate");
+    let signed_bind = SignedCreditFacilityBindV1::sign(bind_body, &authority, &debtor, &creditor)
+        .expect("credit bind should sign");
+    let canonical_bind = signed_bind
+        .canonical_bytes()
+        .expect("credit bind should canonicalize");
+    let bind_trust = CreditFacilityBindTrustV1::new(CreditFacilityBindTrustInputV1 {
+        authority_id: "credit-authority-native".to_string(),
+        authority_key: authority.public_key(),
+        authority_key_epoch: 1,
+        debtor_id: capability.issuer.to_hex(),
+        debtor_key: debtor.public_key(),
+        debtor_key_epoch: 1,
+        creditor_id: "seller-credit".to_string(),
+        creditor_key: creditor.public_key(),
+        creditor_key_epoch: 1,
+        max_lifetime_ms: 30_000,
+    })
+    .expect("credit bind trust should validate");
+    let verified_bind = verify_credit_facility_bind(
+        &canonical_bind,
+        &CreditFacilityBindVerificationContextV1 {
+            trust: &bind_trust,
+            trusted_at_unix_ms: 150_000,
+        },
+    )
+    .expect("credit bind should verify");
+    let payee_binding = crate::kernel::VerifiedGovernedPayeeBinding::for_test(
+        "seller-credit",
+        "acct:seller-credit",
+        &intent_digest,
+        &approval_digest,
+    )
+    .expect("payee binding should validate")
+    .with_credit_facility_bind(verified_bind.clone());
+    let request = ToolCallRequest {
+        request_id: "req-credit-native".to_string(),
+        capability: capability.clone(),
+        tool_name: "purchase".to_string(),
+        server_id: "srv-credit".to_string(),
+        agent_id: capability.subject.to_hex(),
+        arguments: serde_json::json!({ "sku": "compute-1" }),
+        supplemental_authorization: Some(
+            chio_core::OpaqueSupplementalAuthorization::new(
+                chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA,
+                canonical_bind,
+            )
+            .expect("credit bind should fit the authorization boundary"),
+        ),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(governed_intent),
+        approval_token: Some(approval),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let financial = FinancialReceiptMetadata {
+        grant_index: 0,
+        cost_charged: 230,
+        currency: "USD".to_string(),
+        budget_remaining: 770,
+        budget_total: 1_000,
+        delegation_depth: 0,
+        root_budget_holder: capability.issuer.to_hex(),
+        payment_reference: None,
+        settlement_status: SettlementStatus::Pending,
+        cost_breakdown: None,
+        oracle_evidence: None,
+        attempted_cost: None,
+    };
+    let extra_metadata = serde_json::json!({ "financial": financial });
+    let mut metadata = merge_metadata_objects(
+        request_receipt_metadata_with_payee_binding(
+            &request,
+            None,
+            150,
+            Some(&extra_metadata),
+            Some(&payee_binding),
+        )
+        .expect("credit receipt metadata should build"),
+        Some(extra_metadata),
+    )
+    .expect("credit receipt metadata should exist");
+    metadata
+        .as_object_mut()
+        .expect("credit receipt metadata should be an object")
+        .insert(
+            "receipt_context".to_string(),
+            serde_json::json!({ "request_id": request.request_id }),
+        );
+    let receipt_key = Keypair::generate();
+    let receipt = chio_core::receipt::body::ChioReceipt::sign(
+        chio_core::receipt::body::ChioReceiptBody {
+            id: "rcpt-credit-native".to_string(),
+            timestamp: 150,
+            capability_id: capability.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            action: chio_core::receipt::decision::ToolCallAction::from_parameters(
+                request.arguments.clone(),
+            )
+            .expect("credit receipt action should hash"),
+            decision: Some(chio_core::receipt::decision::Decision::Allow),
+            receipt_kind: chio_core::receipt::kinds::ReceiptKind::MediatedDecision,
+            boundary_class: chio_core::receipt::kinds::BoundaryClass::Prevent,
+            observation_outcome: None,
+            tool_origin: chio_core::receipt::kinds::ToolOrigin::CallerExecuted,
+            redaction_mode: chio_core::receipt::kinds::RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash: sha256_hex(br#"{"ok":true}"#),
+            policy_hash: sha256_hex(b"credit-policy"),
+            evidence: Vec::new(),
+            metadata: Some(metadata),
+            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: receipt_key.public_key(),
+            bbs_projection_version: None,
+        },
+        &receipt_key,
+    )
+    .expect("credit receipt should sign");
+
+    chio_credit::validate_credit_facility_election(&receipt)
+        .expect("native kernel metadata should explicitly elect the verified credit facility");
+    let economic = receipt
+        .governed_transaction_metadata()
+        .and_then(|governed| governed.economic_authorization)
+        .expect("credit receipt should carry economic authorization");
+    assert_eq!(economic.rail.kind, "credit_facility");
+    assert_eq!(
+        economic.credit_authority_digest.as_deref(),
+        Some(verified_bind.artifact_digest())
+    );
+
+    let mismatched_financial = FinancialReceiptMetadata {
+        cost_charged: 229,
+        ..financial
+    };
+    let error = request_receipt_metadata_with_payee_binding(
+        &request,
+        None,
+        150,
+        Some(&serde_json::json!({ "financial": mismatched_financial })),
+        Some(&payee_binding),
+    )
+    .expect_err("final cost drift must fail closed");
+    assert!(error
+        .to_string()
+        .contains("credit-facility bind does not match final financial metadata"));
+}

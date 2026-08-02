@@ -8,7 +8,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("snapshot-budget-holds");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_late, late_url) = nodes[0].clone();
@@ -76,39 +76,57 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
 
     let authorize = post_json_eventually_ok_with_diagnostics(
         &client,
-        &format!("{url_b}/v1/budgets/authorize-exposure"),
+        &format!("{url_b}/v1/budgets/authorize-hold"),
         service_token,
-        &json!({
-            "capabilityId": "cap-snapshot-hold",
-            "grantIndex": 0,
-            "maxInvocations": 5,
-            "exposureUnits": 90,
-            "maxExposurePerInvocation": 100,
-            "maxTotalExposureUnits": 400,
-            "holdId": "cap-snapshot-hold-1",
-            "eventId": "cap-snapshot-hold-1:authorize"
-        }),
+        &composite_authorize_payload(
+            "cap-snapshot-hold",
+            0,
+            90,
+            100,
+            400,
+            5,
+            "cap-snapshot-hold-1",
+            "cap-snapshot-hold-1:authorize",
+        ),
         "snapshot hold authorization reaches quorum",
         Duration::from_secs(90),
         || cluster_status_diagnostics(&client, &warm_urls, service_token),
     );
     assert_eq!(authorize["allowed"].as_bool(), Some(true));
-    assert_expected_write_visibility_metadata(&authorize, &warm_leader_url);
+    assert_budget_authority_metadata(&authorize, &warm_leader_url, "ha_linearizable");
+    assert_budget_commit_metadata(
+        &authorize,
+        &warm_leader_url,
+        2,
+        2,
+        &[url_a.as_str(), url_b.as_str()],
+    );
 
     let release = post_json(
         &client,
         &format!("{url_a}/v1/budgets/reconcile-spend"),
         service_token,
         &json!({
+            "operationId": authorize["operationId"].clone(),
+            "requestBindingHash": authorize["requestBindingHash"].clone(),
             "capabilityId": "cap-snapshot-hold",
             "grantIndex": 0,
             "reductionUnits": 30,
             "holdId": "cap-snapshot-hold-1",
-            "eventId": "cap-snapshot-hold-1:release"
+            "eventId": "cap-snapshot-hold-1:release",
+            "budgetAuthority": {
+                "authorityId": authorize["budgetAuthority"]["authorityId"].clone(),
+                "leaseId": authorize["budgetAuthority"]["leaseId"].clone(),
+                "leaseEpoch": authorize["budgetAuthority"]["leaseEpoch"].clone()
+            }
         }),
     );
     assert_eq!(release["releasedExposureUnits"].as_u64(), Some(30));
-    assert_expected_write_visibility_metadata(&release, &warm_leader_url);
+    let release_authority = release["budgetAuthority"]["authorityId"]
+        .as_str()
+        .expect("release budget authority");
+    assert_budget_authority_metadata(&release, release_authority, "ha_linearizable");
+    assert_eq!(release["budgetCommit"]["quorumCommitted"].as_bool(), Some(true));
     assert_budget_invocation_count(
         &client,
         &warm_leader_url,
@@ -194,16 +212,30 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         &format!("{late_url}/v1/budgets/reconcile-spend"),
         service_token,
         &json!({
+            "operationId": authorize["operationId"].clone(),
+            "requestBindingHash": authorize["requestBindingHash"].clone(),
             "capabilityId": "cap-snapshot-hold",
             "grantIndex": 0,
             "authorizedExposureUnits": 60,
             "realizedSpendUnits": 45,
             "holdId": "cap-snapshot-hold-1",
-            "eventId": "cap-snapshot-hold-1:reconcile"
+            "eventId": "cap-snapshot-hold-1:reconcile",
+            "budgetAuthority": {
+                "authorityId": authorize["budgetAuthority"]["authorityId"].clone(),
+                "leaseId": authorize["budgetAuthority"]["leaseId"].clone(),
+                "leaseEpoch": authorize["budgetAuthority"]["leaseEpoch"].clone()
+            }
         }),
     );
     assert_eq!(reconcile["releasedExposureUnits"].as_u64(), Some(15));
-    assert_leader_visible_metadata(&reconcile);
+    let reconcile_authority = reconcile["budgetAuthority"]["authorityId"]
+        .as_str()
+        .expect("reconcile budget authority");
+    assert_budget_authority_metadata(&reconcile, reconcile_authority, "ha_linearizable");
+    assert_eq!(
+        reconcile["budgetCommit"]["quorumCommitted"].as_bool(),
+        Some(true)
+    );
     assert_budget_totals(
         &client,
         &late_url,
@@ -248,7 +280,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
 
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir().join("multi-region-qualification");
-    fs::create_dir_all(&dir).expect("create test dir");
+    create_private_test_dir(&dir);
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();
