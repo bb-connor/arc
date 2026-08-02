@@ -15,12 +15,14 @@ use sigstore_types::{Bundle, SignatureBytes, TransparencyLogEntry};
 ///
 /// # Arguments
 /// * `bundle` - The bundle containing transparency log entries
+/// * `content_bound_entry_indices` - Entries cryptographically bound to the verified content
 /// * `trusted_root` - Trusted root for cryptographic verification
 /// * `not_before` - Certificate validity start time (Unix timestamp)
 /// * `not_after` - Certificate validity end time (Unix timestamp)
 /// * `clock_skew_seconds` - Tolerance in seconds for future time checks
 pub fn verify_tlog_entries(
     bundle: &Bundle,
+    content_bound_entry_indices: &[usize],
     trusted_root: &TrustedRoot,
     not_before: i64,
     not_after: i64,
@@ -29,7 +31,16 @@ pub fn verify_tlog_entries(
     crate::verify::validate_clock_skew_seconds(clock_skew_seconds)?;
     let mut integrated_time_result: Option<i64> = None;
 
-    for entry in &bundle.verification_material.tlog_entries {
+    for &entry_index in content_bound_entry_indices {
+        let entry = bundle
+            .verification_material
+            .tlog_entries
+            .get(entry_index)
+            .ok_or_else(|| {
+                Error::Verification(format!(
+                    "content-bound transparency log entry index {entry_index} is out of range"
+                ))
+            })?;
         // Verify checkpoint signature if present
         if let Some(ref inclusion_proof) = entry.inclusion_proof {
             verify_inclusion_proof(entry, inclusion_proof, trusted_root)?;
@@ -74,7 +85,8 @@ pub fn verify_tlog_entries(
                 )));
             }
 
-            integrated_time_result = Some(time);
+            integrated_time_result =
+                Some(integrated_time_result.map_or(time, |current_time| current_time.min(time)));
         }
     }
 
@@ -289,6 +301,7 @@ mod tests {
 
         let integrated_time = verify_tlog_entries(
             &bundle,
+            &[0],
             &TrustedRoot::production().expect("production root"),
             certificate_info.not_before,
             certificate_info.not_after,
@@ -309,6 +322,7 @@ mod tests {
 
         verify_tlog_entries(
             &bundle,
+            &[0],
             &TrustedRoot::production().expect("production root"),
             certificate_info.not_before,
             certificate_info.not_after,
@@ -321,6 +335,7 @@ mod tests {
 
         let error = verify_tlog_entries(
             &bundle,
+            &[0],
             &TrustedRoot::production().expect("production root"),
             certificate_info.not_before,
             certificate_info.not_after,

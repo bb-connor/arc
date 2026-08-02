@@ -306,6 +306,7 @@ impl Verifier {
                     &signature,
                     &self.trusted_root,
                     verified_tlog_content
+                        .as_ref()
                         .and_then(|verified| verified.v1_integrated_time_with_promise),
                 )?
             } else {
@@ -333,6 +334,7 @@ impl Verifier {
                 crate::verify_impl::helpers::determine_validation_time_from_tlog(
                     bundle,
                     verified_tlog_content
+                        .as_ref()
                         .and_then(|verified| verified.v1_integrated_time_with_promise),
                 )?,
             )
@@ -393,6 +395,9 @@ impl Verifier {
         if policy.verify_tlog {
             let integrated_time = crate::verify_impl::tlog::verify_tlog_entries(
                 bundle,
+                verified_tlog_content
+                    .as_ref()
+                    .map_or(&[], |verified| verified.entry_indices.as_slice()),
                 &self.trusted_root,
                 cert_info.not_before,
                 cert_info.not_after,
@@ -527,8 +532,9 @@ fn verify_message_signature(
     .map_err(|error| Error::Verification(format!("message signature verification failed: {error}")))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct VerifiedTransparencyLogContent {
+    entry_indices: Vec<usize>,
     entry_count: usize,
     v1_integrated_time_with_promise: Option<i64>,
 }
@@ -543,7 +549,7 @@ fn verify_transparency_log_content_binding(
             "transparency-log content binding requires a verifier identity".to_string(),
         )
     })?;
-    let (entry_indices, content_is_dsse) = match &bundle.content {
+    let (mut entry_indices, content_is_dsse) = match &bundle.content {
         SignatureContent::MessageSignature(_) => {
             let entry_indices = crate::verify_impl::verify_hashedrekord_entries(
                 bundle,
@@ -555,11 +561,15 @@ fn verify_transparency_log_content_binding(
         SignatureContent::DsseEnvelope(_) => {
             let mut entry_indices =
                 crate::verify_impl::verify_dsse_entries(bundle, expected_verifier)?;
-            entry_indices
-                .extend(crate::verify_impl::verify_intoto_entries(bundle, expected_verifier)?);
+            entry_indices.extend(crate::verify_impl::verify_intoto_entries(
+                bundle,
+                expected_verifier,
+            )?);
             (entry_indices, true)
         }
     };
+    entry_indices.sort_unstable();
+    entry_indices.dedup();
     for &index in &entry_indices {
         let entry = &bundle.verification_material.tlog_entries[index];
         if entry.inclusion_proof.is_none() && entry.inclusion_promise.is_none() {
@@ -590,8 +600,10 @@ fn verify_transparency_log_content_binding(
         })
         .map(|(_, entry)| entry.integrated_time)
         .min();
+    let entry_count = entry_indices.len();
     Ok(VerifiedTransparencyLogContent {
-        entry_count: entry_indices.len(),
+        entry_indices,
+        entry_count,
         v1_integrated_time_with_promise,
     })
 }
@@ -712,19 +724,6 @@ pub fn verify_with_key<'a>(
         }
     };
 
-    // Verify transparency log entries (checkpoints, SETs) without certificate time validation
-    for entry in &bundle.verification_material.tlog_entries {
-        // Verify checkpoint signature if present
-        if let Some(ref inclusion_proof) = entry.inclusion_proof {
-            crate::verify_impl::tlog::verify_inclusion_proof(entry, inclusion_proof, trusted_root)?;
-        }
-
-        // Verify inclusion promise (SET) if present
-        if entry.inclusion_promise.is_some() {
-            crate::verify_impl::tlog::verify_set(entry, trusted_root)?;
-        }
-    }
-
     // Verify the signature
     match &bundle.content {
         SignatureContent::MessageSignature(msg_sig) => {
@@ -755,19 +754,29 @@ pub fn verify_with_key<'a>(
         }
     }
 
-    if verify_transparency_log_content_binding(
+    let verified_tlog_content = verify_transparency_log_content_binding(
         bundle,
         &artifact,
         Some(crate::verify_impl::rekor::ExpectedDsseVerifier::PublicKey(
             public_key,
         )),
-    )?
-    .entry_count
-        == 0
-    {
+    )?;
+    if verified_tlog_content.entry_count == 0 {
         return Err(Error::Verification(
             "no transparency log entry is bound to the bundle content".to_string(),
         ));
+    }
+
+    // Verify only content-bound transparency log entries. An unrelated entry
+    // cannot add or remove authority for the artifact being verified.
+    for &entry_index in &verified_tlog_content.entry_indices {
+        let entry = &bundle.verification_material.tlog_entries[entry_index];
+        if let Some(ref inclusion_proof) = entry.inclusion_proof {
+            crate::verify_impl::tlog::verify_inclusion_proof(entry, inclusion_proof, trusted_root)?;
+        }
+        if entry.inclusion_promise.is_some() {
+            crate::verify_impl::tlog::verify_set(entry, trusted_root)?;
+        }
     }
 
     Ok(result)
@@ -1033,6 +1042,29 @@ mod tests {
             validation_time,
             bundle.verification_material.tlog_entries[0].integrated_time
         );
+    }
+
+    #[test]
+    fn unrelated_genuine_tlog_entry_does_not_change_content_bound_time() {
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let expected_integrated_time = bundle.verification_material.tlog_entries[0].integrated_time;
+        let unrelated = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("unrelated bundle");
+        let unrelated_entry = unrelated.verification_material.tlog_entries[0].clone();
+        assert_ne!(unrelated_entry.integrated_time, expected_integrated_time);
+        bundle
+            .verification_material
+            .tlog_entries
+            .push(unrelated_entry);
+
+        let result = verify(
+            COSIGN_V3_BLOB,
+            &bundle,
+            &VerificationPolicy::default(),
+            &TrustedRoot::production().expect("production root"),
+        )
+        .expect("an unrelated genuine log entry must not affect artifact verification");
+
+        assert_eq!(result.integrated_time, Some(expected_integrated_time));
     }
 
     #[test]
