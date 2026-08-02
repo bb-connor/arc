@@ -235,12 +235,15 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
     };
 
     assert_eq!(response.status().as_u16(), 502);
+    let receipt_id = response
+        .headers()
+        .get("x-chio-receipt-id")
+        .and_then(|value| value.to_str().ok())
+        .expect("bad-gateway denial must be linked to a finalized receipt");
+    assert!(!receipt_id.is_empty(), "receipt id must not be empty");
     let body = response.text().await.expect("read proxy response");
-    assert!(
-        body.contains("upstream error: link-local egress target denied")
-            && body.contains("169.254.169.254"),
-        "expected specific link-local contract denial, got: {body}"
-    );
+    assert_eq!(body, "upstream request failed");
+    assert!(!body.contains("169.254.169.254"));
 
     proxy_task.abort();
     let _ = upstream_handle.join();
@@ -298,14 +301,15 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
     };
 
     assert_eq!(response.status().as_u16(), 502);
+    let receipt_id = response
+        .headers()
+        .get("x-chio-receipt-id")
+        .and_then(|value| value.to_str().ok())
+        .expect("bad-gateway denial must be linked to a finalized receipt");
+    assert!(!receipt_id.is_empty(), "receipt id must not be empty");
     let body = response.text().await.expect("read proxy response");
-    assert!(
-        body.contains("upstream error:")
-            && body.contains("authority")
-            && body.contains(&target_addr.to_string())
-            && body.contains("not allowed by the HttpEgressContract"),
-        "expected specific loopback redirect contract denial, got: {body}"
-    );
+    assert_eq!(body, "upstream request failed");
+    assert!(!body.contains(&target_addr.to_string()));
 
     proxy_task.abort();
     let _ = upstream_handle.join();
@@ -365,11 +369,14 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
     };
 
     assert_eq!(response.status().as_u16(), 502);
+    let receipt_id = response
+        .headers()
+        .get("x-chio-receipt-id")
+        .and_then(|value| value.to_str().ok())
+        .expect("bad-gateway denial must be linked to a finalized receipt");
+    assert!(!receipt_id.is_empty(), "receipt id must not be empty");
     let body = response.text().await.expect("read proxy response");
-    assert!(
-        body.contains("upstream error: response size") && body.contains("exceeds maximum"),
-        "expected specific contract-backed oversized response denial, got: {body}"
-    );
+    assert_eq!(body, "upstream request failed");
 
     proxy_task.abort();
     let _ = upstream_handle.join();
