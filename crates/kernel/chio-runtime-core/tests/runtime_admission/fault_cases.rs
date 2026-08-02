@@ -376,6 +376,7 @@ fn runtime_hook_cleanup_request(
     let context = request
         .governed_intent
         .as_mut()
+        .and_then(GovernedTransactionIntent::as_tool_invocation_mut)
         .and_then(|intent| intent.context.as_mut())
         .and_then(serde_json::Value::as_object_mut)
         .ok_or_else(|| io::Error::other("governed runtime context missing"))?;
@@ -405,6 +406,8 @@ fn assert_treaty_consume_fault_preserves_same_admission_replay_marker(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -485,6 +488,8 @@ fn assert_swarm_consume_fault_releases_treaty_and_preserves_same_admission_marke
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -574,6 +579,8 @@ fn evaluator_bundle_panic_releases_only_observed_continuation_reservations(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -628,6 +635,8 @@ fn assert_destructive_release_fault_does_not_block_other_releases(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -709,6 +718,8 @@ fn mixed_release_failures_preserve_each_failed_id_and_reason(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);
@@ -772,6 +783,8 @@ fn ambiguous_release_failure_is_not_retried_after_same_admission_reacquire(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
 
     assert!(!decision.allowed);

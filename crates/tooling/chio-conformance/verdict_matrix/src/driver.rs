@@ -665,6 +665,7 @@ fn nonce_binding(
     response: &chio_kernel::ToolCallResponse,
 ) -> NonceBinding {
     NonceBinding {
+        request_id: request.request_id.clone(),
         subject_id: capability.subject.to_hex(),
         capability_id: capability.id.clone(),
         tool_server: request.server_id.clone(),

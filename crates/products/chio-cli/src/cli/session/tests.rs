@@ -1,5 +1,4 @@
 use super::*;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, path::PathBuf};
 use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -886,7 +885,8 @@ capabilities:
         Box::new(chio_kernel::InMemoryExecutionNonceStore::from_config(
             &nonce_config,
         )),
-    );
+    )
+    .expect("set execution nonce store");
 
     let session_agent_kp = Keypair::generate();
     let stolen_agent_kp = Keypair::generate();

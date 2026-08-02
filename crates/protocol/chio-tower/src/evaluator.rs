@@ -119,6 +119,7 @@ impl ChioEvaluator {
             policy_hash,
             receipt_store: None,
             revocation_store: None,
+            durable_admission: None,
             allow_ephemeral: false,
             identity_extractor: crate::identity::extract_identity,
             route_resolver: default_route_resolver,
@@ -345,10 +346,17 @@ pub struct ChioEvaluatorBuilder {
     policy_hash: String,
     receipt_store: Option<std::sync::Arc<dyn chio_kernel::ReceiptStore>>,
     revocation_store: Option<std::sync::Arc<dyn chio_kernel::RevocationStore>>,
+    durable_admission: Option<DurableAdmissionStores>,
     allow_ephemeral: bool,
     identity_extractor: IdentityExtractor,
     route_resolver: RouteResolver,
     fail_open: bool,
+}
+
+struct DurableAdmissionStores {
+    store: std::sync::Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
+    outcome_store: std::sync::Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
+    fence: chio_kernel::admission_operation::StoreMutationFence,
 }
 
 impl ChioEvaluatorBuilder {
@@ -364,6 +372,21 @@ impl ChioEvaluatorBuilder {
         store: std::sync::Arc<dyn chio_kernel::RevocationStore>,
     ) -> Self {
         self.revocation_store = Some(store);
+        self
+    }
+
+    #[must_use]
+    pub fn durable_admission_stores(
+        mut self,
+        store: std::sync::Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
+        outcome_store: std::sync::Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
+        fence: chio_kernel::admission_operation::StoreMutationFence,
+    ) -> Self {
+        self.durable_admission = Some(DurableAdmissionStores {
+            store,
+            outcome_store,
+            fence,
+        });
         self
     }
 
@@ -408,6 +431,13 @@ impl ChioEvaluatorBuilder {
         }
         if let Some(store) = self.revocation_store {
             builder = builder.revocation_store(store);
+        }
+        if let Some(durable) = self.durable_admission {
+            builder = builder.durable_admission_stores(
+                durable.store,
+                durable.outcome_store,
+                durable.fence,
+            );
         }
         let authority = builder
             .build(self.keypair, self.policy_hash)

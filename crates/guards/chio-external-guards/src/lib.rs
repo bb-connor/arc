@@ -305,6 +305,7 @@ mod tests {
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
             supplemental_authorization: None,
+            declassification_grant: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         };
@@ -406,6 +407,7 @@ mod tests {
             server_id: &out_server,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         guard
             .revalidate_before_dispatch(&out_context)
@@ -420,6 +422,7 @@ mod tests {
             server_id: &in_server,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         let decision = guard
             .evaluate(&in_context)

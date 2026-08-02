@@ -182,10 +182,15 @@ fn kernel_capability_checker_enforces_time_bounds_and_scope() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let now = now_secs();
-    let checker = test_kernel_capability_checker(
-        ChioKernel::new(test_kernel_config(&issuer)),
-        "proxy-server",
-    );
+    let shared = Arc::new(Mutex::new(MockStoreState::default()));
+    let mut kernel = ChioKernel::new(test_kernel_config(&issuer));
+    kernel
+        .set_receipt_store(Box::new(MockReceiptStore {
+            state: Arc::clone(&shared),
+            supports_checkpoints: false,
+        }))
+        .expect("test receipt store should install");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
 
     let valid = make_capability_token(
         &issuer,

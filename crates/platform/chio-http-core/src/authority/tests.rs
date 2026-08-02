@@ -520,7 +520,10 @@ fn builder_with_durable_stores_evaluates_without_persistence_deny(
             outcome_store,
             authority_store.mutation_fence(),
         )
-        .build(Keypair::generate(), sha256_hex(b"policy"))?;
+        .build(
+            Keypair::generate(),
+            chio_core_types::crypto::sha256_hex(b"policy"),
+        )?;
 
     let query = HashMap::new();
     let result = authority.evaluate(safe_get_input(&query)).test_unwrap();

@@ -99,17 +99,20 @@ fn strict_cosigner_pipeline_returns_a_verified_envelope() {
     let receipt = sample_receipt(&host);
     let cosigner =
         crate::bilateral::InProcessCoSigner::new("kernel.org-a", origin.clone(), host.public_key());
-    let envelope = sign_chio_bilateral_dsse_envelope_with_cosigner(
-        &receipt,
-        &origin.public_key(),
-        &host,
-        "kernel.org-a",
-        "kernel.org-b",
-        "file_read",
-        1_734_000_000_000,
-        strict_treaty_extensions(&receipt),
-        &cosigner,
-    )
+    let origin_public_key = origin.public_key();
+    let envelope = sign_chio_bilateral_dsse_envelope_with_cosigner(BilateralDsseCosigningInput {
+        invocation: BilateralDsseInvocationInput {
+            receipt: &receipt,
+            org_a_kernel_id: "kernel.org-a",
+            org_b_kernel_id: "kernel.org-b",
+            tool_name: "file_read",
+            timestamp_unix_ms: 1_734_000_000_000,
+            extensions: strict_treaty_extensions(&receipt),
+        },
+        org_a_public_key: &origin_public_key,
+        org_b_signer: &host,
+        org_a_cosigner: &cosigner,
+    })
     .expect("strict co-signing producer succeeds");
     verify_chio_bilateral_dsse_envelope(&envelope, &origin.public_key(), &host.public_key())
         .expect("producer returns a verified envelope");

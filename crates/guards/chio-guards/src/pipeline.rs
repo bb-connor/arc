@@ -341,6 +341,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         assert!(pipeline.requires_dispatch_revalidation());

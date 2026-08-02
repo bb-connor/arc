@@ -343,28 +343,30 @@ fn kernel_hook_immediate_dispatch_revalidation_rejects_advanced_trust_floor(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent-live-1".to_string(),
-        server_id: "vendor-ledger".to_string(),
-        tool_name: "close_account".to_string(),
-        purpose: "close governed vendor account".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-live-1",
-                "bundleSha256": bundle_hash
-            }
-        })),
-        body: Default::default(),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        GovernedToolInvocationIntentBody {
+            id: "intent-live-1".to_string(),
+            server_id: "vendor-ledger".to_string(),
+            tool_name: "close_account".to_string(),
+            purpose: "close governed vendor account".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-live-1",
+                    "bundleSha256": bundle_hash
+                }
+            })),
+        },
+    ));
 
     let hook = allowing_policy_hook(store.clone())?;
     assert!(hook.requires_dispatch_revalidation());
@@ -375,6 +377,8 @@ fn kernel_hook_immediate_dispatch_revalidation_rejects_advanced_trust_floor(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
     assert!(decision.allowed);
     let metadata = decision
@@ -436,6 +440,7 @@ fn kernel_hook_revalidates_non_runtime_request_without_admission_metadata(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -447,6 +452,8 @@ fn kernel_hook_revalidates_non_runtime_request_without_admission_metadata(
         now_unix_ms: 1_800_000_001_000,
         matched_grant_index: Some(0),
         local_kernel_id: "kernel.vendor-b".to_string(),
+        admission_operation_id: None,
+        admission_request_binding_hash: None,
     })?;
     assert!(decision.allowed);
     assert!(decision.metadata.is_none());

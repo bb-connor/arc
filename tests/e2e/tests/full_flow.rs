@@ -105,6 +105,7 @@ fn make_kernel_with_guards() -> (ChioKernel, Keypair) {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel
@@ -139,6 +140,7 @@ fn make_kernel_bare() -> (ChioKernel, Keypair) {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel
@@ -220,6 +222,7 @@ fn make_request(
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     }
@@ -485,6 +488,7 @@ async fn full_flow_revocation_cascade() {
         scope_hash: Some(scope_hash(&cap_a.scope).expect("hash delegated parent scope")),
         aggregate_budget: None,
         cumulative_approval: None,
+        aggregate_family_preservation: None,
     };
     let link = DelegationLink::sign(link_body, &agent_a_kp).expect("sign delegation link");
 
@@ -529,6 +533,7 @@ async fn full_flow_revocation_cascade() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
     };
     let resp_ok = kernel.evaluate_tool_call(&req_ok).await.unwrap();
     assert_eq!(
@@ -558,6 +563,7 @@ async fn full_flow_revocation_cascade() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
     };
     let resp_revoked = kernel.evaluate_tool_call(&req_revoked).await.unwrap();
 
@@ -684,6 +690,7 @@ async fn full_flow_guard_pipeline_mixed_verdicts() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
@@ -881,6 +888,7 @@ async fn full_flow_untrusted_issuer() {
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
+        declassification_grant: None,
     };
 
     let resp = kernel.evaluate_tool_call(&req).await.unwrap();

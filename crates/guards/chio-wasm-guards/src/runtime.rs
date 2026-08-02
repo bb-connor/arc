@@ -176,6 +176,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         guard.evaluate(&context).unwrap().verdict
     }
@@ -236,6 +237,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let decision = guard.evaluate(&context).unwrap();
@@ -276,6 +278,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let decision = guard.evaluate(&context).unwrap();
