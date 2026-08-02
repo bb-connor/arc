@@ -347,6 +347,58 @@ fn combined_manifest_authenticated_session_entrypoint_rejects_wrong_session() {
 }
 
 #[test]
+fn combined_manifest_authenticated_session_entrypoint_preserves_session_roots_and_lifecycle() {
+    let (mut kernel, request, registry, security) = manifest_security_local_fixture();
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "manifest-server",
+        vec!["echo"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    let session_id = SessionId::new("manifest-authenticated-session-roots");
+    kernel
+        .open_session_with_id(
+            session_id.clone(),
+            request.agent_id.clone(),
+            vec![request.capability.clone()],
+        )
+        .unwrap();
+    kernel
+        .replace_session_roots(
+            &session_id,
+            vec![RootDefinition {
+                uri: "file:///workspace".to_string(),
+                name: Some("workspace".to_string()),
+            }],
+        )
+        .unwrap();
+    kernel.activate_session(&session_id).unwrap();
+    let security_context = security_pre_dispatch_context_for(
+        &request,
+        "manifest-authenticated-session-roots",
+        24,
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
+            &request,
+            &registry,
+            &security,
+            None,
+            &session_id,
+            &security_context,
+        )
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        kernel.enforceable_filesystem_root_paths(&session_id).unwrap(),
+        vec!["/workspace".to_string()]
+    );
+}
+
+#[test]
 fn manifest_entrypoint_without_context_denies_enforced_dispatch() {
     let (mut kernel, request, registry, security) = manifest_security_local_fixture();
     let invocations = std::sync::Arc::new(AtomicU64::new(0));

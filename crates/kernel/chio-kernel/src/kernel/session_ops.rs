@@ -437,7 +437,7 @@ impl ChioKernel {
         Ok(())
     }
 
-    fn begin_or_resume_execution_nonce_request(
+    pub(crate) fn begin_or_resume_execution_nonce_request(
         &self,
         context: &OperationContext,
         operation_kind: OperationKind,
@@ -492,6 +492,29 @@ impl ChioKernel {
             &context.request_id,
             terminal_state,
         )
+    }
+
+    pub(crate) fn finish_session_tool_call_request(
+        &self,
+        context: &OperationContext,
+        result: &Result<ToolCallResponse, KernelError>,
+    ) -> Result<(), KernelError> {
+        let terminal_state = match result {
+            Ok(response) => response.terminal_state.clone(),
+            Err(KernelError::RequestCancelled { request_id, reason })
+                if request_id == &context.request_id =>
+            {
+                self.with_session_mut(&context.session_id, |session| {
+                    session.request_cancellation(&context.request_id)?;
+                    Ok(())
+                })?;
+                OperationTerminalState::Cancelled {
+                    reason: reason.clone(),
+                }
+            }
+            _ => OperationTerminalState::Completed,
+        };
+        self.finish_execution_nonce_request(context, result.as_ref().ok(), terminal_state)
     }
 
     /// Construct and register a child request under an existing parent request.
@@ -856,22 +879,7 @@ impl ChioKernel {
                 operation.extra_metadata.clone(),
             ),
         };
-        let terminal_state = match &result {
-            Ok(response) => response.terminal_state.clone(),
-            Err(KernelError::RequestCancelled { request_id, reason })
-                if request_id == &context.request_id =>
-            {
-                self.with_session_mut(&context.session_id, |session| {
-                    session.request_cancellation(&context.request_id)?;
-                    Ok(())
-                })?;
-                OperationTerminalState::Cancelled {
-                    reason: reason.clone(),
-                }
-            }
-            _ => OperationTerminalState::Completed,
-        };
-        self.finish_execution_nonce_request(context, result.as_ref().ok(), terminal_state)?;
+        self.finish_session_tool_call_request(context, &result)?;
         result
     }
 
@@ -1001,22 +1009,7 @@ impl ChioKernel {
                 .await
             }
         };
-        let terminal_state = match &result {
-            Ok(response) => response.terminal_state.clone(),
-            Err(KernelError::RequestCancelled { request_id, reason })
-                if request_id == &context.request_id =>
-            {
-                self.with_session_mut(&context.session_id, |session| {
-                    session.request_cancellation(&context.request_id)?;
-                    Ok(())
-                })?;
-                OperationTerminalState::Cancelled {
-                    reason: reason.clone(),
-                }
-            }
-            _ => OperationTerminalState::Completed,
-        };
-        self.finish_execution_nonce_request(context, result.as_ref().ok(), terminal_state)?;
+        self.finish_session_tool_call_request(context, &result)?;
         result
     }
 

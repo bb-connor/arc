@@ -103,14 +103,29 @@ impl ChioKernel {
             security,
             extra_metadata,
         )?;
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
-            request,
-            None,
-            Some(metadata),
-            Some(authenticated_session_id),
-            Some(security_context),
-            PreflightHoldDisposition::ReverseForRetry,
-        ))
+        let session_filesystem_roots =
+            self.session_enforceable_filesystem_root_paths_owned(authenticated_session_id)?;
+        let context = OperationContext::new(
+            authenticated_session_id.clone(),
+            RequestId::new(request.request_id.clone()),
+            request.agent_id.clone(),
+        );
+        self.begin_or_resume_execution_nonce_request(
+            &context,
+            OperationKind::ToolCall,
+            request.execution_nonce.as_ref(),
+        )?;
+        let result =
+            block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+                request,
+                Some(session_filesystem_roots.as_slice()),
+                Some(metadata),
+                Some(authenticated_session_id),
+                Some(security_context),
+                PreflightHoldDisposition::ReverseForRetry,
+            ));
+        self.finish_session_tool_call_request(&context, &result)?;
+        result
     }
 
     pub fn evaluate_tool_call_blocking_with_security_context(
