@@ -33,8 +33,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/rotation_unwitnessed_signing/mutants.out/outcomes.json",
-          "sha256": "71274db5305e64cc0bf7875b43e6627d1a2660fdc5d727585d4fd3eaabbe0138",
-          "inputs_sha256": "8165c01a36defa09ff546e8f24d001f0a9e579e0f4925b21a98a7673df95354c"
+          "sha256": "f1311fdc9e15340f8467cb77c10389d77b5f3f0436a10efd1aaf71d2cd718d16",
+          "inputs_sha256": "875a3c11c516f47688a7d6c6eb7660580d9631c671c6833abba19932c5e07fd6"
         }
       }
     ]

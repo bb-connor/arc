@@ -33,8 +33,8 @@
         },
         "outcomes": {
           "path": "audits/evidence/mutants/security/broker_orphan_hold/mutants.out/outcomes.json",
-          "sha256": "462e8b090d758701ac6a0606d3491afde2a264f69aff1c5a517fea99a8712e27",
-          "inputs_sha256": "80e148cdebf7ebe6bec4c0c81bc69d72fbb186f6ea7659658704ba18614bafcf"
+          "sha256": "0e3b04b05b1726096d0fbb7642f3f6cb739ca74cfbc9b7aa48af5ce8d936fe62",
+          "inputs_sha256": "ccae4127846c346069450e611fbded451502672f36750d7b22957e654261602f"
         }
       }
     ]

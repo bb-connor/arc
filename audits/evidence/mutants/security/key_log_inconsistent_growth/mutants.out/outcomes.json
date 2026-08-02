@@ -8,7 +8,7 @@
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 70.921999167,
+          "duration": 60.224632792,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -20,7 +20,7 @@
         },
         {
           "phase": "Test",
-          "duration": 9.725327917,
+          "duration": 10.266961041,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -44,22 +44,22 @@
             "return_type": "-> Result<()>",
             "span": {
               "start": {
-                "line": 445,
+                "line": 465,
                 "column": 5
               },
               "end": {
-                "line": 459,
+                "line": 479,
                 "column": 6
               }
             }
           },
           "span": {
             "start": {
-              "line": 447,
+              "line": 467,
               "column": 9
             },
             "end": {
-              "line": 458,
+              "line": 478,
               "column": 15
             }
           },
@@ -68,12 +68,12 @@
         }
       },
       "summary": "CaughtMutant",
-      "log_path": "log/crates__core__chio-core-types__src__merkle.rs_line_447_col_9.log",
-      "diff_path": "diff/crates__core__chio-core-types__src__merkle.rs_line_447_col_9.diff",
+      "log_path": "log/crates__core__chio-core-types__src__merkle.rs_line_467_col_9.log",
+      "diff_path": "diff/crates__core__chio-core-types__src__merkle.rs_line_467_col_9.diff",
       "phase_results": [
         {
           "phase": "Build",
-          "duration": 18.136066458,
+          "duration": 13.929324208,
           "process_status": "Success",
           "argv": [
             "cargo",
@@ -85,7 +85,7 @@
         },
         {
           "phase": "Test",
-          "duration": 4.8998205,
+          "duration": 7.991455792,
           "process_status": {
             "Failure": 101
           },
