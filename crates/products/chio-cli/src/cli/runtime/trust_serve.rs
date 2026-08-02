@@ -75,6 +75,20 @@ pub(super) fn authority_workload_capabilities(
                 }
             }
         }
+        for grant in &mut capability.scope.resource_grants {
+            for operation in &issuance_operations {
+                if !grant.operations.contains(operation) {
+                    grant.operations.push(operation.clone());
+                }
+            }
+        }
+        for grant in &mut capability.scope.prompt_grants {
+            for operation in &issuance_operations {
+                if !grant.operations.contains(operation) {
+                    grant.operations.push(operation.clone());
+                }
+            }
+        }
     }
     capabilities
 }

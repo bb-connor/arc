@@ -1,6 +1,6 @@
 
 use super::*;
-use chio_core::capability::scope::Operation;
+use chio_core::capability::scope::{Operation, PromptGrant, ResourceGrant};
 
 #[test]
 fn authority_workload_ceiling_includes_policy_gated_operations() {
@@ -9,7 +9,20 @@ fn authority_workload_ceiling_includes_policy_gated_operations() {
         .nth(3)
         .expect("workspace root")
         .join("examples/policies/hushspec-reputation.yaml");
-    let loaded = load_policy(&policy_path).expect("load reputation policy");
+    let mut loaded = load_policy(&policy_path).expect("load reputation policy");
+    let default = loaded
+        .default_capabilities
+        .first_mut()
+        .expect("default workload capability");
+    let original_ttl = default.ttl;
+    default.scope.resource_grants.push(ResourceGrant {
+        uri_pattern: "repo://security/*".to_string(),
+        operations: vec![Operation::Read],
+    });
+    default.scope.prompt_grants.push(PromptGrant {
+        prompt_name: "security-review".to_string(),
+        operations: vec![Operation::Get],
+    });
     let capabilities = trust_serve::authority_workload_capabilities(&loaded);
     let read_file = capabilities
         .iter()
@@ -21,6 +34,49 @@ fn authority_workload_ceiling_includes_policy_gated_operations() {
     assert!(read_file.operations.contains(&Operation::Read));
     assert!(read_file.operations.contains(&Operation::Get));
     assert!(read_file.operations.contains(&Operation::Delegate));
+
+    let capability = capabilities
+        .first()
+        .expect("expanded workload capability");
+    assert_eq!(capability.ttl, original_ttl);
+    let resource = capability
+        .scope
+        .resource_grants
+        .iter()
+        .find(|grant| grant.uri_pattern == "repo://security/*")
+        .expect("resource workload grant");
+    let prompt = capability
+        .scope
+        .prompt_grants
+        .iter()
+        .find(|grant| grant.prompt_name == "security-review")
+        .expect("prompt workload grant");
+
+    for operation in [
+        Operation::Invoke,
+        Operation::Read,
+        Operation::Get,
+        Operation::Delegate,
+    ] {
+        assert_eq!(
+            resource
+                .operations
+                .iter()
+                .filter(|candidate| **candidate == operation)
+                .count(),
+            1,
+            "resource operation must be present exactly once: {operation:?}"
+        );
+        assert_eq!(
+            prompt
+                .operations
+                .iter()
+                .filter(|candidate| **candidate == operation)
+                .count(),
+            1,
+            "prompt operation must be present exactly once: {operation:?}"
+        );
+    }
 }
 
 #[test]
