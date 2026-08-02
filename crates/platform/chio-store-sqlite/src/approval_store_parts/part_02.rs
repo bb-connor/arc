@@ -61,6 +61,24 @@ impl ApprovalStore for SqliteApprovalStore {
         &self,
         filter: &ApprovalFilter,
     ) -> Result<Vec<ApprovalRequest>, ApprovalStoreError> {
+        let not_expired_at = filter
+            .not_expired_at
+            .map(|value| {
+                i64::try_from(value).map_err(|_| {
+                    ApprovalStoreError::Invalid(
+                        "not_expired_at exceeds SQLite INTEGER range".to_string(),
+                    )
+                })
+            })
+            .transpose()?;
+        let limit = filter
+            .limit
+            .map(|value| {
+                i64::try_from(value).map_err(|_| {
+                    ApprovalStoreError::Invalid("limit exceeds SQLite INTEGER range".to_string())
+                })
+            })
+            .transpose()?;
         let conn = self
             .pool
             .get()
@@ -75,11 +93,11 @@ impl ApprovalStore for SqliteApprovalStore {
         if filter.tool_name.is_some() {
             sql.push_str(" AND tool_name = :tool_name");
         }
-        if filter.not_expired_at.is_some() {
+        if not_expired_at.is_some() {
             sql.push_str(" AND expires_at > :not_expired_at");
         }
         sql.push_str(" ORDER BY created_at ASC");
-        if filter.limit.is_some() {
+        if limit.is_some() {
             sql.push_str(" LIMIT :limit");
         }
 
@@ -97,11 +115,11 @@ impl ApprovalStore for SqliteApprovalStore {
         if let Some(s) = &filter.tool_name {
             params_vec.push((":tool_name", Box::new(s.clone())));
         }
-        if let Some(t) = &filter.not_expired_at {
-            params_vec.push((":not_expired_at", Box::new(*t as i64)));
+        if let Some(t) = not_expired_at {
+            params_vec.push((":not_expired_at", Box::new(t)));
         }
-        if let Some(limit) = &filter.limit {
-            params_vec.push((":limit", Box::new(*limit as i64)));
+        if let Some(limit) = limit {
+            params_vec.push((":limit", Box::new(limit)));
         }
 
         let refs: Vec<(&str, &dyn rusqlite::ToSql)> = params_vec
@@ -1217,10 +1235,9 @@ mod tests {
     fn receipt_colocated_approval_pool_rejects_post_open_path_rebinding() {
         use std::os::unix::fs::OpenOptionsExt;
 
-        let directory = chio_test_support::private_fs::private_tempdir(
-            "receipt-colocated-approval-rebind",
-        )
-        .test_expect("create private receipt approval directory");
+        let directory =
+            chio_test_support::private_fs::private_tempdir("receipt-colocated-approval-rebind")
+                .test_expect("create private receipt approval directory");
         let directory = fs::canonicalize(directory.path()).unwrap();
         let path = directory.join("receipt-approval.sqlite3");
         let displaced = directory.join("receipt-approval-displaced.sqlite3");

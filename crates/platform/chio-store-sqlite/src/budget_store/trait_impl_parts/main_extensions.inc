@@ -262,7 +262,10 @@ fn advance_payment_journal(
     let (settle_action, settle_amount) = match settle {
         Some(intent) => (
             Some(settle_action_str(intent.action)),
-            intent.amount_units.map(|units| units.min(i64::MAX as u64) as i64),
+            optional_payment_journal_u64_to_sqlite(
+                intent.amount_units,
+                "payment settle_amount_units",
+            )?,
         ),
         None => (None, None),
     };

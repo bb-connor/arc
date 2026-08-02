@@ -620,6 +620,63 @@ fn payment_journal_insert_advance_close_and_conflict() {
 }
 
 #[test]
+fn payment_journal_rejects_values_outside_sqlite_integer_range() {
+    use chio_kernel::budget_store::BudgetStore;
+    use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};
+
+    let store = SqliteBudgetStore::open_in_memory().expect("open budget store");
+    let record = PaymentJournalRecord {
+        request_id: "req-overflow-amount".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        admission_operation: None,
+        authority: None,
+        hold_id: Some("hold-overflow".to_string()),
+        rail: "prepaid".to_string(),
+        authorization_id: None,
+        transaction_id: None,
+        budget_exposure_units: 0,
+        amount_units: (i64::MAX as u64) + 1,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1_000,
+        tenant_id: None,
+    };
+
+    let amount_error = store
+        .record_payment_journal(&record)
+        .expect_err("an unrepresentable payment amount must fail closed");
+    assert!(matches!(amount_error, BudgetStoreError::Overflow(_)));
+    assert!(amount_error
+        .to_string()
+        .contains("payment amount_units exceeds SQLite INTEGER range"));
+    assert!(store
+        .get_payment_journal(&record.request_id)
+        .expect("read journal after rejected amount")
+        .is_none());
+
+    let exposure_record = PaymentJournalRecord {
+        request_id: "req-overflow-exposure".to_string(),
+        amount_units: 1,
+        budget_exposure_units: (i64::MAX as u64) + 1,
+        ..record
+    };
+    let exposure_error = store
+        .record_payment_journal(&exposure_record)
+        .expect_err("an unrepresentable budget exposure must fail closed");
+    assert!(matches!(exposure_error, BudgetStoreError::Overflow(_)));
+    assert!(exposure_error
+        .to_string()
+        .contains("payment budget_exposure_units exceeds SQLite INTEGER range"));
+    assert!(store
+        .get_payment_journal(&exposure_record.request_id)
+        .expect("read journal after rejected exposure")
+        .is_none());
+}
+
+#[test]
 fn payment_journal_capture_intent_can_be_restaged_after_exact_rail_recovery() {
     use chio_kernel::budget_store::BudgetStore;
     use chio_kernel::payment::{

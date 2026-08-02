@@ -262,6 +262,36 @@ fn filter_list_by_subject_and_server() {
 }
 
 #[test]
+fn pending_filter_rejects_values_outside_sqlite_integer_range() {
+    let store = SqliteApprovalStore::open_in_memory().test_unwrap();
+    store
+        .store_pending(&sample_request("a-overflow", "h-overflow"))
+        .test_unwrap();
+
+    let timestamp_error = store
+        .list_pending(&ApprovalFilter {
+            not_expired_at: Some(u64::MAX),
+            ..Default::default()
+        })
+        .test_unwrap_err();
+    assert!(matches!(timestamp_error, ApprovalStoreError::Invalid(_)));
+    assert!(timestamp_error
+        .to_string()
+        .contains("not_expired_at exceeds SQLite INTEGER range"));
+
+    let limit_error = store
+        .list_pending(&ApprovalFilter {
+            limit: Some(usize::MAX),
+            ..Default::default()
+        })
+        .test_unwrap_err();
+    assert!(matches!(limit_error, ApprovalStoreError::Invalid(_)));
+    assert!(limit_error
+        .to_string()
+        .contains("limit exceeds SQLite INTEGER range"));
+}
+
+#[test]
 fn resolve_marks_approved_and_records_consumption() {
     let store = SqliteApprovalStore::open_in_memory().test_unwrap();
     let approver = Keypair::generate();

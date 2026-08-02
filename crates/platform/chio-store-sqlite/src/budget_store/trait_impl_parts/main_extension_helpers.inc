@@ -178,6 +178,26 @@ fn journal_now_unix_ms() -> i64 {
         .unwrap_or(0)
 }
 
+fn payment_journal_u64_to_sqlite(
+    value: u64,
+    field_name: &'static str,
+) -> Result<i64, BudgetStoreError> {
+    i64::try_from(value).map_err(|_| {
+        BudgetStoreError::Overflow(format!(
+            "{field_name} exceeds SQLite INTEGER range: {value}"
+        ))
+    })
+}
+
+fn optional_payment_journal_u64_to_sqlite(
+    value: Option<u64>,
+    field_name: &'static str,
+) -> Result<Option<i64>, BudgetStoreError> {
+    value
+        .map(|value| payment_journal_u64_to_sqlite(value, field_name))
+        .transpose()
+}
+
 pub(super) fn insert_payment_journal_tx(
     transaction: &rusqlite::Transaction<'_>,
     entry: &chio_kernel::payment::PaymentJournalRecord,
@@ -191,6 +211,23 @@ pub(super) fn insert_payment_journal_tx(
         .admission_operation
         .as_ref()
         .map(BudgetAdmissionOperationBinding::request_binding_hash);
+    let sqlite_lease_epoch = entry
+        .authority
+        .as_ref()
+        .map(|value| payment_journal_u64_to_sqlite(value.lease_epoch, "payment lease_epoch"))
+        .transpose()?;
+    let sqlite_budget_exposure_units = payment_journal_u64_to_sqlite(
+        entry.budget_exposure_units,
+        "payment budget_exposure_units",
+    )?;
+    let sqlite_amount_units =
+        payment_journal_u64_to_sqlite(entry.amount_units, "payment amount_units")?;
+    let sqlite_settle_amount_units = optional_payment_journal_u64_to_sqlite(
+        entry.settle_amount_units,
+        "payment settle_amount_units",
+    )?;
+    let sqlite_created_at =
+        payment_journal_u64_to_sqlite(entry.created_at_unix_ms, "payment created_at_unix_ms")?;
     let changed = transaction.execute(
         "INSERT INTO payment_journal (request_id, capability_id, grant_index, operation_id, \
          request_binding_hash, authority_id, lease_id, lease_epoch, hold_id, rail, \
@@ -206,25 +243,26 @@ pub(super) fn insert_payment_journal_tx(
             i64::from(entry.grant_index),
             operation_id,
             request_binding_hash,
-            entry.authority.as_ref().map(|value| value.authority_id.as_str()),
-            entry.authority.as_ref().map(|value| value.lease_id.as_str()),
             entry
                 .authority
                 .as_ref()
-                .map(|value| value.lease_epoch.min(i64::MAX as u64) as i64),
+                .map(|value| value.authority_id.as_str()),
+            entry
+                .authority
+                .as_ref()
+                .map(|value| value.lease_id.as_str()),
+            sqlite_lease_epoch,
             entry.hold_id,
             entry.rail,
             entry.authorization_id,
             entry.transaction_id,
-            entry.budget_exposure_units.min(i64::MAX as u64) as i64,
-            entry.amount_units.min(i64::MAX as u64) as i64,
+            sqlite_budget_exposure_units,
+            sqlite_amount_units,
             entry.settle_action.map(settle_action_str),
-            entry
-                .settle_amount_units
-                .map(|units| units.min(i64::MAX as u64) as i64),
+            sqlite_settle_amount_units,
             entry.currency,
             journal_state_str(entry.state),
-            entry.created_at_unix_ms.min(i64::MAX as u64) as i64,
+            sqlite_created_at,
             journal_now_unix_ms(),
             entry.tenant_id,
         ],
@@ -280,19 +318,14 @@ pub(super) fn insert_payment_journal_tx(
                     .authority
                     .as_ref()
                     .map(|value| value.lease_id.as_str());
-                let expected_lease_epoch = entry
-                    .authority
-                    .as_ref()
-                    .map(|value| value.lease_epoch.min(i64::MAX as u64) as i64);
                 if hold_id == entry.hold_id
                     && operation_id.as_deref() == operation_id_for_entry(entry)
                     && request_binding_hash.as_deref() == request_binding_hash_for_entry(entry)
                     && authority_id.as_deref() == expected_authority_id
                     && lease_id.as_deref() == expected_lease_id
-                    && lease_epoch == expected_lease_epoch
-                    && budget_exposure_units
-                        == entry.budget_exposure_units.min(i64::MAX as u64) as i64
-                    && amount_units == entry.amount_units.min(i64::MAX as u64) as i64
+                    && lease_epoch == sqlite_lease_epoch
+                    && budget_exposure_units == sqlite_budget_exposure_units
+                    && amount_units == sqlite_amount_units
                 {
                     return Ok(());
                 }
@@ -306,9 +339,7 @@ pub(super) fn insert_payment_journal_tx(
     Ok(())
 }
 
-fn operation_id_for_entry(
-    entry: &chio_kernel::payment::PaymentJournalRecord,
-) -> Option<&str> {
+fn operation_id_for_entry(entry: &chio_kernel::payment::PaymentJournalRecord) -> Option<&str> {
     entry
         .admission_operation
         .as_ref()
