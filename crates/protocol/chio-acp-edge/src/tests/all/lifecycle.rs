@@ -376,10 +376,19 @@
         let subject = Keypair::generate();
         let capability = capability_for_tool(&issuer, &subject, "streaming-srv", "search_stream");
         let agent_id = subject.public_key().to_hex();
+        let session_id = SessionId::new("session-acp-deferred");
+        kernel
+            .open_session_with_id(
+                session_id.clone(),
+                agent_id.clone(),
+                vec![capability.clone()],
+            )
+            .test_unwrap();
+        kernel.activate_session(&session_id).test_unwrap();
         let mut execution = AcpKernelExecutionContext {
             capability,
             agent_id,
-            session_id: SessionId::new("session-acp-deferred"),
+            session_id: session_id.clone(),
             dpop_proof: None,
             execution_nonce: None,
             governed_intent: None,
@@ -398,7 +407,7 @@
         ));
         let resolved_generations = Arc::new(Mutex::new(Vec::new()));
         edge.set_deferred_security_context_authority(
-            SessionId::new("session-acp-deferred"),
+            session_id,
             Arc::new(RecordingSecurityContextAuthority {
                 generation: 2,
                 resolved_generations: Arc::clone(&resolved_generations),
@@ -469,7 +478,8 @@
         );
         assert_eq!(
             resumed["result"]["task"]["status"].as_str(),
-            Some("completed")
+            Some("completed"),
+            "{resumed:?}"
         );
         assert_eq!(
             *resolved_generations
