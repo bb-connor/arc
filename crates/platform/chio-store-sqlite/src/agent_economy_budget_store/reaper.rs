@@ -224,6 +224,8 @@ impl SqliteBudgetStore {
         payment_reference: Option<&str>,
         envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
+        let reserved_budget_total =
+            optional_budget_u64_to_sqlite(envelope.budget_total, "reserved_budget_total")?;
         let connection = self
             .connection
             .lock()
@@ -239,7 +241,7 @@ impl SqliteBudgetStore {
                 reserved_until_unix_secs,
                 currency,
                 payment_reference,
-                envelope.budget_total.map(|value| value as i64),
+                reserved_budget_total,
                 envelope.delegation_depth as i64,
                 envelope.root_budget_holder,
             ],
@@ -266,6 +268,8 @@ impl SqliteBudgetStore {
         reserved_until_unix_secs: i64,
         envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
+        let reserved_budget_total =
+            optional_budget_u64_to_sqlite(envelope.budget_total, "reserved_budget_total")?;
         let connection = self
             .connection
             .lock()
@@ -285,7 +289,7 @@ impl SqliteBudgetStore {
                 capability_id,
                 grant_index as i64,
                 reserved_until_unix_secs,
-                envelope.budget_total.map(|value| value as i64),
+                reserved_budget_total,
                 envelope.delegation_depth as i64,
                 envelope.root_budget_holder,
                 unix_now(),
@@ -747,6 +751,52 @@ mod tests {
             Some("root-holder"),
             "the delegation root is recorded durably on the reserved hold"
         );
+    }
+
+    #[test]
+    fn reservation_stamps_reject_budget_totals_above_sqlite_range() {
+        let store = open_temp_store();
+        let oversized_envelope = ReservedHoldEnvelope {
+            budget_total: Some((i64::MAX as u64) + 1),
+            delegation_depth: 1,
+            root_budget_holder: "root-holder".to_string(),
+        };
+
+        authorize(&store, "hold-oversized", "cap-oversized");
+        assert!(matches!(
+            store.mark_hold_reserved_until(
+                "hold-oversized",
+                4_242,
+                "USD",
+                None,
+                &oversized_envelope,
+            ),
+            Err(BudgetStoreError::Overflow(_))
+        ));
+        let monetary_snapshot = store
+            .budget_hold_snapshot("hold-oversized")
+            .unwrap()
+            .unwrap();
+        assert_eq!(monetary_snapshot.reserved_until, None);
+        assert_eq!(monetary_snapshot.reserved_budget_total, None);
+
+        authorize_invocation(&store, "hold-inv-oversized", "cap-inv-oversized");
+        assert!(matches!(
+            store.reserve_invocation_hold(
+                "hold-inv-oversized",
+                "cap-inv-oversized",
+                0,
+                4_242,
+                &oversized_envelope,
+            ),
+            Err(BudgetStoreError::Overflow(_))
+        ));
+        let invocation_snapshot = store
+            .budget_hold_snapshot("hold-inv-oversized")
+            .unwrap()
+            .unwrap();
+        assert_eq!(invocation_snapshot.reserved_until, None);
+        assert_eq!(invocation_snapshot.reserved_budget_total, None);
     }
 
     #[test]
