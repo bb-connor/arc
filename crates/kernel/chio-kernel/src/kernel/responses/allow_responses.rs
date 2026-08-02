@@ -58,7 +58,41 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         nonce: AllowResponseNonce,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.build_allow_response_with_metadata_and_payee_binding(
+            request,
+            output,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            None,
+            nonce,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn build_allow_response_with_metadata_and_payee_binding(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolCallOutput,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        nonce: AllowResponseNonce,
+    ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
+        if let Err(error) = self.check_revocation(cap) {
+            let reason =
+                format!("capability authorization changed before allow finalization: {error}");
+            return self.build_deny_response_with_metadata_and_payee_binding(
+                request,
+                &reason,
+                timestamp,
+                matched_grant_index,
+                extra_metadata,
+                verified_payee_binding,
+            );
+        }
         let expected_chunks = match &output {
             ToolCallOutput::Stream(stream) => Some(stream.chunk_count()),
             ToolCallOutput::Value(_) => None,
@@ -80,11 +114,12 @@ impl ChioKernel {
             }
             _ => None,
         };
-        let request_metadata = request_receipt_metadata(
+        let request_metadata = request_receipt_metadata_with_payee_binding(
             request,
             self.attestation_trust_policy.as_ref(),
             timestamp,
             extra_metadata.as_ref(),
+            verified_payee_binding,
         )?;
 
         // Merge extra_metadata (e.g. "financial") into receipt_content.metadata.

@@ -67,7 +67,7 @@ impl ChioKernel {
         BudgetEventAuthority {
             authority_id: format!("kernel:{}", self.public_key().to_hex()),
             lease_id: "single-node".to_string(),
-            lease_epoch: 0,
+            lease_epoch: 1,
         }
     }
 
@@ -300,6 +300,52 @@ impl ChioKernel {
         }
 
         Some(serde_json::Value::Object(merged))
+    }
+
+    pub(crate) fn ambiguous_dispatch_receipt_metadata(
+        &self,
+        budget_mutation: &PreExecutionBudgetMutation,
+        payment_authorization: Option<&PaymentAuthorization>,
+        runtime_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let retained = match budget_mutation.charge_result() {
+            Some(charge) => match self.budget_execution_receipt_metadata(charge, None, None) {
+                Ok(mut budget_metadata) => {
+                    if let Some(authority) = budget_metadata
+                        .get_mut("budget_authority")
+                        .and_then(serde_json::Value::as_object_mut)
+                    {
+                        authority.insert(
+                            "admission_retained".to_string(),
+                            serde_json::Value::Bool(true),
+                        );
+                    }
+                    self.merge_budget_receipt_metadata(runtime_metadata, budget_metadata)
+                }
+                Err(error) => merge_metadata_objects(
+                    runtime_metadata,
+                    Some(serde_json::json!({
+                        "budget_authority": {
+                            "admission_retained": true,
+                            "retention_projection_error": error.to_string()
+                        }
+                    })),
+                ),
+            },
+            None => runtime_metadata,
+        };
+        match payment_authorization {
+            Some(authorization) => merge_metadata_objects(
+                retained,
+                Some(serde_json::json!({
+                    "financial": {
+                        "payment_reference": authorization.authorization_id,
+                        "payment_authorization_retained": true
+                    }
+                })),
+            ),
+            None => retained,
+        }
     }
 
     pub(crate) fn sanitize_budget_authorization_denial_metadata(
@@ -681,6 +727,7 @@ impl ChioKernel {
         charge_result: Option<&BudgetChargeResult>,
         admission_operation: Option<&BudgetAdmissionOperationBinding>,
         existing_authorization: Option<&PaymentAuthorization>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<Option<ReservedPrepayment>, KernelError> {
         if !Self::is_governed_mustprepay_request(request) {
             return Ok(None);
@@ -688,7 +735,12 @@ impl ChioKernel {
         let authorization = match existing_authorization {
             Some(authorization) => Some(authorization.clone()),
             None => self
-                .authorize_payment_if_needed(request, charge_result, admission_operation)
+                .authorize_payment_if_needed(
+                    request,
+                    charge_result,
+                    admission_operation,
+                    verified_payee_binding,
+                )
                 .map_err(|error| {
                     KernelError::GovernedTransactionDenied(format!(
                         "MustPrepay prepayment authorization failed before reserving an execution nonce: {error}"

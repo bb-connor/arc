@@ -116,6 +116,29 @@ pub(crate) struct AbandonedSeqRange {
     pub(crate) end: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ClusterPartitionRequest {
+    #[serde(default)]
+    pub(crate) blocked_peer_urls: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ClusterPartitionResponse {
+    pub(crate) self_url: String,
+    pub(crate) blocked_peer_urls: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) leader_url: Option<String>,
+    pub(crate) role: String,
+    pub(crate) has_quorum: bool,
+    pub(crate) reachable_nodes: usize,
+    pub(crate) quorum_size: usize,
+    pub(crate) election_term: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClusterAuthorityLeaseView {
@@ -449,6 +472,46 @@ pub(crate) enum BudgetAuthorizeExposureDecision {
     Authorized,
     Denied,
     AlreadyCaptured,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CaptureInvocationRequest {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) hold_id: String,
+    pub(crate) event_id: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum CaptureInvocationDecision {
+    Captured,
+    AlreadyCaptured,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CaptureInvocationResponse {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) hold_id: String,
+    pub(crate) event_id: String,
+    pub(crate) decision: CaptureInvocationDecision,
+    pub(crate) exposure_units: u64,
+    pub(crate) invocation_count_after: u32,
+    pub(crate) usage_invocation_count: u32,
+    pub(crate) committed_cost_units_after: u64,
+    pub(crate) total_cost_exposed_after: u64,
+    pub(crate) total_cost_realized_spend_after: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) usage_seq: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) budget_commit: Option<BudgetWriteCommitView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) structured_projection: Option<StructuredBudgetMutationResponse>,
 }
 
 #[derive(Debug)]

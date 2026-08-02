@@ -206,10 +206,7 @@ pub(super) async fn execute_bridge_mcp_tool_call_async(
         .await
     {
         Ok(response) => response,
-        Err(error) => {
-            record_receipt_write_kernel_error(&error);
-            return Err(AdapterError::KernelRuntime(error.to_string()));
-        }
+        Err(error) => return Err(bridge_kernel_error(error)),
     };
 
     BridgeMcpToolCall::from_kernel_response(
@@ -237,10 +234,7 @@ pub(super) fn execute_bridge_mcp_tool_call(
                 request.route_selection_metadata.clone(),
             ) {
                 Ok(response) => response,
-                Err(error) => {
-                    record_receipt_write_kernel_error(&error);
-                    return Err(AdapterError::KernelRuntime(error.to_string()));
-                }
+                Err(error) => return Err(bridge_kernel_error(error)),
             };
             BridgeMcpToolCall::from_kernel_response(
                 response,
@@ -255,6 +249,22 @@ pub(super) fn execute_bridge_mcp_tool_call(
                 .map_err(|error| AdapterError::KernelRuntime(error.to_string()))?;
             runtime.block_on(execute_bridge_mcp_tool_call_async(kernel, request))
         }
+    }
+}
+
+#[cfg(test)]
+fn bridge_kernel_error(error: chio_kernel::KernelError) -> AdapterError {
+    record_receipt_write_kernel_error(&error);
+    match error {
+        chio_kernel::KernelError::UrlElicitationsRequired {
+            message,
+            elicitations,
+        } => AdapterError::McpError {
+            code: JSONRPC_URL_ELICITATION_REQUIRED,
+            message,
+            data: Some(json!({ "elicitations": elicitations })),
+        },
+        other => AdapterError::KernelRuntime(other.to_string()),
     }
 }
 

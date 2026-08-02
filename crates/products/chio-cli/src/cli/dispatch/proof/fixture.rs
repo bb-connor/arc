@@ -326,7 +326,7 @@ fn generate_proof_fixture(fixture_id: &str, out: &Path, json_output: bool) -> Re
     if descriptor.kind == "transaction-passport"
         && descriptor.id != RECURSIVE_RUNTIME_SWARM_FIXTURE_ID
     {
-        collect::seal_collected_proof_bundle(ProofCollectKind::TransactionPassport, out)?;
+        collect::seal_generated_fixture_bundle(ProofCollectKind::TransactionPassport, out)?;
     }
     let verifier_report_path = proof_fixture_generated_verifier_report_path(&descriptor, out);
     if let Some(verifier_report_path) = verifier_report_path.as_deref() {
@@ -521,7 +521,7 @@ fn refresh_proof_room_bundle_source_report(bundle: &Path) -> Result<(), CliError
         return Ok(());
     }
 
-    let report = verify_transaction_passport_file(&passport_path)?;
+    let report = verify_fixture_transaction_passport_file(&passport_path)?;
     write_json_line_file(&verifier_report_path, &report)?;
     refresh_proof_room_ui_report_source_ref(bundle, &verifier_report_path)
 }
@@ -838,7 +838,7 @@ fn negative_transaction_passport_expected_failure(
     let negative_case = proof_fixture_negative_case(descriptor)?;
     let expected_failure = negative_case.expected_failure_code;
     let _env_overrides = negative_case.verifier_context.apply();
-    match verify_transaction_passport_file(verify_path) {
+    match verify_fixture_transaction_passport_file(verify_path) {
         Ok(_) => Err(CliError::cli_other_error(format!(
             "negative proof fixture unexpectedly verified: {}",
             descriptor.id
@@ -1085,7 +1085,7 @@ fn write_generated_verifier_report(
     if descriptor.id == SINGLE_CALL_AUTHORITY_FIXTURE_ID {
         let valid_passport =
             proof_fixture_source_root().join("minimal-passport/valid/transaction-passport.json");
-        let report = verify_transaction_passport_file(&valid_passport)?;
+        let report = verify_fixture_transaction_passport_file(&valid_passport)?;
         write_json_line_file(verifier_report_path, &report)?;
         return Ok(());
     }
@@ -1112,6 +1112,12 @@ fn write_generated_verifier_report(
     .map_err(CliError::cli_other_error)?;
     fs::write(verifier_report_path, report_bytes)?;
     Ok(())
+}
+
+pub(super) fn verify_fixture_transaction_passport_file(
+    path: &Path,
+) -> Result<serde_json::Value, CliError> {
+    verify_transaction_passport_file(path)
 }
 
 fn proof_fixture(fixture_id: &str) -> Result<ProofFixtureDescriptor, CliError> {
@@ -1389,19 +1395,18 @@ fn normalize_agent_web_fixture_material(
     descriptor: &ProofFixtureDescriptor,
     out: &Path,
 ) -> Result<(), CliError> {
-    if !path_has_component(Path::new(installed_fixture_path(descriptor)), "agent-web") {
-        return Ok(());
-    }
-    if descriptor.id == "agent-web-external-digest-mismatch" {
+    if descriptor.id != DISCLOSURE_AGENT_WEB_FIXTURE_ID
+        && !path_has_component(Path::new(installed_fixture_path(descriptor)), "agent-web")
+    {
         return Ok(());
     }
     let mut evidence_graph_paths = Vec::new();
     collect_evidence_graph_paths(out, &mut evidence_graph_paths)?;
     for evidence_graph_path in evidence_graph_paths {
         let artifact_root = evidence_graph_artifact_root(&evidence_graph_path)?;
-        if path_has_component(&artifact_root, "agent-web-external-digest-mismatch") {
-            continue;
-        }
+        let preserve_standard_webhooks_digest_mismatch = descriptor.id
+            == "agent-web-external-digest-mismatch"
+            || path_has_component(&artifact_root, "agent-web-external-digest-mismatch");
         let verifier_policy_path = artifact_root.join("verifier-policy.json");
         if !verifier_policy_path.is_file() {
             continue;
@@ -1409,13 +1414,25 @@ fn normalize_agent_web_fixture_material(
 
         let policy_sha256 = sha256_file(&verifier_policy_path)?;
         let mut evidence_graph = read_json_value(&evidence_graph_path)?;
+        let passport_path = evidence_graph_path.with_file_name("transaction-passport.json");
+        if passport_path.is_file()
+            && !preserves_evidence_graph_digest_mismatch(descriptor, out, &evidence_graph_path)
+        {
+            let mut passport = read_json_value(&passport_path)?;
+            passport["verifier_policy_sha256"] =
+                serde_json::Value::String(policy_sha256.clone());
+            write_fixture_signed_transaction_passport(&passport_path, passport)?;
+        }
         normalize_agent_web_bilateral_in_toto_statement(&artifact_root)?;
-        refresh_agent_web_envelopes_for_subjects(&artifact_root, &mut evidence_graph)?;
+        refresh_agent_web_envelopes_for_subjects(
+            &artifact_root,
+            &mut evidence_graph,
+            preserve_standard_webhooks_digest_mismatch,
+        )?;
         resign_agent_web_receipts_for_policy(&artifact_root, &policy_sha256)?;
         refresh_graph_node_hashes(&artifact_root, &mut evidence_graph)?;
         write_json_line_file(&evidence_graph_path, &evidence_graph)?;
 
-        let passport_path = evidence_graph_path.with_file_name("transaction-passport.json");
         if passport_path.is_file()
             && !preserves_evidence_graph_digest_mismatch(descriptor, out, &evidence_graph_path)
         {
@@ -3366,22 +3383,24 @@ fn merge_agent_web_fixture(bundle: &Path, agent_web_source: &Path) -> Result<(),
         &evidence_graph,
         &[(&disclosure_passport_id, &agent_web_passport_id)],
     )?;
+    let mut passport = disclosure_passport;
+    passport["id"] = serde_json::Value::String(agent_web_passport_id);
+    passport["claim_set_sha256"] = serde_json::Value::String(claim_set_sha256.clone());
+    passport["claim_set_path"] = serde_json::Value::String("claim-set.json".to_string());
+    passport["verifier_policy_sha256"] = serde_json::Value::String(policy_sha256.clone());
+    write_signed_transaction_passport(&passport_path, passport)?;
     refresh_signed_lineage_subgraph_digest(bundle)?;
     add_disclosure_agent_web_crypto_context_material(bundle, &mut evidence_graph)?;
     append_graph_artifacts_from_fixture(bundle, agent_web_source, &mut evidence_graph, &[])?;
     normalize_agent_web_bilateral_in_toto_statement(bundle)?;
-    refresh_agent_web_envelopes_for_subjects(bundle, &mut evidence_graph)?;
+    refresh_agent_web_envelopes_for_subjects(bundle, &mut evidence_graph, false)?;
     resign_agent_web_receipts_for_policy(bundle, &policy_sha256)?;
     refresh_graph_node_hashes(bundle, &mut evidence_graph)?;
     write_json_line_file(&evidence_graph_path, &evidence_graph)?;
     let evidence_graph_sha256 = sha256_file(&evidence_graph_path)?;
 
-    let mut passport = disclosure_passport;
-    passport["id"] = serde_json::Value::String(agent_web_passport_id);
+    let mut passport = read_json_value(&passport_path)?;
     passport["evidence_graph_sha256"] = serde_json::Value::String(evidence_graph_sha256);
-    passport["claim_set_sha256"] = serde_json::Value::String(claim_set_sha256);
-    passport["claim_set_path"] = serde_json::Value::String("claim-set.json".to_string());
-    passport["verifier_policy_sha256"] = serde_json::Value::String(policy_sha256);
     write_signed_transaction_passport(&passport_path, passport)?;
     Ok(())
 }
@@ -4065,6 +4084,16 @@ pub(super) fn add_disclosure_bbs_material_to_bundle(bundle: &Path) -> Result<(),
     let evidence_graph_sha256 = sha256_file(&evidence_graph_path)?;
 
     let passport_path = bundle.join("transaction-passport.json");
+    let mut passport = read_json_value(&passport_path)?;
+    passport["evidence_graph_sha256"] = serde_json::Value::String(evidence_graph_sha256);
+    write_signed_transaction_passport(&passport_path, passport)?;
+
+    let policy_sha256 = sha256_file(&bundle.join("verifier-policy.json"))?;
+    refresh_agent_web_envelopes_for_subjects(bundle, &mut evidence_graph, false)?;
+    resign_agent_web_receipts_for_policy(bundle, &policy_sha256)?;
+    refresh_graph_node_hashes(bundle, &mut evidence_graph)?;
+    write_json_line_file(&evidence_graph_path, &evidence_graph)?;
+    let evidence_graph_sha256 = sha256_file(&evidence_graph_path)?;
     let mut passport = read_json_value(&passport_path)?;
     passport["evidence_graph_sha256"] = serde_json::Value::String(evidence_graph_sha256);
     write_signed_transaction_passport(&passport_path, passport)?;

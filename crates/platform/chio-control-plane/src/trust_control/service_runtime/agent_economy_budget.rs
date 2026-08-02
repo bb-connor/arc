@@ -3,17 +3,14 @@ use super::*;
 use chio_kernel::agent_economy_budget_store::{
     ApprovalRequiredBudgetHold, AuthorizedBudgetHold, BudgetAuthorizeCumulativeApprovalRequest,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
-    BudgetCancelCapturedBeforeDispatchRequest,
-    BudgetCapturedBeforeDispatchCancellationDecision, BudgetCaptureHoldRequest,
-    BudgetCaptureInvocationRequest, BudgetCommitMetadata,
-    BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalState,
-    BudgetCumulativeApprovalUsage,
-    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
-    BudgetInvocationCaptureDecision, BudgetInvocationQuota, BudgetInvocationState,
-    BudgetMonetaryState, BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest,
-    BudgetReleaseHoldRequest,
-    BudgetReverseHoldRequest, BudgetStore, BudgetStoreError, BudgetUsageRecord,
-    DeniedBudgetHold,
+    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetCapturedBeforeDispatchCancellationDecision,
+    BudgetCommitMetadata, BudgetCumulativeApprovalAuthorizationDecision,
+    BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
+    BudgetInvocationQuota, BudgetInvocationState, BudgetMonetaryState, BudgetQuotaKey,
+    BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest, BudgetStore, BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
 };
 
 fn into_budget_store_error(error: CliError) -> BudgetStoreError {
@@ -32,6 +29,7 @@ enum StructuredUsageSequenceRelation {
     AdvancesAtCommit,
 }
 
+#[cfg(test)]
 pub fn build_remote_budget_store(
     control_url: &str,
     control_token: &str,

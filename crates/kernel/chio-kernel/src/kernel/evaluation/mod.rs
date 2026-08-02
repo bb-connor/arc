@@ -8,8 +8,8 @@ use chio_log_redact::redacted;
 use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 
-mod async_evaluation_core;
 mod agent_economy_evaluation;
+mod async_evaluation_core;
 mod evaluation_entry;
 mod evaluation_helpers;
 mod nested_flow_evaluation;

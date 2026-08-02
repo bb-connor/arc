@@ -101,66 +101,6 @@ impl ChioKernel {
         self.public_key().to_hex()
     }
 
-    pub(super) fn treaty_dsse_extensions_from_receipt_metadata(
-        &self,
-        receipt: &chio_core::receipt::body::ChioReceipt,
-    ) -> Result<Option<chio_federation::bilateral_dsse::BilateralPredicateExtensions>, KernelError>
-    {
-        let Some(metadata) = receipt.metadata.as_ref() else {
-            return Ok(None);
-        };
-        let Some(value) = metadata
-            .get("chio_runtime")
-            .and_then(|runtime| runtime.get("federation_treaty_dsse"))
-        else {
-            return Ok(None);
-        };
-        let material: KernelFederationTreatyDsseMetadata = serde_json::from_value(value.clone())
-            .map_err(|error| {
-                KernelError::Internal(format!(
-                    "federation treaty DSSE metadata is invalid: {error}"
-                ))
-            })?;
-        let consistency_model = material.consistency_model.clone().ok_or_else(|| {
-            KernelError::Internal(
-                "federation treaty DSSE consistency model is missing from runtime material"
-                    .to_string(),
-            )
-        })?;
-        if consistency_model != material.treaty_binding_ref.consistency_model {
-            return Err(KernelError::Internal(
-                "federation treaty DSSE consistency model does not match treaty binding"
-                    .to_string(),
-            ));
-        }
-        let mut treaty_binding_ref = material.treaty_binding_ref;
-        if treaty_binding_ref.request_sha256 != receipt.action.parameter_hash {
-            return Err(KernelError::Internal(
-                "federation treaty DSSE request hash does not match receipt action hash"
-                    .to_string(),
-            ));
-        }
-        treaty_binding_ref.outcome_sha256 = receipt.content_hash.clone();
-        treaty_binding_ref.remote_receipt_sha256 = chio_core::crypto::sha256_hex(
-            &chio_core::canonical::canonical_json_bytes(receipt).map_err(|error| {
-                KernelError::Internal(format!(
-                    "federation treaty DSSE receipt canonicalization failed: {error}"
-                ))
-            })?,
-        );
-        Ok(Some(
-            chio_federation::bilateral_dsse::BilateralPredicateExtensions {
-                capability_lease_ref: Some(material.capability_lease_ref),
-                policy_evaluation_summary: Some(material.policy_evaluation_summary),
-                governance_receipt_ref: material.governance_receipt_ref,
-                consistency_anchor: material.consistency_anchor,
-                consistency_model: Some(consistency_model),
-                cross_org_visibility: material.cross_org_visibility,
-                treaty_binding_ref: Some(treaty_binding_ref),
-            },
-        ))
-    }
-
     /// Post-sign hook. Invoked immediately after
     /// [`Self::build_and_sign_receipt`] so the local (tool-host)
     /// signature has already landed in the `ChioReceipt`. When
@@ -180,12 +120,12 @@ impl ChioKernel {
         &self,
         request: &crate::runtime::ToolCallRequest,
         receipt: &chio_core::receipt::body::ChioReceipt,
-        admitted_peer: Option<&chio_federation::trust_establishment::FederationPeer>,
+        admission: Option<&ReceiptFederationAdmission>,
     ) -> Result<(), KernelError> {
         self.apply_federation_cosign_at_timestamp(
             request,
             receipt,
-            admitted_peer,
+            admission,
             current_unix_timestamp().saturating_mul(1_000),
         )
     }
@@ -194,7 +134,7 @@ impl ChioKernel {
         &self,
         request: &crate::runtime::ToolCallRequest,
         receipt: &chio_core::receipt::body::ChioReceipt,
-        admitted_peer: Option<&chio_federation::trust_establishment::FederationPeer>,
+        admission: Option<&ReceiptFederationAdmission>,
         timestamp_unix_ms: u64,
     ) -> Result<(), KernelError> {
         let Some(origin_kernel_id) = request.federated_origin_kernel_id.as_ref() else {
@@ -206,21 +146,25 @@ impl ChioKernel {
                 request_id = request.request_id,
             )));
         };
-        let peer = match admitted_peer {
-            Some(peer) if peer.kernel_id == *origin_kernel_id => peer.clone(),
-            _ => {
-                let now = current_unix_timestamp();
-                self.federation_peer(origin_kernel_id, now).ok_or_else(|| {
-                    KernelError::Internal(format!(
-                        "federation peer {origin_kernel_id} is not pinned fresh and no admission-time peer snapshot is in scope"
-                    ))
-                })?
-            }
-        };
+        let admission = admission.ok_or_else(|| {
+            KernelError::Internal(format!(
+                "federation admission snapshot missing for origin kernel {origin_kernel_id}"
+            ))
+        })?;
+        if admission.remote_kernel_id.as_deref() != Some(origin_kernel_id.as_str()) {
+            return Err(KernelError::Internal(format!(
+                "federation admission snapshot does not match origin kernel {origin_kernel_id}"
+            )));
+        }
+        let peer = admission.peer.as_ref().ok_or_else(|| {
+            KernelError::Internal(format!(
+                "federation admission snapshot has no admitted peer for origin kernel {origin_kernel_id}"
+            ))
+        })?;
 
         let local_kernel_id = self.federation_local_kernel_id();
-        let extensions = match self.treaty_dsse_extensions_from_receipt_metadata(receipt)? {
-            Some(extensions) => extensions,
+        let treaty_material = match admission.verified_treaty_material.as_ref() {
+            Some(material) => material,
             None => {
                 // A federated request rejected before runtime treaty admission
                 // ran (capability verification, time bounds, revocation, subject
@@ -243,6 +187,13 @@ impl ChioKernel {
                 ));
             }
         };
+        treaty_material.validate_cosign_participants(
+            origin_kernel_id,
+            &peer.public_key,
+            &local_kernel_id,
+            &self.config.keypair.public_key(),
+        )?;
+        let extensions = treaty_material.extensions_for_receipt(request, receipt)?;
         let dual = chio_federation::bilateral::co_sign_with_origin_backend(
             origin_kernel_id,
             &peer.public_key,
@@ -501,6 +452,7 @@ impl ChioKernel {
     ) -> crate::execution_nonce::NonceBinding {
         crate::execution_nonce::NonceBinding {
             subject_id: cap.subject.to_hex(),
+            request_id: request.request_id.clone(),
             capability_id: cap.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
@@ -767,6 +719,7 @@ impl ChioKernel {
         .parameter_hash;
         Ok(crate::execution_nonce::NonceBinding {
             subject_id: cap.subject.to_hex(),
+            request_id: request.request_id.clone(),
             capability_id: cap.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
@@ -847,9 +800,55 @@ impl ChioKernel {
         self.runtime_admission_hook = Some(hook);
     }
 
+    pub fn set_runtime_admission_readiness_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<(), KernelError> {
+        let timeout_ms = u64::try_from(timeout.as_millis()).map_err(|_| {
+            KernelError::InvalidConstraint(
+                "runtime admission readiness timeout exceeds u64 milliseconds".to_string(),
+            )
+        })?;
+        if timeout_ms == 0 {
+            return Err(KernelError::InvalidConstraint(
+                "runtime admission readiness timeout must be at least one millisecond".to_string(),
+            ));
+        }
+        let aligned_timeout = Duration::from_millis(timeout_ms);
+        if aligned_timeout != timeout {
+            return Err(KernelError::InvalidConstraint(
+                "runtime admission readiness timeout must use whole milliseconds".to_string(),
+            ));
+        }
+        if Instant::now().checked_add(aligned_timeout).is_none() {
+            return Err(KernelError::InvalidConstraint(
+                "runtime admission readiness timeout exceeds the monotonic clock range".to_string(),
+            ));
+        }
+        self.runtime_admission_readiness_timeout = aligned_timeout;
+        Ok(())
+    }
+
     /// Remove the product-specific runtime admission hook.
     pub fn clear_runtime_admission_hook(&mut self) {
         self.runtime_admission_hook = None;
+    }
+
+    pub fn set_governed_approval_replay_store(
+        &mut self,
+        store: Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>,
+    ) {
+        self.approval_replay_store = Some(store);
+    }
+
+    pub fn set_runtime_trace_observer(&mut self, observer: Arc<dyn RuntimeTraceObserver>) {
+        self.runtime_trace_sequence.store(0, Ordering::SeqCst);
+        self.runtime_trace_observer = Some(observer);
+    }
+
+    pub fn clear_runtime_trace_observer(&mut self) {
+        self.runtime_trace_observer = None;
+        self.runtime_trace_sequence.store(0, Ordering::SeqCst);
     }
 
     /// Configure whether authoritative security context and a pre-dispatch

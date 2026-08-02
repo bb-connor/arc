@@ -99,6 +99,7 @@ pub(super) fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
     let out_dir = workspace_root.join(CHIO_WIRE_V1_RUST_OUT);
     validate_workspace_subdirectory(&workspace_root, &schemas_dir)?;
     let schema_files = authoritative_schema_json_inventory(&workspace_root, &schemas_dir)?;
+    let statemachines_dir = workspace_root.join(chio_spec_codegen::STATEMACHINES_INPUT);
 
     if check_only {
         // Render BOTH the consolidated chio_wire_v1.rs and the generated
@@ -147,25 +148,33 @@ pub(super) fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
                 differences.join("\n  - ")
             )));
         }
+        let state_outputs =
+            chio_spec_codegen::check_statemachine_outputs(&statemachines_dir, &workspace_root)
+                .map_err(XtaskError::Codegen)?;
         println!(
-            "codegen rust: {} and {} in sync ({} bytes total)",
+            "codegen rust: {} and {} in sync ({} bytes total); {} state-machine outputs in sync",
             display_path(&out_dir.join(chio_spec_codegen::CHIO_WIRE_V1_OUTPUT)),
             display_path(&out_dir.join(chio_spec_codegen::MOD_FILE)),
-            total_bytes
+            total_bytes,
+            state_outputs.len()
         );
         return Ok(());
     }
 
     chio_spec_codegen::codegen_rust_with_inventory(&schemas_dir, &out_dir, &schema_files)
         .map_err(XtaskError::Codegen)?;
+    let state_outputs =
+        chio_spec_codegen::codegen_statemachines(&statemachines_dir, &workspace_root)
+            .map_err(XtaskError::Codegen)?;
     let out_path = out_dir.join(chio_spec_codegen::CHIO_WIRE_V1_OUTPUT);
     let mod_path = out_dir.join(chio_spec_codegen::MOD_FILE);
     let bytes = fs::metadata(&out_path).map(|m| m.len()).unwrap_or_default();
     println!(
-        "codegen rust: wrote {} ({} bytes) and refreshed {}",
+        "codegen rust: wrote {} ({} bytes), refreshed {}, and wrote {} state-machine outputs",
         display_path(&out_path),
         bytes,
-        display_path(&mod_path)
+        display_path(&mod_path),
+        state_outputs.len()
     );
     Ok(())
 }

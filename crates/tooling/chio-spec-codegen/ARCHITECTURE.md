@@ -6,15 +6,15 @@
 development and CI against repository-tracked spec files and writes
 generated Rust and markdown back into the tree. It never links into a
 running kernel, client, or guard, and never touches untrusted network input.
-The crate is four independent generator passes (wire types, error registry,
-threat-model stubs, threat-coverage doc) sharing one binary, one
-`CodegenError` type, and the `write_if_changed` helper that keeps
+The crate is five independent generator passes (wire types, error registry,
+state machines, threat-model stubs, threat-coverage doc) sharing one binary,
+one `CodegenError` type, and the `write_if_changed` helper that keeps
 regeneration idempotent and diff-free. Byte-for-byte reproducibility is the
 core design constraint: identical input must render identical output so the
 `--check` drift lanes in CI are meaningful.
 
-Scope boundary: this crate transforms repository-tracked specifications into
-generated files and provides no runtime policy or authorization surface.
+Its scope is offline generation and validation of tracked artifacts. It does
+not own runtime behavior or consume network input.
 
 ## Module map
 
@@ -22,6 +22,7 @@ generated files and provides no runtime policy or authorization surface.
 |------|----------------|
 | `src/lib.rs` | Wire-type pass: schema discovery, local `$ref` inlining and hazard checks, typify registration, prettyplease formatting. Also hosts `CodegenError`, `GENERATED_HEADER`, and the shared `write_if_changed`. |
 | `src/errors_pass.rs` | Error-registry pass: hand-rolled `registry.yaml` parser, validation, and Rust rendering (formatted via a shelled-out `rustfmt`). Private module, re-exported at the crate root. |
+| `src/statemachines_pass.rs` | State-machine pass: TOML loading, graph validation, generated typestates and conformance relations, reference-table rendering, and complete managed-output drift checks. |
 | `src/threat_model.rs` | Threat-model pass: JSON loading, JSON Schema validation, and per-threat stub rendering with doc-comment injection sanitization. |
 | `src/threat_coverage_doc.rs` | Threat-coverage-doc pass: joins the threat model, the adversarial-suite manifest, and stub-file presence into a markdown report. |
 | `src/main.rs` | CLI dispatcher; one subcommand per pass. |
@@ -32,14 +33,14 @@ generated files and provides no runtime policy or authorization surface.
 ### Wire types (`codegen_rust`, `render_chio_wire_v1`)
 
 1. Walk `schemas_dir`, collect `*.schema.json` files, sort lexicographically.
-2. Derive a deterministic Rust module name from each schema's relative path;
-   a normalization collision fails closed before output is emitted.
-3. For each file, inline local cross-file `$ref`s and `$defs`
+2. Find local `$ref` targets that point at another file's root and skip
+   those files as top-level schemas (`collect_local_schema_ref_roots`), so a
+   schema that exists only to be referenced is not also registered standalone.
+3. For each remaining file, inline local cross-file `$ref`s and `$defs`
    (fail closed on symlinks, absolute-URI refs, or a resolved path outside
    `schemas_dir`), strip typify-unsupported `if`/`allOf` conditionals, parse
-   as `schemars::schema::RootSchema`, and register with an independent
-   `TypeSpace` scoped to that module.
-4. Render the path-named modules to one token stream, parse as `syn::File`, format with
+   as `schemars::schema::RootSchema`, and register with one shared `TypeSpace`.
+4. Render the `TypeSpace` to tokens, parse as `syn::File`, format with
    `prettyplease`, prepend `GENERATED_HEADER`, and write `chio_wire_v1.rs`
    plus a header-only `mod.rs` via `write_if_changed`.
 
@@ -55,6 +56,18 @@ generated files and provides no runtime policy or authorization surface.
    / `lookup_string_code` / `lookup_jsonrpc_code`, parse-check the buffer
    with `syn`, then format by shelling out to `rustfmt --emit stdout`.
 4. Write `error_codes.rs` and a header-only `mod.rs` under `ERRORS_GENERATED_DIR`.
+
+### State machines (`codegen_statemachines`, `render_statemachine_outputs`)
+
+1. Load sorted `spec/statemachines/*.toml` inputs and reject unknown or
+   unreachable states, dead non-terminal states, duplicate transitions or
+   guards, unsafe owner paths, output collisions, and malformed Rust paths.
+2. Render private stage wrappers whose transitions consume the prior stage and
+   delegate runtime checks to hand-written handlers.
+3. Emit typestate Rust under the owning crate, conformance edge and non-edge
+   relations under `chio-conformance`, and the generated state-machine reference.
+4. Format Rust with the active `rustfmt`, write only changed bytes, and make
+   check mode reject stale, missing, or obsolete managed outputs.
 
 ### Threat-model stubs (`codegen_threat_model`)
 
@@ -89,11 +102,14 @@ generated files and provides no runtime policy or authorization surface.
 - Local schema `$ref`s must canonicalize to a path inside `schemas_dir`;
   symlinked schema files and absolute-URI `$ref`s are rejected before
   typify sees them.
-- Independent per-schema `TypeSpace`s prevent unrelated local `$defs` names
-  from colliding while preserving deterministic path-derived module scopes.
 - `write_if_changed` writes only when computed bytes differ from disk, so
   `--check` modes (xtask's Rust and error-registry drift checks) can diff a
   temp-staged regeneration against the working tree byte-for-byte.
+- State-machine generation is deterministic across sorted inputs, stable
+  headers, `rustfmt`, and ordered maps. Managed outputs with no remaining
+  input are removed by regeneration and rejected by check mode.
+- Generated typestate fields remain private, transitions consume their prior
+  stage, and runtime guards remain in hand-written handler modules.
 - `codegen_threat_model` is one-shot per file: once a stub's
   `unimplemented!()` marker is replaced by a real test body, regeneration
   leaves that file alone.
@@ -104,14 +120,15 @@ generated files and provides no runtime policy or authorization surface.
 
 ## Dependencies
 
-No internal `chio-*` dependencies; every pass operates on repository files
-and `serde_json` values only. `xtask` depends on this crate to drive the
-wire-type and error-registry passes in-process (`xtask/src/codegen/rust.rs`);
-the threat-model and threat-coverage-doc passes are invoked through this
-crate's own binary instead and are not xtask-wired.
+No internal `chio-*` dependencies; every pass operates on repository files,
+TOML, and `serde_json` values only. `xtask` depends on this crate to drive the
+wire-type, error-registry, and state-machine passes in-process
+(`xtask/src/codegen/rust.rs`); the threat-model and threat-coverage-doc passes
+are invoked through this crate's own binary instead and are not xtask-wired.
 
 External: `typify` (pinned `=0.4.3`, the schema-to-Rust backend), `schemars`
 0.8 (`RootSchema` parsing), `prettyplease` (deterministic formatting for the
 wire-type pass), `syn` (parses generated tokens and the error-registry
-buffer), `jsonschema` (threat-model schema validation), `serde`/`serde_json`.
-The error-registry pass additionally shells out to the `rustfmt` binary on `PATH`.
+buffer), `jsonschema` (threat-model schema validation), `serde`/`serde_json`,
+and `toml` (state-machine inputs). The error-registry and state-machine passes
+shell out to the `rustfmt` binary on `PATH`.

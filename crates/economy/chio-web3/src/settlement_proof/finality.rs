@@ -184,20 +184,6 @@ fn validate_dispute_snapshot(
     Ok(())
 }
 
-fn settlement_state_id(state: Web3SettlementLifecycleState) -> &'static str {
-    match state {
-        Web3SettlementLifecycleState::PendingDispatch => "pending_dispatch",
-        Web3SettlementLifecycleState::EscrowLocked => "escrow_locked",
-        Web3SettlementLifecycleState::PartiallySettled => "partially_settled",
-        Web3SettlementLifecycleState::Settled => "settled",
-        Web3SettlementLifecycleState::Reversed => "reversed",
-        Web3SettlementLifecycleState::ChargedBack => "charged_back",
-        Web3SettlementLifecycleState::TimedOut => "timed_out",
-        Web3SettlementLifecycleState::Failed => "failed",
-        Web3SettlementLifecycleState::Reorged => "reorged",
-    }
-}
-
 fn push_claim_once(target: &mut Vec<String>, claim: &str) {
     if !target.iter().any(|existing| existing == claim) {
         target.push(claim.to_string());

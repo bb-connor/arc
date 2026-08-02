@@ -61,11 +61,12 @@ impl ChioKernel {
         request_id: &str,
         tenant_id: Option<String>,
     ) -> ScopedKernelReceiptTenantId {
+        let scope_key = receipt_evaluation_map_key(request_id);
         let previous = self
             .receipt_tenant_ids
-            .insert(request_id.to_string(), tenant_id);
+            .insert(scope_key.clone(), tenant_id);
         ScopedKernelReceiptTenantId {
-            request_id: request_id.to_string(),
+            scope_key,
             tenant_ids: Arc::clone(&self.receipt_tenant_ids),
             previous,
         }
@@ -76,15 +77,16 @@ impl ChioKernel {
         request_id: &str,
         handle: Option<crate::receipt_store::DispatchIntentHandle>,
     ) -> ScopedKernelDispatchIntent {
+        let scope_key = receipt_evaluation_map_key(request_id);
         let previous = match handle {
-            Some(handle) => self.dispatch_intents.insert(request_id.to_string(), handle),
+            Some(handle) => self.dispatch_intents.insert(scope_key.clone(), handle),
             None => self
                 .dispatch_intents
-                .remove(request_id)
+                .remove(&scope_key)
                 .map(|(_, previous)| previous),
         };
         ScopedKernelDispatchIntent {
-            request_id: request_id.to_string(),
+            scope_key,
             intents: Arc::clone(&self.dispatch_intents),
             previous,
         }
@@ -95,8 +97,9 @@ impl ChioKernel {
         request_id: Option<&str>,
     ) -> Option<crate::receipt_store::DispatchIntentHandle> {
         request_id.and_then(|request_id| {
+            let scope_key = receipt_evaluation_map_key(request_id);
             self.dispatch_intents
-                .get(request_id)
+                .get(&scope_key)
                 .map(|entry| entry.value().clone())
         })
     }
@@ -112,7 +115,8 @@ impl ChioKernel {
     /// the request append plainly, and a row an uncertain consume left open
     /// surfaces at the next boot.
     pub(crate) fn mark_dispatch_intent_consumed(&self, request_id: &str) {
-        self.dispatch_intents.remove(request_id);
+        let scope_key = receipt_evaluation_map_key(request_id);
+        self.dispatch_intents.remove(&scope_key);
     }
 
     /// The tenant resolved for `request_id` by its evaluation scope. The
@@ -124,8 +128,9 @@ impl ChioKernel {
         request_id: Option<&str>,
     ) -> Option<Option<String>> {
         request_id.and_then(|request_id| {
+            let scope_key = receipt_evaluation_map_key(request_id);
             self.receipt_tenant_ids
-                .get(request_id)
+                .get(&scope_key)
                 .map(|entry| entry.value().clone())
         })
     }
@@ -154,6 +159,30 @@ impl ChioKernel {
         f: impl FnOnce(&dyn RevocationStore) -> Result<R, KernelError>,
     ) -> Result<R, KernelError> {
         f(self.revocation_store.as_ref())
+    }
+
+    pub(crate) fn lock_runtime_trace_transition(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, ()>, KernelError> {
+        Ok(match self.runtime_trace_transition_lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                warn!("runtime trace transition lock was poisoned; recovering trace ordering");
+                self.runtime_trace_transition_lock.clear_poison();
+                poisoned.into_inner()
+            }
+        })
+    }
+
+    pub(crate) fn allocate_runtime_trace_source_sequence(&self) -> Result<u64, KernelError> {
+        self.runtime_trace_sequence
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                current.checked_add(1)
+            })
+            .map(|previous| previous + 1)
+            .map_err(|_| {
+                KernelError::Internal("runtime trace source sequence overflow".to_string())
+            })
     }
 
     pub(crate) fn with_receipt_store<R>(
@@ -404,6 +433,12 @@ impl ChioKernel {
             runtime_admission_hook: None,
             security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
             security_pre_dispatch_hook: None,
+            runtime_admission_readiness_timeout: Duration::from_millis(
+                DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
+            ),
+            runtime_trace_observer: None,
+            runtime_trace_transition_lock: Mutex::new(()),
+            runtime_trace_sequence: AtomicU64::new(0),
             attestation_trust_policy: None,
             capability_crypto_floor: KernelCryptoFloor::AllowClassical,
             checkpoint_batch_size,
@@ -413,6 +448,9 @@ impl ChioKernel {
             dpop_config: None,
             execution_nonce_config: None,
             execution_nonce_store: None,
+            approval_replay_store: Some(Box::new(
+                crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::default(),
+            )),
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
@@ -655,11 +693,12 @@ impl ChioKernel {
         request_id: &str,
         admission: ReceiptFederationAdmission,
     ) -> ScopedKernelReceiptFederationAdmission {
+        let scope_key = receipt_evaluation_map_key(request_id);
         let previous = self
             .receipt_federation_admissions
-            .insert(request_id.to_string(), admission);
+            .insert(scope_key.clone(), admission);
         ScopedKernelReceiptFederationAdmission {
-            request_id: request_id.to_string(),
+            scope_key,
             admissions: Arc::clone(&self.receipt_federation_admissions),
             previous,
         }
@@ -670,15 +709,35 @@ impl ChioKernel {
         request_id: &str,
         remote_kernel_id: Option<&str>,
     ) -> Option<ReceiptFederationAdmission> {
+        let scope_key = receipt_evaluation_map_key(request_id);
         let admission = self
             .receipt_federation_admissions
-            .get(request_id)
+            .get(&scope_key)
             .map(|entry| entry.value().clone())?;
         if admission.remote_kernel_id.as_deref() == remote_kernel_id {
             Some(admission)
         } else {
             None
         }
+    }
+
+    pub(crate) fn install_verified_treaty_material_for_request(
+        &self,
+        request_id: &str,
+        material: VerifiedFederationTreatyMaterial,
+    ) -> Result<(), KernelError> {
+        let scope_key = receipt_evaluation_map_key(request_id);
+        let mut admission = self
+            .receipt_federation_admissions
+            .get_mut(&scope_key)
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "federation admission snapshot missing while installing verified treaty material"
+                        .to_string(),
+                )
+            })?;
+        admission.verified_treaty_material = Some(material);
+        Ok(())
     }
 
     /// Resolve and snapshot federation receipt admission at the boundary.
@@ -695,6 +754,7 @@ impl ChioKernel {
                 return Ok(ReceiptFederationAdmission {
                     remote_kernel_id: Some(remote.to_string()),
                     peer: Some(peer),
+                    verified_treaty_material: None,
                 });
             }
             return Err(KernelError::Internal(format!(
@@ -704,6 +764,7 @@ impl ChioKernel {
         Ok(ReceiptFederationAdmission {
             remote_kernel_id: None,
             peer: None,
+            verified_treaty_material: None,
         })
     }
 

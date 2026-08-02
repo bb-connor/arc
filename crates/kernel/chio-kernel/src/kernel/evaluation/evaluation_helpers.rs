@@ -1,5 +1,5 @@
 use super::*;
-
+use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
 use crate::kernel::responses::{OperationOwnedCallerReservationResponse, ReservedHoldStamp};
 
 /// Incomplete-decision reason for a strict-nonce preflight whose hold was
@@ -24,6 +24,7 @@ pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) payment_authorization: Option<&'a PaymentAuthorization>,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
+    pub(super) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     /// Whether THIS evaluation acquired a sibling-sum child-budget holder lease
     /// (the `admit_capability_budget` return). Only then may cleanup release
     /// one: the reference-counted release frees the shared edge only when the
@@ -56,6 +57,11 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
     /// runs only when true so the reference-counted release never frees an
     /// overlapping sibling's still-held share.
     pub(super) budget_lease_acquired: bool,
+}
+
+struct CleanupReleaseOutcome {
+    metadata: Option<serde_json::Value>,
+    confirmed: bool,
 }
 
 impl ChioKernel {
@@ -120,47 +126,64 @@ impl ChioKernel {
         build()
     }
 
-    /// Record a signed fault receipt for a BUDGET cleanup step that FAILED
-    /// during the URL-elicitation pre-dispatch unwind (Fix: the child-budget
-    /// lease release and the pre-execution budget reversal now RECORD-AND-
-    /// CONTINUE instead of `?`-short-circuiting, so a transient budget-store
-    /// failure cannot replace the `Err(UrlElicitationsRequired)` response). The
-    /// arm returns the elicitation error and records no terminal receipt, so
-    /// without this the stuck child share / budget slot would land on NO
-    /// append-only entry. Best-effort: a receipt-recording failure is logged
-    /// with an `audit_fault` field; the caller still returns the elicitation
-    /// error.
-    // The fault receipt legitimately needs the request, grant, failing step,
-    // reason, stuck hold ids, admission metadata, and guard evidence to locate
-    // the stuck reservation; grouping them into a params struct would only
-    // rename the same inputs.
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn record_url_elicitation_post_dispatch_receipt(
+    pub(super) fn merge_dispatch_credential_disposition_metadata(
         &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
-        matched_grant_index: usize,
         metadata: Option<serde_json::Value>,
-        pre_invocation_guard_evidence: &[chio_core::receipt::metadata::GuardEvidence],
-    ) {
-        let metadata = self.mark_runtime_admission_reservations_retained_fail_closed(metadata);
-        let _guard_evidence_scope =
-            scope_pre_invocation_guard_evidence(pre_invocation_guard_evidence.to_vec());
-        if let Err(error) = self.build_incomplete_response_with_output_and_metadata(
-            request,
-            None,
-            reason,
-            timestamp,
-            Some(matched_grant_index),
+        disposition: PaymentCredentialDisposition,
+    ) -> Option<serde_json::Value> {
+        if disposition == PaymentCredentialDisposition::NonePresent {
+            return metadata;
+        }
+        merge_metadata_objects(
             metadata,
-        ) {
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&error),
-                audit_fault = "url_elicitation_terminal_receipt_unrecorded",
-                "failed to record URL-elicitation post-dispatch receipt"
-            );
+            Some(serde_json::json!({
+                "chio_runtime": {
+                    "payment_credential_disposition": disposition,
+                    "dispatch_credential_disposition": disposition,
+                    "dispatch_credential_retention_outcome_unknown":
+                        disposition == PaymentCredentialDisposition::RetentionOutcomeUnknown
+                }
+            })),
+        )
+    }
+
+    fn release_budget_lease_with_evidence(
+        &self,
+        cap: &CapabilityToken,
+        lease_acquired: bool,
+        metadata: Option<serde_json::Value>,
+    ) -> CleanupReleaseOutcome {
+        if !lease_acquired {
+            return CleanupReleaseOutcome {
+                metadata,
+                confirmed: true,
+            };
+        }
+        match self.release_admitted_capability_budget(cap) {
+            Ok(()) => CleanupReleaseOutcome {
+                metadata,
+                confirmed: true,
+            },
+            Err(error) => {
+                warn!(
+                    capability_id = %cap.id,
+                    reason = %redacted!(&error),
+                    "admitted capability budget lease release could not be confirmed"
+                );
+                CleanupReleaseOutcome {
+                    metadata: merge_metadata_objects(
+                        metadata,
+                        Some(serde_json::json!({
+                            "budget_authority": {
+                                "lease_release_unconfirmed": true,
+                                "lease_retained": true,
+                                "lease_capability_id": cap.id
+                            }
+                        })),
+                    ),
+                    confirmed: false,
+                }
+            }
         }
     }
 
@@ -180,16 +203,250 @@ impl ChioKernel {
         denial: PreDispatchCleanupDeny<'_>,
     ) -> Result<ToolCallResponse, KernelError> {
         let request = denial.request;
-        let result = self.pre_dispatch_cleanup_deny_response(denial);
+        let result = self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+            denial,
+            PaymentCredentialDisposition::NonePresent,
+        );
         if result.is_err() {
             self.clear_dispatch_intent_for_non_dispatch_exit(request);
         }
         result
     }
 
-    fn pre_dispatch_cleanup_deny_response(
+    /// Unwind a typed URL-elicitation result without creating a terminal
+    /// receipt. The tool boundary guarantees that this result precedes any
+    /// tool effect, so a clean unwind leaves the request retryable.
+    pub(super) fn unwind_url_elicitation_before_effect(
         &self,
         denial: PreDispatchCleanupDeny<'_>,
+        credential_disposition: PaymentCredentialDisposition,
+    ) -> Result<(), KernelError> {
+        if let Some(operation) =
+            self.threshold_operation_for_budget_mutation(denial.budget_mutation)?
+        {
+            self.reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)?;
+            if let Some(payment_authorization) = denial.payment_authorization {
+                self.release_threshold_payment_authorization(
+                    denial.request,
+                    denial.budget_mutation,
+                    payment_authorization,
+                )?;
+            }
+            if denial.budget_lease_acquired {
+                self.release_threshold_delegated_budget(denial.cap, &operation)?;
+            }
+            let metadata = self.merge_dispatch_credential_disposition_metadata(
+                denial.runtime_admission_metadata,
+                credential_disposition,
+            );
+            let (_, runtime_release_confirmed) =
+                self.release_runtime_admission_reservations_for_pre_dispatch_denial(metadata);
+            return if runtime_release_confirmed {
+                Ok(())
+            } else {
+                Err(KernelError::Internal(
+                    "URL-elicitation runtime admission cleanup could not be confirmed".to_string(),
+                ))
+            };
+        }
+        let runtime_metadata = self.merge_dispatch_credential_disposition_metadata(
+            denial.runtime_admission_metadata,
+            credential_disposition,
+        );
+        let (runtime_metadata, runtime_release_confirmed) =
+            self.release_runtime_admission_reservations_for_pre_dispatch_denial(runtime_metadata);
+        let lease_release = self.release_budget_lease_with_evidence(
+            denial.cap,
+            denial.budget_lease_acquired,
+            runtime_metadata,
+        );
+        let _reverse = match denial.payment_authorization {
+            Some(payment_authorization) => self
+                .unwind_pre_dispatch_monetary_invocation_with_evidence(
+                    denial.request,
+                    denial.cap,
+                    denial.budget_mutation,
+                    Some(payment_authorization),
+                    credential_disposition,
+                )
+                .map(|(reverse, _)| reverse)
+                .map_err(|failure| *failure.error)?,
+            None => {
+                self.reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)?
+            }
+        };
+        if !runtime_release_confirmed || !lease_release.confirmed {
+            return Err(KernelError::Internal(
+                "URL-elicitation admission cleanup could not be confirmed".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn build_pre_dispatch_cleanup_deny_response_with_credentials(
+        &self,
+        denial: PreDispatchCleanupDeny<'_>,
+        credential_disposition: PaymentCredentialDisposition,
+    ) -> Result<ToolCallResponse, KernelError> {
+        if self
+            .threshold_operation_for_budget_mutation(denial.budget_mutation)?
+            .is_some()
+        {
+            return self
+                .pre_dispatch_threshold_cleanup_deny_response(denial, credential_disposition);
+        }
+        let runtime_admission_metadata = self.merge_dispatch_credential_disposition_metadata(
+            denial.runtime_admission_metadata,
+            credential_disposition,
+        );
+        let (runtime_admission_metadata, _runtime_release_confirmed) = self
+            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                runtime_admission_metadata,
+            );
+        let lease_release = self.release_budget_lease_with_evidence(
+            denial.cap,
+            denial.budget_lease_acquired,
+            runtime_admission_metadata,
+        );
+        let runtime_admission_metadata = lease_release.metadata;
+        let reverse_result = match denial.payment_authorization {
+            Some(payment_authorization) => self
+                .unwind_pre_dispatch_monetary_invocation_with_evidence(
+                    denial.request,
+                    denial.cap,
+                    denial.budget_mutation,
+                    Some(payment_authorization),
+                    credential_disposition,
+                ),
+            None => self
+                .reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)
+                .map(|reverse| (reverse, None))
+                .map_err(PreDispatchMonetaryUnwindFailure::from),
+        };
+        let (reverse, unwind_evidence) = match reverse_result {
+            Ok(result) => result,
+            Err(failure) => {
+                warn!(
+                    request_id = %denial.request.request_id,
+                    reason = %redacted!(&failure.error),
+                    "pre-dispatch cleanup could not be confirmed"
+                );
+                let metadata = match denial.budget_mutation.charge_result() {
+                    Some(charge) => self.merge_budget_receipt_metadata(
+                        runtime_admission_metadata,
+                        self.budget_execution_receipt_metadata(charge, None, None)?,
+                    ),
+                    None => runtime_admission_metadata,
+                };
+                let metadata = merge_metadata_objects(
+                    metadata,
+                    Some(serde_json::json!({
+                        "budget_authority": {
+                            "pre_dispatch_cleanup_unconfirmed": true,
+                            "admission_release_unconfirmed": true,
+                            "admission_may_be_retained": true,
+                            "cleanup_mutation_kind": match denial.budget_mutation {
+                                PreExecutionBudgetMutation::Charge(_) => "charge",
+                                PreExecutionBudgetMutation::Admission(_) => "admission",
+                                PreExecutionBudgetMutation::Invocation { .. } => "invocation",
+                                PreExecutionBudgetMutation::None => "none",
+                            },
+                            "cleanup_capability_id": denial.cap.id,
+                            "cleanup_grant_index": denial.matched_grant_index,
+                            "cleanup_hold_id": denial.budget_mutation.charge_result()
+                                .map(|charge| charge.budget_hold_id.as_str()),
+                            "cleanup_attempt_event_id": denial.budget_mutation.charge_result()
+                                .map(BudgetChargeResult::reverse_event_id),
+                            "cleanup_attempt_event_id_available": denial.budget_mutation
+                                .charge_result().is_some()
+                        }
+                    })),
+                );
+                let metadata = match failure.evidence {
+                    Some(evidence) => merge_metadata_objects(
+                        metadata,
+                        Some(serde_json::json!({
+                            "chio_runtime": {
+                                "pre_dispatch_payment_unwind": evidence
+                            }
+                        })),
+                    ),
+                    None => match denial.payment_authorization {
+                        Some(authorization) => merge_metadata_objects(
+                            metadata,
+                            Some(serde_json::json!({
+                                "financial": {
+                                    "payment_reference": authorization.authorization_id,
+                                    "payment_authorization_may_be_retained": true,
+                                    "payment_unwind_unconfirmed": true,
+                                    "payment_unwind_attempt_reference": denial.request.request_id
+                                }
+                            })),
+                        ),
+                        None => metadata,
+                    },
+                };
+                return self.build_deny_response_with_metadata_and_payee_binding(
+                    denial.request,
+                    &format!(
+                        "{}; pre-dispatch cleanup could not be confirmed: {}",
+                        denial.reason, failure.error
+                    ),
+                    denial.timestamp,
+                    Some(denial.matched_grant_index),
+                    metadata,
+                    denial.verified_payee_binding,
+                );
+            }
+        };
+        let runtime_admission_metadata = match unwind_evidence {
+            Some(evidence) => merge_metadata_objects(
+                runtime_admission_metadata,
+                Some(serde_json::json!({
+                    "chio_runtime": {
+                        "pre_dispatch_payment_unwind": evidence
+                    }
+                })),
+            ),
+            None => runtime_admission_metadata,
+        };
+        if let (Some(charge), Some(reverse)) =
+            (denial.budget_mutation.charge_result(), reverse.as_ref())
+        {
+            return self
+                .build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
+                    denial.request,
+                    denial.reason,
+                    denial.timestamp,
+                    charge,
+                    reverse.committed_cost_units_after,
+                    denial.cap,
+                    self.merge_budget_receipt_metadata(
+                        runtime_admission_metadata,
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", reverse)),
+                            None,
+                        )?,
+                    ),
+                    denial.verified_payee_binding,
+                );
+        }
+
+        self.build_deny_response_with_metadata_and_payee_binding(
+            denial.request,
+            denial.reason,
+            denial.timestamp,
+            Some(denial.matched_grant_index),
+            runtime_admission_metadata,
+            denial.verified_payee_binding,
+        )
+    }
+
+    fn pre_dispatch_threshold_cleanup_deny_response(
+        &self,
+        denial: PreDispatchCleanupDeny<'_>,
+        credential_disposition: PaymentCredentialDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
         let threshold_operation =
             self.threshold_operation_for_budget_mutation(denial.budget_mutation)?;
@@ -226,10 +483,19 @@ impl ChioKernel {
             }
             reverse
         };
-        let mut runtime_admission_metadata = self
+        let runtime_admission_metadata = self.merge_dispatch_credential_disposition_metadata(
+            denial.runtime_admission_metadata,
+            credential_disposition,
+        );
+        let (mut runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                denial.runtime_admission_metadata,
+                runtime_admission_metadata,
             );
+        if !runtime_release_confirmed {
+            return Err(KernelError::Internal(
+                "threshold runtime admission cleanup could not be confirmed".to_string(),
+            ));
+        }
         if let Some(operation) = threshold_operation.as_ref() {
             let terminal_metadata = self
                 .exact_compensated_threshold_admission_metadata(operation)?
@@ -246,30 +512,33 @@ impl ChioKernel {
         if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
         {
-            return self.build_pre_execution_monetary_deny_response_with_metadata(
-                denial.request,
-                denial.reason,
-                denial.timestamp,
-                charge,
-                reverse.committed_cost_units_after,
-                denial.cap,
-                self.merge_budget_receipt_metadata(
-                    runtime_admission_metadata,
-                    self.budget_execution_receipt_metadata(
-                        charge,
-                        Some(("reversed", reverse)),
-                        None,
-                    )?,
-                ),
-            );
+            return self
+                .build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
+                    denial.request,
+                    denial.reason,
+                    denial.timestamp,
+                    charge,
+                    reverse.committed_cost_units_after,
+                    denial.cap,
+                    self.merge_budget_receipt_metadata(
+                        runtime_admission_metadata,
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", reverse)),
+                            None,
+                        )?,
+                    ),
+                    denial.verified_payee_binding,
+                );
         }
 
-        self.build_deny_response_with_metadata(
+        self.build_deny_response_with_metadata_and_payee_binding(
             denial.request,
             denial.reason,
             denial.timestamp,
             Some(denial.matched_grant_index),
             runtime_admission_metadata,
+            denial.verified_payee_binding,
         )
     }
 
@@ -306,10 +575,15 @@ impl ChioKernel {
         if budget_lease_acquired {
             self.release_pre_dispatch_delegated_budget(cap, budget_mutation)?;
         }
-        let runtime_admission_metadata = self
+        let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 runtime_admission_metadata,
             );
+        if !runtime_release_confirmed {
+            return Err(KernelError::Internal(
+                "execution nonce preflight runtime cleanup could not be confirmed".to_string(),
+            ));
+        }
         let budget_metadata = match (budget_mutation.charge_result(), reverse.as_ref()) {
             (Some(charge), Some(reverse)) => Some(self.budget_execution_receipt_metadata(
                 charge,

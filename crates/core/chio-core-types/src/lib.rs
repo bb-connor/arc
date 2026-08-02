@@ -33,6 +33,10 @@ pub mod hashing;
 pub mod loaded_weights;
 pub mod manifest;
 pub mod merkle;
+#[cfg(any(kani, test))]
+#[doc(hidden)]
+pub mod merkle_fixtures;
+pub mod merkle_steps;
 pub mod message;
 pub mod oracle;
 pub mod partition_escrow;
@@ -84,6 +88,7 @@ pub use manifest::{
     ToolFlowDeclaration, ToolFlowValidationError, ToolManifest, ToolManifestBody, ToolPricing,
 };
 pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
+pub use merkle_steps::{inclusion_step, InclusionStep};
 pub use message::{
     AgentMessage, KernelMessage, OpaqueSupplementalAuthorization, ToolCallError, ToolCallResult,
     MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES, MAX_SUPPLEMENTAL_AUTHORIZATION_REFERENCE_BYTES,
@@ -132,10 +137,12 @@ pub use session::{
 };
 pub use signed_artifact::{
     built_in_signed_artifact_registry, is_supported_signed_artifact_schema,
-    validate_signed_artifact_schema, SignedArtifactSchemaEntry, CHIO_ANCHOR_BATCH_V1_SCHEMA,
-    CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA, CHIO_ANCHOR_INCLUSION_PROOF_V2_SCHEMA,
-    CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA, CHIO_ANCHOR_PROOF_BUNDLE_V2_SCHEMA,
-    CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA, CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA,
+    validate_signed_artifact_schema, SignedArtifactSchemaEntry,
+    CHIO_AGENT_WEB_PROOF_ENVELOPE_V1_SCHEMA, CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA,
+    CHIO_ANCHOR_BATCH_V1_SCHEMA, CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA,
+    CHIO_ANCHOR_INCLUSION_PROOF_V2_SCHEMA, CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
+    CHIO_ANCHOR_PROOF_BUNDLE_V2_SCHEMA, CHIO_BROKER_AUDIT_COMPARISON_V1_SCHEMA,
+    CHIO_BROKER_AUDIT_RUNNER_AUTHORIZATION_V1_SCHEMA,
     CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA, CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA,
     CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA, CHIO_ENTERPRISE_MIGRATION_CANARY_EVIDENCE_V1_SCHEMA,
     CHIO_ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_V1_SCHEMA,

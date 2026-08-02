@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, time::Duration};
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 use super::CliError;
 use chio_egress_contract::HttpEgressContract;
@@ -8,6 +8,7 @@ const AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS_ENV: &str =
     "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS";
 const AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS_ENV: &str =
     "CHIO_AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS";
+const AGENT_WEB_REPLAY_STORE_PATH_ENV: &str = "CHIO_AGENT_WEB_REPLAY_STORE_PATH";
 const AGENT_WEB_TRUSTED_KERNEL_KEYS_ENV: &str = "CHIO_AGENT_WEB_TRUSTED_KERNEL_KEYS";
 const AGENT_WEB_TRUSTED_ENVELOPE_SIDECAR_KEYS_ENV: &str =
     "CHIO_AGENT_WEB_TRUSTED_ENVELOPE_SIDECAR_KEYS";
@@ -63,7 +64,15 @@ const PUBLIC_SETTLEMENT_TRUSTED_ESCROW_RUNTIME_CODEHASH_ENV: &str =
 const PUBLIC_SETTLEMENT_TRUSTED_BOND_VAULT_RUNTIME_CODEHASH_ENV: &str =
     "CHIO_PUBLIC_SETTLEMENT_TRUSTED_BOND_VAULT_RUNTIME_CODEHASH";
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum AgentWebReplayMode {
+    ReadOnly,
+    Consume,
+}
+
 pub(super) fn agent_web_verifier_trust_from_env(
+    replay_mode: AgentWebReplayMode,
+    replay_reservation_id: Option<&str>,
 ) -> Result<chio_control_plane::agent_web::AgentWebVerifierTrust, CliError> {
     let mut trust = match std::env::var(AGENT_WEB_STANDARD_WEBHOOKS_SECRET_ENV) {
         Ok(secret) => chio_control_plane::agent_web::AgentWebVerifierTrust::new()
@@ -79,6 +88,15 @@ pub(super) fn agent_web_verifier_trust_from_env(
     };
     if let Some((now_unix_seconds, max_age_seconds)) = standard_webhooks_replay_window_from_env()? {
         trust = trust.with_standard_webhooks_replay_window(now_unix_seconds, max_age_seconds);
+        if replay_mode == AgentWebReplayMode::Consume {
+            let replay_store = agent_web_replay_store_from_env()?;
+            trust = trust.with_standard_webhooks_replay_store(Arc::new(replay_store));
+        }
+    }
+    if let Some(reservation_id) = replay_reservation_id {
+        trust = trust
+            .with_standard_webhooks_replay_reservation_id(reservation_id)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     }
     match std::env::var(AGENT_WEB_TRUSTED_KERNEL_KEYS_ENV) {
         Ok(keys) => {
@@ -109,6 +127,40 @@ pub(super) fn agent_web_verifier_trust_from_env(
         }
     }
     Ok(trust)
+}
+
+pub(super) fn agent_web_replay_store_from_env(
+) -> Result<chio_store_sqlite::SqliteAgentWebReplayStore, CliError> {
+    agent_web_replay_store_from_env_if_configured()?.ok_or_else(|| {
+        CliError::cli_other_error(format!(
+            "{AGENT_WEB_REPLAY_STORE_PATH_ENV} must be set and non-empty"
+        ))
+    })
+}
+
+pub(super) fn agent_web_replay_store_from_env_if_configured(
+) -> Result<Option<chio_store_sqlite::SqliteAgentWebReplayStore>, CliError> {
+    let replay_store_path = match std::env::var(AGENT_WEB_REPLAY_STORE_PATH_ENV) {
+        Ok(value) if value.trim().is_empty() => {
+            return Err(CliError::cli_other_error(format!(
+                "{AGENT_WEB_REPLAY_STORE_PATH_ENV} must be non-empty"
+            )))
+        }
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => return Ok(None),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err(CliError::cli_other_error(format!(
+                "{AGENT_WEB_REPLAY_STORE_PATH_ENV} must be valid UTF-8"
+            )))
+        }
+    };
+    chio_store_sqlite::SqliteAgentWebReplayStore::open(replay_store_path)
+        .map(Some)
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "{AGENT_WEB_REPLAY_STORE_PATH_ENV} could not be opened: {error}"
+            ))
+        })
 }
 
 fn standard_webhooks_replay_window_from_env() -> Result<Option<(u64, u64)>, CliError> {

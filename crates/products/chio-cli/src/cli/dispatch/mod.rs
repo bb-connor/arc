@@ -11,6 +11,7 @@ mod lineage_cmd;
 #[path = "market.rs"]
 mod market_cmd;
 mod output;
+mod policy_analysis;
 mod pheromone;
 mod proof;
 mod receipt_evidence;
@@ -43,6 +44,7 @@ use certify_cert::{dispatch_cert, dispatch_certify};
 use did_passport::{dispatch_did, dispatch_passport};
 pub(crate) use output::write_cli_error;
 use proof::{dispatch_commerce, dispatch_proof};
+use policy_analysis::dispatch_policy;
 use receipt_evidence::{dispatch_evidence, dispatch_receipt};
 use reputation_guard::{dispatch_conformance, dispatch_guard, dispatch_reputation};
 use settle_arena::{dispatch_arena, dispatch_settle};
@@ -378,6 +380,7 @@ pub(crate) fn run() {
             Commands::Proof { command } => dispatch_proof(command, json_output),
             Commands::Commerce { command } => dispatch_commerce(command, json_output),
             Commands::Workflow { command } => dispatch_workflow(command, json_output),
+            Commands::Policy { command } => dispatch_policy(command, json_output),
             Commands::Cert { command } => dispatch_cert(command, json_output, authority_seed_file),
             Commands::Reputation { command } => dispatch_reputation(
                 command,

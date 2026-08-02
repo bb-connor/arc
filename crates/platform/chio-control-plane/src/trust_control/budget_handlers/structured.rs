@@ -571,6 +571,87 @@ pub(crate) async fn handle_structured_budget_capture_invocation(
     )
 }
 
+pub(crate) async fn handle_capture_invocation(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(payload): Json<CaptureInvocationRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match forward_post_to_leader(&state, BUDGET_CAPTURE_INVOCATION_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
+    let (store, authority) = match structured_lifecycle_budget_store(&state, &payload.hold_id) {
+        Ok(authority) => authority,
+        Err(response) => return response,
+    };
+    let grant_index = match u32::try_from(payload.grant_index) {
+        Ok(grant_index) => grant_index,
+        Err(error) => return structured_bad_request(error),
+    };
+    let request = BudgetCaptureInvocationRequest {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
+        trusted_time: None,
+        authority,
+    };
+    if let Err(error) = request.validate() {
+        return structured_bad_request(error);
+    }
+    let (decision, structured_decision, mutation) =
+        match store.capture_invocation_reservations(request) {
+            Ok(BudgetInvocationCaptureDecision::Captured(mutation)) => (
+                CaptureInvocationDecision::Captured,
+                StructuredBudgetMutationDecisionView::Applied,
+                mutation,
+            ),
+            Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(mutation)) => (
+                CaptureInvocationDecision::AlreadyCaptured,
+                StructuredBudgetMutationDecisionView::AlreadyApplied,
+                mutation,
+            ),
+            Err(error) => return budget_internal_error(&error, "budget invocation capture failed"),
+        };
+    let structured_projection = match exact_structured_mutation_projection(
+        &store,
+        Some(&payload.capability_id),
+        Some(grant_index),
+        payload.hold_id.clone(),
+        payload.event_id.clone(),
+        structured_decision,
+        mutation,
+    ) {
+        Ok(projection) => projection,
+        Err(response) => return response,
+    };
+    let Some(usage) = structured_projection.usage.as_ref() else {
+        return structured_projection_error("capture projection omitted durable usage");
+    };
+    Json(CaptureInvocationResponse {
+        capability_id: payload.capability_id,
+        grant_index: payload.grant_index,
+        hold_id: payload.hold_id,
+        event_id: payload.event_id,
+        decision,
+        exposure_units: structured_projection.projection.exposure_units,
+        invocation_count_after: structured_projection.projection.invocation_count_after,
+        usage_invocation_count: usage.invocation_count,
+        committed_cost_units_after: structured_projection.projection.committed_cost_units_after,
+        total_cost_exposed_after: usage.total_cost_exposed,
+        total_cost_realized_spend_after: usage.total_cost_realized_spend,
+        usage_seq: usage.seq,
+        budget_authority: None,
+        budget_commit: None,
+        structured_projection: Some(structured_projection),
+    })
+    .into_response()
+}
+
 pub(crate) async fn handle_structured_budget_reverse(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,

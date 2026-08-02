@@ -14,10 +14,11 @@ mod admission_budget;
 mod admission_consensus;
 #[path = "service_types/aggregate_family_root.rs"]
 mod aggregate_family_root;
+#[path = "service_types/budget_lifecycle.rs"]
+#[cfg(test)]
+mod budget_lifecycle;
 #[path = "service_types/budget_mutation_event_query.rs"]
 mod budget_mutation_event_query;
-#[path = "service_types/budget_lifecycle.rs"]
-mod budget_lifecycle;
 #[path = "service_types/capability_issuance.rs"]
 mod capability_issuance;
 #[path = "service_types/cluster_budget.rs"]
@@ -90,9 +91,10 @@ pub(crate) use self::capability_issuance::{
 pub(crate) use self::cluster_budget::{
     AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
     BudgetAuthorizeExposureDecision, BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse,
-    BudgetInvocationQuotaUsageRecordView,
-    BudgetMutationAuthorityView, BudgetMutationEventView, BudgetOriginAck, BudgetWriteCommitView,
-    ClusterAuthorityLeaseView, ClusterReplicationHeadsView, ClusterStateSnapshotResponse,
+    BudgetInvocationQuotaUsageRecordView, BudgetMutationAuthorityView, BudgetMutationEventView,
+    BudgetOriginAck, BudgetWriteCommitView, CaptureInvocationDecision, CaptureInvocationRequest,
+    CaptureInvocationResponse, ClusterAuthorityLeaseView, ClusterPartitionRequest,
+    ClusterPartitionResponse, ClusterReplicationHeadsView, ClusterStateSnapshotResponse,
     ClusterStatusResponse, LineageDeltaResponse, PeerStatusView, ReceiptDeltaQuery,
     ReceiptDeltaResponse, ReduceChargeCostRequest, ReduceChargeCostResponse,
     ReverseChargeCostRequest, ReverseChargeCostResponse, RevocationCursorView,
@@ -108,18 +110,6 @@ pub use self::config::{
     AuthorityWorkloadPolicy, ClusterMemberIdentity, TrustFiscalRuntimeConfig, TrustServiceConfig,
 };
 pub use self::paths::FEDERATED_DELEGATION_POLICY_SCHEMA;
-pub(crate) use self::paths::{
-    AUTHORITY_CACHE_TTL, BUDGET_CAPTURE_INVOCATION_PATH, FISCAL_ACTIVATIONS_PATH,
-    FISCAL_APPROVALS_PATH, FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH,
-    FISCAL_MARKETPLACE_PRICE_PATH, FISCAL_PROPOSALS_PATH, FISCAL_PROPOSAL_ADMIT_PATH,
-    FISCAL_PROPOSAL_PREVIEW_PATH, FISCAL_RESOLVE_PATH, FISCAL_RUNTIME_STATUS_PATH,
-    INTERNAL_ADMISSION_AUTHORITY_PATH, INTERNAL_CLUSTER_PARTITION_PATH,
-    STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH, STRUCTURED_BUDGET_AUTHORIZE_PATH,
-    STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH, STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH,
-    STRUCTURED_BUDGET_CAPTURE_SPEND_PATH, STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH,
-    STRUCTURED_BUDGET_FENCED_REVERSE_PATH, STRUCTURED_BUDGET_RECONCILE_PATH,
-    STRUCTURED_BUDGET_RELEASE_PATH,
-};
 pub(crate) use self::paths::{
     ACTIVE_DEFENSE_EVENTS_PATH, ACTIVE_DEFENSE_HEALTH_PATH, AGENT_RECEIPTS_PATH,
     AGGREGATE_FAMILY_ROOT_LOOKUP_PATH, AUTHORITY_KEY_LOG_SYNC_PATH, AUTHORITY_PATH,
@@ -199,6 +189,17 @@ pub(crate) use self::paths::{
     BUDGET_AUTHORIZE_HOLD_QUERY_PATH, BUDGET_CAPTURE_INVOCATIONS_PATH,
     BUDGET_CAPTURE_INVOCATIONS_QUERY_PATH,
 };
+pub(crate) use self::paths::{
+    BUDGET_CAPTURE_INVOCATION_PATH, FISCAL_ACTIVATIONS_PATH, FISCAL_APPROVALS_PATH,
+    FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH, FISCAL_MARKETPLACE_PRICE_PATH, FISCAL_PROPOSALS_PATH,
+    FISCAL_PROPOSAL_ADMIT_PATH, FISCAL_PROPOSAL_PREVIEW_PATH, FISCAL_RESOLVE_PATH,
+    FISCAL_RUNTIME_STATUS_PATH, INTERNAL_ADMISSION_AUTHORITY_PATH, INTERNAL_CLUSTER_PARTITION_PATH,
+    STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH, STRUCTURED_BUDGET_AUTHORIZE_PATH,
+    STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH, STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH,
+    STRUCTURED_BUDGET_CAPTURE_SPEND_PATH, STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH,
+    STRUCTURED_BUDGET_FENCED_REVERSE_PATH, STRUCTURED_BUDGET_RECONCILE_PATH,
+    STRUCTURED_BUDGET_RELEASE_PATH,
+};
 pub(crate) use self::requests::{
     build_capability_snapshot, build_federated_delegation_anchor_snapshot,
     ensure_federated_delegation_policy_active,
@@ -238,11 +239,10 @@ pub use self::responses::{
 };
 pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
-    BudgetCursor, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
+    BudgetCursor, CachedBudgetUsage, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
     ClusterRuntimeState, FederationAdmissionRateLimiter, PeerHealth, PeerSyncState,
-    CachedBudgetUsage, RemoteAdmissionCaptureAuthority, RemoteAgentEconomyBudgetStore,
-    RemoteAuthorityEpoch, RemoteBudgetStore, RemoteCapabilityAuthority,
-    RemoteCompositeHoldEvidence, RemoteReceiptStore,
+    RemoteAdmissionCaptureAuthority, RemoteAgentEconomyBudgetStore, RemoteAuthorityEpoch,
+    RemoteBudgetStore, RemoteCapabilityAuthority, RemoteCompositeHoldEvidence, RemoteReceiptStore,
     RemoteRevocationStore, RevocationCursor, TrustServiceState,
 };
 pub(crate) use self::structured_budget::*;

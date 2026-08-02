@@ -19,17 +19,22 @@ use chio_federation::{
     bilateral_dsse::PolicyEvaluationSummary, bilateral_dsse::PolicyVerdict,
     bilateral_dsse::TreatyBindingRef, bilateral_dsse::PAYLOAD_TYPE_IN_TOTO,
 };
-use chio_kernel::{RuntimeAdmissionContext, RuntimeAdmissionHook, ToolCallRequest};
+use chio_kernel::{
+    RuntimeAdmissionContext, RuntimeAdmissionHook, RuntimeAdmissionRevalidationContext,
+    ToolCallRequest,
+};
 use chio_runtime_core::{
     compute_ladder_intersection, evaluate_runtime_admission, runtime_admission_bundle_sha256,
     runtime_peer_weights_sha256, sign_runtime_admission_report, tool_args_sha256,
     verify_signed_runtime_admission_report, BilateralInvocation, ChioRuntimeAdmissionHook,
     CrossKernelContinuation, InMemoryRuntimeAdmissionStore, ReceiptLineageBundle,
     ReceiptLineageStatement, RuntimeAdmissionBundle, RuntimeAdmissionInput,
-    RuntimeAdmissionProfile, RuntimePeerWeight, RuntimePeerWeights, RuntimePheromoneAdvisory,
-    RuntimePheromonePolicy, RuntimePheromonePolicyRule, RuntimeRequestBinding,
-    RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundleV4, SignedRuntimePheromoneQueryReport,
-    SqliteRuntimeOrchestrationStore, TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA,
+    RuntimeAdmissionProfile, RuntimeAdmissionStore, RuntimePeerWeight, RuntimePeerWeights,
+    RuntimePheromoneAdvisory, RuntimePheromonePolicy, RuntimePheromonePolicyRule,
+    RuntimeRequestBinding, RuntimeTrustFloorEntry, RuntimeTrustedVerifierKey,
+    RuntimeVerifierTrustBundleV4, SignedRuntimePheromoneQueryReport,
+    SqliteRuntimeOrchestrationStore, TreatyRuntimeArtifactRecord, TreatyScope,
+    CHIO_BILATERAL_INVOCATION_SCHEMA,
     CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA, CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA,
     CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA, CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
     CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_FAILURE_CODES,
@@ -50,6 +55,8 @@ use chio_swarm_authority::{
     CHIO_SWARM_TASK_GRAPH_SCHEMA, CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA,
 };
 use std::io;
+
+use chio_runtime_core::ChioRuntimeError;
 
 use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
 
@@ -128,6 +135,8 @@ fn bundle() -> RuntimeAdmissionBundle {
         verification_context_sha256: "c".repeat(64),
     }
 }
+
+include!("runtime_admission/fault_cases.rs");
 
 #[test]
 fn chio_native_runtime_admission_schema_emits_chio_report() -> Result<(), Box<dyn std::error::Error>>
@@ -950,6 +959,13 @@ fn treaty_runtime_hook_denies_replayed_continuation() -> Result<(), Box<dyn std:
 
     let first = hook.evaluate(&context)?;
     assert!(first.allowed, "{first:#?}");
+    assert!(first.has_verified_treaty_material(), "{first:#?}");
+    assert!(first
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("chio_runtime"))
+        .and_then(|runtime| runtime.get("federation_treaty_dsse"))
+        .is_none());
     let replay = hook.evaluate(&context)?;
 
     assert!(!replay.allowed);
@@ -981,11 +997,12 @@ fn treaty_runtime_hook_releases_continuation_after_runtime_denial(
     let hook = allowing_policy_hook(store)?;
     let treaty_context = treaty_runtime_context(&fixture);
 
-    let denied_request = treaty_runtime_request(
-        serde_json::json!({"record": "vendor-ledger-7", "value": "wrong"}),
+    let mut denied_request = treaty_runtime_request(
+        good_args.clone(),
         bundle_hash.clone(),
         treaty_context.clone(),
     )?;
+    denied_request.request_id = "req-runtime-binding-mismatch".to_string();
     let denied = hook.evaluate(&RuntimeAdmissionContext {
         request: &denied_request,
         extra_metadata: None,

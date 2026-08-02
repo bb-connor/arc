@@ -113,8 +113,7 @@ pub(crate) const STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH: &str =
     "/v1/budgets/holds/authorize-cumulative";
 pub(crate) const STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH: &str =
     "/v1/budgets/cumulative-approval/lookup";
-pub(crate) const STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH: &str =
-    "/v1/budgets/holds/cancel-captured";
+pub(crate) const STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH: &str = "/v1/budgets/holds/cancel-captured";
 pub(crate) const STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH: &str =
     "/v1/budgets/holds/capture-invocation";
 pub(crate) const STRUCTURED_BUDGET_FENCED_REVERSE_PATH: &str = "/v1/budgets/holds/reverse";
@@ -237,8 +236,7 @@ pub(crate) const FISCAL_APPROVALS_PATH: &str = "/v1/fiscal/approvals";
 pub(crate) const FISCAL_ACTIVATIONS_PATH: &str = "/v1/fiscal/activations";
 pub(crate) const FISCAL_RESOLVE_PATH: &str = "/v1/fiscal/resolve";
 pub(crate) const FISCAL_MARKETPLACE_PRICE_PATH: &str = "/v1/fiscal/marketplace/price";
-pub(crate) const FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH: &str =
-    "/v1/fiscal/marketplace/credit-limit";
+pub(crate) const FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH: &str = "/v1/fiscal/marketplace/credit-limit";
 pub(crate) const UNDERWRITING_INPUT_PATH: &str = "/v1/reports/underwriting-input";
 pub(crate) const UNDERWRITING_DECISION_PATH: &str = "/v1/reports/underwriting-decision";
 pub(crate) const UNDERWRITING_SIMULATION_PATH: &str = "/v1/reports/underwriting-simulation";
@@ -261,7 +259,6 @@ pub(crate) const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
 pub(crate) const DEFAULT_LIST_LIMIT: usize = 50;
 pub(crate) const MAX_LIST_LIMIT: usize = 200;
 pub(crate) const BUDGET_DELTA_MAX_RECORDS: usize = MAX_LIST_LIMIT * 2;
-pub(crate) const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
 pub(crate) const CONTROL_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 /// Hard cap on a single peer-response body the cluster client will buffer and
 /// decode. Matches the HTTP relay body-size posture; an oversized or

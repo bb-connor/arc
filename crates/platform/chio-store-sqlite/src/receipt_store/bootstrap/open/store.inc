@@ -1199,9 +1199,12 @@ impl SqliteReceiptStore {
             super::support::ensure_receipt_retention_watermark_table(&connection)?;
             super::support::ensure_receipt_retention_tombstones(&connection)?;
             backfill_tool_receipt_attribution_columns(&connection)?;
-            super::support::backfill_provenance_lineage_tables(&mut connection)?;
-            super::support::backfill_claim_receipt_log_entries(&mut connection)?;
-            super::support::backfill_checkpoint_transparency_projections(&mut connection)?;
+            let projection_backfill =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            super::support::backfill_provenance_lineage_tables(&projection_backfill)?;
+            super::support::backfill_claim_receipt_log_entries(&projection_backfill)?;
+            super::support::backfill_checkpoint_transparency_projections(&projection_backfill)?;
+            projection_backfill.commit()?;
             Ok(())
         })();
         let guard_result = super::support::ensure_transparency_projection_guards(&connection);

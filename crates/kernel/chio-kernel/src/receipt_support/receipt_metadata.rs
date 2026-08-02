@@ -2,6 +2,7 @@ use super::receipt_scopes::{
     current_governed_call_chain_receipt_evidence, current_governed_runtime_attestation_record,
 };
 use crate::evidence_export::EvidenceLineageReferences;
+use crate::kernel::VerifiedGovernedPayeeBinding;
 use crate::operator_report::GovernedTransactionDiagnostics;
 use crate::*;
 use chio_appraisal::{verify_runtime_attestation_record, VerifiedRuntimeAttestationRecord};
@@ -249,6 +250,7 @@ fn governed_runtime_assurance_receipt_metadata(
 fn governed_economic_authorization_metadata(
     request: &ToolCallRequest,
     financial: &FinancialReceiptMetadata,
+    payee_binding: Option<&VerifiedGovernedPayeeBinding>,
 ) -> Result<Option<chio_core::receipt::economics::EconomicAuthorizationReceiptMetadata>, KernelError>
 {
     let Some(governed_intent) = request.governed_intent.as_ref() else {
@@ -257,6 +259,41 @@ fn governed_economic_authorization_metadata(
     let Some(intent) = governed_intent.as_tool_invocation() else {
         return Ok(None);
     };
+
+    if let Some(payee_binding) = payee_binding {
+        let commerce = intent.commerce.as_ref().ok_or_else(|| {
+            KernelError::ReceiptSigningFailed(
+                "verified governed payee binding has no commerce context".to_string(),
+            )
+        })?;
+        let intent_digest = governed_intent.binding_hash().map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to hash governed transaction intent for payee binding: {error}"
+            ))
+        })?;
+        let approval_artifact_digest = request
+            .approval_artifact_digest()
+            .map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to hash governed approval for payee binding: {error}"
+                ))
+            })?
+            .ok_or_else(|| {
+                KernelError::ReceiptSigningFailed(
+                    "verified governed payee binding has no approval artifact".to_string(),
+                )
+            })?;
+        if payee_binding.economic_intent_digest() != intent_digest.as_str()
+            || payee_binding.beneficiary_id() != commerce.seller
+            || commerce.settlement_destination_ref.as_deref()
+                != Some(payee_binding.settlement_destination_ref())
+            || payee_binding.pre_action_authority_digest() != approval_artifact_digest.as_str()
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "verified governed payee binding does not match the request".to_string(),
+            ));
+        }
+    }
 
     let approved_max =
         intent
@@ -342,9 +379,12 @@ fn governed_economic_authorization_metadata(
     Ok(Some(
         chio_core::receipt::economics::EconomicAuthorizationReceiptMetadata {
             version: chio_core::receipt::economics::EconomicAuthorizationReceiptMetadataVersion::V1,
-            economic_intent_digest: None,
-            payee_binding_digest: None,
-            pre_action_authority_digest: None,
+            economic_intent_digest: payee_binding
+                .map(|binding| binding.economic_intent_digest().to_owned()),
+            payee_binding_digest: payee_binding
+                .map(|binding| binding.payee_binding_digest().to_owned()),
+            pre_action_authority_digest: payee_binding
+                .map(|binding| binding.pre_action_authority_digest().to_owned()),
             credit_authority_digest: None,
             economic_mode,
             payer: chio_core::receipt::economics::EconomicPayerReceiptMetadata {
@@ -364,12 +404,20 @@ fn governed_economic_authorization_metadata(
                 order_ref: Some(request.request_id.clone()),
             },
             payee: chio_core::receipt::economics::EconomicPayeeReceiptMetadata {
-                beneficiary_id: request.server_id.clone(),
-                settlement_destination_ref: financial
-                    .payment_reference
-                    .clone()
-                    .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone()))
+                beneficiary_id: payee_binding
+                    .map(|binding| binding.beneficiary_id().to_owned())
                     .unwrap_or_else(|| request.server_id.clone()),
+                settlement_destination_ref: payee_binding
+                    .map(|binding| binding.settlement_destination_ref().to_owned())
+                    .unwrap_or_else(|| {
+                        financial
+                            .payment_reference
+                            .clone()
+                            .or_else(|| {
+                                commerce.map(|commerce| commerce.shared_payment_token_id.clone())
+                            })
+                            .unwrap_or_else(|| request.server_id.clone())
+                    }),
             },
             rail: chio_core::receipt::economics::EconomicRailReceiptMetadata {
                 kind: if commerce.is_some() {
@@ -584,6 +632,22 @@ pub(crate) fn request_receipt_metadata(
     now: u64,
     extra_metadata: Option<&serde_json::Value>,
 ) -> Result<Option<serde_json::Value>, KernelError> {
+    request_receipt_metadata_with_payee_binding(
+        request,
+        attestation_trust_policy,
+        now,
+        extra_metadata,
+        None,
+    )
+}
+
+pub(crate) fn request_receipt_metadata_with_payee_binding(
+    request: &ToolCallRequest,
+    attestation_trust_policy: Option<&AttestationTrustPolicy>,
+    now: u64,
+    extra_metadata: Option<&serde_json::Value>,
+    payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+) -> Result<Option<serde_json::Value>, KernelError> {
     let governed_metadata = governed_request_metadata(request, attestation_trust_policy, now)?;
     let financial = extra_metadata
         .and_then(serde_json::Value::as_object)
@@ -594,7 +658,9 @@ pub(crate) fn request_receipt_metadata(
         governed_metadata,
         financial
             .as_ref()
-            .map(|financial| governed_economic_authorization_metadata(request, financial))
+            .map(|financial| {
+                governed_economic_authorization_metadata(request, financial, payee_binding)
+            })
             .transpose()?
             .flatten(),
     )?;

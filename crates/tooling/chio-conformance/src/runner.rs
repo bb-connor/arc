@@ -251,6 +251,17 @@ fn validate_conformance_credentials(options: &ConformanceRunOptions) -> Result<(
     Ok(())
 }
 
+fn create_private_directory(path: &Path) -> std::io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(path)
+}
+
 pub fn run_conformance_harness(
     options: &ConformanceRunOptions,
 ) -> Result<ConformanceRunSummary, RunnerError> {
@@ -269,6 +280,7 @@ pub fn run_conformance_harness(
     }
 
     let artifacts_dir = options.results_dir.join("artifacts");
+    create_private_directory(&artifacts_dir)?;
     let logs_dir = artifacts_dir.join("logs");
     fs::create_dir_all(&logs_dir)?;
     #[cfg(unix)]

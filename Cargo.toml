@@ -161,6 +161,7 @@ members = [
     "crates/sdk/chio-eval-receipt",
     "crates/tooling/chio-spec-codegen",
     "crates/tooling/chio-spec-validate",
+    "crates/tooling/chio-trace-validate",
     #
     # Examples
     "examples/bilateral-invocation",
@@ -264,7 +265,7 @@ expect_used = "deny"
 codegen-units = 1
 lto = "fat"
 strip = "symbols"
-panic = "abort"
+panic = "unwind"
 
 [profile.docker-release]
 inherits = "release"
@@ -484,6 +485,7 @@ chio-secret-broker = { path = "crates/security/chio-secret-broker" }
 chio-siem = { path = "crates/observability/chio-siem" }
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }
 chio-spec-validate = { path = "crates/tooling/chio-spec-validate" }
+chio-trace-validate = { path = "crates/tooling/chio-trace-validate" }
 chio-store-sqlite = { path = "crates/platform/chio-store-sqlite" }
 chio-swarm-authority = { path = "crates/kernel/chio-swarm-authority" }
 chio-transaction-passport = { path = "crates/platform/chio-transaction-passport" }

@@ -32,8 +32,7 @@ fn replay_reservation(
         deadline,
     )
     .expect("proposal body");
-    let proposal = ThresholdApprovalProposal::sign(proposal_body, &authority)
-    .expect("proposal");
+    let proposal = ThresholdApprovalProposal::sign(proposal_body, &authority).expect("proposal");
     let proposal_hash = proposal.proposal_hash().expect("proposal hash");
     let tokens = approvers
         .iter()

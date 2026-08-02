@@ -7,7 +7,9 @@ pub(crate) struct TrustServiceState {
     /// authority was injected. Configured paths alone do not enable it.
     pub(crate) joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
     pub(crate) fiscal_runtime: Option<Arc<TrustFiscalRuntime>>,
+    #[cfg(test)]
     pub(crate) budget_store: Option<Arc<SqliteBudgetStore>>,
+    #[cfg(test)]
     pub(crate) revocation_store: Option<Arc<SqliteRevocationStore>>,
     pub(crate) dashboard_sessions: super::super::dashboard_auth::DashboardSessionStore,
     pub(crate) dashboard_report_bridge:
@@ -126,12 +128,7 @@ pub(crate) struct RemoteBudgetStore {
 
 pub(crate) struct RemoteAgentEconomyBudgetStore {
     pub(crate) client: TrustControlClient,
-    pub(crate) cached_usage: Mutex<
-        HashMap<
-            (String, usize),
-            CachedBudgetUsage,
-        >,
-    >,
+    pub(crate) cached_usage: Mutex<HashMap<(String, usize), CachedBudgetUsage>>,
 }
 
 pub(crate) struct RemoteAdmissionCaptureAuthority {
@@ -169,12 +166,14 @@ pub(crate) struct CachedBudgetUsage {
 }
 
 impl TrustServiceState {
+    #[cfg(test)]
     pub(crate) fn optional_revocation_store(
         &self,
     ) -> Result<Option<Arc<SqliteRevocationStore>>, &'static str> {
         Ok(self.revocation_store.clone())
     }
 
+    #[cfg(test)]
     pub(crate) fn revocation_store(&self) -> Result<Arc<SqliteRevocationStore>, Response> {
         self.optional_revocation_store()
             .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error))?
@@ -206,6 +205,7 @@ impl TrustServiceState {
             })
     }
 
+    #[cfg(test)]
     pub(crate) fn budget_store(&self) -> Result<SqliteAgentEconomyBudgetStore, Response> {
         self.agent_economy_budget_store()
     }

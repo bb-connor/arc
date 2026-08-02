@@ -19,6 +19,7 @@ pub fn build_remote_budget_store(
     Ok(Box::new(remote_budget_store(control_url, control_token)?))
 }
 
+#[cfg(test)]
 pub(crate) fn build_shared_remote_budget_store(
     control_url: &str,
     control_token: &str,

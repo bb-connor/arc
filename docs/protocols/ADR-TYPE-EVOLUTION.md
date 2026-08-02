@@ -242,3 +242,20 @@ dispatch permit. The lifetime cap (`MAX_APPROVAL_TTL_SECS = 3600`) keeps the
 durable reservation deadline bounded. See
 `chio-kernel/src/threshold_approval.rs` and
 `chio-kernel/src/kernel/admission_coordinator.rs`.
+
+The governed dispatch boundary independently reserves the
+single-use `(subject_id, request_id, intent_hash)` key through
+`GovernedApprovalReplayStore` before any external payment or tool side effect.
+The reservation is committed after authorization or immediately before
+dispatch, and it is rolled back only while the kernel can prove dispatch and
+external authorization did not occur. A failed or unconfirmed commit leaves
+the marker replay-blocking and is reported as an unknown retention outcome.
+
+The kernel has no implicit approval replay store. Embedding hosts must install
+one explicitly. `InMemoryGovernedApprovalReplayStore` is process-scoped and
+bounded without evicting live markers. Hosts that need replay protection across
+restart must install `SqliteGovernedApprovalReplayStore` or another durable
+implementation. The signed token lifetime cap remains an independent bound on
+valid approval tokens. See
+`chio-kernel/src/governed_approval_replay.rs` and
+`chio-kernel/src/kernel/credential_reservation.rs`.

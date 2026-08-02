@@ -34,9 +34,8 @@ use crate::agent_economy_projection_store::QualifiedAdmissionProjectionStore;
 use crate::agent_economy_revocation_set::AgentEconomyCanonicalRevocationSet;
 use crate::agent_economy_supplemental_quota::{
     canonical_revocation_set_for_verified_claim, supplemental_authorization_artifact_digest,
-    verify_supplemental_quota, KernelVerifiedSupplementalQuotaClaim,
-    SupplementalQuotaError, SupplementalQuotaVerificationContext,
-    BROKER_CAPABILITY_EXECUTION_PROFILE,
+    verify_supplemental_quota, KernelVerifiedSupplementalQuotaClaim, SupplementalQuotaError,
+    SupplementalQuotaVerificationContext, BROKER_CAPABILITY_EXECUTION_PROFILE,
 };
 use crate::tool_outcome::{
     EvaluationModeV1, EvaluationPhaseV1, FrozenEvaluationStepV1, InvocationOutputV1,
@@ -741,9 +740,7 @@ impl ChioKernel {
             .supplemental_authorization
             .as_ref()
             .map(|authorization| {
-                supplemental_authorization_artifact_digest(
-                    authorization.artifact(),
-                )
+                supplemental_authorization_artifact_digest(authorization.artifact())
             });
         let immutable_request_hash =
             immutable_tool_admission_request_hash(request, matching_grants, &post_return_plan)?;
@@ -984,8 +981,8 @@ impl ChioKernel {
             .agent_economy_supplemental_quota_verifier
             .as_ref()
             .ok_or_else(|| {
-            KernelError::DurableAdmission(SupplementalQuotaError::MissingVerifier.to_string())
-        })?;
+                KernelError::DurableAdmission(SupplementalQuotaError::MissingVerifier.to_string())
+            })?;
 
         #[derive(Serialize)]
         struct ToolDestination<'a> {
@@ -1566,15 +1563,17 @@ impl ChioKernel {
             self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
         let journal = runtime
             .store
-            .advance_payment_journal(crate::agent_economy_projection_store::AdmissionPaymentJournalAdvance {
-                operation: &admission.operation,
-                recovery_lease: &recovery_lease,
-                expected,
-                transition,
-                release_evidence: None,
-                active_fence: &runtime.fence,
-                trusted_now_unix_ms,
-            })
+            .advance_payment_journal(
+                crate::agent_economy_projection_store::AdmissionPaymentJournalAdvance {
+                    operation: &admission.operation,
+                    recovery_lease: &recovery_lease,
+                    expected,
+                    transition,
+                    release_evidence: None,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+            )
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
         journal
             .validate()
@@ -1737,7 +1736,9 @@ impl ChioKernel {
                 let result = adapter
                     .release(&authorization_id, current.binding().request_id().as_str())
                     .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                if result.settlement_status != crate::agent_economy_payment::RailSettlementStatus::Released {
+                if result.settlement_status
+                    != crate::agent_economy_payment::RailSettlementStatus::Released
+                {
                     return Err(KernelError::DurableAdmission(
                         "pre-dispatch rail release was not confirmed".to_owned(),
                     ));
@@ -1758,8 +1759,10 @@ impl ChioKernel {
                     })
                     .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
             }
-            let released = journal.state == crate::agent_economy_payment::PaymentJournalState::Settled
-                && journal.settle_action == Some(crate::agent_economy_payment::PaymentSettleAction::Release);
+            let released = journal.state
+                == crate::agent_economy_payment::PaymentJournalState::Settled
+                && journal.settle_action
+                    == Some(crate::agent_economy_payment::PaymentSettleAction::Release);
             let cancelled_before_authorization = journal.state
                 == crate::agent_economy_payment::PaymentJournalState::Closed
                 && journal.authorization_id.is_none();
@@ -1903,12 +1906,16 @@ impl ChioKernel {
             .map_err(durable_store_error)
     }
 
-    fn agent_economy_durable_runtime(&self) -> Result<&AgentEconomyDurableAdmissionRuntime, KernelError> {
-        self.agent_economy_durable_admission_runtime.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "qualified admission operation store is unavailable".to_string(),
-            )
-        })
+    fn agent_economy_durable_runtime(
+        &self,
+    ) -> Result<&AgentEconomyDurableAdmissionRuntime, KernelError> {
+        self.agent_economy_durable_admission_runtime
+            .as_ref()
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "qualified admission operation store is unavailable".to_string(),
+                )
+            })
     }
 
     fn durable_stream_limits(&self) -> Result<InvocationStreamLimitsV1, KernelError> {

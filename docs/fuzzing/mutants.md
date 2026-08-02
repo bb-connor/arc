@@ -12,6 +12,11 @@ actually exercised by tests.
 This lane is owned by `agent-role: fuzz-rust` and lives alongside the
 fuzz infrastructure in `docs/fuzzing/`.
 
+The judged catch-ratio lifecycle remains separate from pass/fail workflow
+postures. `scripts/mutants-gate.sh` owns mutation evidence and its reviewed
+counter in `releases.toml`; `scripts/lane-gate.sh` owns stateless GitHub job
+history for proof and corpus lanes. Neither script substitutes for the other.
+
 ## Pinned version
 
 `cargo-mutants` is pinned to the **25.x** series for compatibility with
@@ -25,30 +30,29 @@ cargo install cargo-mutants --version '~25' --locked
 
 ## Configuration layout
 
-cargo-mutants 25.x reads the workspace-root `.cargo/mutants.toml` by default.
-Per-crate `crates/<group>/<name>/mutants.toml` files are NOT auto-discovered,
-and when loaded explicitly via
+cargo-mutants 25.x reads its configuration exclusively from the
+workspace-root `.cargo/mutants.toml`. Per-crate `crates/<name>/mutants.toml`
+files are NOT auto-discovered, and even when loaded explicitly via
 `--config` their globs are matched relative to the source-tree root rather
-than the per-crate root. The nightly job uses the consolidated root config;
-the dormant PR job maps each package to its exact grouped per-crate config.
-All globs are workspace-rooted (e.g.
+than the per-crate root. All per-crate scoping is therefore consolidated
+into the single workspace-root file with workspace-rooted globs (e.g.
 `crates/kernel/chio-kernel-core/src/evaluate.rs`).
 
-| Path | Role |
-|------|------|
-| `.cargo/mutants.toml` | Default and nightly config: timeouts, examined trust-boundary modules per crate, workspace-wide skip list |
-| `crates/<group>/<name>/mutants.toml` | Focused package config loaded explicitly by the dormant PR matrix |
+| Path                                         | Role                                                  |
+|----------------------------------------------|-------------------------------------------------------|
+| `.cargo/mutants.toml`                        | Single source of truth: timeouts, examined trust-boundary modules per crate, workspace-wide skip list |
 
 A second discovery rule constrains the layout: cargo-mutants walks `mod`
-declarations and does NOT expand `include!` macros. Relevant examples include:
+declarations and does NOT expand `include!` macros. Two crates in this
+workspace use `include!`:
 
 - `chio-credentials/src/lib.rs` `include!`s 13 files. Only `trust_tier`
-  and the `cfg`-gated `fuzz` are real `mod`s. The focused globs cover only
-  functions written directly in `lib.rs` and `trust_tier.rs`; the included
-  implementation files are not discoverable.
+  and the `cfg`-gated `fuzz` are real `mod`s. Globs are written against
+  `lib.rs` (which carries all of the included source for discovery
+  purposes) plus `trust_tier.rs`.
 - `chio-policy/src/evaluate.rs` `include!`s `evaluate/{context,engine,
-  matchers,outcomes,tests}.rs`. The glob targets literal functions in
-  `evaluate.rs`, not the included sub-files.
+  matchers,outcomes,tests}.rs`. The glob targets `evaluate.rs` itself,
+  not the sub-files.
 
 Workspace-level knobs of note (in `.cargo/mutants.toml`):
 
@@ -83,15 +87,15 @@ fuzz lane).
 
 #### `chio-policy`
 
-Examined: functions written directly in the HushSpec evaluator umbrella
-(`evaluate.rs`), the compiler module tree (`compiler/*.rs`), conditional
-activation (`conditions.rs`), regex-based
+Examined: the HushSpec evaluator state machine (`evaluate.rs` +
+`evaluate/{engine,matchers,outcomes,context}.rs`), the compiler bridge
+(`compiler.rs`), conditional activation (`conditions.rs`), regex-based
 detectors (`detection.rs`, `regex_safety.rs`), `extends`-chain
 plumbing (`merge.rs`, `resolve.rs`), schema validation (`validate.rs`),
 and decision-receipt construction (`receipt.rs`).
 
-Excluded: the evaluator's `include!` fragments, `models.rs` (pure data),
-`version.rs` (constant), and embedded YAML rulesets (`rulesets/**`).
+Excluded: `models.rs` (pure data), `version.rs` (constant), embedded
+YAML rulesets (`rulesets/**`).
 
 #### `chio-guards`
 
@@ -112,12 +116,88 @@ integration testing, not mutation).
 
 #### `chio-credentials`
 
-Examined: functions written directly in `lib.rs` plus the real-`mod`
-`trust_tier.rs`.
+Examined: `lib.rs` (which `include!`s the trust-boundary set: portable
+JWT VC verify, SD-JWT VC verify, portable reputation credential verify,
+the OID4VCI issuance flow, the OID4VP presentation flow + verifier,
+presentation construction / verify, presentation challenge binding,
+cross-issuer trust packs, the issuer / trust-anchor registry, OID4VCI /
+OID4VP discovery, artifact normalization, passport verifier glue, and
+credential-side policy intersection) plus the real-`mod` `trust_tier.rs`.
 
-Excluded: the 13 `include!` implementation files, which cargo-mutants does
-not expand, plus `fuzz.rs` (libFuzzer entry points covered by the
+Excluded: `fuzz.rs` (libFuzzer entry points covered by the
 trust-boundary fuzz lane).
+
+## Formal model co-coverage
+
+Two scheduled mutation lanes measure whether the verification properties can
+detect changes to their models:
+
+- `spec-mutants` mutates only exact allowlisted TLA+ action-body sites and uses
+  Apalache 0.50.1 as the oracle. Eligible actions must be reachable from
+  `Next`. It never edits `Init`, `Next`, configured invariant definitions or
+  their transitive definition closure, or temporal-property definition bodies.
+  Every unmodified positive model must pass the same bounded invariant oracle
+  before mutants are scored. The nightly sample contains at least 16 mutants
+  selected deterministically from
+  a rotating window over a commit-seeded permutation. The recorded epoch makes
+  each window reproducible and covers the inventory across consecutive runs on
+  an unchanged revision.
+- `proof-mutants` uses cargo-mutants 25.3.1 to enumerate the two pure Rust
+  model files, in the explicit shards `0/3`, `1/3`, and `2/3`. Every discovery
+  command repeats repository-relative `-f` filters for `formal_core.rs` and
+  `formal_aeneas.rs`, and the merged inventory must equal an unsharded control.
+  A scratch worktree applies each selected mutation and runs the clean Kani
+  core lane as the oracle. Harnesses that directly exercise the mutable model
+  modules run first; a passing priority set is always followed by the complete
+  core lane, while a proof failure stops immediately.
+
+cargo-mutants 25.3.1 accepts only `cargo` and `nextest` for `--test-tool`; it
+cannot invoke a Kani shell command through that option. The proof lane records
+the scratch-worktree fallback as its execution mode and preserves the exact
+cargo-mutants diffs, shard commands, source hashes, Kani logs, and verdicts.
+It runs a clean Kani baseline before applying any mutation. A failing baseline
+aborts the measurement.
+
+Both lanes require a clean scheduled worktree and emit the timeout-aware ratio
+`killed / (killed + survived + timeout)`. Unviable mutations are excluded from
+that denominator, while timeouts reduce the score. The specification lane
+rejects any unviable curated probe. The proof lane additionally requires at
+least 80 percent viable mutants globally and for each model file, preventing
+compile failures from inflating activation. Reports and generated coverage
+attribution are registered in `formal/mutation/registry.toml`.
+Surviving mutants receive idempotent GitHub issues keyed by their stable
+mutation identifier.
+
+The same scheduled workflow carries a non-ratcheted Lean sensitivity pilot.
+`scripts/lean-mutants.py` changes comparisons, Boolean literals, and Boolean
+connectives only inside definitions listed in
+`formal/lean4/lean-mutants-allowlist.toml`; declarations classified as
+theorems, lemmas, or axioms are never mutation candidates. A failed `lake
+build` kills the mutant only when the log contains a Lean source diagnostic;
+unknown tool failures abort the run. A successful build records a survivor
+and files the same disposition issue used by the two scored lanes.
+The allowlist includes the canonical-JSON domain predicates
+`IsLiteralScalar` and `CanonicalInteger`, which calibrate sensitivity of the
+named `escape_string_inj` and `render_int_inj` proof surfaces.
+Approved sources are restricted to the bounded `Core`, `Treaty`, and `Json`
+model roots. The clean Lean build has a separate 1,800-second budget; mutant
+builds keep the 300-second bound recorded in the allowlist.
+
+```bash
+python3 scripts/spec-mutants.py --list
+python3 scripts/spec-mutants.py --sample-from-head --sample-size 16
+
+cargo mutants \
+  --config formal/rust-verification/formal-mutants.toml \
+  --package chio-kernel-core \
+  --list
+./scripts/proof-mutants.sh --sample-size 15 --activation-target 90
+./scripts/lean-mutants.py --sample-size 5
+```
+
+The formal files remain excluded from the unit-test mutation configuration.
+Their exclusion means the cargo test oracle is inappropriate, not that the
+files are unmeasured.
 
 ## Local-developer workflow
 
@@ -127,8 +207,8 @@ cargo install cargo-mutants --version '~25' --locked
 
 # Run only the mutants generated against changed files in your branch.
 # `--in-diff` takes a unified-diff text file path, NOT a git ref, so we
-# capture the diff first. This is the invocation shape encoded by the
-# currently dormant mutants-pr CI job.
+# capture the diff first. This is the same invocation the mutants-pr CI
+# job uses.
 git diff origin/main...HEAD > /tmp/diff.patch
 cargo mutants --in-diff /tmp/diff.patch
 
@@ -145,10 +225,13 @@ tests poison the report and surface as false TIMEOUT verdicts.
 Workflow: `.github/workflows/mutants.yml`.
 Two jobs:
 
-- `mutants-pr` -- defined as a PR-only job, but currently inert because the
-  workflow has no `pull_request` trigger. If that trigger is restored, it runs
-  `cargo mutants --in-diff "$GIT_DIFF" --no-shuffle --jobs 4` against the PR
-  diff and posts a comment via `scripts/mutants-comment.sh`.
+- `mutants-pr` -- triggered when a PR changes source or mutation controls for
+  one of the six trust-boundary crates. Untouched matrix packages stop before
+  installing Rust or cargo-mutants. A selected package runs
+  `cargo mutants --in-diff "$GIT_DIFF" --no-shuffle --jobs 2` with its
+  per-crate `mutants.toml`. Same-repository PRs receive a summary comment and
+  survivor issues beyond the configured cap; fork PRs skip those token writes
+  while still enforcing the mutation result.
   The workflow sets `CHIO_MUTANTS_GATE=blocking`; the actual pass/fail
   posture still comes from `scripts/mutants-gate.sh` and
   `releases.toml::[mutants]`. Empty `cycle_end_tag` or a recorded
@@ -160,11 +243,14 @@ Two jobs:
   workflow artifact, and reports against the per-crate
   `target_catch_ratio_percent` threshold via `scripts/mutants-gate.sh`.
 
-Each job is configured to run `scripts/check-mutants-rationale.sh` before
-spending mutation budget; the dormant PR job does not currently execute.
-That check fails closed if an `exclude_globs` entry in
-the workspace or per-crate `mutants.toml` files lacks a nearby
-`rationale:` comment.
+Selected packages in both jobs run `scripts/check-mutants-rationale.sh` before
+spending mutation budget. That check fails closed if an `exclude_globs` entry
+in the workspace or per-crate `mutants.toml` files lacks a nearby `rationale:`
+comment.
+
+The PR job sets `GH_FUZZ_BUDGET_CAP_MODE=fail`, so an exhausted shared fuzz
+and mutation budget stops the qualification run. The scheduled job sets the
+mode to `warn` and remains available for measurement continuity.
 
 The lane is **advisory** until the required evidence exists, then flips
 to **blocking** through a release-owned PR. The state machine is driven
@@ -207,9 +293,8 @@ without manual edits. `.github/workflows/release-binaries.yml` runs a
 After merge, `scripts/mutants-gate.sh` reads the non-empty
 `cycle_end_tag` and the recorded evidence streak, then switches the
 `mutants-pr` gate from "exit 0 below target" (advisory) to "exit 1
-below target" (blocking) once the workflow's PR trigger is restored. PR
-comments emitted by `mutants-pr` then switch from advisory to blocking mode
-once gate metadata activates blocking.
+below target" (blocking). PR comments emitted by `mutants-pr` switch
+from advisory to blocking mode once gate metadata activates blocking.
 
 If the workflow re-runs against an older tag (workflow_dispatch, repush,
 etc.) the empty-string regex guard makes the write a no-op, so a single

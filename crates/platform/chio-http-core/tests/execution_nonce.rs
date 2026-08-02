@@ -206,6 +206,7 @@ fn evaluate_response_serializes_execution_nonce_field() {
 
     let binding = NonceBinding {
         subject_id: "subject-1".to_string(),
+        request_id: "request-http-1".to_string(),
         capability_id: "cap-1".to_string(),
         tool_server: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -270,6 +271,7 @@ async fn kernel_issued_nonce_verifies_and_replay_fails_end_to_end() {
 
     let binding = NonceBinding {
         subject_id: cap.subject.to_hex(),
+        request_id: req.request_id.clone(),
         capability_id: cap.id.clone(),
         tool_server: req.server_id.clone(),
         tool_name: req.tool_name.clone(),
@@ -300,6 +302,7 @@ fn stale_nonce_is_rejected_against_local_clock() {
     let cfg = ExecutionNonceConfig::default();
     let binding = NonceBinding {
         subject_id: "s".into(),
+        request_id: "request-http-expired".into(),
         capability_id: "c".into(),
         tool_server: "t".into(),
         tool_name: "n".into(),

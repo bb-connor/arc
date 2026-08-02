@@ -1,5 +1,73 @@
 use super::*;
 
+pub(crate) async fn handle_internal_cluster_partition(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(payload): Json<ClusterPartitionRequest>,
+) -> Response {
+    if let Err(response) = validate_cluster_peer_json_request(
+        &headers,
+        &state.config,
+        "POST",
+        INTERNAL_CLUSTER_PARTITION_PATH,
+        &payload,
+    ) {
+        return response;
+    }
+    let Some(cluster) = state.cluster.as_ref() else {
+        return plain_http_error(
+            StatusCode::NOT_FOUND,
+            "cluster replication is not configured",
+        );
+    };
+    let blocked_peer_urls = match payload
+        .blocked_peer_urls
+        .iter()
+        .map(|peer_url| normalize_cluster_url(peer_url))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(urls) => urls,
+        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    };
+    let update = |runtime: &mut ClusterRuntimeState| {
+        let blocked = blocked_peer_urls
+            .iter()
+            .filter(|peer_url| **peer_url != runtime.self_url)
+            .cloned()
+            .collect::<HashSet<_>>();
+        for (peer_url, peer_state) in &mut runtime.peers {
+            let was_partitioned = peer_state.partitioned;
+            peer_state.partitioned = blocked.contains(peer_url);
+            if peer_state.partitioned {
+                peer_state.last_error = Some("cluster peer intentionally partitioned".to_string());
+                peer_state.force_snapshot = true;
+            } else if was_partitioned {
+                peer_state.health = PeerHealth::Unknown;
+                peer_state.last_error = None;
+                peer_state.force_snapshot = true;
+                peer_state.delta_records_since_snapshot = 0;
+            }
+        }
+        compute_cluster_consensus_locked(runtime)
+    };
+    let consensus = match cluster.lock() {
+        Ok(mut guard) => update(&mut guard),
+        Err(poisoned) => update(&mut poisoned.into_inner()),
+    };
+    Json(ClusterPartitionResponse {
+        self_url: consensus.self_url,
+        blocked_peer_urls,
+        leader_url: consensus.leader_url,
+        role: consensus.role.to_string(),
+        has_quorum: consensus.has_quorum,
+        reachable_nodes: consensus.reachable_nodes,
+        quorum_size: consensus.quorum_size,
+        election_term: consensus.election_term,
+        authority_lease: cluster_authority_lease_view(&state),
+    })
+    .into_response()
+}
+
 pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
     if let Some(cluster) = state.cluster.as_ref() {
         let now = unix_timestamp_now();

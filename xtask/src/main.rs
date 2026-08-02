@@ -14,6 +14,9 @@
 //! cargo xtask errors regen [--check]
 //! cargo xtask snippets regen [--check]
 //! cargo xtask check crate-paths
+//! cargo xtask check formal-mirrors [--bless]
+//! cargo xtask gen proof-coverage [--check]
+//! cargo xtask formal itf-to-regression --trace <path> --spec <family>
 //! ```
 //!
 //! `validate-scenarios` walks `tests/conformance/scenarios/**/*.json`, looks
@@ -94,6 +97,7 @@ use clap::{CommandFactory, Parser};
 
 use cli::Cli;
 
+mod adapter_no_bypass;
 mod cli;
 mod codegen;
 mod crate_paths;
@@ -101,7 +105,10 @@ mod dispatch;
 mod error;
 mod eval_receipt_regen;
 mod fixtures;
+mod formal;
+mod formal_mirrors;
 mod launch_acceptance;
+mod proof_coverage;
 mod qualify;
 mod scenarios;
 mod schemas;

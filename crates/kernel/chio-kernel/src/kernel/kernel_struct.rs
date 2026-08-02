@@ -49,6 +49,7 @@ pub const DEFAULT_RECEIPT_APPEND_BUDGET_MS: u64 = 5_000;
 pub const MIN_RECEIPT_APPEND_BUDGET_MS: u64 = 250;
 pub const DEFAULT_RECEIPT_WRITER_POLL_MS: u64 = 1_000;
 pub const DEFAULT_RECEIPT_WRITER_STALL_MS: u64 = 10_000;
+pub const DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS: u64 = 30_000;
 
 impl Default for HotPathDeadlineConfig {
     fn default() -> Self {
@@ -557,8 +558,7 @@ pub struct ChioKernel {
     pub(super) guards: Arc<Vec<Arc<dyn Guard>>>,
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
-    pub(super) agent_economy_budget_store:
-        Arc<dyn crate::agent_economy_budget_store::BudgetStore>,
+    pub(super) agent_economy_budget_store: Arc<dyn crate::agent_economy_budget_store::BudgetStore>,
     pub(super) partition_escrow_registry:
         Option<Arc<crate::partition_escrow::PartitionEscrowRegistry>>,
     pub(super) budget_store_lock: Mutex<()>,
@@ -646,6 +646,10 @@ pub struct ChioKernel {
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
     pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,
     pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
+    pub(super) runtime_admission_readiness_timeout: Duration,
+    pub(super) runtime_trace_observer: Option<Arc<dyn RuntimeTraceObserver>>,
+    pub(super) runtime_trace_transition_lock: Mutex<()>,
+    pub(super) runtime_trace_sequence: AtomicU64,
     pub(super) attestation_trust_policy: Option<AttestationTrustPolicy>,
     pub(super) capability_crypto_floor: KernelCryptoFloor,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
@@ -666,6 +670,8 @@ pub struct ChioKernel {
     /// any tool server that delegates verification to the kernel. Boxed
     /// trait object so SQLite-backed stores can be plugged in.
     pub(super) execution_nonce_store: Option<Box<dyn crate::execution_nonce::ExecutionNonceStore>>,
+    pub(super) approval_replay_store:
+        Option<Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>>,
     /// Emergency kill switch. When `true`, every evaluate entry point returns
     /// `Verdict::Deny` without performing capability validation or guard
     /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.
@@ -739,7 +745,7 @@ pub struct ChioKernel {
     /// accessors fall through to it on a cache miss.
     pub(super) federation_artifact_store:
         Option<std::sync::Arc<dyn crate::federation_artifact_store::FederationArtifactStore>>,
-    /// Request-keyed tenant scope for receipts. Async evaluate futures
+    /// Evaluation-keyed tenant scope for receipts. Async evaluate futures
     /// can resume on a different worker after dispatch, so the scope is
     /// stored in this map rather than a thread-local. The value is the
     /// RESOLVED tenant, including `None` for a tenantless request: the entry
@@ -754,7 +760,7 @@ pub struct ChioKernel {
     /// Request-keyed copy of the receipt-version admission snapshot.
     /// Async evaluate futures may resume on a different Tokio worker
     /// after dispatch. This map keeps the admitted version and peer state
-    /// available until the evaluation future finishes.
+    /// isolated until that specific evaluation future finishes.
     pub(super) receipt_federation_admissions: Arc<DashMap<String, ReceiptFederationAdmission>>,
     /// Request-keyed terminal operation intent installed only while a governed
     /// tool response is being signed. Receipt persistence consumes the intent

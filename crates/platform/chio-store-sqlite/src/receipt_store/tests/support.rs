@@ -54,9 +54,7 @@ pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     chio_test_support::private_fs::unique_sqlite_path(prefix)
 }
 
-pub(super) fn temp_db(
-    prefix: &str,
-) -> std::io::Result<(tempfile::TempDir, std::path::PathBuf)> {
+pub(super) fn temp_db(prefix: &str) -> std::io::Result<(tempfile::TempDir, std::path::PathBuf)> {
     let directory = tempfile::Builder::new().prefix(prefix).tempdir()?;
     let path = directory.path().join("receipts.sqlite3");
     Ok((directory, path))

@@ -55,6 +55,7 @@ fn private_runtime_loopback_directory(
 
 struct RuntimeLoopbackReceiptAuthority {
     directory: Option<tempfile::TempDir>,
+    #[cfg(test)]
     path: std::path::PathBuf,
     store: Option<std::sync::Arc<chio_store_sqlite::SqliteReceiptStore>>,
 }
@@ -70,11 +71,13 @@ impl RuntimeLoopbackReceiptAuthority {
         })?;
         Ok(Self {
             directory: Some(directory),
+            #[cfg(test)]
             path,
             store: Some(std::sync::Arc::new(store)),
         })
     }
 
+    #[cfg(test)]
     fn receipt_path(&self) -> &std::path::Path {
         &self.path
     }

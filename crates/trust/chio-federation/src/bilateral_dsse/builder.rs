@@ -79,7 +79,8 @@ pub fn build_predicate(
     })
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct BilateralPredicateExtensions {
     /// Spec §5 `capability_lease_ref`; required by §7 step 14.
     pub capability_lease_ref: Option<CapabilityLeaseRef>,

@@ -9,8 +9,7 @@ use crate::{canonical_json_bytes, sha256_hex};
 
 pub const MAX_AGENT_ECONOMY_ADMISSION_REVOCATION_IDS: usize = 256;
 const MAX_AGENT_ECONOMY_REVOCATION_ID_BYTES: usize = 512;
-const AGENT_ECONOMY_ADMISSION_REVOCATION_SET_DOMAIN: &str =
-    "chio.admission-revocation-set.v1";
+const AGENT_ECONOMY_ADMISSION_REVOCATION_SET_DOMAIN: &str = "chio.admission-revocation-set.v1";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AgentEconomyRevocationSetError {
@@ -125,9 +124,7 @@ fn validate_canonical_ids(ids: &[String]) -> Result<(), AgentEconomyRevocationSe
     Ok(())
 }
 
-fn revocation_set_digest(
-    value: &[String],
-) -> Result<String, AgentEconomyRevocationSetError> {
+fn revocation_set_digest(value: &[String]) -> Result<String, AgentEconomyRevocationSetError> {
     let canonical = canonical_json_bytes(&value)
         .map_err(|error| AgentEconomyRevocationSetError::Canonicalization(error.to_string()))?;
     let mut message = Vec::with_capacity(

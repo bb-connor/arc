@@ -7,8 +7,8 @@ use super::super::cluster::{
     handle_internal_admission_request_vote, handle_internal_admission_snapshot,
     handle_internal_admission_snapshot_install, handle_internal_authority_snapshot,
     handle_internal_budgets_delta, handle_internal_child_receipts_delta,
-    handle_internal_cluster_snapshot, handle_internal_cluster_status,
-    handle_internal_committed_composite_authorization_query,
+    handle_internal_cluster_partition, handle_internal_cluster_snapshot,
+    handle_internal_cluster_status, handle_internal_committed_composite_authorization_query,
     handle_internal_invocation_capture_query, handle_internal_lineage_delta,
     handle_internal_revocations_delta, handle_internal_tool_receipts_delta,
 };
@@ -39,6 +39,9 @@ const EVIDENCE_IMPORT_MAX_BODY_BYTES: usize = 64 * 1024 * 1024;
 /// `Json` decode so an oversized body cannot grow without limit.
 const RECEIPT_APPEND_MAX_BODY_BYTES: usize = 128 * 1024 * 1024;
 
+/// Admission envelopes may contain complete aggregate mutation projections.
+const ADMISSION_AUTHORITY_MAX_BODY_BYTES: usize = 384 * 1024 * 1024;
+
 /// Two protocol-bounded canonical byte arrays encoded as JSON number arrays,
 /// plus the fixed event envelope.
 const ACTIVE_DEFENSE_EVENT_MAX_BODY_BYTES: usize = 9 * 1024 * 1024;
@@ -54,6 +57,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
     chio_metrics_spec::runtime::preregister_known_label_sets();
 
     let router = trust_control_health::install_health_routes(Router::new())
+        .route(
+            INTERNAL_ADMISSION_AUTHORITY_PATH,
+            post(super::admission_authority::handle_admission_authority)
+                .layer(DefaultBodyLimit::max(ADMISSION_AUTHORITY_MAX_BODY_BYTES)),
+        )
         .route(
             DASHBOARD_SESSION_PATH,
             get(handle_get_dashboard_session)
@@ -205,6 +213,33 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             post(handle_evaluate_open_market_penalty),
         )
         .route(
+            FISCAL_RUNTIME_STATUS_PATH,
+            get(handle_fiscal_runtime_status),
+        )
+        .route(FISCAL_PROPOSALS_PATH, post(handle_fiscal_proposal_persist))
+        .route(
+            FISCAL_PROPOSAL_ADMIT_PATH,
+            post(handle_fiscal_proposal_admit),
+        )
+        .route(FISCAL_APPROVALS_PATH, post(handle_fiscal_approval_persist))
+        .route(
+            FISCAL_ACTIVATIONS_PATH,
+            post(handle_fiscal_activation_commit),
+        )
+        .route(FISCAL_RESOLVE_PATH, post(handle_fiscal_resolve))
+        .route(
+            FISCAL_MARKETPLACE_PRICE_PATH,
+            post(handle_fiscal_marketplace_price),
+        )
+        .route(
+            FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH,
+            post(handle_fiscal_marketplace_credit_limit),
+        )
+        .route(
+            FISCAL_PROPOSAL_PREVIEW_PATH,
+            post(handle_fiscal_proposal_preview),
+        )
+        .route(
             PASSPORT_ISSUER_METADATA_PATH,
             get(handle_passport_issuer_metadata),
         )
@@ -328,6 +363,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(BUDGET_INCREMENT_PATH, post(handle_try_increment_budget))
         .route(BUDGET_AUTHORIZE_EXPOSURE_PATH, post(handle_try_charge_cost))
         .route(
+            BUDGET_CAPTURE_INVOCATION_PATH,
+            post(handle_capture_invocation),
+        )
+        .route(
             BUDGET_AUTHORIZE_HOLD_PATH,
             post(handle_authorize_composite_budget_hold),
         )
@@ -365,12 +404,52 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             post(handle_budget_mutation_event_replica_query),
         )
         .route(
+            STRUCTURED_BUDGET_AUTHORIZE_PATH,
+            post(handle_structured_budget_authorize),
+        )
+        .route(
+            STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH,
+            post(handle_structured_budget_authorize_cumulative),
+        )
+        .route(
+            STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH,
+            post(handle_structured_budget_cumulative_operation),
+        )
+        .route(
+            STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH,
+            post(handle_structured_budget_cancel_captured),
+        )
+        .route(
+            STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH,
+            post(handle_structured_budget_capture_invocation),
+        )
+        .route(
+            STRUCTURED_BUDGET_FENCED_REVERSE_PATH,
+            post(handle_structured_budget_reverse),
+        )
+        .route(
+            STRUCTURED_BUDGET_RELEASE_PATH,
+            post(handle_structured_budget_release),
+        )
+        .route(
+            STRUCTURED_BUDGET_RECONCILE_PATH,
+            post(handle_structured_budget_reconcile),
+        )
+        .route(
+            STRUCTURED_BUDGET_CAPTURE_SPEND_PATH,
+            post(handle_structured_budget_capture_spend),
+        )
+        .route(
             INTERNAL_CLUSTER_STATUS_PATH,
             get(handle_internal_cluster_status),
         )
         .route(
             INTERNAL_CLUSTER_SNAPSHOT_PATH,
             get(handle_internal_cluster_snapshot),
+        )
+        .route(
+            INTERNAL_CLUSTER_PARTITION_PATH,
+            post(handle_internal_cluster_partition),
         )
         .route(
             INTERNAL_ADMISSION_REQUEST_VOTE_PATH,

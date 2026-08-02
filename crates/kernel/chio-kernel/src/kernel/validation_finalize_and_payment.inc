@@ -28,8 +28,7 @@ impl ChioKernel {
                     expected_grant_index: charge.grant_index,
                     expected_hold_id: &charge.budget_hold_id,
                     expected_admission_operation: charge.admission_operation.as_ref(),
-                    expected_mutation_kind:
-                        crate::budget_store::BudgetMutationKind::ReconcileSpend,
+                    expected_mutation_kind: crate::budget_store::BudgetMutationKind::ReconcileSpend,
                     expected_exposure_units: charge.cost_charged,
                     expected_realized_spend_units: realized_cost_units.min(charge.cost_charged),
                     expected_invocation_state: if charge.admission_operation.is_some() {
@@ -62,6 +61,7 @@ impl ChioKernel {
             admission_operation,
             reported_cost,
             payment_authorization,
+            verified_payee_binding,
             cap,
         } = cost_context;
         let Some(charge) = charge_result else {
@@ -72,23 +72,23 @@ impl ChioKernel {
             let Some(auth) = payment_authorization.as_ref() else {
                 return self.finalize_tool_output_with_metadata_and_security_context(
                     FinalizeToolOutputRequest {
-                    request,
-                    output,
-                    elapsed,
-                    timestamp,
-                    matched_grant_index,
-                    security_context,
-                    extra_metadata,
+                        request,
+                        output,
+                        elapsed,
+                        timestamp,
+                        matched_grant_index,
+                        security_context,
+                        verified_payee_binding,
+                        extra_metadata,
                     },
                 );
             };
-            let Some(settlement) =
-                self.settle_prepaid_authorization_without_charge(
-                    request,
-                    auth,
-                    None,
-                    admission_operation.as_ref(),
-                )?
+            let Some(settlement) = self.settle_prepaid_authorization_without_charge(
+                request,
+                auth,
+                None,
+                admission_operation.as_ref(),
+            )?
             else {
                 return self.build_deny_response_with_metadata(
                     request,
@@ -134,13 +134,14 @@ impl ChioKernel {
             let metadata = merge_metadata_objects(extra_metadata, Some(payment_meta));
             return self.finalize_tool_output_with_metadata_and_security_context(
                 FinalizeToolOutputRequest {
-                request,
-                output,
-                elapsed,
-                timestamp,
-                matched_grant_index,
-                security_context,
-                extra_metadata: metadata,
+                    request,
+                    output,
+                    elapsed,
+                    timestamp,
+                    matched_grant_index,
+                    security_context,
+                    verified_payee_binding,
+                    extra_metadata: metadata,
                 },
             );
         };
@@ -405,8 +406,11 @@ impl ChioKernel {
         };
 
         let limited_output = self.apply_stream_limits(output, elapsed)?;
-        let budget_metadata =
-            self.budget_execution_receipt_metadata(&charge, Some(("reconciled", &reconcile)), None)?;
+        let budget_metadata = self.budget_execution_receipt_metadata(
+            &charge,
+            Some(("reconciled", &reconcile)),
+            None,
+        )?;
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
         let mut extra_metadata = extra_metadata;
         strip_reserved_economic_receipt_metadata(&mut extra_metadata);
@@ -460,17 +464,14 @@ impl ChioKernel {
             | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => {
                 let preminted_execution_nonce = if request.execution_nonce.is_none() {
                     if let Some(nonce_config) = self.execution_nonce_config.as_ref() {
-                        let action =
-                            ToolCallAction::from_parameters(request.arguments.clone()).map_err(
-                                |error| {
-                                    KernelError::ReceiptSigningFailed(format!(
-                                        "failed to hash parameters for nonce binding: {error}"
-                                    ))
-                                },
-                            )?;
+                        let action = ToolCallAction::from_parameters(request.arguments.clone())
+                            .map_err(|error| {
+                                KernelError::ReceiptSigningFailed(format!(
+                                    "failed to hash parameters for nonce binding: {error}"
+                                ))
+                            })?;
                         let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-                        let binding =
-                            self.nonce_binding_for(request, cap, &action.parameter_hash);
+                        let binding = self.nonce_binding_for(request, cap, &action.parameter_hash);
                         let signed = crate::execution_nonce::mint_execution_nonce_with_backend(
                             self.authority_signing_backend.as_ref(),
                             binding,
@@ -487,16 +488,19 @@ impl ChioKernel {
                 let execution_nonce_id = preminted_execution_nonce
                     .as_deref()
                     .map(|nonce| nonce.nonce_id())
-                    .or_else(|| request.execution_nonce.as_ref().map(|nonce| nonce.nonce_id()));
+                    .or_else(|| {
+                        request
+                            .execution_nonce
+                            .as_ref()
+                            .map(|nonce| nonce.nonce_id())
+                    });
                 let budget_metadata = self.budget_execution_receipt_metadata(
                     &charge,
                     Some(("reconciled", &reconcile)),
                     execution_nonce_id,
                 )?;
-                let merged = self.merge_budget_receipt_metadata(
-                    post_invocation.extra_metadata,
-                    budget_metadata,
-                );
+                let merged = self
+                    .merge_budget_receipt_metadata(post_invocation.extra_metadata, budget_metadata);
                 self.build_allow_response_with_metadata(
                     request,
                     tool_call_output,
@@ -605,6 +609,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         charge_result: Option<&BudgetChargeResult>,
         admission_operation: Option<&BudgetAdmissionOperationBinding>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<Option<PaymentAuthorization>, PaymentError> {
         // Derive the authorization amount. A MustPrepay intent prepays its quoted
         // cost, so the quote funds the prepayment whenever it is present, even when
@@ -651,7 +656,13 @@ impl ChioKernel {
                         approval_token_id: request
                             .approval_token
                             .as_ref()
-                            .map(|token| token.id.clone()),
+                            .map(|token| token.id.clone())
+                            .or_else(|| {
+                                request
+                                    .threshold_approval_proposal
+                                    .as_ref()
+                                    .map(|proposal| proposal.body().proposal_id().to_owned())
+                            }),
                     })
                     .map_err(|error| {
                         PaymentError::RailError(format!(
@@ -660,20 +671,64 @@ impl ChioKernel {
                     })
             })
             .transpose()?;
-        let commerce = request
+        let commerce = if amount_units == 0 {
+            None
+        } else if let Some(commerce) = request
             .governed_intent
             .as_ref()
             .and_then(|intent| intent.as_tool_invocation())
-            .and_then(|intent| {
-                intent
-                    .commerce
+            .and_then(|intent| intent.commerce.as_ref())
+        {
+            let binding = verified_payee_binding.ok_or_else(|| {
+                PaymentError::RailError(
+                    "governed commerce payment omitted verified payee binding".to_owned(),
+                )
+            })?;
+            let approval_artifact_digest = request
+                .approval_artifact_digest()
+                .map_err(|error| PaymentError::RailError(error.to_string()))?
+                .ok_or_else(|| {
+                    PaymentError::RailError(
+                        "governed commerce payment omitted verified approval".to_owned(),
+                    )
+                })?;
+            let intent_hash = governed
+                .as_ref()
+                .map(|context| context.intent_hash.as_str());
+            if binding.beneficiary_id() != commerce.seller
+                || commerce.settlement_destination_ref.as_deref()
+                    != Some(binding.settlement_destination_ref())
+                || intent_hash != Some(binding.economic_intent_digest())
+                || binding.pre_action_authority_digest() != approval_artifact_digest
+            {
+                return Err(PaymentError::RailError(
+                    "governed commerce payment does not match verified payee binding".to_owned(),
+                ));
+            }
+            Some(CommercePaymentContext {
+                seller: binding.beneficiary_id().to_owned(),
+                settlement_destination_ref: binding.settlement_destination_ref().to_owned(),
+                payee_binding_digest: binding.payee_binding_digest().to_owned(),
+                pre_action_authority_digest: binding.pre_action_authority_digest().to_owned(),
+                shared_payment_token_id: commerce.shared_payment_token_id.clone(),
+                max_amount: request
+                    .governed_intent
                     .as_ref()
-                    .map(|commerce| CommercePaymentContext {
-                        seller: commerce.seller.clone(),
-                        shared_payment_token_id: commerce.shared_payment_token_id.clone(),
-                        max_amount: intent.max_amount.clone(),
-                    })
-            });
+                    .and_then(|intent| intent.as_tool_invocation())
+                    .and_then(|intent| intent.max_amount.clone()),
+            })
+        } else {
+            if verified_payee_binding.is_some() {
+                return Err(PaymentError::RailError(
+                    "verified payee binding has no governed commerce context".to_owned(),
+                ));
+            }
+            None
+        };
+        let payee = verified_payee_binding.map_or_else(
+            || request.server_id.clone(),
+            |binding| binding.beneficiary_id().to_owned(),
+        );
 
         let payment_request = PaymentAuthorizeRequest {
             operation_id: admission_operation.map(|binding| binding.operation_id().to_string()),
@@ -682,7 +737,7 @@ impl ChioKernel {
             amount_units,
             currency,
             payer: request.agent_id.clone(),
-            payee: request.server_id.clone(),
+            payee,
             reference: request.request_id.clone(),
             governed,
             commerce,
@@ -742,14 +797,16 @@ impl ChioKernel {
                 admission_operation,
                 &authorization,
             ) {
-                if let Err(cleanup_error) = self.cleanup_payment_after_authorization_journal_failure(
-                    request,
-                    admission_operation,
-                    &authorization,
-                    amount_units,
-                    &payment_request.currency,
-                    adapter.as_ref(),
-                ) {
+                if let Err(cleanup_error) = self
+                    .cleanup_payment_after_authorization_journal_failure(
+                        request,
+                        admission_operation,
+                        &authorization,
+                        amount_units,
+                        &payment_request.currency,
+                        adapter.as_ref(),
+                    )
+                {
                     warn!(
                         request_id = %request.request_id,
                         reason = %redacted!(&cleanup_error),
@@ -873,8 +930,7 @@ impl ChioKernel {
     ) -> bool {
         record.state == crate::payment::PaymentJournalState::Authorized
             && record.admission_operation.as_ref() == admission_operation
-            && record.authorization_id.as_deref()
-                == Some(authorization.authorization_id.as_str())
+            && record.authorization_id.as_deref() == Some(authorization.authorization_id.as_str())
             && transaction_id
                 .is_none_or(|expected| record.transaction_id.as_deref() == Some(expected))
     }
@@ -993,12 +1049,7 @@ impl ChioKernel {
                     currency,
                     reference: &request.request_id,
                 }),
-                None => adapter.refund(
-                    transaction_id,
-                    amount_units,
-                    currency,
-                    &request.request_id,
-                ),
+                None => adapter.refund(transaction_id, amount_units, currency, &request.request_id),
             },
             None => match admission_operation {
                 Some(binding) => adapter.release_for_operation(
@@ -1050,10 +1101,9 @@ impl ChioKernel {
                 &request.request_id,
                 Some(&authorization.authorization_id),
             ),
-            None => adapter.settlement_state(
-                &request.request_id,
-                Some(&authorization.authorization_id),
-            ),
+            None => {
+                adapter.settlement_state(&request.request_id, Some(&authorization.authorization_id))
+            }
         }?;
         match state {
             crate::payment::RailSettlementState::Settled {
@@ -1075,7 +1125,12 @@ impl ChioKernel {
     ) -> Option<&str> {
         ["transaction_id", "transactionId"]
             .into_iter()
-            .find_map(|key| authorization.metadata.get(key).and_then(serde_json::Value::as_str))
+            .find_map(|key| {
+                authorization
+                    .metadata
+                    .get(key)
+                    .and_then(serde_json::Value::as_str)
+            })
             .filter(|value| !value.is_empty())
     }
 }

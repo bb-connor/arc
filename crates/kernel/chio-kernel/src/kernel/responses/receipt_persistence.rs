@@ -5,6 +5,19 @@ use super::*;
 const SETTLEMENT_OBSERVER_CLAIM_LEASE_MS: u64 = 30_000;
 const MAX_SETTLEMENT_OBSERVER_RECOVERY_ROWS: usize = 4_096;
 
+fn require_receipt_body_fields_coupled(
+    body: &ChioReceiptBody,
+    expected: &ReceiptCouplingExpectation<'_>,
+) -> Result<(), KernelError> {
+    if receipt_body_fields_coupled(body, expected) {
+        Ok(())
+    } else {
+        Err(KernelError::ReceiptSigningFailed(
+            "receipt fields diverged from the admitted decision inputs".to_string(),
+        ))
+    }
+}
+
 fn receipts_match(left: &ChioReceipt, right: &ChioReceipt) -> Result<bool, KernelError> {
     let left = chio_core::canonical::canonical_json_bytes(left)
         .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
@@ -117,6 +130,9 @@ impl ChioKernel {
         backend: &dyn chio_core::crypto::SigningBackend,
         policy_hash: &str,
     ) -> Result<ChioReceipt, KernelError> {
+        let expected_action = params.action.clone();
+        let expected_decision = params.decision.clone();
+        let expected_content_hash = params.content_hash.clone();
         // Multi-tenant receipt isolation: resolve tenant_id for this receipt.
         // Precedence:
         //   1. An explicit override on `ReceiptParams` (currently unused).
@@ -176,6 +192,17 @@ impl ChioKernel {
             kernel_key: backend.public_key(),
             bbs_projection_version: None,
         };
+        let expected = ReceiptCouplingExpectation {
+            capability_id: params.capability_id,
+            server_id: params.server_id,
+            tool_name: params.tool_name,
+            action: &expected_action,
+            decision: &expected_decision,
+            content_hash: &expected_content_hash,
+            policy_hash,
+            trust_level: params.trust_level,
+        };
+        require_receipt_body_fields_coupled(&body, &expected)?;
 
         // WYSIWYS: bind the signature to the exact content this receipt's
         // `content_hash` was derived from. The handle recomputes
@@ -260,13 +287,16 @@ impl ChioKernel {
             admission.remote_kernel_id.as_deref() == request.federated_origin_kernel_id.as_deref()
         });
         let scoped_admission = request_admission.as_ref().or(thread_admission);
+        if receipt.is_allowed() {
+            self.check_revocation(&request.capability)?;
+        }
         if !self.record_scoped_threshold_terminal_receipt(request, receipt)? {
             self.record_chio_receipt_consuming_optional_intent(receipt, Some(&request.request_id))?;
         }
-        self.apply_federation_cosign(
+        self.apply_federation_cosign_for_admitted_request_with_snapshot(
             request,
             receipt,
-            scoped_admission.and_then(|admission| admission.peer.as_ref()),
+            scoped_admission,
         )?;
         Ok(())
     }
@@ -285,11 +315,20 @@ impl ChioKernel {
             admission.remote_kernel_id.as_deref() == request.federated_origin_kernel_id.as_deref()
         });
         let scoped_admission = request_admission.as_ref().or(thread_admission);
-        self.apply_federation_cosign(
+        self.apply_federation_cosign_for_admitted_request_with_snapshot(
             request,
             receipt,
-            scoped_admission.and_then(|admission| admission.peer.as_ref()),
+            scoped_admission,
         )
+    }
+
+    fn apply_federation_cosign_for_admitted_request_with_snapshot(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &ChioReceipt,
+        admission: Option<&ReceiptFederationAdmission>,
+    ) -> Result<(), KernelError> {
+        self.apply_federation_cosign(request, receipt, admission)
     }
 
     pub(super) fn record_chio_receipt_with_mode(
@@ -355,10 +394,9 @@ impl ChioKernel {
             }
             None => {
                 if settlement_observer_enabled {
-                    store
-                        .append_chio_receipt_with_settlement_observer_outbox_with_timeout(
-                            receipt, budget,
-                        )?;
+                    store.append_chio_receipt_with_settlement_observer_outbox_with_timeout(
+                        receipt, budget,
+                    )?;
                 } else {
                     store.append_chio_receipt_with_timeout(receipt, budget)?;
                 }
@@ -415,6 +453,7 @@ impl ChioKernel {
         receipt: &ChioReceipt,
         request_id: Option<&str>,
     ) -> Result<(), KernelError> {
+        let trace_transition = self.lock_runtime_trace_transition()?;
         // Scope the receipt-store write lock around the atomic receipt and
         // settlement-outbox append. Terminal persistence never invokes an
         // arbitrary settlement hook: the background recovery worker owns
@@ -522,6 +561,18 @@ impl ChioKernel {
                 }
             }
             self.append_chio_receipt_to_local_log(receipt.clone());
+        }
+        let trace_event = if self.runtime_trace_observer.is_some() {
+            Some(RuntimeTraceEvent::ReceiptAppended {
+                source_sequence: self.allocate_runtime_trace_source_sequence()?,
+                receipt: Box::new(receipt.clone()),
+            })
+        } else {
+            None
+        };
+        drop(trace_transition);
+        if let Some(event) = trace_event {
+            self.observe_runtime_trace(event);
         }
         // The terminal receipt is durable: the money path's journal row (if
         // any) has served its purpose and closes. A crash before this close

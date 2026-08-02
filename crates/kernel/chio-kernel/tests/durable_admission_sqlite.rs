@@ -17,8 +17,8 @@ use chio_kernel::admission_operation::{
 use chio_kernel::agent_economy_budget_store::BudgetStore;
 use chio_kernel::agent_economy_payment::{
     PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
-    PaymentError, PaymentJournalState, PaymentRailMode, PaymentReleaseAuthorityKind,
-    PaymentResult, PaymentSettleAction, RailSettlementStatus,
+    PaymentError, PaymentJournalState, PaymentRailMode, PaymentReleaseAuthorityKind, PaymentResult,
+    PaymentSettleAction, RailSettlementStatus,
 };
 use chio_kernel::tool_outcome::{
     CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
@@ -31,6 +31,26 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
+
+fn secure_directory(path: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}
+
+fn create_private_directory(path: &std::path::Path) -> std::io::Result<()> {
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(path)?;
+    secure_directory(path)
+}
 
 struct MutationServer {
     invocations: Arc<AtomicU64>,
@@ -62,16 +82,6 @@ struct PaymentCalls {
 struct FailOnceOutcomeStore {
     inner: SqliteToolOutcomeStore,
     fail_record: AtomicBool,
-}
-
-fn create_private_directory(path: &Path) -> Result<(), std::io::Error> {
-    std::fs::create_dir_all(path)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
-    }
-    Ok(())
 }
 
 #[async_trait::async_trait]
@@ -530,7 +540,7 @@ fn now_unix_ms() -> Result<u64, Box<dyn Error>> {
 fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
-    create_private_directory(temp.path())?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     create_private_directory(&lock_root)?;
@@ -648,7 +658,7 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
 fn sqlite_restart_completes_a_committed_capture_without_request_replay(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
-    create_private_directory(temp.path())?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     create_private_directory(&lock_root)?;
@@ -736,7 +746,7 @@ fn sqlite_restart_completes_a_committed_capture_without_request_replay(
 fn sqlite_restart_completes_a_committed_release_without_request_replay(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
-    create_private_directory(temp.path())?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     create_private_directory(&lock_root)?;
@@ -832,7 +842,7 @@ fn sqlite_restart_completes_a_committed_release_without_request_replay(
 fn sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
-    create_private_directory(temp.path())?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     create_private_directory(&lock_root)?;
@@ -908,7 +918,7 @@ fn sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome(
 fn sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
-    create_private_directory(temp.path())?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     create_private_directory(&lock_root)?;

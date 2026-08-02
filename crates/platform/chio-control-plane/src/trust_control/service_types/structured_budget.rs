@@ -506,8 +506,7 @@ impl TryFrom<StructuredBudgetCommitMetadataView> for BudgetCommitMetadata {
             authority: value.authority.map(Into::into),
             guarantee_level,
             budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
-            metering_profile:
-                BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+            metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: value.budget_commit_index,
             event_id: value.event_id,
             recorded_at_unix_seconds: value.recorded_at_unix_seconds,

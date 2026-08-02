@@ -60,8 +60,15 @@
 
 #![forbid(unsafe_code)]
 mod errors_pass;
+pub mod statemachines_pass;
 pub mod threat_coverage_doc;
 pub mod threat_model;
+
+pub use statemachines_pass::{
+    check_statemachine_outputs, codegen_statemachines, load_statemachines,
+    render_statemachine_outputs, StateMachine, CONFORMANCE_ORDERING_DIR, STATEMACHINES_INPUT,
+    STATE_MACHINES_DOC_OUTPUT,
+};
 
 /// Canonical header stamped onto every regenerated Rust source file.
 ///

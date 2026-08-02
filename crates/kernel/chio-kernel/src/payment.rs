@@ -17,6 +17,32 @@ pub struct PaymentAuthorization {
     pub metadata: serde_json::Value,
 }
 
+/// Single-use credential disposition after payment authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentCredentialDisposition {
+    NonePresent,
+    RetainedAfterAuthorization,
+    RetentionOutcomeUnknown,
+}
+
+/// Exact terminal rail action used to unwind a pre-dispatch authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PreDispatchPaymentUnwindStatus {
+    Released,
+    Refunded,
+}
+
+/// Typed evidence embedded in a signed terminal receipt after a clean unwind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreDispatchPaymentUnwindEvidence {
+    pub authorization_id: String,
+    pub transaction_id: String,
+    pub settlement_status: PreDispatchPaymentUnwindStatus,
+    pub credential_disposition: PaymentCredentialDisposition,
+}
+
 /// Result of a capture, settlement, release, or refund operation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PaymentResult {
@@ -78,6 +104,9 @@ pub struct GovernedPaymentContext {
 #[serde(rename_all = "camelCase")]
 pub struct CommercePaymentContext {
     pub seller: String,
+    pub settlement_destination_ref: String,
+    pub payee_binding_digest: String,
+    pub pre_action_authority_digest: String,
     pub shared_payment_token_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_amount: Option<MonetaryAmount>,
@@ -1760,6 +1789,9 @@ mod tests {
                 }),
                 commerce: Some(CommercePaymentContext {
                     seller: "merchant.example".to_string(),
+                    settlement_destination_ref: "acct:merchant-primary".to_string(),
+                    payee_binding_digest: "payee-binding-acp-1".to_string(),
+                    pre_action_authority_digest: "approval-digest-acp-1".to_string(),
                     shared_payment_token_id: "spt_live_123".to_string(),
                     max_amount: Some(MonetaryAmount {
                         units: 5000,

@@ -20,6 +20,9 @@ use crate::budget_store::{
     BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
+#[path = "validation/revocation_trace.rs"]
+mod revocation_trace;
+
 struct IssuedCapabilityPostconditions<'a> {
     expected_subject: &'a chio_core::PublicKey,
     expected_scope: &'a ChioScope,
@@ -317,18 +320,6 @@ impl ChioKernel {
         // would turn an external artifact signer into a capability-minting
         // oracle that bypasses contextual issuance policy and freeze checks.
         Ok(capability)
-    }
-
-    /// Revoke a capability and all descendants in its delegation subtree.
-    ///
-    /// When a root capability is revoked, every capability whose
-    /// `delegation_chain` contains the revoked ID will also be rejected
-    /// on presentation (the kernel checks all chain entries against the
-    /// revocation store).
-    pub fn revoke_capability(&self, capability_id: &CapabilityId) -> Result<(), KernelError> {
-        info!(capability_id = %capability_id, "revoking capability");
-        let _ = self.with_revocation_store(|store| Ok(store.revoke(capability_id)?))?;
-        Ok(())
     }
 
     /// Whether a capability id is present in the installed revocation store.

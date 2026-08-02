@@ -53,10 +53,11 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "/path/to/chio".to_string());
 
+    directory.validate_path_identity()?;
     println!("created Chio scaffold at {}", path.display());
     println!();
     println!("Next steps:");
-    println!("  cd {}", absolute.display());
+    println!("  cd {}", path.display());
     println!("  cargo build --bin hello_server --bin demo");
     println!("  configure the signed native-launch inputs described in README.md");
     println!("  CHIO_BIN={} cargo run --quiet --bin demo", chio_bin_hint);

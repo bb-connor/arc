@@ -4,6 +4,7 @@
 // kernel store paths and control-plane endpoint through every subcommand.
 
 use super::*;
+use crate::trust_commands_cli::cmd_trust_trace_verify;
 use crate::runtime_trust_reports::{
     cmd_trust_authorization_context_list, cmd_trust_authorization_context_metadata,
     cmd_trust_authorization_context_review_pack, cmd_trust_behavioral_feed_export,
@@ -65,11 +66,17 @@ pub(crate) fn dispatch_trust(
             verifier_challenge_db,
             passport_statuses_file,
             passport_issuance_offers_file,
-                certification_registry_file,
-                certification_discovery_file,
-                certification_public_metadata_ttl_seconds,
-                roster_policy_file,
-                ..
+            certification_registry_file,
+            certification_discovery_file,
+            fiscal_genesis_policy,
+            fiscal_anchor_url,
+            fiscal_anchor_token,
+            fiscal_admission_authority_id,
+            fiscal_admission_signer_key_epoch,
+            fiscal_admission_signing_seed,
+            fiscal_anchor_timeout_seconds,
+            certification_public_metadata_ttl_seconds,
+            roster_policy_file,
         } => cmd_trust_serve(
             listen,
             &service_token,
@@ -96,6 +103,13 @@ pub(crate) fn dispatch_trust(
             passport_issuance_offers_file.as_deref(),
             certification_registry_file.as_deref(),
             certification_discovery_file.as_deref(),
+            fiscal_genesis_policy.as_deref(),
+            fiscal_anchor_url.as_deref(),
+            fiscal_anchor_token.as_deref(),
+            &fiscal_admission_authority_id,
+            fiscal_admission_signer_key_epoch,
+            fiscal_admission_signing_seed.as_deref(),
+            fiscal_anchor_timeout_seconds,
             receipt_db.as_deref(),
             revocation_db.as_deref(),
             authority_seed_file.as_deref(),
@@ -1350,6 +1364,24 @@ pub(crate) fn dispatch_trust(
                 },
             ),
         },
+        TrustCommands::TraceVerify {
+            log,
+            trusted_keys,
+            spec,
+            apalache_bin,
+            timeout_secs,
+            itf_output,
+            report_output,
+        } => cmd_trust_trace_verify(
+            &log,
+            &trusted_keys,
+            spec,
+            &apalache_bin,
+            timeout_secs,
+            itf_output.as_deref(),
+            report_output.as_deref(),
+            json_output,
+        ),
         TrustCommands::Revoke { capability_id } => cmd_trust_revoke(
             &capability_id,
             json_output,

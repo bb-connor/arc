@@ -75,6 +75,8 @@ pub mod execution_nonce;
 #[cfg(not(loom))]
 pub mod federation_artifact_store;
 #[cfg(not(loom))]
+pub mod governed_approval_replay;
+#[cfg(not(loom))]
 pub mod memory_provenance;
 #[cfg(not(loom))]
 pub mod observability;
@@ -100,6 +102,8 @@ pub mod receipt_store;
 #[cfg(not(loom))]
 mod receipt_support;
 #[cfg(not(loom))]
+mod replay_retention;
+#[cfg(not(loom))]
 mod request_matching;
 #[cfg(not(loom))]
 pub mod revocation_runtime;
@@ -107,6 +111,8 @@ pub mod revocation_runtime;
 pub mod revocation_store;
 #[cfg(not(loom))]
 pub mod runtime;
+#[cfg(not(loom))]
+mod runtime_trace;
 #[cfg(not(loom))]
 pub mod security_admission_operation;
 pub mod session;
@@ -190,8 +196,8 @@ pub use agent_economy_projection_store::{
     AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
     AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
     AdmissionPaymentSettlementBegin, AnchoredAdmissionProjectionStore,
-    QualifiedAdmissionProjectionStore,
-    ThresholdApprovalReplayReservationV1, ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
+    QualifiedAdmissionProjectionStore, ThresholdApprovalReplayReservationV1,
+    ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
 };
 #[cfg(not(loom))]
 pub use agent_economy_revocation_set::{
@@ -456,6 +462,11 @@ pub use execution_nonce::{
     EXECUTION_NONCE_SCHEMA,
 };
 #[cfg(not(loom))]
+pub use governed_approval_replay::{
+    GovernedApprovalReplayStore, InMemoryGovernedApprovalReplayStore,
+    DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY,
+};
+#[cfg(not(loom))]
 pub use memory_provenance::{
     classify_memory_action, next_entry_id as next_memory_provenance_entry_id,
     recompute_entry_hash as recompute_memory_provenance_entry_hash, InMemoryMemoryProvenanceStore,
@@ -515,7 +526,8 @@ pub use operator_report::{
 pub use payment::{
     AcpPaymentAdapter, CommercePaymentContext, GovernedPaymentContext,
     OperationPaymentCaptureRequest, OperationPaymentRefundRequest, PaymentAdapter,
-    PaymentAuthorization, PaymentAuthorizeRequest, PaymentError, PaymentResult,
+    PaymentAuthorization, PaymentAuthorizeRequest, PaymentCredentialDisposition, PaymentError,
+    PaymentResult, PreDispatchPaymentUnwindEvidence, PreDispatchPaymentUnwindStatus,
     RailSettlementState, RailSettlementStatus, ReceiptSettlement, SimPaymentAdapter,
     X402PaymentAdapter,
 };
@@ -553,9 +565,9 @@ pub use receipt_store::{
 #[cfg(not(loom))]
 pub use receipt_support::{
     fixed_runtime_unix_secs_for_current_thread, kernel_signing_backend,
-    scope_fixed_runtime_for_current_thread, sign_receipt_body_hybrid_canonical,
-    sign_receipt_body_with_backend, FixedRuntimeScope, KernelCryptoFloor,
-    KernelSigningBackendError, SignedHybridReceipt,
+    receipt_body_fields_coupled, scope_fixed_runtime_for_current_thread,
+    sign_receipt_body_hybrid_canonical, sign_receipt_body_with_backend, FixedRuntimeScope,
+    KernelCryptoFloor, KernelSigningBackendError, ReceiptCouplingExpectation, SignedHybridReceipt,
 };
 #[cfg(not(loom))]
 pub(crate) use request_matching::{
@@ -582,6 +594,8 @@ pub use runtime::{
     ToolInvocationCost, ToolServerConnection, ToolServerEvent, ToolServerOutput,
     ToolServerStreamResult, Verdict,
 };
+#[cfg(not(loom))]
+pub use runtime_trace::{RuntimeTraceEvent, RuntimeTraceObserver};
 #[cfg(not(loom))]
 pub use security_admission_operation::{
     derive_cleanup_action_id, derive_operation_id, AdmissionCleanupAction,
@@ -641,18 +655,20 @@ pub use kernel::{
     AutomaticActiveResponsePermit, BudgetHoldSweepHandle, CallerReservationAuthorizationOutcome,
     CallerReservationReplayProbe, CapabilityId, CapabilityIssuanceAdmissionAuthority,
     ChildReceiptLog, ChioKernel, DefaultDispatchIntentReconciler,
-    DispatchCommittedActiveResponseResume, GovernedActiveResponseReservation,
+    DispatchCommittedActiveResponseResume, FederationTreatyAdmissionBinding,
+    FederationTreatyVerification, GovernedActiveResponseReservation,
     GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus, Guard, GuardContext,
     GuardDecision, HotPathDeadlineConfig, HotPathStage, HybridSigningConfig, KernelBuildError,
     KernelConfig, KernelError, MemoryBudgetConfig, MonetaryDispatchIntentReconciler,
     OverloadResource, PaymentReconcileOutcome, PaymentReconcileReport,
     PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission, PromptProvider,
-    ReceiptLog, ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision,
-    RuntimeAdmissionHook, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
+    ReceiptLog, ReplayClockDirection, ResourceProvider, RuntimeAdmissionContext,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, RuntimeAdmissionReadinessToken,
+    RuntimeAdmissionRevalidationContext, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
     SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
     SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
     SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId, StructuredErrorReport,
-    TransportReceiptObservation, VerifiedActiveResponseBindings,
+    TransportReceiptObservation, VerifiedActiveResponseBindings, VerifiedFederationTreatyMaterial,
     ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
     ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA, ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_HOLD_EXPIRY_HORIZON_SECS,

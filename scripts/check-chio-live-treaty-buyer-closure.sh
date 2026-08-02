@@ -47,12 +47,12 @@ run_cargo_test_filter() {
   local package="$1"
   local filter="$2"
   shift 2
-  local profile_flag=""
+  local release_profile=false
   case "${CHIO_TEST_PROFILE:-debug}" in
     "debug")
       ;;
     "release")
-      profile_flag="--release"
+      release_profile=true
       ;;
     *)
       echo "CHIO_TEST_PROFILE must be 'debug' or 'release'" >&2
@@ -60,8 +60,8 @@ run_cargo_test_filter() {
       ;;
   esac
   local output
-  if [[ -n "$profile_flag" ]]; then
-    output="$(cargo test "$profile_flag" -p "$package" "$filter" "$@" 2>&1)" || {
+  if [[ "$release_profile" == true ]]; then
+    output="$(cargo test --release -p "$package" "$filter" "$@" 2>&1)" || {
       printf '%s\n' "$output"
       return 1
     }
@@ -134,21 +134,21 @@ run_matrix_test_and_verify_code() {
   esac
 
   printf '%s\n' "$output"
-  local observed_codes observed_count observed_code
-  observed_codes="$(
+  local observed_codes
+  observed_codes="$({
     grep -oE 'CHIO_THREAT_MATRIX_CODE=[a-z0-9_.-]+' <<<"$output" \
-      | cut -d= -f2 || true
-  )"
-  observed_count="$(printf '%s\n' "$observed_codes" | awk 'NF { count += 1 } END { print count + 0 }')"
-  observed_code="$(printf '%s\n' "$observed_codes" | awk 'NF { print; exit }')"
+      | cut -d= -f2
+  } || true)"
+  local observed_count
+  observed_count="$(awk 'NF { count += 1 } END { print count + 0 }' <<<"$observed_codes")"
   if [[ "$observed_count" -ne 1 ]]; then
     printf 'expected exactly one machine-readable failure code from %s; observed %d\n' \
       "$test_filter" "$observed_count" >&2
     return 1
   fi
-  if [[ "$observed_code" != "$expected_code" ]]; then
+  if [[ "$observed_codes" != "$expected_code" ]]; then
     printf 'failure code mismatch for %s: expected %s, observed %s\n' \
-      "$test_filter" "$expected_code" "$observed_code" >&2
+      "$test_filter" "$expected_code" "$observed_codes" >&2
     return 1
   fi
 }

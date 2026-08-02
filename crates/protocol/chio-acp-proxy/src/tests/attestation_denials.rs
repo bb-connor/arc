@@ -217,7 +217,83 @@ fn kernel_capability_checker_enforces_time_bounds_and_scope() {
         .expect("check should succeed");
     assert!(verdict.allowed);
     assert_eq!(verdict.capability_id.as_deref(), Some(valid.id.as_str()));
-    assert!(verdict.receipt_id.is_some());
+    let receipt_id = verdict
+        .receipt_id
+        .as_deref()
+        .expect("allow should carry an authorization receipt id");
+    let receipt_request_id = verdict
+        .receipt_request_id
+        .as_deref()
+        .expect("allow should carry a kernel request id");
+    let authorization_receipt = shared
+        .lock()
+        .expect("receipt store state should lock")
+        .appended_receipts
+        .iter()
+        .find(|receipt| receipt.id == receipt_id)
+        .cloned()
+        .expect("authorization receipt should be persisted");
+    assert_eq!(
+        authorization_receipt
+            .action
+            .parameters
+            .get("session_id")
+            .and_then(serde_json::Value::as_str),
+        Some("session-1")
+    );
+    assert_eq!(
+        authorization_receipt
+            .action
+            .parameters
+            .get("tool_call_id")
+            .and_then(serde_json::Value::as_str),
+        Some("call-kernel-checker")
+    );
+    assert_eq!(
+        authorization_receipt
+            .action
+            .parameters
+            .get("authorization_correlation_id")
+            .and_then(serde_json::Value::as_str),
+        Some("auth-correlation-session-1")
+    );
+    assert_eq!(
+        authorization_receipt
+            .action
+            .parameters
+            .get("operation")
+            .and_then(serde_json::Value::as_str),
+        Some("fs_read")
+    );
+    assert_eq!(
+        authorization_receipt
+            .action
+            .parameters
+            .get("resource")
+            .and_then(serde_json::Value::as_str),
+        Some("/workspace/src/lib.rs")
+    );
+    assert_eq!(
+        authorization_receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/receipt_context/request_id"))
+            .and_then(serde_json::Value::as_str),
+        Some(receipt_request_id)
+    );
+    assert!(authorization_receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.pointer("/receipt_context/session_id"))
+        .is_none());
+    assert_eq!(
+        authorization_receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/source_receipt_context/session_id"))
+            .and_then(serde_json::Value::as_str),
+        Some("session-1")
+    );
 
     let out_of_scope = AcpCapabilityRequest {
         resource: "/tmp/escape.txt".to_string(),

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   ChioInvariantError,
+  canonicalizeJson,
   canonicalizeJsonString,
   capabilityBodyCanonicalJson,
   parseCapabilityJson,
@@ -97,6 +98,16 @@ test("canonical vectors round-trip through the TS invariant helper", async () =>
       vectorCase.id,
     );
   }
+});
+
+test("canonical strings pass DEL and C1 controls through per RFC 8785", () => {
+  const controls = "\u007f\u009f";
+  assert.equal(canonicalizeJson(controls), `"${controls}"`);
+  assert.equal(canonicalizeJson({ [controls]: controls }), `{"${controls}":"${controls}"}`);
+  assert.equal(
+    canonicalizeJsonString('{"\\u007f\\u009f":"\\u007f\\u009f"}'),
+    `{"${controls}":"${controls}"}`,
+  );
 });
 
 test("canonical JSON rejects duplicate object keys", () => {

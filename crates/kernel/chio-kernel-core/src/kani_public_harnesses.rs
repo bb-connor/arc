@@ -9,6 +9,10 @@ use chio_core_types::capability::{
     token::CapabilityToken,
 };
 use chio_core_types::crypto::{PublicKey, Signature, SigningAlgorithm, SigningBackend};
+use chio_core_types::hashing::Hash;
+use chio_core_types::merkle::node_hash;
+use chio_core_types::merkle_fixtures::bounded_merkle_case;
+use chio_core_types::merkle_steps::inclusion_step;
 use chio_core_types::receipt::{
     body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::TrustLevel,
 };
@@ -17,12 +21,14 @@ use serde_json::Value;
 use crate::capability_verify::CapabilityError;
 use crate::clock::FixedClock;
 use crate::evaluate::EvaluateInput;
+use crate::formal_aeneas::{ledger_apply, ledger_is_terminal, ReservationLedger};
 use crate::formal_core::{
-    admit_quota_maximum, authorize_composite_quotas, capture_invocation_count,
-    family_binding_is_preserved, guard_pipeline_allows, monetary_cap_is_subset_by_parts,
-    optional_u32_cap_is_subset, receipt_fields_coupled, required_true_is_preserved,
-    reserve_replay_fingerprint, revocation_snapshot_denies, time_window_valid,
-    validate_threshold_signers, FamilyBindingPreservation, GuardStep,
+    budget_charge_admits, budget_increment_admits, composite_quota_authorize,
+    family_binding_preserved, guard_pipeline_allows, monetary_cap_is_subset_by_parts,
+    optional_u32_cap_is_subset, quota_maximum_compatible, receipt_fields_coupled,
+    required_true_is_preserved, revocation_lookup_denies, revocation_snapshot_denies,
+    threshold_distinct_eligible_signers, time_window_valid, BudgetAdmissionProjectionError,
+    GuardStep, RevocationCheckTarget,
 };
 use crate::guard::PortableToolCallRequest;
 use crate::normalized::{NormalizedOperation, NormalizedScope, NormalizedToolGrant};
@@ -72,12 +78,12 @@ fn unsigned_capability(ttl: u64) -> CapabilityToken {
         issued_at: 10,
         expires_at: 10 + ttl,
         delegation_chain: vec![],
-        aggregate_invocation_budget: None,
         algorithm: None,
         caveats: vec![],
         scope_attenuations: None,
         attenuation_proof: None,
         budget_share_bps: None,
+        aggregate_invocation_budget: None,
         signature: Signature::from_bytes(&[0; 64]),
     }
 }
@@ -501,6 +507,28 @@ pub fn verify_revocation_predicate_idempotent() {
     let mirrored_second = revocation_snapshot_denies(token_revoked, token_revoked);
     assert_eq!(mirrored_first, mirrored_second);
     assert_eq!(mirrored_first, token_revoked);
+}
+
+#[kani::proof]
+pub fn verify_revocation_admission_projection() {
+    let token_revoked = kani::any::<bool>();
+    let ancestor_revoked = kani::any::<bool>();
+
+    let store_denied =
+        if revocation_lookup_denies(RevocationCheckTarget::PresentedToken, token_revoked) {
+            true
+        } else {
+            revocation_lookup_denies(RevocationCheckTarget::Ancestor, ancestor_revoked)
+        };
+    let view_denied = if revocation_lookup_denies(RevocationCheckTarget::Ancestor, ancestor_revoked)
+    {
+        true
+    } else {
+        revocation_lookup_denies(RevocationCheckTarget::PresentedToken, token_revoked)
+    };
+
+    assert_eq!(store_denied, token_revoked || ancestor_revoked);
+    assert_eq!(view_denied, token_revoked || ancestor_revoked);
 }
 
 // Single-step delegation attenuation has two algebraic pillars in Chio:
@@ -1106,10 +1134,285 @@ pub fn verify_budget_checked_add_no_overflow() {
     }
 }
 
+fn reservation_ledger_total(state: ReservationLedger) -> u64 {
+    state
+        .reserved
+        .checked_add(state.committed)
+        .and_then(|total| total.checked_add(state.released))
+        .and_then(|total| total.checked_add(state.retained))
+        .unwrap_or_else(|| unreachable!("reachable reservation ledger total fits in u64"))
+}
+
+#[kani::proof]
+pub fn verify_reservation_ledger_terminal_classification() {
+    let state = ReservationLedger {
+        reserved: u64::from(kani::any::<u8>()),
+        committed: u64::from(kani::any::<u8>()),
+        released: u64::from(kani::any::<u8>()),
+        retained: u64::from(kani::any::<u8>()),
+    };
+    let expected =
+        state.reserved == 0 && (state.committed != 0 || state.released != 0 || state.retained != 0);
+    assert_eq!(ledger_is_terminal(state), expected);
+}
+
+#[kani::proof]
+pub fn verify_reservation_ledger_conservation() {
+    let mut state = ReservationLedger::default();
+    let mut admitted_total = 0u64;
+    let mut terminal_disposition = 0u8;
+
+    for _ in 0..6 {
+        let op = kani::any::<u8>();
+        let amount = u64::from(kani::any::<u8>());
+        kani::assume(op <= 3);
+        kani::assume(amount <= 8);
+
+        let before = state;
+        let before_total = reservation_ledger_total(before);
+        let (next, valid) = ledger_apply(before, op, amount);
+        if !valid {
+            assert_eq!(next, before);
+        } else if op == 0 {
+            admitted_total = admitted_total
+                .checked_add(amount)
+                .unwrap_or_else(|| unreachable!("six eight-unit reservations fit in u64"));
+            assert_eq!(reservation_ledger_total(next), before_total + amount);
+        } else {
+            assert_eq!(reservation_ledger_total(next), before_total);
+        }
+
+        state = next;
+        assert_eq!(reservation_ledger_total(state), admitted_total);
+        if valid && op != 0 && amount != 0 && state.reserved == 0 {
+            assert_eq!(terminal_disposition, 0);
+            terminal_disposition = op;
+        }
+        if terminal_disposition != 0 {
+            assert_eq!(state.reserved, 0);
+        }
+        if admitted_total != 0 && state.reserved == 0 {
+            assert_ne!(terminal_disposition, 0);
+        }
+    }
+
+    let tail = u64::from(kani::any::<u8>());
+    let overflow_amount = tail + 1;
+
+    let reserve_boundary = ReservationLedger {
+        reserved: u64::MAX - tail,
+        committed: 0,
+        released: 0,
+        retained: 0,
+    };
+    assert_eq!(
+        ledger_apply(reserve_boundary, 0, overflow_amount),
+        (reserve_boundary, false)
+    );
+
+    let mixed_bucket_boundary = ReservationLedger {
+        reserved: 1,
+        committed: u64::MAX - 1,
+        released: 0,
+        retained: 0,
+    };
+    assert_eq!(
+        ledger_apply(mixed_bucket_boundary, 0, 1),
+        (mixed_bucket_boundary, false)
+    );
+
+    for op in 1..=3 {
+        let destination = u64::MAX - overflow_amount;
+        let terminal_boundary = ReservationLedger {
+            reserved: overflow_amount,
+            committed: if op == 1 { destination } else { 0 },
+            released: if op == 2 { destination } else { 0 },
+            retained: if op == 3 { destination } else { 0 },
+        };
+        let (terminal, valid) = ledger_apply(terminal_boundary, op, overflow_amount);
+        assert!(valid);
+        assert_eq!(terminal.reserved, 0);
+        assert_eq!(reservation_ledger_total(terminal), u64::MAX);
+    }
+
+    let invalid_aggregate = ReservationLedger {
+        reserved: 1,
+        committed: u64::MAX,
+        released: 0,
+        retained: 0,
+    };
+    assert_eq!(
+        ledger_apply(invalid_aggregate, 2, 1),
+        (invalid_aggregate, false)
+    );
+
+    let over_disposition = ReservationLedger {
+        reserved: tail,
+        ..ReservationLedger::default()
+    };
+    assert_eq!(
+        ledger_apply(over_disposition, 1, overflow_amount),
+        (over_disposition, false)
+    );
+
+    let terminal = ReservationLedger {
+        reserved: 0,
+        committed: 1,
+        released: 0,
+        retained: 0,
+    };
+    assert_eq!(ledger_apply(terminal, 0, 1), (terminal, false));
+    assert_eq!(ledger_apply(terminal, 2, 1), (terminal, false));
+}
+
+#[kani::proof]
+pub fn verify_budget_admission_projection() {
+    let invocation_count = kani::any::<u32>();
+    let max_invocations = kani::any::<u32>();
+    let has_invocation_cap = kani::any::<bool>();
+    let invocation_cap = has_invocation_cap.then_some(max_invocations);
+    let invocation_projection = budget_increment_admits(invocation_count, invocation_cap);
+    assert_eq!(
+        invocation_projection,
+        !has_invocation_cap || invocation_count < max_invocations,
+    );
+
+    let cost_units = kani::any::<u64>();
+    let max_per_invocation = kani::any::<u64>();
+    let has_per_invocation_cap = kani::any::<bool>();
+    let committed_cost_units = kani::any::<u64>();
+    let max_total_cost_units = kani::any::<u64>();
+    let has_total_cap = kani::any::<bool>();
+    let actual = budget_charge_admits(
+        invocation_count,
+        committed_cost_units,
+        cost_units,
+        invocation_cap,
+        has_per_invocation_cap.then_some(max_per_invocation),
+        has_total_cap.then_some(max_total_cost_units),
+    );
+    let expected = if has_total_cap && committed_cost_units.checked_add(cost_units).is_none() {
+        Err(BudgetAdmissionProjectionError::TotalCostOverflow)
+    } else {
+        let invocation_allowed = !has_invocation_cap || invocation_count < max_invocations;
+        let per_invocation_allowed = !has_per_invocation_cap || cost_units <= max_per_invocation;
+        let total_allowed = !has_total_cap
+            || committed_cost_units
+                .checked_add(cost_units)
+                .is_some_and(|total| {
+                    committed_cost_units <= max_total_cost_units && total <= max_total_cost_units
+                });
+        Ok(invocation_allowed && per_invocation_allowed && total_allowed)
+    };
+    assert_eq!(actual, expected);
+}
+
+#[kani::proof]
+pub fn verify_composite_quota_all_or_nothing() {
+    let before = [kani::any::<u8>(), kani::any::<u8>(), kani::any::<u8>()];
+    let maximum = [kani::any::<u8>(), kani::any::<u8>(), kani::any::<u8>()];
+    let applicable = [
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+    ];
+    let result = composite_quota_authorize(before, maximum, applicable);
+
+    if result.accepted {
+        for index in 0..3 {
+            if applicable[index] {
+                assert_eq!(result.captured[index], before[index] + 1);
+                assert!(result.captured[index] <= maximum[index]);
+            } else {
+                assert_eq!(result.captured[index], before[index]);
+            }
+        }
+    } else {
+        assert_eq!(result.captured, before);
+    }
+}
+
+#[kani::proof]
+pub fn verify_quota_maximum_immutable() {
+    let initialized = kani::any::<bool>();
+    let existing = kani::any::<u8>();
+    let presented = kani::any::<u8>();
+    let compatible = quota_maximum_compatible(initialized, existing, presented);
+
+    assert_eq!(compatible, !initialized || existing == presented);
+    if initialized && existing != presented {
+        assert!(!compatible);
+    }
+}
+
+#[kani::proof]
+pub fn verify_family_binding_preservation() {
+    let fields = [
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+    ];
+    let root_maximum = kani::any::<u8>();
+    let descendant_maximum = kani::any::<u8>();
+    let preserved = family_binding_preserved(fields, root_maximum, descendant_maximum);
+
+    assert_eq!(
+        preserved,
+        fields.iter().all(|matches| *matches) && root_maximum == descendant_maximum
+    );
+    if fields.iter().any(|matches| !*matches) || root_maximum != descendant_maximum {
+        assert!(!preserved);
+    }
+}
+
+#[kani::proof]
+pub fn verify_threshold_distinct_signers() {
+    let signer_ids = [kani::any::<u8>(), kani::any::<u8>(), kani::any::<u8>()];
+    let present = [
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+    ];
+    let eligible = [
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+        kani::any::<bool>(),
+    ];
+    let count = threshold_distinct_eligible_signers(signer_ids, present, eligible);
+
+    assert!(count <= 3);
+    for signer in 0..3_u8 {
+        let occurrences = (0..3)
+            .filter(|index| present[*index] && signer_ids[*index] == signer)
+            .count();
+        if occurrences > 1 {
+            let mut without_duplicate = present;
+            let mut retained = false;
+            for index in 0..3 {
+                if signer_ids[index] == signer && without_duplicate[index] {
+                    if retained {
+                        without_duplicate[index] = false;
+                    } else {
+                        retained = true;
+                    }
+                }
+            }
+            assert_eq!(
+                count,
+                threshold_distinct_eligible_signers(signer_ids, without_duplicate, eligible)
+            );
+        }
+    }
+}
+
 // =====================================================================
 // Public harnesses for recursive delegation, the signed delegation
-// receipt, the revocation-view freshness gate, and sparse-Merkle
-// inclusion soundness.
+// receipt, the revocation-view freshness gate, and Merkle inclusion.
 //
 // Each harness mirrors a property already proved (or pending proof) on
 // the Lean and TLA+ sides:
@@ -1119,11 +1422,10 @@ pub fn verify_budget_checked_add_no_overflow() {
 //     determinism on canonical bytes.
 //   * verify_revocation_view_freshness   - RevocationView::install_if_newer
 //     monotone-epoch fail-closed gate (revocation_view.rs).
-//   * verify_oracle_inclusion_soundness  - sparse-Merkle inclusion proof
-//     soundness modulo a symbolic hash function (chio-revocation-oracle).
+//   * verify_inclusion_step_equivalence  - production/extraction step parity.
+//   * verify_oracle_inclusion_walk_parity  - production inclusion-walk parity.
 //
-// Each property is modelled at the algebraic level so the symbolic search
-// space stays bounded.
+// Each property uses a bounded input domain.
 // =====================================================================
 
 #[kani::proof]
@@ -1248,204 +1550,157 @@ pub fn verify_revocation_view_freshness() {
 }
 
 #[kani::proof]
-pub fn verify_oracle_inclusion_soundness() {
-    let leaf_present = kani::any::<bool>();
-    let chain_hashes_to_root = kani::any::<bool>();
+pub fn verify_inclusion_step_equivalence() {
+    let index = u64::from(kani::any::<u8>());
+    let size = u64::from(kani::any::<u8>());
+    kani::assume(index <= 8);
+    kani::assume(size <= 8);
 
-    let verifier_accepts = guard_pipeline_allows(
-        leaf_present,
-        &[if chain_hashes_to_root {
-            GuardStep::Allow
-        } else {
-            GuardStep::Deny
-        }],
-    );
-
-    assert_eq!(verifier_accepts, leaf_present && chain_hashes_to_root);
-    assert!(
-        receipt_fields_coupled(
-            leaf_present,
-            chain_hashes_to_root,
-            verifier_accepts,
-            true,
-            true
-        ) || !verifier_accepts
-    );
-
-    let retry = guard_pipeline_allows(
-        leaf_present,
-        &[if chain_hashes_to_root {
-            GuardStep::Allow
-        } else {
-            GuardStep::Deny
-        }],
-    );
-    assert_eq!(retry, verifier_accepts);
+    let production = inclusion_step(index, size);
+    let extracted = crate::formal_aeneas::inclusion_step(index, size);
+    assert_eq!(production.consume_sibling, extracted.consume_sibling);
+    assert_eq!(production.sibling_on_left, extracted.sibling_on_left);
+    assert_eq!(production.next_index, extracted.next_index);
+    assert_eq!(production.next_size, extracted.next_size);
 }
 
-#[kani::proof]
-pub fn verify_composite_quota_all_or_nothing() {
-    let counts: [u32; 3] = kani::any();
-    let maxima: [u32; 3] = kani::any();
-    let applicable: [bool; 3] = kani::any();
+fn model_inclusion_root(
+    mut current: Hash,
+    mut index: u64,
+    mut size: u64,
+    audit_path: &[Hash],
+) -> Option<Hash> {
+    if size == 0 || index >= size {
+        return None;
+    }
 
-    let result = authorize_composite_quotas(counts, maxima, applicable);
-    let mut every_quota_admits = true;
-    let mut index = 0;
-    while index < counts.len() {
-        if counts[index] > maxima[index] || (applicable[index] && counts[index] >= maxima[index]) {
-            every_quota_admits = false;
+    let mut path_index = 0usize;
+    while size > 1 {
+        let sibling_on_left = index % 2 != 0;
+        let right_sibling_exists = index.checked_add(1).is_some_and(|sibling| sibling < size);
+        if sibling_on_left || right_sibling_exists {
+            let sibling = audit_path.get(path_index)?;
+            path_index = path_index.checked_add(1)?;
+            current = if sibling_on_left {
+                node_hash(sibling, &current)
+            } else {
+                node_hash(&current, sibling)
+            };
         }
-        index += 1;
+        index /= 2;
+        size = size / 2 + size % 2;
     }
 
-    assert_eq!(result.accepted, every_quota_admits);
-    let mut index = 0;
-    while index < counts.len() {
-        if result.accepted && applicable[index] {
-            assert_eq!(result.counts[index], counts[index] + 1);
-            assert!(result.counts[index] <= maxima[index]);
-        } else {
-            assert_eq!(result.counts[index], counts[index]);
+    (path_index == audit_path.len()).then_some(current)
+}
+
+fn perturb_symbolic_hash(hash: &mut Hash, first: u8, second: u8) {
+    let mut bytes = *hash.as_bytes();
+    bytes[0] ^= first;
+    bytes[1] ^= second;
+    *hash = Hash::from_bytes(bytes);
+}
+
+fn abstract_hash_options_equal(actual: Option<Hash>, model: Option<Hash>) -> bool {
+    match (actual, model) {
+        (None, None) => true,
+        (Some(actual), Some(model)) => {
+            let actual = actual.as_bytes();
+            let model = model.as_bytes();
+            actual[0] == model[0]
+                && actual[1] == model[1]
+                && actual[2] == model[2]
+                && actual[3] == model[3]
+                && actual[4] == model[4]
+                && actual[5] == model[5]
+                && actual[6] == model[6]
+                && actual[7] == model[7]
+                && actual[8] == model[8]
+                && actual[9] == model[9]
+                && actual[10] == model[10]
+                && actual[11] == model[11]
+                && actual[12] == model[12]
+                && actual[13] == model[13]
+                && actual[14] == model[14]
+                && actual[15] == model[15]
+                && actual[16] == model[16]
+                && actual[17] == model[17]
+                && actual[18] == model[18]
+                && actual[19] == model[19]
+                && actual[20] == model[20]
+                && actual[21] == model[21]
+                && actual[22] == model[22]
+                && actual[23] == model[23]
+                && actual[24] == model[24]
+                && actual[25] == model[25]
+                && actual[26] == model[26]
+                && actual[27] == model[27]
+                && actual[28] == model[28]
+                && actual[29] == model[29]
+                && actual[30] == model[30]
+                && actual[31] == model[31]
         }
-        index += 1;
+        _ => false,
     }
 }
 
 #[kani::proof]
-pub fn verify_quota_maximum_immutable() {
-    let key_exists = kani::any::<bool>();
-    let stored_maximum = kani::any::<u32>();
-    let presented_maximum = kani::any::<u32>();
-
-    let result = admit_quota_maximum(key_exists, stored_maximum, presented_maximum);
-    if key_exists {
-        assert_eq!(result.maximum, stored_maximum);
-        assert_eq!(result.accepted, stored_maximum == presented_maximum);
-    } else {
-        assert!(result.accepted);
-        assert_eq!(result.maximum, presented_maximum);
-    }
-}
-
-#[kani::proof]
-pub fn verify_captured_invocation_count_monotonic() {
-    let count = kani::any::<u32>();
-    let maximum = kani::any::<u32>();
-
-    let result = capture_invocation_count(count, maximum);
-    if result.accepted {
-        assert!(result.count > count);
-        assert_eq!(result.count, count + 1);
-        assert!(result.count <= maximum);
-    } else {
-        assert_eq!(result.count, count);
-    }
-}
-
-#[kani::proof]
-pub fn verify_replay_fingerprint_uniqueness() {
-    let fingerprints = kani::any::<[u8; 4]>();
-    let count = kani::any::<u8>();
-    let candidate = kani::any::<u8>();
-
-    let result = reserve_replay_fingerprint(fingerprints, count, candidate);
-    if result.accepted {
-        assert!(count < 4);
-        assert_eq!(result.count, count + 1);
-        assert_eq!(result.fingerprints[usize::from(count)], candidate);
-
-        let mut left = 0_usize;
-        while left < usize::from(result.count) {
-            let mut right = left + 1;
-            while right < usize::from(result.count) {
-                assert_ne!(result.fingerprints[left], result.fingerprints[right]);
-                right += 1;
-            }
-            left += 1;
-        }
-    } else {
-        assert_eq!(result.fingerprints, fingerprints);
-        assert_eq!(result.count, count);
-    }
-}
-
-#[kani::proof]
-pub fn verify_family_binding_preservation() {
-    let binding = FamilyBindingPreservation {
-        root_binding_matches: kani::any(),
-        root_capability_matches: kani::any(),
-        root_subject_matches: kani::any(),
-        root_scope_matches: kani::any(),
-        descendant_expiry_within_root: kani::any(),
-        parent_maximum: kani::any(),
-        descendant_maximum: kani::any(),
+#[kani::unwind(5)]
+pub fn verify_oracle_inclusion_walk_parity() {
+    let tree_size = usize::from((kani::any::<u8>() & 7) + 1);
+    let leaf_index = usize::from(kani::any::<u8>());
+    kani::assume(leaf_index < tree_size);
+    let fixture = bounded_merkle_case(tree_size, leaf_index);
+    assert!(fixture.is_some());
+    let Some((mut leaf, _expected_root, mut proof)) = fixture else {
+        return;
     };
+    perturb_symbolic_hash(&mut leaf, kani::any(), kani::any());
 
-    let preserved = family_binding_is_preserved(binding);
-    let exact_authority = binding.root_binding_matches
-        && binding.root_capability_matches
-        && binding.root_subject_matches
-        && binding.root_scope_matches
-        && binding.descendant_expiry_within_root
-        && binding.parent_maximum == binding.descendant_maximum;
-    assert_eq!(preserved, exact_authority);
-    if preserved {
-        assert_eq!(binding.parent_maximum, binding.descendant_maximum);
+    if let Some(sibling) = proof.audit_path.get_mut(0) {
+        perturb_symbolic_hash(sibling, kani::any(), kani::any());
     }
-}
-
-#[kani::proof]
-pub fn verify_threshold_distinct_signers() {
-    let signers: [u8; 4] = kani::any();
-    let signer_count = kani::any::<u8>();
-    let eligible: [u8; 4] = kani::any();
-    let eligible_count = kani::any::<u8>();
-    let required = kani::any::<u8>();
-    kani::assume(signer_count <= 4);
-    kani::assume(eligible_count <= 4);
-
-    let mut left = 0_usize;
-    while left < usize::from(eligible_count) {
-        let mut right = left + 1;
-        while right < usize::from(eligible_count) {
-            kani::assume(eligible[left] != eligible[right]);
-            right += 1;
-        }
-        left += 1;
+    if let Some(sibling) = proof.audit_path.get_mut(1) {
+        perturb_symbolic_hash(sibling, kani::any(), kani::any());
+    }
+    if let Some(sibling) = proof.audit_path.get_mut(2) {
+        perturb_symbolic_hash(sibling, kani::any(), kani::any());
     }
 
-    let result =
-        validate_threshold_signers(signers, signer_count, eligible, eligible_count, required);
-
-    let mut expected_valid = required > 0;
-    let mut signer_index = 0_usize;
-    while signer_index < usize::from(signer_count) {
-        let mut signer_is_eligible = false;
-        let mut eligible_index = 0_usize;
-        while eligible_index < usize::from(eligible_count) {
-            if signers[signer_index] == eligible[eligible_index] {
-                signer_is_eligible = true;
+    match kani::any::<u8>() % 6 {
+        1 => {
+            if proof.audit_path.pop().is_none() {
+                proof.tree_size = 0;
             }
-            eligible_index += 1;
         }
-        if !signer_is_eligible {
-            expected_valid = false;
-        }
-
-        let mut prior_index = 0_usize;
-        while prior_index < signer_index {
-            if signers[prior_index] == signers[signer_index] {
-                expected_valid = false;
+        2 => {
+            if proof.audit_path.is_empty() {
+                proof.tree_size = 0;
+            } else {
+                proof.tree_size = 1;
+                proof.leaf_index = 0;
             }
-            prior_index += 1;
         }
-        signer_index += 1;
+        3 => {
+            if proof.audit_path.len() > 1 {
+                proof.audit_path.swap(0, 1);
+            } else {
+                proof.leaf_index = proof.tree_size;
+            }
+        }
+        4 => proof.tree_size = 0,
+        5 => proof.leaf_index = proof.tree_size,
+        _ => {}
     }
 
-    assert_eq!(result.valid, expected_valid);
-    assert_eq!(result.accepted, expected_valid && signer_count >= required);
-    if result.accepted {
-        assert_eq!(result.distinct_signers, signer_count);
-    }
+    let model_index = u64::try_from(proof.leaf_index);
+    let model_size = u64::try_from(proof.tree_size);
+    assert!(model_index.is_ok());
+    assert!(model_size.is_ok());
+    let (Ok(model_index), Ok(model_size)) = (model_index, model_size) else {
+        return;
+    };
+    let model_root = model_inclusion_root(leaf, model_index, model_size, &proof.audit_path);
+    let actual_root = proof.compute_root_from_hash(leaf).ok();
+    assert!(abstract_hash_options_equal(actual_root, model_root));
 }

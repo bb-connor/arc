@@ -10,16 +10,19 @@ use crate::{
 
 use super::{
     current_unix_timestamp, merge_metadata_objects, scope_pre_invocation_guard_evidence,
-    ChioKernel, PreExecutionBudgetMutation,
+    ChioKernel, PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
+const POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON: &str =
+    "dispatch credential commit failed after tool execution";
 const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
     "tool evaluation future dropped before dispatch with cleanup fault";
 
 pub(crate) struct PostAdmissionReceiptContext {
     pub(crate) extra_metadata: Option<serde_json::Value>,
     pub(crate) pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    pub(crate) verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
 }
 
 /// A single pre-dispatch cleanup step that failed. Collected so a signed fault
@@ -83,6 +86,7 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
     budget_lease_acquired: bool,
     threshold_operation: Option<AdmissionOperation>,
     security_dispatch_outcome: Option<SecurityDispatchOutcomeHandle>,
+    post_dispatch_reason: &'static str,
     armed: bool,
     dispatch_started: bool,
 }
@@ -111,6 +115,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
             budget_lease_acquired,
             threshold_operation: None,
             security_dispatch_outcome: None,
+            post_dispatch_reason: POST_ADMISSION_DROP_REASON,
             armed: true,
             dispatch_started: false,
         }
@@ -165,6 +170,14 @@ impl<'a> PostAdmissionDropGuard<'a> {
         &mut self,
     ) -> Option<SecurityDispatchOutcomeHandle> {
         self.security_dispatch_outcome.take()
+    }
+
+    /// Classify a normal error return after the tool completed but before its
+    /// replay credentials could be committed. The guard remains armed so its
+    /// drop path records the executed-or-not outcome as a signed terminal
+    /// receipt instead of returning a raw error with no audit trail.
+    pub(crate) fn mark_dispatch_credential_commit_failed(&mut self) {
+        self.post_dispatch_reason = POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON;
     }
 
     pub(crate) fn disarm(&mut self) {
@@ -452,13 +465,17 @@ impl<'a> PostAdmissionDropGuard<'a> {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self.kernel.build_cancelled_response_with_metadata(
-            self.request,
-            PRE_DISPATCH_CLEANUP_FAULT_REASON,
-            current_unix_timestamp(),
-            self.matched_grant_index,
-            metadata,
-        ) {
+        if let Err(error) = self
+            .kernel
+            .build_cancelled_response_with_metadata_and_payee_binding(
+                self.request,
+                PRE_DISPATCH_CLEANUP_FAULT_REASON,
+                current_unix_timestamp(),
+                self.matched_grant_index,
+                metadata,
+                self.receipt_context.verified_payee_binding.as_ref(),
+            )
+        {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),
@@ -556,20 +573,29 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // receipt so the executed-or-not side effect is on the append-only
         // log. The retained reservations are marked in the receipt metadata
         // so the burned lease is auditable and operator-recoverable.
+        let receipt_metadata = self.kernel.ambiguous_dispatch_receipt_metadata(
+            self.budget_mutation,
+            self.payment_authorization,
+            released_metadata,
+        );
         let receipt_metadata = self
             .kernel
-            .mark_runtime_admission_reservations_retained_fail_closed(released_metadata);
+            .mark_runtime_admission_reservations_retained_fail_closed(receipt_metadata);
 
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self.kernel.build_cancelled_response_with_metadata(
-            self.request,
-            POST_ADMISSION_DROP_REASON,
-            current_unix_timestamp(),
-            self.matched_grant_index,
-            receipt_metadata,
-        ) {
+        if let Err(error) = self
+            .kernel
+            .build_cancelled_response_with_metadata_and_payee_binding(
+                self.request,
+                self.post_dispatch_reason,
+                current_unix_timestamp(),
+                self.matched_grant_index,
+                receipt_metadata,
+                self.receipt_context.verified_payee_binding.as_ref(),
+            )
+        {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),

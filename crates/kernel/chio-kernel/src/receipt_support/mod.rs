@@ -1,3 +1,4 @@
+mod coupling;
 mod receipt_building;
 mod receipt_content;
 mod receipt_metadata;
@@ -7,6 +8,7 @@ mod signing;
 #[cfg(test)]
 mod tests;
 
+pub use coupling::{receipt_body_fields_coupled, ReceiptCouplingExpectation};
 pub(crate) use receipt_building::{
     build_child_request_receipt, child_outcome_payload, child_terminal_state, next_receipt_id,
 };
@@ -18,7 +20,7 @@ pub(crate) use receipt_content::{
 pub(crate) use receipt_metadata::governed_request_metadata;
 pub(crate) use receipt_metadata::{
     merge_metadata_objects, receipt_attribution_metadata, request_receipt_metadata,
-    verify_governed_runtime_attestation_record,
+    request_receipt_metadata_with_payee_binding, verify_governed_runtime_attestation_record,
 };
 pub(crate) use receipt_scopes::{
     current_post_invocation_guard_evidence, current_pre_invocation_guard_evidence,

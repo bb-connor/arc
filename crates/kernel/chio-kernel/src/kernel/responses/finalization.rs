@@ -5,6 +5,7 @@ pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) admission_operation: Option<BudgetAdmissionOperationBinding>,
     pub(crate) reported_cost: Option<ToolInvocationCost>,
     pub(crate) payment_authorization: Option<PaymentAuthorization>,
+    pub(crate) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     pub(crate) cap: &'a CapabilityToken,
 }
 
@@ -15,6 +16,7 @@ pub(crate) struct FinalizeToolOutputRequest<'a> {
     pub(crate) timestamp: u64,
     pub(crate) matched_grant_index: usize,
     pub(crate) security_context: Option<&'a SecurityInvocationContext>,
+    pub(crate) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     pub(crate) extra_metadata: Option<serde_json::Value>,
 }
 
@@ -43,6 +45,7 @@ impl ChioKernel {
             timestamp,
             matched_grant_index,
             security_context: None,
+            verified_payee_binding: None,
             extra_metadata,
         })
     }
@@ -58,6 +61,7 @@ impl ChioKernel {
             timestamp,
             matched_grant_index,
             security_context,
+            verified_payee_binding,
             extra_metadata,
         } = request;
         let output = self.apply_stream_limits(output, elapsed)?;
@@ -71,7 +75,7 @@ impl ChioKernel {
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation.evidence);
         if let Some(reason) = post_invocation.blocked_reason.as_deref() {
-            return self.build_deny_response_with_metadata(
+            return self.build_deny_response_with_metadata_and_payee_binding(
                 request,
                 reason,
                 timestamp,
@@ -85,29 +89,33 @@ impl ChioKernel {
                 self.mark_runtime_admission_reservations_retained_fail_closed(
                     post_invocation.extra_metadata,
                 ),
+                verified_payee_binding,
             );
         }
 
         match post_invocation.output {
-            ToolServerOutput::Value(value) => self.build_allow_response_with_metadata(
-                request,
-                ToolCallOutput::Value(value),
-                timestamp,
-                Some(matched_grant_index),
-                post_invocation.extra_metadata,
-                AllowResponseNonce::MintForAllow,
-            ),
+            ToolServerOutput::Value(value) => self
+                .build_allow_response_with_metadata_and_payee_binding(
+                    request,
+                    ToolCallOutput::Value(value),
+                    timestamp,
+                    Some(matched_grant_index),
+                    post_invocation.extra_metadata,
+                    verified_payee_binding,
+                    AllowResponseNonce::MintForAllow,
+                ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
-                .build_allow_response_with_metadata(
+                .build_allow_response_with_metadata_and_payee_binding(
                     request,
                     ToolCallOutput::Stream(stream),
                     timestamp,
                     Some(matched_grant_index),
                     post_invocation.extra_metadata,
+                    verified_payee_binding,
                     AllowResponseNonce::MintForAllow,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
-                .build_incomplete_response_with_output_and_metadata(
+                .build_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(ToolCallOutput::Stream(stream)),
                     &reason,
@@ -121,6 +129,7 @@ impl ChioKernel {
                     self.mark_runtime_admission_reservations_retained_fail_closed(
                         post_invocation.extra_metadata,
                     ),
+                    verified_payee_binding,
                 ),
         }
     }
@@ -310,11 +319,7 @@ impl ChioKernel {
         redacted: serde_json::Value,
         limits: crate::tool_outcome::InvocationStreamLimitsV1,
     ) -> Result<ToolServerOutput, KernelError> {
-        parse_redacted_output(
-            redacted,
-            limits.max_total_bytes,
-            limits.max_chunks,
-        )
+        parse_redacted_output(redacted, limits.max_total_bytes, limits.max_chunks)
     }
 
     fn post_invocation_metadata(
@@ -384,11 +389,8 @@ impl ChioKernel {
             ToolServerStreamResult::Incomplete { stream, reason } => (stream, Some(reason)),
         };
 
-        let (stream, total_bytes, truncation_cause) = truncate_stream_to_limits(
-            &stream,
-            limits.max_total_bytes,
-            limits.max_chunks,
-        )?;
+        let (stream, total_bytes, truncation_cause) =
+            truncate_stream_to_limits(&stream, limits.max_total_bytes, limits.max_chunks)?;
 
         let limit_reason = match truncation_cause {
             Some(cause) => Some(stream_limit_reason(

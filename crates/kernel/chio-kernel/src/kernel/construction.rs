@@ -13,6 +13,13 @@ use dashmap::DashMap;
 
 use super::*;
 
+fn receipt_evaluation_map_key(request_id: &str) -> String {
+    current_receipt_evaluation_scope_key().map_or_else(
+        || format!("request:{request_id}"),
+        |evaluation_id| format!("evaluation:{evaluation_id}"),
+    )
+}
+
 /// Fail-closed kernel build error. Lets deadline config be validated at
 /// construction time without making the infallible `ChioKernel::new` fallible.
 #[derive(Debug, thiserror::Error)]

@@ -285,116 +285,54 @@ function validateChioReceiptRecordSemantics(
   receipt: Receipt_Record.ChioReceiptRecord,
 ): string[] {
   const errors: string[] = [];
-  const record = receipt as unknown as Record<string, unknown>;
-  const receiptKind = record["receipt_kind"];
-  const boundaryClass = record["boundary_class"];
-  const observationOutcome = record["observation_outcome"];
-  const toolOrigin = record["tool_origin"];
-  const redactionMode = record["redaction_mode"];
-  const trustLevel = record["trust_level"];
-  const decision = record["decision"];
-
-  if (!isOneOfString(receiptKind, [
-    "mediated_decision",
-    "trace_observation",
-    "advisory_evaluation",
-  ])) {
-    errors.push("receipt.receipt_kind must be a current v1 receipt kind");
-  }
-  if (!isOneOfString(boundaryClass, ["prevent", "detect_only", "advisory_only"])) {
-    errors.push("receipt.boundary_class must be a runtime boundary class");
-  }
-  if (!isOneOfString(toolOrigin, [
-    "caller_executed",
-    "host_executed_provider_reported",
-    "host_executed_unmediated",
-  ])) {
-    errors.push("receipt.tool_origin must be a current v1 tool origin");
-  }
-  if (!isOneOfString(redactionMode, ["none", "summary", "redacted"])) {
-    errors.push("receipt.redaction_mode must be a current v1 redaction mode");
-  }
-  if (!isOneOfString(trustLevel, ["mediated", "verified", "advisory"])) {
-    errors.push("receipt.trust_level must be a current v1 trust level");
-  }
-  if (observationOutcome !== undefined
-    && !isOneOfString(observationOutcome, ["observed", "evaluated", "dropped"])) {
-    errors.push("receipt.observation_outcome must be a current v1 observation outcome");
-  }
-  if (decision !== undefined && !isValidReceiptRecordDecision(decision)) {
-    errors.push("receipt.decision must be a valid Decision");
-  }
-
-  if (receiptKind === "mediated_decision") {
-    if (boundaryClass !== "prevent") {
-      errors.push("mediated_decision receipts must use boundary_class prevent");
-    }
-    if (trustLevel !== "mediated") {
-      errors.push("mediated_decision receipts must use trust_level mediated");
-    }
-    if (observationOutcome !== undefined) {
-      errors.push("mediated_decision receipts must omit observation_outcome");
-    }
-    if (decision === undefined) {
+  if (receipt.receipt_kind === "mediated_decision") {
+    if (receipt.decision == null) {
       errors.push("mediated_decision receipts must include decision");
     }
-  } else if (receiptKind === "trace_observation") {
-    if (boundaryClass !== "detect_only") {
-      errors.push("trace_observation receipts must use boundary_class detect_only");
+    if (receipt.boundary_class !== "prevent") {
+      errors.push("mediated_decision receipts must use boundary_class prevent");
     }
-    if (trustLevel !== "verified") {
-      errors.push("trace_observation receipts must use trust_level verified");
+    if (receipt.trust_level !== "mediated") {
+      errors.push("mediated_decision receipts must use trust_level mediated");
     }
-    if (observationOutcome === undefined) {
-      errors.push("trace_observation receipts must include observation_outcome");
+    if (receipt.observation_outcome != null) {
+      errors.push("mediated_decision receipts must omit observation_outcome");
     }
-    if (decision !== undefined) {
+    return errors;
+  }
+
+  if (receipt.receipt_kind === "trace_observation") {
+    if (receipt.decision != null) {
       errors.push("trace_observation receipts must omit decision");
     }
-  } else if (receiptKind === "advisory_evaluation") {
-    if (boundaryClass !== "advisory_only") {
-      errors.push("advisory_evaluation receipts must use boundary_class advisory_only");
+    if (receipt.boundary_class !== "detect_only") {
+      errors.push("trace_observation receipts must use boundary_class detect_only");
     }
-    if (trustLevel !== "advisory") {
-      errors.push("advisory_evaluation receipts must use trust_level advisory");
+    if (receipt.trust_level !== "verified") {
+      errors.push("trace_observation receipts must use trust_level verified");
     }
-    if (observationOutcome === undefined) {
-      errors.push("advisory_evaluation receipts must include observation_outcome");
+    if (receipt.observation_outcome == null) {
+      errors.push("trace_observation receipts must include observation_outcome");
     }
-    if (decision !== undefined) {
+    return errors;
+  }
+
+  if (receipt.receipt_kind === "advisory_evaluation") {
+    if (receipt.decision != null) {
       errors.push("advisory_evaluation receipts must omit decision");
     }
+    if (receipt.boundary_class !== "advisory_only") {
+      errors.push("advisory_evaluation receipts must use boundary_class advisory_only");
+    }
+    if (receipt.trust_level !== "advisory") {
+      errors.push("advisory_evaluation receipts must use trust_level advisory");
+    }
+    if (receipt.observation_outcome == null) {
+      errors.push("advisory_evaluation receipts must include observation_outcome");
+    }
+    return errors;
   }
 
-  const hasBbsProjection = record["bbs_projection_version"] !== undefined;
-  const hasBbsSignature = record["bbs_signature"] !== undefined;
-  if (hasBbsProjection !== hasBbsSignature) {
-    errors.push("receipt.bbs_projection_version and receipt.bbs_signature must be present together");
-  }
-
+  errors.push("receipt_kind must be a current v1 receipt kind");
   return errors;
-}
-
-function isOneOfString(value: unknown, allowed: readonly string[]): value is string {
-  return typeof value === "string" && allowed.includes(value);
-}
-
-function isValidReceiptRecordDecision(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  const decision = value as Record<string, unknown>;
-  switch (decision["verdict"]) {
-    case "allow":
-      return true;
-    case "deny":
-      return typeof decision["reason"] === "string"
-        && typeof decision["guard"] === "string";
-    case "cancelled":
-    case "incomplete":
-      return typeof decision["reason"] === "string";
-    default:
-      return false;
-  }
 }

@@ -1,7 +1,7 @@
-#[path = "service_runtime/admission_authority.rs"]
-mod admission_authority;
 #[path = "service_runtime/active_defense.rs"]
 mod active_defense;
+#[path = "service_runtime/admission_authority.rs"]
+mod admission_authority;
 #[path = "service_runtime/agent_economy_budget.rs"]
 pub(crate) mod agent_economy_budget;
 #[path = "service_runtime/budget.rs"]

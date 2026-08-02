@@ -75,7 +75,9 @@ chio-keyring = { workspace = true }
 chio-manifest = { workspace = true }
 chio-security-types = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["conformance"], optional = true }
+chio-trace-validate = { workspace = true }
 chio-store-sqlite = { workspace = true }
+async-trait = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

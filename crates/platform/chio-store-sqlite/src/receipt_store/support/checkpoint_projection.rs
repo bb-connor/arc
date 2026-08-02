@@ -1137,7 +1137,7 @@ pub(crate) fn drop_transparency_projection_guards(
 }
 
 pub(crate) fn backfill_checkpoint_transparency_projections(
-    connection: &mut Connection,
+    connection: &rusqlite::Transaction<'_>,
 ) -> Result<(), ReceiptStoreError> {
     let rows = load_all_persisted_checkpoint_rows(connection)?;
     let mut parsed_checkpoints = Vec::with_capacity(rows.len());
@@ -1198,9 +1198,8 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
         parsed_checkpoints.push(checkpoint);
     }
 
-    let tx = connection.transaction()?;
     for row in &expected_heads {
-        match load_checkpoint_tree_head_projection_row(&tx, row.checkpoint_seq)? {
+        match load_checkpoint_tree_head_projection_row(connection, row.checkpoint_seq)? {
             Some(existing) if existing == *row => {}
             Some(_) => {
                 return Err(ReceiptStoreError::Conflict(format!(
@@ -1208,7 +1207,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
                     row.checkpoint_seq
                 )))
             }
-            None => insert_checkpoint_tree_head_projection_row(&tx, row)?,
+            None => insert_checkpoint_tree_head_projection_row(connection, row)?,
         }
     }
 
@@ -1216,7 +1215,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
         .iter()
         .map(|row| row.checkpoint_seq)
         .collect::<BTreeSet<_>>();
-    let existing_head_ids = load_checkpoint_tree_head_projection_ids(&tx)?;
+    let existing_head_ids = load_checkpoint_tree_head_projection_ids(connection)?;
     if existing_head_ids != expected_head_ids {
         let missing = expected_head_ids
             .difference(&existing_head_ids)
@@ -1238,7 +1237,10 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
     }
 
     for row in &expected_witnesses {
-        match load_checkpoint_predecessor_witness_projection_row(&tx, row.witness_checkpoint_seq)? {
+        match load_checkpoint_predecessor_witness_projection_row(
+            connection,
+            row.witness_checkpoint_seq,
+        )? {
             Some(existing) if existing == *row => {}
             Some(_) => {
                 return Err(ReceiptStoreError::Conflict(format!(
@@ -1246,7 +1248,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
                     row.witness_checkpoint_seq
                 )))
             }
-            None => insert_checkpoint_predecessor_witness_projection_row(&tx, row)?,
+            None => insert_checkpoint_predecessor_witness_projection_row(connection, row)?,
         }
     }
 
@@ -1254,7 +1256,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
         .iter()
         .map(|row| row.witness_checkpoint_seq)
         .collect::<BTreeSet<_>>();
-    let existing_witness_ids = load_checkpoint_predecessor_witness_projection_ids(&tx)?;
+    let existing_witness_ids = load_checkpoint_predecessor_witness_projection_ids(connection)?;
     if existing_witness_ids != expected_witness_ids {
         let missing = expected_witness_ids
             .difference(&existing_witness_ids)
@@ -1276,7 +1278,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
     }
 
     for row in &expected_publications {
-        match load_checkpoint_publication_metadata_projection_row(&tx, row.checkpoint_seq)? {
+        match load_checkpoint_publication_metadata_projection_row(connection, row.checkpoint_seq)? {
             Some(existing) if existing == *row => {}
             Some(_) => {
                 return Err(ReceiptStoreError::Conflict(format!(
@@ -1284,7 +1286,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
                     row.checkpoint_seq
                 )))
             }
-            None => insert_checkpoint_publication_metadata_projection_row(&tx, row)?,
+            None => insert_checkpoint_publication_metadata_projection_row(connection, row)?,
         }
     }
 
@@ -1292,7 +1294,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
         .iter()
         .map(|row| row.checkpoint_seq)
         .collect::<BTreeSet<_>>();
-    let existing_publication_ids = load_checkpoint_publication_metadata_projection_ids(&tx)?;
+    let existing_publication_ids = load_checkpoint_publication_metadata_projection_ids(connection)?;
     if existing_publication_ids != expected_publication_ids {
         let missing = expected_publication_ids
             .difference(&existing_publication_ids)
@@ -1313,6 +1315,5 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
         )));
     }
 
-    tx.commit()?;
     Ok(())
 }

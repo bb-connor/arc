@@ -299,12 +299,30 @@ impl ChioKernel {
         })
     }
 
+    #[cfg(test)]
     pub(super) fn reserve_threshold_tool_admission(
         &self,
         context: ThresholdToolAdmissionContext<'_>,
         prepared: PreparedGovernedToolAdmission,
         protocol: ThresholdProtocolPreparation,
         caller_handoff: Option<ThresholdCallerReservationHandoffContext<'_>>,
+    ) -> Result<(ThresholdDispatchPermit, PreExecutionBudgetMutation), KernelError> {
+        self.reserve_threshold_tool_admission_with_payee_binding(
+            context,
+            prepared,
+            protocol,
+            caller_handoff,
+            None,
+        )
+    }
+
+    pub(super) fn reserve_threshold_tool_admission_with_payee_binding(
+        &self,
+        context: ThresholdToolAdmissionContext<'_>,
+        prepared: PreparedGovernedToolAdmission,
+        protocol: ThresholdProtocolPreparation,
+        caller_handoff: Option<ThresholdCallerReservationHandoffContext<'_>>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<(ThresholdDispatchPermit, PreExecutionBudgetMutation), KernelError> {
         if (context.payment_mode == ThresholdPaymentMode::CallerReservation)
             != caller_handoff.is_some()
@@ -627,6 +645,7 @@ impl ChioKernel {
                     request,
                     &budget_mutation,
                     payment_mode,
+                    verified_payee_binding,
                 ) {
                     Ok(authorization) => payment_authorization = authorization,
                     Err(error) => {
@@ -685,6 +704,7 @@ impl ChioKernel {
                         request,
                         &budget_mutation,
                         payment_mode,
+                        verified_payee_binding,
                     ) {
                         Ok(authorization) => authorization,
                         Err(error) => {
@@ -1132,6 +1152,7 @@ impl ChioKernel {
             .parameter_hash;
         let expected = NonceBinding {
             subject_id: cap.subject.to_hex(),
+            request_id: request.request_id.clone(),
             capability_id: cap.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
@@ -1619,6 +1640,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         budget_mutation: &PreExecutionBudgetMutation,
         payment_mode: ThresholdPaymentMode,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<Option<PaymentAuthorization>, KernelError> {
         if payment_mode == ThresholdPaymentMode::CallerReservation
             && !Self::is_governed_mustprepay_request(request)
@@ -1636,7 +1658,7 @@ impl ChioKernel {
                     "threshold payment recovery omitted its admission operation".to_string(),
                 )
             })?;
-        self.authorize_payment_if_needed(request, charge, Some(binding))
+        self.authorize_payment_if_needed(request, charge, Some(binding), verified_payee_binding)
             .map_err(|error| {
                 KernelError::GovernedTransactionDenied(format!(
                     "threshold payment authorization failed: {error}"

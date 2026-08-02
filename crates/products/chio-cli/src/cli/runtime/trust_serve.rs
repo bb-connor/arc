@@ -67,6 +67,13 @@ pub(crate) fn cmd_trust_serve(
     passport_issuance_offers_file: Option<&Path>,
     certification_registry_file: Option<&Path>,
     certification_discovery_file: Option<&Path>,
+    fiscal_genesis_policy: Option<&Path>,
+    fiscal_anchor_url: Option<&str>,
+    fiscal_anchor_token: Option<&str>,
+    fiscal_admission_authority_id: &str,
+    fiscal_admission_signer_key_epoch: u64,
+    fiscal_admission_signing_seed: Option<&Path>,
+    fiscal_anchor_timeout_seconds: u64,
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
@@ -157,6 +164,31 @@ pub(crate) fn cmd_trust_serve(
         .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
         .unwrap_or((None, None));
     let roster_policy = roster_policy_file.map(load_roster_policy).transpose()?;
+    let fiscal_runtime = match (
+        fiscal_genesis_policy,
+        fiscal_anchor_url,
+        fiscal_anchor_token,
+        fiscal_admission_signing_seed,
+    ) {
+        (Some(policy), Some(anchor_url), Some(anchor_token), Some(admission_seed)) => Some(
+            trust_control::TrustFiscalRuntimeConfig::from_policy_file(
+                policy,
+                anchor_url.to_owned(),
+                anchor_token.to_owned(),
+                std::time::Duration::from_secs(fiscal_anchor_timeout_seconds),
+                fiscal_admission_authority_id.to_owned(),
+                fiscal_admission_signer_key_epoch,
+                admission_seed.to_path_buf(),
+            )?,
+        ),
+        (None, None, None, None) => None,
+        _ => {
+            return Err(CliError::cli_other_error(
+                "fiscal runtime requires --fiscal-genesis-policy, --fiscal-anchor-url, --fiscal-anchor-token, and --fiscal-admission-signing-seed together"
+                    .to_owned(),
+            ));
+        }
+    };
     let cluster_members = parse_cluster_members(cluster_members)?;
     let partition_escrow_authority = match (
         partition_escrow_authority_descriptor,
@@ -189,6 +221,8 @@ pub(crate) fn cmd_trust_serve(
         authority_db_path: authority_db_path.map(Path::to_path_buf),
         authority_keyring_config_path: authority_keyring_config_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        joint_authority_db_path: _session_db_path.map(Path::to_path_buf),
+        fiscal_runtime,
         partition_escrow_authority,
         enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
         federation_policies_file: federation_policies_file.map(Path::to_path_buf),

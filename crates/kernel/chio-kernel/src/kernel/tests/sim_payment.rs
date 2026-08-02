@@ -1856,6 +1856,7 @@ fn governed_mustprepay_with_charge_funds_the_quoted_cost_not_the_hold() {
             &request,
             Some(&charge),
             charge.admission_operation.as_ref(),
+            None,
         )
         .expect("MustPrepay-with-charge authorization must succeed")
         .expect("MustPrepay-with-charge must authorize a prepayment");
@@ -1903,7 +1904,7 @@ fn no_ceiling_mustprepay_authorizes_with_the_payment_journal_active() {
     // `None` models the no-ceiling admission outcome: no monetary charge, hence no
     // HoldPlaced row. This must not deny; the prepayment is journal-free by design.
     let authorization = kernel
-        .authorize_payment_if_needed(&request, None, None)
+        .authorize_payment_if_needed(&request, None, None, None)
         .expect("a no-ceiling MustPrepay must authorize with the journal active, not deny")
         .expect("a no-ceiling MustPrepay must authorize a prepayment");
     assert!(
@@ -1956,6 +1957,7 @@ fn non_mustprepay_charge_authorizes_the_charged_amount() {
             &request,
             Some(&charge),
             charge.admission_operation.as_ref(),
+            None,
         )
         .expect("metered charge authorization must succeed")
         .expect("a metered charge must authorize a payment");

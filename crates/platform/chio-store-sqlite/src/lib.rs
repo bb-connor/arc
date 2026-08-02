@@ -30,6 +30,7 @@ pub mod admission_capture_authority;
 pub mod admission_operation_store;
 pub mod agent_economy_budget_store;
 mod agent_economy_revocation_store;
+mod agent_web_replay_store;
 pub mod aggregate_family_root;
 pub mod approval_store;
 pub mod authority;
@@ -49,12 +50,14 @@ pub mod evidence_export;
 pub mod execution_nonce_store;
 pub mod fiscal_store;
 pub mod frost_store;
+mod governed_approval_replay_store;
 pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
 pub mod memory_provenance_store;
 pub mod receipt_query;
 pub mod receipt_store;
+mod replay_clock;
 pub mod revocation_store;
 pub mod schema_version;
 pub mod sealed_decoy_registry;
@@ -137,6 +140,9 @@ pub use agent_economy_budget_store::{
     SqliteBudgetStore as SqliteAgentEconomyBudgetStore,
 };
 pub use agent_economy_revocation_store::SqliteRevocationStore as SqliteAgentEconomyRevocationStore;
+pub use agent_web_replay_store::{
+    SqliteAgentWebReplayReservationState, SqliteAgentWebReplayStore, SqliteAgentWebReplayStoreError,
+};
 pub use aggregate_family_root::{
     aggregate_family_root_token_digest, AggregateFamilyRootLookupSnapshot,
     AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError, StoredAggregateFamilyRoot,
@@ -167,6 +173,9 @@ pub use economic_state_cache::{
     admission_terminal_projection_effect_result, EconomicOperationStageBinding,
     EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
     EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
+};
+pub use governed_approval_replay_store::{
+    SqliteGovernedApprovalReplayStore, SqliteGovernedApprovalReplayStoreError,
 };
 pub use security_admission_operation_store::SqliteAdmissionOperationStore as SqliteSecurityAdmissionOperationStore;
 

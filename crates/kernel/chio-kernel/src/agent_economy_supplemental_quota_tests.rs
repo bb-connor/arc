@@ -596,4 +596,3 @@ fn canonical_hash_vectors_are_stable() -> Result<(), Box<dyn std::error::Error>>
     );
     Ok(())
 }
-

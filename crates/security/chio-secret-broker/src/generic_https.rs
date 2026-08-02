@@ -983,9 +983,8 @@ mod tests {
     #[test]
     fn not_modified_is_body_free_without_being_a_redirect() {
         let (mut request, constraints) = request_and_constraints();
-        request.destination =
-            BrokerDestination::parse("https://example.com/v1", "HEAD", false)
-                .test_expect("destination");
+        request.destination = BrokerDestination::parse("https://example.com/v1", "HEAD", false)
+            .test_expect("destination");
         let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
         let executor = executor(
             ResponseMode::NotModified,

@@ -14,16 +14,16 @@ use chio_kernel::admission_operation::{
 use chio_kernel::agent_economy_budget_store::{
     BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest, BudgetGuaranteeLevel,
 };
-use chio_kernel::{
-    AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
-    AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
-    AdmissionPaymentSettlementBegin, QualifiedAdmissionProjectionStore,
-};
 use chio_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
 use chio_kernel::tool_outcome::{
     CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
     QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ToolOutcomeInsertResultV1,
     ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
+};
+use chio_kernel::{
+    AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
+    AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
+    AdmissionPaymentSettlementBegin, QualifiedAdmissionProjectionStore,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -73,10 +73,8 @@ pub(crate) fn build_remote_admission_stores(
     let status: AdmissionAuthorityStatusWire = decode_response(response).map_err(|error| {
         CliError::cli_other_error(format!("failed to connect to admission authority: {error}"))
     })?;
-    let budget = super::agent_economy_budget::build_shared_remote_budget_store(
-        control_url,
-        control_token,
-    )?;
+    let budget =
+        super::agent_economy_budget::build_shared_remote_budget_store(control_url, control_token)?;
     let authority = Arc::new(RemoteAdmissionAuthority {
         client,
         fence: status.fence.clone(),
@@ -407,8 +405,10 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
         &self,
         operation_id: &str,
         active_fence: &StoreMutationFence,
-    ) -> Result<Option<chio_kernel::agent_economy_payment::PaymentJournalRecord>, AdmissionPaymentJournalError>
-    {
+    ) -> Result<
+        Option<chio_kernel::agent_economy_payment::PaymentJournalRecord>,
+        AdmissionPaymentJournalError,
+    > {
         if active_fence != &self.fence {
             return Err(AdmissionPaymentJournalError::Fenced);
         }
@@ -439,7 +439,10 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
     fn advance_payment_journal(
         &self,
         advance: AdmissionPaymentJournalAdvance<'_>,
-    ) -> Result<chio_kernel::agent_economy_payment::PaymentJournalRecord, AdmissionPaymentJournalError> {
+    ) -> Result<
+        chio_kernel::agent_economy_payment::PaymentJournalRecord,
+        AdmissionPaymentJournalError,
+    > {
         let AdmissionPaymentJournalAdvance {
             operation,
             recovery_lease,

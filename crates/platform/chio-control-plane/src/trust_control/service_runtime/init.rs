@@ -66,6 +66,7 @@ pub(crate) async fn serve_async(
         joint_authority_store.as_ref(),
         config.fiscal_runtime.as_ref(),
     )?;
+    #[cfg(test)]
     let budget_store = config
         .budget_db_path
         .as_deref()
@@ -77,6 +78,7 @@ pub(crate) async fn serve_async(
             ))
         })?
         .map(Arc::new);
+    #[cfg(test)]
     let revocation_store = config
         .revocation_db_path
         .as_deref()
@@ -102,7 +104,9 @@ pub(crate) async fn serve_async(
         config,
         joint_authority_store,
         fiscal_runtime,
+        #[cfg(test)]
         budget_store,
+        #[cfg(test)]
         revocation_store,
         dashboard_sessions: super::super::dashboard_auth::DashboardSessionStore::production(),
         dashboard_report_bridge,

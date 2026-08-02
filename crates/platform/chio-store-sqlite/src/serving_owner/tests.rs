@@ -11,9 +11,7 @@ use chio_kernel::agent_economy_budget_store::{
     BudgetInvocationQuota, BudgetInvocationState, BudgetQuotaKey, BudgetQuotaProfile,
     BudgetReconcileHoldRequest, BudgetStore, BudgetStoreError,
 };
-use chio_kernel::{
-    AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet, RevocationStore,
-};
+use chio_kernel::{AgentEconomyCanonicalRevocationSet as CanonicalRevocationSet, RevocationStore};
 use rusqlite::{params, Connection};
 use tempfile::TempDir;
 

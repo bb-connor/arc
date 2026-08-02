@@ -3785,7 +3785,7 @@ describe('App operator paths', () => {
   it('renders manifest-bound Agent Web projection evidence without treating external authority as Chio authority', async () => {
     window.history.replaceState({}, '', '/?view=proof-room')
     const agentWebEnvelopeJson = JSON.stringify({
-      schema: 'chio.agent-web-proof-envelope.v1',
+      schema: 'chio.agent-web-proof-envelope.v2',
       envelope_id: 'agent-web-envelope-standard-webhooks-valid',
       transaction_passport_ref: 'passport-agent-web-valid',
       source_protocol: 'standard-webhooks',
@@ -3802,6 +3802,7 @@ describe('App operator paths', () => {
         'claim.agent_web.sidecar_not_native_authority',
       ],
       receipt_refs: ['receipt-agent-web-webhook-allow'],
+      agent_web_passport_scope_sha256: 'scope-digest-agent-web-valid',
       limitations: ['Webhook signature evidence is not Chio capability authority.'],
     })
     const agentWebManifestJson = JSON.stringify({
@@ -3833,7 +3834,7 @@ describe('App operator paths', () => {
           {
             path: 'standard-webhooks-envelope.json',
             sha256: agentWebEnvelopeDigest,
-            schema: 'chio.agent-web-proof-envelope.v1',
+            schema: 'chio.agent-web-proof-envelope.v2',
             renderer_hint: 'agent-web-proof-envelope',
             participates_in_primary_verdict: true,
           },
@@ -3928,7 +3929,7 @@ describe('App operator paths', () => {
   it('rejects served Agent Web projection manifests with unsupported schema', async () => {
     window.history.replaceState({}, '', '/?view=proof-room')
     const agentWebEnvelopeJson = JSON.stringify({
-      schema: 'chio.agent-web-proof-envelope.v1',
+      schema: 'chio.agent-web-proof-envelope.v2',
       envelope_id: 'agent-web-envelope-mcp-invalid-projection',
       transaction_passport_ref: 'passport-agent-web-valid',
       source_protocol: 'mcp',
@@ -3939,6 +3940,7 @@ describe('App operator paths', () => {
       projection_manifest_ref: 'projection-mcp-invalid',
       chio_claim_refs: ['claim.agent_web.external_subject_digest_bound'],
       receipt_refs: ['receipt-agent-web-mcp-allow'],
+      agent_web_passport_scope_sha256: 'scope-digest-agent-web-valid',
       limitations: ['MCP tool calls are external evidence, not Chio capability authority.'],
     })
     const agentWebManifestJson = JSON.stringify({
@@ -3964,7 +3966,7 @@ describe('App operator paths', () => {
           {
             path: 'mcp-envelope.json',
             sha256: agentWebEnvelopeDigest,
-            schema: 'chio.agent-web-proof-envelope.v1',
+            schema: 'chio.agent-web-proof-envelope.v2',
             renderer_hint: 'agent-web-proof-envelope',
             participates_in_primary_verdict: true,
           },
@@ -5415,7 +5417,7 @@ describe('App operator paths', () => {
     }
 
     const agentWebEnvelopeJson = JSON.stringify({
-      schema: 'chio.agent-web-proof-envelope.v1',
+      schema: 'chio.agent-web-proof-envelope.v2',
       envelope_id: 'uploaded-agent-web-envelope',
       source_protocol: 'mcp',
       source_protocol_version: '2025-06-18',
@@ -5425,6 +5427,7 @@ describe('App operator paths', () => {
       projection_manifest_ref: 'uploaded-mcp-projection',
       chio_claim_refs: ['claim.agent_web.external_subject_digest_bound'],
       receipt_refs: ['uploaded-agent-web-receipt'],
+      agent_web_passport_scope_sha256: 'uploaded-agent-web-scope-digest',
       limitations: ['MCP tool calls are external evidence, not Chio capability authority.'],
     })
     const agentWebManifestJson = JSON.stringify({
@@ -5485,7 +5488,7 @@ describe('App operator paths', () => {
         {
           path: 'mcp-envelope.json',
           sha256: agentWebEnvelopeDigest,
-          schema: 'chio.agent-web-proof-envelope.v1',
+          schema: 'chio.agent-web-proof-envelope.v2',
           renderer_hint: 'agent-web-proof-envelope',
         },
         {

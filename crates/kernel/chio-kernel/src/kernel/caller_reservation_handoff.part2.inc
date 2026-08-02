@@ -673,14 +673,30 @@ impl ChioKernel {
                 action_version,
                 claim_token,
             )?;
-            let extensions = self
-                .treaty_dsse_extensions_from_receipt_metadata(receipt)?
+            let treaty_material = intent
+                .body
+                .federation_admission
+                .verified_treaty_material
+                .as_ref()
                 .ok_or_else(|| {
                     KernelError::Internal(
-                        "caller reservation federation receipt lacks treaty DSSE material"
+                        "caller reservation federation receipt lacks verified treaty material"
                             .to_string(),
                     )
                 })?;
+            treaty_material.validate_cosign_participants(
+                remote_kernel_id,
+                &peer.public_key,
+                &local_kernel_id,
+                &self.config.keypair.public_key(),
+            )?;
+            let extensions = treaty_material.extensions_for_receipt_context(
+                &intent.body.request_id,
+                &intent.body.tool_server,
+                &intent.body.tool_name,
+                Some(remote_kernel_id),
+                receipt,
+            )?;
             let dsse = chio_federation::bilateral_dsse::sign_chio_bilateral_dsse_envelope_with_cosigner_backend(
                 chio_federation::bilateral_dsse::BilateralDsseBackendCosigningInput {
                     invocation: chio_federation::bilateral_dsse::BilateralDsseInvocationInput {

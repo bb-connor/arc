@@ -6,7 +6,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use chio_core::capability::{
-    attenuation::{DelegationLink, DelegationLinkBody},
+    attenuation::{scope_hash, DelegationLink, DelegationLinkBody},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -105,7 +105,6 @@ fn make_kernel_with_guards() -> (ChioKernel, Keypair) {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel
@@ -140,7 +139,6 @@ fn make_kernel_bare() -> (ChioKernel, Keypair) {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel
@@ -221,10 +219,9 @@ fn make_request(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        model_metadata: None,
         supplemental_authorization: None,
+        model_metadata: None,
         federated_origin_kernel_id: None,
-        declassification_grant: None,
     }
 }
 
@@ -382,11 +379,38 @@ async fn full_flow_denied_wrong_tool() {
 // Test: Denied by capability -- expired
 #[tokio::test]
 async fn full_flow_denied_expired_capability() {
-    let (kernel, _ca_kp) = make_kernel_bare();
+    let (kernel, ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
-
-    // TTL=0 means the capability expires at the same second it was issued.
-    let cap = issue_tool_cap(&kernel, &agent_kp.public_key(), "echo", 0);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let cap = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-expired".to_string(),
+            issuer: ca_kp.public_key(),
+            subject: agent_kp.public_key(),
+            scope: ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "srv".to_string(),
+                    tool_name: "echo".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+            issued_at: now.saturating_sub(2),
+            expires_at: now.saturating_sub(1),
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        },
+        &ca_kp,
+    )
+    .expect("sign expired capability");
 
     let req = make_request(
         "req-expired",
@@ -458,10 +482,9 @@ async fn full_flow_revocation_cascade() {
         delegatee: agent_b_kp.public_key(),
         attenuations: vec![],
         timestamp: now,
-        scope_hash: None,
+        scope_hash: Some(scope_hash(&cap_a.scope).expect("hash delegated parent scope")),
         aggregate_budget: None,
         cumulative_approval: None,
-        aggregate_family_preservation: None,
     };
     let link = DelegationLink::sign(link_body, &agent_a_kp).expect("sign delegation link");
 
@@ -497,7 +520,6 @@ async fn full_flow_revocation_cascade() {
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
         model_metadata: None,
-        supplemental_authorization: None,
         federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "before revocation"}),
         dpop_proof: None,
@@ -506,7 +528,7 @@ async fn full_flow_revocation_cascade() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        declassification_grant: None,
+        supplemental_authorization: None,
     };
     let resp_ok = kernel.evaluate_tool_call(&req_ok).await.unwrap();
     assert_eq!(
@@ -527,7 +549,6 @@ async fn full_flow_revocation_cascade() {
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
         model_metadata: None,
-        supplemental_authorization: None,
         federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "after revocation"}),
         dpop_proof: None,
@@ -536,7 +557,7 @@ async fn full_flow_revocation_cascade() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        declassification_grant: None,
+        supplemental_authorization: None,
     };
     let resp_revoked = kernel.evaluate_tool_call(&req_revoked).await.unwrap();
 
@@ -663,7 +684,6 @@ async fn full_flow_guard_pipeline_mixed_verdicts() {
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
@@ -852,7 +872,6 @@ async fn full_flow_untrusted_issuer() {
         server_id: "srv".to_string(),
         agent_id: agent_kp.public_key().to_hex(),
         model_metadata: None,
-        supplemental_authorization: None,
         federated_origin_kernel_id: None,
         arguments: serde_json::json!({}),
         dpop_proof: None,
@@ -861,7 +880,7 @@ async fn full_flow_untrusted_issuer() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
-        declassification_grant: None,
+        supplemental_authorization: None,
     };
 
     let resp = kernel.evaluate_tool_call(&req).await.unwrap();

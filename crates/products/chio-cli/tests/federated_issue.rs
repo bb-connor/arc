@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::too_many_arguments, clippy::unwrap_used)]
 
+#[path = "federated_issue/enterprise_provider_fixtures.rs"]
+mod enterprise_provider_fixtures;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -18,6 +21,7 @@ use chio_core::receipt::{
 use chio_kernel::{BudgetStore, CapabilityAuthority, LocalCapabilityAuthority, ReceiptStore};
 use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
+use enterprise_provider_fixtures::{enterprise_provider_record, scim_enterprise_provider_record};
 use reqwest::blocking::Client;
 
 fn unique_dir(prefix: &str) -> PathBuf {
@@ -42,6 +46,12 @@ impl Drop for ServerGuard {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+    }
+}
+
+impl ServerGuard {
+    fn has_exited(&mut self) -> bool {
+        self.child.try_wait().ok().flatten().is_some()
     }
 }
 
@@ -143,6 +153,36 @@ fn wait_for_trust_service(client: &Client, base_url: &str) {
         }
     }
     panic!("trust service did not become ready");
+}
+
+fn wait_for_authenticated_trust_service(
+    client: &Client,
+    base_url: &str,
+    service_token: &str,
+    service: &mut ServerGuard,
+) -> bool {
+    for _ in 0..100 {
+        let response = client
+            .get(format!("{base_url}/v1/lineage/readiness-probe"))
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {service_token}"),
+            )
+            .send();
+        if matches!(
+            response,
+            Ok(response)
+                if response.status() == reqwest::StatusCode::NOT_FOUND
+                    || response.status() == reqwest::StatusCode::OK
+        ) {
+            return true;
+        }
+        if service.has_exited() {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    false
 }
 
 fn make_receipt(
@@ -516,72 +556,6 @@ fn write_enterprise_provider_registry(path: &Path, records: &[serde_json::Value]
     .expect("write enterprise provider registry");
 }
 
-fn enterprise_provider_record(
-    provider_id: &str,
-    enabled: bool,
-    organization_id: &str,
-) -> serde_json::Value {
-    serde_json::json!({
-        "provider_id": provider_id,
-        "kind": "oidc_jwks",
-        "enabled": enabled,
-        "provenance": {
-            "configured_from": "manual",
-            "source_ref": "operator",
-            "trust_material_ref": "jwks:enterprise-login",
-            "subject_mapping_source": "manual"
-        },
-        "trust_boundary": {
-            "allowed_issuers": ["https://issuer.enterprise.example"],
-            "allowed_tenants": ["tenant-123"],
-            "allowed_organizations": [organization_id]
-        },
-        "issuer": "https://issuer.enterprise.example",
-        "jwks_url": "https://issuer.enterprise.example/jwks",
-        "tenant_id": "tenant-123",
-        "organization_id": organization_id,
-        "subject_mapping": {
-            "principal_source": "sub",
-            "tenant_id_field": "tid",
-            "organization_id_field": "org_id",
-            "groups_field": "groups",
-            "roles_field": "roles"
-        }
-    })
-}
-
-fn scim_enterprise_provider_record(
-    provider_id: &str,
-    enabled: bool,
-    organization_id: &str,
-) -> serde_json::Value {
-    serde_json::json!({
-        "provider_id": provider_id,
-        "kind": "scim",
-        "enabled": enabled,
-        "provenance": {
-            "configured_from": "manual",
-            "source_ref": "operator",
-            "trust_material_ref": "scim:enterprise-login",
-            "subject_mapping_source": "manual"
-        },
-        "trust_boundary": {
-            "allowed_tenants": ["tenant-123"],
-            "allowed_organizations": [organization_id]
-        },
-        "scim_base_url": "https://issuer.enterprise.example/scim/v2",
-        "tenant_id": "tenant-123",
-        "organization_id": organization_id,
-        "subject_mapping": {
-            "principal_source": "userName",
-            "tenant_id_field": "tenantId",
-            "organization_id_field": "organizationId",
-            "groups_field": "groups",
-            "roles_field": "roles"
-        }
-    })
-}
-
 fn write_enterprise_identity(
     path: &Path,
     provider_record_id: Option<&str>,
@@ -795,16 +769,7 @@ fn setup_enterprise_federated_issue_case(
     )
     .expect("write verifier policy");
 
-    let listen = reserve_listen_addr();
-    let base_url = format!("http://{listen}");
     let service_token = format!("{prefix}-token");
-    create_challenge(&challenge_path, &base_url, Some(&verifier_policy_path));
-    create_challenge_response(
-        &passport_path,
-        &challenge_path,
-        &holder_seed_path,
-        &response_path,
-    );
     write_enterprise_capability_policy(
         &capability_policy_path,
         policy_organization_id,
@@ -816,29 +781,40 @@ fn setup_enterprise_federated_issue_case(
         enterprise_providers_path
     });
 
-    let service = spawn_trust_service(
-        listen,
-        &base_url,
-        &service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_seed_path,
-        &budget_db_path,
-        enterprise_providers_file.as_deref(),
-    );
-
     let client = Client::builder().build().expect("build reqwest client");
-    wait_for_trust_service(&client, &base_url);
-
-    EnterpriseFederatedIssueHarness {
-        _service: service,
-        base_url,
-        service_token,
-        challenge_path,
-        response_path,
-        capability_policy_path,
-        enterprise_identity_path,
+    for _ in 0..5 {
+        let listen = reserve_listen_addr();
+        let base_url = format!("http://{listen}");
+        create_challenge(&challenge_path, &base_url, Some(&verifier_policy_path));
+        create_challenge_response(
+            &passport_path,
+            &challenge_path,
+            &holder_seed_path,
+            &response_path,
+        );
+        let mut service = spawn_trust_service(
+            listen,
+            &base_url,
+            &service_token,
+            &receipt_db_path,
+            &revocation_db_path,
+            &authority_seed_path,
+            &budget_db_path,
+            enterprise_providers_file.as_deref(),
+        );
+        if wait_for_authenticated_trust_service(&client, &base_url, &service_token, &mut service) {
+            return EnterpriseFederatedIssueHarness {
+                _service: service,
+                base_url,
+                service_token,
+                challenge_path,
+                response_path,
+                capability_policy_path,
+                enterprise_identity_path,
+            };
+        }
     }
+    panic!("authenticated trust service did not become ready after address retries");
 }
 
 fn create_federated_delegation_policy(

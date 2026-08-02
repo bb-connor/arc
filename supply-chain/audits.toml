@@ -1201,11 +1201,23 @@ criteria = "safe-to-deploy"
 version = "0.4.4"
 notes = "Reviewed exact Linux Landlock syscall wrapper, ABI compatibility handling, rule construction, and OwnedFd ownership. Successful descriptors are owned, partial or unavailable enforcement is observable, and callers can require full enforcement."
 
+[[audits.leb128]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.2.7"
+notes = "Local cargo-vet review. Exact locked source is a pure LEB128 integer encoder and decoder with no dependencies, custom build target, unsafe source, network access, or process execution; used transitively by the wasm fuzz generator."
+
 [[audits.libc]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.2.183"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
+
+[[audits.libc]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.2.183 -> 0.2.189"
+notes = "Reviewed the complete crates.io delta and release notes. Changes are ABI declarations, target support, cfg selection, and soundness hardening of opaque extern types and pointer helpers. The build script still limits process execution to existing target-version probes and adds only cfg derivation and opt-in diagnostics."
 
 [[audits.log]]
 who = "Chio supply-chain reviewer"
@@ -1225,6 +1237,12 @@ criteria = "safe-to-deploy"
 version = "2.8.0"
 notes = "SIMD byte-search routines by BurntSushi; pure compute, no IO."
 
+[[audits.memchr]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "2.8.0 -> 2.8.3"
+notes = "Reviewed the complete crates.io source delta. The release fixes a packed-pair out-of-bounds unsafe path, makes raw-pointer search entry points explicitly unsafe, adds bounds assumptions for optimization, and corrects big-endian NEON masking. No build script or ambient-capability surface was added."
+
 [[audits.memoffset]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -1236,6 +1254,18 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-run"
 version = "0.8.11"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.mio]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "1.1.1 -> 1.2.2"
+notes = "Reviewed the complete crates.io delta, including new Solaris event-port selector code and its raw-fd ownership, initialized event-buffer length, token-only pointer encoding, Send and Sync invariants, and registration locking. Other changes add target support and harden Windows inheritance, timeout conversion, named-pipe races, and listener backlog behavior."
+
+[[audits.nix]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.31.2 -> 0.31.3"
+notes = "Reviewed the complete crates.io delta. New unsafe code is confined to the Apple kevent64 FFI wrapper with slice pointer and length pairing. Remaining changes add target constants and documentation and replace panicking kernel bitflag decoding with from_bits_retain. No build script or new ambient-capability mechanism was added."
 
 [[audits.nono]]
 who = "Chio supply-chain reviewer"
@@ -1798,6 +1828,12 @@ notes = "Top-centrality certification seed. Reviewed for dependency role, declar
 [[audits.wasm-encoder]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
+version = "0.221.3"
+notes = "Local cargo-vet review. Exact locked Bytecode Alliance source performs deterministic WebAssembly byte emission, denies unsafe code, has no custom build target, network access, or process execution; enabled only by the wasm fuzz feature."
+
+[[audits.wasm-encoder]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
 version = "0.227.1"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
 
@@ -1806,6 +1842,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.227.1"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.wasm-smith]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+version = "0.221.3"
+notes = "Local cargo-vet review. Exact locked Bytecode Alliance source is a deterministic arbitrary-input WebAssembly generator, denies unsafe code, and has no custom build target, runtime network access, or process execution; enabled only by the wasm fuzz feature."
 
 [[audits.wasmparser]]
 who = "Chio supply-chain reviewer"

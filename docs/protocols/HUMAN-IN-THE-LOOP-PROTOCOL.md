@@ -1382,7 +1382,7 @@ calls `POST /approvals/ar-d4e5/respond` with a signed approval token.
 | Capability revoked during wait | Deny on resume (re-validation) |
 | Grant expired during wait | Deny on resume |
 | Timeout with no response | Deny (default) |
-| Kernel restart during wait | Pending requests survive in approval store |
+| Kernel restart during wait | Pending requests survive only when the approval and replay stores are durable |
 
 ### Replay Protection (Implemented)
 
@@ -1404,6 +1404,26 @@ mechanisms working together:
 
 Implementation: `crates/kernel/chio-kernel/src/threshold_approval.rs` and
 `crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs`.
+
+Governed dispatch also uses a **single-use reservation store**.
+`GovernedApprovalReplayStore` reserves
+   `(subject_id, request_id, intent_hash)` before any external payment or tool
+   side effect. The marker is committed after authorization or immediately
+   before dispatch. It is rolled back only while the kernel can prove neither
+   side effect occurred. A false or failed commit leaves the marker blocking
+   replay and produces signed unknown-retention evidence.
+
+There is no implicit kernel store. Hosts must install a replay store before
+governed dispatch is accepted. `InMemoryGovernedApprovalReplayStore` is
+process-scoped and never evicts a live marker to make room. Production hosts
+that must remain replay-safe across restart use
+`SqliteGovernedApprovalReplayStore` or another durable implementation. Store
+capacity is global to the installed instance, so multi-tenant deployments must
+isolate tenants or enforce upstream admission limits.
+
+Implementation:
+`crates/kernel/chio-kernel/src/governed_approval_replay.rs` and
+`crates/kernel/chio-kernel/src/kernel/credential_reservation.rs`.
 
 ### Separation of Concerns
 

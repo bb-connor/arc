@@ -62,6 +62,7 @@ pub mod budget_split;
 pub mod capability_verify;
 pub mod clock;
 pub mod evaluate;
+#[allow(dead_code)]
 pub(crate) mod formal_aeneas;
 pub(crate) mod formal_core;
 #[cfg(feature = "fuzz")]
@@ -89,6 +90,19 @@ pub use clock::{Clock, FixedClock};
 pub use evaluate::{
     evaluate, evaluate_with_crypto_floor, evaluate_with_crypto_floor_and_budgets,
     evaluate_with_full_floor, EvaluateInput, EvaluationVerdict, KernelCoreError,
+};
+pub use formal_core::{
+    admit_quota_maximum, authorize_composite_quotas, budget_charge_admits, budget_commit,
+    budget_increment_admits, budget_precheck, capture_invocation_count, composite_quota_authorize,
+    dpop_admits, dpop_freshness_valid, dpop_verification_admits, family_binding_is_preserved,
+    family_binding_preserved, guard_pipeline_allows, guard_projection_allows_continuation,
+    guard_step_admits, nonce_admits, quota_maximum_compatible, receipt_fields_coupled,
+    reserve_replay_fingerprint, revocation_lookup_denies, revocation_snapshot_denies,
+    threshold_distinct_eligible_signers, validate_threshold_signers,
+    BudgetAdmissionProjectionError, BudgetCommitResult, CompositeQuotaAuthorization,
+    CompositeQuotaResult, FamilyBindingPreservation, GuardStep, InvocationCapture,
+    QuotaMaximumAdmission, ReplayFingerprintReservation, RevocationCheckTarget,
+    ThresholdSignerValidation,
 };
 pub use guard::{Guard, GuardContext, PortableToolCallRequest};
 pub use normalized::{

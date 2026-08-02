@@ -139,9 +139,7 @@ impl ChioKernel {
             }
         };
 
-        if let Err(error) =
-            self.authorize_agent_economy_payment(request, &admission, now_unix_ms)
-        {
+        if let Err(error) = self.authorize_agent_economy_payment(request, &admission, now_unix_ms) {
             if budget_lease_acquired {
                 self.release_admitted_capability_budget(&request.capability)
                     .map_err(KernelError::DelegationInvalid)?;
@@ -152,34 +150,33 @@ impl ChioKernel {
             return Err(error);
         }
 
-        let mut security_pre_dispatch = match self
-            .run_security_pre_dispatch_hook(request, security_context)
-        {
-            Ok(outcome) => outcome,
-            Err(denial) => {
-                let mut denial_evidence = pre_invocation_guard_evidence.to_vec();
-                denial_evidence.push(denial.evidence);
-                extra_metadata = self.compensate_agent_economy_pre_dispatch(
-                    request,
-                    &admission,
-                    extra_metadata,
-                    budget_lease_acquired,
-                    now_unix_ms,
-                    "security_pre_dispatch_denied",
-                )?;
-                return self
-                    .with_pre_invocation_guard_evidence(&denial_evidence, || {
-                        self.build_deny_response_with_metadata(
-                            request,
-                            denial.reason,
-                            now_unix_secs,
-                            Some(matching.index),
-                            extra_metadata,
-                        )
-                    })
-                    .map(Some);
-            }
-        };
+        let mut security_pre_dispatch =
+            match self.run_security_pre_dispatch_hook(request, security_context) {
+                Ok(outcome) => outcome,
+                Err(denial) => {
+                    let mut denial_evidence = pre_invocation_guard_evidence.to_vec();
+                    denial_evidence.push(denial.evidence);
+                    extra_metadata = self.compensate_agent_economy_pre_dispatch(
+                        request,
+                        &admission,
+                        extra_metadata,
+                        budget_lease_acquired,
+                        now_unix_ms,
+                        "security_pre_dispatch_denied",
+                    )?;
+                    return self
+                        .with_pre_invocation_guard_evidence(&denial_evidence, || {
+                            self.build_deny_response_with_metadata(
+                                request,
+                                denial.reason,
+                                now_unix_secs,
+                                Some(matching.index),
+                                extra_metadata,
+                            )
+                        })
+                        .map(Some);
+                }
+            };
         let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
         let security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
 
@@ -316,8 +313,13 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
         reason: &'static str,
     ) -> Result<Option<serde_json::Value>, KernelError> {
-        let metadata =
+        let (metadata, runtime_release_confirmed) =
             self.release_runtime_admission_reservations_for_pre_dispatch_denial(metadata);
+        if !runtime_release_confirmed {
+            return Err(KernelError::Internal(
+                "agent-economy runtime admission cleanup could not be confirmed".to_string(),
+            ));
+        }
         self.compensate_durable_admission_before_dispatch(
             admission.operation(),
             serde_json::json!({

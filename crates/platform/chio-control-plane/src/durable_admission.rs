@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
-use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::agent_economy_budget_store::BudgetStore;
+use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::{ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
 use chio_store_sqlite::{
     SqliteAgentEconomyBudgetStore as SqliteBudgetStore,
@@ -221,6 +221,17 @@ pub(crate) fn create_private_directory(path: &Path) -> Result<(), std::io::Error
     Ok(())
 }
 
+#[cfg(test)]
+pub(crate) fn private_tempdir() -> Result<tempfile::TempDir, CliError> {
+    let directory = tempfile::tempdir()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(directory)
+}
+
 /// A private directory pinned by a platform directory handle.
 ///
 /// Relative operations remain anchored to the validated directory even if its
@@ -240,6 +251,43 @@ impl PreparedPrivateDirectory {
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// Verifies that the prepared pathname still identifies the pinned
+    /// directory.
+    ///
+    /// Relative operations remain safe when the pathname is replaced, but a
+    /// caller must use this check before reporting that the pathname contains
+    /// those operations' results.
+    pub fn validate_path_identity(&self) -> Result<(), std::io::Error> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+
+            let pinned = self.directory.metadata()?;
+            let current = fs::symlink_metadata(&self.path)?;
+            if !current.is_dir() || pinned.dev() != current.dev() || pinned.ino() != current.ino() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "prepared private directory path `{}` no longer identifies the pinned directory",
+                        self.path.display()
+                    ),
+                ));
+            }
+            Ok(())
+        }
+        #[cfg(windows)]
+        {
+            self.directory.validate_path_identity(&self.path)
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "secure private-directory identity validation is unavailable on this platform",
+            ))
+        }
     }
 
     /// Reports whether the pinned directory contains no entries.
@@ -1125,7 +1173,7 @@ mod tests {
 
     #[test]
     fn database_path_validation_rejects_hard_link_aliases() -> Result<(), CliError> {
-        let directory = tempfile::tempdir()?;
+        let directory = private_tempdir()?;
         let first = directory.path().join("first.sqlite3");
         let second = directory.path().join("second.sqlite3");
         fs::write(&first, [])?;
@@ -1149,7 +1197,7 @@ mod tests {
     fn database_path_validation_rejects_dangling_symlink_aliases() -> Result<(), CliError> {
         use std::os::unix::fs::symlink;
 
-        let directory = tempfile::tempdir()?;
+        let directory = private_tempdir()?;
         let target = directory.path().join("target.sqlite3");
         let alias = directory.path().join("alias.sqlite3");
         symlink(&target, &alias)?;
@@ -1172,7 +1220,7 @@ mod tests {
     fn database_path_validation_rejects_dangling_parent_symlink_aliases() -> Result<(), CliError> {
         use std::os::unix::fs::symlink;
 
-        let directory = tempfile::tempdir()?;
+        let directory = private_tempdir()?;
         let target_directory = directory.path().join("target");
         let alias_directory = directory.path().join("alias");
         symlink(&target_directory, &alias_directory)?;
@@ -1539,9 +1587,17 @@ mod tests {
         let target = directory.path().join("project");
         let pinned = directory.path().join("pinned-project");
         let prepared = prepare_private_directory(&target)?;
+        prepared.validate_path_identity()?;
         fs::rename(&target, &pinned)?;
         fs::create_dir(&target)?;
         fs::set_permissions(&target, fs::Permissions::from_mode(0o700))?;
+
+        let Err(identity_error) = prepared.validate_path_identity() else {
+            return Err(CliError::cli_other_error(
+                "replacement path retained the pinned directory identity",
+            ));
+        };
+        assert_eq!(identity_error.kind(), std::io::ErrorKind::InvalidData);
 
         assert!(prepared.is_empty()?);
         prepared.create_dir_all(Path::new("src/bin"))?;

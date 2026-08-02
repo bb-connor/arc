@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 
-use crate::SessionAuthContext;
+use crate::{SessionAuthContext, VerifiedFederationTreatyMaterial};
+
+tokio::task_local! {
+    pub(crate) static RECEIPT_EVALUATION_SCOPE_KEY: String;
+}
 
 thread_local! {
     static RECEIPT_TENANT_ID_SCOPE: std::cell::RefCell<Option<String>> =
@@ -41,6 +45,10 @@ pub(crate) fn current_scoped_receipt_tenant_id() -> Option<String> {
     RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.borrow().clone())
 }
 
+pub(crate) fn current_receipt_evaluation_scope_key() -> Option<String> {
+    RECEIPT_EVALUATION_SCOPE_KEY.try_with(Clone::clone).ok()
+}
+
 /// Request-keyed tenant registration, dropped when the evaluation future
 /// finishes. The map stores the RESOLVED tenant for the request, including a
 /// known-none entry for tenantless requests: an entry that merely disappeared
@@ -48,7 +56,7 @@ pub(crate) fn current_scoped_receipt_tenant_id() -> Option<String> {
 /// this evaluation while a sibling task's scope guard is still alive that
 /// fallback would leak the sibling's tenant into this request's receipts.
 pub(crate) struct ScopedKernelReceiptTenantId {
-    pub(super) request_id: String,
+    pub(super) scope_key: String,
     pub(super) tenant_ids: Arc<DashMap<String, Option<String>>>,
     pub(super) previous: Option<Option<String>>,
 }
@@ -56,9 +64,9 @@ pub(crate) struct ScopedKernelReceiptTenantId {
 impl Drop for ScopedKernelReceiptTenantId {
     fn drop(&mut self) {
         if let Some(previous) = self.previous.take() {
-            self.tenant_ids.insert(self.request_id.clone(), previous);
+            self.tenant_ids.insert(self.scope_key.clone(), previous);
         } else {
-            self.tenant_ids.remove(&self.request_id);
+            self.tenant_ids.remove(&self.scope_key);
         }
     }
 }
@@ -67,7 +75,7 @@ impl Drop for ScopedKernelReceiptTenantId {
 /// future finishes. Restores any previously registered handle (nested
 /// evaluations under one request id keep their outer binding).
 pub(crate) struct ScopedKernelDispatchIntent {
-    pub(super) request_id: String,
+    pub(super) scope_key: String,
     pub(super) intents: Arc<DashMap<String, crate::receipt_store::DispatchIntentHandle>>,
     pub(super) previous: Option<crate::receipt_store::DispatchIntentHandle>,
 }
@@ -75,18 +83,18 @@ pub(crate) struct ScopedKernelDispatchIntent {
 impl Drop for ScopedKernelDispatchIntent {
     fn drop(&mut self) {
         if let Some(previous) = self.previous.take() {
-            self.intents.insert(self.request_id.clone(), previous);
+            self.intents.insert(self.scope_key.clone(), previous);
         } else {
-            self.intents.remove(&self.request_id);
+            self.intents.remove(&self.scope_key);
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ReceiptFederationAdmission {
     pub remote_kernel_id: Option<String>,
     pub peer: Option<chio_federation::trust_establishment::FederationPeer>,
+    pub verified_treaty_material: Option<VerifiedFederationTreatyMaterial>,
 }
 
 /// Guard returned by [`scope_receipt_federation_admission`]. Restores the
@@ -119,7 +127,7 @@ pub(crate) fn current_scoped_receipt_federation_admission() -> Option<ReceiptFed
 }
 
 pub(crate) struct ScopedKernelReceiptFederationAdmission {
-    pub(super) request_id: String,
+    pub(super) scope_key: String,
     pub(super) admissions: Arc<DashMap<String, ReceiptFederationAdmission>>,
     pub(super) previous: Option<ReceiptFederationAdmission>,
 }
@@ -127,9 +135,9 @@ pub(crate) struct ScopedKernelReceiptFederationAdmission {
 impl Drop for ScopedKernelReceiptFederationAdmission {
     fn drop(&mut self) {
         if let Some(previous) = self.previous.take() {
-            self.admissions.insert(self.request_id.clone(), previous);
+            self.admissions.insert(self.scope_key.clone(), previous);
         } else {
-            self.admissions.remove(&self.request_id);
+            self.admissions.remove(&self.scope_key);
         }
     }
 }

@@ -66,7 +66,7 @@ pub fn is_supported_execution_nonce_schema(schema: &str) -> bool {
 
 /// Fields that tie a nonce to one specific tool invocation.
 ///
-/// All five fields are in the signed body, so any mismatch during verify
+/// All six fields are in the signed body, so any mismatch during verify
 /// means either the nonce was minted for a different call or the nonce was
 /// tampered with after issuance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,6 +74,8 @@ pub fn is_supported_execution_nonce_schema(schema: &str) -> bool {
 pub struct NonceBinding {
     /// Hex-encoded subject (agent) public key, taken from `capability.subject`.
     pub subject_id: String,
+    /// Request identifier for the single invocation this nonce authorizes.
+    pub request_id: String,
     /// ID of the capability that authorized this invocation.
     pub capability_id: String,
     /// Tool server that is expected to execute the call.
@@ -420,6 +422,36 @@ pub trait ExecutionNonceStore: Send + Sync {
         ))
     }
 
+    /// Whether this store can create and conditionally roll back an owned
+    /// reservation before tool dispatch begins.
+    fn supports_dispatch_reservations(&self) -> bool {
+        false
+    }
+
+    /// Reserve a nonce for one dispatch attempt. Stores advertising dispatch
+    /// reservation support must retain the owner and permit only that owner to
+    /// roll the reservation back.
+    fn reserve_for_dispatch(
+        &self,
+        nonce_id: &str,
+        nonce_expires_at: i64,
+        _reservation_id: &str,
+    ) -> Result<bool, KernelError> {
+        self.reserve_until(nonce_id, nonce_expires_at)
+    }
+
+    /// Remove an owned reservation after a failure known to precede any tool
+    /// side effect.
+    fn rollback_dispatch_reservation(
+        &self,
+        _nonce_id: &str,
+        _reservation_id: &str,
+    ) -> Result<bool, KernelError> {
+        Err(KernelError::Internal(
+            "execution nonce store does not support dispatch reservation rollback".to_string(),
+        ))
+    }
+
     /// Report whether `nonce_id` has already been consumed, WITHOUT consuming
     /// it. The two-phase reconcile path uses this to reject an already-settled
     /// nonce during verification while deferring the single-use mark until after
@@ -481,6 +513,27 @@ where
         (**self).get_nonce_reservation(operation_id)
     }
 
+    fn supports_dispatch_reservations(&self) -> bool {
+        (**self).supports_dispatch_reservations()
+    }
+
+    fn reserve_for_dispatch(
+        &self,
+        nonce_id: &str,
+        nonce_expires_at: i64,
+        reservation_id: &str,
+    ) -> Result<bool, KernelError> {
+        (**self).reserve_for_dispatch(nonce_id, nonce_expires_at, reservation_id)
+    }
+
+    fn rollback_dispatch_reservation(
+        &self,
+        nonce_id: &str,
+        reservation_id: &str,
+    ) -> Result<bool, KernelError> {
+        (**self).rollback_dispatch_reservation(nonce_id, reservation_id)
+    }
+
     fn is_consumed(&self, nonce_id: &str) -> Result<bool, KernelError> {
         (**self).is_consumed(nonce_id)
     }
@@ -496,7 +549,7 @@ where
 /// alone because the full binding lives inside the signed body and is
 /// checked separately by `verify_execution_nonce`.
 struct InMemoryExecutionNonceState {
-    consumed: LruCache<String, Instant>,
+    consumed: LruCache<String, InMemoryExecutionNonceEntry>,
     reservations_by_operation: std::collections::HashMap<String, ExecutionNonceReservation>,
     nonce_owners: std::collections::HashMap<String, String>,
 }
@@ -504,6 +557,11 @@ struct InMemoryExecutionNonceState {
 pub struct InMemoryExecutionNonceStore {
     inner: Mutex<InMemoryExecutionNonceState>,
     ttl: Duration,
+}
+
+struct InMemoryExecutionNonceEntry {
+    retain_until: Instant,
+    reservation_id: Option<String>,
 }
 
 impl InMemoryExecutionNonceStore {
@@ -549,13 +607,47 @@ impl Default for InMemoryExecutionNonceStore {
 
 impl ExecutionNonceStore for InMemoryExecutionNonceStore {
     fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
-        self.reserve_with_retention(nonce_id, self.ttl)
+        self.reserve_with_retention(nonce_id, self.ttl, None)
     }
 
     fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError> {
         let retention = duration_until_unix_secs(nonce_expires_at)
             .map_or(self.ttl, |remaining| remaining.max(self.ttl));
-        self.reserve_with_retention(nonce_id, retention)
+        self.reserve_with_retention(nonce_id, retention, None)
+    }
+
+    fn supports_dispatch_reservations(&self) -> bool {
+        true
+    }
+
+    fn reserve_for_dispatch(
+        &self,
+        nonce_id: &str,
+        nonce_expires_at: i64,
+        reservation_id: &str,
+    ) -> Result<bool, KernelError> {
+        let retention = duration_until_unix_secs(nonce_expires_at)
+            .map_or(self.ttl, |remaining| remaining.max(self.ttl));
+        self.reserve_with_retention(nonce_id, retention, Some(reservation_id))
+    }
+
+    fn rollback_dispatch_reservation(
+        &self,
+        nonce_id: &str,
+        reservation_id: &str,
+    ) -> Result<bool, KernelError> {
+        let mut cache = self.inner.lock().map_err(|_| {
+            error!("execution nonce store mutex poisoned; denying fail-closed");
+            KernelError::Internal("execution nonce store mutex poisoned; fail-closed".to_string())
+        })?;
+        let owned = cache
+            .consumed
+            .peek(nonce_id)
+            .is_some_and(|entry| entry.reservation_id.as_deref() == Some(reservation_id));
+        if owned {
+            cache.consumed.pop(nonce_id);
+        }
+        Ok(owned)
     }
 
     fn reserve_nonce_for_operation(
@@ -590,8 +682,8 @@ impl ExecutionNonceStore for InMemoryExecutionNonceStore {
             )));
         }
         let now = Instant::now();
-        if let Some(retain_until) = state.consumed.peek(nonce_id) {
-            if *retain_until > now {
+        if let Some(entry) = state.consumed.peek(nonce_id) {
+            if entry.retain_until > now {
                 return Err(ExecutionNonceReservationError::Conflict(format!(
                     "nonce `{nonce_id}` was already consumed"
                 )));
@@ -646,7 +738,7 @@ impl ExecutionNonceStore for InMemoryExecutionNonceStore {
         Ok(state
             .consumed
             .peek(nonce_id)
-            .is_some_and(|retain_until| *retain_until > now))
+            .is_some_and(|entry| entry.retain_until > now))
     }
 }
 
@@ -687,6 +779,7 @@ impl InMemoryExecutionNonceStore {
         &self,
         nonce_id: &str,
         retention: Duration,
+        reservation_id: Option<&str>,
     ) -> Result<bool, KernelError> {
         let mut cache = self.inner.lock().map_err(|_| {
             error!("execution nonce store mutex poisoned; denying fail-closed");
@@ -698,11 +791,26 @@ impl InMemoryExecutionNonceStore {
         }
         let key = nonce_id.to_string();
         let now = Instant::now();
-        if let Some(retain_until) = cache.consumed.peek(&key) {
-            if *retain_until > now {
+        if let Some(entry) = cache.consumed.peek(&key) {
+            if entry.retain_until > now {
                 return Ok(false);
             }
             cache.consumed.pop(&key);
+        }
+        let expired: Vec<String> = cache
+            .consumed
+            .iter()
+            .filter(|(_, entry)| entry.retain_until <= now)
+            .map(|(nonce_id, _)| nonce_id.clone())
+            .collect();
+        for nonce_id in expired {
+            cache.consumed.pop(&nonce_id);
+        }
+        if cache.consumed.len() >= cache.consumed.cap().get() {
+            error!("execution nonce store capacity exhausted; denying fail-closed");
+            return Err(KernelError::Internal(
+                "execution nonce store capacity exhausted; fail-closed".to_string(),
+            ));
         }
         let Some(retain_until) = now.checked_add(retention) else {
             error!("execution nonce retention overflow; denying fail-closed");
@@ -710,7 +818,13 @@ impl InMemoryExecutionNonceStore {
                 "execution nonce retention overflow; fail-closed".to_string(),
             ));
         };
-        cache.consumed.put(key, retain_until);
+        cache.consumed.put(
+            key,
+            InMemoryExecutionNonceEntry {
+                retain_until,
+                reservation_id: reservation_id.map(str::to_owned),
+            },
+        );
         Ok(true)
     }
 }
@@ -892,7 +1006,7 @@ impl From<ExecutionNonceError> for KernelError {
 /// Steps, in order:
 /// 1. Schema check.
 /// 2. Expiry check -- `now < nonce.expires_at`.
-/// 3. Binding check -- subject, capability, server, tool, parameter_hash.
+/// 3. Binding check -- subject, request, capability, server, tool, parameter_hash.
 /// 4. Signature check -- canonical JSON under the kernel's pubkey.
 ///
 /// Shared by the single-phase verify-and-consume path and the two-phase
@@ -969,6 +1083,11 @@ pub fn verify_execution_nonce_stateless(
     if bound.subject_id != expected.subject_id {
         return Err(ExecutionNonceError::BindingMismatch {
             field: "subject_id",
+        });
+    }
+    if bound.request_id.is_empty() || bound.request_id != expected.request_id {
+        return Err(ExecutionNonceError::BindingMismatch {
+            field: "request_id",
         });
     }
     if bound.capability_id != expected.capability_id {
@@ -1099,6 +1218,7 @@ mod tests {
     fn sample_binding() -> NonceBinding {
         NonceBinding {
             subject_id: "subject-abc".to_string(),
+            request_id: "request-abc".to_string(),
             capability_id: "cap-123".to_string(),
             tool_server: "fs".to_string(),
             tool_name: "read_file".to_string(),
@@ -1243,7 +1363,7 @@ mod tests {
     fn reserve_with_retention_fails_closed_on_overflow() {
         let store = InMemoryExecutionNonceStore::default();
         let err = store
-            .reserve_with_retention("overflow", Duration::MAX)
+            .reserve_with_retention("overflow", Duration::MAX, None)
             .unwrap_err();
 
         assert!(matches!(

@@ -141,7 +141,7 @@ fn sqlite_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
 }
 
 #[test]
-fn chio_runtime_hook_denies_replayed_swarm_continuation_before_dispatch(
+fn chio_runtime_hook_revalidates_reserved_swarm_continuation_then_denies_replay(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let store = InMemoryRuntimeAdmissionStore::new();
     let mut admission_bundle = bundle();
@@ -183,6 +183,14 @@ fn chio_runtime_hook_denies_replayed_swarm_continuation_before_dispatch(
         first_metadata["chio_runtime"]["reserved_swarm_continuation_id"],
         continuation_id
     );
+    hook.revalidate_before_dispatch(&RuntimeAdmissionRevalidationContext {
+        request: &request,
+        admission_metadata: Some(&first_metadata),
+        now_unix_secs: 1_800_000_001,
+        now_unix_ms: 1_800_000_001_000,
+        matched_grant_index: Some(0),
+        local_kernel_id: "kernel.vendor-b".to_string(),
+    })?;
 
     let replay = hook.evaluate(&context)?;
     assert!(!replay.allowed);
@@ -772,6 +780,43 @@ fn treaty_runtime_fixture_with_policy(
 
 fn insert_treaty_runtime_fixture(
     store: &SqliteRuntimeOrchestrationStore,
+    fixture: &TreatyRuntimeFixture,
+) -> Result<(), Box<dyn std::error::Error>> {
+    store.insert_treaty_runtime_artifact(
+        "treaty_scope",
+        &fixture.treaty_scope.treaty_id,
+        &fixture.treaty_scope,
+    )?;
+    store.insert_treaty_runtime_artifact(
+        "ladder_intersection",
+        &fixture.ladder_intersection.intersection_id,
+        &fixture.ladder_intersection,
+    )?;
+    store.insert_treaty_runtime_artifact(
+        "cross_kernel_continuation",
+        &fixture.continuation.continuation_id,
+        &fixture.continuation,
+    )?;
+    store.insert_treaty_runtime_artifact(
+        "receipt_lineage_bundle",
+        &fixture.lineage_bundle.bundle_id,
+        &fixture.lineage_bundle,
+    )?;
+    store.insert_treaty_runtime_artifact(
+        "bilateral_invocation",
+        &fixture.bilateral_invocation.invocation_id,
+        &fixture.bilateral_invocation,
+    )?;
+    store.insert_treaty_runtime_artifact(
+        "bilateral_dsse_envelope",
+        &fixture.bilateral_dsse_id,
+        &fixture.bilateral_dsse,
+    )?;
+    Ok(())
+}
+
+fn insert_in_memory_treaty_runtime_fixture(
+    store: &InMemoryRuntimeAdmissionStore,
     fixture: &TreatyRuntimeFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
     store.insert_treaty_runtime_artifact(

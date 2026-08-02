@@ -11,205 +11,112 @@ cargo registry/target cache. The four gate steps are:
 | Gate | Step in `ci.yml` | Command |
 | ---- | ---------------- | ------- |
 | Format | "Workspace format" | `cargo fmt --all -- --check` |
-| Lint | "Workspace clippy" | `cargo clippy --workspace --all-targets -- -D warnings` |
+| Lint | "Workspace clippy" | `cargo clippy --workspace --lib --bins --examples -- -D warnings` |
 | **Workspace build** | "Workspace build" | `cargo build --workspace` |
 | Tests | "Workspace tests" + "Wasm guards library tests" | `cargo test --workspace --exclude chio-wasm-guards`, then `cargo test -p chio-wasm-guards --lib` |
 
-The intended set of required check contexts is five contexts on the exact test
-merge `M`, not one. The first four use distinct names and are trusted
-default-branch mirrors of source jobs from the CI run bound to `E`; the
-original workflow run, jobs, and Check Runs are authenticated on `E`. A
-separate signed binding proves the exact test merge `M`:
+The full set of required check contexts (the `name:` values GitHub branch
+rulesets match on) is four jobs, not one:
 
-- "Security mirror / Build, lint, test" (mirror of the `check` job)
-- "Security mirror / MSRV build and test" (mirror of the `msrv` job; see below for its coverage caveats)
-- "Security mirror / cargo-vet (locked supply-chain audit)" (mirror of the `cargo-vet` job)
-- "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" (mirror of the `cargo-deny` job)
-- "Security contract" from the dedicated `chio-security-authority` GitHub App.
-  The App publisher refuses to create it unless the Actions aggregate
-  `security-contract-required` job, which uses the same display name, and all
-  of its security dependencies have succeeded.
+- "Build, lint, test" (the `check` job, containing the four steps above)
+- "MSRV build and test" (the `msrv` job; see below for its coverage caveats)
+- "cargo-vet (locked supply-chain audit)" (the `cargo-vet` job)
+- "cargo-deny (supply-chain bans/advisories/licenses)" (the `cargo-deny` job)
 
-Configure all five as required; workflow YAML does not create or enforce the
-repository ruleset. Pin the first four contexts to the GitHub Actions App
-integration ID `15368`, and pin only `Security contract` to the dedicated App
-ID in the repository variable `CHIO_SECURITY_APP_ID`. The App ID is public
-configuration used by both the unprotected secret-free revocation listener and
-the protected publisher. Keep `CHIO_SECURITY_APP_INSTALLATION_ID` as an
-environment variable and `CHIO_SECURITY_APP_PRIVATE_KEY_PEM` as an environment
-secret only in `security-check-publisher`. Keep
-`CHIO_ENTERPRISE_CANARY_SIGNING_SEED_HEX` only in
-`enterprise-evidence-signing`. A candidate-defined Actions job and the
-intermediate Actions aggregate are both App `15368`; neither is an
-authenticated merge mirror and neither satisfies the dedicated-App rule.
-Cargo-vet, cargo-deny, and the security contract must not
-be optional once that ruleset exists. The "Tokio console smoke" check is *not* a separate required context: it is a step inside
+All four are required; cargo-vet and cargo-deny are not optional. The "Tokio
+console smoke" check is *not* a separate required context: it is a step inside
 the "Build, lint, test" job (see the test-lane section below), so it surfaces
 under that job's context rather than as its own check.
 
-The reusable `enterprise-hardening.yml` accepts an exact source repository and
-40-character source commit. Its first job checks out the exact event merge,
-proves its ordered base and head parents, and emits canonical
-`ci-merge-binding.json`. The same file is both the attestation subject and the
-custom predicate. A run-and-attempt-scoped artifact carries that file and the
-GitHub attestation bundle. The four
-candidate-executing jobs check out the event test commit from the trusted GitHub
-context (the synthetic merge on a pull request and the pushed commit on push),
-so a candidate-controlled caller cannot redirect the pinned workflow to trusted
-old code. The separate committed-evidence job checks out the configured
-evidence commit and authorized checker source instead. Every checkout disables
-credential persistence, no job receives a repository secret, and every job
-runs on an ephemeral GitHub-hosted Ubuntu 24.04 runner. The caller must be
-changed from the local reusable-workflow path to a same-repository path pinned
-at the full commit that first lands the workflow on `main`. Until that bootstrap
-commit exists and the caller is pinned to it, the introducing pull request has
-not established an immutable required-workflow definition.
+The regression-test deletion guard and its scratch-repository self-test also
+run inside "Build, lint, test". On pull requests, a deletion or rename from a
+guarded regression path fails that required context unless a separate same-line
+issue reference names each affected file.
 
-Mechanics evidence has four separate trust domains:
+## Formal PR smoke checks are present but not required
 
-The four privileged default-branch workflows are additionally pinned by the
-repository variable `CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA`. Set it to the
-reviewed bootstrap commit `B` only after controller, capture, finalizer, and
-revocation have landed together on `main`; pin the reusable workflow call in
-`ci.yml` to the same full `B` SHA before use. A privileged run may execute at a
-later default-branch commit only when its workflow file has the exact same Git
-blob as the file at `B`. Unrelated `main` advances therefore do not disable the
-authority, while any workflow-byte change fails closed. Rotate the variable and
-reusable pin together only after the replacement definition set is reviewed.
+[`formal-pr-smoke.yml`](./formal-pr-smoke.yml) provides path-scoped feedback
+without changing the four required contexts above. A lightweight scope job
+classifies the PR diff before any proof toolchain is installed. The reported
+verification check names are:
 
-1. `enterprise-evidence-controller.yml` is loaded from the default branch by
-   `pull_request_target`. It revalidates the live owner, actor, workflow ID and
-   path, run and attempt, default-branch definition, pull-request head and base,
-   explicit `refs/pull/<N>/merge` commit and tree, and live labels. It dispatches only when
-   `CHIO_AUTHORIZED_SECURITY_SOURCE_SHA` equals the head or the head is a
-   linear descendant whose commits change only the three committed Linux
-   evidence files. It performs no checkout and executes no candidate artifact.
-   It generates a 256-bit capture nonce, binds the exact capture run and all
-   dispatch inputs into a controller-owned artifact, and accepts only attempt
-   one of the uniquely titled capture run.
-2. `enterprise-linux-capture.yml` independently repeats authorization before
-   candidate checkout, including the exact controller intent artifact and
-   attempt-one capture identity. Enforcement checks out the explicit merge-ref commit;
-   refresh checks out the exact head. Both disable persisted credentials, run
-   on ephemeral hosted Linux, and receive no repository secret. Source-SHA
-   concurrency cancels stale enforcement and refresh runs across both modes.
-3. After enforcement upload, a no-checkout capture job with `actions: write`
-   explicitly dispatches `enterprise-evidence-finalizer.yml` on the exact
-   default-branch definition. It generates a 256-bit nonce, binds that nonce
-   into the dispatch input and finalizer run title, and paginates until exactly
-   one matching attempt-one run is visible. It uploads a capture-owned dispatch
-   intent binding that run, nonce, source, merge, definition, and capture
-   identity. The finalizer verifies the nonce-bound title and exact intent
-   and uses a bounded multi-minute poll for the exact capture run to complete
-   before binding the controller, capture, finalizer, runner job,
-   GitHub-hosted runner group, exact singleton runner label inventory, run
-   attempts, workflow definitions, artifact ID, digest, size, timestamps,
-   merge tree, label state, and source allowlist. It then downloads the exact
-   archive and performs bounded path-safe extraction with an exact file
-   inventory. The protected `enterprise-evidence-signing` environment exposes
-   the seed to one step only. That step uses a separately published verifier
-   whose URL and SHA-256 are repository variables, creates the strict
-   three-file migration-canary surface, invokes
-   `verify-committed-linux-evidence`, and uploads no private material.
-4. A secret-free publication-authorizer job requires the configured committed
-   evidence SHA to equal the live pull-request head, runs checker bytes from
-   the authorized source against that exact evidence commit, and authenticates
-   the exact current `ci.yml` pull-request run on head `E`. The run title is
-   exactly `CI N=<N> E=<E> B=<base> M=<M>`. It requires successful GitHub
-   Actions checks for Build, MSRV, cargo-vet, cargo-deny, and the Actions
-   security aggregate, including exact workflow, run, attempt, head, check
-   suite, and App `15368` bindings on `E`, then verifies the canonical merge
-   binding artifact and its GitHub certificate. The certificate must identify
-   the pinned reusable signer, source `M`, merge ref, exact CI run and attempt,
-   caller, repository, and GitHub-hosted runner. It seals those results together with every
-   validated controller, capture, runner, artifact, and evidence binding. The
-   protected main-branch publisher requires both that authorization and the
-   protected migration-canary signing job to succeed before it can revalidate
-   the exact live test merge `M`. It mirrors the four authenticated ordinary checks onto `M` as
-   GitHub Actions App `15368` check runs and posts `Security contract` on `M`
-   with the dedicated App. All five share the stable
-   `(<PR>, <E>, <M>, <S>)` identity. Capture labels are not publication or
-   revocation authority.
-5. `security-contract-revocation.yml` is both the frozen manual revoker and a
-   default-branch failure-only `workflow_run` projector. Any completed CI
-   conclusion other than success, including an absent conclusion, is a failure
-   signal. Each listener binds the immutable `workflow_run.run_attempt` from
-   the event, fetches that exact historical attempt endpoint, and rejects a
-   response whose run or attempt identity differs. It does not reclassify the
-   event through the mutable current-run endpoint. The projector authenticates
-   the exact run title and `E`, proves `M`
-   directly from its ordered parents, verifies the signed binding when the
-   builder succeeded, and binds
-   `S` from the repository source variable and requires the committed-evidence
-   variable to equal `E` before creating new tombstones. If the live PR has
-   advanced from `(B1, M1)` to `(B2, M2)`, the listener may normalize existing
-   authority on `M1` but cannot create a missing namespace and never touches
-   `M2`. Only a failed finalizer publisher that follows successful validation,
-   signing, and publication authorization is failure-authoritative. It is
-   independently bound by its authenticated
-   `N/E/M/S/nonce` title, trusted default-branch workflow blob, bot actors,
-   ordered merge parents, exact four-job attempt state, authenticated dispatch
-   intent, and the dedicated App success-check `details_url` for that run and
-   attempt. Earlier failures are ineligible because they cannot have published
-   dedicated authority. Definition or source-variable rotation does not erase
-   an authenticated historical failure. This path can normalize only
-   preexisting exact authority created by the failed publisher and can never
-   create a namespace. Publication
-   and revocation share the non-cancelling maximum-queue
-   `security-check-authority-<M>` lock. Both jobs set `queue: max`, so a later
-   authority mutation cannot replace an earlier pending member. The revoker
-   creates missing failure tombstones or normalizes existing members while
-   preserving their external IDs and source metadata. If duplicates exist, it
-   retains the oldest member carrying the required external ID under the
-   protected name and renames every other member to a unique failure-only
-   superseded name, then proves an exact singleton failed namespace.
-   The protected publisher is also an authority reconciler. Its success branch is
-   POST-only, but before and after every success POST it paginates matching
-   PR/E/M CI run identities, reads every exact historical attempt from one
-   through the current maximum, and fails closed before GitHub's 1,000-result
-   filtered-search ceiling. A completed non-success attempt dominates any
-   newer incomplete attempt and immediately selects the failure-only branch;
-   an incomplete history blocks publication when no bad completion exists. It
-   compares the maximum attempt fingerprint across the current projection and
-   exact attempt, then re-lists the run set and revalidates every maximum after
-   the full scan. A bounded three-pass retry fails closed if the run set or any
-   maximum advances. Any authenticated completed non-success attempt, including
-   a failure followed by a successful rerun, selects a separate failure-only
-   branch that creates or normalizes all five tombstones. If the PR tuple has
-   drifted, that branch normalizes existing
-   authority on the historical `M` but does not create a missing namespace.
-   Manual authority withdrawal first freezes publication with the all-zero
-   evidence SHA, then performs the same five-namespace operation. Any bad CI
-   completion for the current tuple may permanently tombstone it even if a
-   later rerun succeeds; recovery requires a new tuple.
+- "lean-build (lake + sorry scan + manifest cross-ref)"
+- "kani-public-pr (lanes.pr sweep)"
+- "kani-manifest-pr (non-core lanes.pr sweep)"
+- "rust-verification-metadata (schema only, no proofs)"
 
-The reusable lane verifies the committed canary in a fresh job that does not
-execute candidate code. It checks out the detached commit named by
-`CHIO_COMMITTED_LINUX_EVIDENCE_SHA` and runs checker bytes from the exact
-`CHIO_AUTHORIZED_SECURITY_SOURCE_SHA` checkout against the separately pinned
-verifier. The event test commit remains separate and is exercised by the other
-enterprise jobs; it is not misused as the evidence-only commit. The only
-bootstrap exception is an empty committed-evidence variable while the
-independently bound source head exactly equals the authorized source.
+The core Kani job reads all 24 PR harnesses from
+`formal/rust-verification/kani-public-harnesses.toml`. The non-core job reads
+the 12 matching entries for chio-attest-verify, chio-anchor, and chio-weights
+from `.kani/harnesses.toml`. The metadata job validates registry structure only;
+strict Creusot checks remain in `nightly.yml` and release qualification. These
+checks are frozen in `releases.toml` and must not enter a ruleset until a
+run-always aggregator exists. Real proof work must upload the configured
+per-attempt execution marker; a successful no-op must not upload that marker.
 
-Remove `refresh-linux-evidence` before committing the refreshed patch. Label
-removal triggers ordinary CI and a new enforcement capture. The controller,
-capture, and finalizer definitions must already exist on the default branch;
-the pull request that first introduces them cannot use them as a trusted
-default-branch control plane. Before use, configure the source allowlist,
-committed evidence SHA, evidence policy JSON, public key, pinned verifier URL
-and digest, and the protected signing environment. Except for the narrow
-pre-evidence bootstrap above, a missing value fails the corresponding gate.
+The separate [`mutants.yml`](./mutants.yml) workflow also has a path-scoped PR
+lane for six trust-boundary crates. It remains advisory until the evidence
+ratchet in `releases.toml` activates blocking posture.
 
-The publisher boundary is effective only after the private GitHub App,
-repository-scoped public App ID, protected publisher environment, restricted
-installation ID and private-key secret, and exact integration-bound ruleset in
-`docs/security/committed-linux-evidence.md` are configured. The App must be
-installed only on `bb-connor/arc`; the publisher rejects App ID `15368`, a
-different installation or repository inventory, wrong permissions, a non-main
-workflow ref, stale source/evidence variables, and any response not attributed
-to `chio-security-authority`. Until that external state exists, the YAML alone
-does not provide a required non-spoofable publisher.
+[`apalache-safety.yml`](./apalache-safety.yml) checks the distributed
+revocation model at the PR bound, expands it on scheduled runs, reproduces the
+registered negative witnesses, and runs the production ITF projection gate.
+[`apalache-temporal.yml`](./apalache-temporal.yml) keeps both revocation
+liveness properties scheduled and non-required, with a bounded selected-pair
+refinement and an explicit fair-observation witness for the distributed
+property. That property is conditional on weak-fair connected catch-up
+opportunities and partition heal; its post-change flake rate is unmeasured, so
+the lane remains frozen.
+
+## Evidence-gated lane postures
+
+`releases.toml` is the authoritative posture registry for pass/fail proof and
+corpus lanes. Each entry records the workflow filename, exact job display name,
+triggering event, evidence reset, freshness limit, required streak, and current
+advisory or required posture. `scripts/lane-gate.sh` counts matching job results
+from bounded GitHub Actions history. Whole-workflow conclusions and manual
+dispatch runs do not count. Pull-request evidence must target the configured
+base branch and include the exact per-attempt real-execution marker.
+
+Strict proof artifacts are named with both `github.run_id` and
+`github.run_attempt`. Streak evaluation reads the latest job attempt and rejects
+a strict artifact left by any earlier attempt of the same run.
+
+Scored lanes also upload a dedicated report-only artifact using the configured
+prefix followed by `github.run_id` and `github.run_attempt`. The lane gate
+requires one unexpired artifact and one JSON report with the configured schema,
+checks the artifact digest, complete artifact listing, workflow commit and run
+identity, rotation epoch, expected sample and inventory sizes, and exact
+canonical inventory digest, normalized tool versions, registered sources,
+files, and seeds. It recomputes global and source-scoped mutation counts and
+activation ratios. Specification reports must include exact passing positive
+baseline evidence for every registered model. Proof reports must also meet the
+configured global and per-file viability floor. A missing, duplicate, stale,
+weaker, replayed, or
+internally inconsistent report cannot contribute to the promotion streak.
+
+Strict report generation requires a clean worktree and executes the manifest
+gate set. The report checker validates schema, hashes, source bindings, commit
+identity, and the recorded evidence boundary. It does not replay proof commands;
+the protected generator process attests those gate statuses.
+
+The registry covers seven scheduled formal lanes, all four formal PR checks
+listed above, and both locked-corpus smoke checks. The scored specification and
+proof mutation lanes remain advisory until their configured evidence streaks
+qualify them for promotion.
+
+- "fuzz-corpus-smoke-pr (locked replay)"
+- "fuzz corpus smoke"
+
+All thirteen entries are advisory, and no hosted qualifying streak is claimed by
+the registry. Required promotion follows the runbook in
+`docs/formal/ROADMAP.md` and adds structured `promotion_evidence` to the same
+protected registry edit. Pull-request checks remain frozen until they use a
+run-always aggregator and real-execution marker. Scheduled-only required lanes
+gate release qualification via
+`scripts/lane-gate.sh --fleet`; they are never added as pull-request contexts.
+The separately judged cargo-mutants catch-ratio gate remains under
+`scripts/mutants-gate.sh`.
 
 ### Why the build step MUST stay `--workspace`, not per-crate (`-p`)
 
@@ -229,16 +136,18 @@ lane.
 
 Do not narrow the "Workspace build" step to `-p`/path-scoped invocations, and
 do not delete it in favor of relying on clippy alone (clippy here is scoped to
-`--all-targets` but still does not replace the ordinary workspace build).
+`--lib --bins --examples` and likewise does not compile test/bench targets).
 Keeping the unscoped `cargo build --workspace` step is the invariant that
 closes the downstream-exhaustiveness gap.
 
-### The test lane: staged workspace coverage, then an exact full-workspace gate
+### The test lane: workspace-wide except a separate wasm-guards lib lane
 
-The Rust tests are staged so the ordinary workspace can run before the Python
-WASM fixture is built, then the complete workspace is run without exclusions:
+The tests run in two steps, not one, and they do *not* uniformly cover
+integration-test targets:
 
 - "Workspace tests" runs `cargo test --workspace --exclude chio-wasm-guards`.
+  The job installs Bun 1.3.3 first because the anchored-root tamper tests run
+  required Rust-TypeScript differentials and fail when Bun is unavailable.
   Across every other workspace member this compiles and runs `#[cfg(test)]`
   unit tests *and* the `tests/` integration targets, extending the
   build-breakage guarantee above to test code. Note this lane does not pass
@@ -250,21 +159,30 @@ WASM fixture is built, then the complete workspace is run without exclusions:
   are not compiled or run by any gate. (The one feature-gated integration target
   that *is* covered is `tokio_console_smoke`: the separate "Tokio console smoke"
   step in `ci.yml` runs `cargo test -p chio-kernel --features tokio-console-smoke
-  --test tokio_console_smoke`.) `chio-wasm-guards` is excluded from this early
-  step because its integration suite needs the WASM fixture prepared later.
+  --test tokio_console_smoke`.) `chio-wasm-guards` is excluded here because its
+  `tests/` integration suite needs a wasm-capable harness and cannot run in this
+  plain `cargo test` lane.
 - "Wasm guards library tests" then runs `cargo test -p chio-wasm-guards --lib`.
   `--lib` is "test only this package's library", so this lane compiles and runs
-  only `chio-wasm-guards`'s in-crate unit tests.
-- CI builds the pinned Python guard WASM fixture and runs the explicit
-  `py_guard_integration` round trip.
-- "Exact workspace test gate" finally runs `cargo test --workspace` with no
-  package exclusion. This compiles and runs the workspace integration targets,
-  including `chio-wasm-guards`; tests that explicitly detect an absent optional
-  external SDK artifact may still self-skip according to their own contract.
+  only `chio-wasm-guards`'s in-crate unit tests. The many integration targets
+  under `crates/guards/chio-wasm-guards/tests/` are **not** compiled or run by
+  this gate.
 
-Do not remove the early carveout or the later exact gate. The former preserves
-the fixture setup order; the latter is the required no-exclusion regression
-guard.
+So the wasm-guards carveout is deliberate but partial: the crate's library code
+is gated by the PR lane, while its `tests/` integration targets are **not
+exercised by any PR gate**. No PR gate compiles or runs
+`crates/guards/chio-wasm-guards/tests/*` (the other PR-triggered wasm/conformance
+workflows build browser SDK artifacts, run conformance peers, or run benches
+via `cargo bench`, none of which invoke these integration targets). They are
+covered outside the PR gates instead: the push-to-`main` and manual
+`release-qualification.yml` workflow runs `cargo +1.93.0 test --workspace` with
+no `--exclude`, which does compile and run those `wasmtime-runtime` integration
+targets. So editing or adding a test under `crates/guards/chio-wasm-guards/tests/`
+will not be caught by any PR gate (only later, by Release Qualification on
+push/main or a manual run). Do not "fix" the PR-gate carveout by folding
+`chio-wasm-guards` back into the PR `--workspace` test step (it is excluded there
+on purpose), and do not assume a green PR `ci.yml` run covered the wasm-guards
+integration tests.
 
 ### The MSRV job does not fully test the workspace
 

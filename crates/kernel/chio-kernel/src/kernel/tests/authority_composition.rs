@@ -1257,6 +1257,7 @@ fn split_backend_fails_closed_for_every_governed_artifact() {
         kernel.authority_signing_backend.as_ref(),
         NonceBinding {
             subject_id: subject.public_key().to_hex(),
+            request_id: "request-split-backend".to_string(),
             capability_id: "cap-split-backend".to_string(),
             tool_server: "srv-a".to_string(),
             tool_name: "read_file".to_string(),
