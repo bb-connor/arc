@@ -111,7 +111,8 @@ pub trait SettlementRetryStore: Send + Sync {
     }
 
     /// Release a claimed row back to pending with its next monotonic attempt and
-    /// visibility. Returns false when the supplied lease lost its fence.
+    /// visibility. Returns false when the supplied lease lost its fence or has
+    /// expired according to the store's trusted clock.
     fn reschedule_claimed_attempt(
         &self,
         _lease: &SettleAttemptLease,
@@ -123,7 +124,8 @@ pub trait SettlementRetryStore: Send + Sync {
     }
 
     /// Delete a successfully reconciled or skipped claimed row. Returns false
-    /// when the supplied lease lost its fence.
+    /// when the supplied lease lost its fence or has expired according to the
+    /// store's trusted clock.
     fn complete_claimed_attempt(
         &self,
         _lease: &SettleAttemptLease,
@@ -136,7 +138,8 @@ pub trait SettlementRetryStore: Send + Sync {
     /// Atomically insert an exact dead letter for the next attempt and delete
     /// its claimed retry row. A divergent existing dead letter or nonmonotonic
     /// attempt count is a conflict and leaves the retry row claimed. Returns
-    /// false when the supplied lease lost its fence.
+    /// false when the supplied lease lost its fence or has expired according to
+    /// the store's trusted clock.
     fn dead_letter_claimed_attempt(
         &self,
         _lease: &SettleAttemptLease,

@@ -268,6 +268,77 @@ fn manifest_count_verification_rejects_semantic_drift() {
 }
 
 #[test]
+fn evidence_lineage_rejects_local_only_and_unbound_projections() {
+    let legacy = CapabilitySnapshot {
+        capability_id: "legacy-capability".to_string(),
+        subject_key: "legacy-subject".to_string(),
+        issuer_key: "legacy-issuer".to_string(),
+        issued_at: 1,
+        expires_at: 2,
+        grants_json: "{}".to_string(),
+        delegation_depth: 0,
+        parent_capability_id: None,
+        federated_parent_capability_id: None,
+        provenance: chio_kernel::CapabilitySnapshotProvenance::LegacyProjection,
+        signed_capability: None,
+    };
+    let error = verify_lineage(&[legacy]).test_unwrap_err();
+    assert!(
+        error.to_string().contains("legacy projection provenance"),
+        "unexpected error: {error}"
+    );
+
+    let unbound = CapabilitySnapshot {
+        capability_id: "unbound-capability".to_string(),
+        subject_key: "unbound-subject".to_string(),
+        issuer_key: "unbound-issuer".to_string(),
+        issued_at: 1,
+        expires_at: 2,
+        grants_json: "{}".to_string(),
+        delegation_depth: 0,
+        parent_capability_id: None,
+        federated_parent_capability_id: None,
+        provenance: chio_kernel::CapabilitySnapshotProvenance::SignedToken,
+        signed_capability: None,
+    };
+    let error = verify_lineage(std::slice::from_ref(&unbound)).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("signed-token provenance without a signed token"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn evidence_lineage_accepts_valid_synthetic_federation_anchor() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let anchor = CapabilitySnapshot {
+        capability_id: format!("fed-del-{}", "a".repeat(64)),
+        subject_key: subject.public_key().to_hex(),
+        issuer_key: issuer.public_key().to_hex(),
+        issued_at: 1,
+        expires_at: 2,
+        grants_json: serde_json::to_string(&chio_core::capability::scope::ChioScope::default())
+            .test_unwrap(),
+        delegation_depth: 0,
+        parent_capability_id: None,
+        federated_parent_capability_id: None,
+        provenance: chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor,
+        signed_capability: None,
+    };
+
+    let verified = verify_lineage(std::slice::from_ref(&anchor)).test_unwrap();
+    assert_eq!(
+        verified
+            .get(&anchor.capability_id)
+            .map(|snapshot| snapshot.capability_id.as_str()),
+        Some(anchor.capability_id.as_str())
+    );
+}
+
+#[test]
 fn query_scope_rejects_tenant_scoped_package_with_mixed_receipt_tenant() {
     let mut receipt = sample_receipt();
     receipt.tenant_id = Some("tenant-b".to_string());

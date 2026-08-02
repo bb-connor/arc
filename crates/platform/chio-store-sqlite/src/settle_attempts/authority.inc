@@ -184,12 +184,36 @@ pub struct SqliteSettlementRetryStore {
     dead_letters: SqliteDeadLetterStore,
     writer: crate::receipt_store::WriterHandle,
     storage_identity: chio_core::Hash,
+    clock: std::sync::Arc<dyn SettlementClock + Send + Sync>,
+}
+
+trait SettlementClock {
+    fn now_unix_secs(&self) -> Result<u64, SettlementRetryError>;
+}
+
+#[derive(Debug)]
+struct SystemSettlementClock;
+
+impl SettlementClock for SystemSettlementClock {
+    fn now_unix_secs(&self) -> Result<u64, SettlementRetryError> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .map_err(backend_err)
+    }
 }
 
 impl SqliteSettlementRetryStore {
     /// Open the retry sink in the same database as `store` (mirrors
     /// [`SqliteDeadLetterStore::open_alongside`]).
     pub fn open_alongside(store: &crate::SqliteReceiptStore) -> Result<Self, SettlementRetryError> {
+        Self::open_alongside_with_clock(store, std::sync::Arc::new(SystemSettlementClock))
+    }
+
+    fn open_alongside_with_clock(
+        store: &crate::SqliteReceiptStore,
+        clock: std::sync::Arc<dyn SettlementClock + Send + Sync>,
+    ) -> Result<Self, SettlementRetryError> {
         let dead_letters = SqliteDeadLetterStore::open_alongside(store).map_err(map_dl_err)?;
         let connection_checkout = receipt_connection_checkout(store);
         let writer = store.writer_handle();
@@ -220,14 +244,12 @@ impl SqliteSettlementRetryStore {
             dead_letters,
             writer,
             storage_identity,
+            clock,
         })
     }
 
-    fn now_unix_secs() -> Result<u64, SettlementRetryError> {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .map_err(backend_err)
+    fn now_unix_secs(&self) -> Result<u64, SettlementRetryError> {
+        self.clock.now_unix_secs()
     }
 
     fn run_write<T, F>(&self, job: F) -> Result<T, SettlementRetryError>
@@ -264,6 +286,20 @@ fn ensure_settle_attempt_lease_schema_on_connection(
         "next_visible_at",
         "last_reason",
         "updated_at",
+    ];
+    let previous_columns = [
+        "receipt_id",
+        "finalized_at",
+        "work_kind",
+        "attempts",
+        "next_visible_at_ms",
+        "row_version",
+        "lease_owner",
+        "lease_token",
+        "lease_until_ms",
+        "reason_code",
+        "reason_detail_sha256",
+        "updated_at_ms",
     ];
     let current_columns = [
         "receipt_id",
@@ -331,9 +367,81 @@ fn ensure_settle_attempt_lease_schema_on_connection(
         connection
             .execute_batch("DROP TABLE settle_attempts_legacy;")
             .map_err(backend_err)?;
+    } else if columns
+        .iter()
+        .map(String::as_str)
+        .eq(previous_columns)
+    {
+        let orphaned_previous = connection
+            .query_row(
+                "SELECT attempt.receipt_id FROM settle_attempts AS attempt \
+                 WHERE NOT EXISTS ( \
+                     SELECT 1 FROM chio_tool_receipts AS receipt \
+                     WHERE receipt.receipt_id = attempt.receipt_id \
+                       AND receipt.timestamp = attempt.finalized_at \
+                 ) LIMIT 1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(backend_err)?;
+        if orphaned_previous.is_some() {
+            return Err(SettlementRetryError::Conflict(
+                "previous settle_attempts contains a row without its exact authoritative live receipt"
+                    .to_string(),
+            ));
+        }
+        connection
+            .execute_batch(
+                "DROP INDEX IF EXISTS idx_settle_attempts_visible; \
+                 DROP TRIGGER IF EXISTS trg_settle_attempts_reject_terminal_insert; \
+                 DROP TRIGGER IF EXISTS trg_settle_attempts_reject_terminal_update; \
+                 DROP TRIGGER IF EXISTS trg_settle_dead_letters_reject_attempt_insert; \
+                 DROP TRIGGER IF EXISTS trg_settle_dead_letters_reject_attempt_update;",
+            )
+            .map_err(backend_err)?;
+        connection
+            .execute_batch("ALTER TABLE settle_attempts RENAME TO settle_attempts_previous;")
+            .map_err(backend_err)?;
+        connection
+            .execute_batch(SETTLE_ATTEMPTS_MIGRATION)
+            .map_err(backend_err)?;
+        connection
+            .execute_batch(SETTLE_ATTEMPTS_LIVE_RECEIPT_INSERT_TRIGGER)
+            .map_err(backend_err)?;
+        connection
+            .execute_batch(SETTLE_ATTEMPTS_LIVE_RECEIPT_UPDATE_TRIGGER)
+            .map_err(backend_err)?;
+        connection
+            .execute(
+                "INSERT INTO settle_attempts \
+                     (receipt_id, finalized_at, attempts, next_visible_at, last_reason, \
+                      updated_at, state, claim_token, claim_deadline_unix_secs, version) \
+                 SELECT receipt_id, finalized_at, \
+                        CASE WHEN attempts = 0 THEN 1 ELSE attempts END, \
+                        (next_visible_at_ms / 1000) + \
+                            CASE WHEN (next_visible_at_ms % 1000) = 0 THEN 0 ELSE 1 END, \
+                        CASE WHEN work_kind = 'pending_observation' \
+                             THEN 'migrated pending observation' ELSE reason_code END, \
+                        (updated_at_ms / 1000) + \
+                            CASE WHEN (updated_at_ms % 1000) = 0 THEN 0 ELSE 1 END, \
+                        CASE WHEN lease_token IS NULL THEN 'pending' ELSE 'claimed' END, \
+                        lease_token, \
+                        CASE WHEN lease_until_ms IS NULL THEN NULL \
+                             ELSE (lease_until_ms / 1000) + \
+                                  CASE WHEN (lease_until_ms % 1000) = 0 THEN 0 ELSE 1 END \
+                        END, \
+                        row_version \
+                 FROM settle_attempts_previous",
+                [],
+            )
+            .map_err(backend_err)?;
+        connection
+            .execute_batch("DROP TABLE settle_attempts_previous;")
+            .map_err(backend_err)?;
     } else if !columns.iter().map(String::as_str).eq(current_columns) {
         return Err(SettlementRetryError::Conflict(
-            "settle_attempts columns are neither the exact legacy nor current schema".to_string(),
+            "settle_attempts columns are neither a supported prior nor current schema".to_string(),
         ));
     }
     for schema_object in [
@@ -958,7 +1066,8 @@ fn row_to_stored_attempt(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredAtte
 
 impl SqliteSettlementRetryStore {
     /// Commit the IOU, exact reconciliation, and lease deletion in one fenced
-    /// transaction. A stale lease returns `Ok(false)` without writing evidence.
+    /// transaction. A stale or expired lease returns `Ok(false)` without
+    /// writing evidence.
     pub fn commit_claimed_settlement_exact(
         &self,
         lease: &SettleAttemptLease,
@@ -1000,17 +1109,20 @@ impl SqliteSettlementRetryStore {
         let lease_claim_deadline =
             sqlite_i64(lease.claim_deadline_unix_secs, "settlement claim deadline")?;
         let version = sqlite_i64(lease.version, "settlement lease version")?;
+        let clock = std::sync::Arc::clone(&self.clock);
         self.run_write(move |connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(backend_err)?;
+            let now = sqlite_i64(clock.now_unix_secs()?, "settlement terminal time")?;
             let owns_lease = transaction
                 .query_row(
                     "SELECT 1 FROM settle_attempts \
                      WHERE receipt_id = ?1 AND finalized_at = ?2 AND state = 'claimed' \
                        AND claim_token = ?3 AND version = ?4 AND attempts = ?5 \
                        AND next_visible_at = ?6 AND last_reason IS ?7 \
-                       AND claim_deadline_unix_secs = ?8",
+                       AND claim_deadline_unix_secs = ?8 \
+                       AND claim_deadline_unix_secs > ?9",
                     rusqlite::params![
                         lease.record.receipt_id.as_str(),
                         finalized_at,
@@ -1020,6 +1132,7 @@ impl SqliteSettlementRetryStore {
                         lease_next_visible_at,
                         lease.record.last_reason.as_deref(),
                         lease_claim_deadline,
+                        now,
                     ],
                     |_| Ok(()),
                 )
@@ -1057,7 +1170,8 @@ impl SqliteSettlementRetryStore {
                      WHERE receipt_id = ?1 AND finalized_at = ?2 AND state = 'claimed' \
                        AND claim_token = ?3 AND version = ?4 AND attempts = ?5 \
                        AND next_visible_at = ?6 AND last_reason IS ?7 \
-                       AND claim_deadline_unix_secs = ?8",
+                       AND claim_deadline_unix_secs = ?8 \
+                       AND claim_deadline_unix_secs > ?9",
                     rusqlite::params![
                         lease.record.receipt_id.as_str(),
                         finalized_at,
@@ -1067,6 +1181,7 @@ impl SqliteSettlementRetryStore {
                         lease_next_visible_at,
                         lease.record.last_reason.as_deref(),
                         lease_claim_deadline,
+                        now,
                     ],
                 )
                 .map_err(backend_err)?;
@@ -1114,7 +1229,7 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
         let record = record.clone();
         let finalized_at = sqlite_i64(record.finalized_at, "settlement finalized_at")?;
         let next_visible_at = sqlite_i64(record.next_visible_at, "settlement next_visible_at")?;
-        let updated_at = sqlite_i64(Self::now_unix_secs()?, "settlement updated_at")?;
+        let updated_at = sqlite_i64(self.now_unix_secs()?, "settlement updated_at")?;
         self.run_write(move |connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -1208,7 +1323,7 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
         let record = record.clone();
         let finalized_at = sqlite_i64(record.finalized_at, "settlement finalized_at")?;
         let next_visible_at = sqlite_i64(record.next_visible_at, "settlement next_visible_at")?;
-        let updated_at = sqlite_i64(Self::now_unix_secs()?, "settlement updated_at")?;
+        let updated_at = sqlite_i64(self.now_unix_secs()?, "settlement updated_at")?;
         self.run_write(move |connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -1344,10 +1459,9 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                             AND candidate.claim_deadline_unix_secs <= ?1)) \
                    AND NOT EXISTS ( \
                        SELECT 1 FROM settle_attempts AS earlier \
-                       WHERE earlier.next_visible_at <= ?1 \
-                         AND (earlier.finalized_at < candidate.finalized_at \
+                       WHERE earlier.finalized_at < candidate.finalized_at \
                               OR (earlier.finalized_at = candidate.finalized_at \
-                                  AND earlier.receipt_id < candidate.receipt_id)) \
+                                  AND earlier.receipt_id < candidate.receipt_id) \
                    ) \
                  ORDER BY candidate.finalized_at ASC, candidate.receipt_id ASC \
                  LIMIT 1",
@@ -1438,9 +1552,13 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
         )?;
         let finalized_at = sqlite_i64(next.finalized_at, "settlement finalized_at")?;
         let next_visible_at = sqlite_i64(next.next_visible_at, "settlement next_visible_at")?;
-        let updated_at = sqlite_i64(Self::now_unix_secs()?, "settlement updated_at")?;
+        let clock = std::sync::Arc::clone(&self.clock);
         self.run_write(move |connection| {
-            let changed = connection
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(backend_err)?;
+            let updated_at = sqlite_i64(clock.now_unix_secs()?, "settlement updated_at")?;
+            let changed = transaction
                 .execute(
                     "UPDATE settle_attempts \
                  SET attempts = ?1, next_visible_at = ?2, last_reason = ?3, \
@@ -1449,7 +1567,8 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                  WHERE receipt_id = ?5 AND finalized_at = ?6 AND state = 'claimed' \
                    AND claim_token = ?7 AND version = ?8 AND attempts = ?9 \
                    AND next_visible_at = ?10 AND last_reason IS ?11 \
-                   AND claim_deadline_unix_secs = ?12",
+                   AND claim_deadline_unix_secs = ?12 \
+                   AND claim_deadline_unix_secs > ?13",
                     rusqlite::params![
                         i64::from(next.attempts),
                         next_visible_at,
@@ -1463,9 +1582,11 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                         lease_next_visible_at,
                         lease_last_reason.as_deref(),
                         lease_claim_deadline,
+                        updated_at,
                     ],
                 )
                 .map_err(backend_err)?;
+            transaction.commit().map_err(backend_err)?;
             Ok(changed == 1)
         })
     }
@@ -1486,14 +1607,20 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
         let claim_deadline =
             sqlite_i64(lease.claim_deadline_unix_secs, "settlement claim deadline")?;
         let version = sqlite_i64(lease.version, "settlement lease version")?;
+        let clock = std::sync::Arc::clone(&self.clock);
         self.run_write(move |connection| {
-            let changed = connection
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(backend_err)?;
+            let now = sqlite_i64(clock.now_unix_secs()?, "settlement terminal time")?;
+            let changed = transaction
                 .execute(
                     "DELETE FROM settle_attempts \
                  WHERE receipt_id = ?1 AND finalized_at = ?2 AND state = 'claimed' \
                    AND claim_token = ?3 AND version = ?4 AND attempts = ?5 \
                    AND next_visible_at = ?6 AND last_reason IS ?7 \
-                   AND claim_deadline_unix_secs = ?8",
+                   AND claim_deadline_unix_secs = ?8 \
+                   AND claim_deadline_unix_secs > ?9",
                     rusqlite::params![
                         receipt_id.as_str(),
                         finalized_at,
@@ -1503,9 +1630,11 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                         next_visible_at,
                         last_reason.as_deref(),
                         claim_deadline,
+                        now,
                     ],
                 )
                 .map_err(backend_err)?;
+            transaction.commit().map_err(backend_err)?;
             Ok(changed == 1)
         })
     }
@@ -1545,17 +1674,20 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
             sqlite_i64(lease.claim_deadline_unix_secs, "settlement claim deadline")?;
         let lease_version = sqlite_i64(lease.version, "settlement lease version")?;
         let dead_letter_finalized_at = sqlite_i64(record.finalized_at, "dead-letter finalized_at")?;
+        let clock = std::sync::Arc::clone(&self.clock);
         self.run_write(move |connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(backend_err)?;
+            let now = sqlite_i64(clock.now_unix_secs()?, "settlement terminal time")?;
             let owned = transaction
                 .query_row(
                     "SELECT 1 FROM settle_attempts \
                      WHERE receipt_id = ?1 AND finalized_at = ?2 AND state = 'claimed' \
                        AND claim_token = ?3 AND version = ?4 AND attempts = ?5 \
                        AND next_visible_at = ?6 AND last_reason IS ?7 \
-                       AND claim_deadline_unix_secs = ?8",
+                       AND claim_deadline_unix_secs = ?8 \
+                       AND claim_deadline_unix_secs > ?9",
                     rusqlite::params![
                         lease.record.receipt_id.as_str(),
                         finalized_at,
@@ -1565,6 +1697,7 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                         lease_next_visible_at,
                         lease.record.last_reason.as_deref(),
                         lease_claim_deadline,
+                        now,
                     ],
                 |_| Ok(()),
             )
@@ -1615,7 +1748,8 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                      WHERE receipt_id = ?1 AND finalized_at = ?2 AND state = 'claimed' \
                        AND claim_token = ?3 AND version = ?4 AND attempts = ?5 \
                        AND next_visible_at = ?6 AND last_reason IS ?7 \
-                       AND claim_deadline_unix_secs = ?8",
+                       AND claim_deadline_unix_secs = ?8 \
+                       AND claim_deadline_unix_secs > ?9",
                     rusqlite::params![
                         lease.record.receipt_id.as_str(),
                         finalized_at,
@@ -1625,6 +1759,7 @@ impl SettlementRetryStore for SqliteSettlementRetryStore {
                         lease_next_visible_at,
                         lease.record.last_reason.as_deref(),
                         lease_claim_deadline,
+                        now,
                     ],
                 )
                 .map_err(backend_err)?;

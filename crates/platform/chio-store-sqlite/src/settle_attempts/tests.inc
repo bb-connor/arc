@@ -61,7 +61,16 @@ mod tests {
                 policy_hash: "policy".to_string(),
                 evidence: Vec::new(),
                 metadata: Some(serde_json::json!({
-                    "financial": {"cost_charged": 25, "currency": "USD"}
+                    "financial": {
+                        "grant_index": 0,
+                        "cost_charged": 25,
+                        "currency": "USD",
+                        "budget_remaining": 975,
+                        "budget_total": 1000,
+                        "delegation_depth": 0,
+                        "root_budget_holder": "root-agent",
+                        "settlement_status": "pending"
+                    }
                 })),
                 trust_level: TrustLevel::default(),
                 tenant_id: None,
@@ -82,6 +91,31 @@ mod tests {
         let receipt = priced_receipt(&keypair, receipt_id, timestamp);
         receipts.append_chio_receipt(&receipt).unwrap();
         receipt
+    }
+
+    fn open_retry_store(
+        receipts: &crate::SqliteReceiptStore,
+    ) -> Result<SqliteSettlementRetryStore, SettlementRetryError> {
+        open_retry_store_at(receipts, 10)
+    }
+
+    #[derive(Debug)]
+    struct FixedSettlementClock(u64);
+
+    impl SettlementClock for FixedSettlementClock {
+        fn now_unix_secs(&self) -> Result<u64, SettlementRetryError> {
+            Ok(self.0)
+        }
+    }
+
+    fn open_retry_store_at(
+        receipts: &crate::SqliteReceiptStore,
+        now_unix_secs: u64,
+    ) -> Result<SqliteSettlementRetryStore, SettlementRetryError> {
+        SqliteSettlementRetryStore::open_alongside_with_clock(
+            receipts,
+            std::sync::Arc::new(FixedSettlementClock(now_unix_secs)),
+        )
     }
 
     fn wait_for_writer_queue_depth(store: &crate::SqliteReceiptStore, minimum: u64) {
@@ -118,7 +152,7 @@ mod tests {
         let path = unique_db_path("settle-attempts");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let receipt = append_attempt_receipt(&receipts, "r1", 100);
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
 
         assert!(store.load_attempt(&receipt.id).unwrap().is_none());
         assert!(matches!(
@@ -171,7 +205,7 @@ mod tests {
     fn dead_letter_insert_is_idempotent() {
         let path = unique_db_path("settle-dead-letter");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         let record = chio_settle::DeadLetterRecord::new("r-dl", 100, 3, "permanent");
         assert!(
             store.insert_dead_letter(&record).unwrap(),
@@ -189,7 +223,7 @@ mod tests {
         let path = unique_db_path("settle-upsert-fence");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let receipt = append_attempt_receipt(&receipts, "r-upsert", 100);
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         let first = attempt_record(&receipt.id, receipt.timestamp, 1, 10);
 
         store.upsert_attempt(&first).unwrap();
@@ -223,7 +257,7 @@ mod tests {
         let path = unique_db_path("settle-observer-insert");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let receipt = append_attempt_receipt(&receipts, "r-observer-insert", 100);
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         let record = attempt_record(&receipt.id, receipt.timestamp, 1, 10);
 
         assert!(store.insert_observer_attempt_if_absent(&record).unwrap());
@@ -241,7 +275,7 @@ mod tests {
     fn retry_open_installs_iou_live_owner_and_immutability_guards() {
         let path = unique_db_path("settle-installs-iou-guards");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
-        let _store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let _store = open_retry_store(&receipts).unwrap();
         let raw = rusqlite::Connection::open(&path).unwrap();
         let installed_guards: i64 = raw
             .query_row(
@@ -273,8 +307,8 @@ mod tests {
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let later = append_attempt_receipt(&receipts, "r-later", 200);
         let earlier = append_attempt_receipt(&receipts, "r-earlier", 100);
-        let first_store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
-        let second_store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let first_store = open_retry_store(&receipts).unwrap();
+        let second_store = open_retry_store(&receipts).unwrap();
 
         first_store
             .upsert_attempt(&attempt_record(&later.id, later.timestamp, 1, 1))
@@ -315,11 +349,101 @@ mod tests {
     }
 
     #[test]
+    fn delayed_absolute_head_blocks_later_due_attempts() {
+        let path = unique_db_path("settle-delayed-head");
+        let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
+        let earlier = append_attempt_receipt(&receipts, "r-delayed-head", 100);
+        let later = append_attempt_receipt(&receipts, "r-due-sibling", 200);
+        let store = open_retry_store(&receipts).unwrap();
+
+        store
+            .upsert_attempt(&attempt_record(&earlier.id, earlier.timestamp, 1, 30))
+            .unwrap();
+        store
+            .upsert_attempt(&attempt_record(&later.id, later.timestamp, 1, 1))
+            .unwrap();
+
+        assert!(store
+            .claim_due_attempts(10, 40, "worker-a", 1)
+            .unwrap()
+            .is_empty());
+        let head = store
+            .claim_due_attempts(30, 40, "worker-a", 1)
+            .unwrap()
+            .pop()
+            .expect("absolute head becomes claimable at its visibility deadline");
+        assert_eq!(head.record.receipt_id, earlier.id);
+        assert!(store.complete_claimed_attempt(&head).unwrap());
+
+        let sibling = store
+            .claim_due_attempts(30, 40, "worker-b", 1)
+            .unwrap()
+            .pop()
+            .expect("later due row is unblocked only after the absolute head completes");
+        assert_eq!(sibling.record.receipt_id, later.id);
+        assert!(store.complete_claimed_attempt(&sibling).unwrap());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn expired_lease_rejects_every_terminal_mutation_without_evidence() {
+        let path = unique_db_path("settle-expired-terminal");
+        let kernel = Keypair::from_seed(&[81; 32]);
+        let issuer = Keypair::from_seed(&[82; 32]);
+        let receipt = priced_receipt(&kernel, "r-expired-terminal", 100);
+        let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
+        receipts.append_chio_receipt(&receipt).unwrap();
+        let store = open_retry_store_at(&receipts, 20).unwrap();
+        store
+            .upsert_attempt(&attempt_record(&receipt.id, receipt.timestamp, 1, 10))
+            .unwrap();
+        let lease = store
+            .claim_due_attempts(10, 20, "expired-worker", 1)
+            .unwrap()
+            .pop()
+            .expect("attempt claimed before its deadline");
+
+        let next = attempt_record(&receipt.id, receipt.timestamp, 2, 30);
+        assert!(!store.reschedule_claimed_attempt(&lease, &next).unwrap());
+        assert!(!store.complete_claimed_attempt(&lease).unwrap());
+        let dead_letter =
+            dead_letter_record(&receipt.id, receipt.timestamp, 2, "expired worker");
+        assert!(!store
+            .dead_letter_claimed_attempt(&lease, &dead_letter)
+            .unwrap());
+        let expected = envelope(&issuer, &kernel, &receipt);
+        assert!(!store
+            .commit_claimed_settlement_exact(
+                &lease,
+                &expected,
+                &[issuer.public_key()],
+                &[kernel.public_key()],
+                Some("transcript=expired"),
+            )
+            .unwrap());
+
+        let reader = receipts.reader_connection_for_test().unwrap();
+        let counts: (i64, i64, i64, i64) = reader
+            .query_row(
+                "SELECT \
+                   (SELECT COUNT(*) FROM settle_attempts WHERE receipt_id = ?1 AND state = 'claimed'), \
+                   (SELECT COUNT(*) FROM settle_dead_letters WHERE receipt_id = ?1), \
+                   (SELECT COUNT(*) FROM iou_envelope WHERE receipt_id = ?1), \
+                   (SELECT COUNT(*) FROM settlement_reconciliations WHERE receipt_id = ?1)",
+                rusqlite::params![receipt.id.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(counts, (1, 0, 0, 0));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
     fn reschedule_advances_attempt_and_invalidates_the_old_lease() {
         let path = unique_db_path("settle-reschedule");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let receipt = append_attempt_receipt(&receipts, "r-reschedule", 100);
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         store
             .upsert_attempt(&attempt_record(&receipt.id, receipt.timestamp, 1, 10))
             .unwrap();
@@ -351,7 +475,7 @@ mod tests {
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let dead_receipt = append_attempt_receipt(&receipts, "r-dead", 100);
         let divergent_receipt = append_attempt_receipt(&receipts, "r-divergent", 200);
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         store
             .upsert_attempt(&attempt_record(
                 &dead_receipt.id,
@@ -455,7 +579,7 @@ mod tests {
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let maximum_receipt = append_attempt_receipt(&receipts, "r-maximum-attempts", 100);
         let token_receipt = append_attempt_receipt(&receipts, "r-token", 100);
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
 
         for receipt_id in [" ".to_string(), "x".repeat(513), "é".repeat(257)] {
             let mut record = attempt_record("valid", 100, 1, 10);
@@ -520,7 +644,7 @@ mod tests {
         #[cfg(target_pointer_width = "64")]
         assert!(matches!(
             store.due_attempts(10, usize::MAX),
-            Err(SettlementRetryError::Backend(_))
+            Err(SettlementRetryError::Conflict(_))
         ));
         let _ = std::fs::remove_file(&path);
     }
@@ -529,7 +653,7 @@ mod tests {
     fn opening_rejects_a_same_name_tampered_trigger() {
         let path = unique_db_path("settle-schema-tamper");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
-        let _store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let _store = open_retry_store(&receipts).unwrap();
         let checkout = receipt_connection_checkout(&receipts);
         let connection = checkout().unwrap();
         connection
@@ -543,7 +667,7 @@ mod tests {
         drop(connection);
 
         assert!(matches!(
-            SqliteSettlementRetryStore::open_alongside(&receipts),
+            open_retry_store(&receipts),
             Err(SettlementRetryError::Conflict(_))
         ));
         let _ = std::fs::remove_file(&path);
@@ -554,7 +678,7 @@ mod tests {
         let path = unique_db_path("settle-value-tamper");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let corrupt_receipt = append_attempt_receipt(&receipts, "r-corrupt", 100);
-        let _store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let _store = open_retry_store(&receipts).unwrap();
         let checkout = receipt_connection_checkout(&receipts);
         let connection = checkout().unwrap();
         connection
@@ -583,7 +707,7 @@ mod tests {
         drop(connection);
 
         assert!(matches!(
-            SqliteSettlementRetryStore::open_alongside(&receipts),
+            open_retry_store(&receipts),
             Err(SettlementRetryError::Conflict(_))
         ));
         let _ = std::fs::remove_file(&path);
@@ -594,7 +718,7 @@ mod tests {
         let path = unique_db_path("settle-attempt-count-tamper");
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         let excessive_receipt = append_attempt_receipt(&receipts, "r-excessive", 100);
-        let _store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let _store = open_retry_store(&receipts).unwrap();
         let checkout = receipt_connection_checkout(&receipts);
         let connection = checkout().unwrap();
         connection
@@ -623,7 +747,7 @@ mod tests {
         drop(connection);
 
         assert!(matches!(
-            SqliteSettlementRetryStore::open_alongside(&receipts),
+            open_retry_store(&receipts),
             Err(SettlementRetryError::Conflict(_))
         ));
         let _ = std::fs::remove_file(&path);
@@ -658,7 +782,7 @@ mod tests {
             .unwrap();
         drop(connection);
 
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         assert_eq!(
             store.load_attempt(&legacy_receipt.id).unwrap(),
             Some(attempt_record(
@@ -674,6 +798,113 @@ mod tests {
             .pop()
             .expect("legacy row is claimable after rebuild");
         assert!(store.complete_claimed_attempt(&lease).unwrap());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn previous_production_table_is_rebuilt_without_losing_time_or_lease_fences() {
+        let path = unique_db_path("settle-previous-production-rebuild");
+        let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
+        let pending_receipt = append_attempt_receipt(&receipts, "r-previous-pending", 100);
+        let claimed_receipt = append_attempt_receipt(&receipts, "r-previous-claimed", 200);
+        let checkout = receipt_connection_checkout(&receipts);
+        let connection = checkout().unwrap();
+        connection
+            .connection()
+            .execute_batch(
+                "CREATE TABLE settle_attempts ( \
+                     receipt_id TEXT PRIMARY KEY, \
+                     finalized_at INTEGER NOT NULL CHECK (finalized_at >= 0), \
+                     work_kind TEXT NOT NULL CHECK ( \
+                         work_kind IN ('pending_observation', 'retry_scheduled')), \
+                     attempts INTEGER NOT NULL CHECK (attempts BETWEEN 0 AND 4294967295), \
+                     next_visible_at_ms INTEGER NOT NULL CHECK (next_visible_at_ms >= 0), \
+                     row_version INTEGER NOT NULL CHECK (row_version >= 0), \
+                     lease_owner TEXT, lease_token TEXT, lease_until_ms INTEGER, \
+                     reason_code TEXT, reason_detail_sha256 BLOB, \
+                     updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0), \
+                     CHECK ((lease_owner IS NULL AND lease_token IS NULL AND lease_until_ms IS NULL) \
+                            OR (lease_owner IS NOT NULL AND lease_token IS NOT NULL \
+                                AND lease_until_ms IS NOT NULL)) \
+                 ); \
+                 CREATE INDEX idx_settle_attempts_visible \
+                     ON settle_attempts(next_visible_at_ms, lease_until_ms, receipt_id);",
+            )
+            .unwrap();
+        connection
+            .connection()
+            .execute(
+                "INSERT INTO settle_attempts \
+                     (receipt_id, finalized_at, work_kind, attempts, next_visible_at_ms, \
+                      row_version, lease_owner, lease_token, lease_until_ms, reason_code, \
+                      reason_detail_sha256, updated_at_ms) \
+                 VALUES (?1, ?2, 'pending_observation', 0, 10001, 0, \
+                         NULL, NULL, NULL, NULL, NULL, 9001)",
+                rusqlite::params![
+                    pending_receipt.id.as_str(),
+                    sqlite_i64(pending_receipt.timestamp, "finalized_at").unwrap()
+                ],
+            )
+            .unwrap();
+        connection
+            .connection()
+            .execute(
+                "INSERT INTO settle_attempts \
+                     (receipt_id, finalized_at, work_kind, attempts, next_visible_at_ms, \
+                      row_version, lease_owner, lease_token, lease_until_ms, reason_code, \
+                      reason_detail_sha256, updated_at_ms) \
+                 VALUES (?1, ?2, 'retry_scheduled', 2, 11001, 7, \
+                         'previous-worker', 'previous-token', 20001, 'transport', \
+                         zeroblob(32), 10001)",
+                rusqlite::params![
+                    claimed_receipt.id.as_str(),
+                    sqlite_i64(claimed_receipt.timestamp, "finalized_at").unwrap()
+                ],
+            )
+            .unwrap();
+        drop(connection);
+
+        let store = open_retry_store(&receipts).unwrap();
+        assert_eq!(
+            store.load_attempt(&pending_receipt.id).unwrap(),
+            Some(SettleAttemptRecord {
+                receipt_id: pending_receipt.id.clone(),
+                finalized_at: pending_receipt.timestamp,
+                attempts: 1,
+                next_visible_at: 11,
+                last_reason: Some("migrated pending observation".to_string()),
+            })
+        );
+        assert_eq!(
+            store.load_attempt(&claimed_receipt.id).unwrap(),
+            Some(SettleAttemptRecord {
+                receipt_id: claimed_receipt.id.clone(),
+                finalized_at: claimed_receipt.timestamp,
+                attempts: 2,
+                next_visible_at: 12,
+                last_reason: Some("transport".to_string()),
+            })
+        );
+
+        let pending = store
+            .claim_due_attempts(11, 30, "new-worker", 1)
+            .unwrap()
+            .pop()
+            .expect("migrated pending observation is claimable at rounded-up visibility");
+        assert_eq!(pending.record.receipt_id, pending_receipt.id);
+        assert!(store.complete_claimed_attempt(&pending).unwrap());
+        assert!(store
+            .claim_due_attempts(20, 30, "new-worker", 1)
+            .unwrap()
+            .is_empty());
+        let reclaimed = store
+            .claim_due_attempts(21, 30, "new-worker", 1)
+            .unwrap()
+            .pop()
+            .expect("migrated lease is reclaimable only at its rounded-up deadline");
+        assert_eq!(reclaimed.record.receipt_id, claimed_receipt.id);
+        assert_eq!(reclaimed.version, 8);
+        assert!(store.complete_claimed_attempt(&reclaimed).unwrap());
         let _ = std::fs::remove_file(&path);
     }
 
@@ -714,7 +945,7 @@ mod tests {
             .unwrap();
         drop(connection);
 
-        assert!(SqliteSettlementRetryStore::open_alongside(&receipts).is_err());
+        assert!(open_retry_store(&receipts).is_err());
         let connection = checkout().unwrap();
         let table_sql_after: String = connection
             .connection()
@@ -776,7 +1007,7 @@ mod tests {
         drop(connection);
 
         assert!(matches!(
-            SqliteSettlementRetryStore::open_alongside(&receipts),
+            open_retry_store(&receipts),
             Err(SettlementRetryError::Conflict(_))
         ));
         let connection = checkout().unwrap();
@@ -826,7 +1057,7 @@ mod tests {
                 .created
         );
         let store = std::sync::Arc::new(
-            SqliteSettlementRetryStore::open_alongside(receipts.as_ref()).unwrap(),
+            open_retry_store(receipts.as_ref()).unwrap(),
         );
 
         // Open a genuinely independent receipt writer before rotation. Its
@@ -835,7 +1066,7 @@ mod tests {
         let independent_receipts =
             std::sync::Arc::new(crate::SqliteReceiptStore::open_existing(&path).unwrap());
         let independent_store =
-            SqliteSettlementRetryStore::open_alongside(independent_receipts.as_ref()).unwrap();
+            open_retry_store(independent_receipts.as_ref()).unwrap();
 
         // Park the local actor, enqueue rotation, then enqueue the retry. FIFO
         // order is observed through queue_depth before the blocker is released.
@@ -933,7 +1164,7 @@ mod tests {
         let receipt = priced_receipt(&kernel, "r-stale-success", 100);
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         receipts.append_chio_receipt(&receipt).unwrap();
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         store
             .upsert_attempt(&attempt_record(&receipt.id, receipt.timestamp, 1, 10))
             .unwrap();
@@ -993,7 +1224,7 @@ mod tests {
         let receipt = priced_receipt(&kernel, "r-divergent-economics", 100);
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         receipts.append_chio_receipt(&receipt).unwrap();
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         store
             .upsert_attempt(&attempt_record(&receipt.id, receipt.timestamp, 1, 0))
             .unwrap();
@@ -1044,7 +1275,7 @@ mod tests {
         let receipt = priced_receipt(&kernel, "r-algorithm-mismatch", 100);
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         receipts.append_chio_receipt(&receipt).unwrap();
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         store
             .upsert_attempt(&attempt_record(&receipt.id, receipt.timestamp, 1, 0))
             .unwrap();
@@ -1090,7 +1321,7 @@ mod tests {
         let receipt = priced_receipt(&kernel, "r-unknown-iou-field", 100);
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         receipts.append_chio_receipt(&receipt).unwrap();
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         let ious = crate::SqliteIouEnvelopeStore::open_alongside(&receipts).unwrap();
         let expected = envelope(&issuer, &kernel, &receipt);
         assert!(ious.insert(&expected).unwrap());
@@ -1161,7 +1392,7 @@ mod tests {
                 Some("operator decision"),
             )
             .unwrap();
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         store
             .upsert_attempt(&attempt_record(&receipt.id, receipt.timestamp, 1, 0))
             .unwrap();
@@ -1203,7 +1434,7 @@ mod tests {
         let receipt = priced_receipt(&kernel, "r-issuer-rotation", 100);
         let receipts = crate::SqliteReceiptStore::open(&path).unwrap();
         receipts.append_chio_receipt(&receipt).unwrap();
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         let ious = crate::SqliteIouEnvelopeStore::open_alongside(&receipts).unwrap();
         let old_envelope = envelope(&old_issuer, &kernel, &receipt);
         assert!(ious.insert(&old_envelope).unwrap());
@@ -1253,7 +1484,7 @@ mod tests {
             }
         }
 
-        let store = SqliteSettlementRetryStore::open_alongside(&receipts).unwrap();
+        let store = open_retry_store(&receipts).unwrap();
         store
             .upsert_attempt(&attempt_record(&receipt.id, receipt.timestamp, 1, 0))
             .unwrap();
