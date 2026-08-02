@@ -286,14 +286,17 @@ fn test_capital_book_report_export_surfaces() {
         |event| event.loss_event_id.as_deref() == Some(reserve_release.body.event_id.as_str())
     ));
 
+    let authority_seed_path = trust_service_authority_seed_path(&receipt_db_path);
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
             "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--authority-db",
-            authority_db_path.to_str().expect("authority db path"),
+            "--authority-seed-file",
+            authority_seed_path
+                .to_str()
+                .expect("authority seed file path"),
             "trust",
             "capital-book",
             "export",
