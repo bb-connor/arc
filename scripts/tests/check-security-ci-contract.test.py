@@ -4367,6 +4367,26 @@ assert_rejected(
     "does not bind live workflow, PR, merge, and source authorization",
 )
 assert_rejected(
+    "controller conflates the event head with the trusted runtime commit",
+    "enterprise-evidence-controller.yml",
+    replace_in_named_step(
+        "Authorize exact source and controller context",
+        'test "$(jq -r \'.head_sha\' <<< "${controller_run}")" = "${EVENT_HEAD_SHA}"',
+        'test "$(jq -r \'.head_sha\' <<< "${controller_run}")" = "${CONTROLLER_SHA}"',
+    ),
+    "does not bind live workflow, PR, merge, and source authorization",
+)
+assert_rejected(
+    "controller does not bind its trusted runtime commit to the event base",
+    "enterprise-evidence-controller.yml",
+    replace_in_named_step(
+        "Authorize exact source and controller context",
+        'test "${CONTROLLER_SHA}" = "${EVENT_BASE_SHA}"',
+        "true",
+    ),
+    "does not bind live workflow, PR, merge, and source authorization",
+)
+assert_rejected(
     "controller drops the final explicit merge-ref race check",
     "enterprise-evidence-controller.yml",
     replace_in_named_step(

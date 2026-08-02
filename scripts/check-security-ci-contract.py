@@ -861,7 +861,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence controller",
         "dispatch-isolated-capture",
-    ): "f00b93ee141443abd5ff2c041632d48b974e290b8096f7d7f9599f78b9cc136e",
+    ): "d4dbf15622085a5d14edc2512bb81129b94c268dab12a9249985b5c6c8482b69",
     (
         "enterprise Linux capture",
         "authorize-capture",
@@ -5363,6 +5363,7 @@ def validate(root: Path) -> None:
             "git/trees/${authorized_tree_sha}?recursive=1",
             'test "$(jq -r \'.truncated\' <<< "${authorized_tree}")" = "false"',
             'test "${SECURITY_DEFINITION_SHA}" = "${ENTERPRISE_SECURITY_DEFINITION_SHA}"',
+            'test "${CONTROLLER_SHA}" = "${EVENT_BASE_SHA}"',
             "100644:deploy/docker/Dockerfile.security-evidence-runner",
             "100644:deploy/docker/security-evidence-apk.lock",
             "100644:deploy/docker/security-evidence-seccomp.json",
@@ -5381,7 +5382,7 @@ def validate(root: Path) -> None:
             "actions/workflows/enterprise-evidence-controller.yml",
             'test "$(jq -r \'.path\' <<< "${controller_run}")" = ".github/workflows/enterprise-evidence-controller.yml"',
             'test "$(jq -r \'.event\' <<< "${controller_run}")" = "pull_request_target"',
-            'test "$(jq -r \'.head_sha\' <<< "${controller_run}")" = "${CONTROLLER_SHA}"',
+            'test "$(jq -r \'.head_sha\' <<< "${controller_run}")" = "${EVENT_HEAD_SHA}"',
             'test "$(jq -r \'.actor.login\' <<< "${controller_run}")" = "${CONTROLLER_ACTOR}"',
             'test "$(jq -r \'.triggering_actor.login\' <<< "${controller_run}")" = "${CONTROLLER_ACTOR}"',
             'test "${CONTROLLER_RUN_ATTEMPT}" = "1"',
