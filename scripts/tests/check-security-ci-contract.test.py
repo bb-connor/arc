@@ -36,6 +36,8 @@ for empty_field in (
     "kwonlyargs=[]",
     "kw_defaults=[]",
     "decorator_list=[]",
+    "returns=None",
+    "type_params=[]",
 ):
     if empty_field not in stable_dump:
         raise AssertionError(

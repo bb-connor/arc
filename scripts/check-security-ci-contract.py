@@ -74,7 +74,7 @@ EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
     "bdd31e29868ad10bcc18af97eb431958851824634d977eeaffaa95a995109d33"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "0ddbd2622510f6059a79e46d560a6a1e5e43ee5cc468f159a4f542f0b56be953"
+    "a336ecc6cb0f1325fb1881a12f6513d667641776a36bd8af2657953301b433d3"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "51cfd01140812db5df3310271c0cc12e123d41ddea2e13e9f82b23cfaec18cde"
@@ -83,7 +83,7 @@ EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
     "d77a400edb34778a1718782974b3b0eb1f179741dc227a91ddc1706c6cb5fb4a"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "98383fbbdb3cd705a60087009def0af4d04f424e64d9f277c7b5918837ce7dda"
+    "e5594621e3afeef910f0ced9e6e0ff87504cbaa840033b984013fba9c936f153"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554"
@@ -2172,10 +2172,26 @@ def ast_function_map(tree: ast.Module) -> dict[str, ast.FunctionDef]:
 
 
 def stable_ast_dump(node: ast.AST) -> str:
-    try:
-        return ast.dump(node, include_attributes=False, show_empty=True)
-    except TypeError:
-        return ast.dump(node, include_attributes=False)
+    def render(value: object) -> str:
+        if isinstance(value, ast.AST):
+            fields = list(value._fields)
+            if (
+                isinstance(value, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and "type_params" not in fields
+            ):
+                fields.append("type_params")
+            rendered_fields = []
+            for name in fields:
+                default = [] if name == "type_params" else None
+                rendered_fields.append(
+                    f"{name}={render(getattr(value, name, default))}"
+                )
+            return f"{type(value).__name__}({', '.join(rendered_fields)})"
+        if isinstance(value, list):
+            return f"[{', '.join(render(item) for item in value)}]"
+        return repr(value)
+
+    return render(node)
 
 
 def ast_parent_map(root: ast.AST) -> dict[ast.AST, ast.AST]:
