@@ -247,6 +247,17 @@ impl Verifier {
         validate_bundle_with_options(bundle, &options)
             .map_err(|e| Error::Verification(format!("bundle validation failed: {}", e)))?;
 
+        if policy.verify_timestamp && !policy.verify_tlog {
+            if let SignatureContent::DsseEnvelope(envelope) = &bundle.content {
+                if envelope.signatures.len() != 1 {
+                    return Err(Error::Verification(
+                        "timestamp verification without transparency logs requires exactly one DSSE signature"
+                            .to_string(),
+                    ));
+                }
+            }
+        }
+
         // Extract certificate for verification
         let cert = crate::verify_impl::helpers::extract_certificate(
             &bundle.verification_material.content,
@@ -802,6 +813,29 @@ mod tests {
         assert!(error
             .to_string()
             .contains("requires an authenticated RFC 3161 timestamp"));
+    }
+
+    #[test]
+    fn skip_tlog_rejects_ambiguous_multi_signature_dsse_timestamps() {
+        let mut bundle = Bundle::from_json(CONDA_ATTESTATION_BUNDLE).expect("DSSE bundle");
+        let SignatureContent::DsseEnvelope(envelope) = &mut bundle.content else {
+            panic!("expected DSSE bundle");
+        };
+        envelope.signatures.push(envelope.signatures[0].clone());
+
+        let result = verify(
+            CONDA_PACKAGE,
+            &bundle,
+            &VerificationPolicy::default().skip_tlog(),
+            &TrustedRoot::production().expect("production root"),
+        );
+
+        let error = result.expect_err(
+            "the timestamped signature must be unambiguous when transparency logs are skipped",
+        );
+        assert!(error
+            .to_string()
+            .contains("requires exactly one DSSE signature"));
     }
 
     #[test]

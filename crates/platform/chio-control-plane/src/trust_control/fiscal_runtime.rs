@@ -11,6 +11,7 @@ use chio_fiscal::{
     VerifiedFiscalProposalAdmission, VerifiedFiscalSchedule,
 };
 use chio_kernel::admission_operation::StoreMutationFence;
+use chio_open_market::fiscal_adapter::FiscalLegacyFeeScheduleBinding;
 use chio_store_sqlite::fiscal_store::SqliteFiscalStore;
 
 use crate::fiscal_runtime_readiness::production_fiscal_runtime_assembler;
@@ -502,6 +503,40 @@ impl TrustFiscalRuntime {
             schedules: &schedules,
             verify_at: startup.checkpoint.body().trusted_clock_high_water,
         }))
+    }
+
+    pub(crate) fn legacy_fee_schedule_binding(
+        &self,
+        fiscal_schedule_id: &str,
+    ) -> Result<Option<FiscalLegacyFeeScheduleBinding>, TrustFiscalOperationError> {
+        match self
+            .store
+            .load_legacy_fee_schedule_binding(fiscal_schedule_id)
+        {
+            Ok(binding) => Ok(Some(FiscalLegacyFeeScheduleBinding {
+                fiscal_schedule_id: binding.fiscal_schedule_id,
+                legacy_envelope_digest: binding.legacy_envelope_digest,
+            })),
+            Err(chio_store_sqlite::fiscal_store::FiscalStoreError::NotFound) => Ok(None),
+            Err(error) => Err(TrustFiscalOperationError::Store(error)),
+        }
+    }
+
+    pub(crate) fn bind_legacy_fee_schedule(
+        &self,
+        fiscal_schedule_id: &str,
+        legacy: &chio_fiscal::fee_schedule::SignedOpenMarketFeeSchedule,
+    ) -> Result<(), TrustFiscalOperationError> {
+        let startup = self
+            .reconcile()
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let schedule = self
+            .store
+            .load_verified_schedule(fiscal_schedule_id, &startup.charters)
+            .map_err(TrustFiscalOperationError::Store)?;
+        self.store
+            .bind_legacy_fee_schedule(legacy, &schedule, &self.fence)
+            .map_err(TrustFiscalOperationError::Store)
     }
 
     fn activation_history(
