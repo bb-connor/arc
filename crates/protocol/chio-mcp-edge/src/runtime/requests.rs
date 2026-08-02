@@ -233,6 +233,10 @@ impl ChioMcpEdge {
                     "path": "spec/errors/chio-error-registry.v1.json",
                 },
                 "capabilityNegotiation": self.local_protocol_features,
+                "requestIdentity": {
+                    "stableRequestIdMetaField": "chioRequestId",
+                    "requestBoundArtifactsRequireStableId": true,
+                },
             }),
         );
         capabilities.insert("experimental".to_string(), Value::Object(experimental));
@@ -321,12 +325,16 @@ impl ChioMcpEdge {
             Err(response) => return response,
         };
 
-        let request_id = self.next_request_id();
-        let context =
-            match build_operation_context(&id, session_id, request_id, &self.agent_id, &params) {
-                Ok(context) => context,
-                Err(response) => return response,
-            };
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "resources/list",
+            &params,
+        ) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
         let response = match self
             .kernel
             .evaluate_session_operation(&context, &SessionOperation::ListResources)
@@ -366,12 +374,16 @@ impl ChioMcpEdge {
             Err(response) => return response,
         };
 
-        let request_id = self.next_request_id();
-        let context =
-            match build_operation_context(&id, session_id, request_id, &self.agent_id, &params) {
-                Ok(context) => context,
-                Err(response) => return response,
-            };
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "resources/templates/list",
+            &params,
+        ) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
         let response = match self
             .kernel
             .evaluate_session_operation(&context, &SessionOperation::ListResourceTemplates)
@@ -429,12 +441,16 @@ impl ChioMcpEdge {
             }
         };
 
-        let request_id = self.next_request_id();
-        let context =
-            match build_operation_context(&id, session_id, request_id, &self.agent_id, &params) {
-                Ok(context) => context,
-                Err(response) => return response,
-            };
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "resources/read",
+            &params,
+        ) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
         let operation = SessionOperation::ReadResource(ReadResourceOperation { capability, uri });
 
         match self.kernel.evaluate_session_operation(&context, &operation) {
@@ -588,9 +604,9 @@ impl ChioMcpEdge {
             Err(response) => return response,
         };
 
-        let request_id = self.next_request_id();
         let context =
-            match build_operation_context(&id, session_id, request_id, &self.agent_id, &params) {
+            match build_operation_context(&id, session_id, &self.agent_id, "prompts/list", &params)
+            {
                 Ok(context) => context,
                 Err(response) => return response,
             };
@@ -658,12 +674,16 @@ impl ChioMcpEdge {
             }
         };
 
-        let request_id = self.next_request_id();
-        let context =
-            match build_operation_context(&id, session_id, request_id, &self.agent_id, &params) {
-                Ok(context) => context,
-                Err(response) => return response,
-            };
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "prompts/get",
+            &params,
+        ) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
         let operation = SessionOperation::GetPrompt(GetPromptOperation {
             capability,
             prompt_name,
@@ -743,12 +763,16 @@ impl ChioMcpEdge {
             );
         };
 
-        let request_id = self.next_request_id();
-        let context =
-            match build_operation_context(&id, session_id, request_id, &self.agent_id, &params) {
-                Ok(context) => context,
-                Err(response) => return response,
-            };
+        let context = match build_operation_context(
+            &id,
+            session_id,
+            &self.agent_id,
+            "completion/complete",
+            &params,
+        ) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
         let operation = SessionOperation::Complete(CompleteOperation {
             capability,
             reference,

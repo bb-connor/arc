@@ -931,6 +931,16 @@ fn initialize_then_initialized_enters_ready_state() {
         "reject"
     );
     assert_eq!(
+        initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
+            ["requestIdentity"]["stableRequestIdMetaField"],
+        "chioRequestId"
+    );
+    assert_eq!(
+        initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
+            ["requestIdentity"]["requestBoundArtifactsRequireStableId"],
+        true
+    );
+    assert_eq!(
         initialize["result"]["capabilities"]["tasks"]["list"],
         json!({})
     );
@@ -953,6 +963,138 @@ fn initialize_then_initialized_enters_ready_state() {
     }));
     assert!(initialized.is_none());
     assert!(matches!(edge.state, EdgeState::Ready { .. }));
+}
+
+#[test]
+fn external_request_identity_is_unique_without_a_caller_stable_id() {
+    let first = build_operation_context(
+        &json!(41),
+        SessionId::new("stable-session-a"),
+        "agent",
+        "tools/call",
+        &json!({}),
+    )
+    .unwrap();
+    let replay = build_operation_context(
+        &json!(41),
+        SessionId::new("stable-session-a"),
+        "agent",
+        "tools/call",
+        &json!({}),
+    )
+    .unwrap();
+    let other_session = build_operation_context(
+        &json!(41),
+        SessionId::new("stable-session-b"),
+        "agent",
+        "tools/call",
+        &json!({}),
+    )
+    .unwrap();
+    let other_request = build_operation_context(
+        &json!(42),
+        SessionId::new("stable-session-a"),
+        "agent",
+        "tools/call",
+        &json!({}),
+    )
+    .unwrap();
+
+    assert_ne!(first.request_id, replay.request_id);
+    assert_ne!(first.request_id, other_session.request_id);
+    assert_ne!(first.request_id, other_request.request_id);
+    assert!(first.request_id.as_str().starts_with("mcp-edge-req-"));
+}
+
+#[test]
+fn caller_supplied_request_identity_is_stable_across_sessions() {
+    let first = build_operation_context(
+        &json!(41),
+        SessionId::new("caller-session-a"),
+        "agent",
+        "tools/call",
+        &json!({
+            "_meta": {
+                "chioRequestId": "caller-stable-request"
+            }
+        }),
+    )
+    .expect("caller request ID should build");
+    let replay = build_operation_context(
+        &json!(99),
+        SessionId::new("caller-session-b"),
+        "agent",
+        "tools/call",
+        &json!({
+            "_meta": {
+                "chioRequestId": "caller-stable-request",
+                "progressToken": "retry"
+            }
+        }),
+    )
+    .expect("caller request ID replay should build");
+
+    assert_eq!(first.request_id.as_str(), "caller-stable-request");
+    assert_eq!(first.request_id, replay.request_id);
+}
+
+#[test]
+fn caller_supplied_request_identity_rejects_invalid_values() {
+    for invalid in [
+        Value::Null,
+        json!(""),
+        json!(" padded"),
+        json!("control\ncharacter"),
+        json!("x".repeat(2_049)),
+    ] {
+        let error = build_operation_context(
+            &json!(41),
+            SessionId::new("caller-session"),
+            "agent",
+            "tools/call",
+            &json!({
+                "_meta": {
+                    "chioRequestId": invalid
+                }
+            }),
+        )
+        .expect_err("invalid caller request ID must be rejected");
+        assert_eq!(error["error"]["code"], JSONRPC_INVALID_PARAMS);
+    }
+}
+
+#[test]
+fn request_bound_artifacts_require_a_caller_supplied_request_identity() {
+    let mut edge = make_edge(10);
+    initialize_edge_with_protocol_features(&mut edge, &threshold_and_broker_protocol_features());
+    let params = json!({
+        "name": "read_file",
+        "arguments": { "path": "/tmp/demo.txt" },
+        "_meta": {
+            "supplementalAuthorization": {
+                "reference": "opaque",
+                "artifact": [1]
+            }
+        }
+    });
+    let error = edge
+        .prepare_tool_call_request(&json!(2), &params)
+        .expect_err("request-bound artifacts must require a stable request ID");
+    assert_eq!(error["error"]["code"], JSONRPC_INVALID_PARAMS);
+    assert!(error["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("_meta.chioRequestId")));
+
+    let mut stable_params = params;
+    stable_params["_meta"]["chioRequestId"] = json!("mcp-stable-authorization-request");
+    let (_session_id, context, operation) = edge
+        .prepare_tool_call_request(&json!(2), &stable_params)
+        .expect("stable request ID path should accept request-bound artifacts");
+    assert_eq!(
+        context.request_id.as_str(),
+        "mcp-stable-authorization-request"
+    );
+    assert!(operation.supplemental_authorization.is_some());
 }
 
 #[test]

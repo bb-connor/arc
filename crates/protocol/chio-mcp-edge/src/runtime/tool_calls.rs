@@ -402,6 +402,19 @@ impl ChioMcpEdge {
         let supplemental_authorization = parse_request_supplemental_authorization(id, params)?;
         let (approval_token, approval_tokens, threshold_approval_proposal) =
             parse_request_approval_artifacts(id, params)?;
+        if parse_request_stable_request_id(id, params)?.is_none()
+            && (approval_token.is_some()
+                || !approval_tokens.is_empty()
+                || threshold_approval_proposal.is_some()
+                || supplemental_authorization.is_some())
+        {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "MCP approval artifacts and supplemental authorization require \
+                 _meta.chioRequestId",
+            ));
+        }
         let extra_metadata = parse_request_extra_metadata(id, params)?;
 
         let Some(&tool_index) = self.tool_index.get(tool_name) else {
@@ -452,9 +465,27 @@ impl ChioMcpEdge {
             }
         };
 
-        let request_id = self.next_request_id();
-        let context =
-            build_operation_context(id, session_id.clone(), request_id, &self.agent_id, params)?;
+        let nonce_bound_request_id = execution_nonce
+            .as_ref()
+            .map(|nonce| nonce.nonce.bound_to.request_id.as_str());
+        let context = build_operation_context_for_retry(
+            id,
+            session_id.clone(),
+            &self.agent_id,
+            "tools/call",
+            params,
+            nonce_bound_request_id,
+        )?;
+        let execution_nonce = execution_nonce
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|error| {
+                jsonrpc_error(
+                    id.clone(),
+                    JSONRPC_INVALID_REQUEST,
+                    &format!("failed to serialize execution nonce: {error}"),
+                )
+            })?;
         let operation = ToolCallOperation {
             capability,
             server_id: binding.server_id,

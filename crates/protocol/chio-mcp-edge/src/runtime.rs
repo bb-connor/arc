@@ -45,6 +45,7 @@ use chio_manifest::{LatencyHint, ToolDefinition};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::{json, Value};
+use uuid::Uuid;
 
 #[path = "runtime/discovery.rs"]
 mod discovery;
@@ -147,7 +148,7 @@ pub struct ChioMcpEdge {
     capabilities: Vec<CapabilityToken>,
     tools: Vec<ExposedToolBinding>,
     tool_index: BTreeMap<String, usize>,
-    request_counter: u64,
+    child_request_counter: u64,
     client_request_counter: u64,
     state: EdgeState,
     minimum_log_level: LogLevel,
@@ -363,7 +364,7 @@ impl ChioMcpEdge {
             capabilities,
             tools,
             tool_index,
-            request_counter: 0,
+            child_request_counter: 0,
             client_request_counter: 0,
             state: EdgeState::Uninitialized,
             minimum_log_level: LogLevel::Info,

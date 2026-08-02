@@ -284,11 +284,11 @@ impl ChioMcpEdge {
             sequence: u64,
         }
 
-        self.request_counter += 1;
+        self.child_request_counter += 1;
         let identity = ChildRequestIdentity {
             domain: "CHIO-MCP-CHILD-REQUEST-ID-V1",
             parent_request_id: parent_context.request_id.as_str(),
-            sequence: self.request_counter,
+            sequence: self.child_request_counter,
         };
         let canonical = canonical_json_bytes(&identity).map_err(|error| {
             AdapterError::ParseError(format!(
@@ -296,11 +296,6 @@ impl ChioMcpEdge {
             ))
         })?;
         Ok(format!("mcp-edge-child-{}", sha256_hex(&canonical)))
-    }
-
-    pub(super) fn next_request_id(&mut self) -> String {
-        self.request_counter += 1;
-        format!("mcp-edge-req-{}", self.request_counter)
     }
 
     pub(super) fn visible_tools(&self) -> Vec<&ExposedToolBinding> {

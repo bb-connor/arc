@@ -241,11 +241,38 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
         nonce.is_object(),
         "preflight nonce metadata missing: {preflight}"
     );
+    let nonce_request_id = nonce["nonce"]["bound_to"]["request_id"]
+        .as_str()
+        .expect("preflight nonce must bind the internal request ID")
+        .to_string();
+
+    let mismatched = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "read_file",
+                "arguments": { "path": "/tmp/demo.txt" },
+                "_meta": {
+                    "chioRequestId": "different-request",
+                    "chioExecutionNonce": nonce.clone()
+                }
+            }
+        }))
+        .unwrap();
+    assert_eq!(mismatched["result"]["isError"], true);
+    assert!(
+        mismatched["result"]["content"][0]["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("execution nonce")),
+        "expected request-binding denial, got {mismatched}"
+    );
 
     let allowed = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
-            "id": 3,
+            "id": 4,
             "method": "tools/call",
             "params": {
                 "name": "read_file",
@@ -257,11 +284,12 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
         }))
         .unwrap();
     assert_eq!(allowed["result"]["isError"], false);
+    assert_ne!(nonce_request_id, "different-request");
 
     let replay = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
-            "id": 4,
+            "id": 5,
             "method": "tools/call",
             "params": {
                 "name": "read_file",
