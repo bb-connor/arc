@@ -41,7 +41,7 @@ use verification::{
 };
 
 const EVIDENCE_EXPORT_MANIFEST_SCHEMA: &str = "chio.evidence_export_manifest.v1";
-const FEDERATION_POLICY_SCHEMA: &str = "chio.federation-policy.v1";
+const FEDERATION_POLICY_SCHEMA: &str = "chio.federation-policy.v2";
 const FEDERATED_EVIDENCE_SHARE_SCHEMA: &str = "chio.federated-evidence-share.v1";
 
 fn is_supported_evidence_export_manifest_schema(schema: &str) -> bool {
@@ -114,6 +114,7 @@ struct FederationPolicyAttachmentMetadata {
     created_at: u64,
     expires_at: u64,
     require_proofs: bool,
+    trusted_receipt_kernel_keys: Vec<PublicKey>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -127,6 +128,7 @@ pub(crate) struct FederationPolicyBody {
     expires_at: u64,
     query: EvidenceExportQuery,
     require_proofs: bool,
+    trusted_receipt_kernel_keys: Vec<PublicKey>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     purpose: Option<String>,
 }
@@ -606,6 +608,24 @@ pub(crate) fn verify_federation_policy(policy: &FederationPolicyDocument) -> Res
             "federation policy created_at must be less than or equal to expires_at".to_string(),
         ));
     }
+    if policy.body.trusted_receipt_kernel_keys.is_empty() {
+        return Err(CliError::attest_error(
+            "federation policy must authorize at least one receipt kernel key".to_string(),
+        ));
+    }
+    if policy.body.trusted_receipt_kernel_keys.len() > 256 {
+        return Err(CliError::attest_error(
+            "federation policy authorizes more than 256 receipt kernel keys".to_string(),
+        ));
+    }
+    let mut trusted_key_hex = BTreeSet::new();
+    for key in &policy.body.trusted_receipt_kernel_keys {
+        if !trusted_key_hex.insert(key.to_hex()) {
+            return Err(CliError::attest_error(
+                "federation policy contains duplicate trusted receipt kernel keys".to_string(),
+            ));
+        }
+    }
     if !policy
         .body
         .signer_public_key
@@ -668,6 +688,7 @@ fn federation_policy_metadata(
         created_at: policy.body.created_at,
         expires_at: policy.body.expires_at,
         require_proofs: policy.body.require_proofs,
+        trusted_receipt_kernel_keys: policy.body.trusted_receipt_kernel_keys.clone(),
     }
 }
 
@@ -1061,6 +1082,7 @@ pub struct EvidenceFederationPolicyCreateArgs<'a> {
     pub admin_all: bool,
     pub expires_at: u64,
     pub require_proofs: bool,
+    pub trusted_receipt_kernel_keys: &'a [PublicKey],
     pub purpose: Option<&'a str>,
     pub json_output: bool,
 }
@@ -1097,6 +1119,8 @@ pub fn cmd_evidence_federation_policy_create(
         ));
     };
 
+    let mut trusted_receipt_kernel_keys = args.trusted_receipt_kernel_keys.to_vec();
+    trusted_receipt_kernel_keys.sort_by_key(PublicKey::to_hex);
     let body = FederationPolicyBody {
         schema: FEDERATION_POLICY_SCHEMA.to_string(),
         issuer: args.issuer.to_string(),
@@ -1113,6 +1137,7 @@ pub fn cmd_evidence_federation_policy_create(
             read_boundary,
         },
         require_proofs: args.require_proofs,
+        trusted_receipt_kernel_keys,
         purpose: args.purpose.map(ToOwned::to_owned),
     };
     let (signature, _) = keypair.sign_canonical(&body)?;

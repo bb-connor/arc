@@ -39,7 +39,8 @@ The profile covers:
 - `chio.public-wallet-routing-manifest.v1`
 - `chio.identity-interop-qualification-matrix.v1`
 - `chio.evidence_export_manifest.v1`
-- `chio.federation-policy.v1`
+- `chio.federation-policy.v2`, including an explicit signed set of trusted
+  receipt kernel keys
 - `chio.federated-delegation-policy.v1`
 - `chio.certify.check.v1`
 - `chio.certify.registry.v1`

@@ -215,6 +215,7 @@ pub(crate) fn dispatch_evidence(
                 admin_all,
                 expires_at,
                 require_proofs,
+                trusted_receipt_kernel_key,
                 purpose,
             } => evidence_export::cmd_evidence_federation_policy_create(
                 evidence_export::EvidenceFederationPolicyCreateArgs {
@@ -230,6 +231,7 @@ pub(crate) fn dispatch_evidence(
                     admin_all,
                     expires_at,
                     require_proofs,
+                    trusted_receipt_kernel_keys: &trusted_receipt_kernel_key,
                     purpose: purpose.as_deref(),
                     json_output,
                 },

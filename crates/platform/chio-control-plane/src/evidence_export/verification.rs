@@ -142,11 +142,18 @@ pub(super) fn verify_tool_receipts(
     tool_receipts: &[EvidenceToolReceiptRecord],
 ) -> Result<BTreeMap<u64, &ChioReceipt>, CliError> {
     let mut by_seq = BTreeMap::new();
+    let mut receipt_ids = BTreeSet::new();
     for record in tool_receipts {
         if by_seq.insert(record.seq, &record.receipt).is_some() {
             return Err(CliError::attest_error(format!(
                 "duplicate tool receipt seq in evidence package: {}",
                 record.seq
+            )));
+        }
+        if !receipt_ids.insert(record.receipt.id.as_str()) {
+            return Err(CliError::attest_error(format!(
+                "duplicate tool receipt id in evidence package: {}",
+                record.receipt.id
             )));
         }
         // Evidence package verification has no policy.crypto_floor input.
@@ -331,8 +338,9 @@ pub(super) fn verify_inclusion_proofs(
     checkpoints_by_seq: &BTreeMap<u64, &KernelCheckpoint>,
     inclusion_proofs: &[ReceiptInclusionProof],
     expected_uncheckpointed_receipts: u64,
-) -> Result<(), CliError> {
+) -> Result<Vec<EvidenceUncheckpointedReceipt>, CliError> {
     let mut proved_receipt_seqs = BTreeSet::new();
+    let mut proved_checkpoint_leaves = BTreeSet::new();
     for proof in inclusion_proofs {
         let checkpoint = checkpoints_by_seq
             .get(&proof.checkpoint_seq)
@@ -376,6 +384,12 @@ pub(super) fn verify_inclusion_proofs(
                 proof.receipt_seq
             )));
         }
+        if !proved_checkpoint_leaves.insert((proof.checkpoint_seq, proof.leaf_index)) {
+            return Err(CliError::attest_error(format!(
+                "duplicate inclusion proof leaf {} for checkpoint {}",
+                proof.leaf_index, proof.checkpoint_seq
+            )));
+        }
         let canonical = canonical_json_bytes(*receipt)?;
         if !proof.verify(&canonical, &checkpoint.body.merkle_root) {
             return Err(CliError::attest_error(format!(
@@ -385,6 +399,14 @@ pub(super) fn verify_inclusion_proofs(
         }
     }
 
+    let uncheckpointed_receipts = tool_receipts_by_seq
+        .iter()
+        .filter(|(seq, _)| !proved_receipt_seqs.contains(seq))
+        .map(|(seq, receipt)| EvidenceUncheckpointedReceipt {
+            seq: *seq,
+            receipt_id: receipt.id.clone(),
+        })
+        .collect::<Vec<_>>();
     let derived_uncheckpointed = tool_receipts_by_seq
         .len()
         .saturating_sub(proved_receipt_seqs.len()) as u64;
@@ -395,7 +417,7 @@ pub(super) fn verify_inclusion_proofs(
         )));
     }
 
-    Ok(())
+    Ok(uncheckpointed_receipts)
 }
 
 pub(super) fn evidence_receipt_semantic_summary(
@@ -549,6 +571,36 @@ pub(super) fn verify_federation_policy_attachment(
     Ok(())
 }
 
+fn verify_federation_receipt_signers(
+    policy: &FederationPolicyDocument,
+    tool_receipts: &[EvidenceToolReceiptRecord],
+    child_receipts: &[EvidenceChildReceiptRecord],
+) -> Result<(), CliError> {
+    let trusted_keys = policy
+        .body
+        .trusted_receipt_kernel_keys
+        .iter()
+        .map(PublicKey::to_hex)
+        .collect::<BTreeSet<_>>();
+    for record in tool_receipts {
+        if !trusted_keys.contains(&record.receipt.kernel_key.to_hex()) {
+            return Err(CliError::attest_error(format!(
+                "tool receipt {} kernel key is not authorized by the federation policy",
+                record.receipt.id
+            )));
+        }
+    }
+    for record in child_receipts {
+        if !trusted_keys.contains(&record.receipt.kernel_key.to_hex()) {
+            return Err(CliError::attest_error(format!(
+                "child receipt {} kernel key is not authorized by the federation policy",
+                record.receipt.id
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_import_package_data(
     package: &EvidenceImportPackage,
 ) -> Result<(), CliError> {
@@ -589,6 +641,11 @@ pub(crate) fn validate_import_package_data(
     }
     if let Some(policy) = package.federation_policy.as_ref() {
         verify_federation_policy(policy)?;
+        verify_federation_receipt_signers(
+            policy,
+            &package.bundle.tool_receipts,
+            &package.bundle.child_receipts,
+        )?;
         if package.manifest.exported_at < policy.body.created_at
             || package.manifest.exported_at > policy.body.expires_at
         {
@@ -626,12 +683,18 @@ pub(crate) fn validate_import_package_data(
         &package.bundle,
         &transparency,
     )?;
-    verify_inclusion_proofs(
+    let uncheckpointed_receipts = verify_inclusion_proofs(
         &tool_receipts_by_seq,
         &checkpoints_by_seq,
         &package.bundle.inclusion_proofs,
         package.manifest.counts.uncheckpointed_receipts,
     )?;
+    if package.bundle.uncheckpointed_receipts != uncheckpointed_receipts {
+        return Err(CliError::attest_error(
+            "evidence import package uncheckpointed receipt identities do not match proof coverage"
+                .to_string(),
+        ));
+    }
     verify_query_scope(
         &package.bundle.query,
         &package.bundle.tool_receipts,
@@ -712,7 +775,7 @@ pub(super) fn load_verified_evidence_package(
         &checkpoint_consistency_proofs,
         &checkpoint_equivocations,
     )?;
-    verify_inclusion_proofs(
+    let uncheckpointed_receipts = verify_inclusion_proofs(
         &tool_receipts_by_seq,
         &checkpoints_by_seq,
         &inclusion_proofs,
@@ -726,7 +789,7 @@ pub(super) fn load_verified_evidence_package(
         checkpoints,
         capability_lineage,
         inclusion_proofs,
-        uncheckpointed_receipts: Vec::new(),
+        uncheckpointed_receipts,
         retention,
     };
     verify_transparency_claim_boundary(manifest.claim_boundary.as_ref(), &bundle, &transparency)?;
@@ -770,6 +833,12 @@ pub(crate) fn build_federated_share_import(
             "evidence import requires a signed attached federation policy so remote receipt sharing stays bilateral and explicit".to_string(),
         )
     })?;
+    verify_federation_policy(federation_policy)?;
+    verify_federation_receipt_signers(
+        federation_policy,
+        &package.bundle.tool_receipts,
+        &package.bundle.child_receipts,
+    )?;
     let share_descriptor = serde_json::json!({
         "schema": federated_evidence_share_schema_for_manifest(&package.manifest.schema),
         "manifest": &package.manifest,

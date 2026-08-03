@@ -220,6 +220,7 @@ fn create_federation_policy(
     partner: &str,
     capability_id: &str,
     expires_at: u64,
+    trusted_receipt_kernel_key: &chio_core::PublicKey,
 ) {
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
@@ -242,6 +243,8 @@ fn create_federation_policy(
             &expires_at.to_string(),
             "--require-proofs",
         ])
+        .arg("--trusted-receipt-kernel-key")
+        .arg(trusted_receipt_kernel_key.to_hex())
         .output()
         .expect("run federation policy create");
 
@@ -451,10 +454,10 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
     let output_dir = unique_path("evidence-export-federated-output", "");
     let federation_policy_path = unique_path("federation-policy", ".json");
     let signing_seed_path = unique_path("federation-policy-seed", ".txt");
+    let issuer = Keypair::generate();
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-federated", &subject, &issuer);
         store
@@ -504,6 +507,7 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
         "org-beta",
         "cap-federated",
         4_102_444_800,
+        &issuer.public_key(),
     );
 
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -625,6 +629,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
         "org-beta",
         "cap-federated-reputation",
         4_102_444_800,
+        &issuer.public_key(),
     );
 
     let export = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -729,6 +734,7 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
     let output_dir = unique_path("evidence-export-federated-scope-output", "");
     let federation_policy_path = unique_path("federation-policy-scope", ".json");
     let signing_seed_path = unique_path("federation-policy-scope-seed", ".txt");
+    let trusted_receipt_signer = Keypair::generate().public_key();
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -747,6 +753,7 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
         "org-beta",
         "cap-one",
         4_102_444_800,
+        &trusted_receipt_signer,
     );
 
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -792,10 +799,10 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
     let output_dir = dir.join("evidence-package");
     let federation_policy_path = dir.join("federation-policy.json");
     let signing_seed_path = dir.join("federation-policy-seed.txt");
+    let issuer = Keypair::generate();
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-remote-federated", &subject, &issuer);
         store
@@ -845,6 +852,7 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         "org-beta",
         "cap-remote-federated",
         4_102_444_800,
+        &issuer.public_key(),
     );
 
     let listen = reserve_listen_addr();

@@ -869,6 +869,7 @@ fn create_evidence_federation_policy(
     issuer: &str,
     partner: &str,
     capability_id: &str,
+    trusted_receipt_kernel_key: &chio_core::PublicKey,
 ) {
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
@@ -890,6 +891,8 @@ fn create_evidence_federation_policy(
             "--expires-at",
             "1900000000",
         ])
+        .arg("--trusted-receipt-kernel-key")
+        .arg(trusted_receipt_kernel_key.to_hex())
         .output()
         .expect("run evidence federation policy create");
     assert!(
@@ -1662,16 +1665,17 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     .expect("shared signer keypair")
     .public_key()
     .to_hex();
+    let federated_hop_receipt = make_receipt(
+        "fed-hop-a-1",
+        &first_capability_id,
+        &subject_hex,
+        &authority_public_key,
+        1_700_100_000,
+    );
     {
         let store = SqliteReceiptStore::open(&a_receipt_db_path).expect("open a receipt store");
         store
-            .append_chio_receipt(&make_receipt(
-                "fed-hop-a-1",
-                &first_capability_id,
-                &subject_hex,
-                &authority_public_key,
-                1_700_100_000,
-            ))
+            .append_chio_receipt(&federated_hop_receipt)
             .expect("append federated hop receipt");
     }
 
@@ -1681,6 +1685,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
         "org-alpha",
         "org-beta",
         &first_capability_id,
+        &federated_hop_receipt.kernel_key,
     );
 
     let export = Command::new(env!("CARGO_BIN_EXE_chio"))
