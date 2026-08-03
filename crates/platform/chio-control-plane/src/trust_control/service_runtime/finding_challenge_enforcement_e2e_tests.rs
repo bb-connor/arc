@@ -1890,6 +1890,7 @@ fn digest_mismatch_case(
             authoritative_payment_operation_id: DENY_PAYMENT_ID,
             payer_hex: &keypair(41).public_key().to_hex(),
             agent_id: "agent-buyer-01",
+            payout_destination: EVM_BUYER_DESTINATION,
             finding_id: &challenged.finding.finding_id,
             listing_id: LISTING_ID,
             bid_envelope_sha256: &hex64('c'),
@@ -2504,6 +2505,11 @@ fn settle_purchase_with(
     } else {
         41
     });
+    let withheld_destination = buyer_destination(99);
+    let settlement_destination = match admission {
+        PayoutAdmission::Admitted => &refund_destination,
+        PayoutAdmission::Withheld => &withheld_destination,
+    };
     deployment
         .purchases
         .open_reservation(&FindingPurchaseReservationInput {
@@ -2512,6 +2518,7 @@ fn settle_purchase_with(
             authoritative_payment_operation_id: &payment_operation_id,
             payer_hex: &buyer.public_key().to_hex(),
             agent_id: "agent-buyer-01",
+            payout_destination: settlement_destination,
             finding_id: &finding.finding_id,
             listing_id: LISTING_ID,
             bid_envelope_sha256: &bid,
@@ -2549,7 +2556,7 @@ fn settle_purchase_with(
         encumbrance_id: format!("encumbrance-{tag}"),
         delivery_receipt_id: format!("receipt-delivery-{tag}"),
         payment_reference: payment_operation_id.clone(),
-        payout_destination: refund_destination.clone(),
+        payout_destination: settlement_destination.clone(),
         recorded_at: now,
     };
     record.validate()?;
@@ -2573,10 +2580,7 @@ fn settle_purchase_with(
             record_json: &record_json,
             record_sha256: &record_sha256,
             delivery_receipt_id: &format!("receipt-delivery-{tag}"),
-            payout_destination: match admission {
-                PayoutAdmission::Admitted => &refund_destination,
-                PayoutAdmission::Withheld => "rail:venue-ledger:withheld-test-placeholder",
-            },
+            payout_destination: settlement_destination,
             retention_expires_at: now + 100_000,
             now,
         })?;
@@ -10219,6 +10223,7 @@ fn finding_challenge_an_expired_reservation_neither_wedges_nor_inflates_the_clai
             authoritative_payment_operation_id: "payment-abandoned",
             payer_hex: &keypair(41).public_key().to_hex(),
             agent_id: "agent-buyer-01",
+            payout_destination: EVM_BUYER_DESTINATION,
             finding_id: &finding.finding_id,
             listing_id: LISTING_ID,
             bid_envelope_sha256: &digest("bid-abandoned"),

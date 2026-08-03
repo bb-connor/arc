@@ -1808,6 +1808,7 @@ impl FindingChallengeCoordinator {
         }
         let defect_key = derive_defect_key(identity.finding_id);
         let liability_key = derive_liability_key(&defect_key, &self.venue_id, identity);
+        let seller_hex = terms.body.seller.to_hex();
         self.challenges
             .open_liability(&FindingLiabilityInput {
                 liability_key: &liability_key,
@@ -1815,6 +1816,7 @@ impl FindingChallengeCoordinator {
                 finding_id: identity.finding_id,
                 listing_id: identity.listing_id,
                 allocation_id: identity.allocation_id,
+                seller_hex: &seller_hex,
                 venue_id: &self.venue_id,
                 chain_id: identity.chain_id,
                 vault_contract: identity.vault_contract,
@@ -2128,6 +2130,14 @@ impl FindingChallengeCoordinator {
         if liability.state != FindingLiabilityState::Finalizing {
             return Err(ChallengeCoordinatorError::LiabilityState("finalizing"));
         }
+        let durable_seller = PublicKey::from_hex(&liability.seller_hex).map_err(|_| {
+            ChallengeCoordinatorError::ChallengeStore(
+                "liability carries an invalid durable seller key".to_owned(),
+            )
+        })?;
+        if seller != &durable_seller {
+            return Err(ChallengeCoordinatorError::LiabilityIdentity("seller"));
+        }
         self.require_penalty_matches_enforcement(&liability, old, &authorized.slash.penalty, now)?;
         let seller_intent_id = old
             .body
@@ -2185,7 +2195,7 @@ impl FindingChallengeCoordinator {
         let pins = FindingEnforcementPins {
             finalization_authority: self.finalization_authority.public_key(),
             settlement_observer,
-            seller: seller.clone(),
+            seller: durable_seller,
             finality_requirement: self.pins.settlement_finality_requirement,
             max_snapshot_age_secs: self.market_config.max_snapshot_age_secs,
         };
@@ -2286,6 +2296,14 @@ impl FindingChallengeCoordinator {
         if liability.state != FindingLiabilityState::Finalizing {
             return Err(ChallengeCoordinatorError::LiabilityState("finalizing"));
         }
+        let durable_seller = PublicKey::from_hex(&liability.seller_hex).map_err(|_| {
+            ChallengeCoordinatorError::ChallengeStore(
+                "liability carries an invalid durable seller key".to_owned(),
+            )
+        })?;
+        if seller != &durable_seller {
+            return Err(ChallengeCoordinatorError::LiabilityIdentity("seller"));
+        }
         if enforcement.body.liability_key != liability_key {
             return Err(ChallengeCoordinatorError::Settlement(
                 "enforcement does not name this liability".to_owned(),
@@ -2369,7 +2387,7 @@ impl FindingChallengeCoordinator {
         let pins = FindingEnforcementPins {
             finalization_authority,
             settlement_observer,
-            seller: seller.clone(),
+            seller: durable_seller,
             finality_requirement: self.pins.settlement_finality_requirement,
             max_snapshot_age_secs: self.market_config.max_snapshot_age_secs,
         };
