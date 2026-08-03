@@ -86,11 +86,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "proof dispatch with ClaimSet-routed family verification; capped to current size until split",
         max_lines=3_498,
     ),
-    "crates/products/chio-cli/src/cli/dispatch/finding/unit_tests.rs": allow(
-        "2026-08-31",
-        "finding CLI regression suite; capped to current size until split",
-        max_lines=2_124,
-    ),
     "crates/products/chio-mercury/tests/cli.rs": allow(
         "2026-08-31",
         "existing oversized Mercury CLI integration suite; capped to current size until split",
@@ -321,6 +316,11 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "kernel construction surface with M8 finding-pool ledger wiring; capped to current size until split",
         max_lines=2_026,
     ),
+    "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
+        "2026-08-31",
+        "dispatch revalidation, status-proof replay, and pool-delivery claim boundary; capped to current size until split",
+        max_lines=2_042,
+    ),
     "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": allow(
         "2026-08-31",
         "kernel async evaluation core with M8 pool dispatch continuity; capped to current size until split",
@@ -350,11 +350,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-08-31",
         "kernel capability and admission validation surface; capped to current size until split",
         max_lines=2_900,
-    ),
-    "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
-        "2026-08-31",
-        "kernel dispatch surface with M8 pool claim checks; capped to current size until split",
-        max_lines=2_042,
     ),
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs": allow(
         "2026-08-31",
